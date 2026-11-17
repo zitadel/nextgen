@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
@@ -62,7 +63,8 @@ const RELEASE_IN_USE_REFUSAL: Refusal = {
  */
 export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
   static override description = "Revoke a release so its content is never served again.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1",

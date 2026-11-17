@@ -102,6 +102,9 @@ export type LiveOnResult = Readonly<
 /** What making a release live takes: the release, the targets and the optional guard. */
 export type DeploymentInput = Readonly<CreateDeploymentBody>;
 
+/** The most deployments the API returns in one page, so a search takes the fewest requests. */
+const PAGE_SIZE = 100;
+
 /** What narrows a list of deployments. */
 export type DeploymentQuery = Readonly<
   Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">
@@ -169,16 +172,60 @@ export class Deployment {
   }
 
   /**
-   * Whether this deployment serves a primary origin. A preview deployment's
-   * targets carry an expiry; it is never the baseline, the guard or the thing a
-   * bare rollback undoes.
+   * Whether this deployment serves a primary origin. A preview deployment is
+   * never the baseline, the guard or the thing a bare rollback undoes.
    *
-   * @returns True when at least one target never expires.
+   * @returns True when the API recorded it as a primary deployment.
    */
   get servesPrimary(): boolean {
-    return this.targets.some((target) => {
-      return target.expires_at == null;
+    return this.record.kind === "primary";
+  }
+
+  /**
+   * Whether this deployment served primary origins or preview URLs.
+   *
+   * @returns The kind the API recorded, which it always records.
+   */
+  get kind(): ListDeployments200DeploymentsItem["kind"] {
+    return this.record.kind;
+  }
+
+  /**
+   * Whether a preview URL still serves this deployment.
+   *
+   * @returns True for a preview deployment the API reports live.
+   */
+  get servesLivePreview(): boolean {
+    return this.record.kind === "preview" && this.record.status === "live";
+  }
+
+  /**
+   * When the preview this deployment made expires. A deployment a later one
+   * replaced is not what its URL serves now, so it has no expiry of its own.
+   *
+   * @remarks
+   * It reads the deployment's own origins, so ask it of the deployment as the
+   * live view lists it ({@link DeploymentService.servingLivePreviews}), whose
+   * origins are only those it still serves.
+   *
+   * @param expiries - Each live preview's expiry, by origin.
+   * @returns The earliest expiry among the origins that still have a live
+   *   preview, or an empty string when this deployment is not live or is not
+   *   a preview one.
+   */
+  expiryAmong(expiries: ReadonlyMap<string, string>): string {
+    if (!this.servesLivePreview) {
+      return "";
+    }
+    const found = this.origins.flatMap((origin) => {
+      const expiresAt = expiries.get(origin);
+      return expiresAt === undefined ? [] : [expiresAt];
     });
+    return (
+      found.sort((first, second) => {
+        return Date.parse(first) - Date.parse(second);
+      })[0] ?? ""
+    );
   }
 
   /**
@@ -265,6 +312,71 @@ export class DeploymentService extends ApiService {
       }),
       next: collected.next,
     };
+  }
+
+  /**
+   * The live preview deployments on a page, each narrowed to the origins it
+   * still serves.
+   *
+   * @remarks
+   * The history names every origin a deployment was made live on, and the live
+   * view only those it still serves. A deployment a later one replaced on some
+   * of its origins is therefore asked of the live view, so what is said of it
+   * covers only what it serves.
+   *
+   * @param deployments - A page of deployments.
+   * @param isLiveView - Whether the page is itself the live view, whose targets
+   *   are already the ones served, so nothing more is read.
+   * @returns The page's live preview deployments as the live view lists them,
+   *   by id. One the live view no longer lists is absent, and it makes the read
+   *   go through every page of the live view. Nothing is read when the page
+   *   has none.
+   */
+  async servingLivePreviews(
+    deployments: readonly Deployment[],
+    isLiveView: boolean,
+  ): Promise<ReadonlyMap<string, Deployment>> {
+    const wanted = new Set(
+      deployments
+        .filter((deployment) => {
+          return deployment.servesLivePreview;
+        })
+        .map((deployment) => {
+          return deployment.id;
+        }),
+    );
+    if (wanted.size === 0) {
+      return new Map();
+    }
+    if (isLiveView) {
+      return new Map(
+        deployments
+          .filter((deployment) => {
+            return wanted.has(deployment.id);
+          })
+          .map((deployment) => {
+            return [deployment.id, deployment] as const;
+          }),
+      );
+    }
+    const found = new Map<string, Deployment>();
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const pages = this.client.listDeployments.pages({
+      project_id: this.projectId,
+      live: true,
+      limit: PAGE_SIZE,
+    });
+    for await (const page of pages) {
+      for (const record of paging.items(page)) {
+        if (wanted.has(record.id)) {
+          found.set(record.id, Deployment.of(record));
+        }
+      }
+      if (found.size === wanted.size) {
+        break;
+      }
+    }
+    return found;
   }
 
   /**

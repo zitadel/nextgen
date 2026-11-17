@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished } from "vitest";
 
 import {
   indented,
@@ -108,6 +108,17 @@ export default defineConfig({
   }
 });
 `;
+
+/**
+ * `config` with its `vite` import spelled as in {@link PREVIOUS_CONFIG}, the way
+ * magicast printed it before 0.5.5: an edit leaves an import it need not change alone.
+ */
+function withPreviousImport(config: string): string {
+  return config.replace(
+    'import { defineConfig, loadEnv } from "vite";',
+    'import {defineConfig, loadEnv} from "vite";',
+  );
+}
 
 /** What setup wrote before it held the bearer to the exchange: the secret went with every request. */
 const UNCONDITIONAL_BEARER_CONFIG = `import { defineConfig, loadEnv } from "vite";
@@ -240,7 +251,7 @@ describe("viteProxyEdit", () => {
     // exchange under the API prefix, then the address from ZITADEL_URL.
     expect(
       withoutBlankLines(addressEdit(apiPrefixEdit(sessionCookieEdit(edit(PREVIOUS_CONFIG))))),
-    ).toBe(withoutBlankLines(current));
+    ).toBe(withoutBlankLines(withPreviousImport(current)));
   });
 
   it("leaves a hand-written entry that keeps the browser's Host alone", () => {
@@ -359,7 +370,7 @@ describe("viteSessionCookieEdit", () => {
   it("gives the entry it wrote before the session-cookie hooks", () => {
     const current = withFixedAddress(edit(BARE_CONFIG), SERVER);
 
-    expect(apiPrefixEdit(sessionCookieEdit(bearerOnly))).toBe(current);
+    expect(apiPrefixEdit(sessionCookieEdit(bearerOnly))).toBe(withPreviousImport(current));
   });
 
   it("finds the entry it wrote whatever a formatter did to its layout", () => {
@@ -948,10 +959,8 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   const env = { ZITADEL_PROJECT_SECRET: "sk_proj_test" };
   /** An app whose `.env.local` names its project, as setup writes it. */
   const withProject = { ...env, ZITADEL_PROJECT_ID: "proj_spa" };
-  const apps: DevApp[] = [];
 
-  afterEach(async () => {
-    await Promise.all(apps.splice(0).map((app) => app.close()));
+  afterEach(() => {
     remote.answerWith(undefined);
   });
 
@@ -969,7 +978,9 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     files: Record<string, string> = {},
   ): Promise<DevApp> {
     const app = await aViteApp(config, appEnv, files);
-    apps.push(app);
+    onTestFinished(async () => {
+      await app.close();
+    });
     return app;
   }
 
@@ -1100,7 +1111,9 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     "reaches the server under vite preview with only the secret in the environment, %s",
     async (_, config) => {
       const app = await aVitePreview(config(), env);
-      apps.push(app);
+      onTestFinished(async () => {
+        await app.close();
+      });
 
       const response = await fetch(`${app.origin}/__nextgen/healthz`);
 

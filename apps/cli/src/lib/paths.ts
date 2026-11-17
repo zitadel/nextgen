@@ -11,14 +11,6 @@ export function resolveCwd(cwd?: string): string {
 }
 
 /**
- * Sentinel comment stamped at the top of every file the CLI generates and
- * owns. Commands like `doctor` and `eject` look for this marker to decide
- * whether a file is safe to touch; the trailing `v1` lets the format evolve
- * without mistaking newer managed files for hand-edited ones.
- */
-export const MANAGED_MARKER = "// zitadel-cli: managed-file v1";
-
-/**
  * The directories to look in when searching upward from `path`: `path` itself,
  * then its parent, then that directory's parent, and so on, nearest first.
  *

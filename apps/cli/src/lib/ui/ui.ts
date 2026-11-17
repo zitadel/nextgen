@@ -1,4 +1,6 @@
 import type { Audience } from "./audience";
+import { Asker, type Session } from "./asker";
+import { Box } from "./box";
 import { Chain } from "./chain";
 import { Narration } from "./narration";
 import type { Presentation } from "./presentation";
@@ -51,6 +53,30 @@ export class Ui {
   private readonly narration: Narration;
   /** Whether a command took its own ending away as text ({@link ending}). */
   private handedOver = false;
+
+  /**
+   * Questions answered from a session instead of from a run's audience, for
+   * a caller that has no chain: a test, or a library handed its own session.
+   * A command reaches its questions as `this.ask`.
+   *
+   * @param session - Who can answer, and how a prompt is drawn.
+   * @returns The questions, bound to the session.
+   */
+  static asker(session: Session): Questions & Confirmer {
+    return Asker.for(session);
+  }
+
+  /**
+   * Wraps content to the terminal so a frame drawn around it never exceeds the
+   * window, for a caller that draws a frame of its own.
+   *
+   * @param message - The content to wrap.
+   * @param columns - The terminal's width. Defaults to stdout's.
+   * @returns The content, wrapped to fit inside a frame.
+   */
+  static wrap(message: string, columns?: number): string {
+    return Box.at(columns).wrap(message);
+  }
 
   constructor(audience: Audience, presentation: Presentation = "wizard") {
     this.chain = new Chain(audience, presentation);

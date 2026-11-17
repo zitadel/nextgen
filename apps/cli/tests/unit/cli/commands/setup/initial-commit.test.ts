@@ -10,10 +10,9 @@ import {
   MakeInitialCommit,
 } from "@/cli/commands/setup/steps/make-initial-commit";
 import { inspectWorktree } from "@/cli/commands/setup/shared";
-import { Ui } from "@/lib/ui";
-import { it } from "@tests/helpers/fixtures";
-import { recordLog } from "@tests/helpers/log";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { it } from "@tests/fixtures";
+import { recordLog } from "@tests/fixtures/log";
+import { Ui, warnings } from "@/lib/ui";
 import {
   commitAll,
   commitSubjects,
@@ -673,23 +672,21 @@ describe("the warning for a commit that could not be made", () => {
   it("names the reason the commit could not be made", async ({ dir, other }) => {
     await aProject(dir);
     await aGitThatFails(other, "fatal: one\\n");
-    takeReportedWarnings();
+    warnings.take();
 
     await makeInitialCommit(dir);
 
-    expect(takeReportedWarnings()).toEqual([
+    expect(warnings.take()).toEqual([
       "Could not commit the scaffolded project (fatal: one); the first release records no commit, so the next deploy cannot show a diff.",
     ]);
   });
 
   it("says when setup left a new, empty repository behind", async ({ dir }) => {
     await write(dir, { ".env": "SECRET=1\n" });
-    takeReportedWarnings();
+    warnings.take();
 
     await makeInitialCommit(dir);
 
-    expect(takeReportedWarnings().join("\n")).toContain(
-      "Setup created a new, empty git repository here.",
-    );
+    expect(warnings.take().join("\n")).toContain("Setup created a new, empty git repository here.");
   });
 });

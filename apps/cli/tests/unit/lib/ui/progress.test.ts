@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { Chain } from "@/lib/ui/chain";
 import { Progress } from "@/lib/ui/progress";
-import { atScreenRecording } from "@tests/helpers/fixtures";
+import { atScreenRecording } from "@tests/fixtures";
 import type { Terminal } from "@tests/helpers/keyboard";
 
 /** The chain progress draws into, as a person watching a wizard or a normal command sees it. */
@@ -14,8 +14,8 @@ const chain = (interactive: boolean, chained = true): Chain =>
  * Every line drawn but the chain's heading, in order, with its mark, and the gutter left
  * out. Clack puts two spaces after a mark; one reads the same here.
  */
-const drawn = (screen: Terminal): string[] =>
-  stripAnsi(screen.shown())
+const drawn = (terminal: Terminal): string[] =>
+  stripAnsi(terminal.shown())
     .split("\n")
     .map((line) => line.trimEnd().replace(/^(\S) {2}/, "$1 "))
     .filter((line) => line !== "" && line !== "│" && !line.startsWith("┌"));
@@ -62,30 +62,30 @@ describe("Progress", () => {
       expect(at("fail")).toEqual(["Fetching failed"]);
     });
 
-    it("spins while it runs and says so when it is done", async ({ screen }) => {
+    it("spins while it runs and says so when it is done", async ({ terminal }) => {
       await new Progress(chain(true)).run("Removing the origin", async () => undefined);
 
-      expect(drawn(screen)).toEqual(["✔ Removing the origin"]);
+      expect(drawn(terminal)).toEqual(["✔ Removing the origin"]);
     });
 
-    it("lets the work name its own result", async ({ screen }) => {
+    it("lets the work name its own result", async ({ terminal }) => {
       await new Progress(chain(true)).run(
         "Fetching users",
         async () => ["a", "b"],
         (users) => `Fetched ${users.length} users`,
       );
 
-      expect(drawn(screen)).toEqual(["✔ Fetched 2 users"]);
+      expect(drawn(terminal)).toEqual(["✔ Fetched 2 users"]);
     });
 
-    it("lists what the work reported under its result, verbs aligned", async ({ screen }) => {
+    it("lists what the work reported under its result, verbs aligned", async ({ terminal }) => {
       await new Progress(chain(true)).run("Writing", async (report) => {
         report.done("Wrote", ".env.local");
         report.skipped("Left", "flows/default-login.json");
         report.warning("Check", "no claim_mapping");
       });
 
-      expect(drawn(screen).slice(1)).toEqual([
+      expect(drawn(terminal).slice(1)).toEqual([
         "│   Wrote  .env.local",
         "│ – Left   flows/default-login.json",
         "│ ! Check  no claim_mapping",
@@ -94,7 +94,7 @@ describe("Progress", () => {
 
     // Reported rows are a column layout this builds itself, so a long subject
     // keeps its row whole rather than folding the verb out of its column.
-    it("leaves a reported row whole, however long its subject", async ({ screen }) => {
+    it("leaves a reported row whole, however long its subject", async ({ terminal }) => {
       const subject =
         ".zitadel/schemas/default-human-user.json and .zitadel/flows/default-login.json";
 
@@ -102,30 +102,30 @@ describe("Progress", () => {
         report.done("Wrote", subject);
       });
 
-      expect(drawn(screen).slice(1)).toEqual([`│   Wrote  ${subject}`]);
+      expect(drawn(terminal).slice(1)).toEqual([`│   Wrote  ${subject}`]);
     });
 
-    it("says the step failed and lets the error through", async ({ screen }) => {
+    it("says the step failed and lets the error through", async ({ terminal }) => {
       const boom = new Error("boom");
 
       await expect(
         new Progress(chain(true)).run("Removing the origin", () => Promise.reject(boom)),
       ).rejects.toBe(boom);
-      expect(drawn(screen)).toEqual(["✖ Removing the origin failed"]);
+      expect(drawn(terminal)).toEqual(["✖ Removing the origin failed"]);
     });
 
-    it("opens the chain before it draws into it", async ({ screen }) => {
+    it("opens the chain before it draws into it", async ({ terminal }) => {
       await new Progress(chain(true)).run("Fetching", async () => undefined);
 
-      expect(stripAnsi(screen.shown()).startsWith("┌")).toBe(true);
+      expect(stripAnsi(terminal.shown()).startsWith("┌")).toBe(true);
     });
 
-    it("narrates as plain lines when nobody is watching", async ({ at, screen }) => {
+    it("narrates as plain lines when nobody is watching", async ({ at, terminal }) => {
       await new Progress(chain(false)).run("Fetching users", async (report) => {
         report.done("Wrote", ".env.local");
       });
 
-      expect(screen.shown()).toBe("");
+      expect(terminal.shown()).toBe("");
       expect(at("start")).toEqual(["Fetching users"]);
       expect(at("info")).toEqual(["Wrote .env.local"]);
       expect(at("done")).toEqual(["Fetching users"]);
@@ -133,67 +133,67 @@ describe("Progress", () => {
   });
 
   describe("a step the caller ends itself", () => {
-    it("ends with the result it is given", ({ screen }) => {
+    it("ends with the result it is given", ({ terminal }) => {
       new Progress(chain(true)).begin("Detecting framework").done("Detected Next.js");
 
-      expect(drawn(screen)).toEqual(["✔ Detected Next.js"]);
+      expect(drawn(terminal)).toEqual(["✔ Detected Next.js"]);
     });
 
-    it("falls back to its own label when the caller names no result", ({ screen }) => {
+    it("falls back to its own label when the caller names no result", ({ terminal }) => {
       new Progress(chain(true)).begin("Detecting framework").done();
 
-      expect(drawn(screen)).toEqual(["✔ Detecting framework"]);
+      expect(drawn(terminal)).toEqual(["✔ Detecting framework"]);
     });
 
     it("draws a detail too wide for the chain on one line, as the terminal wraps it", ({
-      screen,
+      terminal,
     }) => {
       const step = new Progress(chain(true)).begin("Patching project files");
       const wide = `Wrote the editable default human user schema (${"x".repeat(100)}.json)`;
       step.detail(wide);
       step.done("Patched 1 file");
 
-      expect(drawn(screen).slice(1)).toEqual([`│ ${wide}`]);
+      expect(drawn(terminal).slice(1)).toEqual([`│ ${wide}`]);
     });
 
-    it("lists the detail it collected under its result", ({ screen }) => {
+    it("lists the detail it collected under its result", ({ terminal }) => {
       const step = new Progress(chain(true)).begin("Patching project files");
       step.detail("src/app/page.tsx");
       step.done("Patched 1 file");
 
-      expect(drawn(screen)).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
+      expect(drawn(terminal)).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
     });
 
     it("draws a detail given after the step has ended, under it, rather than losing it", ({
-      screen,
+      terminal,
     }) => {
       const step = new Progress(chain(true)).begin("Patching project files");
       step.done("Patched 1 file");
       step.detail("src/app/page.tsx");
 
-      expect(drawn(screen)).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
+      expect(drawn(terminal)).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
     });
 
-    it("ends once, however many times it is ended", ({ screen }) => {
+    it("ends once, however many times it is ended", ({ terminal }) => {
       const step = new Progress(chain(true)).begin("Detecting framework");
       step.done("Detected Next.js");
       step.fail("Detected nothing");
 
-      expect(drawn(screen)).toEqual(["✔ Detected Next.js"]);
+      expect(drawn(terminal)).toEqual(["✔ Detected Next.js"]);
     });
 
-    it("marks a step that failed", ({ screen }) => {
+    it("marks a step that failed", ({ terminal }) => {
       new Progress(chain(true)).begin("Detecting framework").fail();
 
-      expect(drawn(screen)).toEqual(["✖ Detecting framework failed"]);
+      expect(drawn(terminal)).toEqual(["✖ Detecting framework failed"]);
     });
 
-    it("narrates as plain lines when nobody is watching", ({ at, screen }) => {
+    it("narrates as plain lines when nobody is watching", ({ at, terminal }) => {
       const step = new Progress(chain(false)).begin("Detecting framework");
       step.detail("package.json");
       step.done("Detected Next.js");
 
-      expect(screen.shown()).toBe("");
+      expect(terminal.shown()).toBe("");
       expect(at("info")).toEqual(["package.json"]);
       expect(at("done")).toEqual(["Detected Next.js"]);
     });
@@ -215,10 +215,10 @@ describe("Progress", () => {
 // not have; `task` and `begin` were not, so either one drew a `│` above that
 // command's answer and made it look like a wizard that happened to do work.
 describe("progress for a command that draws no chain", () => {
-  it("draws no gutter for work as a callback", async ({ screen }) => {
+  it("draws no gutter for work as a callback", async ({ terminal }) => {
     await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
 
-    expect(stripAnsi(screen.shown())).not.toContain("│");
+    expect(stripAnsi(terminal.shown())).not.toContain("│");
   });
 
   it("says what the work ended on, as a plain line", async ({ said }) => {
@@ -227,10 +227,10 @@ describe("progress for a command that draws no chain", () => {
     expect(said()).toEqual(["Fetching variables"]);
   });
 
-  it("keeps its spinner out of the gutter too", async ({ screen }) => {
+  it("keeps its spinner out of the gutter too", async ({ terminal }) => {
     await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
 
-    expect(stripAnsi(screen.shown())).not.toContain("│");
+    expect(stripAnsi(terminal.shown())).not.toContain("│");
   });
 
   it("indents what the work reported under its result", async ({ said }) => {
@@ -241,15 +241,15 @@ describe("progress for a command that draws no chain", () => {
     expect(said()).toEqual(["Fetching variables", "    Read  two variables"]);
   });
 
-  it("draws no gutter for a hand-ended step either", ({ screen }) => {
+  it("draws no gutter for a hand-ended step either", ({ terminal }) => {
     new Progress(chain(true, false)).begin("Fetching variables").done();
 
-    expect(stripAnsi(screen.shown())).not.toContain("│");
+    expect(stripAnsi(terminal.shown())).not.toContain("│");
   });
 
-  it("still narrates with nobody watching, whatever the shape", async ({ screen }) => {
+  it("still narrates with nobody watching, whatever the shape", async ({ terminal }) => {
     await new Progress(chain(false, false)).run("Fetching variables", async () => undefined);
 
-    expect(screen.shown()).toBe("");
+    expect(terminal.shown()).toBe("");
   });
 });

@@ -12,7 +12,7 @@ import { PolicyService } from "@/lib/backend";
 import { PolicyTest, SignupPolicy } from "@/lib/zitadel";
 import { PASSWORD_POLICY } from "@tests/helpers/config";
 import { fakeClient } from "@tests/helpers/fake-client";
-import { it as withDir } from "@tests/helpers/fixtures";
+import { it as withDir } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { PROJECT_ID } from "@tests/helpers/records";
 

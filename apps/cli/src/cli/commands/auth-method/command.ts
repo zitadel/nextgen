@@ -2,18 +2,16 @@ import type { Interfaces } from "@oclif/core";
 
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/log";
+import { log, warnings } from "@/lib/ui";
 import { Destructive } from "@/lib/oclif/destructive";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { JsonEnvelope } from "@/lib/oclif/types";
-import { optionArgs } from "@/lib/public-cli";
 import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
 import {
   AmbiguousSchemaError,
   type BrokenFile,
@@ -30,6 +28,7 @@ import {
   type UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { Cmd } from "@/lib/cmd";
 
 /**
  * The flags the re-run of a refused change sets: the schema every `auth-method`
@@ -413,7 +412,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       const question = `Disable ${error.disabling} anyway? Nobody will be able to sign in to ${error.schema}.`;
       // The run again with --force, on the schema it resolved (a dry run's stays
       // a preview, since --force with --dry-run writes nothing), then enabling
-      // each method the schema could take instead.
+      // each method the schema could take instead, then a social sign-in provider.
       const retry = await this.rerun<RetryFlags>({
         with: { ...naming, schema: target.schemaFlag, force: true },
       });
@@ -428,6 +427,10 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
                 }),
               ]
             : [];
+        }),
+        this.suggest({
+          id: "auth-method:sso:enable",
+          flags: { provider: "<name>", schema: target.schemaFlag },
         }),
       ];
       const refusal: NoSignInLeftRefusal = {
@@ -534,7 +537,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   protected report(change: Change): void {
     for (const notice of change.notices) {
       if (notice.severity === "warning") {
-        reportWarning(notice.message);
+        warnings.report(notice.message);
       } else {
         log.info(escapeControlCharacters(notice.message));
       }
@@ -690,7 +693,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 type NoSignInLeftRefusal = {
   readonly error: NoSignInLeftError;
   readonly question: string;
-  /** The exact re-run first, then enabling each method the schema could take instead. */
+  /** The exact re-run first, then enabling each method the schema could take instead, then a provider. */
   readonly suggested: FollowUps;
   readonly json: boolean;
 };
@@ -700,7 +703,7 @@ type NoSignInLeftRefusal = {
  *
  * @remarks
  * The exact re-run comes first, then enabling each method the schema could
- * take instead. Only `--json` names `details.suggested_args`: a person reads
+ * take instead, then a social sign-in provider. Only `--json` names `details.suggested_args`: a person reads
  * the same commands under Next.
  *
  * @param input - The run, the refusal, the question a person would be asked,
@@ -714,7 +717,7 @@ function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
     : ".";
   // Its --force retry is a consent only a person may give, as every gate's is.
   throw new ZitadelError("E_CONFIRMATION_REQUIRED", error.message, {
-    hint: `Enable another method first, such as \`zitadel auth-method sso enable --provider '<name>'\`. If the schema's users are only managed through the API, ask a person first: ${input.question} Re-run with --force only once they agree${where}`,
+    hint: `Enable another method first. If the schema's users are only managed through the API, ask a person first: ${input.question} Re-run with --force only once they agree${where}`,
     details: {
       question: input.question,
       file: error.path,
@@ -812,7 +815,7 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
         });
       }
       const flags = error.candidates.map((schema) => {
-        return optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
+        return Cmd.optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
       });
       throw refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
         requested,

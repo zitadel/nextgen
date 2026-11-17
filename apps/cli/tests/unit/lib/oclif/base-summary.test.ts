@@ -1,18 +1,18 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { aConfigAt } from "@tests/helpers/suggestions";
-import { mkdirSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { COLUMN_MARK } from "@/lib/ui/layout";
 import { painted, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import { it } from "@tests/fixtures";
 import { printing } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /** A command that ends on a summary, so its box is what the assertions read. */
 class SummarisingCommand extends BaseCommand {
@@ -252,14 +252,16 @@ describe("looking for the skills offer", () => {
   /**
    * Gives the machine an installed agent, which is a `.claude` directory in its home, and
    * a config directory that has never been offered the skills.
+   *
+   * @param home - The directory that is the machine's home.
+   * @param config - The directory that is its config directory.
    */
-  function aMachineNeverOffered(): void {
-    const home = mkdtempSync(join(tmpdir(), "zitadel-home-"));
+  function aMachineNeverOffered(home: string, config: string): void {
     mkdirSync(join(home, ".claude"));
     vi.stubEnv("HOME", home);
     vi.stubEnv("CI", "");
     vi.stubEnv("NO_SKILLS_PROMPT", "");
-    vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "zitadel-skills-")));
+    vi.stubEnv("XDG_CONFIG_HOME", config);
   }
 
   /** What a run at a terminal drew, on the machine as it now is. */
@@ -275,30 +277,38 @@ describe("looking for the skills offer", () => {
 
   const DONE: CommandResult = { summary: { title: "Done", sections: [] }, status: "ok", data: "x" };
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("is done by a command that draws a box, which is the one that carries the offer", async () => {
-    aMachineNeverOffered();
+  it("is done by a command that draws a box, which is the one that carries the offer", async ({
+    dir,
+    other,
+  }) => {
+    aMachineNeverOffered(dir, other);
 
     expect(await ran(SummarisingCommand, DONE)).toContain("skills add");
   });
 
-  it("is not done by a normal command, which would pay for a scan it never uses", async () => {
-    aMachineNeverOffered();
+  it("is not done by a normal command, which would pay for a scan it never uses", async ({
+    dir,
+    other,
+  }) => {
+    aMachineNeverOffered(dir, other);
 
     expect(await ran(AnsweringCommand, DONE)).not.toContain("skills add");
   });
 
-  it("is not done on a dry run, which must not spend the one offer a machine gets", async () => {
-    aMachineNeverOffered();
+  it("is not done on a dry run, which must not spend the one offer a machine gets", async ({
+    dir,
+    other,
+  }) => {
+    aMachineNeverOffered(dir, other);
 
     expect(await ran(SummarisingCommand, DONE, { "dry-run": true })).not.toContain("skills add");
   });
 
-  it("is not spent by a run that changed nothing, so the next one that does still offers it", async () => {
-    aMachineNeverOffered();
+  it("is not spent by a run that changed nothing, so the next one that does still offers it", async ({
+    dir,
+    other,
+  }) => {
+    aMachineNeverOffered(dir, other);
 
     await ran(SummarisingCommand, {
       status: "skipped",

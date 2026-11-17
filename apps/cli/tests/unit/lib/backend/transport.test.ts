@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 import { UnavailableError } from "@/lib/backend/errors";
 import { request } from "@/lib/backend/transport";
 import { ZitadelError } from "@/lib/errors";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /** A port nothing listens on, so a connection is refused at once. */
 const CLOSED = "http://127.0.0.1:1/sessions/exchange";

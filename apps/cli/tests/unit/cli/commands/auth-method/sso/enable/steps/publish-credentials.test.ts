@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { PublishCredentials } from "@/cli/commands/auth-method/sso/enable/steps/publish-credentials";
+import { ZitadelRuntime } from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
+import { Environment } from "@/lib/environment";
 import { CredentialDelivery } from "@/lib/idp";
 import { Connection } from "@/lib/zitadel";
 import { anAcmeSsoConnection } from "@tests/helpers/connections";
@@ -23,12 +25,11 @@ describe("PublishCredentials", () => {
         }),
         projectId: "proj_1",
         server: "http://localhost:1",
-        environment: {
+        environment: await Environment.resolve({
           cwd: "/tmp/app",
-          name: { value: "development", source: "default" },
-          values: {},
-          consulted: [],
-        },
+          env: {},
+          servers: ZitadelRuntime,
+        }),
       },
       delivery: new CredentialDelivery({
         connection: Connection.of({
@@ -36,7 +37,13 @@ describe("PublishCredentials", () => {
           body: anAcmeSsoConnection(),
         }),
         reused: false,
-        suggest: aSuggest(),
+        republish: (missing) => {
+          return aSuggest()({
+            id: "variable:set",
+            args: { name: missing.name },
+            flags: { secret: missing.secret },
+          });
+        },
       }),
       given: { endpoints: undefined, clientId: clientId("abc"), secret: clientSecret("shh") },
     });

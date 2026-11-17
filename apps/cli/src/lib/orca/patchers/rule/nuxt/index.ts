@@ -1,6 +1,5 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "@/lib/public-cli";
 import { configCandidates } from "@/lib/orca/patchers/rule/config-paths";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
@@ -84,7 +83,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
       // `nuxt dev` takes its port from the command line only, so without this
       // the app can serve a port the project does not allow as an origin.

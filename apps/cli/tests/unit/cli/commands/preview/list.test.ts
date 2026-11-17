@@ -10,7 +10,7 @@ import { asTerminal } from "@tests/helpers/project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
-const { server, dirs } = usePlatformServer();
+const { server } = usePlatformServer();
 
 /** A project directory whose server answers with one page of previews and a cursor to the next. */
 async function aProjectWithTwoPagesOfPreviews(): Promise<string> {
@@ -29,7 +29,6 @@ async function aProjectWithTwoPagesOfPreviews(): Promise<string> {
     ),
   );
   const cwd = await aProjectDirectory("zitadel-preview-list-", { id: "proj_test", secret: "ps" });
-  dirs.push(cwd);
   return cwd;
 }
 
@@ -85,7 +84,6 @@ describe("preview list", () => {
       ),
     );
     const cwd = await aProjectDirectory("zitadel-preview-list-", { id: "proj_test", secret: "ps" });
-    dirs.push(cwd);
 
     const { stdout } = await runCliForTest([
       "preview",
@@ -118,7 +116,6 @@ describe("preview list", () => {
       }),
     );
     const cwd = await aProjectDirectory("zitadel-preview-list-", { id: "proj_test", secret: "ps" });
-    dirs.push(cwd);
 
     await runCliForTest(["preview", "list", "--all", "--json", "--cwd", cwd, "--server", SERVER]);
 
@@ -132,7 +129,6 @@ describe("preview list", () => {
       ),
     );
     const cwd = await aProjectDirectory("zitadel-preview-list-", { id: "proj_test", secret: "ps" });
-    dirs.push(cwd);
 
     const result = await asTerminal(() =>
       runCliForTest(["preview", "list", "--cwd", cwd, "--server", SERVER]),
