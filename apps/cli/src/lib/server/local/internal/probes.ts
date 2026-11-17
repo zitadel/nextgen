@@ -15,7 +15,11 @@ import { tryLock } from "./start-lock";
  */
 export function defaultClaimsDir(): string {
   const uid = process.getuid?.();
-  return join(tmpdir(), uid === undefined ? "zitadel-local-ports" : `zitadel-local-ports-${uid}`);
+  if (uid === undefined) {
+    return join(tmpdir(), "zitadel-local-ports");
+  } else {
+    return join(tmpdir(), `zitadel-local-ports-${uid}`);
+  }
 }
 
 /**

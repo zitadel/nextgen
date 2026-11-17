@@ -6,7 +6,6 @@ import { PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 import { Origins } from "@/lib/backend";
 import { stableStringify } from "@/lib/json";
 import { MetaSchemas } from "@/lib/meta-schemas";
-import { Server } from "@/lib/server";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
@@ -476,7 +475,7 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     // file offline against the CLI version that wrote it.
     $schema: PROJECT_FILE_SCHEMA_REF,
     project: ctx.project.id,
-    server: resolveServerOrigin(ctx.server),
+    server: resolveServerOrigin(ctx.server, ctx.defaultServer),
     framework: { id: ctx.framework.id },
     branding: { renderer: ctx.rendererId, attribution: "visible" },
     ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
@@ -484,11 +483,11 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
   };
 }
 
-/** Normalizes a server URL to its origin, falling back to {@link Server.DEFAULT}. */
-function resolveServerOrigin(source: string): string {
+/** Normalizes a server URL to its origin, falling back to `defaultServer`. */
+function resolveServerOrigin(source: string, defaultServer: string): string {
   try {
     return new URL(source).origin;
   } catch {
-    return Server.DEFAULT;
+    return defaultServer;
   }
 }

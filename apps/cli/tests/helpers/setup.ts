@@ -1,3 +1,5 @@
+import type { LocalMachine } from "@/lib/server";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import type { SetupServices } from "@/cli/commands/setup/shared";
 import { Ui } from "@/lib/ui";
 import { write } from "@tests/helpers/git-repo";
@@ -48,13 +50,23 @@ export function suggestedCommands(stdout: string): string[] {
  * the app directory, as setup builds it.
  *
  * @param cwd - The project's directory.
+ * @param machine - What the machine knows about local servers; an empty one by default.
  * @returns The services those steps take.
  */
 export function aQuestionDeps(
   cwd = "/tmp/app",
+  machine: LocalMachine = new FakeMachine(),
 ): Pick<
   SetupServices,
-  "ask" | "cwd" | "developmentBuild" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  | "ask"
+  | "cwd"
+  | "developmentBuild"
+  | "dryRun"
+  | "machine"
+  | "nonInteractive"
+  | "serverFlag"
+  | "suggest"
+  | "ui"
 > {
   const audience = { interactive: true, force: false };
   return {
@@ -62,6 +74,7 @@ export function aQuestionDeps(
     cwd,
     developmentBuild: false,
     dryRun: false,
+    machine,
     nonInteractive: false,
     serverFlag: undefined,
     suggest: aSuggest({}, "1.2.3"),

@@ -1,4 +1,4 @@
-import type { BinaryRuntimeMetadata, DockerRuntimeMetadata } from "@/lib/server/local/runtime";
+import type { BinaryRuntimeMetadata, DockerRuntimeMetadata } from "@/lib/server";
 
 /**
  * A `.zitadel/local/runtime.json` record of a server started as a process. The

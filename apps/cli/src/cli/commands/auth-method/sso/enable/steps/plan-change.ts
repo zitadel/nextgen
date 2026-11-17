@@ -1,8 +1,7 @@
 import { credentialVariables, providerOf, selectionName } from "@zitadel/config/idp";
 
-import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
-import { loopbackReach } from "@/lib/server/local/runtime";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Connection } from "@/lib/zitadel";
@@ -13,6 +12,11 @@ import { Connection } from "@/lib/zitadel";
 type Needs = Fact<
   "target" | "remote" | "origins" | "issuer" | "selection" | "provider" | "options" | "claims"
 >;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "machine">;
 
 /**
  * Works out the whole change before anything is asked or written, so every
@@ -28,6 +32,19 @@ export class PlanChange extends WizardStep<
    * The step's name, which a wizard refuses to hold twice.
    */
   readonly key = "plan";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Make the candidate connection and the change it would make, and say what
@@ -58,7 +75,7 @@ export class PlanChange extends WizardStep<
     });
     const loopback = loopbackIssuerWarning(
       needs.selection,
-      await loopbackReach(needs.target.cwd, needs.remote.server),
+      await this.deps.machine.loopbackReach(needs.target.cwd, needs.remote.server),
     );
     if (loopback !== undefined) {
       warnings.report(loopback);

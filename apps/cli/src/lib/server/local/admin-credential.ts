@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
-import { ZitadelError, errorMessage } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerError } from "./local-server-error";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
@@ -16,7 +17,6 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
-import { shellCommand } from "@/lib/suggestion";
 import { SecretFile } from "@/lib/project/secret-file";
 
 /**
@@ -79,10 +79,12 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} cannot be read`, {
-      hint: `Check that ${LOCAL_ADMIN_FILE} is readable by you; \`zitadel start\` writes it owner-only.`,
-      details: { cause: errorMessage(error) },
-    });
+    throw new LocalServerError(
+      "admin-unreadable",
+      "E_VALIDATION",
+      `${LOCAL_ADMIN_FILE} cannot be read`,
+      { path: join(cwd, LOCAL_ADMIN_FILE), cause: errorMessage(error) },
+    );
   });
   if (raw === undefined) return undefined;
 
@@ -90,9 +92,9 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     const parsed: unknown = JSON.parse(raw);
     if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
-    throw malformedAdminFile(error);
+    throw malformedAdminFile(cwd, error);
   }
-  throw malformedAdminFile();
+  throw malformedAdminFile(cwd);
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {
@@ -112,16 +114,23 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
  * could never sign in. Removing the file and resetting the data lets the next
  * start mint a fresh credential and import it.
  */
-function malformedAdminFile(cause?: unknown): ZitadelError {
-  return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
-    hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
-    nextCommands: [
-      shellCommand("rm", LOCAL_ADMIN_FILE),
-      { id: "reset", flags: { force: true } },
-      { id: "start" },
-    ],
-    ...(cause ? { details: { cause: errorMessage(cause) } } : {}),
-  });
+function malformedAdminFile(cwd: string, cause?: unknown): LocalServerError {
+  const details = { path: join(cwd, LOCAL_ADMIN_FILE), directory: cwd };
+  if (cause) {
+    return new LocalServerError(
+      "admin-malformed",
+      "E_VALIDATION",
+      `${LOCAL_ADMIN_FILE} is malformed`,
+      { ...details, cause: errorMessage(cause) },
+    );
+  } else {
+    return new LocalServerError(
+      "admin-malformed",
+      "E_VALIDATION",
+      `${LOCAL_ADMIN_FILE} is malformed`,
+      details,
+    );
+  }
 }
 
 /**
@@ -185,7 +194,11 @@ async function createLocalAdmin(cwd: string): Promise<LocalAdmin> {
 
   const path = join(cwd, LOCAL_ADMIN_FILE);
   const won = await writePrivateIfAbsent(path, `${JSON.stringify(candidate, null, 2)}\n`);
-  return won ? candidate : ((await readLocalAdmin(cwd)) ?? candidate);
+  if (won) {
+    return candidate;
+  } else {
+    return (await readLocalAdmin(cwd)) ?? candidate;
+  }
 }
 
 /** Writes owner-only, reporting `false` when another run got there first. */

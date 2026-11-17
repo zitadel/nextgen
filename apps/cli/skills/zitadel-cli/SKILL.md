@@ -83,8 +83,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   whose flag only the user may agree to (next rule).
 - **Ask the user before `--force` on anything destructive.** A command that
   deletes, revokes or rolls back (`user delete`, `variable rm`, `origin rm`,
-  `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
-  person first. Non-interactive and without `--force`, it fails with
+  `invitation cancel`, `deployment rollback`, `reset`, `eject`, a destructive
+  `api` call) asks a person first. Non-interactive and without `--force`, it fails with
   `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
   same command with `--force`, except for `api`, whose body may hold a secret
   or come from a pipe: rerun that call yourself, with its `-F` fields or
@@ -176,6 +176,21 @@ nothing; `data.skills` and `data.directories` say what it added where.
   non-interactive, pass `--force` too, or `warnings` says the repair waited.
   The repair deploys the newest primary release to it when there is one;
   otherwise `warnings` says to `deploy`.
+- **Invitations.** `zitadel invitation create --relation viewer|editor|admin`
+  makes a link that grants that role on the project to whoever opens it and
+  signs in; `--name` labels who it is for and is never matched. Non-interactive,
+  `create` asks nothing and needs `--relation`.
+  - `data.link` is in the create result only and never again: hand it to the
+    user, never put it in a file or a commit. It expires in 72 hours.
+  - `--replaces <invitation_id>` makes a new link for a lost, expired or
+    declined one, keeping its name unless `--name` gives another; an accepted
+    one fails with `E_VALIDATION`.
+  - `invitation list [--status …] [--type …]` and `invitation get
+    <invitation_id>` read them. `invitation cancel <invitation_id>` stops a
+    pending link or removes a declined one and needs `--force` when
+    non-interactive; its `--dry-run` needs the id.
+  - A project nobody has claimed refuses invitations until it is claimed
+    (`zitadel claim`). Existing members are read with `grant list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -338,9 +353,9 @@ Each invocation prints one JSON object:
   flag the run was given except those that only say how it answers
   (`--json`, `--non-interactive`, `--no-color`, `--verbose`, `--debug`,
   `--no-telemetry`); add `--non-interactive --json` when you run one.
-- A command named in a `hint`, a `warning` or a `next_actions` line is written
-  the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
-  unquoted — so prose and follow-up never name the same command two ways.
+- Run a command that takes the environment flags only from `next_commands` (or
+  `details.suggested_args`): a `hint`, a `warning` or a `next_actions` line never
+  spells one out, because prose cannot carry `--env`, `--env-file` or `--server`.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
@@ -1022,7 +1037,8 @@ step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
-could be enabled instead. A non-interactive dry run refuses it the same way, and its
+could be enabled instead, then `sso enable --provider '<name>'` (replace
+`<name>`). A non-interactive dry run refuses it the same way, and its
 `--force` re-run keeps `--dry-run`; with `--force` it previews the change and
 warns that no way to sign in would be left. A method that is enabled but not
 offered by any flow is reported in `warnings` (and in `data.not_offered`

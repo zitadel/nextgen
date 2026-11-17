@@ -1,4 +1,3 @@
-import { LocalServer } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
@@ -12,7 +11,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive">;
+type Deps = Pick<SetupServices, "ask" | "dryRun" | "machine" | "nonInteractive">;
 
 /**
  * "Port 3000 is in use. Which port should your app run on?" — asked only when
@@ -67,13 +66,15 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
       this.deps.nonInteractive ||
       this.deps.dryRun ||
       flags.devPort !== undefined ||
-      (await LocalServer.isPortFree(answers.devPort))
+      (await this.deps.machine.isPortFree(answers.devPort))
     ) {
       return {
         answers,
       };
     }
-    const suggested = String((await LocalServer.nextFreePort(answers.devPort)) ?? answers.devPort);
+    const suggested = String(
+      (await this.deps.machine.nextFreePort(answers.devPort)) ?? answers.devPort,
+    );
     return {
       answers: {
         ...answers,

@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { basename, dirname, join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
@@ -17,7 +18,7 @@ import { it } from "@tests/fixtures";
 
 vi.mock("execa", () => ({ execaSync: vi.fn(() => ({ failed: true, stdout: "" })) }));
 
-const orca = new Orca(detectors, scaffolders, patchers);
+const orca = new Orca(detectors, scaffolders, patchers, LocalRuntime.DIR);
 
 /**
  * Makes a directory with a name npm accepts as a package name.
@@ -189,7 +190,10 @@ describe("Orca detection", () => {
   }) => {
     const cwd = join(dir, "my-zitadel-app");
 
-    await expect(inspectScaffoldTarget(cwd)).resolves.toEqual({ scaffoldable: true, entries: [] });
+    await expect(inspectScaffoldTarget(cwd, LocalRuntime.DIR)).resolves.toEqual({
+      scaffoldable: true,
+      entries: [],
+    });
     await expect(stat(cwd)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
@@ -200,7 +204,7 @@ describe("Orca detection", () => {
     await writeFile(join(cwd, ".gitignore"), "node_modules\n.zitadel/local/\n");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
 
-    await expect(inspectScaffoldTarget(cwd)).resolves.toEqual({
+    await expect(inspectScaffoldTarget(cwd, LocalRuntime.DIR)).resolves.toEqual({
       scaffoldable: false,
       reason: "Directory is not empty (contains .gitignore).",
       entries: [".gitignore", ".zitadel"],
@@ -249,7 +253,7 @@ describe("Orca.scaffold", () => {
       await writeFile(join(cwd, "package.json"), "{}");
     },
   };
-  const fakeOrca = new Orca([fakeDetector], [fakeScaffolder], []);
+  const fakeOrca = new Orca([fakeDetector], [fakeScaffolder], [], LocalRuntime.DIR);
 
   it("scaffolds into an empty dir and re-detects the result", async ({ dir }) => {
     const cwd = await tmpPackageSafe(dir);
@@ -278,7 +282,7 @@ describe("Orca.scaffold", () => {
         await writeFile(join(scaffoldCwd, "package.json"), "{}");
       },
     };
-    const guardedOrca = new Orca([fakeDetector], [guardedScaffolder], []);
+    const guardedOrca = new Orca([fakeDetector], [guardedScaffolder], [], LocalRuntime.DIR);
 
     await expect(guardedOrca.scaffold(cwd, "fake")).resolves.toMatchObject({ id: "fake" });
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
@@ -333,7 +337,7 @@ describe("Orca.scaffold", () => {
         throw new ZitadelError("E_VALIDATION", "boom");
       },
     };
-    const guardedOrca = new Orca([fakeDetector], [throwingScaffolder], []);
+    const guardedOrca = new Orca([fakeDetector], [throwingScaffolder], [], LocalRuntime.DIR);
 
     await expect(guardedOrca.scaffold(cwd, "fake", true)).rejects.toMatchObject({
       code: "E_VALIDATION",
@@ -378,7 +382,7 @@ describe("Orca.scaffold", () => {
         throw new ZitadelError("E_VALIDATION", "boom");
       }
     }
-    const failingOrca = new Orca([fakeDetector], [new Failing()], []);
+    const failingOrca = new Orca([fakeDetector], [new Failing()], [], LocalRuntime.DIR);
 
     await expect(failingOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_VALIDATION" });
     expect(await readdir(cwd)).toEqual([]);
@@ -398,6 +402,7 @@ describe("Orca.scaffold", () => {
         },
       ],
       [],
+      LocalRuntime.DIR,
     );
 
     await expect(
@@ -420,6 +425,7 @@ describe("Orca.scaffold", () => {
         },
       ],
       [],
+      LocalRuntime.DIR,
     );
 
     await expect(failingOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
@@ -442,6 +448,7 @@ describe("Orca.scaffold", () => {
         },
       ],
       [],
+      LocalRuntime.DIR,
     );
 
     it("puts back what start left, without what was written after the scaffold", async ({
@@ -531,6 +538,7 @@ describe("Orca.scaffold", () => {
           },
         ],
         [],
+        LocalRuntime.DIR,
       );
 
       await expect(undetectableOrca.scaffoldUndoably(cwd, "fake")).rejects.toMatchObject({
@@ -576,7 +584,7 @@ describe("Orca.planScaffold", () => {
 
   it("refuses a framework it could create but not integrate", async ({ dir }) => {
     const cwd = await tmpPackageSafe(dir);
-    const withoutPatchers = new Orca(detectors, scaffolders, []);
+    const withoutPatchers = new Orca(detectors, scaffolders, [], LocalRuntime.DIR);
 
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
       code: "E_VALIDATION",

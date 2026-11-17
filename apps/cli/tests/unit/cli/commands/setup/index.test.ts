@@ -36,12 +36,8 @@ import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { Ui, warnings } from "@/lib/ui";
-import {
-  localRuntimePaths,
-  type RuntimeMetadata,
-  writeRuntimeMetadata,
-} from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
@@ -90,7 +86,7 @@ const PINNED_DEV_PORT = ["--dev-port", "3000"];
 /**
  * The version of the server this CLI ships.
  */
-const BUNDLED_VERSION = String(LocalServer.bundledVersion());
+const BUNDLED_VERSION = String(LocalRuntime.bundledVersion());
 
 /**
  * A server URL nothing answers on, for a runtime record of a server that is
@@ -561,11 +557,11 @@ function aRuntime(
   return aBinaryRecord({
     pid: process.pid,
     command: process.execPath,
-    log_path: localRuntimePaths(cwd).logFile,
+    log_path: LocalRuntime.paths(cwd).logFile,
     server_version: serverVersion,
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
-    data_dir: localRuntimePaths(cwd).dataDir,
+    data_dir: LocalRuntime.paths(cwd).dataDir,
     cli_version: serverVersion,
   });
 }
@@ -660,7 +656,7 @@ async function aHeldPort(serve: Serve): Promise<number> {
  * @returns Once the record is written.
  */
 async function recordStartedServer(cwd: string, serverUrl: string): Promise<void> {
-  await writeRuntimeMetadata(
+  await LocalRuntime.write(
     cwd,
     aDockerRecord({
       port: Number(new URL(serverUrl).port),
@@ -958,7 +954,7 @@ describe("setup", () => {
 
   describe("in a directory holding only what start left", () => {
     it("refuses, hinting at --framework rather than --force", async ({ dir, serve }) => {
-      await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve)));
+      await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve)));
 
       const res = await runCliForTest(setupIn(dir, ...LOCAL, ...SCRIPTED));
 
@@ -970,7 +966,7 @@ describe("setup", () => {
       dir,
       serve,
     }) => {
-      await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve)));
+      await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve)));
 
       const res = await runCliForTest(setupIn(dir, ...LOCAL, ...SCRIPTED));
 
@@ -979,7 +975,7 @@ describe("setup", () => {
 
     describe("when nobody is at a terminal to choose a framework", () => {
       it("exits 3", async ({ dir, serve }) => {
-        await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve)));
+        await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve)));
 
         const res = await runCliForTest(setupIn(dir, ...LOCAL));
 
@@ -991,7 +987,7 @@ describe("setup", () => {
         ...FRAMEWORKS,
         expectedPublicCliCommand("setup --framework next --server local"),
       ])("says %s", async (said, { dir, serve }) => {
-        await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve)));
+        await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve)));
 
         const res = await runCliForTest(setupIn(dir, ...LOCAL));
 
@@ -999,7 +995,7 @@ describe("setup", () => {
       });
 
       it("does not say to run without --json or --non-interactive", async ({ dir, serve }) => {
-        await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve)));
+        await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve)));
 
         const res = await runCliForTest(setupIn(dir, ...LOCAL));
 
@@ -1011,7 +1007,7 @@ describe("setup", () => {
   describe("with a local server another CLI release started", () => {
     it("refuses, naming both versions and how to restart the server", async ({ dir, serve }) => {
       const serverUrl = await aHealthyServer(serve);
-      await writeRuntimeMetadata(dir, aRuntime(dir, serverUrl, "0.0.1"));
+      await LocalRuntime.write(dir, aRuntime(dir, serverUrl, "0.0.1"));
 
       const res = await runCliForTest(setupIn(dir, "--framework", "next", ...LOCAL, ...SCRIPTED));
 
@@ -1031,7 +1027,7 @@ describe("setup", () => {
       dir,
       serve,
     }) => {
-      await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve), "0.0.1"));
+      await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve), "0.0.1"));
       const cwd = join(dir, "my-app");
       await mkdir(cwd);
 
@@ -1043,7 +1039,7 @@ describe("setup", () => {
     });
 
     it("writes nothing beside what start left", async ({ dir, serve }) => {
-      await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve), "0.0.1"));
+      await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve), "0.0.1"));
 
       await runCliForTest(setupIn(dir, "--framework", "next", ...LOCAL, ...SCRIPTED));
 
@@ -1053,7 +1049,7 @@ describe("setup", () => {
 
   describe("with a local server of this CLI's own version", () => {
     it("gets past the version check to ask for --framework", async ({ dir, serve }) => {
-      await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve)));
+      await LocalRuntime.write(dir, aRuntime(dir, await aHealthyServer(serve)));
 
       const res = await runCliForTest(setupIn(dir, ...LOCAL, ...SCRIPTED));
 
@@ -1067,7 +1063,7 @@ describe("setup", () => {
     });
 
     it("refuses, keeping the framework in the setup it suggests after start", async ({ dir }) => {
-      await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+      await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
       const res = await runCliForTest(setupIn(dir, "--framework", "next", ...LOCAL, ...SCRIPTED));
 
@@ -1083,7 +1079,7 @@ describe("setup", () => {
 
     it("points every recovery command at the project directory", async ({ dir }) => {
       await aNextApp(dir);
-      await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+      await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
       const res = await runCliForTest(setupIn(dir, "--framework", "next", ...LOCAL, "--json"));
 
@@ -1095,12 +1091,31 @@ describe("setup", () => {
       });
     });
 
+    it("starts the server where it was started when its record is in a parent folder", async ({
+      dir,
+    }) => {
+      await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
+      const app = join(dir, "app");
+      await mkdir(app);
+
+      const res = await runCliForTest(setupIn(app, "--framework", "next", ...LOCAL, ...SCRIPTED));
+
+      expect(res).toFailWith("E_LOCAL_SERVER_NOT_RUNNING");
+      expect(parseJson(res.stdout)).toMatchObject({
+        hint: expect.stringContaining("It was started in"),
+        next_commands: [
+          expectedPublicCliCommand(`start --cwd ${dir}`),
+          expectedPublicCliCommand(`setup --framework next --server local --cwd ${app}`),
+        ],
+      });
+    });
+
     describe("with --sso google and a client id, run non-interactively", () => {
       const flags = ["--framework", "next", ...LOCAL, "--sso", "google"];
 
       it("keeps the provider in the setup it suggests", async ({ dir }) => {
         await aNextApp(dir);
-        await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+        await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
         const res = await runCliForTest(
           setupIn(dir, ...flags, "--sso-client-id", GOOGLE_CLIENT_ID, ...SCRIPTED),
@@ -1113,7 +1128,7 @@ describe("setup", () => {
         dir,
       }) => {
         await aNextApp(dir);
-        await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+        await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
         const res = await runCliForTest(
           setupIn(dir, ...flags, "--sso-client-id", GOOGLE_CLIENT_ID, ...SCRIPTED),
@@ -1126,7 +1141,7 @@ describe("setup", () => {
         "hints %s, so the scripted path stays reachable",
         async (hinted, { dir }) => {
           await aNextApp(dir);
-          await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+          await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
           const res = await runCliForTest(
             setupIn(dir, ...flags, "--sso-client-id", GOOGLE_CLIENT_ID, ...SCRIPTED),
@@ -1144,7 +1159,7 @@ describe("setup", () => {
         dir,
       }) => {
         await aNextApp(dir);
-        await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+        await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
         const res = await runCliForTest(setupIn(dir, ...flags, "--json"));
 
@@ -1153,7 +1168,7 @@ describe("setup", () => {
 
       it("hints at --sso-client-id, which a scripted rerun cannot do without", async ({ dir }) => {
         await aNextApp(dir);
-        await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+        await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
         const res = await runCliForTest(setupIn(dir, ...flags, "--json"));
 
@@ -1168,7 +1183,7 @@ describe("setup", () => {
         "suggests no command holding %s",
         async (held, { dir }) => {
           await aNextApp(dir);
-          await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+          await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
           const res = await runCliForTest(
             setupIn(dir, ...flags, "--sso-client-id", SHELL_HOSTILE_CLIENT_ID, ...SCRIPTED),
@@ -1180,7 +1195,7 @@ describe("setup", () => {
 
       it("keeps the client id out of the hint", async ({ dir }) => {
         await aNextApp(dir);
-        await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+        await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
         const res = await runCliForTest(
           setupIn(dir, ...flags, "--sso-client-id", SHELL_HOSTILE_CLIENT_ID, ...SCRIPTED),
@@ -1191,7 +1206,7 @@ describe("setup", () => {
 
       it("still keeps the provider in the setup it suggests", async ({ dir }) => {
         await aNextApp(dir);
-        await writeRuntimeMetadata(dir, aRuntime(dir, DOWN_SERVER_URL));
+        await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
 
         const res = await runCliForTest(
           setupIn(dir, ...flags, "--sso-client-id", SHELL_HOSTILE_CLIENT_ID, ...SCRIPTED),
@@ -3171,10 +3186,6 @@ describe("setup --help", () => {
 });
 
 describe("Setup.run", () => {
-  beforeEach(() => {
-    vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
-  });
-
   describe("with --force", () => {
     it("still asks whether to proceed with the detected framework", async ({ dir }) => {
       await aNextApp(dir);
@@ -3413,7 +3424,7 @@ async function readingCredentialFiles(dir: string) {
     return {
       step,
       out: await step.run({
-        patcher: createOrca().patcherFor("next"),
+        patcher: createOrca(LocalRuntime.DIR).patcherFor("next"),
         patchContext: () => {
           return aPatchContext("next");
         },
@@ -3755,8 +3766,13 @@ describe("SettleAnswers", () => {
    * @param suggest - Renders the suggested command.
    * @returns Once the step has said what it has to.
    */
-  async function settleOnTakenPort3000(suggest = aSuggest()): Promise<void> {
-    await new SettleAnswers({ dryRun: false, nonInteractive: true, suggest }).run({
+  async function settleOnTakenPort3000(machine: LocalMachine, suggest = aSuggest()): Promise<void> {
+    await new SettleAnswers({
+      dryRun: false,
+      machine,
+      nonInteractive: true,
+      suggest,
+    }).run({
       flags: {} as SetupFlags,
       answers: {
         server: "http://localhost:8080",
@@ -3773,15 +3789,10 @@ describe("SettleAnswers", () => {
   });
 
   describe("when a later port is free", () => {
-    it("suggests setup on that port, from the run's directory", async ({ onTestFinished }) => {
-      const taken = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
-      const next = vi.spyOn(LocalServer, "nextFreePort").mockResolvedValue(3001);
-      onTestFinished(() => {
-        taken.mockRestore();
-        next.mockRestore();
-      });
+    it("suggests setup on that port, from the run's directory", async () => {
+      const machine = new FakeMachine({ taken: [3000], nextFree: () => 3001 });
 
-      await settleOnTakenPort3000(aSuggest({ cwd: "app" }, "1.2.3"));
+      await settleOnTakenPort3000(machine, aSuggest({ cwd: "app" }, "1.2.3"));
 
       expect(warnings.take().join("\n")).toContain(
         "npx @zitadel/cli@1.2.3 setup --dev-port 3001 --cwd app",
@@ -3790,15 +3801,14 @@ describe("SettleAnswers", () => {
   });
 
   describe("when the ports after the taken one are taken too", () => {
-    it("names only the flag, since a placeholder would run as a shell redirection", async ({
-      onTestFinished,
-    }) => {
-      const taken = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
-      onTestFinished(() => {
-        taken.mockRestore();
-      });
-
-      await settleOnTakenPort3000();
+    it("names only the flag, since a placeholder would run as a shell redirection", async () => {
+      await settleOnTakenPort3000(
+        new FakeMachine({
+          taken: Array.from({ length: 21 }, (_, index) => {
+            return 3000 + index;
+          }),
+        }),
+      );
 
       expect(warnings.take()).toEqual([
         "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",

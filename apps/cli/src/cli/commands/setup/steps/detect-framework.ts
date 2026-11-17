@@ -1,5 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
-import { createOrca, inspectScaffoldTarget } from "@/lib/orca";
+import { LocalRuntime } from "@/lib/server";
+import { createOrca } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
@@ -88,7 +89,7 @@ export class DetectFramework extends WizardStep<
    */
   async run(needs: Needs): Promise<Fact<"orca" | "found" | "scaffoldedFramework">> {
     const { flags } = needs;
-    const orca = createOrca();
+    const orca = createOrca(LocalRuntime.DIR);
     const home = this.deps.env.HOME;
     const detecting = this.deps.ui.begin(
       `Detecting framework in ${escapeControlCharacters(
@@ -117,7 +118,7 @@ export class DetectFramework extends WizardStep<
           detecting.fail();
           throw error;
         }
-        const target = await inspectScaffoldTarget(this.deps.cwd);
+        const target = await orca.inspectScaffoldTarget(this.deps.cwd);
         if (!target.scaffoldable && !this.deps.force) {
           detecting.fail();
           throw new ZitadelError(

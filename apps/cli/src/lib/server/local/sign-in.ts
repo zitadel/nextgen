@@ -1,7 +1,7 @@
 import { apiBaseUrl, request } from "@/lib/backend/transport";
 
 import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { LocalServerError } from "./local-server-error";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
@@ -92,12 +92,11 @@ export async function adminSessionCookie(
       });
     });
   if (!res.ok || !cookie) {
-    throw new ZitadelError(
+    throw new LocalServerError(
+      "session-exchange-failed",
       "E_AUTH",
       `Local admin session exchange failed (${String(res.status)})`,
-      {
-        details: { status: res.status },
-      },
+      { status: res.status },
     );
   }
   return cookie;
@@ -114,16 +113,11 @@ async function signIn(
 ): Promise<{ handoffToken: string; publishableKey: string }> {
   const runtime = await readPlatformRuntime(serverUrl, REQUEST_TIMEOUT_MS);
   if (!runtime) {
-    throw new ZitadelError(
+    throw new LocalServerError(
+      "platform-missing",
       "E_VALIDATION",
       "The local server does not host the platform project, so the local admin cannot sign in",
-      {
-        // `zitadel start` adopts a healthy running server untouched, so it
-        // cannot fix this on its own: the server has to stop first.
-        hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
-        nextCommands: [{ id: "stop" }, { id: "start" }],
-        details: { server_url: serverUrl },
-      },
+      { server_url: serverUrl },
     );
   }
   const client = createZitadelClient({
@@ -173,9 +167,10 @@ async function signIn(
  * deletes local data, so it stays a hint a person reads, never a next command
  * an agent runs.
  */
-function adminNotFound(): ZitadelError {
-  return new ZitadelError("E_AUTH", "The local server could not find the local admin", {
-    hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
-    nextCommands: [{ id: "logs" }],
-  });
+function adminNotFound(): LocalServerError {
+  return new LocalServerError(
+    "admin-not-found",
+    "E_AUTH",
+    "The local server could not find the local admin",
+  );
 }

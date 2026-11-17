@@ -1482,6 +1482,22 @@ describe("auth-method sso enable", () => {
       });
     });
 
+    it("suggests a dry run of deploy, which reports those flow errors", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        next_commands: expect.arrayContaining([expect.stringContaining("deploy --dry-run")]),
+      });
+    });
+
     it("writes no connection", async ({ dir }) => {
       const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {

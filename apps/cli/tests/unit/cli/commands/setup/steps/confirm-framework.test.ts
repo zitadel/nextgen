@@ -4,20 +4,12 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/server/local/server", async (importOriginal) => {
-  return {
-    ...(await importOriginal<object>()),
-    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
-  };
-});
-
 import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 
 import { ConfirmFramework } from "@/cli/commands/setup/steps/confirm-framework";
 import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
-import { LocalServer } from "@/lib/server/local/server";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { aQuestionDeps } from "@tests/helpers/setup";
 
@@ -76,8 +68,6 @@ async function confirmationFor(
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
-  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
 describe("ConfirmFramework", () => {

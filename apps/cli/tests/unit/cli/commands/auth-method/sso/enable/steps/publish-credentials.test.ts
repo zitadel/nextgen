@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PublishCredentials } from "@/cli/commands/auth-method/sso/enable/steps/publish-credentials";
+import { ZitadelRuntime } from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
 import { Environment } from "@/lib/environment";
 import { warnings } from "@/lib/ui";
@@ -13,7 +14,11 @@ import { aSuggest } from "@tests/helpers/suggestions";
 /**
  * The environment the run resolved, as it would be with nothing set.
  */
-const ENVIRONMENT = await Environment.resolve({ cwd: "/tmp/app", env: {} });
+const ENVIRONMENT = await Environment.resolve({
+  cwd: "/tmp/app",
+  env: {},
+  servers: ZitadelRuntime,
+});
 
 /**
  * What the step reads from the steps before it.

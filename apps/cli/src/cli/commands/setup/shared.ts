@@ -54,9 +54,9 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import type { FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import { LocalServer, type ResolvedServer } from "@/lib/server";
-import { readNearestRuntimeMetadata, sameLocalServer } from "@/lib/server/local/runtime";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { LocalRuntime, type LocalMachine, type ResolvedServer } from "@/lib/server";
+
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -653,6 +653,11 @@ export type Fact<Key extends keyof SetupFacts> = Pick<SetupFacts, Key>;
  * in the command.
  */
 export type SetupServices = Readonly<{
+  /**
+   * What this machine knows about local servers.
+   */
+  machine: LocalMachine;
+
   /**
    * The command's global options, as the run was given them.
    */
@@ -1554,12 +1559,15 @@ export type OutdatedLocalServer = Readonly<{
  * @returns The server, or `undefined` when the nearest one is this CLI's own
  *   release or says nothing about its version.
  */
-export async function outdatedLocalServer(cwd: string): Promise<OutdatedLocalServer | undefined> {
-  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => {
+export async function outdatedLocalServer(
+  cwd: string,
+  machine: LocalMachine,
+): Promise<OutdatedLocalServer | undefined> {
+  const nearest = await LocalRuntime.readNearest(cwd).catch(() => {
     return undefined;
   });
   const runtime = nearest?.runtime;
-  const expected = LocalServer.bundledVersion();
+  const expected = machine.bundledVersion();
   if (
     !nearest ||
     runtime?.backend !== "binary" ||
@@ -1595,13 +1603,14 @@ export async function outdatedLocalServer(cwd: string): Promise<OutdatedLocalSer
 export async function refuseOutdatedLocalServer(
   input: Readonly<{
     cwd: string;
+    machine: LocalMachine;
     serverUrl: string;
     flags: Parameters<typeof retryOptionsFromFlags>[0];
   }>,
 ): Promise<void> {
-  const { cwd, serverUrl, flags } = input;
-  const outdated = await outdatedLocalServer(cwd);
-  if (!outdated || !sameLocalServer(outdated.serverUrl, serverUrl)) {
+  const { cwd, machine, serverUrl, flags } = input;
+  const outdated = await outdatedLocalServer(cwd, machine);
+  if (!outdated || !LocalRuntime.same(outdated.serverUrl, serverUrl)) {
     return;
   }
   throw refusalError(

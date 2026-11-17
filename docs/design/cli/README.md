@@ -139,6 +139,7 @@ Users and access
   team             Create and manage teams
   grant            Manage access grants
   session          View and revoke sessions
+  invitation       Invite people into the project with a link
 
 Sign-in
   auth-method      Configure how users sign in

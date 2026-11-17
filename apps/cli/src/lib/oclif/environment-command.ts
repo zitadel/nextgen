@@ -1,4 +1,5 @@
 import { createZitadelClient } from "@/lib/backend";
+import { ZitadelRuntime } from "@/lib/server";
 import { Environment } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
@@ -54,6 +55,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
       return super.toMeta(given, { resolveServer: options.resolveServer, source: options.source });
     }
     this.environment = await Environment.resolve({
+      servers: ZitadelRuntime,
       cwd: resolveCwd(text(flags.cwd)),
       env: process.env,
       serverFlag: options.source ?? text(flags.server),

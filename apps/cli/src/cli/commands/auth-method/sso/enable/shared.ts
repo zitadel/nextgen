@@ -1,3 +1,4 @@
+import type { LocalMachine } from "@/lib/server";
 import type { IdpProvider, ProviderName, ProviderSelection } from "@zitadel/config/idp";
 
 import type { FollowUps, SchemaTarget } from "@/cli/commands/auth-method/command";
@@ -229,6 +230,11 @@ export type Fact<Key extends keyof EnableFacts> = Pick<EnableFacts, Key>;
  * command that read, write and word the result, which stay in the command.
  */
 export type EnableServices = Readonly<{
+  /**
+   * What this machine knows about local servers.
+   */
+  machine: LocalMachine;
+
   /**
    * The server the run addresses.
    */

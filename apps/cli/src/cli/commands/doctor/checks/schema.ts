@@ -1,4 +1,5 @@
 import { createZitadelClient, IdpService } from "@/lib/backend";
+import { ZitadelRuntime } from "@/lib/server";
 import { isCancellation } from "@/lib/errors";
 import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { Runtime } from "@/lib/runtime";
@@ -186,7 +187,7 @@ export class SchemaCheck extends AbstractSanityCheck {
   private async deployedConnections(ctx: CheckContext): Promise<ReadonlySet<string> | undefined> {
     try {
       const secret = await Project.at(ctx.cwd).secret();
-      const server = (await Project.at(ctx.cwd).config()).server;
+      const server = (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
       const client = createZitadelClient({
         userAgent: Runtime.current().userAgent(),
         baseUrl: server,

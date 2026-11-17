@@ -4,13 +4,6 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/server/local/server", async (importOriginal) => {
-  return {
-    ...(await importOriginal<object>()),
-    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
-  };
-});
-
 import { CANCEL_SYMBOL, confirm, isCancel, multiselect, password, text } from "@clack/prompts";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
@@ -20,7 +13,6 @@ import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { Ui, warnings } from "@/lib/ui";
-import { LocalServer } from "@/lib/server/local/server";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -209,8 +201,6 @@ async function socialFor(
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
-  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
 describe("ChooseSocialSignIn", () => {

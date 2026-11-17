@@ -11,6 +11,7 @@ import type { Confirmer } from "@/lib/ui/questions";
  */
 export type Verb =
   | "call"
+  | "cancel"
   | "deactivate"
   | "delete"
   | "deploy"
@@ -74,7 +75,7 @@ const granted = new WeakSet<object>();
  * Proof that a person, or `--force`, agreed to one destructive action. Every
  * destructive operation takes one: the client's (`deleteVariable`,
  * `revokeRelease`; the spec marks them) are reached only through
- * {@link Consent.unlock}, and the local ones (`LocalServer.reset`, `eject`'s
+ * {@link Consent.unlock}, and the local ones (`LocalRuntime.reset`, `eject`'s
  * removals) take it as a parameter.
  *
  * Only {@link Consent.request} makes one: the constructor is private, and a private

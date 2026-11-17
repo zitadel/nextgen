@@ -1,3 +1,4 @@
+import { SystemMachine } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   type ClientId,
@@ -232,7 +233,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           }),
         )
         .step(new ReadClaims())
-        .step(new PlanChange())
+        .step(
+          new PlanChange({
+            machine: new SystemMachine(),
+          }),
+        )
         .step(new IntroduceProvider())
         .endWhen(
           new PreviewChange({
