@@ -274,7 +274,7 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
-      ...(error instanceof BrokenFlowsError
+      ...(error instanceof BrokenFlowsError && error.hint?.includes("deploy --dry-run")
         ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
         : {}),
     });

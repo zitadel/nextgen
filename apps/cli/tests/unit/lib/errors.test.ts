@@ -136,20 +136,32 @@ describe("toZitadelError", () => {
   });
 
   it.each([
-    ["a method still in use", { kind: "method-in-use", uses: [] }],
-    ["a change that breaks a flow", { kind: "broken" }],
-  ] as const)("gives %s a dry run of deploy as its follow-up", (_name, report) => {
+    [
+      "a method still in use",
+      { kind: "method-in-use", uses: [], hint: "`zitadel deploy --dry-run` checks the edit." },
+      [{ id: "deploy", flags: { dryRun: true } }],
+    ],
+    [
+      "flows already broken on disk",
+      { kind: "broken", hint: "Fix those errors first (`zitadel deploy --dry-run` reports them)." },
+      [{ id: "deploy", flags: { dryRun: true } }],
+    ],
+    [
+      "an edit that would break a flow, which is never saved",
+      { kind: "broken", hint: "Fix the steps named above, then run the command again." },
+      undefined,
+    ],
+  ] as const)("gives %s its follow-up", (_name, report, next) => {
     const result = toZitadelError(
       new BrokenFlowsError({
         ...report,
         file: "default-human-user.json",
         heading: "A login flow would break:",
-        hint: "Fix it.",
         issues: [],
       }),
     );
 
-    expect(result.nextCommands).toEqual([{ id: "deploy", flags: { dryRun: true } }]);
+    expect(result.nextCommands).toEqual(next);
   });
 
   it("leaves out the hint and details a ConfigError has none of", () => {
