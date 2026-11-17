@@ -24,6 +24,7 @@ export type LocalServerErrorKind =
   | "processes-did-not-stop"
   | "server-did-not-stop"
   | "permit-mismatch"
+  | "processes-unlistable"
   | "docker-unavailable"
   | "no-free-port"
   | "port-in-use"

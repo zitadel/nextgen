@@ -1,4 +1,4 @@
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
@@ -301,6 +301,66 @@ describe("LocalRuntime", () => {
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).resolves.toBeDefined();
+    });
+
+    it("deletes nothing when the record cannot be read and the machine's processes cannot be listed", async ({
+      dir: cwd,
+    }) => {
+      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+      await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
+
+      await expect(
+        at(cwd, {
+          servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
+        }).reset(DestroyPermit.forFolder(cwd)),
+      ).rejects.toMatchObject({ kind: "processes-unlistable" });
+
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
+    });
+
+    it("resets a folder that never started a server on a machine whose processes cannot be listed", async ({
+      dir: cwd,
+    }) => {
+      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+
+      await at(cwd, {
+        servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
+      }).reset(DestroyPermit.forFolder(cwd));
+
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("finds the server process of a folder reached through a symlink", async ({
+      dir: cwd,
+      other,
+    }) => {
+      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+      await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
+      const link = join(other, "link");
+      await symlink(cwd, link);
+      const stopped: number[] = [];
+
+      await at(cwd, {
+        servers: {
+          current: async () => ({
+            supported: true,
+            processes: [
+              {
+                command: "nextgen",
+                data_dir: localRuntimePaths(link).dataDir,
+                kind: "server-binary",
+                pid: 4242,
+              },
+            ],
+          }),
+        },
+        stopPid: async (pid) => {
+          stopped.push(pid);
+          return { pid, status: "stopped", target: "process", signal: "SIGTERM" };
+        },
+      }).reset(DestroyPermit.forFolder(cwd));
+
+      expect(stopped).toEqual([4242]);
     });
 
     it("refuses a permit for another folder, and deletes nothing", async ({ dir: cwd, other }) => {

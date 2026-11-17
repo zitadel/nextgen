@@ -1,3 +1,4 @@
+import { readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { DEFAULT_SERVER } from "@zitadel/config/server";
@@ -1247,14 +1248,17 @@ export class LocalRuntime extends ZitadelRuntime {
    * sign in, because the server only imports the admin once. The data cannot
    * be recovered, so it takes a permit for exactly this folder.
    *
-   * @param permit - The caller's proof that deleting is meant.
-   * @returns What stopping the server did.
    * Without a readable record, the managed server processes running on this
    * folder's data are stopped first, and none is deleted from under a process
-   * that would not stop.
+   * that would not stop. A record that exists but cannot be read, on a machine
+   * whose processes cannot be listed, is refused: nothing says whether a server
+   * still runs on the data.
    *
+   * @param permit - The caller's proof that deleting is meant.
+   * @returns What stopping the server did.
    * @throws {LocalServerError} `permit-mismatch` when the permit is for another folder.
    * @throws {LocalServerError} `server-did-not-stop` when a process on this folder's data would not stop.
+   * @throws {LocalServerError} `processes-unlistable` when the record cannot be read and the machine's processes cannot be listed.
    */
   async reset(permit: DestroyPermit): Promise<StopReport> {
     if (resolve(permit.folder) !== resolve(this.cwd)) {
@@ -1276,10 +1280,46 @@ export class LocalRuntime extends ZitadelRuntime {
       // running on this folder's data are found by their command lines, and
       // stopped before the data is deleted from under them.
       const discovery = await this.directory.servers.current();
-      const dataDir = resolve(localRuntimePaths(this.cwd).dataDir);
-      const mine = discovery.processes.filter((processInfo) => {
-        return processInfo.data_dir !== undefined && resolve(processInfo.data_dir) === dataDir;
-      });
+      if (!discovery.supported) {
+        const recordExists = await readFile(localRuntimePaths(this.cwd).runtimeFile, "utf8").then(
+          () => {
+            return true;
+          },
+          () => {
+            return false;
+          },
+        );
+        if (recordExists) {
+          throw new LocalServerError(
+            "processes-unlistable",
+            "E_VALIDATION",
+            "The local runtime record cannot be read and the machine's processes cannot be listed",
+            { error: discovery.error },
+          );
+        }
+      }
+      const realPath = (path: string): Promise<string> => {
+        return realpath(path).catch(() => {
+          return resolve(path);
+        });
+      };
+      const dataDir = await realPath(localRuntimePaths(this.cwd).dataDir);
+      const listed = await Promise.all(
+        discovery.processes.map(async (processInfo) => {
+          return {
+            processInfo,
+            dataDir:
+              processInfo.data_dir === undefined ? undefined : await realPath(processInfo.data_dir),
+          };
+        }),
+      );
+      const mine = listed
+        .filter((entry) => {
+          return entry.dataDir === dataDir;
+        })
+        .map((entry) => {
+          return entry.processInfo;
+        });
       for (const processInfo of mine) {
         orphans.push({
           process: processInfo,

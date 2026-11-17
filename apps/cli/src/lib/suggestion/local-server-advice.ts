@@ -96,6 +96,9 @@ export const LOCAL_SERVER_ADVICE = {
     hint: "Read `zitadel logs` for why the server did not become healthy, then run `zitadel start` again.",
     next: [{ id: "logs" }, { id: "start" }],
   },
+  "processes-unlistable": {
+    hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
+  },
   "permit-mismatch": {
     hint: "A reset acts on one folder only. Run it from the folder whose server you mean to reset.",
   },
