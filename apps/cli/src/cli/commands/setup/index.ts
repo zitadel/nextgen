@@ -38,6 +38,7 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
+import { FlowTelemetry } from "@/lib/oclif/flow-telemetry";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { accepts, parses, reads } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -51,7 +52,14 @@ import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
-import { DEFAULT_RENDERER, type Fact, PORT } from "./shared";
+import {
+  DEFAULT_RENDERER,
+  type Fact,
+  ONBOARDING_CHECKS,
+  ONBOARDING_STEPS,
+  PORT,
+  type SetupFacts,
+} from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
 import { CheckPatch } from "./steps/check-patch";
 import { CheckPreconditions } from "./steps/check-preconditions";
@@ -391,6 +399,21 @@ export default class Setup extends Destructive(BaseCommand) {
       ui: this.ui,
     };
 
+    const onboarding = new FlowTelemetry<Partial<SetupFacts>>({
+      flow: "onboarding",
+      steps: ONBOARDING_STEPS,
+      failures: ONBOARDING_CHECKS,
+      completesAt: "result",
+      otherwise: "application_setup",
+      preview: () => {
+        return this.dryRun;
+      },
+      send: (event, properties) => {
+        this.trackEvent(event, properties);
+      },
+    });
+    onboarding.begin();
+
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("setup")
         .step(
@@ -642,6 +665,7 @@ export default class Setup extends Destructive(BaseCommand) {
         .run(
           { flags },
           {
+            watch: onboarding.watcher,
             onUndoError: (key, error) => {
               warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

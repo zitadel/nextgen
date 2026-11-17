@@ -503,8 +503,7 @@ components:
         destinations: [mixpanel, vercel]
         properties: [status, reason, exit_code, duration_ms]
       flow_started:
-        status: planned
-        plan: "#2200"
+        status: emitted
         trigger: Onboarding begins, before its initial checks; or identity provider setup begins.
         destinations: [mixpanel]
         properties: [flow, entry_point, provider_type]
@@ -515,23 +514,20 @@ components:
         destinations: [mixpanel]
         properties: [flow, step]
       step_completed:
-        status: planned
-        plan: "#2200"
+        status: emitted
         trigger: A setup choice is confirmed, or resolved from the options given.
         destinations: [mixpanel]
         properties: [flow, step, framework, server_type, use_case, preset, provider_types]
       flow_completed:
-        status: planned
-        plan: "#2200"
+        status: emitted
         trigger: A new application's setup succeeds; or an identity provider and its credentials are saved.
         destinations: [mixpanel]
-        properties: [flow, duration_ms, framework, use_case, preset, entry_point, provider_type]
+        properties: [flow, duration_ms, framework, server_type, use_case, preset, provider_types, entry_point, provider_type]
       flow_failed:
-        status: planned
-        plan: "#2200"
+        status: emitted
         trigger: Setup fails; or identity provider setup fails.
         destinations: [mixpanel]
-        properties: [flow, step, duration_ms, reason, framework, use_case, preset, entry_point, provider_type]
+        properties: [flow, step, duration_ms, reason, framework, server_type, use_case, preset, provider_types, entry_point, provider_type]
       action_completed:
         status: planned
         plan: "#2200"

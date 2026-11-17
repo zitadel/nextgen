@@ -47,7 +47,8 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import { LocalServer, type ResolvedServer } from "@/lib/server";
+import type { FlowStep } from "@/lib/oclif/flow-telemetry";
+import { LocalServer, type ResolvedServer, Server } from "@/lib/server";
 import { readNearestRuntimeMetadata, sameLocalServer } from "@/lib/server/local/runtime";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { style } from "@/lib/ui";
@@ -1632,3 +1633,60 @@ export async function refuseOutdatedLocalServer(
     },
   );
 }
+
+/**
+ * How the onboarding flow reports the steps of `setup` that settle a choice,
+ * by the step's key. The names are the event catalog's.
+ */
+export const ONBOARDING_STEPS: Readonly<Record<string, FlowStep<Partial<SetupFacts>>>> = {
+  detect: {
+    step: "framework_selection",
+    choice: ({ found }) => {
+      return { framework: found?.app.framework };
+    },
+  },
+  server: {
+    step: "server_selection",
+    choice: ({ answers }) => {
+      return {
+        server_type: answers !== undefined && Server.at(answers.server).kind === "local" ? "local" : "remote",
+      };
+    },
+  },
+  devPort: {
+    step: "dev_port_selection",
+  },
+  useCase: {
+    step: "use_case_selection",
+    choice: ({ answers }) => {
+      return { use_case: answers?.useCase };
+    },
+  },
+  signInPreset: {
+    step: "preset_selection",
+    choice: ({ answers }) => {
+      return { preset: answers?.preset };
+    },
+  },
+  socialSignIn: {
+    step: "provider_selection",
+    choice: ({ answers }) => {
+      return {
+        provider_types: (answers?.sso ?? []).map((draft) => {
+          return selectionName(draft.selection);
+        }),
+      };
+    },
+  },
+};
+
+/**
+ * The steps of `setup` that run before its questions, and so report a failure
+ * as an initial check.
+ */
+export const ONBOARDING_CHECKS: Readonly<Record<string, string>> = {
+  preconditions: "initial_checks",
+  moveDevPort: "initial_checks",
+  alreadySetUp: "initial_checks",
+  ssoFlags: "initial_checks",
+};

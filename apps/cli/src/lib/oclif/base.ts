@@ -599,6 +599,23 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
+   * Sends an event of the event catalog with the run's common properties, if
+   * the developer has not opted out. For the events a flow or an action
+   * reports; the three lifecycle events are sent by the base command itself.
+   *
+   * @param event - The event's name.
+   * @param properties - The event's own properties.
+   */
+  protected trackEvent(event: string, properties: Properties): void {
+    if (this.telemetry?.enabled) {
+      this.telemetry.track(
+        event,
+        commandEventProperties(this.meta, this.telemetryInvocationId, properties),
+      );
+    }
+  }
+
+  /**
    * Builds {@link GlobalOptions} from parsed flags and stores the result on
    * `this.meta` so the error handler can render a complete envelope. The server
    * `source` is `--server` or the cloud default, which is `setup`'s rule; a
