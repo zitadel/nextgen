@@ -1,8 +1,5 @@
-import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { AddAdminDialog } from "./add-admin-dialog";
-import { CARD_ACTION_BUTTON } from "@/components/detail-page";
 import { type Removable, RemoveAdminDialog } from "./remove-admin-dialog";
 import {
   RESOURCE_CELL,
@@ -16,7 +13,6 @@ import {
   RowMenu,
 } from "@/components/resource-list";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { joinAnd, titleCase } from "@/lib/text";
@@ -29,11 +25,10 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 /**
  * A project's admins: who administers it, how each of them holds that access,
- * and how it is given and taken away (#1025, journey in #769). The Members tab
+ * and how it is taken away (#1025, journey in #769). The Members tab
  * of the project's Settings (D40), because a grant is project-level data
  * (#1238): the project id comes from the route, and every request made from
- * here carries it. The Add button is `AddAdminButton`, which the page draws on
- * the tabs' row.
+ * here carries it.
  *
  * **People come from `GET /projects/{id}/admins`** (#1462). It lists each person
  * once with every way they hold admin access: membership in the owning team,
@@ -59,17 +54,10 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  * project through neither a grant nor the owning team, so nothing here is
  * theirs, and the table says nothing about it.
  *
- * **Not an invite flow.** The design draws `Invite`, a `Pending` status and
- * revoke/resend actions, but a grant is only ever created against a person who
- * already exists: `POST /grants` takes a user locator, and the grant resource
- * carries no status field, so there is no pending state to render and nothing
- * to revoke before signup. #769 says the same in its scope — the colleague signs
- * up through a separately shared link, and access is given afterwards. The
- * button therefore adds an existing person rather than inviting a new one.
- *
- * **`admin` only, by design.** The catalog defines `viewer` and `editor` too,
- * and the table renders whichever relation a grant carries, but this section
- * only ever creates `admin`: #769 puts other access levels out of scope.
+ * **Access is given by invitation, not here.** The table lists and revokes;
+ * a colleague is brought in with a link from the Invitations tab beside it
+ * (root ADR 086), which is also where a pending or expired link shows. A grant
+ * carries no status, so there is nothing pending to draw in this table.
  */
 export function ProjectAdmins({
   projectId,
@@ -136,21 +124,6 @@ export function ProjectAdmins({
         </Table>
       </div>
     </section>
-  );
-}
-
-/**
- * Add admin, drawn on the tabs' row of the Members page rather than in the table:
- * the secondary small button the design placed beside the tabs.
- */
-export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
-  return (
-    <AddAdminDialog projectId={projectId} onAdded={onAdded}>
-      <Button variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
-        <Plus aria-hidden />
-        Add admin
-      </Button>
-    </AddAdminDialog>
   );
 }
 
