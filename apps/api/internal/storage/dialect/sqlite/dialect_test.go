@@ -4,29 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestFileURI(t *testing.T) {
-	t.Parallel()
-
-	for name, tc := range map[string]struct{ path, prefix string }{
-		"posix absolute path":      {"/var/data/zitadel.db", "file:///var/data/zitadel.db?"},
-		"windows drive path":       {"D:/a/_temp/app/zitadel.db", "file:///D:/a/_temp/app/zitadel.db?"},
-		"windows path with spaces": {"C:/Program Files/z/zitadel.db", "file:///C:/Program%20Files/z/zitadel.db?"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			got := fileURI(tc.path)
-			assert.True(t, strings.HasPrefix(got, tc.prefix), got)
-			assert.Contains(t, got, "foreign_keys")
-		})
-	}
-}
 
 func TestMergeSQLitePragmas(t *testing.T) {
 	t.Parallel()
@@ -81,6 +65,9 @@ func TestConfigMemoryUsesUniqueName(t *testing.T) {
 
 func TestConnectTightensFilePermissions(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX file modes: it reports every file as 0666 and ignores chmod")
+	}
 
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "zitadel.db")
@@ -106,6 +93,9 @@ func TestConfigPathURIEscapesMetacharacters(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			if runtime.GOOS == "windows" && strings.ContainsAny(tc.dir, "?*<>|:\"") {
+				t.Skip("Windows does not allow this character in a directory name")
+			}
 			root := t.TempDir()
 			dir := filepath.Join(root, tc.dir)
 			require.NoError(t, os.MkdirAll(dir, 0o700))

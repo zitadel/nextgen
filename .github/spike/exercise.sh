@@ -160,11 +160,15 @@ else FAIL=$((FAIL+1)); echo "| FAIL | port: refusal code is E_PORT_IN_USE | - |"
 t "port: start without --port takes a free port" z start --non-interactive --json
 t "port: status reports a running server" z status --json
 t "port: stop" z stop
-if pgrep -f "zitadel-server\|nextgen" > /dev/null 2>&1 || tasklist 2>/dev/null | grep -qi "zitadel\|nextgen"; then
+LEFT=$( { pgrep -fl "zitadel-server|nextgen" 2>/dev/null; tasklist 2>/dev/null | grep -iE "zitadel|nextgen"; } || true)
+if [ -n "$LEFT" ]; then
   FAIL=$((FAIL+1)); echo "| FAIL | stop leaves no server process behind | - |" >> "$OUT"
+  { echo "<details><summary>processes left after stop</summary>"; echo '```'; echo "$LEFT"; echo '```'; echo "</details>"; } >> "$RUNNER_TEMP/details.md"
 else PASS=$((PASS+1)); echo "| PASS | stop leaves no server process behind | - |" >> "$OUT"; fi
-if [ -n "$(find "$RUNNER_TEMP/ports/.zitadel/local" -name '*-wal' -size +0 2>/dev/null)" ]; then
+WAL=$(find "$RUNNER_TEMP/ports/.zitadel" -name '*-wal' -size +0 2>/dev/null)
+if [ -n "$WAL" ]; then
   FAIL=$((FAIL+1)); echo "| FAIL | stop leaves a non-empty SQLite WAL (not a clean shutdown) | - |" >> "$OUT"
+  { echo "<details><summary>WAL files after stop</summary>"; echo '```'; ls -l $WAL; echo '```'; echo "</details>"; } >> "$RUNNER_TEMP/details.md"
 else PASS=$((PASS+1)); echo "| PASS | stop leaves no pending SQLite WAL | - |" >> "$OUT"; fi
 kill "$BLOCKER" 2>/dev/null || true
 cd "$RUNNER_TEMP"
