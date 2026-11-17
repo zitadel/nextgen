@@ -228,6 +228,10 @@
   `Destructive` around it. `LocalServerCommand` does not take `--server`; a
   command that also reads one is `LocalServerCommand(ServerCommand(Base))`.
   Each local-server command declares its own `group`.
+  `start`, `stop`, `logs`, `reset`, `setup`, `upgrade`, `eject` and a few more
+  still wrap `ServerCommand(...)` only to keep accepting `--server`, which they
+  ignore, each overriding `resolveServer` to name no server: leave them as they
+  are until the flag is removed from them.
 - "Server" on its own is the Zitadel instance a command talks to by URL. The
   "local server" is the one `zitadel start` runs in a folder. The "server
   binary" is `@zitadel/server`.

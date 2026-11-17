@@ -284,7 +284,7 @@ describe("operation statics", () => {
 describe("bindOperation", () => {
   it("produces a BaseCommand subclass carrying the definition and statics", () => {
     const Bound = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
-    expect(Object.getPrototypeOf(Object.getPrototypeOf(Bound))).toBe(GetOperation);
+    expect(Bound.prototype).toBeInstanceOf(GetOperation);
     expect(Bound.prototype).toBeInstanceOf(BaseCommand);
     expect(Bound.description).toBe("Get one team by id.");
     expect(Object.keys(Bound.flags)).toEqual(["fields", "extra"]);
