@@ -339,7 +339,7 @@ export abstract class AuthMethodCommand extends Destructive(ServerCommand(Enviro
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.
   static override baseFlags = {
-    ...EnvironmentCommand.baseFlags,
+    ...super.baseFlags,
     ...HIDDEN_ENVIRONMENT_FLAGS,
     schema: nonBlankString({
       description:

@@ -1,4 +1,5 @@
 import type { ServerAddresses } from "@/lib/environment";
+import { serverFlag } from "@/lib/oclif/flags";
 import type { BaseCommand } from "@/lib/oclif";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import { Promptable } from "@/lib/oclif/promptable";
@@ -12,6 +13,15 @@ import {
 } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { log } from "@/lib/ui";
+
+/**
+ * `--server`: the one flag every {@link ServerCommand} takes, declared once so
+ * every command carries the same one.
+ */
+const SERVER = serverFlag({
+  char: "s",
+  description: "Override the resolved server URL.",
+});
 
 /**
  * Marks a command that talks to a Zitadel server, and gives it the one way a
@@ -35,10 +45,12 @@ export function ServerCommand<
   TBase extends CommandClass<BaseCommand> &
     Pick<typeof BaseCommand, "baseFlags" | "enableJsonFlag">,
 >(Base: TBase) {
+  const { cwd, ...others } = Base.baseFlags;
   abstract class ServerResolving extends Base {
     // oclif reads a command's statics up the chain of classes only while each
     // declares a static of its own, so this mixin declares the two it passes on.
-    static override baseFlags = { ...Base.baseFlags };
+    // `--server` sits after `--cwd`, where the help and the reference list it.
+    static override baseFlags = { cwd: cwd, server: SERVER, ...others };
     static override enableJsonFlag = Base.enableJsonFlag;
 
     /**
@@ -55,6 +67,22 @@ export function ServerCommand<
       serverFlag: string | undefined,
     ): Promise<string> {
       return (await ZitadelRuntime.resolve({ cwd, serverFlag })).value;
+    }
+
+    /**
+     * @param flags - The parsed flags.
+     * @returns What `--server` was given as, if it was.
+     */
+    protected override serverFlagOf(flags: Record<string, unknown>): string | undefined {
+      return typeof flags.server === "string" ? flags.server : undefined;
+    }
+
+    /**
+     * @returns What `--server` was typed as on the command line, for a failure
+     *   that came before the flags were parsed.
+     */
+    protected override serverFlagFromArgv(): string | undefined {
+      return this.argvFlag("--server");
     }
 
     /**

@@ -219,7 +219,20 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   // in every command, so only the base flags' letters are known. A flag every
   // command takes a value for takes the next word whatever it is, as oclif
   // would; any other leaves a word that is a flag itself, such as `--json`.
-  const base = Object.entries(BaseCommand.baseFlags);
+  // The flags every command takes: the base flags, and any a mixin adds to all
+  // of them, such as `--server`.
+  const base = [
+    ...Object.entries(BaseCommand.baseFlags),
+    ...Object.entries(config.commands[0]?.flags ?? {}).filter(([name, flag]) => {
+      return (
+        !(name in BaseCommand.baseFlags) &&
+        config.commands.every((command) => {
+          const other = command.flags[name];
+          return other?.type === flag.type && other.char === flag.char;
+        })
+      );
+    }),
+  ];
   const switches = new Map<string, boolean>([["json", true]]);
   for (const [name, flag] of [
     ...base,
@@ -246,9 +259,13 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
     }),
   );
   const lettered = (letter: string) => {
-    return Object.values(BaseCommand.baseFlags).find((flag) => {
-      return flag.char === letter;
-    });
+    return base
+      .map(([, flag]) => {
+        return flag;
+      })
+      .find((flag) => {
+        return flag.char === letter;
+      });
   };
   const words: string[] = [];
   // biome-ignore lint/plugin: scanner state the loop updates as it reads argv

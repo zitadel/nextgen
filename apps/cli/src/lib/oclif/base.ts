@@ -6,7 +6,7 @@ import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { byName, type ByName } from "@/lib/names";
-import { nonBlankString, serverFlag } from "./flags";
+import { nonBlankString } from "./flags";
 import { Interruptible } from "./interruptible";
 import { log, style, warnings } from "@/lib/ui";
 
@@ -178,10 +178,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
-    server: serverFlag({
-      char: "s",
-      description: "Override the resolved server URL.",
-    }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -720,14 +716,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * What `--server` was given as, read from the parsed flags: the command
-   * that takes the flag says, and one that does not has none.
+   * What `--server` was given as, read from the parsed flags: a command that
+   * takes the flag says (`ServerCommand`), and one that does not has none.
    *
    * @param flags - The parsed flags, by name.
    * @returns The flag as it was typed, if it was.
    */
-  protected serverFlagOf(flags: Record<string, unknown>): string | undefined {
-    return typeof flags.server === "string" ? flags.server : undefined;
+  protected serverFlagOf(_flags: Record<string, unknown>): string | undefined {
+    return undefined;
   }
 
   /**
@@ -737,7 +733,18 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @returns The flag as it was typed, if it was.
    */
   protected serverFlagFromArgv(): string | undefined {
-    return argvValue(this.argv, "--server");
+    return undefined;
+  }
+
+  /**
+   * What an option has on the command line, as `--name value` or `--name=value`,
+   * for a command that reads one of its own flags before any is parsed.
+   *
+   * @param names - The spellings of the option.
+   * @returns The value, if it was typed.
+   */
+  protected argvFlag(...names: string[]): string | undefined {
+    return argvValue(this.argv, ...names);
   }
 
   /**
