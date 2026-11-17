@@ -10,6 +10,7 @@ import { mergeDocuments, typedValue } from "@/lib/oclif/crud/document";
 import { describeBody } from "@/lib/oclif/crud/fields";
 import type { Schema } from "@/lib/oclif/crud/types";
 import { nodeAt, unwrap, type ZodLike } from "@/lib/oclif/crud/zod";
+import type { Suggested } from "@/lib/suggestion";
 
 /** The flag a field is given with, which errors name. */
 const FIELD = "--field";
@@ -77,11 +78,13 @@ export class ApiCall {
    * its end would look like a hang, so `-` with nothing piped in is refused.
    *
    * @param source - The path, `-` for stdin, or undefined when none was given.
+   * @param retry - The run again with `--input <path>`, which the refusal suggests.
    * @returns The document, or undefined when no source was given.
    * @throws {ZitadelError} E_VALIDATION when `-` is given with nothing piped in, or the document is no JSON object.
    */
   static async readInput(
     source: string | undefined,
+    retry: Suggested,
   ): Promise<Readonly<Record<string, unknown>> | undefined> {
     if (source === undefined) {
       return undefined;
@@ -93,7 +96,7 @@ export class ApiCall {
           "--input - reads the body from a pipe, but nothing is piped in",
           {
             hint: "Pipe a body in and pass --input -, or pass --input <path>.",
-            retry: { with: { input: "<path>" }, without: ["field"] },
+            nextCommands: [retry],
           },
         );
       }

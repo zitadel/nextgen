@@ -8,7 +8,7 @@ import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
 import { log, style, warnings } from "@/lib/ui";
 
-import { errorMessage, failureText, toZitadelError, ZitadelError } from "@/lib/errors";
+import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/server/local/processes";
 import { resolveCwd } from "@/lib/paths";
@@ -1018,32 +1018,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * A failure with the run it asks to be suggested again added to its next
-   * commands. Code below a command names the change as data
-   * ({@link ZitadelError.retry}); the command builds it here, so one place
-   * puts the run's arguments and flags back on.
-   *
-   * @param failure - The failure as it was raised.
-   * @returns The same failure when it asks for no retry or the retry cannot be
-   *   built, else a copy that lists it.
-   */
-  private async retried(failure: ZitadelError): Promise<ZitadelError> {
-    if (failure.retry === undefined) {
-      return failure;
-    }
-    try {
-      return new ZitadelError(failure.code, failure.raised, {
-        hint: failure.hint,
-        nextCommands: [...(failure.nextCommands ?? []), await this.rebuilt(failure.retry)],
-        details: failure.details,
-      });
-    } catch (cause) {
-      log.debug(`Left out a retry that could not be built: ${errorMessage(cause)}`);
-      return failure;
-    }
-  }
-
-  /**
    * Renders any thrown error as the failure envelope and exits with its code.
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
@@ -1064,9 +1038,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
       this.config.findCommand(meta.command) === undefined
         ? commandOf(["--help"], meta.cliVersion)
         : this.suggest(helpOf(meta.command));
-    const failure = cancelled ? reason : toZitadelError(error);
     const zitadelError = presentedFailure(
-      this.suggestions.renderedFailure(await this.retried(failure)),
+      this.suggestions.renderedFailure(cancelled ? reason : toZitadelError(error)),
       help,
     );
     this.meta = meta;
