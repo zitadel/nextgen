@@ -67,7 +67,7 @@ func TestReleaseSettingsReadsThePinnedRevision(t *testing.T) {
 
 	got, err := source.Get(t.Context(), customerIssuer(t))
 	require.NoError(t, err)
-	assert.Equal(t, Settings{Enabled: true}, got)
+	assert.Equal(t, Settings{Enabled: true, DeploymentID: "dep_1", ReleaseID: "rel_1"}, got)
 	assert.Equal(t, []string{"proj_app|https://app.example.com"}, rt.resolved, "the deployment to the issuer's origin decides")
 }
 

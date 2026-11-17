@@ -37,9 +37,13 @@ type Admission interface {
 	Admit(ctx context.Context, projectID, origin string) error
 }
 
-// Settings are the OAuth settings of an issuer's project.
+// Settings are the OAuth settings of an issuer's project, with the
+// deployment and release they were read from, so a flow the issuer opens
+// keeps reading that release.
 type Settings struct {
-	Enabled bool
+	Enabled      bool
+	DeploymentID string
+	ReleaseID    string
 }
 
 // SettingsSource reads the OAuth settings that apply to an issuer.

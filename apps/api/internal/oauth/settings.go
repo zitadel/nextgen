@@ -55,7 +55,7 @@ func (s *ReleaseSettings) Get(ctx context.Context, issuer Issuer) (Settings, err
 	if settings == nil {
 		return Settings{}, nil
 	}
-	return Settings{Enabled: settings.Enabled}, nil
+	return Settings{Enabled: settings.Enabled, DeploymentID: resolution.Deployment.ID, ReleaseID: resolution.Release.ID}, nil
 }
 
 // deployedToIssuer reports whether resolution is a primary deployment made
