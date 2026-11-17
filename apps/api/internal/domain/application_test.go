@@ -279,9 +279,10 @@ func TestApplicationClientsToCreate(t *testing.T) {
 // A release checks clients against every client the application ever
 // stored: it may drop one and declare it again, never under another
 // client_id.
-func TestDeclaredClientsToCreate(t *testing.T) {
+func TestReviseDeclaredApplication(t *testing.T) {
 	t.Parallel()
 
+	declared := &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop", IsDeclared: true}
 	stored := []*domain.ApplicationClient{
 		{Slug: "web", ClientID: "shop-web"},
 		{Slug: "api", ClientID: "shop-api"},
@@ -289,56 +290,62 @@ func TestDeclaredClientsToCreate(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		stored      []*domain.ApplicationClient
+		old         *domain.Application
 		document    []domain.ApplicationClientDocument
-		want        []string
+		want        []*domain.ApplicationClient
 		wantErr     error
 		wantDetails any
 	}{
 		{
-			name:     "on create every client is new",
-			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
-			want:     []string{"web"},
-		},
-		{
 			name:     "a dropped client is not an error",
-			stored:   stored,
+			old:      declared,
 			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+			want:     []*domain.ApplicationClient{},
 		},
 		{
 			name:     "a client declared again under its client_id is not created again",
-			stored:   stored,
+			old:      declared,
 			document: []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api")}, {Slug: "cli", ClientID: new("shop-cli")}},
-			want:     []string{"cli"},
+			want:     []*domain.ApplicationClient{{ProjectID: "prj", Slug: "cli", ClientID: "shop-cli"}},
 		},
 		{
 			name:        "a client declared again under another client_id",
-			stored:      stored,
+			old:         declared,
 			document:    []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api-2")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
 			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
 		},
 		{
 			name:     "a new client with a reserved prefix",
-			stored:   stored,
+			old:      declared,
 			document: []domain.ApplicationClientDocument{{Slug: "cli", ClientID: new("client_mine")}},
 			wantErr:  domain.ErrApplicationInvalid(nil, nil),
 			wantDetails: map[string]string{
 				"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_",
 			},
 		},
+		{
+			name:     "a registered application",
+			old:      &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop"},
+			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+			wantErr:  domain.ErrApplicationRegistered(),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := domain.DeclaredClientsToCreate(tt.stored, domain.ApplicationDocument{Clients: tt.document})
+			revised, got, err := domain.ReviseDeclaredApplication(tt.old, stored, domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.document}, []byte("{}"))
 			if tt.wantErr == nil {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
+				assert.Equal(t, &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop", IsDeclared: true, Document: []byte("{}")}, revised)
 				return
 			}
 			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantDetails == nil {
+				return
+			}
 			var de domain.Error
 			require.True(t, errors.As(err, &de))
 			assert.Equal(t, tt.wantDetails, de.Details)

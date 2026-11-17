@@ -18396,7 +18396,7 @@ func (c *MockApplicationServiceClientCall) DoAndReturn(f func(context.Context, s
 }
 
 // CreateOrRevise mocks base method.
-func (m *MockApplicationService) CreateOrRevise(ctx context.Context, projectID string, document []byte) (*service.CreateApplicationOutput, error) {
+func (m *MockApplicationService) CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte) (*service.CreateApplicationOutput, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateOrRevise", ctx, projectID, document)
 	ret0, _ := ret[0].(*service.CreateApplicationOutput)
@@ -18407,7 +18407,7 @@ func (m *MockApplicationService) CreateOrRevise(ctx context.Context, projectID s
 // CreateOrRevise indicates an expected call of CreateOrRevise.
 func (mr *MockApplicationServiceMockRecorder) CreateOrRevise(ctx, projectID, document any) *MockApplicationServiceCreateOrReviseCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrRevise", reflect.TypeOf((*MockApplicationService)(nil).CreateOrRevise), ctx, projectID, document)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrRevise", reflect.TypeOf((*MockApplicationService)(nil).CreateOrReviseRegistered), ctx, projectID, document)
 	return &MockApplicationServiceCreateOrReviseCall{Call: call}
 }
 

@@ -18,7 +18,7 @@ func (h *Handler) PublishApplication(ctx context.Context, req *api.CreateApplica
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to encode application")
 	}
-	result, err := h.applicationService.CreateOrRevise(ctx, string(params.ProjectID), document)
+	result, err := h.applicationService.CreateOrReviseRegistered(ctx, string(params.ProjectID), document)
 	if err != nil {
 		return nil, err
 	}

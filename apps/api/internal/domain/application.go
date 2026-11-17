@@ -185,8 +185,10 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 	if err != nil {
 		return nil, nil, nil, ErrInternal(err).WithMessage("failed to parse stored application")
 	}
-	if err := validateNoImmutabilityViolations(oldDoc, newDoc); err != nil {
-		return nil, nil, nil, err
+	removed := removedClients(oldDoc.Clients, newDoc.Clients)
+	modifiedClientIDs := modifiedClientIDs(oldDoc.Clients, newDoc.Clients)
+	if len(removed) > 0 || len(modifiedClientIDs) == 0 {
+		return nil, nil, nil, ErrApplicationFieldImmutable(append(modifiedClientIDs, removed...))
 	}
 
 	toAdd := linq.FromSlice(newDoc.Clients).
@@ -218,6 +220,62 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 	return revisedApp, clientsToAdd, plainSecrets, nil
 }
 
+func NewDeclaredApplication(projectID string, doc ApplicationDocument, docBs []byte) (app *Application, clients []*ApplicationClient, err error) {
+	if err := ValidateDeclaredApplication(doc); err != nil {
+		return nil, nil, err
+	}
+
+	clients = make([]*ApplicationClient, len(doc.Clients))
+	for i, client := range doc.Clients {
+		clients[i] = &ApplicationClient{ProjectID: projectID, Slug: client.Slug, ClientID: gu.Value(client.ClientID)}
+	}
+
+	app = &Application{
+		ProjectID:  projectID,
+		Slug:       doc.Slug,
+		IsDeclared: true,
+		Document:   docBs,
+	}
+
+	return app, clients, nil
+}
+
+func (app *Application) ReviseDeclaredApplication(stored []*ApplicationClient, newDoc ApplicationDocument, docBs []byte) (revisedApp *Application, clientsToAdd []*ApplicationClient, err error) {
+	if !app.IsDeclared {
+		return nil, nil, ErrApplicationRegistered()
+	}
+	if err := ValidateDeclaredApplication(newDoc); err != nil {
+		return nil, nil, err
+	}
+
+	oldClients := linq.FromSlice(stored).
+		Select(func(client *ApplicationClient) ApplicationClientDocument {
+			return ApplicationClientDocument{Slug: client.Slug, ClientID: &client.ClientID}
+		}).
+		ToSlice()
+
+	if modifiedClientIDs := modifiedClientIDs(oldClients, newDoc.Clients); len(modifiedClientIDs) > 0 {
+		return nil, nil, ErrApplicationFieldImmutable(modifiedClientIDs)
+	}
+
+	toAdd, _ := slice_util.DiffFunc(oldClients, newDoc.Clients, func(a ApplicationClientDocument, b ApplicationClientDocument) bool { return a.Slug == b.Slug })
+	clientsToAdd = make([]*ApplicationClient, len(toAdd))
+	for i, client := range toAdd {
+		clientsToAdd[i] = &ApplicationClient{ProjectID: app.ProjectID, Slug: client.Slug, ClientID: gu.Value(client.ClientID)}
+	}
+
+	revisedApp = &Application{
+		ProjectID:  app.ProjectID,
+		ID:         app.ID,
+		Slug:       app.Slug,
+		CreatedAt:  app.CreatedAt,
+		IsDeclared: true,
+		Document:   docBs,
+	}
+
+	return revisedApp, clientsToAdd, nil
+}
+
 // The codes are literal: the ID prefix is "app", the error resource is
 // "application".
 
@@ -226,8 +284,16 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 // client's index in the new document, or its slug for an omitted client, which
 // has no index there.
 // todo (@grvijayan) : denying removal of a client is temporary until the deletion semantics are defined.
-func ErrApplicationFieldImmutable(details any) Error {
-	return newError(PrefixApplication.ErrorCodePrefix("field_immutable"), "application: a revision may not change a client's client_id or remove a client", details, nil)
+func ErrApplicationFieldImmutable(violatingClients []ApplicationClientDocument) Error {
+	return newError(
+		PrefixApplication.ErrorCodePrefix("field_immutable"),
+		"application: a revision may not change a client's client_id or remove a client",
+		map[string][]string{
+			"fields": linq.FromSlice(violatingClients).
+				Select(func(c ApplicationClientDocument) string { return "/clients/" + gu.Value(c.ClientID) }).
+				ToSlice(),
+		},
+		nil)
 }
 
 // ErrApplicationInvalid rejects a document that passes the schema but breaks
@@ -353,68 +419,26 @@ func validateApplicationDocument(doc ApplicationDocument) map[string]string {
 	return failures
 }
 
-func validateNoImmutabilityViolations(oldApp, newApp ApplicationDocument) error {
-	removedClients := linq.FromSlice(oldApp.Clients).
+func removedClients(oldClients, newClients []ApplicationClientDocument) []ApplicationClientDocument {
+	return linq.FromSlice(oldClients).
 		Where(func(oc ApplicationClientDocument) bool {
-			return !slices.ContainsFunc(newApp.Clients, func(c ApplicationClientDocument) bool { return oc.Slug == c.Slug })
+			return !slices.ContainsFunc(newClients, func(c ApplicationClientDocument) bool {
+				return oc.Slug == c.Slug
+			})
 		}).
 		ToSlice()
-	modifiedClientIds := linq.FromSlice(newApp.Clients).
+}
+
+func modifiedClientIDs(newClients, oldClients []ApplicationClientDocument) []ApplicationClientDocument {
+	return linq.FromSlice(oldClients).
 		Where(func(client ApplicationClientDocument) bool {
 			if client.ClientID == nil {
 				return false
 			}
-			oldClient, ok := slice_util.FindFunc(oldApp.Clients, func(c ApplicationClientDocument) bool { return c.Slug == client.Slug })
+			oldClient, ok := slice_util.FindFunc(newClients, func(c ApplicationClientDocument) bool {
+				return c.Slug == client.Slug
+			})
 			return ok && !sameString(oldClient.ClientID, client.ClientID)
-		}).
-		ToSlice()
-
-	if len(removedClients) > 0 || len(modifiedClientIds) > 0 {
-		return ErrApplicationFieldImmutable(map[string][]string{
-			"fields": linq.FromSlice(removedClients).Concat(linq.FromSlice(modifiedClientIds)).
-				Select(func(c ApplicationClientDocument) string { return "/clients/" + gu.Value(c.ClientID) }).
-				ToSlice(),
-		})
-	}
-
-	return nil
-}
-
-// DeclaredClientsToCreate returns the slugs of document's clients that have
-// no stored client yet, for a release. stored is every client the application
-// ever held, so a release may drop a client and declare it again, but never
-// under another client_id: dropping a client only stops serving it (ADR 082
-// section 3). Errors: app.field_immutable for a changed client_id,
-// app.invalid for a new client_id with a reserved prefix.
-func DeclaredClientsToCreate(stored []*ApplicationClient, document ApplicationDocument) ([]string, error) {
-	held := make([]ApplicationClientDocument, 0, len(stored))
-	for _, client := range stored {
-		held = append(held, ApplicationClientDocument{Slug: client.Slug, ClientID: &client.ClientID})
-	}
-	added, _ := slice_util.DiffFunc(held, document.Clients, func(a ApplicationClientDocument, b ApplicationClientDocument) bool { return a.Slug == b.Slug })
-	if immutable := changedClientIDs(held, document); len(immutable) > 0 {
-		return nil, ErrApplicationFieldImmutable(map[string][]string{"fields": immutable})
-	}
-	if failures := reservedClientIDFailures(added, document); len(failures) > 0 {
-		return nil, ErrApplicationInvalid(failures, nil)
-	}
-	return linq.FromSlice(added).
-		Select(func(client ApplicationClientDocument) string { return client.Slug }).
-		ToSlice(), nil
-}
-
-func changedClientIDs(original []ApplicationClientDocument, updated []ApplicationClientDocument) []ApplicationClientDocument {
-	return linq.FromSlice(updated).
-		Where(func(client ApplicationClientDocument) bool {
-			if client.ClientID == nil {
-				return false
-			}
-			i := slices.IndexFunc(original, func(c ApplicationClientDocument) bool { return c.Slug == client.Slug })
-			if i < 0 {
-				return false
-			}
-			existing := original[i]
-			return !sameString(existing.ClientID, client.ClientID)
 		}).
 		ToSlice()
 }
@@ -422,26 +446,6 @@ func changedClientIDs(original []ApplicationClientDocument, updated []Applicatio
 func HasReservedClientIDPRefix(clientID string) bool {
 	return slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
 		return strings.HasPrefix(clientID, prefix)
-	})
-}
-
-func reservedClientIDFailures(added []ApplicationClientDocument, document ApplicationDocument) map[string]string {
-	return linq.FromSlice(added).
-		Where(func(client ApplicationClientDocument) bool { return hasReservedPrefix(client.ClientID) }).
-		ToMapBy(
-			func(client ApplicationClientDocument) string {
-				i := slices.IndexFunc(document.Clients, func(c ApplicationClientDocument) bool { return c.Slug == client.Slug })
-				return fmt.Sprintf("/clients/%d/client_id", i)
-			},
-			func(client ApplicationClientDocument) string {
-				return "a supplied client_id may not start with " + strings.Join(reservedClientIDPrefixes, " or ")
-			},
-		)
-}
-
-func hasReservedPrefix(clientID *string) bool {
-	return clientID != nil && slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
-		return strings.HasPrefix(*clientID, prefix)
 	})
 }
 

@@ -37,7 +37,7 @@ type ServedApplicationClient struct {
 }
 
 type ApplicationService interface {
-	CreateOrRevise(ctx context.Context, projectID string, document []byte) (*CreateApplicationOutput, error)
+	CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte) (*CreateApplicationOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Application, error)
 	// GetRevision reads one revision by its id, the one a release pins.
 	GetRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error)
@@ -72,12 +72,12 @@ func NewApplicationService(v2Pool *DB, schemas BuiltinSchemaProvider, generator 
 	return &applicationService{v2Pool: v2Pool, schemas: schemas, secrets: generator, variables: variables, keys: keys}
 }
 
-// CreateOrRevise stores document as a new registered application when its
+// CreateOrReviseRegistered stores document as a new registered application when its
 // slug is new in the project, and as a new revision of the existing
 // registered application otherwise. Each client the write adds gets a secret,
 // returned once in the output. An application a release declares has the
 // release as its one writer, so its slug is refused.
-func (s *applicationService) CreateOrRevise(ctx context.Context, projectID string, document []byte) (_ *CreateApplicationOutput, err error) {
+func (s *applicationService) CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte) (_ *CreateApplicationOutput, err error) {
 	ctx, end := startSpan(ctx, "ApplicationService.CreateOrRevise")
 	defer end(&err)
 
@@ -88,12 +88,12 @@ func (s *applicationService) CreateOrRevise(ctx context.Context, projectID strin
 
 	existing, err := s.get(ctx, projectID, domain.ApplicationFieldSlug, next.Slug)
 	if err == nil {
-		return s.revise(ctx, existing.ProjectID, existing.ID, next, document)
+		return s.reviseRegistered(ctx, existing.ProjectID, existing.ID, next, document)
 	}
 	if !errors.Is(err, domain.ErrApplicationNotFound()) {
 		return nil, err
 	}
-	return s.create(ctx, projectID, next, document)
+	return s.createRegistered(ctx, projectID, next, document)
 }
 
 func (s *applicationService) Get(ctx context.Context, projectID, id string) (_ *domain.Application, err error) {
@@ -134,7 +134,7 @@ func (s *applicationService) validate(document []byte, declared bool) (domain.Ap
 	return doc, domain.ValidateRegisteredApplication(doc)
 }
 
-func (s *applicationService) create(ctx context.Context, projectID string, next domain.ApplicationDocument, document []byte) (*CreateApplicationOutput, error) {
+func (s *applicationService) createRegistered(ctx context.Context, projectID string, next domain.ApplicationDocument, document []byte) (*CreateApplicationOutput, error) {
 	app, clients, plainSecrets, err := domain.NewRegisteredApplication(projectID, next, document, s.secrets)
 	if err != nil {
 		return nil, err
@@ -180,16 +180,17 @@ func (s *applicationService) create(ctx context.Context, projectID string, next 
 		return nil, domain.ErrInternal(err).WithMessage("failed to create application")
 	}
 
-	return s.revise(ctx, existing.ProjectID, existing.ID, next, document)
+	return s.reviseRegistered(ctx, existing.ProjectID, existing.ID, next, document)
 }
 
-// revise appends document as a new revision of existing. The row is locked
+// reviseRegistered appends document as a new revision of existing. The row is locked
 // before the newest revision is read, so two concurrent revisions cannot both
 // treat the same client as new.
-func (s *applicationService) revise(ctx context.Context, projectID string, applicationID string, newDoc domain.ApplicationDocument, newDocBs []byte) (*CreateApplicationOutput, error) {
+func (s *applicationService) reviseRegistered(ctx context.Context, projectID string, applicationID string, newDoc domain.ApplicationDocument, newDocBs []byte) (*CreateApplicationOutput, error) {
 	var revisedApp *domain.Application
 	var addedClients []*domain.ApplicationClient
 	var plainSecrets []string
+
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 		if err := stmts.LockApplication(ctx, projectID, applicationID); err != nil {
@@ -198,6 +199,7 @@ func (s *applicationService) revise(ctx context.Context, projectID string, appli
 			}
 			return err
 		}
+
 		oldApp, err := stmts.GetApplication(ctx, applicationBy(projectID, domain.ApplicationFieldID, applicationID))
 		if err != nil {
 			return err
@@ -234,36 +236,6 @@ func (s *applicationService) revise(ctx context.Context, projectID string, appli
 	}
 
 	return &CreateApplicationOutput{Application: revisedApp, Secrets: clientSecrets(addedClients, plainSecrets)}, nil
-}
-
-// addedClients builds the row of each client of next whose slug is in added,
-// in document order.
-func addedClients(projectID string, next domain.ApplicationDocument, added []string) []*domain.ApplicationClient {
-	clients := make([]*domain.ApplicationClient, 0, len(added))
-	for _, client := range next.Clients {
-		if !slices.Contains(added, client.Slug) {
-			continue
-		}
-		stored := &domain.ApplicationClient{ProjectID: projectID, Slug: client.Slug}
-		if client.ClientID != nil {
-			stored.ClientID = *client.ClientID
-		}
-		clients = append(clients, stored)
-	}
-	return clients
-}
-
-// newSecrets generates count plaintext client secrets.
-func (s *applicationService) newSecrets(count int) ([]string, error) {
-	plain := make([]string, 0, count)
-	for range count {
-		secret, err := s.secrets.New(string(domain.PrefixApplicationClient))
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to generate client secret")
-		}
-		plain = append(plain, secret)
-	}
-	return plain, nil
 }
 
 // storeClientSecrets stores the hash of plain[i] as the secret of clients[i].
@@ -348,6 +320,7 @@ func (s *applicationService) declaredWriteRefusals(ctx context.Context, stmts Al
 	var (
 		applicationID string
 		stored        []*domain.ApplicationClient
+		refusals      []error
 	)
 	existing, err := stmts.GetApplication(ctx, applicationBy(projectID, domain.ApplicationFieldSlug, next.Slug))
 	if err == nil {
@@ -358,12 +331,11 @@ func (s *applicationService) declaredWriteRefusals(ctx context.Context, stmts Al
 		if stored, err = stmts.ListApplicationClients(ctx, projectID, existing.ID); err != nil {
 			return nil, applicationReadError(err)
 		}
+		if _, _, err := existing.ReviseDeclaredApplication(stored, next, nil); err != nil {
+			refusals = append(refusals, err)
+		}
 	} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 		return nil, applicationReadError(err)
-	}
-	var refusals []error
-	if _, err := domain.DeclaredClientsToCreate(stored, next); err != nil {
-		refusals = append(refusals, err)
 	}
 	storedIDs := make(map[string]string, len(stored))
 	for _, client := range stored {
@@ -402,96 +374,85 @@ func (s *applicationService) declaredWriteRefusals(ctx context.Context, stmts Al
 // inside the build's transaction: a new slug creates it, a document equal to
 // its newest revision reuses that revision, and any other appends one. Each
 // client's secret variable is claimed for that client. The caller validated
-// document and found no declaredWriteRefusals. A declared client's secret is
-// a variable, so no secret is generated.
-//
-// A concurrent build or API call can still take the slug or a client_id
-// first. Then the refusal it causes is returned, and when there is none, the
-// write goes on against what the other writer stored.
+// document and found no declaredWriteRefusals.
 func (s *applicationService) resolveOrCreateDeclared(ctx context.Context, stmts AllStatements, projectID string, next domain.ApplicationDocument, document []byte) (*domain.Application, error) {
 	existing, err := stmts.GetApplication(ctx, applicationBy(projectID, domain.ApplicationFieldSlug, next.Slug))
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-		added, err := domain.DeclaredClientsToCreate(nil, next)
-		if err != nil {
-			return nil, err
-		}
-		clients := addedClients(projectID, next, added)
-		entity := &domain.Application{ProjectID: projectID, Slug: next.Slug, IsDeclared: true, Document: document}
-		err = stmts.CreateApplication(ctx, entity, clients)
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			refusals, readErr := s.declaredWriteRefusals(ctx, stmts, projectID, next)
-			if readErr != nil {
-				return nil, readErr
-			}
-			if len(refusals) > 0 {
-				return nil, refusals[0]
-			}
-			if existing, err = stmts.GetApplication(ctx, applicationBy(projectID, domain.ApplicationFieldSlug, next.Slug)); err != nil {
-				return nil, declaredWriteError(err)
-			}
-			return s.reviseDeclared(ctx, stmts, existing, next, document)
-		}
-		if err != nil {
-			return nil, declaredWriteError(err)
-		}
+	if err == nil {
+		return s.reviseDeclared(ctx, stmts, existing.ProjectID, existing.ID, next, document)
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, applicationReadError(err)
+	}
+	return s.createDeclared(ctx, stmts, projectID, next, document)
+}
+
+func (s *applicationService) createDeclared(ctx context.Context, stmts AllStatements, projectID string, next domain.ApplicationDocument, document []byte) (*domain.Application, error) {
+	app, clients, err := domain.NewDeclaredApplication(projectID, next, document)
+	if err != nil {
+		return nil, err
+	}
+
+	err = stmts.CreateApplication(ctx, app, clients)
+	if err == nil {
 		if err := claimSecretVariables(ctx, stmts, next, clients); err != nil {
 			return nil, err
 		}
-		return entity, emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationCreated, entity, domain.ApplicationPayloadSnapshot(entity, next, clients))
+		return app, emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationCreated, app, domain.ApplicationPayloadSnapshot(app, next, clients))
 	}
-	if err != nil {
-		return nil, applicationReadError(err)
-	}
-	return s.reviseDeclared(ctx, stmts, existing, next, document)
-}
-
-// reviseDeclared is resolveOrCreateDeclared for a slug already stored.
-func (s *applicationService) reviseDeclared(ctx context.Context, stmts AllStatements, existing *domain.Application, next domain.ApplicationDocument, document []byte) (*domain.Application, error) {
-	if err := stmts.LockApplication(ctx, existing.ProjectID, existing.ID); err != nil {
+	if _, ok := errors.AsType[*database.UniqueError](err); !ok {
 		return nil, declaredWriteError(err)
 	}
-	current, err := stmts.GetApplication(ctx, applicationBy(existing.ProjectID, domain.ApplicationFieldID, existing.ID))
+
+	refusals, err := s.declaredWriteRefusals(ctx, stmts, projectID, next)
+	if err != nil {
+		return nil, err
+	}
+	if len(refusals) > 0 {
+		return nil, refusals[0]
+	}
+	existing, err := stmts.GetApplication(ctx, applicationBy(projectID, domain.ApplicationFieldSlug, next.Slug))
+	if err != nil {
+		return nil, declaredWriteError(err)
+	}
+	return s.reviseDeclared(ctx, stmts, existing.ProjectID, existing.ID, next, document)
+}
+
+func (s *applicationService) reviseDeclared(ctx context.Context, stmts AllStatements, projectID string, applicationID string, newDoc domain.ApplicationDocument, newDocBs []byte) (*domain.Application, error) {
+	if err := stmts.LockApplication(ctx, projectID, applicationID); err != nil {
+		return nil, declaredWriteError(err)
+	}
+	oldApp, err := stmts.GetApplication(ctx, applicationBy(projectID, domain.ApplicationFieldID, applicationID))
 	if err != nil {
 		return nil, applicationReadError(err)
 	}
-	if !current.IsDeclared {
-		return nil, domain.ErrApplicationRegistered()
+	stored, err := stmts.ListApplicationClients(ctx, projectID, applicationID)
+	if err != nil {
+		return nil, applicationReadError(err)
 	}
-	same, err := domain.JSONEqual(current.Document, document)
+
+	revisedApp, addedClients, err := oldApp.ReviseDeclaredApplication(stored, newDoc, newDocBs)
+	if err != nil {
+		return nil, err
+	}
+	same, err := domain.JSONEqual(oldApp.Document, newDocBs)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to compare application documents")
 	}
 	if same {
-		return current, nil
+		return oldApp, nil
 	}
-	stored, err := stmts.ListApplicationClients(ctx, current.ProjectID, current.ID)
-	if err != nil {
-		return nil, applicationReadError(err)
-	}
-	added, err := domain.DeclaredClientsToCreate(stored, next)
-	if err != nil {
-		return nil, err
-	}
-	previous, err := domain.ParseApplicationDocument(current.Document)
+	oldDoc, err := domain.ParseApplicationDocument(oldApp.Document)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to parse stored application")
 	}
-	clients := addedClients(current.ProjectID, next, added)
-	entity := &domain.Application{
-		ProjectID:  current.ProjectID,
-		ID:         current.ID,
-		Slug:       current.Slug,
-		IsDeclared: true,
-		Document:   document,
-		CreatedAt:  current.CreatedAt,
-	}
-	if err := stmts.ReviseApplication(ctx, entity, clients); err != nil {
+
+	if err := stmts.ReviseApplication(ctx, revisedApp, addedClients); err != nil {
 		return nil, declaredWriteError(err)
 	}
-	if err := claimSecretVariables(ctx, stmts, next, append(stored, clients...)); err != nil {
+	if err := claimSecretVariables(ctx, stmts, newDoc, append(stored, addedClients...)); err != nil {
 		return nil, err
 	}
-	return entity, emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationUpdated, entity, domain.ApplicationPayloadDelta(previous, next, entity, clients))
+	return revisedApp, emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationUpdated, revisedApp, domain.ApplicationPayloadDelta(oldDoc, newDoc, revisedApp, addedClients))
 }
 
 // claimSecretVariables stores, for each client of next that names a secret
