@@ -283,7 +283,7 @@ describe("LocalRuntime", () => {
       });
       const printed: string[] = [];
 
-      await at(cwd).followLogs({
+      await at(cwd).follow({
         tail: 1,
         level: "warn",
         print: (lines) => printed.push(...lines.map((line) => line.text)),
@@ -304,7 +304,7 @@ describe("LocalRuntime", () => {
       await writeFile(join(cwd, "server.log"), "level=INFO msg=first\nlevel=INFO msg=last\n");
       const printed: string[] = [];
 
-      await at(cwd).followLogs({
+      await at(cwd).follow({
         tail: 5,
         print: (lines) => printed.push(...lines.map((line) => line.text)),
         signal: AbortSignal.abort(),

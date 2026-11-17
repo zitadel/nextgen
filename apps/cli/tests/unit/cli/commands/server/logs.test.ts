@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Config } from "@oclif/core";
 import { describe, expect, vi } from "vitest";
 
-import Logs from "@/cli/commands/logs";
+import Logs from "@/cli/commands/server/logs";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";

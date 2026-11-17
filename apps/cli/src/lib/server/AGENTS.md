@@ -81,6 +81,13 @@ namespace over loose functions. They disagreed on order, and this is the call:
    `StatusDeriver` as pure classes. `startLocked` is the cyclomatic hot spot.
 4. **Per-directory `index.ts` barrels** for `local/` and `local/internal/`.
 
+## The commands
+
+The commands live in [`src/cli/commands/server`](../../cli/commands/server/AGENTS.md)
+and extend one `ServerCommand`. They call `plan()`, `launch()`, `stop()`,
+`reset()` and `follow()` and render the answer; none builds a path, a container
+name or an address.
+
 ## What is still open on this branch
 
 Not done yet, in the order above: everything under "Review outcome". Today the

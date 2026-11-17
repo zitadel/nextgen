@@ -1,7 +1,7 @@
 import type { Config } from "@oclif/core";
 import { describe, expect } from "vitest";
 
-import Start from "@/cli/commands/start";
+import Start from "@/cli/commands/server/start";
 import { LocalRuntime } from "@/lib/server";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";

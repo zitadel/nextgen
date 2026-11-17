@@ -14,5 +14,13 @@ export type { LogLine } from "./local/server-log";
 export type { LocalMachine } from "./local-machine";
 export { SystemMachine } from "./local-machine";
 export { StartedServer } from "./started-server";
-export type { ResolvedServer, ResolveServerInput, RuntimeKind } from "./zitadel-runtime";
+export type {
+  ResolvedServer,
+  ResolveServerInput,
+  BinaryStart,
+  DockerStart,
+  RuntimeKind,
+  StartPlan,
+  StartRequest,
+} from "./zitadel-runtime";
 export { CloudRuntime, LocalRuntime, ZitadelRuntime } from "./zitadel-runtime";

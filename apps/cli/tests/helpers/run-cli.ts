@@ -165,7 +165,7 @@ async function commandSeeing(
     };
   }
   if (name === "stop") {
-    const { default: Stop } = await import("@/cli/commands/stop");
+    const { default: Stop } = await import("@/cli/commands/server/stop");
     return class extends Stop {
       static override id = "stop";
 

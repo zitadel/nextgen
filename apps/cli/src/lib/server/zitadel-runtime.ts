@@ -324,6 +324,36 @@ export type RunConfig =
   | (CommonRunConfig & Readonly<{ backend: "binary" }>)
   | (CommonRunConfig & Readonly<{ backend: "docker"; image: string }>);
 
+/** What a start is asked for, as a command's flags and shell give it. */
+export type StartRequest = Readonly<{
+  /** The port to take as asked; by default the folder keeps the one it had, or takes the first free one. */
+  port?: number;
+  /** The runtime asked for, or the one that fits the image and the folder's record. */
+  backend?: RuntimeBackend;
+  /** The container image asked for. */
+  image?: string;
+  /** The shell the run was given, which may name an image (`ZITADEL_LOCAL_IMAGE`) and the server's own variables. */
+  shell: NodeJS.ProcessEnv;
+}>;
+
+/** What a start with Docker would do. */
+export type DockerStart = Readonly<{
+  backend: "docker";
+  port: number;
+  image: string;
+  containerName: string;
+}>;
+
+/** What a start with the CLI's own server binary would do; it has no image or container. */
+export type BinaryStart = Readonly<{ backend: "binary"; port: number }>;
+
+/**
+ * What a start would do, decided before it does it: the runtime and the port,
+ * and for Docker the image and the container. It is a value; nothing is
+ * started, created or written to make one.
+ */
+export type StartPlan = DockerStart | BinaryStart;
+
 /** How {@link LocalRuntime.start} is asked to start. */
 export type StartOptions = Readonly<{
   /** The port to take as asked or refuse, never move; the first free one when absent. */
@@ -739,6 +769,122 @@ export class LocalRuntime extends ZitadelRuntime {
   }
 
   /**
+   * The address this folder's server answers on: the one it recorded when it
+   * was started, or the default one when it never was.
+   *
+   * @returns The address.
+   */
+  async url(): Promise<string> {
+    const recorded = await readRuntimeMetadata(this.cwd);
+    if (recorded === undefined) {
+      return LocalRuntime.DEFAULT_URL;
+    } else {
+      return recorded.server_url;
+    }
+  }
+
+  /**
+   * The server of the closest folder, `cwd` or a parent, where `start` was run.
+   * `start` often runs in a parent of the app, so commands that only read a
+   * server look upward instead of acting on the folder they are in.
+   *
+   * @param cwd - Where to start looking.
+   * @param options - The CLI release that would start it.
+   * @returns That folder's server, or `undefined` when no folder above started one.
+   */
+  static async findStartedFrom(
+    cwd: string,
+    options: { cliVersion: string },
+  ): Promise<LocalRuntime | undefined> {
+    const nearest = await readNearestRuntimeMetadata(cwd);
+    if (nearest === undefined) {
+      return undefined;
+    } else {
+      return LocalRuntime.forFolder(nearest.dir, options);
+    }
+  }
+
+  /**
+   * What a start would do for this folder, without doing it: the port it keeps
+   * or takes, the runtime and image that fit the request and the folder's
+   * record, and the container's name.
+   *
+   * @param request - What the command was asked for.
+   * @returns The plan.
+   */
+  async plan(request: StartRequest): Promise<StartPlan> {
+    const recorded = await peekRuntimeMetadata(this.cwd);
+    const envImage = request.shell.ZITADEL_LOCAL_IMAGE;
+    const backend = resolveRuntimeBackend({
+      image: request.image,
+      runtime: request.backend,
+      envImage,
+    });
+    const port = request.port ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
+
+    if (backend === "docker") {
+      return {
+        backend: "docker",
+        port,
+        image: request.image ?? envImage ?? defaultLocalServerImageForCliVersion(this.cliVersion),
+        containerName: localContainerName(this.cwd),
+      };
+    } else {
+      return { backend: "binary", port };
+    }
+  }
+
+  /**
+   * Starts the folder's server as {@link plan} says, or finds it already
+   * running: creates the state directories, reads the project's `NEXTGEN_*`
+   * variables before any runtime is stopped, creates the local admin the
+   * platform bootstrap needs, and launches.
+   *
+   * The developer exists on their own server from the first start: the server
+   * imports the local admin, and the console signs them in by link. The admin is
+   * a user of the platform project, so the two travel together. A caller that
+   * opts out of the platform bootstrap (a test harness wanting a bare
+   * single-project server) gets neither. The opt-out is read from the merged
+   * environment the server receives, the project's env files over the shell, so
+   * a `false` in `.env.local` turns both off. A server pinned to a project of
+   * its own cannot also bootstrap the platform one (it refuses that combination
+   * at startup), so the pin wins and there is no admin.
+   *
+   * @param request - What the command was asked for.
+   * @param retry - The run to repeat once what stopped it is fixed (Docker answering), as it was typed.
+   * @returns The server's record, and whether it was already running.
+   */
+  async launch(
+    request: StartRequest,
+    retry: SuggestedCommand,
+  ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
+    const plan = await this.plan(request);
+    await ensureLocalState(this.cwd);
+    const env = await loadProjectEnv(this.cwd, request.shell);
+    const serverEnv = { ...request.shell, ...env.values };
+    const pinned = serverEnv.NEXTGEN_PLATFORM_PROJECT_ID;
+    const bootstraps =
+      (serverEnv.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true").toLowerCase() !== "false" &&
+      (!pinned || pinned === PLATFORM_PROJECT_ID);
+    const options = { port: request.port, retry };
+
+    if (bootstraps) {
+      const { userFile } = await this.ensureAdmin(serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE);
+      if (plan.backend === "docker") {
+        return this.start({ backend: "docker", image: plan.image, env, userFile }, options);
+      } else {
+        return this.start({ backend: "binary", env, userFile }, options);
+      }
+    } else {
+      if (plan.backend === "docker") {
+        return this.start({ backend: "docker", image: plan.image, env }, options);
+      } else {
+        return this.start({ backend: "binary", env }, options);
+      }
+    }
+  }
+
+  /**
    * Starts the directory's server, or finds it already running.
    *
    * A running server is kept only if it is what was asked for: the server
@@ -966,7 +1112,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * each line the server writes, until interrupted. With `level`, the lines
    * below it are left out of both.
    */
-  async followLogs(options: {
+  async follow(options: {
     tail: number;
     level?: LogLevel;
     print: (lines: readonly LogLine[]) => void;

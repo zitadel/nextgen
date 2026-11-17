@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 
 import { LocalRuntime, type RuntimeMetadata } from "@/lib/server";
-import Reset from "@/cli/commands/reset";
+import Reset from "@/cli/commands/server/reset";
 import {
   aMachineRunning,
   expectedPublicCliCommand,
@@ -1363,7 +1363,7 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
 
 async function expectedDefaultImage(): Promise<string> {
   const pkg = JSON.parse(
-    await readFile(new URL("../../../../package.json", import.meta.url), "utf8"),
+    await readFile(new URL("../../../../../package.json", import.meta.url), "utf8"),
   ) as { version: string };
   return LocalRuntime.imageFor(pkg.version);
 }

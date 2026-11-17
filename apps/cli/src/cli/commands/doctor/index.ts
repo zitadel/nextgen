@@ -20,7 +20,8 @@ import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { log, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
+import { ServerCommand } from "@/cli/commands/server/base";
+import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -110,7 +111,7 @@ type Checking = Readonly<{
 /**
  * `zitadel doctor` — verify local runtime and project state.
  */
-export default class Doctor extends Destructive(BaseCommand) {
+export default class Doctor extends Destructive(ServerCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 3;

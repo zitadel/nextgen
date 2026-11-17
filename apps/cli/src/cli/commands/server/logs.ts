@@ -1,9 +1,9 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime, StartedServer, type LogLine } from "@/lib/server";
-import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
+import { LocalRuntime } from "@/lib/server";
+import { ServerCommand } from "@/cli/commands/server/base";
+import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted, prose } from "@/lib/oclif/rendering";
@@ -43,16 +43,15 @@ const NOT_STARTED_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * `zitadel logs` — show local Zitadel server logs.
- *
- * On a terminal, warnings are yellow and errors red. Run it in the directory
- * the start command ran in, or one inside it: the server is found from the
- * nearest .zitadel/local/ on the way up.
+ * `zitadel logs`: shows the end of the nearest server's log, or follows it as
+ * the server writes. On a terminal, warnings are yellow and errors red. Run it
+ * in the folder `start` ran in, or one inside it: the server is found from the
+ * nearest `.zitadel/local/` on the way up.
  */
-export default class Logs extends BaseCommand {
+export default class Logs extends ServerCommand {
+  static override folderRule = "nearest" as const;
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
-  static override group = CommandGroups.localServer;
   static override groupOrder = 4;
 
   static override examples = [
@@ -73,96 +72,76 @@ export default class Logs extends BaseCommand {
     }),
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
-
-  private readonly started = new StartedServer(LocalRuntime.readNearest);
-
-  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
-    // The default where nothing was started here, because a run still reports
-    // the server it is about: an empty one would name no server at all.
-    return (await this.started.of(cwd))?.runtime.server_url ?? LocalRuntime.DEFAULT_URL;
-  }
-
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
     if (flags.follow && this.isJson) {
       throw refusalError(FOLLOW_IS_NOT_JSON_REFUSAL, {});
     }
-    // The server this directory uses: the one `zitadel start` ran in here or
-    // in the nearest parent, as `doctor` and `console` find it.
-    const started = await this.started.of(this.cwd);
-    if (started === undefined) {
+
+    const server = await this.serverInNearestFolder();
+    if (server === undefined) {
       throw refusalError(NOT_STARTED_REFUSAL, {});
     }
-    const server = LocalRuntime.forFolder(started.dir, {
-      cliVersion: this.cliVersion,
-    });
+
     if (flags.follow) {
-      await server.followLogs({
+      await server.follow({
         tail: flags.tail,
         level: flags.level,
         print: (lines) => {
           if (lines.length > 0) {
-            process.stdout.write(`${render(lines, this.isColored)}\n`);
+            const drawn = lines.map((line) => {
+              return LocalRuntime.renderLogLine(line, this.isColored);
+            });
+            process.stdout.write(`${drawn.join("\n")}\n`);
           }
         },
         signal: this.signal,
       });
 
       const title = "Stopped following local Zitadel logs";
-
-      return this.emit({
-        status: "ok",
-        data: { title },
-        ...(this.isOnScreen ? {} : { pretty: prose("") }),
-        summary: {
-          title,
-          sections: [],
-        },
+      if (this.isOnScreen) {
+        return this.emit({
+          status: "ok",
+          data: { title },
+          summary: { title, sections: [] },
+        });
+      } else {
+        return this.emit({
+          status: "ok",
+          data: { title },
+          pretty: prose(""),
+          summary: { title, sections: [] },
+        });
+      }
+    } else {
+      const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+      const shown = lines.map((line) => {
+        return LocalRuntime.renderLogLine(line, this.isColored);
       });
+      const title = "Local Zitadel server logs";
+
+      if (runtime.backend === "binary") {
+        return this.emit({
+          status: "ok",
+          data: {
+            title,
+            runtime: { backend: runtime.backend, pid: runtime.pid, log_path: runtime.log_path },
+            logs: LocalRuntime.logText(lines),
+          },
+          pretty: painted(shown.join("\n")),
+          summary: { title, sections: [], lines: shown },
+        });
+      } else {
+        return this.emit({
+          status: "ok",
+          data: {
+            title,
+            runtime: { backend: runtime.backend, container_name: runtime.container_name },
+            logs: LocalRuntime.logText(lines),
+          },
+          pretty: painted(shown.join("\n")),
+          summary: { title, sections: [], lines: shown },
+        });
+      }
     }
-
-    const { runtime, lines } = await server.logs({
-      tail: flags.tail,
-      level: flags.level,
-    });
-    const shown = lines.map((line) => {
-      return LocalRuntime.renderLogLine(line, this.isColored);
-    });
-    const title = "Local Zitadel server logs";
-
-    return this.emit({
-      status: "ok",
-      data: {
-        title,
-        runtime:
-          runtime.backend === "binary"
-            ? {
-                backend: runtime.backend,
-                pid: runtime.pid,
-                log_path: runtime.log_path,
-              }
-            : {
-                backend: runtime.backend,
-                container_name: runtime.container_name,
-              },
-        logs: LocalRuntime.logText(lines),
-      },
-      pretty: painted(shown.join("\n")),
-      summary: {
-        title,
-        sections: [],
-        lines: shown,
-      },
-    });
   }
-}
-
-function render(lines: readonly LogLine[], color: boolean): string {
-  return lines
-    .map((line) => {
-      return LocalRuntime.renderLogLine(line, color);
-    })
-    .join("\n");
 }

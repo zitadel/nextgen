@@ -10,7 +10,7 @@ import { log, style, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
-import { PsLocalServers, ZitadelRuntime, type LocalServers } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import { resolveCwd } from "@/lib/paths";
 import {
   Spelling,
@@ -744,14 +744,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected createTelemetry(deps: TelemetryDeps): Telemetry {
     return Telemetry.create(deps);
-  }
-
-  /**
-   * Which local servers are running on the machine. Production asks `ps`; a
-   * test overrides this, like {@link createTelemetry}, to answer for the machine.
-   */
-  protected localServers(): LocalServers {
-    return new PsLocalServers();
   }
 
   private openTelemetry(flag: boolean | undefined): void {

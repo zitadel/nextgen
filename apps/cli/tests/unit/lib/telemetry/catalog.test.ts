@@ -122,11 +122,17 @@ function calls(name: string): (call: ts.CallExpression) => boolean {
     ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === name;
 }
 
-/** The command id oclif gives a file under `src/cli/commands`, such as `variables:set`. */
+/**
+ * The command id oclif gives a file under `src/cli/commands`, such as `variables:set`.
+ * The `server` folder only groups its commands, so it adds nothing to their ids.
+ */
 function commandId(file: string): string {
   const segments = file.replace(/\.ts$/, "").split(sep);
   if (segments.at(-1) === "index") {
     segments.pop();
+  }
+  if (segments[0] === "server") {
+    segments.shift();
   }
   return segments.join(":");
 }
