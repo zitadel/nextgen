@@ -259,7 +259,7 @@ export function assertSuggestionsCarryTheRun(
   envelope: Readonly<{ next_commands?: string[]; data?: unknown }>,
   ranWith: readonly string[],
 ): void {
-  const given = new Set(ranWith);
+  const given = new Set(ranWith.map((word) => word.split("=")[0]));
   const selected = [...SELECTORS].some((flag) => given.has(flag));
   for (const command of suggestedBy(envelope)) {
     const own = ownCommand(command);

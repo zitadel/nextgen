@@ -51,6 +51,33 @@ describe("assertSuggestionsCarryTheRun", () => {
     expect(thrown).toBeInstanceOf(Error);
   });
 
+  it.each([
+    ["--server=", ["deploy", "--cwd", "/app", "--server=http://localhost:8080"]],
+    ["--env=", ["deploy", "--cwd", "/app", "--env=staging"]],
+    ["--env-file=", ["deploy", "--cwd", "/app", "--env-file=.env.production"]],
+  ])("holds a command to a run that gave %s inline", (_form, ran) => {
+    const thrown = thrownBy(() => {
+      assertSuggestionsCarryTheRun(
+        WHERE,
+        { next_commands: ["npx @zitadel/cli@0.1.0 deploy --dry-run --cwd /app"] },
+        ran,
+      );
+    });
+
+    expect(thrown).toBeInstanceOf(Error);
+  });
+
+  it("holds a command to the directory a run gave inline", () => {
+    const thrown = thrownBy(() => {
+      assertSuggestionsCarryTheRun(WHERE, { next_commands: ["npx @zitadel/cli@0.1.0 start"] }, [
+        "start",
+        "--cwd=/app",
+      ]);
+    });
+
+    expect(thrown).toBeInstanceOf(Error);
+  });
+
   it("holds the commands in the data to it as well", () => {
     const thrown = thrownBy(() => {
       assertSuggestionsCarryTheRun(
