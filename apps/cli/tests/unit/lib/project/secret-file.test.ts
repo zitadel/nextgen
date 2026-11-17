@@ -28,15 +28,33 @@ describe("SecretFile.isSecure", () => {
     expect(await SecretFile.isSecure(file)).toBe(true);
   });
 
-  it("leaves no probe file behind", async () => {
-    const dir = await scratchDir("zitadel-secret-file-");
-    const file = join(dir, "secret");
+  it("leaves nothing behind in the temp directory", async () => {
+    const tmp = await scratchDir("zitadel-secret-file-tmp-");
+    const file = join(await scratchDir("zitadel-secret-file-"), "secret");
     await writeFile(file, "x");
     await chmod(file, 0o644);
+    const names = ["TMPDIR", "TEMP", "TMP"] as const;
+    const saved = names.map((name) => {
+      return process.env[name];
+    });
+    for (const name of names) {
+      process.env[name] = tmp;
+    }
 
-    await SecretFile.isSecure(file);
+    try {
+      await SecretFile.isSecure(file);
+    } finally {
+      names.forEach((name, index) => {
+        const value = saved[index];
+        if (value === undefined) {
+          Reflect.deleteProperty(process.env, name);
+        } else {
+          process.env[name] = value;
+        }
+      });
+    }
 
-    expect(await readdir(dir)).toEqual(["secret"]);
+    expect(await readdir(tmp)).toEqual([]);
   });
 
   it("is true again once the file is secured", async () => {

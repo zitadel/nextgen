@@ -98,6 +98,10 @@ export async function pathExistsStrict(path: string): Promise<boolean> {
  * Whether an entry exists at `path`, a link counting as an entry even when what
  * it points at is missing. False only when nothing is there; any other failure
  * to look throws.
+ *
+ * @param path - What to look for.
+ * @returns Whether an entry is there.
+ * @throws Any `lstat` error other than the entry being missing.
  */
 export async function entryExists(path: string): Promise<boolean> {
   try {

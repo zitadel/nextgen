@@ -74,15 +74,31 @@ export class SecretFile {
    * Whether a file keeps the mode it is given, found by trying one in a
    * directory of its own under the temp directory, so it needs no list of the
    * platforms and filesystems that do not and leaves nothing in the project.
-   * Where it cannot be tried, modes are taken to be kept.
+   * It reports on the temp directory's filesystem, which is the project's on
+   * every ordinary setup. A filesystem that refuses `chmod` keeps no modes; where
+   * the probe cannot be made at all, modes are taken to be kept.
+   *
+   * @returns `true` when the mode a file is given is the mode it reads back.
    */
   private static async keepsModes(): Promise<boolean> {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-modes-"));
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-modes-")).catch(() => {
+      return undefined;
+    });
+    if (dir === undefined) {
+      return true;
+    }
     try {
       const probe = join(dir, "probe");
       await writeFile(probe, "", { mode: SECRET_MODE });
-      await chmod(probe, 0o640);
-      return ((await stat(probe)).mode & 0o777) === 0o640;
+      const accepted = await chmod(probe, 0o640).then(
+        () => {
+          return true;
+        },
+        () => {
+          return false;
+        },
+      );
+      return accepted && ((await stat(probe)).mode & 0o777) === 0o640;
     } catch {
       return true;
     } finally {

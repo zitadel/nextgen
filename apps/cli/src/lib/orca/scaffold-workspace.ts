@@ -30,7 +30,7 @@ export class ScaffoldWorkspace {
     }
     const dir = join(
       dirname(cwd),
-      `.${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
+      `.${basename(cwd).slice(0, 100)}.scaffold-workspace-${String(process.pid)}-${String(Date.now())}`,
     );
     const work = join(dir, "work", basename(cwd));
     await mkdir(work, { recursive: true, mode: 0o700 });
@@ -42,6 +42,10 @@ export class ScaffoldWorkspace {
 
   private readonly dir: string;
 
+  /**
+   * @param dir - The folder that holds the work directory and the backup.
+   * @param work - The empty directory the scaffold runs in.
+   */
   private constructor(dir: string, work: string) {
     this.dir = dir;
     this.work = work;
@@ -95,16 +99,29 @@ export class ScaffoldWorkspace {
     }
   }
 
-  /** Lets go of the workspace and the backup. */
+  /**
+   * Lets go of the workspace and the backup.
+   *
+   * @returns Once both are removed.
+   */
   async drop(): Promise<void> {
     await rm(this.dir, { recursive: true, force: true });
   }
 
+  /**
+   * Where what the scaffold replaces is kept.
+   *
+   * @returns The backup directory, which exists once something is moved in.
+   */
   private get backup(): string {
     return join(this.dir, "backup");
   }
 
-  /** Appends any lines from the backed-up `.gitignore` that the scaffold's own one lacks. */
+  /**
+   * Appends any lines from the backed-up `.gitignore` that the scaffold's own one lacks.
+   *
+   * @param dest - The scaffold's `.gitignore` in the project, which is written.
+   */
   private async mergeGitignore(dest: string): Promise<void> {
     const [from, into] = await Promise.all([
       readFile(join(this.backup, ".gitignore"), "utf8"),
