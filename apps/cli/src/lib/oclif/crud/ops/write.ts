@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
@@ -207,6 +207,10 @@ abstract class WriteOperation<
         document: documentSchemaOf(spec.schema, spec.root),
         fields,
         references: options.references,
+        retry: await this.rerun<{
+          file: Interfaces.OptionFlag<string | undefined>;
+          data: Interfaces.OptionFlag<string | undefined>;
+        }>({ with: { file: "<path>" }, without: ["data"] }),
       },
       flags,
     );
