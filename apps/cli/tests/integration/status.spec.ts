@@ -415,7 +415,7 @@ describe("status", () => {
           source: "",
           code: "E_VALIDATION",
           message: 'Invalid server "nope"',
-          hint: "Use local, or a URL like https://preview.zitadel.com.",
+          hint: "Use local, or an http(s) URL.",
         });
       });
     });
