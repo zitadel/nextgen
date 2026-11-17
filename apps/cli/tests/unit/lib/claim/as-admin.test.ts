@@ -79,11 +79,22 @@ afterEach(() => {
   completes.length = 0;
 });
 
-const claim = () =>
-  new AdminClaim(new AdminSession(SERVER, admin, signal)).attach({
+const claim = () => {
+  const session = new AdminSession(SERVER, admin, signal);
+  return new AdminClaim(
+    SERVER,
+    signal,
+    () => {
+      return session.cookie();
+    },
+    (headers) => {
+      return session.request(headers);
+    },
+  ).attach({
     projectId: PROJECT,
     projectSecret: "sk_project",
   });
+};
 
 describe("claiming a project as the local admin", () => {
   it("opens the claim with the project secret and completes it as the admin", async () => {

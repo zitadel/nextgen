@@ -13,7 +13,7 @@ export type ManagedRuntimeProcess = Readonly<{
   ppid?: number;
 }>;
 
-export type ManagedRuntimeDiscovery = Readonly<{
+type ManagedRuntimeDiscovery = Readonly<{
   error?: string;
   processes: ReadonlyArray<ManagedRuntimeProcess>;
   supported: boolean;
@@ -154,13 +154,17 @@ async function toManagedRuntimeProcess(
   if (!wrapper && !isCliLocalDataDir(dataDir)) {
     return undefined;
   }
-  return {
+  const base = {
     pid: row.pid,
     ppid: row.ppid,
     command: stripEnvironmentNoise(row.shown ?? row.command),
-    kind: wrapper ? "server-wrapper" : "server-binary",
-    ...(dataDir ? { data_dir: dataDir } : {}),
   };
+  const withDataDir = (dataDir && { data_dir: dataDir }) || {};
+  if (wrapper) {
+    return { ...base, kind: "server-wrapper", ...withDataDir };
+  } else {
+    return { ...base, kind: "server-binary", ...withDataDir };
+  }
 }
 
 function isRuntimeCandidate(command: string): boolean {
@@ -221,7 +225,9 @@ async function isServerWrapper(command: string): Promise<boolean> {
       !OPTIONS_WITH_A_VALUE.has(given[index - 1] ?? "")
     );
   });
-  const rest = first < 0 ? [] : given.slice(first);
+  const rest = given.filter((_word, index) => {
+    return first >= 0 && index >= first;
+  });
   const script = rest.findIndex((word) => {
     return basename(word) === WRAPPER_SCRIPT;
   });

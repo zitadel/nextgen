@@ -148,7 +148,7 @@ export default class Start extends ServerCommand {
 
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const plan = await this.serverInThisFolder(cwd).plan({
-      port: typeof flags.port === "number" ? flags.port : undefined,
+      port: z.number().optional().catch(undefined).parse(flags.port),
       shell: process.env,
     });
 

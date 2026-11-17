@@ -3,7 +3,7 @@ import pTimeout from "p-timeout";
 import { UserService } from "@/lib/backend";
 import { Claim, type ClaimState } from "@/lib/claim";
 import { isCancellation } from "@/lib/errors";
-import { LocalRuntime } from "@/lib/server";
+import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Connection,
@@ -252,7 +252,7 @@ async function projectStatus(
     secret !== undefined && projectId === secret.data.project_id
       ? Claim.state({
           secret: secret.data,
-          server: config.server,
+          cloud: ZitadelRuntime.fromUrl(config.server ?? ZitadelRuntime.DEFAULT).isCloud(),
         })
       : ({ kind: "not-applicable" } as const);
   return {

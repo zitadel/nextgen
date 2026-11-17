@@ -1,5 +1,7 @@
 import { execa } from "execa";
 
+import { isLoopbackHost } from "@/lib/server/host";
+
 /**
  * How a program is run: its name, its arguments and how long to wait, answering
  * with what it printed. The machine's own is `execa`; a test passes a function
@@ -15,8 +17,6 @@ export type Run = (
 export const systemRun: Run = (program, args, options) => {
   return execa(program, [...args], options);
 };
-
-import { isLoopbackHost } from "@/lib/server/host";
 
 export type TcpListener = Readonly<{
   address: string;
@@ -74,10 +74,10 @@ function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
     .flatMap((block): TcpListener[] => {
       const lines = block.split(/\r?\n/);
       const pidLine = lines[0] ?? "";
-      const parsedPid = pidLine.startsWith("p")
-        ? Number.parseInt(pidLine.slice(1), 10)
-        : Number.NaN;
-      const pid = Number.isFinite(parsedPid) && parsedPid > 0 ? parsedPid : undefined;
+      // `p` opens each block, so a first line that is not one names no process.
+      const pid = [Number.parseInt(pidLine.slice(1), 10)].find((value) => {
+        return pidLine.startsWith("p") && Number.isFinite(value) && value > 0;
+      });
       const command =
         lines
           .find((line) => {

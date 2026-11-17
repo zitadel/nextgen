@@ -1,4 +1,3 @@
-import { ZitadelRuntime } from "@/lib/server";
 import type { ProjectSecretData } from "@/lib/project";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { BoxAction } from "@/lib/ui";
@@ -33,8 +32,8 @@ type ClaimRecord = Pick<ProjectSecretData, "claimed_at" | "team_id"> & { created
 type ClaimInput = Readonly<{
   /** The project's local secret, or the part of it that exists. */
   secret: ClaimRecord;
-  /** The server the project lives on. */
-  server: string;
+  /** Whether the server the project lives on is the Zitadel cloud. */
+  cloud: boolean;
 }>;
 
 /**
@@ -65,7 +64,7 @@ export class Claim {
   /**
    * Decides the attachment state of a project from the local record alone.
    *
-   * @param input - The project's secret and the server it lives on.
+   * @param input - The project's secret, and whether it lives on the cloud.
    * @returns The state.
    */
   static state(input: ClaimInput): ClaimState {
@@ -223,11 +222,11 @@ export class Claim {
    * advisory, and `zitadel claim` itself turns the resulting `409` into a clean
    * skip rather than an error.
    *
-   * @param input - The project's secret and the server it lives on.
+   * @param input - The project's secret, and whether it lives on the cloud.
    * @returns The state.
    */
   private static classify(input: ClaimInput): ClaimState {
-    if (ZitadelRuntime.fromUrl(input.server).kind !== "cloud") {
+    if (!input.cloud) {
       return { kind: "not-applicable" };
     }
     if (Claim.isAttached(input.secret)) {

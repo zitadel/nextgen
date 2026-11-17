@@ -11,7 +11,7 @@ import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { ScriptedMachine } from "@tests/helpers/local-machine";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { Ui } from "@/lib/ui";
 import { it } from "@tests/fixtures";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
@@ -116,7 +116,7 @@ async function startedLocally(dir: string, serverVersion: string): Promise<void>
   );
 }
 
-const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION });
+const machine = new FakeMachine({ bundled: BUNDLED_VERSION });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -193,7 +193,7 @@ describe("ChooseServer", () => {
   });
 
   describe("when a local server is detected", () => {
-    const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
+    const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
 
     beforeEach(() => {
       vi.mocked(select).mockResolvedValueOnce(LOCAL);
@@ -302,7 +302,7 @@ describe("ChooseServer", () => {
   describe("when the detected local server was started by another CLI release", () => {
     it("lists it as unavailable, and says to restart it", async ({ dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
+      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
       await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
@@ -320,7 +320,7 @@ describe("ChooseServer", () => {
 
     it("preselects the cloud", async ({ dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
+      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
       await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
@@ -336,7 +336,7 @@ describe("ChooseServer", () => {
       { how: "under its other loopback name", url: "http://127.0.0.1:8080" },
     ])("refuses its URL entered as a custom one, $how", async ({ url }, { dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
+      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
       vi.mocked(text).mockResolvedValueOnce(url);
 
@@ -359,7 +359,7 @@ describe("ChooseServer", () => {
   describe("when the detected local server is this CLI's own release", () => {
     it("offers it", async ({ dir }) => {
       await startedLocally(dir, BUNDLED_VERSION);
-      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
+      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(LOCAL);
 
       await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {

@@ -3,7 +3,6 @@ import { join, resolve } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
-import { ZitadelRuntime } from "@/lib/server";
 
 import { Dotenv } from "./dotenv";
 import { EnvironmentName } from "./environment-name";
@@ -18,6 +17,7 @@ import type {
   InteractiveOptions,
   Resolved,
   ResolveEnvironmentInput,
+  ServerAddresses,
   Values,
 } from "./types";
 
@@ -48,18 +48,22 @@ export class Environment {
   /** The project directory the run resolved against. */
   readonly cwd: string;
 
+  private readonly servers: ServerAddresses;
+
   private constructor(parts: {
     name: Resolved;
     values: Readonly<Partial<Record<EnvironmentKey, Resolved>>>;
     consulted: readonly Consulted[];
     envFile: string | undefined;
     cwd: string;
+    servers: ServerAddresses;
   }) {
     this.name = parts.name;
     this.values = parts.values;
     this.consulted = parts.consulted;
     this.envFile = parts.envFile;
     this.cwd = parts.cwd;
+    this.servers = parts.servers;
   }
 
   /**
@@ -95,7 +99,7 @@ export class Environment {
         values: input.serverFlag
           ? {
               ZITADEL_URL: (
-                await ZitadelRuntime.resolve({ cwd: input.cwd, serverFlag: input.serverFlag })
+                await input.servers.resolve({ cwd: input.cwd, serverFlag: input.serverFlag })
               ).value,
             }
           : undefined,
@@ -146,17 +150,25 @@ export class Environment {
       for (const key of ENVIRONMENT_KEYS) {
         const value = supplied?.[key];
         if (value !== undefined && values[key] === undefined) {
-          values[key] = {
-            value: key === "ZITADEL_URL" ? Environment.originFrom(value, source) : value,
-            source,
-          };
+          if (key === "ZITADEL_URL") {
+            values[key] = { value: Environment.originFrom(input.servers, value, source), source };
+          } else {
+            values[key] = { value, source };
+          }
           taken.push(key);
         }
       }
       consulted.push({ source, present: supplied !== undefined, supplied: taken });
     }
 
-    return new Environment({ name, values, consulted, envFile: input.envFile, cwd: input.cwd });
+    return new Environment({
+      name,
+      values,
+      consulted,
+      envFile: input.envFile,
+      cwd: input.cwd,
+      servers: input.servers,
+    });
   }
 
   /**
@@ -302,7 +314,7 @@ export class Environment {
           } as const;
         }
         return key === "ZITADEL_URL"
-          ? ZitadelRuntime.parse(typed)
+          ? this.servers.parse(typed)
           : ({
               ok: true,
               value: typed,
@@ -321,14 +333,15 @@ export class Environment {
   /**
    * A server value as an origin.
    *
+   * @param servers - How a server address is read.
    * @param value - The value a source supplied.
    * @param source - Where it came from, for the error.
    * @returns The origin.
    * @throws {ZitadelError} `E_VALIDATION` naming where it came from.
    */
-  private static originFrom(value: string, source: string): string {
+  private static originFrom(servers: ServerAddresses, value: string, source: string): string {
     try {
-      return ZitadelRuntime.origin(value);
+      return servers.origin(value);
     } catch (error) {
       throw new ZitadelError(
         "E_VALIDATION",

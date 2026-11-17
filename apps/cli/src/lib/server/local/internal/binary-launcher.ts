@@ -10,17 +10,15 @@ import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
-import { ZitadelError, errorMessage } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerError } from "../local-server-error";
 import { isErrno } from "@/lib/errno";
-import { PM } from "@/lib/pm";
-import { suggestedCommandOf } from "@/lib/suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
 import { type Clock, SystemClock } from "@/lib/clock";
 import { stopSignal } from "./stop-signal";
 import { type Launched, type Launcher, launched } from "./lifecycle";
-import { CliPackage } from "@/lib/upgrade";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
@@ -38,7 +36,6 @@ const SERVER_PROGRAM = "nextgen";
  * since the hints that go with it say npm installs @zitadel/server and its
  * platform package.
  */
-const REINSTALL = suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`]));
 
 const require = createRequire(import.meta.url);
 
@@ -113,10 +110,13 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
     const log = await open(spec.logPath, "a", 0o600);
     try {
-      const args = withMigrateFlag([
-        ...command.args,
-        ...(spec.userFile ? ["--user-file", spec.userFile] : []),
-      ]);
+      const userFileArgs: string[] = [];
+      const bootstrapEnv: NodeJS.ProcessEnv = {};
+      if (spec.userFile) {
+        userFileArgs.push("--user-file", spec.userFile);
+        bootstrapEnv.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = "true";
+      }
+      const args = withMigrateFlag([...command.args, ...userFileArgs]);
       const child = spawn(command.command, args, {
         detached: true,
         // On Windows a detached process otherwise opens a console window.
@@ -134,7 +134,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
           // is a user of it. The caller decides by passing a user file, and an
           // opted-out start passes none — leaving whatever the environment says
           // (by default nothing, which the server reads as disabled).
-          ...(spec.userFile ? { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true" } : {}),
+          ...bootstrapEnv,
         },
         stdio: ["ignore", log.fd, log.fd],
       });
@@ -218,7 +218,11 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       return env[COMMAND_VERSION_ENV]?.trim() || "override";
     }
     const manifest = require(resolveServerPackageManifest()) as { version?: unknown };
-    return typeof manifest.version === "string" ? manifest.version : "unknown";
+    if (typeof manifest.version === "string") {
+      return manifest.version;
+    } else {
+      return "unknown";
+    }
   }
 
   /**
@@ -236,7 +240,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
-  /** The bundled server version, or a `ZitadelError` that says how to repair the install. */
+  /** The bundled server version, or a `LocalServerError` of kind `package-missing`. */
   static assertAvailable(): string {
     return BinaryLauncher.available(() => {
       if (!process.env[COMMAND_ENV]) {
@@ -251,11 +255,12 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return find();
     } catch (error) {
-      throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
-        hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: [REINSTALL],
-        details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
-      });
+      throw new LocalServerError(
+        "package-missing",
+        "E_VALIDATION",
+        "Zitadel server npm package is not available",
+        { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
+      );
     }
   }
 
@@ -348,9 +353,15 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     const content = await BinaryLauncher.readLog(logPath);
     const lines = content.split(/\r?\n/);
     const hasTrailingNewline = lines.at(-1) === "";
-    const body = hasTrailingNewline ? lines.slice(0, -1) : lines;
+    const body = lines.slice(0, lines.length - Number(hasTrailingNewline));
     const selected = body.slice(-tail).join("\n");
-    return selected.length === 0 ? "" : `${selected}${hasTrailingNewline ? "\n" : ""}`;
+    if (selected.length === 0) {
+      return "";
+    } else if (hasTrailingNewline) {
+      return `${selected}\n`;
+    } else {
+      return selected;
+    }
   }
 
   /**
@@ -449,7 +460,11 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
       });
     const ours =
       match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
-    return named && ours ? [Number(match[1])] : [];
+    if (named && ours) {
+      return [Number(match[1])];
+    } else {
+      return [];
+    }
   });
   for (const pid of candidates) {
     if (await servesDataDir(pid, record.data_dir)) {
@@ -497,9 +512,13 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
   try {
     const pid = await new Promise<number>((resolve, reject) => {
       child.once("error", reject);
-      child.once("spawn", () =>
-        child.pid ? resolve(child.pid) : reject(new Error("server process did not expose a pid")),
-      );
+      child.once("spawn", () => {
+        if (child.pid) {
+          resolve(child.pid);
+        } else {
+          reject(new Error("server process did not expose a pid"));
+        }
+      });
     });
     // Anything it reports from here on, such as a failed signal, is not the start's to raise.
     child.on("error", () => {
@@ -508,11 +527,12 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
     child.unref();
     return pid;
   } catch (error) {
-    throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
-      hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: [REINSTALL],
-      details: { command, message: errorMessage(error) },
-    });
+    throw new LocalServerError(
+      "cannot-launch",
+      "E_VALIDATION",
+      "The Zitadel server could not be started",
+      { command, message: errorMessage(error) },
+    );
   }
 }
 
@@ -609,5 +629,9 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
  * The server applies schema migrations only when asked, and a local server must.
  */
 function withMigrateFlag(args: string[]): string[] {
-  return args.includes(MIGRATE_FLAG) ? args : [...args, MIGRATE_FLAG];
+  if (args.includes(MIGRATE_FLAG)) {
+    return args;
+  } else {
+    return [...args, MIGRATE_FLAG];
+  }
 }

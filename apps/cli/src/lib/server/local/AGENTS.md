@@ -15,21 +15,22 @@ admin credential, and the CLI talks only to the server a
   the tree (`findUpward` in `runtime.ts`).
 - Never fall back to a default port.
 - Never trust a recorded URL or pid on its own: the record's own process or
-  container must be the one serving (`LocalServer.resolveUrl`).
+  container must be the one serving (`LocalRuntime.resolveUrl`).
 
 ## Where things live
 
 - Everything outside `src/lib/server` reaches it through `@/lib/server` alone
   (`index.ts` exports classes and their types, never a loose function);
-  Nothing enforces it yet: a lint rule or a test is the owner's call.
-- Add to the class that owns the concern (`LocalServer` for the lifecycle,
-  `LocalRuntime` for a directory's record, `LocalAdmins`, `AdminSession`,
-  `ServerLogs`, `DockerGuidance`, `ProjectEnv`) before adding an export.
+  `tests/unit/lib/server/layering.test.ts` keeps `lib/ui`, `lib/suggestion`,
+  `lib/consent`, `lib/oclif` and `cli` out of the package.
+- Add to the class that owns the concern (`LocalRuntime` for the lifecycle and
+  a directory's record, `AdminSession`, `LogLines`, `LocalMachine`) before
+  adding an export.
 - Claiming a project is not a server concern: it lives in `lib/claim` and asks
   the server for an `AdminSession`.
-- `internal/` is private to `server.ts` (`LocalServer`).
+- `internal/` is private to `zitadel-runtime.ts` (`LocalRuntime`).
 - A command that needs more from a running server gets it from a new
-  `LocalServer` method (and a launcher method), not code of its own.
+  `LocalRuntime` method (and a launcher method), not code of its own.
 - `internal/lifecycle.ts` decides against interfaces (reuse, restart, port,
   failure), so its tests need no processes, sockets or real time.
 

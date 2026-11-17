@@ -22,7 +22,7 @@ const DETACHED = {};
 
 describe("claim state", () => {
   it("reads an attached project from the local secret", () => {
-    expect(claimState({ secret: ATTACHED, server: "https://api.zitadel.cloud" })).toEqual({
+    expect(claimState({ secret: ATTACHED, cloud: true })).toEqual({
       kind: "attached",
       team_id: "team-001",
       claimed_at: "2026-08-01T10:00:00.000Z",
@@ -32,7 +32,7 @@ describe("claim state", () => {
   // Without a creation time the window cannot be classified, so the state is
   // lenient (claimable, no deadline): the server enforces, the CLI advises.
   it("reads a project with neither field as detached and claimable", () => {
-    expect(claimState({ secret: DETACHED, server: "https://api.zitadel.cloud" })).toEqual({
+    expect(claimState({ secret: DETACHED, cloud: true })).toEqual({
       kind: "detached",
       claimable: true,
     });
@@ -40,18 +40,14 @@ describe("claim state", () => {
 
   it("classifies the claim window from the recorded creation time", () => {
     const recent = new Date(Date.now() - 60_000).toISOString();
-    expect(
-      claimState({ secret: { created_at: recent }, server: "https://api.zitadel.cloud" }),
-    ).toEqual({
+    expect(claimState({ secret: { created_at: recent }, cloud: true })).toEqual({
       kind: "detached",
       claimable: true,
       deadline: Claim.deadline(recent).toISOString(),
     });
 
     const stale = "2026-01-01T00:00:00.000Z";
-    expect(
-      claimState({ secret: { created_at: stale }, server: "https://api.zitadel.cloud" }),
-    ).toEqual({
+    expect(claimState({ secret: { created_at: stale }, cloud: true })).toEqual({
       kind: "detached",
       claimable: false,
       deadline: Claim.deadline(stale).toISOString(),
@@ -62,13 +58,14 @@ describe("claim state", () => {
   // half-written record is not an attachment, so the nudge stays and the
   // command can still recover the real answer from the platform.
   it("treats a half-written record as detached", () => {
-    expect(
-      claimState({ secret: { team_id: "team-001" }, server: "https://api.zitadel.cloud" }),
-    ).toEqual({ kind: "detached", claimable: true });
+    expect(claimState({ secret: { team_id: "team-001" }, cloud: true })).toEqual({
+      kind: "detached",
+      claimable: true,
+    });
     expect(
       claimState({
         secret: { claimed_at: ATTACHED.claimed_at },
-        server: "https://api.zitadel.cloud",
+        cloud: true,
       }),
     ).toEqual({ kind: "detached", claimable: true });
   });
@@ -77,17 +74,8 @@ describe("claim state", () => {
   // host a claim: this classifier is offline by design, and only `setup`
   // (online anyway) probes the local server's runtime document to nudge.
   it("is not applicable off the cloud, attached or not", () => {
-    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
-      expect(claimState({ secret: DETACHED, server })).toEqual({ kind: "not-applicable" });
-      expect(claimState({ secret: ATTACHED, server })).toEqual({ kind: "not-applicable" });
-    }
-  });
-
-  it("recognises cloud subdomains", () => {
-    expect(claimState({ secret: DETACHED, server: "https://eu-1.zitadel.cloud" })).toEqual({
-      kind: "detached",
-      claimable: true,
-    });
+    expect(claimState({ secret: DETACHED, cloud: false })).toEqual({ kind: "not-applicable" });
+    expect(claimState({ secret: ATTACHED, cloud: false })).toEqual({ kind: "not-applicable" });
   });
 });
 

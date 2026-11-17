@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ZitadelRuntime } from "@/lib/server";
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
@@ -91,11 +90,11 @@ describe("ProjectConfig", () => {
     expect([bare.preset, bare.useCase]).toEqual([undefined, undefined]);
   });
 
-  it("reads the server it lives on, else the default server", async () => {
+  it("reads the server it lives on, else nothing", async () => {
     expect((await configOf({ server: "http://localhost:8080" })).server).toBe(
       "http://localhost:8080",
     );
-    expect((await configOf({})).server).toBe(ZitadelRuntime.DEFAULT);
+    expect((await configOf({})).server).toBeUndefined();
   });
 
   it("answers as an empty configuration when there is none to read", async () => {

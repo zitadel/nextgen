@@ -1,17 +1,20 @@
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, vi } from "vitest";
+import { describe, expect } from "vitest";
 
-import { DockerLauncher } from "@/lib/server/local/internal/docker-launcher";
+import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
 import {
   LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
+  PLATFORM_PROJECT_ID,
+  defaultLocalServerImageForCliVersion,
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/server/local/runtime";
 import {
   DestroyPermit,
+  DockerUnavailableError,
   LocalRuntime,
   PortInUseError,
   ZitadelRuntime,
@@ -29,7 +32,11 @@ import type { Serve } from "@tests/fixtures";
 
 const at = (
   cwd: string,
-  collaborators: { docker?: DockerEngine; processes?: ServerProcesses } = {},
+  collaborators: {
+    docker?: DockerEngine;
+    processes?: ServerProcesses;
+    fetcher?: typeof fetch;
+  } = {},
 ) => {
   return LocalRuntime.forFolder(cwd, { cliVersion: "0.0.0-test", ...collaborators });
 };
@@ -204,6 +211,16 @@ describe("LocalRuntime", () => {
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
     });
 
+    it("deletes the data and the record when the record cannot be read", async ({ dir: cwd }) => {
+      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+      await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
+
+      await at(cwd).reset(DestroyPermit.forFolder(cwd));
+
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
     it("refuses a permit for another folder, and deletes nothing", async ({ dir: cwd, other }) => {
       await directoryWithAGoneServer(cwd);
 
@@ -214,13 +231,20 @@ describe("LocalRuntime", () => {
     });
   });
 
+  describe("url", () => {
+    it("is the default address when the record cannot be read", async ({ dir: cwd }) => {
+      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+      await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
+
+      await expect(at(cwd).url()).resolves.toBe(LocalRuntime.DEFAULT_URL);
+    });
+  });
+
   describe("logs", () => {
-    it("refuses a directory that never started a server, and says how to start one", async ({
-      dir,
-    }) => {
+    it("refuses a directory that never started a server", async ({ dir }) => {
       await expect(at(dir).logs({ tail: 10 })).rejects.toMatchObject({
         code: "E_VALIDATION",
-        hint: "Run `zitadel start` first.",
+        kind: "not-started",
       });
     });
 
@@ -247,13 +271,17 @@ describe("LocalRuntime", () => {
 
     it("reads all of a container's log to pick the lines at a level", async ({ dir: cwd }) => {
       await writeRuntimeMetadata(cwd, aDockerRecord());
-      const read = vi
-        .spyOn(DockerLauncher, "readLogs")
-        .mockResolvedValue("level=ERROR msg=a\nlevel=INFO msg=b\n");
+      const asked: Array<[string, number | "all"]> = [];
+      const docker = aDockerEngine({
+        readLogs: async (name, tail) => {
+          asked.push([name, tail]);
+          return "level=ERROR msg=a\nlevel=INFO msg=b\n";
+        },
+      });
 
-      const { lines } = await at(cwd).logs({ tail: 5, level: "error" });
+      const { lines } = await at(cwd, { docker }).logs({ tail: 5, level: "error" });
 
-      expect(read).toHaveBeenCalledWith("zitadel-server-abc", "all");
+      expect(asked).toEqual([["zitadel-server-abc", "all"]]);
       expect(lines.drawn(false)).toEqual(["level=ERROR msg=a"]);
     });
 
@@ -304,17 +332,14 @@ describe("LocalRuntime", () => {
   describe("finding the server of a directory", () => {
     const url = "http://localhost:8099";
 
-    function answeringAt(...origins: string[]): void {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async (input: string | URL) => {
-          const target = new URL(String(input));
-          if (target.pathname === "/readyz" && origins.includes(target.origin)) {
-            return new Response("ok", { status: 200 });
-          }
-          throw new TypeError("fetch failed (stub: connection refused)");
-        }),
-      );
+    function answeringAt(...origins: string[]): typeof fetch {
+      return async (input: RequestInfo | URL) => {
+        const target = new URL(String(input));
+        if (target.pathname === "/readyz" && origins.includes(target.origin)) {
+          return new Response("ok", { status: 200 });
+        }
+        throw new TypeError("fetch failed (connection refused)");
+      };
     }
 
     async function directoryWithARunningServer(cwd: string, daemon: Daemons): Promise<void> {
@@ -327,9 +352,9 @@ describe("LocalRuntime", () => {
       daemon,
     }) => {
       await directoryWithARunningServer(cwd, daemon);
-      answeringAt(url);
+      const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.resolveUrl(cwd)).resolves.toBe(url);
+      await expect(LocalRuntime.resolveUrl(cwd, fetcher)).resolves.toBe(url);
     });
 
     it("is the server of the nearest parent directory that started one", async ({
@@ -339,18 +364,18 @@ describe("LocalRuntime", () => {
       await directoryWithARunningServer(cwd, daemon);
       const app = join(cwd, "my-app");
       await mkdir(app);
-      answeringAt(url);
+      const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.resolveUrl(app)).resolves.toBe(url);
+      await expect(LocalRuntime.resolveUrl(app, fetcher)).resolves.toBe(url);
     });
 
     it("is not a server that answers at the recorded URL after the recorded one is gone", async ({
       dir: cwd,
     }) => {
       await directoryWithAGoneServer(cwd);
-      answeringAt(url);
+      const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.resolveUrl(cwd)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -361,18 +386,32 @@ describe("LocalRuntime", () => {
     }) => {
       const child = await daemon.spawn("sleep", ["60"]);
       await directoryRecording(cwd, child.pid, "/opt/zitadel/nextgen --migrate");
-      answeringAt(url);
+      const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.resolveUrl(cwd)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
+      });
+    });
+
+    it("names the folder that holds the record when its server does not answer", async ({
+      dir: cwd,
+      daemon,
+    }) => {
+      await directoryWithARunningServer(cwd, daemon);
+      const app = join(cwd, "my-app");
+      await mkdir(app);
+
+      await expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects.toMatchObject({
+        kind: "not-responding",
+        details: { server_url: url, directory: cwd },
       });
     });
 
     it("is not a server that runs but does not answer", async ({ dir: cwd, daemon }) => {
       await directoryWithARunningServer(cwd, daemon);
-      answeringAt();
+      const fetcher = answeringAt();
 
-      await expect(LocalRuntime.resolveUrl(cwd)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -380,11 +419,11 @@ describe("LocalRuntime", () => {
     it("is not whatever answers on the default port when the directory started none", async ({
       dir,
     }) => {
-      answeringAt("http://localhost:8080");
+      const fetcher = answeringAt("http://localhost:8080");
 
-      await expect(LocalRuntime.resolveUrl(dir)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(dir, fetcher)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
-        hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
+        kind: "not-running",
       });
     });
 
@@ -393,22 +432,22 @@ describe("LocalRuntime", () => {
       daemon,
     }) => {
       await directoryWithARunningServer(cwd, daemon);
-      answeringAt(url);
+      const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.detectUrl(cwd)).resolves.toBe(url);
+      await expect(LocalRuntime.detectUrl(cwd, fetcher)).resolves.toBe(url);
     });
 
     it("is not found for optional UI when the recorded server is gone", async ({ dir: cwd }) => {
       await directoryWithAGoneServer(cwd);
-      answeringAt(url);
+      const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.detectUrl(cwd)).resolves.toBeUndefined();
+      await expect(LocalRuntime.detectUrl(cwd, fetcher)).resolves.toBeUndefined();
     });
 
     it("is not found for optional UI when the directory started none", async ({ dir }) => {
-      answeringAt(url);
+      const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.detectUrl(dir)).resolves.toBeUndefined();
+      await expect(LocalRuntime.detectUrl(dir, fetcher)).resolves.toBeUndefined();
     });
 
     it("is not found, and not an error, for optional UI when the record cannot be read", async ({
@@ -466,6 +505,150 @@ describe("LocalRuntime", () => {
       daemon.adopt(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);
     });
+  });
+});
+
+describe("LocalRuntime start planning", () => {
+  const SHELL = {};
+
+  it("keeps the port the folder recorded when none is asked for", async ({ dir }) => {
+    await writeRuntimeMetadata(dir, aBinaryRecord({ port: 8123 }));
+
+    expect(await at(dir).plan({ shell: SHELL })).toMatchObject({ port: 8123 });
+  });
+
+  it("takes the port it is asked for over the recorded one", async ({ dir }) => {
+    await writeRuntimeMetadata(dir, aBinaryRecord({ port: 8123 }));
+
+    expect(await at(dir).plan({ port: 9000, shell: SHELL })).toMatchObject({
+      port: 9000,
+      apiUrl: "http://localhost:9000",
+    });
+  });
+
+  it("takes the default port in a folder that started nothing", async ({ dir }) => {
+    expect(await at(dir).plan({ shell: SHELL })).toMatchObject({
+      backend: "binary",
+      port: 8080,
+    });
+  });
+
+  it.each([
+    ["the flag", { image: "flag:1" }, { ZITADEL_LOCAL_IMAGE: "env:1" }, "flag:1"],
+    ["the shell's image", {}, { ZITADEL_LOCAL_IMAGE: "env:1" }, "env:1"],
+  ])("plans a Docker start with %s as the image", async (_name, request, shell, image) => {
+    const plan = await at("/unused").plan({ ...request, shell });
+
+    expect(plan).toMatchObject({ backend: "docker", image });
+  });
+
+  it("plans the default image for a Docker start that names none, off a release train", async () => {
+    const plan = await at("/unused").plan({ backend: "docker", shell: SHELL });
+
+    expect(plan).toMatchObject({
+      backend: "docker",
+      image: defaultLocalServerImageForCliVersion("0.0.0-test"),
+    });
+  });
+});
+
+describe("LocalRuntime launch", () => {
+  const refusingDocker = aDockerEngine({
+    available: async () => {
+      throw new Error("no daemon");
+    },
+  });
+
+  const request = (shell: NodeJS.ProcessEnv) => {
+    return { backend: "docker", image: "zitadel:test", shell } as const;
+  };
+
+  it("refuses a Docker start when Docker does not answer", async ({ dir }) => {
+    const launching = at(dir, { docker: refusingDocker }).launch(request({}));
+
+    await expect(launching).rejects.toBeInstanceOf(DockerUnavailableError);
+    await expect(launching).rejects.toMatchObject({ detail: "no daemon" });
+  });
+
+  it("refuses a Docker start when the daemon answers with a failure", async ({ dir }) => {
+    const docker = aDockerEngine({
+      available: async () => ({ status: 1, stdout: "", stderr: "daemon is down" }),
+    });
+
+    await expect(at(dir, { docker }).launch(request({}))).rejects.toMatchObject({
+      name: "DockerUnavailableError",
+      detail: "daemon is down",
+    });
+  });
+
+  it.for<readonly [string, NodeJS.ProcessEnv, boolean]>([
+    ["by default", {}, true],
+    [
+      "when the platform project is pinned to the platform one",
+      { NEXTGEN_PLATFORM_PROJECT_ID: PLATFORM_PROJECT_ID },
+      true,
+    ],
+    ["unless the bootstrap is turned off", { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false" }, false],
+    [
+      "unless the bootstrap is turned off in any case",
+      { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "FALSE" },
+      false,
+    ],
+    [
+      "unless the server is pinned to a project of its own",
+      { NEXTGEN_PLATFORM_PROJECT_ID: "proj_mine" },
+      false,
+    ],
+  ])("creates the local admin %s", async ([_name, shell, creates], { dir }) => {
+    await at(dir, { docker: refusingDocker })
+      .launch(request(shell))
+      .catch(() => undefined);
+
+    const written = await stat(join(dir, LOCAL_ADMIN_FILE)).then(
+      () => true,
+      () => false,
+    );
+    expect(written).toBe(creates);
+  });
+});
+
+describe("LocalRuntime.findStartedFrom", () => {
+  it("finds the folder itself when it started a server", async ({ dir }) => {
+    await directoryWithAGoneServer(dir);
+
+    const found = await LocalRuntime.findStartedFrom(dir, { cliVersion: "0.0.0-test" });
+
+    expect(found?.dataDirectory()).toBe(localRuntimePaths(dir).dataDir);
+  });
+
+  it("walks up to the nearest parent that started one", async ({ dir }) => {
+    await directoryWithAGoneServer(dir);
+    const app = join(dir, "apps", "web");
+    await mkdir(app, { recursive: true });
+
+    const found = await LocalRuntime.findStartedFrom(app, { cliVersion: "0.0.0-test" });
+
+    expect(found?.dataDirectory()).toBe(localRuntimePaths(dir).dataDir);
+  });
+
+  it("answers nothing when no folder above started one", async ({ dir }) => {
+    const found = await LocalRuntime.findStartedFrom(dir, { cliVersion: "0.0.0-test" });
+
+    expect(found).toBeUndefined();
+  });
+});
+
+describe("LocalRuntime.stopAll", () => {
+  it("says so when the processes of this machine cannot be listed", async () => {
+    const servers = { current: async () => ({ supported: false, error: "no ps", processes: [] }) };
+
+    expect(await LocalRuntime.stopAll(servers)).toEqual({ supported: false, error: "no ps" });
+  });
+
+  it("stops nothing when no server runs", async () => {
+    const servers = { current: async () => ({ supported: true, processes: [] }) };
+
+    expect(await LocalRuntime.stopAll(servers)).toEqual({ supported: true, results: [] });
   });
 });
 

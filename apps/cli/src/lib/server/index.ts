@@ -6,6 +6,8 @@ export {
   ServerStartError,
   ServerStopError,
 } from "./local/internal/lifecycle";
+export { LocalServerError } from "./local/local-server-error";
+export type { LocalServerErrorKind } from "./local/local-server-error";
 export { DestroyPermit } from "./local/destroy-permit";
 export type { EnvSummary, ResolvedEnv } from "./local/env-vars";
 export type { LocalAdmin } from "./local/admin-credential";
@@ -18,8 +20,10 @@ export type {
   RuntimeMetadata,
 } from "./local/runtime";
 export { LogLines } from "./local/log-lines";
-export type { LocalMachine, MachineChecks } from "./local-machine";
+export type { LocalMachine } from "./local-machine";
 export type { DockerResult, TcpListener, WritablePathProbe } from "./local";
+export { BinaryLauncher, DockerLauncher } from "./local/internal";
+export { assertLocalStateWritable, checkLocalServerHealth, listenersForPort } from "./local";
 export { SystemMachine } from "./local-machine";
 export { StartedServer } from "./started-server";
 export type {

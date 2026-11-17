@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 
 import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
+import { Cmd } from "@/lib/cmd";
 import { byName, type ByName } from "@/lib/names";
 import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
@@ -10,13 +12,16 @@ import { log, style, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
-import { ZitadelRuntime } from "@/lib/server";
+import { LocalServerError, ZitadelRuntime } from "@/lib/server";
+import { LOCAL_SERVER_ADVICE } from "@/lib/suggestion/local-server-advice";
+import { interpolate } from "./refusal";
 import { resolveCwd } from "@/lib/paths";
 import {
   Spelling,
   commandOf,
   declaredOf,
   helpOf,
+  shellCommand,
   isSuggestion,
   spelled,
   type Again,
@@ -60,10 +65,6 @@ import type {
   SkippedEnvelope,
 } from "./types";
 
-/**
- * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
- * and the colour libraries read. The libraries agree that off wins.
- */
 /** The variable the server is named by when `--server` is not given. */
 const SERVER: FlagVariable = {
   name: "ZITADEL_API_BASE",
@@ -72,6 +73,10 @@ const SERVER: FlagVariable = {
   precedence: "`--server` wins over it, and it wins over `server` in `zitadel.json`.",
 };
 
+/**
+ * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
+ * and the colour libraries read. The libraries agree that off wins.
+ */
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
   flag: "color",
@@ -761,7 +766,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
     }
     this.telemetry.track(
       CLI_COMMAND_STARTED,
-      commandEventProperties(this.meta, this.telemetryInvocationId, this.telemetryProps),
+      commandEventProperties(
+        this.meta,
+        ZitadelRuntime.fromUrl(this.meta.source).kind,
+        this.telemetryInvocationId,
+        this.telemetryProps,
+      ),
     );
     if (this.telemetry.isFirstRun) {
       this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
@@ -803,11 +813,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_COMPLETED,
-        commandEventProperties(this.meta, this.telemetryInvocationId, {
-          ...this.telemetryProps,
-          status: result.status,
-          duration_ms: Date.now() - this.telemetryStartedAt,
-        }),
+        commandEventProperties(
+          this.meta,
+          ZitadelRuntime.fromUrl(this.meta.source).kind,
+          this.telemetryInvocationId,
+          {
+            ...this.telemetryProps,
+            status: result.status,
+            duration_ms: Date.now() - this.telemetryStartedAt,
+          },
+        ),
       );
     }
     const next =
@@ -1017,6 +1032,72 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
+   * A failure of the local server with the advice for it: the server package
+   * names what failed, and this says what to do about it. Where the failing
+   * record or file sits in another folder than this run's, the commands it
+   * suggests carry that folder's `--cwd`, so they fix the right one.
+   *
+   * @param error - What the command threw.
+   * @param cwd - The folder this run acts on, from the settled meta.
+   * @returns The error with its hint and next commands, or the error as it was.
+   */
+  private advise(error: unknown, cwd: string): unknown {
+    if (!(error instanceof LocalServerError)) {
+      return error;
+    }
+    const advice: { hint: string; next?: readonly Suggested[] } = LOCAL_SERVER_ADVICE[error.kind];
+    const details: Record<string, unknown> = {};
+    if (isObject(error.details)) {
+      Object.assign(details, error.details);
+    }
+    const { directory } = details;
+    const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(cwd);
+    const removal: Suggested[] = [];
+    if (error.kind === "admin-malformed" && typeof details.path === "string") {
+      removal.push(shellCommand("rm", Cmd.quote(details.path)));
+    }
+    const retargeted: string[][] = [];
+    const next = (advice.next ?? []).map((step) => {
+      if (elsewhere && typeof step === "object" && (step.id === "reset" || step.id === "start")) {
+        const flags = { ...("flags" in step ? step.flags : undefined), cwd: directory };
+        retargeted.push([
+          step.id,
+          ...Object.entries(flags).flatMap(([name, value]) => {
+            if (value === true) {
+              return [`--${name}`];
+            } else {
+              return [`--${name}`, String(value)];
+            }
+          }),
+        ]);
+        return { ...step, flags } as Suggested;
+      } else {
+        return step;
+      }
+    });
+    const quoted = { ...details };
+    for (const key of ["directory", "path"]) {
+      const value = details[key];
+      if (typeof value === "string") {
+        quoted[key] = Cmd.quote(value);
+      }
+    }
+    const failure = (reported: unknown): ZitadelError => {
+      return new ZitadelError(error.code, error.message, {
+        hint: interpolate(advice.hint, quoted),
+        nextCommands: [...removal, ...next],
+        details: reported,
+      });
+    };
+    if (retargeted.length > 0) {
+      details.suggested_args = retargeted;
+      return failure(details);
+    } else {
+      return failure(error.details);
+    }
+  }
+
+  /**
    * Renders any thrown error as the failure envelope and exits with its code.
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
@@ -1038,7 +1119,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? commandOf(["--help"], meta.cliVersion)
         : this.suggest(helpOf(meta.command));
     const zitadelError = presentedFailure(
-      this.suggestions.renderedFailure(cancelled ? reason : toZitadelError(error)),
+      this.suggestions.renderedFailure(
+        cancelled ? reason : toZitadelError(this.advise(error, meta.cwd)),
+      ),
       help,
     );
     this.meta = meta;
@@ -1046,13 +1129,18 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_FAILED,
-        commandEventProperties(meta, this.telemetryInvocationId, {
-          ...this.telemetryProps,
-          status: "error",
-          reason: zitadelError.code,
-          exit_code: zitadelError.exitCode,
-          duration_ms: Date.now() - this.telemetryStartedAt,
-        }),
+        commandEventProperties(
+          meta,
+          ZitadelRuntime.fromUrl(meta.source).kind,
+          this.telemetryInvocationId,
+          {
+            ...this.telemetryProps,
+            status: "error",
+            reason: zitadelError.code,
+            exit_code: zitadelError.exitCode,
+            duration_ms: Date.now() - this.telemetryStartedAt,
+          },
+        ),
       );
     }
     if (this.jsonEnabled()) {

@@ -37,7 +37,7 @@ import { ZitadelError } from "@/lib/errors";
 import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { Ui, warnings } from "@/lib/ui";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
-import { ScriptedMachine } from "@tests/helpers/local-machine";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
@@ -3329,7 +3329,7 @@ async function readingCredentialFiles(dir: string) {
     return {
       step,
       out: await step.run({
-        patcher: createOrca().patcherFor("next"),
+        patcher: createOrca(LocalRuntime.DIR).patcherFor("next"),
         patchContext: () => {
           return aPatchContext("next");
         },
@@ -3674,7 +3674,7 @@ describe("SettleAnswers", () => {
 
   describe("when a later port is free", () => {
     it("suggests setup on that port, from the run's directory", async () => {
-      const machine = new ScriptedMachine({ taken: [3000], nextFree: () => 3001 });
+      const machine = new FakeMachine({ taken: [3000], nextFree: () => 3001 });
 
       await settleOnTakenPort3000(machine, aSuggest({ cwd: "app" }, "1.2.3"));
 
@@ -3686,7 +3686,13 @@ describe("SettleAnswers", () => {
 
   describe("when the ports after the taken one are taken too", () => {
     it("names only the flag, since a placeholder would run as a shell redirection", async () => {
-      await settleOnTakenPort3000(new ScriptedMachine({ taken: [3000] }));
+      await settleOnTakenPort3000(
+        new FakeMachine({
+          taken: Array.from({ length: 21 }, (_, index) => {
+            return 3000 + index;
+          }),
+        }),
+      );
 
       expect(warnings.take()).toEqual([
         "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",

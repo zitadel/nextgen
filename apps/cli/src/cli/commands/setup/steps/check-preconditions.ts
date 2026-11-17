@@ -1,7 +1,8 @@
-import { toZitadelError } from "@/lib/errors";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { isObject } from "@/lib/json";
+import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
-import { ZitadelRuntime } from "@/lib/server";
+import { LocalServerError, ZitadelRuntime } from "@/lib/server";
+import { LOCAL_SERVER_ADVICE } from "@/lib/suggestion/local-server-advice";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -128,16 +129,19 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
     }).catch((error: unknown) => {
-      const normalized = toZitadelError(error);
-      if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+      if (!(error instanceof LocalServerError) || error.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
         throw error;
       }
+      const hint = interpolate(
+        LOCAL_SERVER_ADVICE[error.kind].hint,
+        isObject(error.details) ? error.details : {},
+      );
       const retry = retryOptionsFromFlags(flags);
       const recovery = ssoRecovery(retry, suggest);
       throw refusalError(
         NO_LOCAL_SERVER_REFUSAL,
         {
-          reason: normalized.hint ? `${normalized.hint} ` : "",
+          reason: `${hint} `,
           scripting:
             retry.sso && retry.sso.length > 0
               ? "The rerun asks for the client id and secret, because a command carries neither. " +

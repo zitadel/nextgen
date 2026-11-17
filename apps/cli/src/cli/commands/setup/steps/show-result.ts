@@ -1,4 +1,5 @@
 import { basename, join } from "node:path";
+import { ZitadelRuntime } from "@/lib/server";
 
 import semver from "semver";
 
@@ -277,7 +278,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
       !ownedByLocalAdmin &&
       (Claim.state({
         secret: {},
-        server: answers.server,
+        cloud: ZitadelRuntime.fromUrl(answers.server).isCloud(),
       }).kind === "detached" ||
         (isLocal && (this.deps.dryRun || hostsPlatform)))
         ? {

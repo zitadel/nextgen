@@ -1,7 +1,7 @@
-import type { LocalMachine } from "@/lib/server";
+import type { LocalMachine, TcpListener } from "@/lib/server";
 
 /**
- * What a {@link ScriptedMachine} answers. Every field has the answer of a
+ * What a {@link FakeMachine} answers. Every field has the answer of a
  * machine with no local server, every port free and no bundled release.
  */
 export type MachineScript = Readonly<{
@@ -13,6 +13,8 @@ export type MachineScript = Readonly<{
   nextFree?: (port: number) => number | undefined;
   /** The server release the CLI ships. */
   bundled?: string;
+  /** The processes that listen on each port. */
+  listening?: Readonly<Record<number, readonly TcpListener[]>>;
   /** How the server reaches this machine's localhost. */
   reach?: "allowed" | "container" | "unknown";
 }>;
@@ -21,7 +23,7 @@ export type MachineScript = Readonly<{
  * A machine that answers setup's questions about local servers as a test
  * scripts it, and never changes after it is built.
  */
-export class ScriptedMachine implements LocalMachine {
+export class FakeMachine implements LocalMachine {
   private readonly script: MachineScript;
 
   /**
@@ -49,10 +51,22 @@ export class ScriptedMachine implements LocalMachine {
 
   /**
    * @param port - The port that is taken.
-   * @returns What the script suggests, if anything.
+   * @returns What the script suggests; without a suggestion, the first of the next 20 ports the
+   *   script does not hold, as the real machine finds it.
    */
   async nextFreePort(port: number): Promise<number | undefined> {
-    return this.script.nextFree?.(port);
+    if (this.script.nextFree) {
+      return this.script.nextFree(port);
+    }
+    const count = Math.max(0, Math.min(port + 20, 65_535) - port);
+    for (const next of Array.from({ length: count }, (_, index) => {
+      return port + 1 + index;
+    })) {
+      if (await this.isPortFree(next)) {
+        return next;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -60,6 +74,14 @@ export class ScriptedMachine implements LocalMachine {
    */
   bundledVersion(): string | undefined {
     return this.script.bundled;
+  }
+
+  /**
+   * @param port - The port asked about.
+   * @returns What the script has listening there.
+   */
+  async listeners(port: number): Promise<readonly TcpListener[]> {
+    return this.script.listening?.[port] ?? [];
   }
 
   /**

@@ -33,7 +33,11 @@ export class RuntimeFileStore<B extends RuntimeBackend> implements ServerStore<R
 
   async read(): Promise<RecordOf<B> | undefined> {
     const runtime = await readRuntimeMetadata(this.cwd);
-    return runtime && isRecordOf(runtime, this.backend) ? runtime : undefined;
+    if (runtime && isRecordOf(runtime, this.backend)) {
+      return runtime;
+    } else {
+      return undefined;
+    }
   }
 
   write(record: RecordOf<B>): Promise<void> {

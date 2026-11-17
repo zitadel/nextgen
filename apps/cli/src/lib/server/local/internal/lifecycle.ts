@@ -10,6 +10,8 @@
  * process is spawned or how a port is probed, the tests that make it cheap to
  * change stop being able to cover it.
  */
+import { errorMessage } from "@/lib/errors";
+import { LocalServerError } from "../local-server-error";
 import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/server/local/runtime";
 import { type Clock, SystemClock } from "@/lib/clock";
 
@@ -168,15 +170,16 @@ const PORT_SEARCH_RANGE = 100;
  * start stop a working server.
  */
 const HEALTH_ATTEMPTS = 3;
+/** The highest TCP port there is. */
+const MAX_PORT = 65_535;
 /** How many times a start that lost a race for its port tries the next one. */
 const PORT_RACE_RETRIES = 3;
 
-/** Every port in the search range was taken. */
 /**
  * Docker did not answer, so a Docker start cannot begin. The CLI says what to
  * do about it; the package only reports that it happened and what Docker said.
  */
-export class DockerUnavailableError extends Error {
+export class DockerUnavailableError extends LocalServerError {
   /** What Docker said, or that it said nothing. */
   readonly detail: string;
 
@@ -184,31 +187,45 @@ export class DockerUnavailableError extends Error {
    * @param reason - What asking Docker failed with: its error, or the text it printed.
    */
   constructor(reason: unknown) {
-    super("Docker is not reachable");
+    const detail = errorMessage(reason).trim() || "no reason given";
+    super("docker-unavailable", "E_NETWORK", "Docker is not reachable", { detail });
     this.name = "DockerUnavailableError";
-    this.detail =
-      (reason instanceof Error ? reason.message : String(reason)).trim() || "no reason given";
+    this.detail = detail;
   }
 }
 
-export class NoFreePortError extends Error {
+/** Every port in the search range was taken. */
+export class NoFreePortError extends LocalServerError {
   readonly firstPort: number;
 
   constructor(firstPort: number) {
-    super(`No free port from ${String(firstPort)} to ${String(firstPort + PORT_SEARCH_RANGE - 1)}`);
+    super(
+      "no-free-port",
+      "E_PORT_IN_USE",
+      `No free port from ${String(firstPort)} to ${String(Math.min(firstPort + PORT_SEARCH_RANGE - 1, MAX_PORT))}`,
+      { first_port: firstPort },
+    );
+    this.name = "NoFreePortError";
     this.firstPort = firstPort;
   }
 }
 
 /** A port that was explicitly asked for is held, so the start is refused rather than moved. */
-export class PortInUseError extends Error {
+export class PortInUseError extends LocalServerError {
   readonly port: number;
 
   constructor(port: number) {
-    super(`Port ${String(port)} is already in use`);
+    super("port-in-use", "E_PORT_IN_USE", `Port ${String(port)} is already in use`, { port });
+    this.name = "PortInUseError";
     this.port = port;
   }
 }
+
+/** What a start says when its server did not become ready, by why. */
+const START_FAILURES = {
+  exited: "The server exited before it became healthy",
+  timeout: "The server did not become healthy in time",
+} as const;
 
 /**
  * A server was launched but did not become ready. `cleanup` says what stopping
@@ -216,13 +233,13 @@ export class PortInUseError extends Error {
  * cleaning up because cleaning up a container removes its log, which is the
  * only explanation of why it failed.
  */
-export class ServerStartError<R extends ServerRecord> extends Error {
+export class ServerStartError<R extends ServerRecord> extends LocalServerError {
   readonly reason: "exited" | "timeout";
   readonly record: R;
   readonly cleanup: StopOutcome;
   readonly logTail: string | undefined;
   /** What identifies the server, from {@link Launcher.describe}. */
-  readonly details: Readonly<Record<string, unknown>>;
+  override readonly details: Readonly<Record<string, unknown>>;
 
   constructor(
     reason: "exited" | "timeout",
@@ -231,11 +248,8 @@ export class ServerStartError<R extends ServerRecord> extends Error {
     details: Readonly<Record<string, unknown>>,
     logTail?: string,
   ) {
-    super(
-      reason === "exited"
-        ? "The server exited before it became healthy"
-        : "The server did not become healthy in time",
-    );
+    super("server-did-not-start", "E_NETWORK", START_FAILURES[reason], details);
+    this.name = "ServerStartError";
     this.reason = reason;
     this.record = record;
     this.cleanup = cleanup;
@@ -245,12 +259,16 @@ export class ServerStartError<R extends ServerRecord> extends Error {
 }
 
 /** A server that had to be stopped (to restart or move it) was still running afterwards. */
-export class ServerStopError<R extends ServerRecord> extends Error {
+export class ServerStopError<R extends ServerRecord> extends LocalServerError {
   readonly record: R;
   readonly outcome: StopOutcome;
 
   constructor(record: R, outcome: StopOutcome) {
-    super("The server did not stop");
+    super("server-did-not-stop", "E_VALIDATION", "The server did not stop", {
+      runtime: record,
+      stop_result: outcome,
+    });
+    this.name = "ServerStopError";
     this.record = record;
     this.outcome = outcome;
   }
@@ -284,9 +302,11 @@ export class Lifecycle<R extends ServerRecord> {
       return { kind: "stopped" };
     }
     const alive = await this.deps.launcher.isAlive(record);
-    return alive && (await this.answers(record.server_url))
-      ? { kind: "running", record }
-      : { kind: "dead", record };
+    if (alive && (await this.answers(record.server_url))) {
+      return { kind: "running", record };
+    } else {
+      return { kind: "dead", record };
+    }
   }
 
   /** Whether a server that is alive answers, asking up to {@link HEALTH_ATTEMPTS} times. */
@@ -328,7 +348,7 @@ export class Lifecycle<R extends ServerRecord> {
       return { record: state.record, alreadyRunning: true };
     }
 
-    const previous = state.kind === "stopped" ? undefined : state.record;
+    const previous = (state.kind !== "stopped" && state.record) || undefined;
     // A port other than the running server's own is checked before that server
     // is touched, so a refused move leaves it running. Its own port cannot be
     // checked yet: it is held by the server about to be stopped.
@@ -377,7 +397,7 @@ export class Lifecycle<R extends ServerRecord> {
           requested === undefined &&
           attempt < PORT_RACE_RETRIES &&
           !(error instanceof ServerStopError) &&
-          (error instanceof ServerStartError ? error.reason === "exited" : true) &&
+          (!(error instanceof ServerStartError) || error.reason === "exited") &&
           !(await this.deps.ports.isFree(claim.port))
         ) {
           return undefined;
@@ -458,7 +478,11 @@ export class Lifecycle<R extends ServerRecord> {
       return { result: "not-running" };
     }
     const outcome = await this.terminate(record);
-    return { result: outcome.status === "stopped" ? "stopped" : "not-running", record };
+    if (outcome.status === "stopped") {
+      return { result: "stopped", record };
+    } else {
+      return { result: "not-running", record };
+    }
   }
 
   /** Refuses a port that is held. Used before anything is torn down, so a refusal changes nothing. */
@@ -554,7 +578,8 @@ export async function claimFreePort(
     return { port: requested, release };
   }
   const first = preferred ?? firstPort;
-  for (const port of Array.from({ length: PORT_SEARCH_RANGE }, (_, index) => {
+  const count = Math.min(PORT_SEARCH_RANGE, MAX_PORT - first + 1);
+  for (const port of Array.from({ length: Math.max(count, 0) }, (_, index) => {
     return first + index;
   })) {
     if (!(await ports.isFree(port))) {

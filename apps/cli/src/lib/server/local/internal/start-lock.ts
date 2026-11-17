@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
+import { LocalServerError } from "../local-server-error";
 import { isErrno } from "@/lib/errno";
 import { type Clock, SystemClock } from "@/lib/clock";
 
@@ -60,7 +60,9 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
       }
     }
     const owner = await readOwner(lockFile);
-    const abandoned = owner === undefined ? await isUnwritten(lockFile) : !isAlive(owner);
+    const abandoned =
+      (owner === undefined && (await isUnwritten(lockFile))) ||
+      (owner !== undefined && !isAlive(owner));
     if (!abandoned || !(await clearStale(lockFile, owner))) {
       return undefined;
     }
@@ -155,7 +157,10 @@ async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | und
       }
     }
     const holder = await readOwner(file);
-    if (holder === undefined ? !(await isUnwritten(file)) : isAlive(holder)) {
+    if (
+      (holder === undefined && !(await isUnwritten(file))) ||
+      (holder !== undefined && isAlive(holder))
+    ) {
       return undefined;
     }
   }
@@ -172,13 +177,11 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
       return release;
     }
     if (clock.now() >= deadline) {
-      throw new ZitadelError(
+      throw new LocalServerError(
+        "start-in-progress",
         "E_CONFLICT",
         "Another `zitadel start` is still running in this directory",
-        {
-          hint: `Wait for it to finish, or delete ${lockFile} if no start is running.`,
-          details: { lock_file: lockFile, owner_pid: await readOwner(lockFile) },
-        },
+        { lock_file: lockFile, owner_pid: await readOwner(lockFile) },
       );
     }
     await clock.wait(pollMs);
@@ -193,7 +196,11 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
 async function readOwner(lockFile: string): Promise<number | undefined> {
   try {
     const pid = Number.parseInt(await readFile(lockFile, "utf8"), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+    if (Number.isInteger(pid) && pid > 0) {
+      return pid;
+    } else {
+      return undefined;
+    }
   } catch {
     return undefined;
   }

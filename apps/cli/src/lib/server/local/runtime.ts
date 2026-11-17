@@ -4,7 +4,8 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { ZitadelError, errorMessage } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerError } from "./local-server-error";
 import { isErrno } from "@/lib/errno";
 
 import { readIfExists } from "@/lib/fs";
@@ -15,16 +16,16 @@ import { isLoopbackHost } from "@/lib/server/host";
 import { Runtime } from "@/lib/runtime";
 import { CliPackage } from "@/lib/upgrade";
 
-export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
-export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
+const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
+const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
 export const DEFAULT_LOCAL_SERVER_PORT = 8080;
 export const DEFAULT_LOCAL_SERVER_URL = "http://localhost:8080";
 export const LOCAL_RUNTIME_DIR = ".zitadel/local";
 export const LOCAL_DATA_DIR = ".zitadel/local/nextgen-data";
 export const LOCAL_RUNTIME_FILE = ".zitadel/local/runtime.json";
-export const LOCAL_SERVER_LOG_FILE = ".zitadel/local/server.log";
-export const LOCAL_CONTAINER_PASSWD_FILE = ".zitadel/local/container-passwd";
-export const LOCAL_CONTAINER_GROUP_FILE = ".zitadel/local/container-group";
+const LOCAL_SERVER_LOG_FILE = ".zitadel/local/server.log";
+const LOCAL_CONTAINER_PASSWD_FILE = ".zitadel/local/container-passwd";
+const LOCAL_CONTAINER_GROUP_FILE = ".zitadel/local/container-group";
 export const CONTAINER_DATA_DIR = "/var/lib/zitadel/nextgen-data";
 export const CONTAINER_HTTP_PORT = 8080;
 
@@ -60,9 +61,11 @@ export async function readPlatformRuntime(
       return undefined;
     }
     const doc = (await res.json()) as { console_project_id?: unknown; publishable_key?: unknown };
-    return doc.console_project_id === PLATFORM_PROJECT_ID && typeof doc.publishable_key === "string"
-      ? { publishable_key: doc.publishable_key }
-      : undefined;
+    if (doc.console_project_id === PLATFORM_PROJECT_ID && typeof doc.publishable_key === "string") {
+      return { publishable_key: doc.publishable_key };
+    } else {
+      return undefined;
+    }
   } catch {
     return undefined;
   }
@@ -142,7 +145,7 @@ export type DockerRuntimeMetadata = RuntimeMetadataBase & {
 
 export type RuntimeMetadata = BinaryRuntimeMetadata | DockerRuntimeMetadata;
 
-export type LocalRuntimePaths = {
+type LocalRuntimePaths = {
   runtimeDir: string;
   dataDir: string;
   runtimeFile: string;
@@ -273,9 +276,9 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
       return false;
     }
-    throw new ZitadelError("E_VALIDATION", `${path} cannot be read`, {
-      hint: `Check that ${path} and its directory are readable by you.`,
-      details: { cause: errorMessage(error) },
+    throw new LocalServerError("record-unreadable", "E_VALIDATION", `${path} cannot be read`, {
+      path,
+      cause: errorMessage(error),
     });
   }
 }
@@ -316,11 +319,14 @@ export async function loopbackReach(
   if (nearest.runtime.backend === "docker") {
     return "container";
   }
-  return Object.keys(LOCAL_DEFAULTS).every((name) => {
+  const injectsEveryDefault = Object.keys(LOCAL_DEFAULTS).every((name) => {
     return nearest.runtime.env?.injected.includes(name);
-  })
-    ? "allowed"
-    : "unknown";
+  });
+  if (injectsEveryDefault) {
+    return "allowed";
+  } else {
+    return "unknown";
+  }
 }
 
 /** Runtime metadata of the server started in `cwd` or the nearest parent with one. */
@@ -331,12 +337,12 @@ export async function readNearestRuntimeMetadata(
   if (!dir) {
     return undefined;
   }
-  const runtime = await readRuntimeMetadata(dir).catch((error: unknown) => {
-    // A record in a parent is recovered where it is: the bare commands would
-    // act on the working directory instead.
-    throw dir === cwd ? error : retargetMalformedRuntime(error, dir);
-  });
-  return runtime ? { dir, runtime } : undefined;
+  const runtime = await readRuntimeMetadata(dir);
+  if (runtime) {
+    return { dir, runtime };
+  } else {
+    return undefined;
+  }
 }
 
 /**
@@ -360,7 +366,7 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
   }
 
   const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
-  return normalizeRuntimeMetadata(parsed);
+  return normalizeRuntimeMetadata(parsed, cwd);
 }
 
 export async function writeRuntimeMetadata(cwd: string, metadata: RuntimeMetadata): Promise<void> {
@@ -404,19 +410,31 @@ export async function checkLocalServerHealth(
 
 /**
  * The error for a directory with no running server of its own. With a
- * `serverUrl` there is a record whose server is not running; without one there
- * is no record in the directory or a parent. The hint offers `--server` for the
- * case where someone really does mean another directory's server, since
- * nothing falls back to one on its own.
+ * `serverUrl` there is a record whose server is not running, and `directory`
+ * is the folder that holds the record (a parent, when `start` ran there);
+ * without one there is no record in the directory or a parent. Nothing falls
+ * back to another directory's server on its own.
+ *
+ * @param serverUrl - The address the record names, when there is a record.
+ * @param directory - The folder that holds the record.
+ * @returns The error.
  */
-export function localServerNotRunning(serverUrl?: string): ZitadelError {
-  return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
-    hint: serverUrl
-      ? `No healthy local server responded at ${serverUrl}.`
-      : "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
-    nextCommands: [{ id: "start" }],
-    details: { server_url: serverUrl },
-  });
+export function localServerNotRunning(serverUrl?: string, directory?: string): LocalServerError {
+  if (serverUrl) {
+    return new LocalServerError(
+      "not-responding",
+      "E_LOCAL_SERVER_NOT_RUNNING",
+      "Local Zitadel server is not running",
+      { server_url: serverUrl, directory },
+    );
+  } else {
+    return new LocalServerError(
+      "not-running",
+      "E_LOCAL_SERVER_NOT_RUNNING",
+      "Local Zitadel server is not running",
+      { server_url: serverUrl },
+    );
+  }
 }
 
 async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
@@ -429,11 +447,17 @@ async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   if (lines.includes(entry)) {
     return;
   }
-  const prefix = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
-  await writeFile(path, `${existing}${prefix}${entry}\n`);
+  if (existing.length === 0 || existing.endsWith("\n")) {
+    await writeFile(path, `${existing}${entry}\n`);
+  } else {
+    await writeFile(path, `${existing}\n${entry}\n`);
+  }
 }
 
-function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetadata {
+function normalizeRuntimeMetadata(
+  input: Record<string, unknown>,
+  directory: string,
+): RuntimeMetadata {
   if (
     input.schema_version !== 1 ||
     typeof input.port !== "number" ||
@@ -444,10 +468,13 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
   ) {
-    throw malformedRuntime(input);
+    throw malformedRuntime(input, directory);
   }
 
-  const backend = input.backend === undefined ? "docker" : input.backend;
+  const backend = [input.backend, "docker"].find((value) => {
+    return value !== undefined;
+  });
+  const env = (isEnvSummary(input.env) && input.env) || undefined;
   const base = {
     schema_version: 1 as const,
     port: input.port,
@@ -455,7 +482,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     data_dir: input.data_dir,
     created_at: input.created_at,
     cli_version: input.cli_version,
-    env: isEnvSummary(input.env) ? input.env : undefined,
+    env,
   };
 
   if (backend === "binary") {
@@ -468,7 +495,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
       typeof input.server_package !== "string" ||
       typeof input.server_version !== "string"
     ) {
-      throw malformedRuntime(input);
+      throw malformedRuntime(input, directory);
     }
     return {
       ...base,
@@ -487,7 +514,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.container_id !== "string" ||
     typeof input.image !== "string"
   ) {
-    throw malformedRuntime(input);
+    throw malformedRuntime(input, directory);
   }
   return {
     ...base,
@@ -572,37 +599,18 @@ function explicitUrlPort(value: string): number | undefined {
     return undefined;
   }
   const port = Number(match[1]);
-  return isValidPort(port) ? port : undefined;
-}
-
-function malformedRuntime(input: Record<string, unknown>): ZitadelError {
-  return new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
-    hint: "Run `zitadel reset --force`, then `zitadel start`.",
-    nextCommands: [{ id: "reset", flags: { force: true } }, { id: "start" }],
-    details: input,
-  });
-}
-
-/**
- * The malformed-record error again, with its recovery aimed at `dir`. The
- * commands quote `dir` where it needs it, and `details.suggested_args` holds
- * the same arguments as they are.
- */
-export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
-  if (!(error instanceof ZitadelError) || error.message !== `${LOCAL_RUNTIME_FILE} is malformed`) {
-    return error;
+  if (isValidPort(port)) {
+    return port;
+  } else {
+    return undefined;
   }
-  const resetArgs = ["reset", "--force", "--cwd", dir];
-  const startArgs = ["start", "--cwd", dir];
-  return new ZitadelError(error.code, error.message, {
-    hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
-    nextCommands: [
-      { id: "reset", flags: { force: true, cwd: dir } },
-      { id: "start", flags: { cwd: dir } },
-    ],
-    details: {
-      ...(error.details as Record<string, unknown>),
-      suggested_args: [resetArgs, startArgs],
-    },
-  });
+}
+
+function malformedRuntime(input: Record<string, unknown>, directory: string): LocalServerError {
+  return new LocalServerError(
+    "record-malformed",
+    "E_VALIDATION",
+    `${LOCAL_RUNTIME_FILE} is malformed`,
+    { ...input, directory },
+  );
 }

@@ -40,8 +40,10 @@ manages the wrong server: see [`local/AGENTS.md`](local/AGENTS.md).
   for an `AdminSession`. `Clock` is not either: it is `lib/clock.ts`.
 - Setup asks about this machine through the `LocalMachine` interface
   (`local-machine.ts`). Production passes `SystemMachine`; tests pass the real,
-  in-memory `ScriptedMachine` (`tests/helpers/local-machine.ts`). That is why
+  in-memory `FakeMachine` (`tests/helpers/local-machine.ts`). That is why
   setup's tests need no `vi.mock` of the server.
+- `doctor` owns its own probes (`DoctorMachine`, `src/cli/commands/doctor/checks/machine.ts`);
+  the server package has no interface for them.
 
 ## Decisions, and why
 
@@ -69,8 +71,9 @@ namespace over loose functions. They disagreed on order, and this is the call:
    `ServerError` subclasses carrying a code and plain data, and optionally emits
    progress events; a presenter in `src/cli` turns them into hints and
    suggested commands. Destructive `reset` takes a capability token, not
-   `Consent`. Then a Biome rule forbids `@/lib/ui`, `@/lib/suggestion`,
-   `@/lib/consent` and `@/lib/oclif` here.
+   `Consent`. A layering test (`tests/unit/lib/server/layering.test.ts`) forbids
+   `@/lib/ui`, `@/lib/suggestion`, `@/lib/consent`, `@/lib/oclif` and
+   `@/cli` here.
 2. **Helper modules become classes** (`RuntimeRecords`, `LocalLayout`,
    `AdminCredentials`, `ProjectEnv`, `LogParser`, `PortListeners`) with
    injected file system, ports, Docker and process table, so start, stop and
@@ -88,20 +91,19 @@ and extend one `ServerCommand`. They call `plan()`, `launch()`, `stop()`,
 `reset()` and `follow()` and render the answer; none builds a path, a container
 name or an address.
 
-## What is still open on this branch
+## Errors
 
-Done from the review: `start` throws the lifecycle's typed errors
-(`DockerUnavailableError`, `PortInUseError`, `NoFreePortError`,
-`ServerStartError`, `ServerStopError`) and the command words them
-(`src/cli/commands/server/failures.ts`); `reset` takes a `DestroyPermit`, not
+Every failure of the package is a `LocalServerError`: a `kind`, a code, a
+message and the facts behind it, never a hint or a next command. The commands
+say what to do about each kind (`src/lib/suggestion/local-server-advice.ts`,
+applied by `BaseCommand`), and `start` words its own refusals from the
+lifecycle's errors (`DockerUnavailableError`, `PortInUseError`,
+`NoFreePortError`, `ServerStartError`, `ServerStopError`, all subclasses) in
+`src/cli/commands/server/start.ts`. `reset` takes a `DestroyPermit`, not
 `Consent`; the package says what it is doing through a `progress` callback the
 command gives it, not through `log`.
 
-Not done yet: other errors in the package (`runtime.ts`, `admin-credential.ts`,
-`sign-in.ts`, `env-vars.ts`, `start-lock.ts`, the launchers) still carry hint
-and next-command wording in a `ZitadelError`; the helper aliases on
-`LocalRuntime` are still `static readonly` function references; there are no
-per-directory `index.ts` barrels; and `zitadel-runtime.ts` is still one large
-file. The seams that already exist (`Lifecycle` with `Launcher`, `ServerStore`,
-`PortProbe` and `HealthProbe`; `LocalServers`; `LocalMachine`) are the ones to
-build on.
+Still open: the helper methods on `LocalRuntime` delegate to functions in
+`local/runtime.ts`, and `zitadel-runtime.ts` is one large file. The seams that
+already exist (`Lifecycle` with `Launcher`, `ServerStore`, `PortProbe` and
+`HealthProbe`; `LocalServers`; `LocalMachine`) are the ones to build on.

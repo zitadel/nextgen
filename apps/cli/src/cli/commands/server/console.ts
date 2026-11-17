@@ -56,6 +56,7 @@ export default class Console extends ServerCommand {
     if (found === undefined) {
       // A server that cannot be resolved is the run's error, not a missing local setup.
       const environment = await Environment.resolve({
+        servers: ZitadelRuntime,
         cwd,
         env: process.env,
         serverFlag: typeof flags.server === "string" ? flags.server : undefined,

@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { DEFAULT_SERVER } from "@zitadel/config/server";
 import type { Parsed } from "@zitadel/config/idp";
@@ -7,7 +7,6 @@ import { ZitadelError, errorMessage } from "@/lib/errors";
 import { currentUser } from "@/lib/uidgid";
 
 import {
-  assertLocalStateWritable,
   atLeast,
   BinaryLauncher,
   checkLocalServerHealth,
@@ -17,7 +16,6 @@ import {
   defaultLocalServerImageForCliVersion,
   type DestroyPermit,
   DockerLauncher,
-  type DockerResult,
   DockerUnavailableError,
   EMPTY_SUMMARY,
   ensureContainerIdentity,
@@ -31,7 +29,6 @@ import {
   type Launcher,
   Lifecycle,
   type LifecycleOptions,
-  listenersForPort,
   loadProjectEnv,
   LOCAL_ADMIN_FILE,
   LOCAL_RUNTIME_DIR,
@@ -39,6 +36,7 @@ import {
   type LocalAdmin,
   localContainerName,
   localRuntimePaths,
+  LocalServerError,
   localServerNotRunning,
   type LocalServers,
   localServerUrl,
@@ -48,7 +46,6 @@ import {
   LogLines,
   logLines,
   type LogSink,
-  loopbackReach,
   type ManagedRuntimeProcess,
   peekRuntimeMetadata,
   PLATFORM_PROJECT_ID,
@@ -250,7 +247,11 @@ export abstract class ZitadelRuntime {
    * @throws {ZitadelError} `E_VALIDATION` when the address is not an http(s) URL.
    */
   consoleUrl(): string {
-    return `${ZitadelRuntime.origin(this.address)}${this.isCloud() ? "/console/" : "/ui/console/"}`;
+    if (this.isCloud()) {
+      return `${ZitadelRuntime.origin(this.address)}/console/`;
+    } else {
+      return `${ZitadelRuntime.origin(this.address)}/ui/console/`;
+    }
   }
 
   /**
@@ -263,7 +264,11 @@ export abstract class ZitadelRuntime {
   hostUnlessDefault(): string | undefined {
     try {
       const { host } = new URL(this.address);
-      return host === new URL(ZitadelRuntime.DEFAULT).host ? undefined : host;
+      if (host === new URL(ZitadelRuntime.DEFAULT).host) {
+        return undefined;
+      } else {
+        return host;
+      }
     } catch {
       return undefined;
     }
@@ -294,11 +299,15 @@ export class CloudRuntime extends ZitadelRuntime {
       return "local";
     }
 
-    return hostname === new URL(ZitadelRuntime.DEFAULT).hostname ||
+    if (
+      hostname === new URL(ZitadelRuntime.DEFAULT).hostname ||
       hostname === "zitadel.cloud" ||
       hostname.endsWith(".zitadel.cloud")
-      ? "cloud"
-      : "self_hosted";
+    ) {
+      return "cloud";
+    } else {
+      return "self_hosted";
+    }
   }
 }
 
@@ -314,7 +323,28 @@ export type LocalDirectory = Readonly<{
   docker: DockerEngine;
   /** The processes it asks about servers it started. */
   processes: ServerProcesses;
+  /** What it asks whether a server answers. */
+  fetcher: typeof fetch;
 }>;
+
+/** What a folder's runtime is made with: the release, where it speaks, and what it asks. */
+export type FolderOptions = Readonly<{
+  /** The CLI release that starts it. */
+  cliVersion: string;
+  /** Where it says what is happening (nowhere by default). */
+  progress?: (message: string) => void;
+  /** The Docker it asks about containers (the real one by default). */
+  docker?: DockerEngine;
+  /** The processes it asks about servers it started (the real ones by default). */
+  processes?: ServerProcesses;
+  /** What it asks whether a server answers (`fetch` by default). */
+  fetcher?: typeof fetch;
+}>;
+
+/** Where a runtime says what it is doing when nothing listens. */
+const NO_PROGRESS = (): void => {
+  return;
+};
 
 /**
  * What a runtime asks of Docker once a server's record names a container. The
@@ -348,7 +378,7 @@ type CommonRunConfig = Readonly<{
  * not, so the two are separate shapes: a Docker config without an image cannot
  * be written, instead of failing when it is used.
  */
-export type RunConfig =
+type RunConfig =
   | (CommonRunConfig & Readonly<{ backend: "binary" }>)
   | (CommonRunConfig & Readonly<{ backend: "docker"; image: string }>);
 
@@ -390,7 +420,7 @@ export type BinaryStart = Readonly<{
 export type StartPlan = DockerStart | BinaryStart;
 
 /** How {@link LocalRuntime.start} is asked to start. */
-export type StartOptions = Readonly<{
+type StartOptions = Readonly<{
   /** The port to take as asked or refuse, never move; the first free one when absent. */
   port?: number;
 }>;
@@ -403,7 +433,7 @@ export type StartOptions = Readonly<{
  * another directory's server may have taken the port since; see
  * {@link LocalRuntime.resolveUrl}.
  */
-export type ServerStatus = Readonly<{
+type ServerStatus = Readonly<{
   /** Where the server stands, as defined above. */
   lifecycle: "missing" | "running" | "unhealthy" | "stopped";
   /** What the directory recorded, or `undefined` when it never started one. */
@@ -425,7 +455,7 @@ export type ServerStatus = Readonly<{
   };
 }>;
 
-export type StopReport = Readonly<{
+type StopReport = Readonly<{
   runtime: RuntimeMetadata | undefined;
   /** False when there was nothing to stop: no record, or the process was already gone. */
   stopped: boolean;
@@ -438,7 +468,7 @@ export type StopReport = Readonly<{
  * process list cannot be read (Windows, or no `ps`), so callers can say so
  * instead of reporting that nothing was running.
  */
-export type SweepResult = Readonly<
+type SweepResult = Readonly<
   | { supported: false; error?: string }
   | {
       supported: true;
@@ -468,9 +498,6 @@ export type SweepResult = Readonly<
  * command, or the commands drift apart again.
  */
 export class LocalRuntime extends ZitadelRuntime {
-  /** The processes listening on a TCP port of this machine, for naming what holds one. */
-  static readonly listenersOn = listenersForPort;
-
   /** The address a local server answers on when nothing names another. */
   static readonly DEFAULT_URL: string = DEFAULT_LOCAL_SERVER_URL;
 
@@ -492,74 +519,163 @@ export class LocalRuntime extends ZitadelRuntime {
   /** The runtimes `--runtime` names. */
   static readonly BACKENDS: typeof RUNTIME_BACKENDS = RUNTIME_BACKENDS;
 
-  /** The record in `cwd`, or `undefined` when none was written there. */
-  static readonly read = readRuntimeMetadata;
-
-  /** The record in `cwd` read without recovering a malformed one. */
-  static readonly peek = peekRuntimeMetadata;
-
-  /** The record in `cwd` or the nearest parent that has one, and where it was found. */
-  static readonly readNearest = readNearestRuntimeMetadata;
-
-  /** The directory, from `cwd` upward, that holds `file`. */
-  static readonly findUpward = findUpward;
-
-  /** Where everything a local server keeps for `cwd` lives. */
-  static readonly paths = localRuntimePaths;
-
-  /** The name of the container a server in `cwd` runs as. */
-  static readonly containerName = localContainerName;
-
-  /** The address a local server on `port` answers on. */
-  static readonly urlOf = localServerUrl;
-
-  /** The image that goes with a CLI release. */
-  static readonly imageFor = defaultLocalServerImageForCliVersion;
-
-  /** The runtime a run asks for, or the one this machine can run. */
-  static readonly resolveBackend = resolveRuntimeBackend;
-
-  /** Creates the directories a local server keeps its state in. */
-  static readonly ensureState = ensureLocalState;
-
-  /** Whether the state directories can be written, and why not. */
-  static readonly assertWritable = assertLocalStateWritable;
-
-  /** What a record reports about itself, for a command's output. */
-  static readonly summary = runtimeSummary;
-
-  /** Whether two addresses name the same local server. */
-  static readonly same = sameLocalServer;
-
-  /** How the server at an address reaches this machine's loopback, judged by the nearest record. */
-  static readonly loopbackReach = loopbackReach;
-
-  /** The platform document a server publishes, or `undefined` when it hosts no platform project. */
-  static readonly readPlatform = readPlatformRuntime;
-
-  /** Writes the record of a directory; the lifecycle does this, and tests arrange one by it. */
-  static readonly write = writeRuntimeMetadata;
-
-  /** Whether the server at an address answers its readiness probe. */
-  static readonly isHealthy = checkLocalServerHealth;
-
   /** Where the admin's credential is kept, from a project's root. */
   static readonly ADMIN_FILE: string = LOCAL_ADMIN_FILE;
-
-  /** The directory holding the admin: `cwd`, or the nearest parent a server was started in. */
-  static readonly findAdminDir = findLocalAdminDir;
-
-  /** The nearest admin, from `cwd` upward, of the server at an address. */
-  static readonly findAdminFor = findLocalAdminFor;
-
-  /** The admin in a directory, or `undefined` when none was created. */
-  static readonly readAdmin = readLocalAdmin;
 
   /** What a start that injected no project variables reports. */
   static readonly NO_ENV: typeof EMPTY_SUMMARY = EMPTY_SUMMARY;
 
-  /** Reads the project's env files and the defaults a local server needs. */
-  static readonly loadProjectEnv = loadProjectEnv;
+  /**
+   * The record in a directory.
+   *
+   * @param cwd - The directory.
+   * @returns The record, or `undefined` when none was written there.
+   * @throws {LocalServerError} `record-unreadable` or `record-malformed` when it cannot be used.
+   */
+  static read(cwd: string): Promise<RuntimeMetadata | undefined> {
+    return readRuntimeMetadata(cwd);
+  }
+
+  /**
+   * The record in a directory or the nearest parent that has one.
+   *
+   * @param cwd - Where to start looking.
+   * @returns The record and the directory it was found in, or `undefined` when no directory above has one.
+   * @throws {LocalServerError} `record-unreadable` or `record-malformed` when it cannot be used.
+   */
+  static readNearest(cwd: string): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
+    return readNearestRuntimeMetadata(cwd);
+  }
+
+  /**
+   * The directory, from a starting one upward, that holds a file.
+   *
+   * @param cwd - Where to start looking.
+   * @param file - The file's name, relative to a directory.
+   * @param stopAt - The directory the search ends at; the home directory unless given.
+   * @returns The nearest directory that holds it, or `undefined` when none does.
+   */
+  static findUpward(cwd: string, file: string, stopAt?: string): Promise<string | undefined> {
+    return findUpward(cwd, file, stopAt);
+  }
+
+  /**
+   * Where everything a local server keeps for a directory lives.
+   *
+   * @param cwd - The directory.
+   * @returns The paths.
+   */
+  static paths(cwd: string): ReturnType<typeof localRuntimePaths> {
+    return localRuntimePaths(cwd);
+  }
+
+  /**
+   * The name of the container a server in a directory runs as.
+   *
+   * @param cwd - The directory.
+   * @returns The name.
+   */
+  static containerName(cwd: string): string {
+    return localContainerName(cwd);
+  }
+
+  /**
+   * The address a local server on a port answers on.
+   *
+   * @param port - The port.
+   * @returns The address.
+   */
+  static urlOf(port: number): string {
+    return localServerUrl(port);
+  }
+
+  /**
+   * The image that goes with a CLI release.
+   *
+   * @param cliVersion - The release.
+   * @returns The image reference.
+   */
+  static imageFor(cliVersion: string): string {
+    return defaultLocalServerImageForCliVersion(cliVersion);
+  }
+
+  /**
+   * The runtime a run asks for, or the one this machine can run.
+   *
+   * @param input - What the run named and what is already there.
+   * @returns The backend.
+   */
+  static resolveBackend(input: Parameters<typeof resolveRuntimeBackend>[0]): RuntimeBackend {
+    return resolveRuntimeBackend(input);
+  }
+
+  /**
+   * What a record reports about itself, for a command's output.
+   *
+   * @param metadata - The record, if there is one.
+   * @returns The summary.
+   */
+  static summary(metadata: RuntimeMetadata | undefined): ReturnType<typeof runtimeSummary> {
+    return runtimeSummary(metadata);
+  }
+
+  /**
+   * Whether two addresses name the same local server.
+   *
+   * @param a - One address.
+   * @param b - The other.
+   * @returns `true` when they do.
+   */
+  static same(a: string, b: string): boolean {
+    return sameLocalServer(a, b);
+  }
+
+  /**
+   * The platform document a server publishes.
+   *
+   * @param serverUrl - The server.
+   * @param timeoutMs - How long to wait for it.
+   * @param fetcher - What fetches; the global `fetch` unless given.
+   * @returns The document, or `undefined` when the server hosts no platform project.
+   */
+  static readPlatform(
+    serverUrl: string,
+    timeoutMs?: number,
+    fetcher?: typeof fetch,
+  ): Promise<{ publishable_key: string } | undefined> {
+    return readPlatformRuntime(serverUrl, timeoutMs, fetcher);
+  }
+
+  /**
+   * Writes the record of a directory; the lifecycle does this, and tests arrange one by it.
+   *
+   * @param cwd - The directory.
+   * @param metadata - The record.
+   */
+  static write(cwd: string, metadata: RuntimeMetadata): Promise<void> {
+    return writeRuntimeMetadata(cwd, metadata);
+  }
+
+  /**
+   * The directory holding the admin: a directory, or the nearest parent a server was started in.
+   *
+   * @param cwd - Where to start looking.
+   * @returns The directory, or `undefined` when no directory above holds one.
+   */
+  static findAdminDir(cwd: string): Promise<string | undefined> {
+    return findLocalAdminDir(cwd);
+  }
+
+  /**
+   * The nearest admin, from a directory upward, of the server at an address.
+   *
+   * @param cwd - Where to start looking.
+   * @param serverUrl - The server.
+   * @returns The admin, or `undefined` when none belongs to that server.
+   */
+  static findAdminFor(cwd: string, serverUrl: string): Promise<LocalAdmin | undefined> {
+    return findLocalAdminFor(cwd, serverUrl);
+  }
 
   /** The levels a log line can have, from the most verbose. */
   static readonly LOG_LEVELS: typeof LOG_LEVELS = LOG_LEVELS;
@@ -589,28 +705,17 @@ export class LocalRuntime extends ZitadelRuntime {
    * `--cwd` the run was given.
    *
    * @param cwd - The directory the server belongs to.
-   * @param options - The CLI release that starts it, where to say what is happening (nowhere by default), and the Docker and processes it works through (the real ones by default).
+   * @param options - The CLI release that starts it and what it works through (see {@link FolderOptions}).
    * @returns The directory's local runtime.
    */
-  static forFolder(
-    cwd: string,
-    options: {
-      cliVersion: string;
-      progress?: (message: string) => void;
-      docker?: DockerEngine;
-      processes?: ServerProcesses;
-    },
-  ): LocalRuntime {
+  static forFolder(cwd: string, options: FolderOptions): LocalRuntime {
     return new LocalRuntime(LocalRuntime.DEFAULT_URL, {
       cwd,
       cliVersion: options.cliVersion,
       docker: options.docker ?? DockerLauncher,
       processes: options.processes ?? BinaryLauncher,
-      progress:
-        options.progress ??
-        (() => {
-          return;
-        }),
+      fetcher: options.fetcher ?? fetch,
+      progress: options.progress ?? NO_PROGRESS,
     });
   }
 
@@ -636,27 +741,6 @@ export class LocalRuntime extends ZitadelRuntime {
   }
 
   /**
-   * The bundled server version, or the error that says how to repair the
-   * install. For `doctor`, which must report a broken install, not crash on it.
-   *
-   * @returns The bundled server version.
-   * @throws {ZitadelError} When the install is broken, naming how to repair it.
-   */
-  static assertBinaryAvailable(): string {
-    return BinaryLauncher.assertAvailable();
-  }
-
-  /** Whether the Docker daemon answers, for `doctor` and for failing a Docker start early. */
-  static dockerReachable(): Promise<DockerResult> {
-    return DockerLauncher.available();
-  }
-
-  /** Where an image can be had from, so `doctor` can warn before a start has to pull it. */
-  static imageAvailable(image: string): Promise<"local" | "remote"> {
-    return DockerLauncher.imageAvailable(image);
-  }
-
-  /**
    * The URL of the server the nearest `zitadel start` record names, when that
    * server is the one running and answering.
    *
@@ -671,18 +755,37 @@ export class LocalRuntime extends ZitadelRuntime {
    * parent of the app directory.
    *
    * @param cwd - The directory the run addresses.
+   * @param fetcher - What asks whether the server answers (`fetch` by default).
    * @returns The address of the server running there.
-   * @throws {ZitadelError} When no server was started there, or the recorded one is not running.
+   * @throws {LocalServerError} `not-running` when no server was started there, or `not-responding` when the recorded one is not running.
    */
-  static async resolveUrl(cwd: string): Promise<string> {
+  static async resolveUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
     if (!nearest) {
       throw localServerNotRunning();
     }
-    if (await LocalRuntime.isServing(nearest.runtime)) {
-      return nearest.runtime.server_url;
+    // A record counts only for a server that runs, by identity and not by pid alone (see the
+    // launchers), and answers.
+    const { runtime } = nearest;
+    if (runtime.backend === "binary") {
+      if (
+        (await BinaryLauncher.isRecordRunning(runtime)) &&
+        (await checkLocalServerHealth(runtime.server_url, undefined, fetcher))
+      ) {
+        return runtime.server_url;
+      }
+    } else {
+      const container = await DockerLauncher.inspect(runtime.container_name).catch(() => {
+        return undefined;
+      });
+      if (
+        container?.running === true &&
+        (await checkLocalServerHealth(runtime.server_url, undefined, fetcher))
+      ) {
+        return runtime.server_url;
+      }
     }
-    throw localServerNotRunning(nearest.runtime.server_url);
+    throw localServerNotRunning(runtime.server_url, nearest.dir);
   }
 
   /**
@@ -691,27 +794,15 @@ export class LocalRuntime extends ZitadelRuntime {
    * running yields `undefined` (`doctor` owns diagnosing those states).
    *
    * @param cwd - The directory the run addresses.
+   * @param fetcher - What asks whether the server answers (`fetch` by default).
    * @returns The address, or `undefined` when no server is running there.
    */
-  static async detectUrl(cwd: string): Promise<string | undefined> {
+  static async detectUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string | undefined> {
     try {
-      return await LocalRuntime.resolveUrl(cwd);
+      return await LocalRuntime.resolveUrl(cwd, fetcher);
     } catch {
       return undefined;
     }
-  }
-
-  /** Whether the server a record names is running (see the identity checks in the launchers) and answering. */
-  private static async isServing(runtime: RuntimeMetadata): Promise<boolean> {
-    const alive =
-      runtime.backend === "binary"
-        ? await BinaryLauncher.isRecordRunning(runtime)
-        : (
-            await DockerLauncher.inspect(runtime.container_name).catch(() => {
-              return undefined;
-            })
-          )?.running === true;
-    return alive && (await checkLocalServerHealth(runtime.server_url));
   }
 
   /**
@@ -722,7 +813,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param servers - The processes of this machine.
    * @returns What was stopped, or that the processes cannot be listed here.
-   * @throws {ZitadelError} When a process did not stop.
+   * @throws {LocalServerError} `processes-did-not-stop` when a process did not stop.
    */
   static async stopAll(servers: LocalServers): Promise<SweepResult> {
     const discovery = await servers.current();
@@ -742,10 +833,12 @@ export class LocalRuntime extends ZitadelRuntime {
         return result.stop_result.status === "failed";
       })
     ) {
-      throw new ZitadelError("E_VALIDATION", "Some managed local runtime processes did not stop", {
-        hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
-        details: { supported: true, results },
-      });
+      throw new LocalServerError(
+        "processes-did-not-stop",
+        "E_VALIDATION",
+        "Some managed local runtime processes did not stop",
+        { supported: true, results },
+      );
     }
     return { supported: true, results };
   }
@@ -775,10 +868,10 @@ export class LocalRuntime extends ZitadelRuntime {
   /**
    * What this folder recorded about the server started in it.
    *
-   * @returns The record, or `undefined` when the folder never started one.
+   * @returns The record, or `undefined` when the folder never started one or its record cannot be read (`stop` and `start` report that, with the way out).
    */
   record(): Promise<RuntimeMetadata | undefined> {
-    return readRuntimeMetadata(this.cwd);
+    return peekRuntimeMetadata(this.cwd);
   }
 
   /**
@@ -818,15 +911,15 @@ export class LocalRuntime extends ZitadelRuntime {
   }
 
   /**
-   * The address of this folder's server when it is the one running and
-   * answering. A recorded address alone is not enough: another folder's server
-   * may have taken the port since.
+   * The address of the server the nearest record names, from this folder up,
+   * when it is the one running and answering. A recorded address alone is not
+   * enough: another folder's server may have taken the port since.
    *
    * @returns The address.
-   * @throws {ZitadelError} When no server was started here, or the recorded one is not running.
+   * @throws {LocalServerError} `not-running` when no folder from here up started a server, or `not-responding` when the recorded one is not running.
    */
   runningUrl(): Promise<string> {
-    return LocalRuntime.resolveUrl(this.cwd);
+    return LocalRuntime.resolveUrl(this.cwd, this.directory.fetcher);
   }
 
   /**
@@ -836,7 +929,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * @returns The address.
    */
   async url(): Promise<string> {
-    const recorded = await readRuntimeMetadata(this.cwd);
+    const recorded = await peekRuntimeMetadata(this.cwd);
     if (recorded === undefined) {
       return LocalRuntime.DEFAULT_URL;
     } else {
@@ -850,17 +943,12 @@ export class LocalRuntime extends ZitadelRuntime {
    * server look upward instead of acting on the folder they are in.
    *
    * @param cwd - Where to start looking.
-   * @param options - The CLI release that would start it.
+   * @param options - The CLI release that would start it and what it works through.
    * @returns That folder's server, or `undefined` when no folder above started one.
    */
   static async findStartedFrom(
     cwd: string,
-    options: {
-      cliVersion: string;
-      progress?: (message: string) => void;
-      docker?: DockerEngine;
-      processes?: ServerProcesses;
-    },
+    options: FolderOptions,
   ): Promise<LocalRuntime | undefined> {
     const nearest = await readNearestRuntimeMetadata(cwd);
     if (nearest === undefined) {
@@ -888,22 +976,21 @@ export class LocalRuntime extends ZitadelRuntime {
     });
     const port = request.port ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
 
+    const address = {
+      port,
+      apiUrl: localServerUrl(port),
+      consoleUrl: `${localServerUrl(port)}/ui/console/`,
+    };
+
     if (backend === "docker") {
       return {
         backend: "docker",
-        port,
-        apiUrl: localServerUrl(port),
-        consoleUrl: `${localServerUrl(port)}/ui/console/`,
+        ...address,
         image: request.image ?? envImage ?? defaultLocalServerImageForCliVersion(this.cliVersion),
         containerName: localContainerName(this.cwd),
       };
     } else {
-      return {
-        backend: "binary",
-        port,
-        apiUrl: localServerUrl(port),
-        consoleUrl: `${localServerUrl(port)}/ui/console/`,
-      };
+      return { backend: "binary", ...address };
     }
   }
 
@@ -939,20 +1026,19 @@ export class LocalRuntime extends ZitadelRuntime {
       (serverEnv.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true").toLowerCase() !== "false" &&
       (!pinned || pinned === PLATFORM_PROJECT_ID);
     const options = { port: request.port };
-
-    if (bootstraps) {
-      const { userFile } = await this.ensureAdmin(serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE);
+    const startWith = (userFile?: string) => {
       if (plan.backend === "docker") {
         return this.start({ backend: "docker", image: plan.image, env, userFile }, options);
       } else {
         return this.start({ backend: "binary", env, userFile }, options);
       }
+    };
+
+    if (bootstraps) {
+      const { userFile } = await this.ensureAdmin(serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE);
+      return startWith(userFile);
     } else {
-      if (plan.backend === "docker") {
-        return this.start({ backend: "docker", image: plan.image, env }, options);
-      } else {
-        return this.start({ backend: "binary", env }, options);
-      }
+      return startWith();
     }
   }
 
@@ -974,6 +1060,12 @@ export class LocalRuntime extends ZitadelRuntime {
    * Starts are serialised per directory by a lock, so two at once cannot run two
    * servers over one data directory; the second finds the first's. Failures are
    * mapped to the errors the commands report in `internal/failures.ts`.
+   *
+   * Switching backends (container to process, or back) stops the other
+   * backend's server to make way, but never for a port that cannot be had: a
+   * refused move must leave the working server running, so the destination
+   * port is checked before anything is torn down. The port the directory had is
+   * carried over (`previousPort`) so a backend switch does not change its URLs.
    */
   async start(
     config: RunConfig,
@@ -981,63 +1073,78 @@ export class LocalRuntime extends ZitadelRuntime {
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     // One start at a time per directory: two at once would pick the same port
     // and run two servers over one data directory. The second finds the first's.
-    return withStartLock(this.startLockFile(), () => {
-      return this.startLocked(config, options);
-    });
-  }
-
-  /**
-   * The body of {@link start}, run while holding the directory's start lock.
-   * Switching backends (container to process, or back) stops the other
-   * backend's server to make way, but never for a port that cannot be had: a
-   * refused move must leave the working server running, so the destination
-   * port is checked before anything is torn down. The port the directory had is
-   * carried over (`previousPort`) so a backend switch does not change its URLs.
-   */
-  private async startLocked(
-    config: RunConfig,
-    options: StartOptions,
-  ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
-    const existing = await readRuntimeMetadata(this.cwd);
-    const paths = localRuntimePaths(this.cwd);
-    // The server another backend left. It is stopped to make way for this one,
-    // but not for a port that cannot be had: a refused move leaves it running.
-    const other = existing && existing.backend !== config.backend ? existing : undefined;
-    if (
-      other &&
-      options.port !== undefined &&
-      options.port !== other.port &&
-      !(await new TcpPorts().isFree(options.port))
-    ) {
-      throw new PortInUseError(options.port);
-    }
-    if (config.backend === "binary") {
-      // A server another CLI release started serves that release's API, and
-      // `setup` against it fails halfway, after the project exists. So a
-      // running server is reused only when it is the version this CLI ships;
-      // the Docker backend compares the image for the same reason. `version` is
-      // `undefined` only when the package cannot be read, and then any running
-      // server is kept: there is nothing to compare with.
-      const version = BinaryLauncher.bundledVersion();
+    return withStartLock(this.startLockFile(), async () => {
+      const existing = await readRuntimeMetadata(this.cwd);
+      const paths = localRuntimePaths(this.cwd);
+      // The server another backend left. It is stopped to make way for this one,
+      // but not for a port that cannot be had: a refused move leaves it running.
+      const other = (existing && existing.backend !== config.backend && existing) || undefined;
       if (
-        existing?.backend === "binary" &&
-        version !== undefined &&
-        existing.server_version !== version &&
-        (await this.directory.processes.isRecordRunning(existing))
+        other &&
+        options.port !== undefined &&
+        options.port !== other.port &&
+        !(await new TcpPorts().isFree(options.port))
       ) {
-        this.directory.progress(
-          `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
+        throw new PortInUseError(options.port);
+      }
+      if (config.backend === "binary") {
+        // A server another CLI release started serves that release's API, and
+        // `setup` against it fails halfway, after the project exists. So a
+        // running server is reused only when it is the version this CLI ships;
+        // the Docker backend compares the image for the same reason. `version` is
+        // `undefined` only when the package cannot be read, and then any running
+        // server is kept: there is nothing to compare with.
+        const version = BinaryLauncher.bundledVersion();
+        if (
+          existing?.backend === "binary" &&
+          version !== undefined &&
+          existing.server_version !== version &&
+          (await this.directory.processes.isRecordRunning(existing))
+        ) {
+          this.directory.progress(
+            `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
+          );
+        }
+        if (existing?.backend === "docker") {
+          await this.directory.docker.remove(existing.container_name);
+        }
+        return await this.run(
+          "binary",
+          new BinaryLauncher({
+            cliVersion: this.cliVersion,
+            dataDir: paths.dataDir,
+            logPath: paths.logFile,
+            env: config.env,
+            userFile: config.userFile,
+          }),
+          {
+            port: options.port,
+            previousPort: other?.port,
+            reusable: (record) => {
+              return version === undefined || record.server_version === version;
+            },
+          },
         );
       }
-      if (existing?.backend === "docker") {
-        await this.directory.docker.remove(existing.container_name);
+
+      const { image } = config;
+      const docker = await this.directory.docker.available().catch((error: unknown) => {
+        throw new DockerUnavailableError(error);
+      });
+      if (docker.status !== 0) {
+        throw new DockerUnavailableError(docker.stderr || "docker version failed");
+      }
+      if (existing?.backend === "binary") {
+        await this.directory.processes.stopRecord(existing);
       }
       return await this.run(
-        "binary",
-        new BinaryLauncher({
+        "docker",
+        new DockerLauncher({
           cliVersion: this.cliVersion,
+          containerName: localContainerName(this.cwd),
+          image,
           dataDir: paths.dataDir,
-          logPath: paths.logFile,
+          identity: await ensureContainerIdentity(this.cwd, currentUser()),
           env: config.env,
           userFile: config.userFile,
         }),
@@ -1045,41 +1152,11 @@ export class LocalRuntime extends ZitadelRuntime {
           port: options.port,
           previousPort: other?.port,
           reusable: (record) => {
-            return version === undefined || record.server_version === version;
+            return record.image === image;
           },
         },
       );
-    }
-
-    const { image } = config;
-    const docker = await this.directory.docker.available().catch((error: unknown) => {
-      throw new DockerUnavailableError(error);
     });
-    if (docker.status !== 0) {
-      throw new DockerUnavailableError(docker.stderr || "docker version failed");
-    }
-    if (existing?.backend === "binary") {
-      await this.directory.processes.stopRecord(existing);
-    }
-    return await this.run(
-      "docker",
-      new DockerLauncher({
-        cliVersion: this.cliVersion,
-        containerName: localContainerName(this.cwd),
-        image,
-        dataDir: paths.dataDir,
-        identity: await ensureContainerIdentity(this.cwd, currentUser()),
-        env: config.env,
-        userFile: config.userFile,
-      }),
-      {
-        port: options.port,
-        previousPort: other?.port,
-        reusable: (record) => {
-          return record.image === image;
-        },
-      },
-    );
   }
 
   /**
@@ -1093,39 +1170,47 @@ export class LocalRuntime extends ZitadelRuntime {
    */
   async status(): Promise<ServerStatus> {
     const runtime = await readRuntimeMetadata(this.cwd);
-    const { container, dockerError } =
-      runtime?.backend === "docker"
-        ? await this.directory.docker.inspect(runtime.container_name).then(
-            (inspected) => {
-              return { container: inspected, dockerError: undefined };
-            },
-            (error: unknown) => {
-              return { container: undefined, dockerError: errorMessage(error) };
-            },
-          )
-        : { container: undefined, dockerError: undefined };
-    const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
-    const running =
-      runtime?.backend === "binary"
-        ? await this.directory.processes.isRecordRunning(runtime)
-        : false;
+    const inspectContainer = async () => {
+      if (runtime?.backend !== "docker") {
+        return { container: undefined, dockerError: undefined };
+      }
+      return this.directory.docker.inspect(runtime.container_name).then(
+        (inspected) => {
+          return { container: inspected, dockerError: undefined };
+        },
+        (error: unknown) => {
+          return { container: undefined, dockerError: errorMessage(error) };
+        },
+      );
+    };
+    const { container, dockerError } = await inspectContainer();
+    const healthy =
+      runtime !== undefined &&
+      (await checkLocalServerHealth(runtime.server_url, undefined, this.directory.fetcher));
+    const isProcess = runtime?.backend === "binary";
+    const running = isProcess && (await this.directory.processes.isRecordRunning(runtime));
     // A process is up when its recorded pid still belongs to the server; a container
     // when Docker says it runs. Either way, up and answering is `running`, up and
     // silent is `unhealthy`, and a container that exists but is down is `unhealthy` too.
-    const up = runtime?.backend === "binary" ? running : container?.running === true;
-    const present = runtime?.backend === "binary" ? running : container?.exists === true;
-    const lifecycle: ServerStatus["lifecycle"] = !runtime
-      ? "missing"
-      : up && healthy
-        ? "running"
-        : present
-          ? "unhealthy"
-          : "stopped";
+    const up = (isProcess && running) || (!isProcess && container?.running === true);
+    const present = (isProcess && running) || (!isProcess && container?.exists === true);
+    const lifecycleOf = (): ServerStatus["lifecycle"] => {
+      if (!runtime) {
+        return "missing";
+      }
+      if (up && healthy) {
+        return "running";
+      }
+      if (present) {
+        return "unhealthy";
+      }
+      return "stopped";
+    };
     return {
-      lifecycle,
+      lifecycle: lifecycleOf(),
       runtime,
       healthy,
-      ...(runtime?.backend === "binary" ? { process: { pid: runtime.pid, running } } : {}),
+      ...(runtime?.backend === "binary" && { process: { pid: runtime.pid, running } }),
       docker: {
         available: dockerError === undefined,
         error: dockerError,
@@ -1141,7 +1226,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * nothing was stopped instead of failing, so scripts can run it twice.
    */
   async stop(): Promise<StopReport> {
-    return this.halt();
+    return this.halt(await readRuntimeMetadata(this.cwd));
   }
 
   /**
@@ -1153,13 +1238,18 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param permit - The caller's proof that deleting is meant.
    * @returns What stopping the server did.
-   * @throws {Error} When the permit is for another folder.
+   * @throws {LocalServerError} `permit-mismatch` when the permit is for another folder.
    */
   async reset(permit: DestroyPermit): Promise<StopReport> {
-    if (permit.folder !== this.cwd) {
-      throw new Error(`The permit is for ${permit.folder}, not ${this.cwd}`);
+    if (resolve(permit.folder) !== resolve(this.cwd)) {
+      throw new LocalServerError(
+        "permit-mismatch",
+        "E_VALIDATION",
+        `The permit is for ${permit.folder}, not ${this.cwd}`,
+      );
     }
-    const report = await this.halt();
+    // A record that cannot be read must not stop the reset that is its way out.
+    const report = await this.halt(await peekRuntimeMetadata(this.cwd));
     await removeLocalData(this.cwd);
     await removeRuntimeMetadata(this.cwd);
     return report;
@@ -1178,13 +1268,14 @@ export class LocalRuntime extends ZitadelRuntime {
     const runtime = await this.recordedRuntime();
     // Docker picks the last lines itself, but by count only, so lines at a
     // level are picked here from the whole log.
-    const text =
-      runtime.backend === "binary"
-        ? await this.directory.processes.readLog(runtime.log_path)
-        : await this.directory.docker.readLogs(
-            runtime.container_name,
-            options.level ? "all" : options.tail,
-          );
+    const dockerTail = (options.level && "all") || options.tail;
+    const text = await (async () => {
+      if (runtime.backend === "binary") {
+        return this.directory.processes.readLog(runtime.log_path);
+      } else {
+        return this.directory.docker.readLogs(runtime.container_name, dockerTail);
+      }
+    })();
     return { runtime, lines: new LogLines(lastLines(logLines(text), options.tail, options.level)) };
   }
 
@@ -1212,7 +1303,7 @@ export class LocalRuntime extends ZitadelRuntime {
     } else {
       await this.directory.docker.followLogs(
         runtime.container_name,
-        options.level ? "all" : options.tail,
+        (options.level && "all") || options.tail,
         sink,
         options.signal,
       );
@@ -1225,10 +1316,11 @@ export class LocalRuntime extends ZitadelRuntime {
   private async recordedRuntime(): Promise<RuntimeMetadata> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (!runtime) {
-      throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
-        hint: "Run `zitadel start` first.",
-        nextCommands: [{ id: "start" }],
-      });
+      throw new LocalServerError(
+        "not-started",
+        "E_VALIDATION",
+        "Local Zitadel runtime has not been started",
+      );
     }
     return runtime;
   }
@@ -1240,21 +1332,26 @@ export class LocalRuntime extends ZitadelRuntime {
    * container named for this directory is removed if there is one: a start that
    * failed halfway can leave a container behind with no record of it. Where
    * Docker is not installed there is none, and that is not an error.
+   *
+   * @param runtime - The folder's record, if it has one.
+   * @returns What stopping did.
+   * @throws {LocalServerError} `server-did-not-stop` when a recorded process was still running afterwards.
    */
-  private async halt(): Promise<StopReport> {
-    const runtime = await readRuntimeMetadata(this.cwd);
+  private async halt(runtime: RuntimeMetadata | undefined): Promise<StopReport> {
     if (runtime?.backend === "binary") {
       const outcome = await this.directory.processes.stopRecord(runtime);
       if (outcome.status === "failed") {
-        throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
-          hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
-          details: { runtime, stop_result: outcome },
-        });
+        throw new LocalServerError(
+          "server-did-not-stop",
+          "E_VALIDATION",
+          "Local Zitadel server did not stop",
+          { runtime, stop_result: outcome },
+        );
       }
       return { runtime, stopped: outcome.status !== "stale", outcome };
     }
     const removed = await this.directory.docker.remove(
-      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd),
+      (runtime?.backend === "docker" && runtime.container_name) || localContainerName(this.cwd),
     );
     return { runtime, stopped: removed };
   }
@@ -1262,7 +1359,7 @@ export class LocalRuntime extends ZitadelRuntime {
   /**
    * Runs the lifecycle for one backend. The store is typed to that backend so a
    * record the other backend wrote reads as "nothing here": the other backend's
-   * server is handled explicitly by {@link startLocked}, never by accident.
+   * server is handled explicitly by the start, never by accident.
    */
   private async run<B extends RuntimeBackend>(
     backend: B,

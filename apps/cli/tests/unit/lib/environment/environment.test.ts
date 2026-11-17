@@ -7,6 +7,7 @@ import { describe, expect, vi } from "vitest";
 import { it } from "@tests/fixtures";
 
 import { Environment } from "@/lib/environment";
+import { ZitadelRuntime } from "@/lib/server";
 import type { Questions } from "@/lib/ui";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -63,7 +64,7 @@ async function writeSecret(dir: string): Promise<void> {
 }
 
 const resolve = (dir: string, input: Partial<Parameters<typeof Environment.resolve>[0]> = {}) =>
-  Environment.resolve({ cwd: dir, env: {}, ...input });
+  Environment.resolve({ cwd: dir, env: {}, servers: ZitadelRuntime, ...input });
 
 /** {@link resolve} from a shell in `dir`, the directory a relative `--env-file` is read from. */
 async function resolveFromDir(
@@ -166,6 +167,7 @@ describe("Environment.resolve", () => {
       const environment = await Environment.resolve({
         cwd: join(dir, "app"),
         env: {},
+        servers: ZitadelRuntime,
         envFile: "staging.env",
       });
 

@@ -11,7 +11,7 @@ import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
-import { ScriptedMachine } from "@tests/helpers/local-machine";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { aPromptDeps } from "@tests/helpers/setup";
@@ -85,7 +85,7 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
-const machine = new ScriptedMachine();
+const machine = new FakeMachine();
 
 beforeEach(() => {
   vi.clearAllMocks();

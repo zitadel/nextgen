@@ -2,7 +2,6 @@ import {
   LocalRuntime,
   type LocalMachine,
   type LocalServers,
-  type MachineChecks,
   PsLocalServers,
   SystemMachine,
 } from "@/lib/server";
@@ -16,11 +15,12 @@ import { BaseCommand } from "@/lib/oclif";
  * Every such command acts on one project folder. `folderRule` says which: with
  * `"exact"` it is the folder the command runs in (`start`, `stop`, `reset`), and
  * with `"nearest"` it is the closest folder, that one or a parent, where `start`
- * was run (`logs`, `console`). Acting on the wrong one manages another
+ * was run (`logs`). Acting on the wrong one manages another
  * project's server, so a command states its rule and nothing else decides it.
  *
  * `status` is the one command about this server that does not extend it: it also
- * reads the project's environment, so it extends `EnvironmentCommand`.
+ * reads the project's environment, so it extends `EnvironmentCommand`. `console`
+ * extends it but sets no `folderRule`; it finds its own folder in `sourceOf`.
  */
 export abstract class ServerCommand extends BaseCommand {
   static override group: string = CommandGroups.localServer;
@@ -65,7 +65,7 @@ export abstract class ServerCommand extends BaseCommand {
    *
    * @returns The machine.
    */
-  protected machine(): LocalMachine & MachineChecks {
+  protected machine(): LocalMachine {
     return new SystemMachine();
   }
 

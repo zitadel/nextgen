@@ -112,8 +112,16 @@ export class ClaimOwnership extends WizardStep<
           isLocal,
         };
       }
+      const session = new AdminSession(answers.server, admin, this.deps.signal);
       const owner = await new AdminClaim(
-        new AdminSession(answers.server, admin, this.deps.signal),
+        answers.server,
+        this.deps.signal,
+        () => {
+          return session.cookie();
+        },
+        (headers) => {
+          return session.request(headers);
+        },
       ).attach({
         projectId: project.id,
         projectSecret: project.project_secret,

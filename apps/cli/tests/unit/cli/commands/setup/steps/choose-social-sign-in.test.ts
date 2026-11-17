@@ -13,7 +13,7 @@ import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { Ui, warnings } from "@/lib/ui";
-import { ScriptedMachine } from "@tests/helpers/local-machine";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -183,7 +183,7 @@ async function answerFromEverything({ message }: { message: string }): Promise<s
   );
 }
 
-const machine = new ScriptedMachine();
+const machine = new FakeMachine();
 
 beforeEach(() => {
   vi.clearAllMocks();

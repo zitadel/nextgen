@@ -38,7 +38,7 @@ const GENERIC = [
  * Product knowledge the glue still reaches for, each one a leak to move into
  * the commands that own it. The list only shrinks: a new one fails the test.
  */
-const LEAKS = ["lib/environment", "lib/server/local/processes", "lib/skills"];
+const LEAKS = ["lib/environment", "lib/skills"];
 
 /**
  * Domain libs that still reach into the layer, each one a dependency pointing

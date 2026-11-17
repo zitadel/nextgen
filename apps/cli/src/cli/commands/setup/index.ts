@@ -1,4 +1,4 @@
-import { SystemMachine } from "@/lib/server";
+import { SystemMachine, LocalRuntime } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   BRANDING_DESIGNS,
@@ -145,7 +145,7 @@ const SSO_NEEDS_CLIENT_ID_REFUSAL = {
  * `createOrca` is pure, as it only builds the in-memory registries, so calling
  * it at module load is safe.
  */
-const FRAMEWORK_OPTIONS = createOrca()
+const FRAMEWORK_OPTIONS = createOrca(LocalRuntime.DIR)
   .availableFrameworks()
   .map((framework) => {
     return framework.id;

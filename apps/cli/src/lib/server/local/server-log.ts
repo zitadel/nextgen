@@ -67,7 +67,11 @@ export function levelOf(text: string): LogLevel | undefined {
   if (name !== undefined) {
     return LEVEL_NAMES[name];
   }
-  return CRASH.test(text) ? "error" : undefined;
+  if (CRASH.test(text)) {
+    return "error";
+  } else {
+    return undefined;
+  }
 }
 
 function jsonLevel(text: string): string | undefined {
@@ -75,8 +79,15 @@ function jsonLevel(text: string): string | undefined {
     return undefined;
   }
   const record = parseJsonOrUndefined(text);
-  const level = isObject(record) ? (record.level ?? record.severity) : undefined;
-  return typeof level === "string" ? level.replace(/[+-]\d+$/, "") : undefined;
+  if (!isObject(record)) {
+    return undefined;
+  }
+  const level = record.level ?? record.severity;
+  if (typeof level === "string") {
+    return level.replace(/[+-]\d+$/, "");
+  } else {
+    return undefined;
+  }
 }
 
 /**
@@ -102,11 +113,15 @@ export class LogLineReader {
   end(): LogLine[] {
     const rest = this.partial;
     this.partial = "";
-    return rest === "" ? [] : [this.line(rest)];
+    if (rest === "") {
+      return [];
+    } else {
+      return [this.line(rest)];
+    }
   }
 
   private line(piece: string): LogLine {
-    const text = piece.endsWith("\r") ? piece.slice(0, -1) : piece;
+    const text = piece.replace(/\r$/, "");
     this.level = levelOf(text) ?? this.level;
     return { text, level: this.level };
   }
