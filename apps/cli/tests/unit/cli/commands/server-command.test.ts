@@ -11,7 +11,7 @@ import {
 } from "@/cli/commands/server-command";
 import { type Admitted, BaseCommand, EnvironmentCommand } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { LocalRuntime, PsLocalServers, SystemMachine, ZitadelRuntime } from "@/lib/server";
+import { LocalRuntime, PsLocalServers, RealMachine, ZitadelRuntime } from "@/lib/server";
 import { shellCommand } from "@/lib/suggestion";
 import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -169,7 +169,7 @@ describe("LocalServerCommand", () => {
   it("asks the machine and its processes through the seams a test replaces", () => {
     const command = new AboutTheLocalServer([], aConfigAt(VERSION));
 
-    expect(command.theMachine).toBeInstanceOf(SystemMachine);
+    expect(command.theMachine).toBeInstanceOf(RealMachine);
     expect(command.theServers).toBeInstanceOf(PsLocalServers);
   });
 

@@ -8,7 +8,7 @@ import {
   type LocalMachine,
   type LocalServers,
   PsLocalServers,
-  SystemMachine,
+  RealMachine,
   ZitadelRuntime,
 } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
@@ -226,7 +226,7 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
      * @returns The machine.
      */
     protected machine(): LocalMachine {
-      return new SystemMachine();
+      return new RealMachine();
     }
 
     /**

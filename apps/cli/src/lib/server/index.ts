@@ -24,7 +24,7 @@ export type { LocalMachine } from "./local-machine";
 export type { DockerResult, TcpListener, WritablePathProbe } from "./local";
 export { BinaryLauncher, DockerLauncher } from "./local/internal";
 export { assertLocalStateWritable, checkLocalServerHealth, listenersForPort } from "./local";
-export { SystemMachine } from "./local-machine";
+export { RealMachine } from "./local-machine";
 export { StartedServer } from "./started-server";
 export type {
   ResolvedServer,

@@ -1,4 +1,4 @@
-import { SystemMachine, LocalRuntime } from "@/lib/server";
+import { RealMachine, LocalRuntime } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   BRANDING_DESIGNS,
@@ -385,7 +385,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
 
-    const machine = new SystemMachine();
+    const machine = new RealMachine();
     const prompting = {
       ask: this.ask,
       cwd: this.cwd,
