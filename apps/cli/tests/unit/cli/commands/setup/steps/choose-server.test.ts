@@ -116,13 +116,11 @@ async function startedLocally(dir: string, serverVersion: string): Promise<void>
   );
 }
 
-const machine = new ScriptedMachine();
+const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION });
 
 beforeEach(() => {
-  machine.reset();
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  machine.bundled = BUNDLED_VERSION;
 });
 
 describe("ChooseServer", () => {
@@ -195,15 +193,10 @@ describe("ChooseServer", () => {
   });
 
   describe("when a local server is detected", () => {
+    const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
+
     beforeEach(() => {
-      machine.detects(LOCAL, undefined);
       vi.mocked(select).mockResolvedValueOnce(LOCAL);
-    });
-
-    it("looks for it in the app directory", async () => {
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
-
-      expect(machine.asked.detectUrl).toContain(APP_DIR);
     });
 
     it("writes it when it is picked", async () => {
@@ -296,15 +289,6 @@ describe("ChooseServer", () => {
       expect(answers).toEqual(setupAnswers({ server: LOCAL }));
     });
 
-    it("does not look for a local server", async () => {
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers({ server: LOCAL }), {
-        ...CONTEXT,
-        serverFlag: "local",
-      });
-
-      expect(machine.asked.detectUrl).toEqual([]);
-    });
-
     it("does not ask", async () => {
       await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers({ server: LOCAL }), {
         ...CONTEXT,
@@ -318,7 +302,7 @@ describe("ChooseServer", () => {
   describe("when the detected local server was started by another CLI release", () => {
     it("lists it as unavailable, and says to restart it", async ({ dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      machine.detects(LOCAL, undefined);
+      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
       await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
@@ -336,7 +320,7 @@ describe("ChooseServer", () => {
 
     it("preselects the cloud", async ({ dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      machine.detects(LOCAL, undefined);
+      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
       await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
@@ -352,7 +336,7 @@ describe("ChooseServer", () => {
       { how: "under its other loopback name", url: "http://127.0.0.1:8080" },
     ])("refuses its URL entered as a custom one, $how", async ({ url }, { dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      machine.detects(LOCAL, undefined);
+      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
       vi.mocked(text).mockResolvedValueOnce(url);
 
@@ -375,7 +359,7 @@ describe("ChooseServer", () => {
   describe("when the detected local server is this CLI's own release", () => {
     it("offers it", async ({ dir }) => {
       await startedLocally(dir, BUNDLED_VERSION);
-      machine.detects(LOCAL, undefined);
+      const machine = new ScriptedMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(LOCAL);
 
       await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {

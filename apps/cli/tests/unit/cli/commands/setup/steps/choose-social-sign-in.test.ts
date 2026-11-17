@@ -186,7 +186,6 @@ async function answerFromEverything({ message }: { message: string }): Promise<s
 const machine = new ScriptedMachine();
 
 beforeEach(() => {
-  machine.reset();
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
 });

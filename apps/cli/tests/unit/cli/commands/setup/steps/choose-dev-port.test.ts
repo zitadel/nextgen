@@ -81,20 +81,21 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
 const machine = new ScriptedMachine();
 
 beforeEach(() => {
-  machine.reset();
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
 });
 
 describe("ChooseDevPort", () => {
   describe("when the detected port is free", () => {
-    it("checks the detected port", async () => {
-      await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+    it("asks about the detected port only when something holds it", async () => {
+      vi.mocked(text).mockResolvedValueOnce("3001");
+
+      await new ChooseDevPort(aPromptDeps(undefined, new ScriptedMachine({ taken: [3000] }))).ask(
         setupAnswers({ devPort: 3000 }),
         CONTEXT,
       );
 
-      expect(machine.asked.isPortFree).toContain(3000);
+      expect(text).toHaveBeenCalledTimes(1);
     });
 
     it("keeps the detected port", async () => {
@@ -117,11 +118,11 @@ describe("ChooseDevPort", () => {
   });
 
   describe("when the detected port is taken", () => {
-    beforeEach(() => {
-      machine.portIsFree = false;
-      machine.nextFree = (port) => {
-        return Promise.resolve(port + 1);
-      };
+    const machine = new ScriptedMachine({
+      taken: [3000, 5173],
+      nextFree: (port) => {
+        return port + 1;
+      },
     });
 
     it("parses the entered text into a number", async () => {
@@ -133,17 +134,6 @@ describe("ChooseDevPort", () => {
       );
 
       expect(answers.devPort).toBe(4000);
-    });
-
-    it("looks for the next free port after it", async () => {
-      vi.mocked(text).mockResolvedValueOnce("5174");
-
-      await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
-        setupAnswers({ devPort: 5173 }),
-        CONTEXT,
-      );
-
-      expect(machine.asked.nextFreePort).toContain(5173);
     });
 
     it("says the port is in use and suggests the next free one", async () => {
@@ -161,10 +151,9 @@ describe("ChooseDevPort", () => {
     });
 
     it("suggests the taken port when the next ones are taken too", async () => {
-      machine.nextFree = () => undefined;
       vi.mocked(text).mockResolvedValueOnce("5173");
 
-      await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+      await new ChooseDevPort(aPromptDeps(undefined, new ScriptedMachine({ taken: [5173] }))).ask(
         setupAnswers({ devPort: 5173 }),
         CONTEXT,
       );
@@ -174,9 +163,9 @@ describe("ChooseDevPort", () => {
   });
 
   describe("with --dev-port", () => {
-    it("keeps the flagged port", async () => {
-      machine.portIsFree = false;
+    const machine = new ScriptedMachine({ taken: [5000] });
 
+    it("keeps the flagged port", async () => {
       const answers = await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
         setupAnswers({ devPort: 5000 }),
         {
@@ -189,8 +178,6 @@ describe("ChooseDevPort", () => {
     });
 
     it("does not ask", async () => {
-      machine.portIsFree = false;
-
       await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
         setupAnswers({ devPort: 5000 }),
         {

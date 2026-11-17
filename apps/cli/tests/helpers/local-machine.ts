@@ -1,74 +1,62 @@
 import type { LocalMachine } from "@/lib/server";
 
 /**
+ * What a {@link ScriptedMachine} answers. Every field has the answer of a
+ * machine with no local server, every port free and no bundled release.
+ */
+export type MachineScript = Readonly<{
+  /** The server running for the directory, if any. */
+  detected?: string;
+  /** The ports something holds. */
+  taken?: readonly number[];
+  /** The port to suggest in place of a taken one. */
+  nextFree?: (port: number) => number | undefined;
+  /** The server release the CLI ships. */
+  bundled?: string;
+}>;
+
+/**
  * A machine that answers setup's questions about local servers as a test
- * scripts it, and remembers what it was asked. Everything starts as a machine
- * with no local server, every port free and no bundled release.
+ * scripts it, and never changes after it is built.
  */
 export class ScriptedMachine implements LocalMachine {
-  /** What `detectUrl` answers, one per call; the last repeats. */
-  private detections: Array<string | undefined> = [undefined];
-
-  /** Whether `isPortFree` answers yes. */
-  portIsFree = true;
-
-  /** What `nextFreePort` answers for a port. */
-  nextFree: (port: number) => number | undefined | Promise<number | undefined> = () => {
-    return undefined;
-  };
-
-  /** What `bundledVersion` answers. */
-  bundled: string | undefined;
-
-  /** What each question was asked about, in order. */
-  readonly asked = {
-    detectUrl: [] as string[],
-    isPortFree: [] as number[],
-    nextFreePort: [] as number[],
-  };
+  private readonly script: MachineScript;
 
   /**
-   * Scripts the answers `detectUrl` gives from now on.
-   *
-   * @param answers - One per call; the last repeats.
+   * @param script - The answers; whatever it leaves out is the answer of an empty machine.
    */
-  detects(...answers: Array<string | undefined>): void {
-    this.detections = answers;
+  constructor(script: MachineScript = {}) {
+    this.script = script;
   }
 
-  /** Forgets every script and question, as a fresh machine would. */
-  reset(): void {
-    this.detections = [undefined];
-    this.portIsFree = true;
-    this.nextFree = () => {
-      return undefined;
-    };
-    this.bundled = undefined;
-    this.asked.detectUrl.length = 0;
-    this.asked.isPortFree.length = 0;
-    this.asked.nextFreePort.length = 0;
+  /**
+   * @param _cwd - The directory asked about; the script does not tell directories apart.
+   * @returns The scripted server, if any.
+   */
+  async detectUrl(_cwd: string): Promise<string | undefined> {
+    return this.script.detected;
   }
 
-  async detectUrl(cwd: string): Promise<string | undefined> {
-    this.asked.detectUrl.push(cwd);
-    const index = Math.min(this.asked.detectUrl.length, this.detections.length) - 1;
-
-    return this.detections[index];
-  }
-
+  /**
+   * @param port - The port asked about.
+   * @returns Whether the script holds it.
+   */
   async isPortFree(port: number): Promise<boolean> {
-    this.asked.isPortFree.push(port);
-
-    return this.portIsFree;
+    return !(this.script.taken ?? []).includes(port);
   }
 
+  /**
+   * @param port - The port that is taken.
+   * @returns What the script suggests, if anything.
+   */
   async nextFreePort(port: number): Promise<number | undefined> {
-    this.asked.nextFreePort.push(port);
-
-    return this.nextFree(port);
+    return this.script.nextFree?.(port);
   }
 
+  /**
+   * @returns The scripted release, if any.
+   */
   bundledVersion(): string | undefined {
-    return this.bundled;
+    return this.script.bundled;
   }
 }

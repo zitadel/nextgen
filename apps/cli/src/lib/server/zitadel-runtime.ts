@@ -88,7 +88,9 @@ export type RuntimeKind = "cloud" | "local" | "self_hosted" | "unknown";
  * chosen.
  */
 export type ResolvedServer = {
+  /** The server's address. */
   value: string;
+  /** What named it: `--server`, the default, or the local server of the directory. */
   origin: "flag" | "default" | "local";
 };
 
@@ -98,7 +100,9 @@ export type ResolvedServer = {
  * parsed CLI invocation.
  */
 export type ResolveServerInput = {
+  /** The directory the run addresses, where `--server local` looks for a started server. */
   cwd: string;
+  /** The value of `--server`, when it was given. */
   serverFlag?: string;
 };
 
@@ -127,15 +131,15 @@ export abstract class ZitadelRuntime {
 
   /**
    * A server known by its address, as a hint, a flag or a response names it.
+   * An address alone is never a server the CLI manages, even on this machine:
+   * only {@link LocalRuntime.forFolder} is, because only a folder says which
+   * server it started.
    *
    * @param address - The server's address.
-   * @returns The server.
+   * @returns A runtime the CLI can ask about and talk to.
    */
-  static fromUrl(address: string): ZitadelRuntime {
-    return address === "mock" ||
-      (URL.canParse(address) && isLoopbackHost(new URL(address).hostname))
-      ? new LocalRuntime(address, undefined)
-      : new CloudRuntime(address);
+  static fromUrl(address: string): CloudRuntime {
+    return new CloudRuntime(address);
   }
 
   /**
@@ -272,20 +276,28 @@ export abstract class ZitadelRuntime {
 }
 
 /**
- * A runtime that is not on this machine: Zitadel's hosted cloud, or a server a
- * team runs itself. The CLI only talks to it; it never starts or stops it.
+ * A runtime the CLI only talks to, wherever it is: Zitadel's hosted cloud, a
+ * server a team runs itself, or an address on this machine that no folder
+ * started. It never starts or stops it.
  */
 export class CloudRuntime extends ZitadelRuntime {
   /**
    * @returns `cloud` for Zitadel's hosted cloud (the default server or a host
-   *   under `zitadel.cloud`), `self_hosted` for any other server, `unknown` for
-   *   an address that is not a URL.
+   *   under `zitadel.cloud`), `local` for an address on this machine,
+   *   `self_hosted` for any other server, `unknown` for an address that is not
+   *   a URL.
    */
   get kind(): RuntimeKind {
+    if (this.address === "mock") {
+      return "local";
+    }
     if (!URL.canParse(this.address)) {
       return "unknown";
     }
     const { hostname } = new URL(this.address);
+    if (isLoopbackHost(hostname)) {
+      return "local";
+    }
 
     return hostname === new URL(ZitadelRuntime.DEFAULT).hostname ||
       hostname === "zitadel.cloud" ||
@@ -332,15 +344,23 @@ export type StartOptions = Readonly<{
  * {@link LocalRuntime.resolveUrl}.
  */
 export type ServerStatus = Readonly<{
+  /** Where the server stands, as defined above. */
   lifecycle: "missing" | "running" | "unhealthy" | "stopped";
+  /** What the directory recorded, or `undefined` when it never started one. */
   runtime: RuntimeMetadata | undefined;
+  /** Whether the recorded address answers its readiness probe. */
   healthy: boolean;
   /** The recorded process, for the binary backend. */
   process?: { pid: number; running: boolean };
+  /** What Docker says; the fields are false when it cannot be asked. */
   docker: {
+    /** Whether the Docker daemon answered. */
     available: boolean;
+    /** Why it did not answer. */
     error?: string;
+    /** Whether the recorded container exists. */
     container_exists: boolean;
+    /** Whether it is running. */
     container_running: boolean;
   };
 }>;
@@ -496,20 +516,15 @@ export class LocalRuntime extends ZitadelRuntime {
   /** One log line as it is drawn, coloured or not. */
   static readonly renderLogLine = renderLogLine;
 
-  private readonly directory: Readonly<{ cwd: string; cliVersion: string }> | undefined;
+  private readonly directory: Readonly<{ cwd: string; cliVersion: string }>;
 
   /**
-   * Use {@link LocalRuntime.forFolder} for a directory's server, or
-   * {@link ZitadelRuntime.fromUrl} for an address alone, which can be asked what it
-   * is but not started or stopped.
+   * Use {@link LocalRuntime.forFolder}.
    *
    * @param address - The address the server answers on.
    * @param directory - The directory it belongs to, and the CLI release that starts it.
    */
-  constructor(
-    address: string,
-    directory: Readonly<{ cwd: string; cliVersion: string }> | undefined,
-  ) {
+  constructor(address: string, directory: Readonly<{ cwd: string; cliVersion: string }>) {
     super(address);
     this.directory = directory;
   }
@@ -533,31 +548,22 @@ export class LocalRuntime extends ZitadelRuntime {
     return new LocalRuntime(LocalRuntime.DEFAULT_URL, { cwd, cliVersion: options.cliVersion });
   }
 
-  /** The directory this runtime belongs to; an address-only runtime has none. */
+  /** The directory this runtime belongs to. */
   private get cwd(): string {
-    return this.home().cwd;
+    return this.directory.cwd;
   }
 
   /** The CLI release that starts this runtime. */
   private get cliVersion(): string {
-    return this.home().cliVersion;
-  }
-
-  private home(): Readonly<{ cwd: string; cliVersion: string }> {
-    if (this.directory === undefined) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `The local server at ${this.address} belongs to no directory, so it cannot be managed`,
-      );
-    }
-
-    return this.directory;
+    return this.directory.cliVersion;
   }
 
   /**
    * The server version this CLI ships. A server another CLI release started
    * serves that release's API, so `start` and `setup` compare it with a running
    * server's before reusing it. `undefined` when it cannot be read.
+   *
+   * @returns The version, or `undefined` when it cannot be read.
    */
   static bundledVersion(): string | undefined {
     return BinaryLauncher.bundledVersion();
@@ -566,6 +572,9 @@ export class LocalRuntime extends ZitadelRuntime {
   /**
    * The bundled server version, or the error that says how to repair the
    * install. For `doctor`, which must report a broken install, not crash on it.
+   *
+   * @returns The bundled server version.
+   * @throws {ZitadelError} When the install is broken, naming how to repair it.
    */
   static assertBinaryAvailable(): string {
     return BinaryLauncher.assertAvailable();
@@ -594,6 +603,10 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * The record is looked up from `cwd` upwards because `start` may have run in a
    * parent of the app directory.
+   *
+   * @param cwd - The directory the run addresses.
+   * @returns The address of the server running there.
+   * @throws {ZitadelError} When no server was started there, or the recorded one is not running.
    */
   static async resolveUrl(cwd: string): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
@@ -610,6 +623,9 @@ export class LocalRuntime extends ZitadelRuntime {
    * {@link resolveUrl} for optional UI such as the setup wizard's server
    * choice: it never throws, and a malformed record or a server that is not
    * running yields `undefined` (`doctor` owns diagnosing those states).
+   *
+   * @param cwd - The directory the run addresses.
+   * @returns The address, or `undefined` when no server is running there.
    */
   static async detectUrl(cwd: string): Promise<string | undefined> {
     try {
@@ -624,6 +640,9 @@ export class LocalRuntime extends ZitadelRuntime {
    * decides it for a server (connect and bind, never `lsof`). For setup, which
    * asks for an app port, or warns when it cannot ask, only when the detected
    * one is taken.
+   *
+   * @param port - The port to check.
+   * @returns Whether nothing holds it.
    */
   static isPortFree(port: number): Promise<boolean> {
     return new TcpPorts().isFree(port);
@@ -632,6 +651,9 @@ export class LocalRuntime extends ZitadelRuntime {
   /**
    * The first free port among the 20 after `port`, for setup to suggest in
    * place of a taken one, or `undefined` when they are all taken too.
+   *
+   * @param port - The port that is taken.
+   * @returns The first free port after it, or `undefined` when the next twenty are taken.
    */
   static async nextFreePort(port: number): Promise<number | undefined> {
     const count = Math.max(0, Math.min(port + 20, 65535) - port);
@@ -663,6 +685,10 @@ export class LocalRuntime extends ZitadelRuntime {
    * started it. It is the way out when a record is lost or wrong and `stop`
    * cannot find the server: the processes are found by their command lines, not
    * by any directory's record.
+   *
+   * @param servers - The processes of this machine.
+   * @returns What was stopped, or that the processes cannot be listed here.
+   * @throws {ZitadelError} When a process did not stop.
    */
   static async stopAll(servers: LocalServers): Promise<SweepResult> {
     const discovery = await servers.current();
@@ -843,6 +869,8 @@ export class LocalRuntime extends ZitadelRuntime {
    * `docker` part says why), because `status` and `doctor` exist to report those
    * states. "Running" for a process means its recorded pid still belongs to the
    * server that was started, not merely that some process has that pid.
+   *
+   * @returns The status.
    */
   async status(): Promise<ServerStatus> {
     const runtime = await readRuntimeMetadata(this.cwd);
@@ -860,8 +888,20 @@ export class LocalRuntime extends ZitadelRuntime {
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
     const running =
       runtime?.backend === "binary" ? await BinaryLauncher.isRecordRunning(runtime) : false;
+    // A process is up when its recorded pid still belongs to the server; a container
+    // when Docker says it runs. Either way, up and answering is `running`, up and
+    // silent is `unhealthy`, and a container that exists but is down is `unhealthy` too.
+    const up = runtime?.backend === "binary" ? running : container?.running === true;
+    const present = runtime?.backend === "binary" ? running : container?.exists === true;
+    const lifecycle: ServerStatus["lifecycle"] = !runtime
+      ? "missing"
+      : up && healthy
+        ? "running"
+        : present
+          ? "unhealthy"
+          : "stopped";
     return {
-      lifecycle: lifecycleOf({ runtime, healthy, running, container }),
+      lifecycle,
       runtime,
       healthy,
       ...(runtime?.backend === "binary" ? { process: { pid: runtime.pid, running } } : {}),
@@ -1014,25 +1054,4 @@ export class LocalRuntime extends ZitadelRuntime {
     ).start();
     return { runtime: record, alreadyRunning };
   }
-}
-
-function lifecycleOf(input: {
-  runtime: RuntimeMetadata | undefined;
-  healthy: boolean;
-  running: boolean;
-  container: { exists: boolean; running: boolean } | undefined;
-}): ServerStatus["lifecycle"] {
-  if (!input.runtime) {
-    return "missing";
-  }
-  if (input.runtime.backend === "binary") {
-    if (input.running && input.healthy) {
-      return "running";
-    }
-    return input.running ? "unhealthy" : "stopped";
-  }
-  if (input.container?.running && input.healthy) {
-    return "running";
-  }
-  return input.container?.exists ? "unhealthy" : "stopped";
 }
