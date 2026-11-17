@@ -1,0 +1,52 @@
+name: spike-cli-windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [spike/cli-windows-smoke]
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the CLI from this ref
+        run: corepack pnpm exec turbo run build --filter=@zitadel/cli
+
+      - name: CLI runs
+        run: node apps/cli/bin/run.js --version && node apps/cli/bin/run.js --help
+
+      - name: Scaffold a project
+        run: |
+          mkdir "$RUNNER_TEMP/app"
+          cd "$RUNNER_TEMP/app"
+          node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" setup --framework react --server local --non-interactive --no-telemetry --no-git
+
+      - name: Run the project
+        working-directory: ${{ runner.temp }}/app
+        run: |
+          ls -la
+          npm run build
