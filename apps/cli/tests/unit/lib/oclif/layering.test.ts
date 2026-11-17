@@ -18,6 +18,7 @@ const LAYER = posix.join("lib", "oclif");
  * the generated resource commands speak through.
  */
 const GENERIC = [
+  "constants",
   "lib/backend",
   "lib/cmd",
   "lib/consent",

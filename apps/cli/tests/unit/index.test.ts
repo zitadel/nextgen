@@ -185,7 +185,7 @@ describe("the flags each command takes", () => {
     return Object.keys({ ...command.baseFlags, ...command.flags }).sort();
   };
 
-  it("are the same as they were before servers were taken by a mixin", () => {
+  it("are pinned for every command", () => {
     expect(
       Object.fromEntries(
         Object.entries(COMMANDS)
@@ -197,18 +197,5 @@ describe("the flags each command takes", () => {
           }),
       ),
     ).toMatchSnapshot();
-  });
-
-  it("take --server in every command that takes it today", () => {
-    expect(
-      Object.entries(COMMANDS)
-        .filter(([, command]) => {
-          return effective(command).includes("server");
-        })
-        .map(([id]) => {
-          return id;
-        })
-        .sort(),
-    ).toEqual(Object.keys(COMMANDS).sort());
   });
 });

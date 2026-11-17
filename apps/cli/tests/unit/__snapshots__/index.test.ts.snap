@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the flags each command takes > are the same as they were before servers were taken by a mixin 1`] = `
+exports[`the flags each command takes > are pinned for every command 1`] = `
 {
   "api": [
     "color",

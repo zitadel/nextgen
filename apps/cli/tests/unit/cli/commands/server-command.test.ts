@@ -38,6 +38,10 @@ class ChoosesAServer extends ChoosingServerCommand(BaseCommand) {
     throw new Error("unused");
   }
 
+  public async metaOf(flags: Record<string, unknown>) {
+    return this.toMeta({ "no-telemetry": true, ...flags });
+  }
+
   public async chooseWith(flags: Record<string, unknown>) {
     await this.toMeta({ "no-telemetry": true, "non-interactive": true, ...flags });
     return (await this.givenServer()) ?? this.askServer(shellCommand("docker", "version"));
@@ -285,7 +289,7 @@ class CapturingEnvironment extends ServerCommand(EnvironmentCommand) {
     this.json.push(recordOf(json));
   }
 
-  protected override createTelemetry(deps: TelemetryDeps): Telemetry {
+  protected override createTelemetry(_deps: TelemetryDeps): Telemetry {
     const events = this.events;
     const client: MixpanelClient = {
       track(event: string, properties: Properties, callback?: Callback): void {
@@ -312,8 +316,7 @@ class CapturingEnvironment extends ServerCommand(EnvironmentCommand) {
       },
     };
     return Telemetry.create({
-      ...deps,
-      env: { ...deps.env, ZITADEL_TELEMETRY_TOKEN: "tok" },
+      env: { ZITADEL_TELEMETRY_TOKEN: "tok" },
       flag: true,
       initClient: () => client,
       loadIdentity: () => ({ distinctId: "did-test", isFirstRun: false }),
@@ -343,6 +346,17 @@ describe("the server of a command that reads an environment", () => {
   });
 });
 
+/**
+ * A command that reads an environment and says nothing of how it reads a server:
+ * `servers()` is what `ServerCommand` implements, so this does not compile.
+ */
+// @ts-expect-error `servers()` is left abstract
+class Bare extends EnvironmentCommand {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+}
+
 describe("the types a server mixin gives a command", () => {
   it("type --server for a command admitted under the mixin", () => {
     expectTypeOf<Admitted<typeof TakesAServer>["flags"]["server"]>().toEqualTypeOf<
@@ -350,15 +364,8 @@ describe("the types a server mixin gives a command", () => {
     >();
   });
 
-  it("refuse a command that reads an environment and says nothing of how it reads a server", () => {
-    // @ts-expect-error `servers()` is what `ServerCommand` implements
-    class Bare extends EnvironmentCommand {
-      protected async execute(): Promise<never> {
-        throw new Error("unused");
-      }
-    }
-
-    expect(Bare).toBeDefined();
+  it("leave a command that reads an environment to say how it reads a server", () => {
+    expect(Object.hasOwn(Bare.prototype, "servers")).toBe(false);
   });
 
   it("keep the group and the folder rule of a command that is also destructive", () => {
@@ -376,21 +383,9 @@ describe("the types a server mixin gives a command", () => {
 });
 
 describe("the server of a command that chooses it", () => {
-  it("names none until it is asked, where a command that takes a server names the cloud", async () => {
-    const meta = await new ChoosesAServerWithMeta([], aConfigAt(VERSION)).metaWith({});
+  it("names none until it is asked", async () => {
+    const meta = await new ChoosesAServer([], aConfigAt(VERSION)).metaOf({});
 
     expect(meta.source).toBe("");
   });
 });
-
-class ChoosesAServerWithMeta extends ChoosingServerCommand(BaseCommand) {
-  public static override readonly id: string = "chooses-a-server-meta-test";
-
-  protected async execute(): Promise<never> {
-    throw new Error("unused");
-  }
-
-  public async metaWith(flags: Record<string, unknown>) {
-    return this.toMeta({ "no-telemetry": true, ...flags });
-  }
-}
