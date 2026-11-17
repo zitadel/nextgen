@@ -277,6 +277,28 @@ describe("invitation page", () => {
     expect(trackEvent).not.toHaveBeenCalled();
   });
 
+  it("turns unavailable when the inviter no longer administers the project", async () => {
+    stubLookup();
+    stubVerb("accept", () =>
+      HttpResponse.json(
+        {
+          code: "inv.inviter_not_admin",
+          message: "the inviter no longer administers the project",
+        },
+        { status: 409 },
+      ),
+    );
+    await openLink();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Join project" }));
+
+    // No retry and no other account makes this link work again.
+    expect(
+      await screen.findByRole("heading", { name: "Invitation unavailable" }),
+    ).toBeInTheDocument();
+    expect(readInvitationToken()).toBeUndefined();
+  });
+
   it("turns unavailable when the invitation finished while the page was open", async () => {
     stubLookup();
     stubVerb("accept", NOT_FOUND);

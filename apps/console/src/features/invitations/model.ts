@@ -7,24 +7,14 @@ export type Invitation = Awaited<ReturnType<typeof api.listInvitations>>["invita
 export type InvitationLookup = Awaited<ReturnType<typeof api.lookupInvitation>>;
 
 /**
- * Who created an invitation, as the lookup resolves them for the invitation
- * page (`inviter`, a user-ref): the invited person cannot read the project's
- * users, so the server names the inviter rather than leaving the page an id to
- * look up. Declared here until the generated client carries the field.
+ * The inviter's name as the console shows it: `display`, falling back to
+ * `identifier`, then `user_id` (ADR 058 §3). The server resolves them
+ * (`inviter`, a user-ref) on the lookup and, with `expand=inviter`, on the
+ * list, because the reader may not be able to read the project's users.
+ * Nothing when a project secret created the invitation.
  */
-export interface Inviter {
-  user_id: string;
-  identifier?: string | null;
-  display?: string | null;
-}
-
-/**
- * The inviter's name as the page shows it: `display`, falling back to
- * `identifier`, then `user_id` (ADR 058 §3). Nothing when a project secret
- * created the invitation, or the server sent no inviter.
- */
-export function inviterLabel(lookup: { inviter?: Inviter | null }): string | undefined {
-  const inviter = lookup.inviter;
+export function inviterLabel(invitation: Pick<InvitationLookup, "inviter">): string | undefined {
+  const inviter = invitation.inviter;
   if (!inviter) return undefined;
   return inviter.display || inviter.identifier || inviter.user_id;
 }

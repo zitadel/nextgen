@@ -17,7 +17,6 @@ import {
   describeExpiry,
   effectiveStatus,
   type InvitationLookup,
-  type Inviter,
   inviterLabel,
   roleInProse,
 } from "../model";
@@ -32,12 +31,18 @@ export type InvitationPageState =
   /** The lookup failed for another reason; the token is kept for a retry. */
   | { kind: "error"; message: string };
 
-/** The API's one answer for every unknown or finished token (root ADR 086 §10). */
-const NOT_FOUND = "inv.not_found";
+/**
+ * The answers that mean the link can never be used: the API's one answer for
+ * every unknown or finished token (root ADR 086 §10), and the refusal of a
+ * link whose creator no longer administers the project, which no retry and no
+ * other account changes.
+ */
+const DEAD_LINK = new Set(["inv.not_found", "inv.inviter_not_admin"]);
 
 /** Whether a failed call says the link is finished, rather than that the call failed. */
 export function isInvitationGone(cause: unknown): boolean {
-  return errorCode(cause) === NOT_FOUND;
+  const code = errorCode(cause);
+  return code !== undefined && DEAD_LINK.has(code);
 }
 
 /**
@@ -48,8 +53,8 @@ export function isInvitationGone(cause: unknown): boolean {
  * **One message for every dead link.** The server answers an unknown, expired,
  * accepted, declined and cancelled token alike, so that holding a token never
  * tells anyone what became of an invitation; the page says `Invitation
- * unavailable` for all of them, and for a lookup that names a status other
- * than `pending`. The design's `Invitation already accepted` state has nothing
+ * unavailable` for all of them, for a lookup that names a status other than
+ * `pending`, and for a link whose creator lost the project's administration. The design's `Invitation already accepted` state has nothing
  * to tell it apart from the rest.
  *
  * **The token leaves with the outcome.** Accepting, declining and a token the
@@ -190,7 +195,7 @@ function OpenInvitation({
   }, "Could not decline the invitation. Try again.");
 
   const busy = accept.pending || decline.pending;
-  const inviter = inviterLabel(invitation as InvitationLookup & { inviter?: Inviter | null });
+  const inviter = inviterLabel(invitation);
 
   return (
     <div className={`${CARD} gap-5`}>

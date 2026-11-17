@@ -45,11 +45,15 @@ function invitation(overrides: Record<string, unknown> = {}) {
     created_at: "2026-11-04T10:00:00Z",
     expires_at: IN_TWO_DAYS,
     journey_id: "journey_1",
-    accepted_by: null,
-    accepted_at: null,
+    responded_by: null,
+    responded_at: null,
+    inviter: { user_id: "user_test", identifier: "admin@example.com", display: "Alex Morgan" },
     ...overrides,
   };
 }
+
+/** Every `GET /invitations` URL of the test, for what the query asked for. */
+const urls: string[] = [];
 
 /** One `GET /invitations` as the tab sends it. */
 interface ListRead {
@@ -66,6 +70,7 @@ function stubPage(
     HttpResponse.json({ invitations: [], next_page_token: null }),
 ) {
   const reads: ListRead[] = [];
+  urls.length = 0;
   server.use(
     http.get(`${API}/projects/:id`, () =>
       HttpResponse.json({
@@ -82,6 +87,7 @@ function stubPage(
       const params = new URL(request.url).searchParams;
       const read = { projectId: params.get("project_id"), pageToken: params.get("page_token") };
       reads.push(read);
+      urls.push(request.url);
       return list(read);
     }),
   );
@@ -205,6 +211,12 @@ describe("project invitations", () => {
     expect(pending.getByText("Editor")).toBeInTheDocument();
     expect(pending.getByText("Pending")).toBeInTheDocument();
     expect(pending.getByText("Expires in 2 days")).toBeInTheDocument();
+    // Everything but accepted, whose person is a row of the Members tab, and
+    // the inviter resolved by the server rather than read by id.
+    const sent = new URL(urls[0] ?? "").searchParams;
+    expect(sent.getAll("status")).toEqual(["pending", "expired", "rejected"]);
+    expect(sent.getAll("expand")).toEqual(["inviter"]);
+    expect(pending.getByText("Alex Morgan")).toBeInTheDocument();
     // No name was given: the row says so rather than showing an id.
     const expired = row("Unnamed invitation");
     expect(expired.getByText("Viewer")).toBeInTheDocument();
@@ -218,18 +230,52 @@ describe("project invitations", () => {
     expect(row("Lena Becker").getByText("Expired")).toBeInTheDocument();
   });
 
-  it("gives a finished invitation its status and no menu", async () => {
+  it("keeps a declined invitation's name and says when it was declined", async () => {
     stubPage(
       listing(
-        invitation({ id: "inv_a", metadata: null, status: "accepted", accepted_by: "user_9" }),
-        invitation({ id: "inv_r", metadata: null, status: "rejected" }),
+        invitation({
+          id: "inv_r",
+          status: "rejected",
+          responded_by: "user_9",
+          responded_at: "2026-11-05T09:00:00Z",
+          inviter: null,
+        }),
       ),
     );
     const section = await openInvitations();
-    expect(section.getByText("Accepted")).toBeInTheDocument();
+
     // `rejected` in the API; the invitation page calls it declining.
-    expect(section.getByText("Declined")).toBeInTheDocument();
-    expect(section.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
+    const declined = row("Lena Becker");
+    expect(declined.getByText("Declined")).toBeInTheDocument();
+    expect(declined.getByText("Nov 5, 2026")).toBeInTheDocument();
+    expect(declined.queryByText(/Expires in/)).not.toBeInTheDocument();
+    // A project secret made this one: nobody to name.
+    expect(declined.getByText("—")).toBeInTheDocument();
+    expect(section.getByRole("button", { name: "Actions for Lena Becker" })).toBeInTheDocument();
+  });
+
+  it("removes a declined invitation after confirming, in its own words", async () => {
+    const reads = stubPage(listing(invitation({ status: "rejected" })));
+    const removed: string[] = [];
+    server.use(
+      http.delete(`${INVITATIONS_URL}/:id`, ({ params }) => {
+        removed.push(params.id as string);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await openInvitations();
+
+    await openMenu("Lena Becker");
+    expect(screen.queryByRole("menuitem", { name: "Cancel invitation" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove invitation" }));
+    const confirm = within(await screen.findByRole("alertdialog"));
+    expect(confirm.getByText("Remove declined invitation?")).toBeInTheDocument();
+    const before = reads.length;
+    await userEvent.click(confirm.getByRole("button", { name: "Remove invitation" }));
+
+    expect(await screen.findByText("Invitation removed")).toBeInTheDocument();
+    expect(removed).toEqual(["inv_1"]);
+    await waitFor(() => expect(reads.length).toBeGreaterThan(before));
   });
 
   it("offers to invite from the empty state", async () => {
