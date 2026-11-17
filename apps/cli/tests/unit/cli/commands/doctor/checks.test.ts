@@ -19,6 +19,7 @@ import {
   SecretCheck,
   SecretPermissionsCheck,
 } from "@/cli/commands/doctor/checks";
+import { keepsPosixModes } from "@/cli/commands/doctor/checks/secret-permissions";
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
 import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
 import { Orca, createOrca } from "@/lib/orca";
@@ -596,6 +597,16 @@ describe("SecretCheck", () => {
 });
 
 describe("SecretPermissionsCheck", () => {
+  describe("keepsPosixModes", () => {
+    it.each([
+      ["linux", true],
+      ["darwin", true],
+      ["win32", false],
+    ] as const)("on %s is %s", (platform, expected) => {
+      expect(keepsPosixModes(platform)).toBe(expected);
+    });
+  });
+
   it("passes at 0600", async ({ dir }) => {
     await aNextProject(dir);
 

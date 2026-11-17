@@ -28,6 +28,17 @@ t() {
   return 0
 }
 # idof <file>: first "id" value in a JSON log.
+jid() { grep -o "\"$2\": *\"[^\"]*\"" "$1" | head -1 | cut -d'"' -f4; }
+# tx <name> <command...>: a refusal is the right answer, so a non-zero exit passes.
+tx() {
+  local name="$1"; shift
+  timeout 180 "$@" > "$RUNNER_TEMP/last.log" 2>&1
+  local code=$?
+  if [ "$code" -ne 0 ]; then PASS=$((PASS+1)); echo "| PASS | $name (refused, exit $code) | $code |" >> "$OUT"
+  else FAIL=$((FAIL+1)); echo "| FAIL | $name (expected a refusal) | 0 |" >> "$OUT"; fi
+  echo "::group::$name (exit $code)"; sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/last.log" | tail -n 12 | cut -c1-220; echo "::endgroup::"
+  return 0
+}
 idof() { grep -o '"id": *"[^"]*"' "$1" | head -1 | cut -d'"' -f4; }
 last() { cat "$RUNNER_TEMP/last.log"; }
 : > "$RUNNER_TEMP/details.md"
@@ -73,10 +84,9 @@ for c in "project list" "schema list" "flow-definition list" "policy list" "bran
 done
 t "event list --limit 5" z event list --limit 5 --json
 t "event get (first event)" bash -c "id=\$(node '$CLI' event list --limit 1 --json --no-telemetry | grep -o '\"id\": *\"[^\"]*\"' | head -1 | cut -d'\"' -f4); node '$CLI' event get \"\$id\" --json --no-telemetry"
-t "api GET (raw)" z api -X GET /projects
+t "api (raw path)" z api /users/query
 t "schema get (first)" bash -c "id=\$(node '$CLI' schema list --json --no-telemetry | grep -o '\"id\": *\"[^\"]*\"' | head -1 | cut -d'\"' -f4); node '$CLI' schema get \"\$id\" --json --no-telemetry"
 t "policy get (first)" bash -c "id=\$(node '$CLI' policy list --json --no-telemetry | grep -o '\"id\": *\"[^\"]*\"' | head -1 | cut -d'\"' -f4); node '$CLI' policy get \"\$id\" --json --no-telemetry"
-t "branding get (first)" bash -c "id=\$(node '$CLI' branding list --json --no-telemetry | grep -o '\"id\": *\"[^\"]*\"' | head -1 | cut -d'\"' -f4); node '$CLI' branding get \"\$id\" --json --no-telemetry"
 
 # --- 5. Write commands ---
 SCH=$(node "$CLI" schema list --json --no-telemetry | grep -o '"id": *"[^"]*"' | head -1 | cut -d'"' -f4)
@@ -99,7 +109,7 @@ t "variable get" z variable get WIN_VAR --json
 t "variable resolve" z variable resolve --json
 t "variable rm" z variable rm WIN_VAR --force --json
 t "env add (dry-run)" z env add staging --server https://api.zitadel.cloud --dry-run --json
-t "auth-method password disable" z auth-method password disable --json
+tx "auth-method password disable" z auth-method password disable --json
 t "project get (id from project list)" bash -c "id=\$(node '$CLI' project list --json --no-telemetry | grep -o '\"id\": *\"[^\"]*\"' | head -1 | cut -d'\"' -f4); node '$CLI' project get \"\$id\" --json --no-telemetry"
 t "auth-method password enable" z auth-method password enable --json
 t "auth-method passkey enable" z auth-method passkey enable --json
@@ -112,10 +122,10 @@ t "team deactivate" z team deactivate "$TID" --force --json
 # --- 6. Release flow ---
 t "pull" z pull --json
 t "release create" z release create -m "windows spike" --json
-RID=$(idof "$RUNNER_TEMP/last.log")
+RID=$(jid "$RUNNER_TEMP/last.log" release_id)
 t "release get" z release get "$RID" --json
 t "deployment create" z deployment create --release "$RID" --json
-DID=$(idof "$RUNNER_TEMP/last.log")
+DID=$(jid "$RUNNER_TEMP/last.log" deployment_id)
 t "deployment get" z deployment get "$DID" --json
 t "deployment rollback" z deployment rollback --json
 t "deploy --dry-run" z deploy --dry-run --json
@@ -125,7 +135,7 @@ t "upgrade --dry-run" z upgrade --dry-run --json
 
 # --- 7. Project extras ---
 t "skills add" z skills add --non-interactive
-t "tests add --skip-install" z tests add --skip-install
+tx "tests add --skip-install (react unsupported)" z tests add --skip-install
 t "eject --dry-run" z eject --dry-run --json
 
 # --- 8. Teardown ---

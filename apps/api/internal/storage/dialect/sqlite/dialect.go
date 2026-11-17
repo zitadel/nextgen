@@ -92,18 +92,23 @@ func (c Config) dsn() (dsn string, filePath string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("sqlite: resolve path: %w", err)
 	}
-	uriPath := filepath.ToSlash(abs)
-	if !strings.HasPrefix(uriPath, "/") {
-		// A Windows drive path ("D:/x") needs the leading slash, or the URI
-		// reads the drive letter as its authority.
-		uriPath = "/" + uriPath
+	return fileURI(filepath.ToSlash(abs)), abs, nil
+}
+
+// fileURI returns the SQLite URI for an absolute, slash-separated path with
+// the connection pragmas as its query. A Windows drive path ("D:/x") gets the
+// leading slash a URI path needs, or the drive letter reads as the authority
+// ("file://D:/x" fails with "invalid uri authority: D:").
+func fileURI(slashPath string) string {
+	if !strings.HasPrefix(slashPath, "/") {
+		slashPath = "/" + slashPath
 	}
 	u := &url.URL{
 		Scheme:   "file",
-		Path:     uriPath,
+		Path:     slashPath,
 		RawQuery: migration.PragmaQuery,
 	}
-	return u.String(), abs, nil
+	return u.String()
 }
 
 // mergeSQLitePragmas appends missing default pragma query params.

@@ -50,6 +50,15 @@ jobs:
           corepack pnpm exec turbo run build --filter=@zitadel/cli
           corepack pnpm exec turbo run build-binary --filter=@zitadel/${{ matrix.binary }} --output-logs=errors-only
 
+      - name: CLI unit tests
+        continue-on-error: true
+        run: corepack pnpm exec turbo run test --filter=@zitadel/cli --output-logs=errors-only 2>&1 | tail -n 60
+
+      - name: Go SQLite dialect tests
+        continue-on-error: true
+        working-directory: apps/api
+        run: go test ./internal/storage/dialect/sqlite/ -run 'TestFileURI|TestMergeSQLitePragmas' -count=1
+
       - name: Exercise the CLI
         run: bash .github/spike/exercise.sh
 

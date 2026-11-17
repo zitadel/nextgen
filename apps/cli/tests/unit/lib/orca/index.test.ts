@@ -270,8 +270,7 @@ describe("Orca.scaffold", () => {
     const guardedScaffolder: Scaffolder = {
       ...fakeScaffolder,
       async scaffold(scaffoldCwd) {
-        // The stash emptied the directory so the underlying generator sees a
-        // clean slate.
+        // The generator runs in an empty directory beside the project.
         await expect(stat(join(scaffoldCwd, ".zitadel"))).rejects.toMatchObject({
           code: "ENOENT",
         });
@@ -348,6 +347,48 @@ describe("Orca.scaffold", () => {
       "localhost",
     );
     await expect(stat(join(cwd, "half-written.txt"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("scaffolds beside the runtime start left without moving it, and leaves nothing behind", async ({
+    dir,
+  }) => {
+    const cwd = await tmpPackageSafe(dir);
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/local/runtime.json"), '{"server_url":"http://localhost"}');
+    let ranIn = "";
+    const watchingScaffolder: Scaffolder = {
+      ...fakeScaffolder,
+      async scaffold(scaffoldCwd) {
+        ranIn = scaffoldCwd;
+        // A running server holds files open here, so they must stay where they are.
+        await expect(stat(join(cwd, ".zitadel/local/runtime.json"))).resolves.toBeTruthy();
+        await writeFile(join(scaffoldCwd, "package.json"), "{}");
+      },
+    };
+    const watchingOrca = new Orca([fakeDetector], [watchingScaffolder], [], LocalRuntime.DIR);
+
+    await watchingOrca.scaffold(cwd, "fake");
+
+    expect(ranIn).not.toBe(cwd);
+    expect(basename(ranIn)).toBe(basename(cwd));
+    expect(await readdir(dirname(cwd))).toEqual([basename(cwd)]);
+  });
+
+  it("leaves nothing beside the project when the scaffold fails", async ({ dir }) => {
+    const cwd = await tmpPackageSafe(dir);
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    const failingScaffolder: Scaffolder = {
+      ...fakeScaffolder,
+      async scaffold() {
+        throw new ZitadelError("E_VALIDATION", "boom");
+      },
+    };
+    const failingOrca = new Orca([fakeDetector], [failingScaffolder], [], LocalRuntime.DIR);
+
+    await expect(failingOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_VALIDATION" });
+
+    expect(await readdir(dirname(cwd))).toEqual([basename(cwd)]);
+    expect(await readdir(cwd)).toEqual([".zitadel"]);
   });
 
   it("refuses a non-empty directory without force", async ({ dir }) => {
