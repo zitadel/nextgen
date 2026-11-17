@@ -12,35 +12,31 @@ server package they call is described in
   table in `src/index.ts`, so `server/start.ts` is still `start`.
 - Tests mirror it: `tests/unit/cli/commands/server/<command>.test.ts`.
 
-## The mixins: `LocalServerCommand` (`src/cli/commands/server-command.ts`)
+## The base: `LocalServerCommand` (`src/cli/commands/server-command.ts`)
 
-One module holds every way a command takes a server, as mixins in the style of
-`Promptable` and `Destructive`:
+`LocalServerCommand(Base, folderRule)` is the one base for every command about
+the local server, so none repeats the same things (a `sourceOf`, and the `ps`
+seam). It is a mixin like `Promptable`; the rest of the server family
+(`ServerCommand`, `ChoosingServerCommand`) is in the same module and described
+in [`apps/cli/AGENTS.md`](../../../../AGENTS.md).
 
-- `ServerCommand(Base)` is a command that takes `--server`: the run's server is
-  resolved before it starts. No command resolves, parses or normalises a server
-  address itself.
-- `ChoosingServerCommand(Base)` is a `ServerCommand` that asks for the server
-  when none was given (`serverOrAsk`), as `env add` does.
-- `LocalServerCommand(Base)` is a command about the server on this machine, and
-  the one these commands extend, so none repeats the same four things (the
-  group, `meta`, a `sourceOf`, and the `ps` seam).
-
-What `LocalServerCommand` adds:
-
-- `static folderRule`: `"exact"` acts on the folder the command runs in
+- `folderRule` is its argument: `"exact"` acts on the folder the command runs in
   (`start`, `stop`, `reset`); `"nearest"` acts on the closest folder, that one
   or a parent, where `start` ran (`logs`). Choosing wrongly manages another
-  project's server, so every command states it.
+  project's server, so every command that has a rule states it. `console` and
+  `doctor` have none and name their own `sourceOf`.
 - `serverInThisFolder()` and `serverInNearestFolder()` return the runtime the
   command acts on. A command asks them; it never builds paths, names or
   addresses itself.
 - `localServers()` is the test seam for the machine's process list. It lives
   here and not in `BaseCommand` because only these commands ask it.
+- It sets no group and takes no `--server`: each command declares its own
+  `group`, and one that reads `--server` wraps `ServerCommand` inside it. The
+  commands that only accept `--server` and ignore it (`start`, `stop`, `logs`,
+  `reset`) say so on `resolveServer`.
 - `status` is the one command about this server that does not extend it: it
   also reads the project's environment, so it extends
-  `ServerCommand(EnvironmentCommand)`. `console` and `doctor` keep their own
-  `sourceOf`.
+  `ServerCommand(EnvironmentCommand)`.
 
 ## How a command reads
 

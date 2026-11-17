@@ -210,11 +210,27 @@
   first question, and each one that does as soon as its answer is given.
 - Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
-- A command that talks to a Zitadel server extends `ServerCommand(...)`, one
-  that may have to ask for it `ChoosingServerCommand(...)`, and one about the
-  server on this machine `LocalServerCommand(...)`, all from
-  `src/cli/commands/server-command.ts`. A command never resolves, parses or
-  normalises a server address itself.
+- Pick the command's base by what it does with a server (all from
+  `src/cli/commands/server-command.ts`, wrapping what a command extends the way
+  `Promptable` does); a command never resolves, parses or normalises a server
+  address itself:
+
+  | The command | It extends |
+  | --- | --- |
+  | never talks to a server | `BaseCommand` or `EnvironmentCommand` |
+  | talks to one through `--server` or its environment | `ServerCommand(Base)` |
+  | may have to ask which server | `ChoosingServerCommand(Base)` |
+  | is about the local server | `LocalServerCommand(Base, folderRule)` |
+  | is destructive | `Destructive(...)`, outermost |
+
+  A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
+  the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
+  `Destructive` around it. `LocalServerCommand` does not take `--server`; a
+  command that also reads one is `LocalServerCommand(ServerCommand(Base))`.
+  Each local-server command declares its own `group`.
+- "Server" on its own is the Zitadel instance a command talks to by URL. The
+  "local server" is the one `zitadel start` runs in a folder. The "server
+  binary" is `@zitadel/server`.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so

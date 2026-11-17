@@ -2,16 +2,19 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   ChoosingServerCommand,
   LocalServerCommand,
   ServerCommand,
 } from "@/cli/commands/server-command";
-import { BaseCommand } from "@/lib/oclif";
+import { type Admitted, BaseCommand, EnvironmentCommand } from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
 import { LocalRuntime, PsLocalServers, SystemMachine, ZitadelRuntime } from "@/lib/server";
 import { shellCommand } from "@/lib/suggestion";
+import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
+import { CommandGroups } from "@/cli/commands/groups";
 import { aConfigAt } from "@tests/helpers/suggestions";
 
 /** A command that takes a server, with its protected reading opened for the test. */
@@ -181,3 +184,205 @@ describe("LocalServerCommand", () => {
     );
   });
 });
+
+/** What each kind of command reports of its server in an envelope, given what was typed. */
+class Capturing extends ServerCommand(BaseCommand) {
+  public static override readonly id: string = "capturing-test";
+  public readonly json: Record<string, unknown>[] = [];
+
+  public override jsonEnabled(): boolean {
+    return true;
+  }
+
+  public override logJson(json: unknown): void {
+    this.json.push(json as Record<string, unknown>);
+  }
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  public async failAfterFlags(flags: Record<string, unknown>): Promise<Record<string, unknown>> {
+    await this.toMeta({ "no-telemetry": true, ...flags });
+    return this.failWith(new Error("It failed"));
+  }
+
+  public async failBeforeFlags(): Promise<Record<string, unknown>> {
+    return this.failWith(new Error("It failed"));
+  }
+
+  private async failWith(error: Error): Promise<Record<string, unknown>> {
+    try {
+      await this.catch(error);
+    } catch {
+      /* catch() ends by throwing oclif's ExitError */
+    }
+    return this.json[0] ?? {};
+  }
+}
+
+/** The same, for a command that takes no server. */
+class CapturingNoServer extends BaseCommand {
+  public static override readonly id: string = "capturing-no-server-test";
+  public readonly json: Record<string, unknown>[] = [];
+
+  public override jsonEnabled(): boolean {
+    return true;
+  }
+
+  public override logJson(json: unknown): void {
+    this.json.push(json as Record<string, unknown>);
+  }
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  public async failBeforeFlags(): Promise<Record<string, unknown>> {
+    try {
+      await this.catch(new Error("It failed"));
+    } catch {
+      /* catch() ends by throwing oclif's ExitError */
+    }
+    return this.json[0] ?? {};
+  }
+}
+
+describe("the server a failure names", () => {
+  it.each([
+    { typed: undefined, source: ZitadelRuntime.DEFAULT },
+    { typed: "https://auth.acme.example/path", source: "https://auth.acme.example" },
+  ])("is $source after the flags, when --server is $typed", async ({ typed, source }) => {
+    const envelope = await new Capturing([], aConfigAt(VERSION)).failAfterFlags({
+      ...(typed === undefined ? {} : { server: typed }),
+    });
+
+    expect(envelope).toMatchObject({ source });
+  });
+
+  it("is the one --server named before the flags were parsed, as --server=<url> or --server <url>", async () => {
+    for (const argv of [
+      ["--bogus", "--server=https://auth.acme.example"],
+      ["--bogus", "--server", "https://auth.acme.example"],
+    ]) {
+      const envelope = await new Capturing(argv, aConfigAt(VERSION)).failBeforeFlags();
+
+      expect(envelope).toMatchObject({ source: "https://auth.acme.example" });
+    }
+  });
+
+  it("is none for a command that takes no server, whatever was typed", async () => {
+    const envelope = await new CapturingNoServer(
+      ["--server=https://auth.acme.example"],
+      aConfigAt(VERSION),
+    ).failBeforeFlags();
+
+    expect(envelope.source).toBe("");
+  });
+});
+
+/** A command that reads an environment, and so a server, with its failure captured. */
+class CapturingEnvironment extends ServerCommand(EnvironmentCommand) {
+  public static override readonly id: string = "capturing-environment-test";
+  public readonly json: Record<string, unknown>[] = [];
+  public readonly events: { event: string; properties: Properties }[] = [];
+
+  public override jsonEnabled(): boolean {
+    return true;
+  }
+
+  public override logJson(json: unknown): void {
+    this.json.push(json as Record<string, unknown>);
+  }
+
+  protected override createTelemetry(_deps: TelemetryDeps): Telemetry {
+    const events = this.events;
+    return {
+      enabled: true,
+      isFirstRun: false,
+      distinctId: "did-test",
+      track: (event: string, properties: Properties = {}) => {
+        events.push({ event, properties });
+      },
+      profile: () => undefined,
+      shutdown: async () => undefined,
+    } as unknown as Telemetry;
+  }
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  public async failAfterFlags(flags: Record<string, unknown>): Promise<Record<string, unknown>> {
+    await this.toMeta(flags);
+    try {
+      await this.catch(new Error("It failed"));
+    } catch {
+      /* catch() ends by throwing oclif's ExitError */
+    }
+    return this.json[0] ?? {};
+  }
+}
+
+describe("the server of a command that reads an environment", () => {
+  it("is the one --server named, in the failure and in the telemetry of the failed run", async () => {
+    const command = new CapturingEnvironment([], aConfigAt(VERSION));
+
+    const envelope = await command.failAfterFlags({ server: "https://auth.acme.example/path" });
+
+    expect(envelope).toMatchObject({ source: "https://auth.acme.example" });
+    expect(command.events.at(-1)?.properties).toMatchObject({ server_kind: "self_hosted" });
+  });
+});
+
+describe("the types a server mixin gives a command", () => {
+  it("type --server for a command admitted under the mixin", () => {
+    expectTypeOf<Admitted<typeof TakesAServer>["flags"]["server"]>().toEqualTypeOf<
+      string | undefined
+    >();
+  });
+
+  it("refuse a command that reads an environment and says nothing of how it reads a server", () => {
+    // @ts-expect-error `servers()` is what `ServerCommand` implements
+    class Bare extends EnvironmentCommand {
+      protected async execute(): Promise<never> {
+        throw new Error("unused");
+      }
+    }
+
+    expect(Bare).toBeDefined();
+  });
+
+  it("keep the group and the folder rule of a command that is also destructive", () => {
+    class Destroying extends Destructive(LocalServerCommand(BaseCommand, "exact")) {
+      static override group = CommandGroups.localServer;
+
+      protected async execute(): Promise<never> {
+        throw new Error("unused");
+      }
+    }
+
+    expect(Destroying.group).toBe(CommandGroups.localServer);
+    expect(Destroying.folderRule).toBe("exact");
+  });
+});
+
+describe("the server of a command that chooses it", () => {
+  it("names none until it is asked, where a command that takes a server names the cloud", async () => {
+    const meta = await new ChoosesAServerWithMeta([], aConfigAt(VERSION)).metaWith({});
+
+    expect(meta.source).toBe("");
+  });
+});
+
+class ChoosesAServerWithMeta extends ChoosingServerCommand(BaseCommand) {
+  public static override readonly id: string = "chooses-a-server-meta-test";
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  public async metaWith(flags: Record<string, unknown>) {
+    return this.toMeta({ "no-telemetry": true, ...flags });
+  }
+}
