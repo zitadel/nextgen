@@ -99,7 +99,7 @@ export async function resolvePointer(
         return { ...base, name: handleName(pointer), document: body.branding };
       }
       case "oauth": {
-        const body = await api.getOAuthSettingsById(pointer.revision_id);
+        const body = await api.getOAuthSettings(pointer.revision_id);
         return { ...base, name: handleName(pointer), document: body.oauth };
       }
       case "idp": {

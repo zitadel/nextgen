@@ -132,10 +132,11 @@ var brandingAccess = resourceAccess{
 // own id resolves through RSI, like branding's; a release is the only writer,
 // so no write path reaches writeMiss.
 var oauthSettingsAccess = resourceAccess{
-	kind:      domain.ResourceKindOAuthSettings,
-	readMiss:  domain.ErrOAuthSettingsNotFound,
-	writeMiss: domain.ErrOAuthSettingsNotFound,
-	denied:    domain.ErrOAuthSettingsPermissionDenied,
+	kind:          domain.ResourceKindOAuthSettings,
+	readMiss:      domain.ErrOAuthSettingsNotFound,
+	writeMiss:     domain.ErrOAuthSettingsNotFound,
+	denied:        domain.ErrOAuthSettingsPermissionDenied,
+	configuration: true,
 }
 
 // policyAccess gates operation policies (ADR 066). Publish and the revision

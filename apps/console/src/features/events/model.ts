@@ -208,6 +208,7 @@ export const EVENT_TYPES = [
   "invitation.cancelled",
   "invitation.created",
   "invitation.rejected",
+  "oauth_settings.created",
   "origin.added",
   "origin.removed",
   "policy.created",
