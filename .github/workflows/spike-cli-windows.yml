@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
   push:
     branches: [spike/cli-windows-smoke]
+  pull_request:
+    paths:
+      - .github/workflows/spike-cli-windows.yml
+      - .github/spike/**
 
 jobs:
   windows:
     runs-on: windows-2025
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -33,36 +37,19 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: Build the CLI from this ref
-        run: corepack pnpm exec turbo run build --filter=@zitadel/cli
-
-      - name: Build the Windows server binary
-        run: corepack pnpm exec turbo run build-binary --filter=@zitadel/server-win32-x64 --output-logs=errors-only
-
-      - name: CLI runs
-        run: node apps/cli/bin/run.js --version && node apps/cli/bin/run.js --help
-
-      - name: Start the local server
+      - name: Build the CLI and the Windows server binary from this ref
         run: |
-          mkdir -p "$RUNNER_TEMP/host/app"
-          cd "$RUNNER_TEMP/host"
-          node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" start --help
-          node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" start --non-interactive --no-telemetry || true
+          corepack pnpm exec turbo run build --filter=@zitadel/cli
+          corepack pnpm exec turbo run build-binary --filter=@zitadel/server-win32-x64 --output-logs=errors-only
 
-      - name: Server logs
+      - name: Exercise the CLI
+        run: bash .github/spike/exercise.sh
+
+      - uses: actions/upload-artifact@v7
         if: always()
-        run: |
-          cd "$RUNNER_TEMP/host"
-          node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" logs --no-telemetry || true
-          find .zitadel -type f | head -30
-
-      - name: Scaffold a project
-        run: |
-          cd "$RUNNER_TEMP/host/app"
-          node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" setup --framework react --server local --non-interactive --no-telemetry --no-git
-
-      - name: Run the project
-        working-directory: ${{ runner.temp }}/host/app
-        run: |
-          ls -la
-          npm run build
+        with:
+          name: windows-findings
+          path: |
+            ${{ runner.temp }}/summary.md
+            ${{ runner.temp }}/dev.log
+            ${{ runner.temp }}/host/.zitadel/local/server.log
