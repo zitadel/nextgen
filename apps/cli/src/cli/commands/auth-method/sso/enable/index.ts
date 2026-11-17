@@ -1,3 +1,4 @@
+import { SystemMachine } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   type ClientId,
@@ -182,6 +183,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .step(
           new PlanChange({
             ask: this.ask,
+            machine: new SystemMachine(),
             developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
             suggest: this.suggest,
             again: this.again,

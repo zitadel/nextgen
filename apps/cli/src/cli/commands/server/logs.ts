@@ -87,11 +87,8 @@ export default class Logs extends ServerCommand {
         tail: flags.tail,
         level: flags.level,
         print: (lines) => {
-          if (lines.length > 0) {
-            const drawn = lines.map((line) => {
-              return LocalRuntime.renderLogLine(line, this.isColored);
-            });
-            process.stdout.write(`${drawn.join("\n")}\n`);
+          if (!lines.isEmpty) {
+            process.stdout.write(`${lines.drawn(this.isColored).join("\n")}\n`);
           }
         },
         signal: this.signal,
@@ -114,9 +111,7 @@ export default class Logs extends ServerCommand {
       }
     } else {
       const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
-      const shown = lines.map((line) => {
-        return LocalRuntime.renderLogLine(line, this.isColored);
-      });
+      const shown = lines.drawn(this.isColored);
       const title = "Local Zitadel server logs";
 
       if (runtime.backend === "binary") {
@@ -125,7 +120,7 @@ export default class Logs extends ServerCommand {
           data: {
             title,
             runtime: { backend: runtime.backend, pid: runtime.pid, log_path: runtime.log_path },
-            logs: LocalRuntime.logText(lines),
+            logs: lines.text(),
           },
           pretty: painted(shown.join("\n")),
           summary: { title, sections: [], lines: shown },
@@ -136,7 +131,7 @@ export default class Logs extends ServerCommand {
           data: {
             title,
             runtime: { backend: runtime.backend, container_name: runtime.container_name },
-            logs: LocalRuntime.logText(lines),
+            logs: lines.text(),
           },
           pretty: painted(shown.join("\n")),
           summary: { title, sections: [], lines: shown },

@@ -147,10 +147,12 @@ export default class Start extends ServerCommand {
         });
       }
     } else {
-      const { runtime: record, alreadyRunning } = await server.launch(
-        request,
-        await this.again("start", {}),
-      );
+      const retry = await this.again("start", {});
+      const { runtime: record, alreadyRunning } = await server
+        .launch(request)
+        .catch(async (error) => {
+          throw await this.explain(error, retry);
+        });
       this.meta = { ...this.meta, source: record.server_url };
 
       if (alreadyRunning) {

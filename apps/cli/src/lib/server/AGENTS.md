@@ -34,8 +34,8 @@ manages the wrong server: see [`local/AGENTS.md`](local/AGENTS.md).
 ## Who may reach in
 
 - Everything outside `src/lib/server` imports `@/lib/server` and nothing
-  deeper. `index.ts` exports classes, interfaces and their types. Biome's
-  `noRestrictedImports` in `biome.json` fails a deeper import.
+  deeper. `index.ts` exports classes, interfaces and their types. Nothing
+  enforces it yet; the lint configuration is the owner's, so no rule was added.
 - Claiming a project is not a server concern: it lives in `lib/claim` and asks
   for an `AdminSession`. `Clock` is not either: it is `lib/clock.ts`.
 - Setup asks about this machine through the `LocalMachine` interface
@@ -90,10 +90,18 @@ name or an address.
 
 ## What is still open on this branch
 
-Not done yet, in the order above: everything under "Review outcome". Today the
-package still imports `@/lib/consent`, `@/lib/suggestion` and `@/lib/ui/log`
-and throws `ZitadelError` with CLI hints; the helper aliases are still
-`static readonly` function references; `zitadel-runtime.ts` is still one
-large file. The seams that already exist (`Lifecycle` with `Launcher`,
-`ServerStore`, `PortProbe` and `HealthProbe`; `LocalServers`; `LocalMachine`)
-are the ones to build on.
+Done from the review: `start` throws the lifecycle's typed errors
+(`DockerUnavailableError`, `PortInUseError`, `NoFreePortError`,
+`ServerStartError`, `ServerStopError`) and the command words them
+(`src/cli/commands/server/failures.ts`); `reset` takes a `DestroyPermit`, not
+`Consent`; the package says what it is doing through a `progress` callback the
+command gives it, not through `log`.
+
+Not done yet: other errors in the package (`runtime.ts`, `admin-credential.ts`,
+`sign-in.ts`, `env-vars.ts`, `start-lock.ts`, the launchers) still carry hint
+and next-command wording in a `ZitadelError`; the helper aliases on
+`LocalRuntime` are still `static readonly` function references; there are no
+per-directory `index.ts` barrels; and `zitadel-runtime.ts` is still one large
+file. The seams that already exist (`Lifecycle` with `Launcher`, `ServerStore`,
+`PortProbe` and `HealthProbe`; `LocalServers`; `LocalMachine`) are the ones to
+build on.

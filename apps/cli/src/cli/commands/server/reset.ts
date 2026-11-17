@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { LocalRuntime } from "@/lib/server";
+import { DestroyPermit, LocalRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { ServerCommand } from "@/cli/commands/server/base";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif";
@@ -97,8 +97,8 @@ export default class Reset extends Destructive(ServerCommand) {
           },
         };
       },
-      apply: async (consent) => {
-        await this.serverInThisFolder().reset(consent);
+      apply: async () => {
+        await this.serverInThisFolder().reset(DestroyPermit.forFolder(this.cwd));
         const title = "Local Zitadel server runtime reset";
 
         return {

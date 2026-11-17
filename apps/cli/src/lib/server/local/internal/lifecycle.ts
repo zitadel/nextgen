@@ -172,6 +172,24 @@ const HEALTH_ATTEMPTS = 3;
 const PORT_RACE_RETRIES = 3;
 
 /** Every port in the search range was taken. */
+/**
+ * Docker did not answer, so a Docker start cannot begin. The CLI says what to
+ * do about it; the package only reports that it happened and what Docker said.
+ */
+export class DockerUnavailableError extends Error {
+  /** What asking Docker failed with: its error, or the text it printed. */
+  readonly reason: unknown;
+
+  /**
+   * @param reason - What asking Docker failed with.
+   */
+  constructor(reason: unknown) {
+    super("Docker is not reachable");
+    this.name = "DockerUnavailableError";
+    this.reason = reason;
+  }
+}
+
 export class NoFreePortError extends Error {
   readonly firstPort: number;
 

@@ -12,12 +12,10 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/server/local/runtime";
-import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
+import { DestroyPermit, LocalRuntime, PortInUseError, ZitadelRuntime } from "@/lib/server";
 import type { Daemons } from "@tests/fixtures/daemon";
 import { aFakeServerBinary } from "@tests/helpers/local-server";
-import { forcedConsent } from "@tests/helpers/consent";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
-import { aSuggest } from "@tests/helpers/suggestions";
 import { it } from "@tests/unit/lib/server/local/occupied-port";
 import type { Serve } from "@tests/fixtures";
 
@@ -37,7 +35,6 @@ const AN_ADMIN: LocalAdmin = {
 };
 
 /** The start a refused start would offer again. */
-const RETRY = aSuggest()({ id: "start" });
 
 const at = (cwd: string) => {
   return LocalRuntime.forFolder(cwd, { cliVersion: "0.0.0-test" });
@@ -213,17 +210,17 @@ describe("LocalRuntime", () => {
     }) => {
       await directoryWithAGoneServer(cwd);
 
-      await at(cwd).reset(await forcedConsent());
+      await at(cwd).reset(DestroyPermit.forFolder(cwd));
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
     });
 
-    it("refuses without consent, and deletes nothing", async ({ dir: cwd }) => {
+    it("refuses a permit for another folder, and deletes nothing", async ({ dir: cwd, other }) => {
       await directoryWithAGoneServer(cwd);
 
-      await expect(at(cwd).reset({} as never)).rejects.toThrow(
-        "A destructive operation ran without consent",
+      await expect(at(cwd).reset(DestroyPermit.forFolder(other))).rejects.toThrow(
+        "The permit is for",
       );
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
     });
@@ -245,7 +242,7 @@ describe("LocalRuntime", () => {
 
       const { lines } = await at(cwd).logs({ tail: 2 });
 
-      expect(lines.map((line) => line.text)).toEqual(["two", "three"]);
+      expect(lines.drawn(false)).toEqual(["two", "three"]);
     });
 
     it("picks the last lines at a level from the whole log", async ({ dir: cwd }) => {
@@ -257,7 +254,7 @@ describe("LocalRuntime", () => {
 
       const { lines } = await at(cwd).logs({ tail: 1, level: "warn" });
 
-      expect(lines.map((line) => line.text)).toEqual(["level=WARN msg=second"]);
+      expect(lines.drawn(false)).toEqual(["level=WARN msg=second"]);
     });
 
     it("reads all of a container's log to pick the lines at a level", async ({ dir: cwd }) => {
@@ -269,7 +266,7 @@ describe("LocalRuntime", () => {
       const { lines } = await at(cwd).logs({ tail: 5, level: "error" });
 
       expect(read).toHaveBeenCalledWith("zitadel-server-abc", "all");
-      expect(lines.map((line) => line.text)).toEqual(["level=ERROR msg=a"]);
+      expect(lines.drawn(false)).toEqual(["level=ERROR msg=a"]);
     });
 
     it("prints the end of the log at a level, then each line at it the server writes", async ({
@@ -286,7 +283,7 @@ describe("LocalRuntime", () => {
       await at(cwd).follow({
         tail: 1,
         level: "warn",
-        print: (lines) => printed.push(...lines.map((line) => line.text)),
+        print: (lines) => printed.push(...lines.drawn(false)),
         signal: new AbortController().signal,
       });
 
@@ -306,7 +303,7 @@ describe("LocalRuntime", () => {
 
       await at(cwd).follow({
         tail: 5,
-        print: (lines) => printed.push(...lines.map((line) => line.text)),
+        print: (lines) => printed.push(...lines.drawn(false)),
         signal: AbortSignal.abort(),
       });
 
@@ -481,11 +478,8 @@ describe("LocalRuntime", () => {
       const remove = vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
 
       await expect(
-        at(cwd).start(
-          { backend: "binary", env: none },
-          { port: await occupiedPort(), retry: RETRY },
-        ),
-      ).rejects.toMatchObject({ code: "E_PORT_IN_USE" });
+        at(cwd).start({ backend: "binary", env: none }, { port: await occupiedPort() }),
+      ).rejects.toBeInstanceOf(PortInUseError);
 
       expect(remove).not.toHaveBeenCalled();
     });
@@ -495,7 +489,7 @@ describe("LocalRuntime", () => {
       vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
       vi.stubEnv("ZITADEL_SERVER_BINARY", await aFakeServerBinary("plain"));
 
-      const { runtime } = await at(cwd).start({ backend: "binary", env: none }, { retry: RETRY });
+      const { runtime } = await at(cwd).start({ backend: "binary", env: none }, {});
 
       daemon.adopt(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);

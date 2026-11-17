@@ -17,6 +17,14 @@ export interface LocalMachine {
 
   /** The server release this CLI ships, or `undefined` when it cannot be read. */
   bundledVersion(): string | undefined;
+
+  /**
+   * Whether the server at `serverUrl` can reach this machine's `localhost`:
+   * `allowed` for a server the CLI started as a process with that opened,
+   * `container` for one in Docker, where `localhost` is the container's own,
+   * and `unknown` for any other server.
+   */
+  loopbackReach(cwd: string, serverUrl: string): Promise<"allowed" | "container" | "unknown">;
 }
 
 /** This machine, answering from its sockets, its records and the CLI's own install. */
@@ -35,5 +43,9 @@ export class SystemMachine implements LocalMachine {
 
   bundledVersion(): string | undefined {
     return LocalRuntime.bundledVersion();
+  }
+
+  loopbackReach(cwd: string, serverUrl: string): Promise<"allowed" | "container" | "unknown"> {
+    return LocalRuntime.loopbackReach(cwd, serverUrl);
   }
 }

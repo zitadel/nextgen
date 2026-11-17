@@ -13,6 +13,8 @@ export type MachineScript = Readonly<{
   nextFree?: (port: number) => number | undefined;
   /** The server release the CLI ships. */
   bundled?: string;
+  /** How the server reaches this machine's localhost. */
+  reach?: "allowed" | "container" | "unknown";
 }>;
 
 /**
@@ -58,5 +60,17 @@ export class ScriptedMachine implements LocalMachine {
    */
   bundledVersion(): string | undefined {
     return this.script.bundled;
+  }
+
+  /**
+   * @param _cwd - The folder asked about; the script does not tell folders apart.
+   * @param _serverUrl - The server asked about.
+   * @returns The scripted reach, `unknown` by default.
+   */
+  async loopbackReach(
+    _cwd: string,
+    _serverUrl: string,
+  ): Promise<"allowed" | "container" | "unknown"> {
+    return this.script.reach ?? "unknown";
   }
 }

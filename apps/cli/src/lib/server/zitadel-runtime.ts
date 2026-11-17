@@ -3,81 +3,76 @@ import { join } from "node:path";
 import { DEFAULT_SERVER } from "@zitadel/config/server";
 import type { Parsed } from "@zitadel/config/idp";
 
-import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";
-import type { SuggestedCommand } from "@/lib/suggestion";
 import { currentUser } from "@/lib/uidgid";
-import { log } from "@/lib/ui/log";
 
-import { isLoopbackHost } from "./host";
 import {
-  ensureLocalAdmin,
-  findLocalAdminDir,
-  findLocalAdminFor,
-  LOCAL_ADMIN_FILE,
-  type LocalAdmin,
-  readLocalAdmin,
-} from "./local/admin-credential";
-import { dockerRuntimeGuidance, dockerUnavailableMessage } from "./local/docker-guidance";
-import { EMPTY_SUMMARY, loadProjectEnv, type ResolvedEnv } from "./local/env-vars";
-import { assertDockerAvailable, startFailure } from "./local/internal/failures";
-import { BinaryLauncher, type StopBinaryRuntimeResult } from "./local/internal/binary-launcher";
-import { DockerLauncher, type DockerResult } from "./local/internal/docker-launcher";
-import {
-  Lifecycle,
-  PortInUseError,
-  type Launcher,
-  type LifecycleOptions,
-} from "./local/internal/lifecycle";
-import { HttpHealth, TcpPorts } from "./local/internal/probes";
-import { withStartLock } from "./local/internal/start-lock";
-import { listenersForPort } from "./local/ports";
-import { RuntimeFileStore } from "./local/internal/store";
-import type { LocalServers, ManagedRuntimeProcess } from "./local/processes";
-import {
-  type RuntimeBackend,
-  type RuntimeMetadata,
   assertLocalStateWritable,
+  atLeast,
+  BinaryLauncher,
   checkLocalServerHealth,
   CONTAINER_DATA_DIR,
   DEFAULT_LOCAL_SERVER_PORT,
   DEFAULT_LOCAL_SERVER_URL,
   defaultLocalServerImageForCliVersion,
+  type DestroyPermit,
+  DockerLauncher,
+  type DockerResult,
+  DockerUnavailableError,
+  EMPTY_SUMMARY,
   ensureContainerIdentity,
+  ensureLocalAdmin,
   ensureLocalState,
+  findLocalAdminDir,
+  findLocalAdminFor,
   findUpward,
+  HttpHealth,
+  lastLines,
+  type Launcher,
+  Lifecycle,
+  type LifecycleOptions,
+  listenersForPort,
+  loadProjectEnv,
+  LOCAL_ADMIN_FILE,
   LOCAL_RUNTIME_DIR,
   LOCAL_RUNTIME_FILE,
+  type LocalAdmin,
   localContainerName,
   localRuntimePaths,
   localServerNotRunning,
+  type LocalServers,
   localServerUrl,
+  LOG_LEVELS,
+  type LogLevel,
+  LogLineReader,
+  LogLines,
+  logLines,
+  type LogSink,
   loopbackReach,
-  PLATFORM_PROJECT_ID,
+  type ManagedRuntimeProcess,
   peekRuntimeMetadata,
+  PLATFORM_PROJECT_ID,
+  PortInUseError,
+  readLocalAdmin,
   readNearestRuntimeMetadata,
   readPlatformRuntime,
   readRuntimeMetadata,
   removeLocalData,
   removeRuntimeMetadata,
+  type ResolvedEnv,
   resolveRuntimeBackend,
   RUNTIME_BACKENDS,
+  type RuntimeBackend,
+  RuntimeFileStore,
+  type RuntimeMetadata,
   runtimeSummary,
   sameLocalServer,
+  type StopBinaryRuntimeResult,
+  TcpPorts,
+  withStartLock,
   writeRuntimeMetadata,
-} from "./local/runtime";
-import {
-  LOG_LEVELS,
-  type LogLevel,
-  type LogLine,
-  LogLineReader,
-  type LogSink,
-  atLeast,
-  lastLines,
-  logLines,
-  logText,
-  renderLogLine,
-} from "./local/server-log";
+} from "./local";
+import { isLoopbackHost } from "./host";
 
 /** What a runtime is, as telemetry and decisions bucket it. */
 export type RuntimeKind = "cloud" | "local" | "self_hosted" | "unknown";
@@ -358,11 +353,6 @@ export type StartPlan = DockerStart | BinaryStart;
 export type StartOptions = Readonly<{
   /** The port to take as asked or refuse, never move; the first free one when absent. */
   port?: number;
-  /**
-   * The run to repeat once what stopped it is fixed (Docker answering), as it
-   * was typed: the command's `this.again`, so its flags are kept.
-   */
-  retry: SuggestedCommand;
 }>;
 
 /**
@@ -525,12 +515,6 @@ export class LocalRuntime extends ZitadelRuntime {
   /** The admin in a directory, or `undefined` when none was created. */
   static readonly readAdmin = readLocalAdmin;
 
-  /** What to do when Docker does not answer, and the run to repeat afterwards. */
-  static readonly dockerGuidance = dockerRuntimeGuidance;
-
-  /** The message for a Docker that cannot be reached. */
-  static readonly dockerUnavailable = dockerUnavailableMessage;
-
   /** What a start that injected no project variables reports. */
   static readonly NO_ENV: typeof EMPTY_SUMMARY = EMPTY_SUMMARY;
 
@@ -540,13 +524,11 @@ export class LocalRuntime extends ZitadelRuntime {
   /** The levels a log line can have, from the most verbose. */
   static readonly LOG_LEVELS: typeof LOG_LEVELS = LOG_LEVELS;
 
-  /** Log lines as one text. */
-  static readonly logText = logText;
-
-  /** One log line as it is drawn, coloured or not. */
-  static readonly renderLogLine = renderLogLine;
-
-  private readonly directory: Readonly<{ cwd: string; cliVersion: string }>;
+  private readonly directory: Readonly<{
+    cwd: string;
+    cliVersion: string;
+    progress: (message: string) => void;
+  }>;
 
   /**
    * Use {@link LocalRuntime.forFolder}.
@@ -554,7 +536,10 @@ export class LocalRuntime extends ZitadelRuntime {
    * @param address - The address the server answers on.
    * @param directory - The directory it belongs to, and the CLI release that starts it.
    */
-  constructor(address: string, directory: Readonly<{ cwd: string; cliVersion: string }>) {
+  constructor(
+    address: string,
+    directory: Readonly<{ cwd: string; cliVersion: string; progress: (message: string) => void }>,
+  ) {
     super(address);
     this.directory = directory;
   }
@@ -571,11 +556,22 @@ export class LocalRuntime extends ZitadelRuntime {
    * `--cwd` the run was given.
    *
    * @param cwd - The directory the server belongs to.
-   * @param options - The CLI release that starts it.
+   * @param options - The CLI release that starts it, and where to say what is happening (nowhere by default).
    * @returns The directory's local runtime.
    */
-  static forFolder(cwd: string, options: { cliVersion: string }): LocalRuntime {
-    return new LocalRuntime(LocalRuntime.DEFAULT_URL, { cwd, cliVersion: options.cliVersion });
+  static forFolder(
+    cwd: string,
+    options: { cliVersion: string; progress?: (message: string) => void },
+  ): LocalRuntime {
+    return new LocalRuntime(LocalRuntime.DEFAULT_URL, {
+      cwd,
+      cliVersion: options.cliVersion,
+      progress:
+        options.progress ??
+        (() => {
+          return;
+        }),
+    });
   }
 
   /** The directory this runtime belongs to. */
@@ -794,7 +790,7 @@ export class LocalRuntime extends ZitadelRuntime {
    */
   static async findStartedFrom(
     cwd: string,
-    options: { cliVersion: string },
+    options: { cliVersion: string; progress?: (message: string) => void },
   ): Promise<LocalRuntime | undefined> {
     const nearest = await readNearestRuntimeMetadata(cwd);
     if (nearest === undefined) {
@@ -851,12 +847,11 @@ export class LocalRuntime extends ZitadelRuntime {
    * at startup), so the pin wins and there is no admin.
    *
    * @param request - What the command was asked for.
-   * @param retry - The run to repeat once what stopped it is fixed (Docker answering), as it was typed.
    * @returns The server's record, and whether it was already running.
+   * @throws {DockerUnavailableError} When a Docker start is asked for and Docker does not answer.
    */
   async launch(
     request: StartRequest,
-    retry: SuggestedCommand,
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     const plan = await this.plan(request);
     await ensureLocalState(this.cwd);
@@ -866,7 +861,7 @@ export class LocalRuntime extends ZitadelRuntime {
     const bootstraps =
       (serverEnv.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT ?? "true").toLowerCase() !== "false" &&
       (!pinned || pinned === PLATFORM_PROJECT_ID);
-    const options = { port: request.port, retry };
+    const options = { port: request.port };
 
     if (bootstraps) {
       const { userFile } = await this.ensureAdmin(serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE);
@@ -931,68 +926,41 @@ export class LocalRuntime extends ZitadelRuntime {
     // The server another backend left. It is stopped to make way for this one,
     // but not for a port that cannot be had: a refused move leaves it running.
     const other = existing && existing.backend !== config.backend ? existing : undefined;
-    try {
+    if (
+      other &&
+      options.port !== undefined &&
+      options.port !== other.port &&
+      !(await new TcpPorts().isFree(options.port))
+    ) {
+      throw new PortInUseError(options.port);
+    }
+    if (config.backend === "binary") {
+      // A server another CLI release started serves that release's API, and
+      // `setup` against it fails halfway, after the project exists. So a
+      // running server is reused only when it is the version this CLI ships;
+      // the Docker backend compares the image for the same reason. `version` is
+      // `undefined` only when the package cannot be read, and then any running
+      // server is kept: there is nothing to compare with.
+      const version = BinaryLauncher.bundledVersion();
       if (
-        other &&
-        options.port !== undefined &&
-        options.port !== other.port &&
-        !(await new TcpPorts().isFree(options.port))
+        existing?.backend === "binary" &&
+        version !== undefined &&
+        existing.server_version !== version &&
+        (await BinaryLauncher.isRecordRunning(existing))
       ) {
-        throw new PortInUseError(options.port);
-      }
-      if (config.backend === "binary") {
-        // A server another CLI release started serves that release's API, and
-        // `setup` against it fails halfway, after the project exists. So a
-        // running server is reused only when it is the version this CLI ships;
-        // the Docker backend compares the image for the same reason. `version` is
-        // `undefined` only when the package cannot be read, and then any running
-        // server is kept: there is nothing to compare with.
-        const version = BinaryLauncher.bundledVersion();
-        if (
-          existing?.backend === "binary" &&
-          version !== undefined &&
-          existing.server_version !== version &&
-          (await BinaryLauncher.isRecordRunning(existing))
-        ) {
-          log.info(
-            `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
-          );
-        }
-        if (existing?.backend === "docker") {
-          await DockerLauncher.remove(existing.container_name);
-        }
-        return await this.run(
-          "binary",
-          new BinaryLauncher({
-            cliVersion: this.cliVersion,
-            dataDir: paths.dataDir,
-            logPath: paths.logFile,
-            env: config.env,
-            userFile: config.userFile,
-          }),
-          {
-            port: options.port,
-            previousPort: other?.port,
-            reusable: (record) => {
-              return version === undefined || record.server_version === version;
-            },
-          },
+        this.directory.progress(
+          `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
         );
       }
-
-      const { image } = config;
-      await assertDockerAvailable(options.retry);
-      if (existing?.backend === "binary") {
-        await BinaryLauncher.stopRecord(existing);
+      if (existing?.backend === "docker") {
+        await DockerLauncher.remove(existing.container_name);
       }
       return await this.run(
-        "docker",
-        new DockerLauncher({
+        "binary",
+        new BinaryLauncher({
           cliVersion: this.cliVersion,
-          containerName: localContainerName(this.cwd),
-          image,
           dataDir: paths.dataDir,
-          identity: await ensureContainerIdentity(this.cwd, currentUser()),
+          logPath: paths.logFile,
           env: config.env,
           userFile: config.userFile,
         }),
@@ -1000,13 +968,41 @@ export class LocalRuntime extends ZitadelRuntime {
           port: options.port,
           previousPort: other?.port,
           reusable: (record) => {
-            return record.image === image;
+            return version === undefined || record.server_version === version;
           },
         },
       );
-    } catch (error) {
-      throw await startFailure(error);
     }
+
+    const { image } = config;
+    const docker = await DockerLauncher.available().catch((error: unknown) => {
+      throw new DockerUnavailableError(error);
+    });
+    if (docker.status !== 0) {
+      throw new DockerUnavailableError(docker.stderr || "docker version failed");
+    }
+    if (existing?.backend === "binary") {
+      await BinaryLauncher.stopRecord(existing);
+    }
+    return await this.run(
+      "docker",
+      new DockerLauncher({
+        cliVersion: this.cliVersion,
+        containerName: localContainerName(this.cwd),
+        image,
+        dataDir: paths.dataDir,
+        identity: await ensureContainerIdentity(this.cwd, currentUser()),
+        env: config.env,
+        userFile: config.userFile,
+      }),
+      {
+        port: options.port,
+        previousPort: other?.port,
+        reusable: (record) => {
+          return record.image === image;
+        },
+      },
+    );
   }
 
   /**
@@ -1074,10 +1070,16 @@ export class LocalRuntime extends ZitadelRuntime {
    * server is stopped first so its database is not deleted from under it. The
    * local admin credential is kept: deleting it would leave a start that cannot
    * sign in, because the server only imports the admin once. The data cannot
-   * be recovered, so it takes the consent `reset` asked for.
+   * be recovered, so it takes a permit for exactly this folder.
+   *
+   * @param permit - The caller's proof that deleting is meant.
+   * @returns What stopping the server did.
+   * @throws {Error} When the permit is for another folder.
    */
-  async reset(consent: Consent): Promise<StopReport> {
-    Consent.assert(consent);
+  async reset(permit: DestroyPermit): Promise<StopReport> {
+    if (permit.folder !== this.cwd) {
+      throw new Error(`The permit is for ${permit.folder}, not ${this.cwd}`);
+    }
     const report = await this.halt();
     await removeLocalData(this.cwd);
     await removeRuntimeMetadata(this.cwd);
@@ -1093,7 +1095,7 @@ export class LocalRuntime extends ZitadelRuntime {
   async logs(options: {
     tail: number;
     level?: LogLevel;
-  }): Promise<{ runtime: RuntimeMetadata; lines: LogLine[] }> {
+  }): Promise<{ runtime: RuntimeMetadata; lines: LogLines }> {
     const runtime = await this.recordedRuntime();
     // Docker picks the last lines itself, but by count only, so lines at a
     // level are picked here from the whole log.
@@ -1104,7 +1106,7 @@ export class LocalRuntime extends ZitadelRuntime {
             runtime.container_name,
             options.level ? "all" : options.tail,
           );
-    return { runtime, lines: lastLines(logLines(text), options.tail, options.level) };
+    return { runtime, lines: new LogLines(lastLines(logLines(text), options.tail, options.level)) };
   }
 
   /**
@@ -1115,15 +1117,16 @@ export class LocalRuntime extends ZitadelRuntime {
   async follow(options: {
     tail: number;
     level?: LogLevel;
-    print: (lines: readonly LogLine[]) => void;
+    print: (lines: LogLines) => void;
     /** The run's Ctrl-C: once it aborts, following stops, even before it began. */
     signal: AbortSignal;
   }): Promise<RuntimeMetadata> {
     const runtime = await this.recordedRuntime();
     const reader = new LogLineReader();
     const sink: LogSink = {
-      existing: (text) => options.print(lastLines(reader.read(text), options.tail, options.level)),
-      appended: (text) => options.print(atLeast(reader.read(text), options.level)),
+      existing: (text) =>
+        options.print(new LogLines(lastLines(reader.read(text), options.tail, options.level))),
+      appended: (text) => options.print(new LogLines(atLeast(reader.read(text), options.level))),
     };
     if (runtime.backend === "binary") {
       await BinaryLauncher.followLogs(runtime.log_path, sink, { signal: options.signal });
@@ -1135,7 +1138,7 @@ export class LocalRuntime extends ZitadelRuntime {
         options.signal,
       );
     }
-    options.print(atLeast(reader.end(), options.level));
+    options.print(new LogLines(atLeast(reader.end(), options.level)));
     return runtime;
   }
 

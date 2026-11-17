@@ -1,5 +1,12 @@
 export { AdminSession } from "./admin-session";
-export type { DockerRuntimeGuidance } from "./local/docker-guidance";
+export {
+  DockerUnavailableError,
+  NoFreePortError,
+  PortInUseError,
+  ServerStartError,
+  ServerStopError,
+} from "./local/internal/lifecycle";
+export { DestroyPermit } from "./local/destroy-permit";
 export type { EnvSummary, ResolvedEnv } from "./local/env-vars";
 export type { LocalAdmin } from "./local/admin-credential";
 export type { LocalServers, ManagedRuntimeProcess } from "./local/processes";
@@ -10,7 +17,7 @@ export type {
   RuntimeBackend,
   RuntimeMetadata,
 } from "./local/runtime";
-export type { LogLine } from "./local/server-log";
+export { LogLines } from "./local/log-lines";
 export type { LocalMachine } from "./local-machine";
 export { SystemMachine } from "./local-machine";
 export { StartedServer } from "./started-server";

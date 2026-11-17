@@ -573,10 +573,9 @@ export function failureAdvice(
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = LocalRuntime.dockerGuidance(again.rerun);
     return {
-      hint: advice.hint,
-      nextCommands: [advice.check, again.rerun],
+      hint: ServerCommand.DOCKER.hint,
+      nextCommands: [shellCommand("docker", "version"), again.rerun],
     };
   }
 
@@ -723,9 +722,11 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = LocalRuntime.dockerGuidance(again.rerun);
-    nextActions.push(...advice.nextActions);
-    nextCommands.push(advice.check, again.rerun);
+    nextActions.push(
+      "Start Docker Desktop, Docker Engine, or a Docker-compatible runtime such as Colima.",
+      "If you are not using the managed local runtime, run setup with --server <url> instead.",
+    );
+    nextCommands.push(shellCommand("docker", "version"), again.rerun);
   }
 
   const claimWarning = warnings.find((check) => {
@@ -951,10 +952,12 @@ async function runLocalRuntimeChecks(
     "Docker is reachable",
     async () => {
       const result = await LocalRuntime.dockerReachable().catch((error: unknown) => {
-        throw new Error(LocalRuntime.dockerUnavailable(error), { cause: error });
+        throw new Error(ServerCommand.dockerUnavailableMessage(error), { cause: error });
       });
       if (result.status !== 0) {
-        throw new Error(LocalRuntime.dockerUnavailable(result.stderr || "docker version failed"));
+        throw new Error(
+          ServerCommand.dockerUnavailableMessage(result.stderr || "docker version failed"),
+        );
       }
       return `Docker engine ${result.stdout.trim() || "available"}`;
     },
