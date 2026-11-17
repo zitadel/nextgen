@@ -340,7 +340,7 @@ describe("status", () => {
         await app.writeConfig({
           $schema: "./.zitadel/meta/project.json",
           project: "orphan",
-          server: "https://api.zitadel.cloud",
+          server: "https://preview.zitadel.com",
         });
 
         const result = await app.status();
@@ -415,7 +415,7 @@ describe("status", () => {
           source: "",
           code: "E_VALIDATION",
           message: 'Invalid server "nope"',
-          hint: "Use local, or a URL like https://acme.zitadel.cloud.",
+          hint: "Use local, or a URL like https://preview.zitadel.com.",
         });
       });
     });

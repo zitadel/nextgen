@@ -1,3 +1,4 @@
+import { SERVER } from "@/constants";
 import { Args, Flags } from "@oclif/core";
 import type { IsNever } from "type-fest";
 import { type ZodType, z } from "zod";
@@ -494,7 +495,7 @@ export const serverFlag = Flags.custom<string>({
       .pipe(z.union([z.literal("local"), z.url({ protocol: /^https?$/ })])),
     refusal: {
       message: 'Invalid server "{value}"',
-      hint: "Use `local`, or a URL like https://acme.zitadel.cloud.",
+      hint: `Use \`local\`, or a URL like ${SERVER}.`,
     },
   }),
 });

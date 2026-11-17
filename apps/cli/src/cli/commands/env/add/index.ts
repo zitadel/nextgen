@@ -1,3 +1,4 @@
+import { SERVER } from "@/constants";
 import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Args, Flags } from "@oclif/core";
@@ -130,8 +131,8 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
   static override groupOrder = 2;
 
   static override examples = [
-    "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
-    "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
+    `<%= config.bin %> env add production --server ${SERVER} --app-url https://app.acme.com`,
+    `<%= config.bin %> env add staging --server ${SERVER} --project proj_01K9AA9M3K7E2QX8VB4T`,
   ];
   static override args = {
     name: Args.custom<string>({
@@ -172,9 +173,7 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
     // (`--project`) stays a bind rather than creating a new project.
     const server =
       givenServer ??
-      (await this.askServer(
-        await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),
-      ));
+      (await this.askServer(await this.again("env:add", { with: { server: SERVER } })));
 
     const appUrl =
       flags.appUrl ??

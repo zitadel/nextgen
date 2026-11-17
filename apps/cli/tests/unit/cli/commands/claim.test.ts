@@ -29,7 +29,7 @@ import { aBinaryRecord } from "@tests/helpers/runtime-record";
  * `claim/complete` route is cookie-authenticated and Express-only, so it is
  * not reachable through msw handlers.
  */
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = "https://preview.zitadel.com";
 const { server } = usePlatformServer();
 type Project = { id: string; project_secret: string };
 
@@ -774,7 +774,7 @@ describe("claim", () => {
       await makeProject(cwd);
       const serverUrl = await startClaimServer(
         serve,
-        "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_localstub",
+        "https://preview.zitadel.com/ui/console/claim?challenge_id=ch_localstub",
       );
       await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
