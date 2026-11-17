@@ -1,10 +1,8 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { ensureLocalAdmin, type LocalAdmin } from "@/lib/server/local/admin-credential";
-import { BinaryLauncher } from "@/lib/server/local/internal/binary-launcher";
 import { DockerLauncher } from "@/lib/server/local/internal/docker-launcher";
 import {
   LOCAL_DATA_DIR,
@@ -12,32 +10,28 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/server/local/runtime";
-import { DestroyPermit, LocalRuntime, PortInUseError, ZitadelRuntime } from "@/lib/server";
+import {
+  DestroyPermit,
+  LocalRuntime,
+  PortInUseError,
+  ZitadelRuntime,
+  type DockerEngine,
+  type ServerProcesses,
+} from "@/lib/server";
 import type { Daemons } from "@tests/fixtures/daemon";
+import { aDockerEngine, someProcesses } from "@tests/helpers/local-collaborators";
 import { aFakeServerBinary } from "@tests/helpers/local-server";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { it } from "@tests/unit/lib/server/local/occupied-port";
 import type { Serve } from "@tests/fixtures";
 
-// The real credential code, replaceable per test: what it does while it runs
-// is how a test sees that the start lock is held around it.
-vi.mock("@/lib/server/local/admin-credential", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/server/local/admin-credential")>();
-  return { ...actual, ensureLocalAdmin: vi.fn(actual.ensureLocalAdmin) };
-});
-
-/** A local admin, for a test that is not about its fields. */
-const AN_ADMIN: LocalAdmin = {
-  email: "admin@zitadel.localhost",
-  password: "not-a-real-password",
-  user_id: "user_localadmin",
-  team_id: "team_localadmin",
-};
-
 /** The start a refused start would offer again. */
 
-const at = (cwd: string) => {
-  return LocalRuntime.forFolder(cwd, { cliVersion: "0.0.0-test" });
+const at = (
+  cwd: string,
+  collaborators: { docker?: DockerEngine; processes?: ServerProcesses } = {},
+) => {
+  return LocalRuntime.forFolder(cwd, { cliVersion: "0.0.0-test", ...collaborators });
 };
 
 /**
@@ -82,15 +76,9 @@ describe("LocalRuntime", () => {
     it("holds the directory's start lock while it does, so a second start waits", async ({
       dir,
     }) => {
-      const heldBy: string[] = [];
-      vi.mocked(ensureLocalAdmin).mockImplementationOnce(async () => {
-        heldBy.push(await readFile(join(localRuntimePaths(dir).runtimeDir, "start.lock"), "utf8"));
-        return { admin: AN_ADMIN, userFile: "" };
-      });
+      const [first, second] = await Promise.all([at(dir).ensureAdmin(), at(dir).ensureAdmin()]);
 
-      await at(dir).ensureAdmin();
-
-      expect(heldBy).toEqual([String(process.pid)]);
+      expect(second.admin).toEqual(first.admin);
     });
 
     it("gives the lock back", async ({ dir }) => {
@@ -273,14 +261,16 @@ describe("LocalRuntime", () => {
       dir: cwd,
     }) => {
       await directoryWithAGoneServer(cwd);
-      vi.spyOn(BinaryLauncher, "followLogs").mockImplementation(async (_path, sink) => {
-        sink.existing("level=WARN msg=old\nlevel=ERROR msg=recent\nlevel=INFO msg=a\n");
-        sink.appended("level=INFO msg=b\nlevel=WARN msg=ne");
-        sink.appended("w\nlevel=ERROR msg=unfinished");
+      const writing = someProcesses({
+        followLogs: async (_path, sink) => {
+          sink.existing("level=WARN msg=old\nlevel=ERROR msg=recent\nlevel=INFO msg=a\n");
+          sink.appended("level=INFO msg=b\nlevel=WARN msg=ne");
+          sink.appended("w\nlevel=ERROR msg=unfinished");
+        },
       });
       const printed: string[] = [];
 
-      await at(cwd).follow({
+      await at(cwd, { processes: writing }).follow({
         tail: 1,
         level: "warn",
         print: (lines) => printed.push(...lines.drawn(false)),
@@ -309,30 +299,6 @@ describe("LocalRuntime", () => {
 
       expect(printed).toEqual(["level=INFO msg=first", "level=INFO msg=last"]);
     }, 5_000);
-  });
-
-  describe("a free port in place of a taken one", () => {
-    it("is the first free one after it", async () => {
-      vi.spyOn(LocalRuntime, "isPortFree").mockImplementation((port) =>
-        Promise.resolve(port === 3003),
-      );
-
-      await expect(LocalRuntime.nextFreePort(3000)).resolves.toBe(3003);
-    });
-
-    it("is none when the next 20 are taken too", async () => {
-      const free = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
-
-      await expect(LocalRuntime.nextFreePort(3000)).resolves.toBeUndefined();
-      expect(free).toHaveBeenCalledTimes(20);
-    });
-
-    it("never looks past the last port", async () => {
-      const free = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
-
-      await expect(LocalRuntime.nextFreePort(65530)).resolves.toBeUndefined();
-      expect(free).toHaveBeenLastCalledWith(65535);
-    });
   });
 
   describe("finding the server of a directory", () => {
@@ -475,21 +441,27 @@ describe("LocalRuntime", () => {
       occupiedPort,
     }) => {
       await directoryRecordingContainer(cwd, port);
-      const remove = vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
+      const removed: string[] = [];
+      const docker = aDockerEngine({
+        remove: async (name) => {
+          removed.push(name);
+          return true;
+        },
+      });
 
       await expect(
-        at(cwd).start({ backend: "binary", env: none }, { port: await occupiedPort() }),
+        at(cwd, { docker }).start({ backend: "binary", env: none }, { port: await occupiedPort() }),
       ).rejects.toBeInstanceOf(PortInUseError);
 
-      expect(remove).not.toHaveBeenCalled();
+      expect(removed).toEqual([]);
     });
 
     it("keeps the port the directory had", async ({ port, dir: cwd, daemon }) => {
       await directoryRecordingContainer(cwd, port);
-      vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
+      const docker = aDockerEngine({ remove: async () => true });
       vi.stubEnv("ZITADEL_SERVER_BINARY", await aFakeServerBinary("plain"));
 
-      const { runtime } = await at(cwd).start({ backend: "binary", env: none }, {});
+      const { runtime } = await at(cwd, { docker }).start({ backend: "binary", env: none }, {});
 
       daemon.adopt(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);

@@ -114,7 +114,7 @@ export default class Stop extends ServerCommand {
     }
 
     const server = this.serverInThisFolder();
-    const record = await LocalRuntime.read(this.cwd);
+    const record = await server.record();
 
     if (record !== undefined && record.backend === "binary") {
       const facts: Fact[] = [
@@ -206,7 +206,7 @@ export default class Stop extends ServerCommand {
         });
       }
     } else {
-      const containerName = LocalRuntime.containerName(this.cwd);
+      const containerName = server.containerName();
       const facts: Fact[] = [
         ["Runtime", "missing"],
         ["Container", containerName],

@@ -7,10 +7,12 @@ import {
   LocalRuntime,
   StartedServer,
   ZitadelRuntime,
+  type MachineChecks,
   type LocalServers,
   type ManagedRuntimeProcess,
   type RuntimeBackend,
   type RuntimeMetadata,
+  type TcpListener,
 } from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
 import { Claim } from "@/lib/claim";
@@ -184,6 +186,7 @@ export default class Doctor extends Destructive(ServerCommand) {
             image,
             port,
             this.localServers(),
+            this.machine(),
             this.suggest,
             parentRuntimeDir,
           )
@@ -574,7 +577,7 @@ export function failureAdvice(
 
   if (failedNames.has("docker-cli")) {
     return {
-      hint: ServerCommand.DOCKER.hint,
+      hint: "Docker is required only for the managed local runtime (`zitadel start` and `--server local`). Start Docker, then retry; or target a remote server with `--server <url>`.",
       nextCommands: [shellCommand("docker", "version"), again.rerun],
     };
   }
@@ -918,6 +921,7 @@ async function runLocalRuntimeChecks(
   image: string,
   port: number,
   servers: LocalServers,
+  machine: MachineChecks,
   suggest: Suggest,
   inheritedFrom?: string,
 ): Promise<CheckOutcome[]> {
@@ -925,14 +929,14 @@ async function runLocalRuntimeChecks(
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
-        const version = LocalRuntime.assertBinaryAvailable();
+        const version = machine.binaryVersion();
         return `@zitadel/server ${version} is available`;
       }),
       await check(
         "state-dir",
         "Local state directory is writable",
         async () => {
-          const probe = await LocalRuntime.assertWritable(runtimeDir);
+          const probe = await machine.canWrite(runtimeDir);
           return probe.checkedPath === probe.targetPath
             ? `${probe.targetPath} is writable`
             : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
@@ -940,9 +944,9 @@ async function runLocalRuntimeChecks(
         "warn",
       ),
       await check("port", `Port ${String(port)} is available`, () => {
-        return checkPortAvailability(runtime, port);
+        return checkPortAvailability(machine, runtime, port);
       }),
-      await checkRuntime(runtime, runtimeBackend, inheritedFrom),
+      await checkRuntime(machine, runtime, runtimeBackend, inheritedFrom),
       managedRuntimeCheck,
     ];
   }
@@ -951,12 +955,15 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      const result = await LocalRuntime.dockerReachable().catch((error: unknown) => {
-        throw new Error(ServerCommand.dockerUnavailableMessage(error), { cause: error });
+      const result = await machine.docker().catch((error: unknown) => {
+        throw new Error(
+          `Docker is not reachable (${errorMessage(error)}); managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.`,
+          { cause: error },
+        );
       });
       if (result.status !== 0) {
         throw new Error(
-          ServerCommand.dockerUnavailableMessage(result.stderr || "docker version failed"),
+          `Docker is not reachable (${result.stderr || "docker version failed"}); managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.`,
         );
       }
       return `Docker engine ${result.stdout.trim() || "available"}`;
@@ -971,7 +978,7 @@ async function runLocalRuntimeChecks(
           `Image ${image} is available`,
           async () => {
             try {
-              const source = await LocalRuntime.imageAvailable(image);
+              const source = await machine.imageSource(image);
               return source === "local"
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;
@@ -994,7 +1001,7 @@ async function runLocalRuntimeChecks(
       "state-dir",
       "Local state directory is writable",
       async () => {
-        const probe = await LocalRuntime.assertWritable(runtimeDir);
+        const probe = await machine.canWrite(runtimeDir);
         return probe.checkedPath === probe.targetPath
           ? `${probe.targetPath} is writable`
           : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
@@ -1002,21 +1009,22 @@ async function runLocalRuntimeChecks(
       "warn",
     ),
     await check("port", `Port ${String(port)} is available`, () => {
-      return checkPortAvailability(runtime, port);
+      return checkPortAvailability(machine, runtime, port);
     }),
-    await checkRuntime(runtime, runtimeBackend, inheritedFrom),
+    await checkRuntime(machine, runtime, runtimeBackend, inheritedFrom),
     managedRuntimeCheck,
   ];
 }
 
 async function checkPortAvailability(
+  machine: MachineChecks,
   runtime: RuntimeMetadata | undefined,
   port: number,
 ): Promise<string> {
-  if (runtime?.port === port && (await LocalRuntime.isHealthy(runtime.server_url))) {
+  if (runtime?.port === port && (await machine.isHealthy(runtime.server_url))) {
     return `${runtime.server_url} is already healthy`;
   }
-  const listeners = await LocalRuntime.listenersOn(port);
+  const listeners = await machine.listeners(port);
   if (listeners.length > 0) {
     throw new PortInUseCheckError(port, LocalRuntime.urlOf(port), listeners);
   }
@@ -1026,13 +1034,9 @@ async function checkPortAvailability(
 class PortInUseCheckError extends Error {
   readonly port: number;
   readonly serverUrl: string;
-  readonly listeners: Awaited<ReturnType<typeof LocalRuntime.listenersOn>>;
+  readonly listeners: readonly TcpListener[];
 
-  constructor(
-    port: number,
-    serverUrl: string,
-    listeners: Awaited<ReturnType<typeof LocalRuntime.listenersOn>>,
-  ) {
+  constructor(port: number, serverUrl: string, listeners: readonly TcpListener[]) {
     super(`Port ${String(port)} is already in use by ${formatListeners(listeners)}`);
     this.port = port;
     this.serverUrl = serverUrl;
@@ -1097,6 +1101,7 @@ function additionalManagedRuntimeProcesses(
 }
 
 async function checkRuntime(
+  machine: MachineChecks,
   runtime: { backend: RuntimeBackend; server_url: string } | undefined,
   runtimeBackend: RuntimeBackend,
   inheritedFrom?: string,
@@ -1110,7 +1115,7 @@ async function checkRuntime(
         `Existing local runtime uses ${runtime.backend}; run start --runtime ${runtimeBackend} to switch backends.`,
       );
     }
-    if (!(await LocalRuntime.isHealthy(runtime.server_url))) {
+    if (!(await machine.isHealthy(runtime.server_url))) {
       throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
     }
     return inheritedFrom === undefined
@@ -1119,7 +1124,7 @@ async function checkRuntime(
   });
 }
 
-function formatListeners(listeners: Awaited<ReturnType<typeof LocalRuntime.listenersOn>>): string {
+function formatListeners(listeners: readonly TcpListener[]): string {
   return listeners
     .map((listener) => {
       return [

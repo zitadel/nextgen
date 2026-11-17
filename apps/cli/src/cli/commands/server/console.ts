@@ -64,7 +64,9 @@ export default class Console extends ServerCommand {
     }
 
     return (
-      this.named ?? (await LocalRuntime.read(found ?? cwd))?.server_url ?? LocalRuntime.DEFAULT_URL
+      this.named ??
+      (await this.serverInThisFolder(found ?? cwd).record())?.server_url ??
+      LocalRuntime.DEFAULT_URL
     );
   }
 
@@ -115,7 +117,7 @@ export default class Console extends ServerCommand {
 
     const found = await LocalRuntime.findAdminDir(this.cwd);
     const localDir = found ?? this.cwd;
-    const admin = await LocalRuntime.readAdmin(localDir);
+    const admin = await this.serverInThisFolder(localDir).admin();
     if (admin === undefined) {
       throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
     }
@@ -141,7 +143,7 @@ export default class Console extends ServerCommand {
       });
     }
 
-    const serverUrl = await LocalRuntime.resolveUrl(localDir);
+    const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
     const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
     log.plain(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);

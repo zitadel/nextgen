@@ -1,7 +1,6 @@
-import { join } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { DestroyPermit, LocalRuntime } from "@/lib/server";
+import { DestroyPermit } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { ServerCommand } from "@/cli/commands/server/base";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif";
@@ -35,7 +34,7 @@ export default class Reset extends Destructive(ServerCommand) {
   };
 
   protected async execute(): Promise<JsonEnvelope> {
-    const record = await LocalRuntime.read(this.cwd);
+    const record = await this.serverInThisFolder().record();
 
     if (record !== undefined && record.backend === "binary") {
       return this.emit(
@@ -52,7 +51,7 @@ export default class Reset extends Destructive(ServerCommand) {
         ]),
       );
     } else {
-      const containerName = LocalRuntime.containerName(this.cwd);
+      const containerName = this.serverInThisFolder().containerName();
 
       return this.emit(
         await this.confirmedReset({ backend: "missing", container_name: containerName }, [
@@ -78,11 +77,11 @@ export default class Reset extends Destructive(ServerCommand) {
       verb: "reset",
       name: "delete the local runtime and its data",
       message: [
-        `Permanently delete the local Zitadel server's data in ${LocalRuntime.paths(this.cwd).dataDir}?`,
+        `Permanently delete the local Zitadel server's data in ${this.serverInThisFolder().dataDirectory()}?`,
         "",
         "It stops and removes the local server if one is running, so the status command no longer reports it.",
         "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
-        `Kept: ${join(this.cwd, LocalRuntime.ADMIN_FILE)}, the local admin sign-in, and everything else in your project.`,
+        `Kept: ${this.serverInThisFolder().adminFile()}, the local admin sign-in, and everything else in your project.`,
         `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
       ].join("\n"),
       preview: async () => {

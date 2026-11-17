@@ -18,16 +18,20 @@ export type {
   RuntimeMetadata,
 } from "./local/runtime";
 export { LogLines } from "./local/log-lines";
-export type { LocalMachine } from "./local-machine";
+export type { LocalMachine, MachineChecks } from "./local-machine";
+export type { DockerResult, TcpListener, WritablePathProbe } from "./local";
 export { SystemMachine } from "./local-machine";
 export { StartedServer } from "./started-server";
 export type {
   ResolvedServer,
   ResolveServerInput,
   BinaryStart,
+  DockerEngine,
   DockerStart,
+  LocalDirectory,
   RuntimeKind,
   StartPlan,
+  ServerProcesses,
   StartRequest,
 } from "./zitadel-runtime";
 export { CloudRuntime, LocalRuntime, ZitadelRuntime } from "./zitadel-runtime";

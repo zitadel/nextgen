@@ -177,16 +177,17 @@ const PORT_RACE_RETRIES = 3;
  * do about it; the package only reports that it happened and what Docker said.
  */
 export class DockerUnavailableError extends Error {
-  /** What asking Docker failed with: its error, or the text it printed. */
-  readonly reason: unknown;
+  /** What Docker said, or that it said nothing. */
+  readonly detail: string;
 
   /**
-   * @param reason - What asking Docker failed with.
+   * @param reason - What asking Docker failed with: its error, or the text it printed.
    */
   constructor(reason: unknown) {
     super("Docker is not reachable");
     this.name = "DockerUnavailableError";
-    this.reason = reason;
+    this.detail =
+      (reason instanceof Error ? reason.message : String(reason)).trim() || "no reason given";
   }
 }
 

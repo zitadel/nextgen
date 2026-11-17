@@ -1,13 +1,21 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime, type RuntimeMetadata } from "@/lib/server";
+import {
+  DockerUnavailableError,
+  LocalRuntime,
+  NoFreePortError,
+  PortInUseError,
+  type RuntimeMetadata,
+  ServerStartError,
+  ServerStopError,
+} from "@/lib/server";
 import { ServerCommand } from "@/cli/commands/server/base";
 import { type Admitted, type CommandResult, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Guidance, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
+import { Guidance, shellCommand, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import { section } from "@/lib/ui";
 
 /**
@@ -37,6 +45,82 @@ const PORT = {
     max: MAX_PORT,
   },
 } as const satisfies Refused<number>;
+
+/** How a start is refused when Docker, which a Docker start needs, does not answer. */
+const DOCKER_UNAVAILABLE_REFUSAL = {
+  message: "Docker is not reachable",
+  hint: "Docker is required only for the managed local runtime (`zitadel start` and `--server local`). Start Docker, then retry; or target a remote server with `--server <url>`.",
+  next: ["{check}", "{retry}"],
+  details: {
+    message:
+      "Docker is not reachable ({detail}); managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.",
+  },
+} as const satisfies Refusal;
+
+/** How a start is refused when the port it was asked for is held. */
+const PORT_IN_USE_REFUSAL = {
+  code: "E_PORT_IN_USE",
+  message: "Port {port} is already in use",
+  hint: "Stop the process using {url}, run `zitadel stop --all` for managed local runtimes, or choose another port.",
+  next: [{ id: "stop", flags: { all: true } }, "{alternate}"],
+  details: { port: "{port}", server_url: "{url}", listeners: "{listeners}" },
+} as const satisfies Refusal;
+
+/** How a start is refused when every port it would try is held. */
+const NO_FREE_PORT_REFUSAL = {
+  code: "E_PORT_IN_USE",
+  message: "{message}",
+  hint: "Free a port, or choose one with --port.",
+  next: [{ id: "start", flags: { port: 9080 } }],
+  details: { first_port: "{first}" },
+} as const satisfies Refusal;
+
+/** How a start is refused when the server it launched did not become ready. */
+const SERVER_NOT_READY_REFUSAL = {
+  code: "E_NETWORK",
+  message: "{message}",
+  hint: "{hint}",
+  next: [{ id: "logs" }, { id: "reset", flags: { force: true } }],
+  details: "{details}",
+} as const satisfies Refusal;
+
+/**
+ * How a start is refused when the server did not become ready and stopping it
+ * failed too, so it may still be running with nothing recording it.
+ */
+const SERVER_NOT_READY_AND_RUNNING_REFUSAL = {
+  code: "E_NETWORK",
+  message: "{message}; cleanup did not stop the spawned local runtime",
+  hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
+  next: [
+    { id: "logs" },
+    { id: "reset", flags: { force: true } },
+    { id: "stop", flags: { all: true } },
+  ],
+  details: {
+    startup_error: { code: "E_NETWORK", message: "{message}", details: "{details}" },
+    stop_result: "{stop}",
+  },
+} as const satisfies Refusal;
+
+/** How a start is refused when the server it had to replace would not stop. */
+const SERVER_WOULD_NOT_STOP_REFUSAL = {
+  message: "Existing local Zitadel server did not stop",
+  hint: "Stop the existing local runtime manually, then rerun start.",
+  details: { runtime: "{runtime}", stop_result: "{stop}" },
+} as const satisfies Refusal;
+
+/** What a server that launched but did not become ready is reported as, by why. */
+const NOT_READY_REASONS = {
+  exited: {
+    message: "Local Zitadel server process exited before becoming healthy",
+    hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+  },
+  timeout: {
+    message: "Local Zitadel server did not become healthy",
+    hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
+  },
+} as const;
 
 /**
  * `zitadel start`: starts this folder's server, or finds it already running.
@@ -68,7 +152,7 @@ export default class Start extends ServerCommand {
       shell: process.env,
     });
 
-    return LocalRuntime.urlOf(plan.port);
+    return plan.apiUrl;
   }
 
   protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {
@@ -84,8 +168,7 @@ export default class Start extends ServerCommand {
       shell: this.env,
     };
     const plan = await server.plan(request);
-    const apiUrl = LocalRuntime.urlOf(plan.port);
-    const consoleUrl = `${apiUrl}/ui/console/`;
+    const { apiUrl, consoleUrl } = plan;
     this.recordTelemetry({ runtime: plan.backend });
 
     if (this.dryRun) {
@@ -150,8 +233,61 @@ export default class Start extends ServerCommand {
       const retry = await this.again("start", {});
       const { runtime: record, alreadyRunning } = await server
         .launch(request)
-        .catch(async (error) => {
-          throw await this.explain(error, retry);
+        .catch(async (error: unknown) => {
+          if (error instanceof DockerUnavailableError) {
+            throw refusalError(
+              DOCKER_UNAVAILABLE_REFUSAL,
+              { detail: error.detail },
+              { check: shellCommand("docker", "version"), retry },
+            );
+          } else if (error instanceof PortInUseError) {
+            const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
+              return port !== error.port;
+            });
+
+            throw refusalError(
+              PORT_IN_USE_REFUSAL,
+              {
+                port: error.port,
+                url: LocalRuntime.urlOf(error.port),
+                listeners: await this.machine().listeners(error.port, { timeoutMs: 5000 }),
+              },
+              { alternate: this.suggest({ id: "start", flags: { port: alternatePort } }) },
+            );
+          } else if (error instanceof NoFreePortError) {
+            throw refusalError(NO_FREE_PORT_REFUSAL, {
+              message: error.message,
+              first: error.firstPort,
+            });
+          } else if (error instanceof ServerStartError) {
+            const details = {
+              ...error.details,
+              server_url: error.record.server_url,
+              log_tail: error.logTail || undefined,
+            };
+            const reason = NOT_READY_REASONS[error.reason];
+
+            if (error.cleanup.status === "failed") {
+              throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+                message: reason.message,
+                details,
+                stop: error.cleanup,
+              });
+            } else {
+              throw refusalError(SERVER_NOT_READY_REFUSAL, {
+                message: reason.message,
+                hint: reason.hint,
+                details,
+              });
+            }
+          } else if (error instanceof ServerStopError) {
+            throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
+              runtime: error.record,
+              stop: error.outcome,
+            });
+          } else {
+            throw error;
+          }
         });
       this.meta = { ...this.meta, source: record.server_url };
 

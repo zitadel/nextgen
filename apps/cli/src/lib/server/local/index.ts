@@ -10,6 +10,7 @@ export { EMPTY_SUMMARY, loadProjectEnv } from "./env-vars";
 export type { ResolvedEnv } from "./env-vars";
 export type { DestroyPermit } from "./destroy-permit";
 export { listenersForPort } from "./ports";
+export type { TcpListener } from "./ports";
 export type { LocalServers, ManagedRuntimeProcess } from "./processes";
 export {
   CONTAINER_DATA_DIR,
@@ -41,7 +42,7 @@ export {
   sameLocalServer,
   writeRuntimeMetadata,
 } from "./runtime";
-export type { RuntimeBackend, RuntimeMetadata } from "./runtime";
+export type { RuntimeBackend, RuntimeMetadata, WritablePathProbe } from "./runtime";
 export { LogLines } from "./log-lines";
 export { LOG_LEVELS, LogLineReader, atLeast, lastLines, logLines } from "./server-log";
 export type { LogLevel, LogSink } from "./server-log";

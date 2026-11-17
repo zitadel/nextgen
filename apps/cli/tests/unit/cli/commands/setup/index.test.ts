@@ -36,7 +36,8 @@ import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { Ui, warnings } from "@/lib/ui";
-import { LocalRuntime, SystemMachine, type RuntimeMetadata } from "@/lib/server";
+import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
+import { ScriptedMachine } from "@tests/helpers/local-machine";
 import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
@@ -3090,10 +3091,6 @@ describe("setup --help", () => {
 });
 
 describe("Setup.run", () => {
-  beforeEach(() => {
-    vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(true);
-  });
-
   describe("with --force", () => {
     it("still asks whether to proceed with the detected framework", async ({ dir }) => {
       await aNextApp(dir);
@@ -3653,10 +3650,10 @@ describe("SettleAnswers", () => {
    * @param suggest - Renders the suggested command.
    * @returns Once the step has said what it has to.
    */
-  async function settleOnTakenPort3000(suggest = aSuggest()): Promise<void> {
+  async function settleOnTakenPort3000(machine: LocalMachine, suggest = aSuggest()): Promise<void> {
     await new SettleAnswers({
       dryRun: false,
-      machine: new SystemMachine(),
+      machine,
       nonInteractive: true,
       suggest,
     }).run({
@@ -3676,15 +3673,10 @@ describe("SettleAnswers", () => {
   });
 
   describe("when a later port is free", () => {
-    it("suggests setup on that port, from the run's directory", async ({ onTestFinished }) => {
-      const taken = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
-      const next = vi.spyOn(LocalRuntime, "nextFreePort").mockResolvedValue(3001);
-      onTestFinished(() => {
-        taken.mockRestore();
-        next.mockRestore();
-      });
+    it("suggests setup on that port, from the run's directory", async () => {
+      const machine = new ScriptedMachine({ taken: [3000], nextFree: () => 3001 });
 
-      await settleOnTakenPort3000(aSuggest({ cwd: "app" }, "1.2.3"));
+      await settleOnTakenPort3000(machine, aSuggest({ cwd: "app" }, "1.2.3"));
 
       expect(warnings.take().join("\n")).toContain(
         "npx @zitadel/cli@1.2.3 setup --dev-port 3001 --cwd app",
@@ -3693,15 +3685,8 @@ describe("SettleAnswers", () => {
   });
 
   describe("when the ports after the taken one are taken too", () => {
-    it("names only the flag, since a placeholder would run as a shell redirection", async ({
-      onTestFinished,
-    }) => {
-      const taken = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
-      onTestFinished(() => {
-        taken.mockRestore();
-      });
-
-      await settleOnTakenPort3000();
+    it("names only the flag, since a placeholder would run as a shell redirection", async () => {
+      await settleOnTakenPort3000(new ScriptedMachine({ taken: [3000] }));
 
       expect(warnings.take()).toEqual([
         "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
