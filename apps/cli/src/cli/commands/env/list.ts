@@ -1,5 +1,6 @@
-import { readBoundEnvironments } from "@/lib/environment";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { Environment } from "@/lib/environment";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
@@ -13,7 +14,8 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
  */
 export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
@@ -23,7 +25,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
   protected async execute({ flags }: Admitted<typeof EnvList>): Promise<JsonEnvelope> {
     const { name, values } = this.environment;
 
-    const bound = await readBoundEnvironments(this.cwd);
+    const bound = await Environment.bound(this.cwd);
     const items = [
       ...bound.map((entry) => {
         return {

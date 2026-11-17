@@ -1,9 +1,10 @@
 import { isObject } from "@/lib/json";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { helpOf } from "@/lib/suggestion";
+import { helpOf, type Suggested } from "@/lib/suggestion";
 
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
+import { named } from "@/lib/names";
 import { mergeDocuments, setAt, valueAt } from "./document";
 import { type BodyField, bodyFromFlags } from "./fields";
 import { findCredential, type References, refuseSecret } from "./secrets";
@@ -30,6 +31,15 @@ const argvParts = (
         ]
       : []),
     ...fields.flatMap((field) => {
+      const given = field.flag === undefined ? undefined : flags[named(field.flag)];
+      if (field.kind === "record" && Array.isArray(given)) {
+        return given.map((entry) => {
+          return {
+            value: setAt({}, field.path, Object.fromEntries([entry])),
+            source: `--${field.flag}`,
+          };
+        });
+      }
       const value = valueAt(fromFlags, field.path);
       return value === undefined || field.flag === undefined
         ? []
@@ -99,6 +109,8 @@ export type ResourceBodySource = Readonly<{
   document: ZodLike | undefined;
   fields: readonly BodyField[];
   references: References | undefined;
+  /** The run again with `--file <path>`, which a refusal to read stdin suggests. */
+  retry: Suggested;
 }>;
 
 /**
@@ -117,10 +129,15 @@ const MISSING_FIELDS_REFUSAL = {
 } as const satisfies Refusal;
 
 export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
-  const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);
-  const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
   const fromFlags = bodyFromFlags(source.fields, flags);
   const assignments = (flags.set ?? []) as readonly Assignment[];
+  refuseArgvCredentials(
+    argvParts(flags, undefined, source.fields, fromFlags, assignments),
+    source.document,
+    source.references,
+  );
+  const raw = await readRawBody(flags, source.retry);
+  const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
   refuseArgvCredentials(
     argvParts(flags, base, source.fields, fromFlags, assignments),
     source.document,

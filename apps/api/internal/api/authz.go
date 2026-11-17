@@ -476,6 +476,41 @@ func mapCeilingError(err error, res resourceAccess, op accessOp, rsi *domain.Res
 	}
 }
 
+// InviterAdminCheck is the invitation service's accept-time check that the
+// creator still holds the admin createInvitation required (ADR 086). It reads
+// through the accept's transaction, so it resolves the user's home itself.
+func InviterAdminCheck(platformProjectID string) service.InviterCheck {
+	return func(ctx context.Context, stmts service.AllStatements, projectID, userID string) (bool, error) {
+		home, err := stmts.GetResourceScope(ctx, userID)
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return false, nil
+			}
+			return false, err
+		}
+		if home.ResourceKind != domain.ResourceKindUser {
+			return false, nil
+		}
+		req := resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   userID,
+			ProjectID:     projectID,
+			HomeProjectID: home.ProjectID,
+			ObjectType:    "project",
+			Relation:      projectRelation(opDelete),
+		}
+		// Set only for a user homed in the platform project (ADR 075).
+		if platformProjectID != "" && home.ProjectID == platformProjectID {
+			req.PlatformProjectID = platformProjectID
+		}
+		dec, err := resolver.New().Check(ctx, stmts, req)
+		if err != nil {
+			return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+		}
+		return dec == resolver.DecisionAllow, nil
+	}
+}
+
 func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi *domain.ResourceScope) resolver.Request {
 	req := resolver.Request{
 		PrincipalType: scope.PrincipalType,

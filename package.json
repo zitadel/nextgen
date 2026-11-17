@@ -9,7 +9,7 @@
     "cli": "node scripts/run-cli.mjs",
     "server": "node scripts/run-server.mjs",
     "cloud": "node scripts/run-cloud.mjs",
-    "install:cloud": "pnpm install --filter=@zitadel/source --filter='@zitadel/cloud*...' --filter=@zitadel/docs... --filter=@zitadel/website... --os=current --cpu=current --optimistic-repeat-install",
+    "install:cloud": "pnpm install --filter=@zitadel/source --filter='@zitadel/cloud*...' --filter=@zitadel/docs... --filter=@zitadel/website... --os=current --cpu=current --optimistic-repeat-install --config.modules-cache-max-age=0",
     "docs": "turbo run dev --filter=@zitadel/docs",
     "check:cloud": "turbo run e2e-deployment console-deployment schemas-deployment cli-deployment --continue",
     "ci": "turbo boundaries && turbo run lint typecheck build test @zitadel/server#test:postgres @zitadel/server#test:pow //#smoke-upgrade @zitadel/testing#test:integration console-smoke console-real console-embedded console-platform demo-next-mock demo-next-real demo-nuxt-mock journey:next journey:nuxt journey:react journey:vue journey:angular journey:solid journey:svelte journey:qwik journey:passkey journey:preexisting-next journey:preexisting-nuxt journey:testkit journey:remote check-generate conformance @zitadel/release#pack --affected --continue=dependencies-successful",

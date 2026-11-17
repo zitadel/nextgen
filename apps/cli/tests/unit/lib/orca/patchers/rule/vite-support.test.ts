@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished } from "vitest";
 
 import {
   indented,
@@ -959,10 +959,8 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   const env = { ZITADEL_PROJECT_SECRET: "sk_proj_test" };
   /** An app whose `.env.local` names its project, as setup writes it. */
   const withProject = { ...env, ZITADEL_PROJECT_ID: "proj_spa" };
-  const apps: DevApp[] = [];
 
-  afterEach(async () => {
-    await Promise.all(apps.splice(0).map((app) => app.close()));
+  afterEach(() => {
     remote.answerWith(undefined);
   });
 
@@ -980,7 +978,9 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     files: Record<string, string> = {},
   ): Promise<DevApp> {
     const app = await aViteApp(config, appEnv, files);
-    apps.push(app);
+    onTestFinished(async () => {
+      await app.close();
+    });
     return app;
   }
 
@@ -1111,7 +1111,9 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     "reaches the server under vite preview with only the secret in the environment, %s",
     async (_, config) => {
       const app = await aVitePreview(config(), env);
-      apps.push(app);
+      onTestFinished(async () => {
+        await app.close();
+      });
 
       const response = await fetch(`${app.origin}/__nextgen/healthz`);
 

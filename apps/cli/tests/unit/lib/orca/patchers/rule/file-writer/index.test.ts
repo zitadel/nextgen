@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { ZitadelError } from "@/lib/errors";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer/index";
@@ -73,25 +73,23 @@ describe("scaffold - mkdir", () => {
 
   it("never reports mode healing on win32, where POSIX modes are not implemented", async ({
     dir,
+    terminal,
   }) => {
     await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
       cwd: dir,
       dryRun: false,
       force: false,
     });
-    const descriptor = Object.getOwnPropertyDescriptor(process, "platform")!;
-    Object.defineProperty(process, "platform", { value: "win32" });
-    try {
-      const rerun = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
-        cwd: dir,
-        dryRun: false,
-        force: false,
-      });
-      expect(rerun.files).toEqual([]);
-      expect(rerun.filesSkipped).toEqual([join(dir, "vault")]);
-    } finally {
-      Object.defineProperty(process, "platform", descriptor);
-    }
+    terminal.platform("win32");
+
+    const rerun = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+
+    expect(rerun.files).toEqual([]);
+    expect(rerun.filesSkipped).toEqual([join(dir, "vault")]);
   });
 
   it("reports a permission repair on an existing directory as an update, not a skip", async ({

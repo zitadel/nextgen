@@ -67,10 +67,11 @@ starts the launcher on loopback, forwards every request to it with Vercel's
 own `traceparent`, and hands the server's spans and metrics to Vercel. Its build command
 puts Go on PATH ([`install-go.sh`](install-go.sh)), which Vercel's Node.js
 build image lacks, and runs `deploy`, which turbo orders after `build` (the
-launcher) and `migrate`; the function ships the launcher through its
-`includeFiles`. None of the three is cached: the launcher runs with
+launcher), `migrate` and `seed`; the function ships the launcher through its
+`includeFiles`. None of the four is cached: the launcher runs with
 the deployment's secrets, and any branch's build can write the team's cache.
-`migrate` sees the deployment's whole environment. The `schemas` service
+`migrate` and `seed` see the deployment's whole environment. The function
+itself neither migrates nor seeds: starting an instance writes nothing. The `schemas` service
 runs `schemas` and is rooted here, where `package.json` has no
 framework dependencies, so Vercel detects no framework (a service takes no
 `framework: null`); a framework dependency in it would change how that
@@ -78,9 +79,9 @@ service builds. The launcher's Go tests run in the server's `test`.
 
 | File | Role |
 |---|---|
-| [`../api/cmd/cloud-launcher/`](../api/cmd/cloud-launcher/) | the function binary, a package of the Go module: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, `CRON_SECRET` (the token of the cron job that purges expired audit events), Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates; `drop-preview` drops a merged branch's database, or every idle one |
+| [`../api/cmd/cloud-launcher/`](../api/cmd/cloud-launcher/) | the function binary, a package of the Go module: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, `CRON_SECRET` (the token of the cron job that purges expired audit events), Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration, migrates, and seeds what the function serves (the platform project and its release, the root admin, the platform operators); `drop-preview` drops a merged branch's database, or every idle one |
 | [`build-launcher.sh`](build-launcher.sh) | the `build` task: compiles the launcher, without the console, into `dist/nextgen-launcher`; it stamps in the branch, which picks a preview's database |
-| [`deploy.sh`](deploy.sh) | the `deploy` task, last in the `server` service's build: checks that the migrated launcher is in `dist/`, where the function ships it from |
+| [`deploy.sh`](deploy.sh) | the `deploy` task, last in the `server` service's build, after `migrate` and `seed`: checks that the launcher is in `dist/`, where the function ships it from |
 | [`server/`](server/) | the `server` service's function: starts the launcher, forwards requests to it and prints its log lines at their level and under their request ([`logs.mjs`](server/logs.mjs)). While Vercel is the telemetry sink ([`sink.mjs`](server/sink.mjs)), it takes the server's OTLP exports on a loopback collector ([`collector.mjs`](server/collector.mjs)), decodes them ([`otlp.mjs`](server/otlp.mjs)), hands each request's spans ([`spans.mjs`](server/spans.mjs)) to Vercel Tracing and sends the metrics its list names ([`metrics.mjs`](server/metrics.mjs)) as Vercel custom metrics |
 | [`install-go.sh`](install-go.sh) | puts the Go toolchain `apps/api/go.mod` names on PATH in the `server` service's build, once its SHA-256 matches the one go.dev lists |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |

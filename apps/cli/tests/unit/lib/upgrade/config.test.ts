@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { releaseChannel, updateCheckDisabled } from "@/lib/upgrade/config";
-import { test } from "@tests/helpers/fixtures";
+import { test } from "@tests/fixtures";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 

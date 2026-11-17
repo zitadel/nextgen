@@ -4,7 +4,8 @@ import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { SolidPatcher } from "@/lib/orca/patchers/rule/solid";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctx(): PatchContext {
   return {
@@ -19,7 +20,9 @@ function ctx(): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
+    defaultServer: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
   };
 }
 
@@ -34,7 +37,7 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
 describe("SolidPatcher.plan", () => {
   it("writes the managed App.tsx and merges the Vite config", () => {
     const plan = new SolidPatcher().plan(ctx());
-    expect(writeContents(plan, "src/App.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/App.tsx")).toContain(ManagedFile.MARKER);
     const edit = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "edit" }> =>
         op.kind === "edit" && String(op.path).includes("vite.config"),

@@ -99,7 +99,7 @@ describe("validateConnections", () => {
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
 
-    it("suggests publishing a missing variable in the environment the deploy addressed", async () => {
+    it("suggests publishing a missing variable", async () => {
       const context = aStepContext({ config: ACME, client: holdingVariables({}) });
 
       const error = await rejectionOf(() => {
@@ -109,7 +109,11 @@ describe("validateConnections", () => {
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
         nextCommands: [
-          expect.stringMatching(/ variable set ACME_CLIENT_SECRET --secret --env staging$/),
+          {
+            id: "variable:set",
+            args: { name: "ACME_CLIENT_SECRET" },
+            flags: { secret: true, preview: false },
+          },
         ],
       });
     });
@@ -206,9 +210,11 @@ describe("validateConnections", () => {
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
         nextCommands: [
-          expect.stringMatching(
-            / variable set ACME_CLIENT_SECRET --secret --preview --env staging$/,
-          ),
+          {
+            id: "variable:set",
+            args: { name: "ACME_CLIENT_SECRET" },
+            flags: { secret: true, preview: true },
+          },
         ],
       });
     });

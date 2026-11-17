@@ -2,7 +2,7 @@ import wrapAnsi from "wrap-ansi";
 
 import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
 import type { Suggest } from "@/lib/suggestion";
-import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
+import { style } from "@/lib/ui/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import type { CheckOutcome } from "./checks";
@@ -106,10 +106,10 @@ export function withCategories(
 type RowStatus = CheckOutcome["status"] | "skip";
 
 const ROW_MARK: Record<RowStatus, string> = {
-  pass: statusColor.pass("[✓]"),
-  warn: statusColor.warn("[!]"),
-  fail: statusColor.fail("[✗]"),
-  skip: dim("[-]"),
+  pass: style.statusColor.pass("[✓]"),
+  warn: style.statusColor.warn("[!]"),
+  fail: style.statusColor.fail("[✗]"),
+  skip: style.dim("[-]"),
 };
 
 export type DoctorReportInput = {
@@ -187,7 +187,7 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     lines.push(conclusion(input.checks));
   }
   if (showsHint) {
-    lines.push(dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
+    lines.push(style.dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
   }
   const shownActions = new Set(
     (input.fixes ?? [])
@@ -215,7 +215,9 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
 export function renderDoctorReport(input: DoctorReportInput): string {
   const { lines, next } = doctorReport(input);
   const block = renderNextSteps(next);
-  return [strong("Zitadel doctor"), "", ...lines, ...(block === "" ? [] : ["", block])].join("\n");
+  return [style.strong("Zitadel doctor"), "", ...lines, ...(block === "" ? [] : ["", block])].join(
+    "\n",
+  );
 }
 
 /** Why a category has no checks to show this run, and what to do about it, if anything. */
@@ -236,10 +238,10 @@ function skipReason(
 }
 
 function row(status: RowStatus, label: string, summary: string | undefined): string {
-  const title = status === "pass" || status === "skip" ? label : strong(label);
+  const title = status === "pass" || status === "skip" ? label : style.strong(label);
   return [
     `${ROW_MARK[status]} ${title}${" ".repeat(LABEL_WIDTH - label.length)}`,
-    ...(summary === undefined || summary === "" ? [] : [dim(summary)]),
+    ...(summary === undefined || summary === "" ? [] : [style.dim(summary)]),
   ]
     .join("  ")
     .trimEnd();
@@ -329,7 +331,7 @@ function detailLines(
     const text = escapeControlCharacters(
       input.verbose ? `${check.name}: ${check.message}` : check.message,
     );
-    lines.push(detailLine(check.status, check.status === "pass" ? dim(text) : text, input));
+    lines.push(detailLine(check.status, check.status === "pass" ? style.dim(text) : text, input));
     const fix = input.fixes?.find((candidate) => {
       return candidate.check === check.name;
     });
@@ -351,7 +353,7 @@ function detailLine(
     : wrapAnsi(text, Math.max(20, input.columns - DETAIL_INDENT), { hard: false });
   const [first = "", ...rest] = wrapped.split("\n");
   return [
-    `    ${mark[status]} ${first}`,
+    `    ${style.mark[status]} ${first}`,
     ...rest.map((line) => {
       return `${" ".repeat(DETAIL_INDENT)}${line}`;
     }),
@@ -375,7 +377,7 @@ function remediesOf(category: CheckCategory, checks: readonly CheckOutcome[]): s
 }
 
 function remedyLine(remedy: string): string {
-  return `    ${arrow} ${command(remedy)}`;
+  return `    ${style.arrow} ${style.command(remedy)}`;
 }
 
 function conclusion(checks: readonly CheckOutcome[]): string {
@@ -395,5 +397,5 @@ function conclusion(checks: readonly CheckOutcome[]): string {
       ? "1 category"
       : `${String(count)} categories`;
   };
-  return `${mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
+  return `${style.mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
 }

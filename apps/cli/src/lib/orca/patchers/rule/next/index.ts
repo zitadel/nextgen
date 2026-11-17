@@ -2,8 +2,7 @@ import { basename, join } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { isFile } from "@/lib/fs";
-import { MANAGED_MARKER } from "@/lib/paths";
-import { sdkVersionForCli } from "@/lib/public-cli";
+import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
 import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "@/lib/orca/patchers/rule/base";
@@ -23,7 +22,7 @@ import type { RendererSpec } from "./renderers/types";
  * Carries the managed marker so `doctor --fix` reclaims it and `eject` removes it.
  */
 function requestBoundaryTemplate(functionName: "middleware" | "proxy"): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
@@ -270,7 +269,7 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "add-dep",
       name: renderer.dependency.name,
-      version: sdkVersionForCli(ctx.cliVersion),
+      version: ctx.sdkVersion,
     },
     // `next dev` takes its port from the command line only, so without this
     // the app can serve a port the project does not allow as an origin.
@@ -300,7 +299,7 @@ function routeTitles(renderer: RendererSpec): ReadonlyArray<{ segment: string; t
 }
 
 function routeLayoutTemplate(title: string): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: ${JSON.stringify(title)} };
@@ -312,7 +311,7 @@ export default function Layout({ children }: Readonly<{ children: React.ReactNod
 }
 
 function homePageTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { redirect } from "next/navigation";
 
 // A redirect is never an instant navigation: tell Next.js not to validate it.

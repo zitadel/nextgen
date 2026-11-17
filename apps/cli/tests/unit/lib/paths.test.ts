@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ancestors, MANAGED_MARKER, resolveCwd } from "@/lib/paths";
+import { ancestors, resolveCwd } from "@/lib/paths";
 
 describe("resolveCwd", () => {
   it("returns process.cwd() when no argument is given", () => {
@@ -20,12 +20,6 @@ describe("resolveCwd", () => {
   it("passes an absolute path through (normalised)", () => {
     expect(resolveCwd("/tmp/example")).toBe(resolve("/tmp/example"));
     expect(resolveCwd("/tmp/example")).toBe("/tmp/example");
-  });
-});
-
-describe("MANAGED_MARKER", () => {
-  it("is the versioned managed-file sentinel comment", () => {
-    expect(MANAGED_MARKER).toBe("// zitadel-cli: managed-file v1");
   });
 });
 

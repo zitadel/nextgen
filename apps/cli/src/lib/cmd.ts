@@ -99,8 +99,7 @@ export class Cmd {
    * be read as the next option rather than as this one's value, and quoting
    * does not prevent that (`--cwd '--force'` still parses as two options), so
    * the value is joined with `=`, which no parser splits. The value is quoted
-   * like any word. The argument-list form of the same rule is `optionArgs` in
-   * `public-cli.ts`.
+   * like any word. The argument-list form of the same rule is {@link Cmd.optionArgs}.
    *
    * @param option - The option as it is spelled, such as `--cwd`.
    * @param value - Its value.
@@ -115,6 +114,18 @@ export class Cmd {
       return `${option}=${quoted}`;
     }
     return `${option} ${quoted}`;
+  }
+
+  /**
+   * An option and its value as separate arguments, for an argument list rather than text. A value
+   * that starts with `-` would be read as the next flag, so it is joined with `=` instead.
+   *
+   * @param option - The option, with its dashes, e.g. `--schema`.
+   * @param value - The value it takes, as the user or a file name gave it.
+   * @returns The arguments, one or two.
+   */
+  static optionArgs(option: string, value: string): string[] {
+    return value.startsWith("-") ? [`${option}=${value}`] : [option, value];
   }
 
   /**
