@@ -145,7 +145,8 @@ post:
                   deployed_by_type: human
             previewed:
               summary: A release deployed to two preview URLs
-              description: Each target carries the expiry of its preview.
+              description: |
+                Each preview's expiry is on `GET /projects/{project_id}/previews`.
               value:
                 id: dep_01KX5M2A0C4D7F0N9WD3P2E4YM8
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -153,9 +154,7 @@ post:
                 kind: preview
                 targets:
                   - origin: https://acme-git-sso-acmeinc.vercel.app
-                    expires_at: '2026-10-09T14:10:00Z'
                   - origin: https://acme-k3x9v2-acmeinc.vercel.app
-                    expires_at: '2026-10-09T14:10:00Z'
                 status: live
                 deployed_at: '2026-10-02T14:10:00Z'
                 metadata:
@@ -276,7 +275,8 @@ get:
     A deployment makes a release live on origins. By default the list is the
     history, newest first: every deployment of the project, with every target
     it made the release live on. With `origin`, it is the history of that
-    origin alone.
+    origin alone. With `release_id`, it is every deployment of that release,
+    superseded ones included.
 
     With `live=true`, the list is what is served now, newest first. It holds
     the project's newest primary deployment with every origin it names, an
@@ -285,6 +285,9 @@ get:
     deployment to each live preview URL, narrowed to the URLs it still
     serves. Combined with `origin`, it is the one deployment that origin
     serves, or empty, as it is for an origin the project no longer lists.
+    Combined with `release_id`, it is the deployments of the live view that
+    serve that release: the primary deployment only when it is of that
+    release, and the previews serving it.
 
     The `id` of an entry is the deployment ID that `getDeployment` (`GET /deployments/{deployment_id}`),
     `listDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.
@@ -297,6 +300,7 @@ get:
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/origin-filter.yaml
+    - $ref: ../../components/parameters/release-id-filter.yaml
     - name: live
       in: query
       required: false
@@ -360,7 +364,6 @@ get:
                     kind: preview
                     targets:
                       - origin: https://acme-git-sso-acmeinc.vercel.app
-                        expires_at: '2026-10-09T14:58:00Z'
                     status: live
                     deployed_at: '2026-10-02T14:58:00Z'
                     metadata:
@@ -425,7 +428,6 @@ get:
                     kind: preview
                     targets:
                       - origin: https://acme-git-sso-acmeinc.vercel.app
-                        expires_at: '2026-10-09T14:58:00Z'
                     status: live
                     deployed_at: '2026-10-02T14:58:00Z'
                     metadata:

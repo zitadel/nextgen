@@ -1,9 +1,10 @@
 import { PassThrough } from "node:stream";
 import { stripVTControlCharacters as plain } from "node:util";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { DrawnSpinner, QuietSpinner, type Spinner } from "@/lib/ui/spinner";
+import { it } from "@tests/fixtures";
 import { atTerminal } from "@tests/helpers/keyboard";
 
 /** What clack writes as a spinner starts, and as it ends. */
@@ -34,8 +35,6 @@ const interrupts = (act: () => void): number => {
 const FRAME = 100;
 
 afterEach(() => {
-  vi.useRealTimers();
-  vi.unstubAllEnvs();
   // A spinner no test stopped must not be drawn again by the next test's line.
   DrawnSpinner.active.clear();
 });
@@ -129,13 +128,12 @@ describe("DrawnSpinner", () => {
     expect(input.listenerCount("data")).toBe(0);
   });
 
-  it("renames itself while the work goes on", () => {
-    vi.useFakeTimers();
+  it("renames itself while the work goes on", ({ clock }) => {
     const screen = atTerminal();
     const running = new DrawnSpinner("Fetching users");
 
     running.message("Fetching users — page 2");
-    vi.advanceTimersByTime(FRAME);
+    clock.advance(FRAME);
 
     expect(plain(screen.shown())).toContain("Fetching users — page 2");
     running.clear();
@@ -177,15 +175,14 @@ describe("DrawnSpinner.around", () => {
     running.clear();
   });
 
-  it("draws it again under the name it was last given", () => {
-    vi.useFakeTimers();
+  it("draws it again under the name it was last given", ({ clock }) => {
     const screen = atTerminal();
     const running = new DrawnSpinner("Deploying");
     running.message("Deploying — 2 of 3");
 
     DrawnSpinner.around(() => undefined);
     const before = plain(screen.shown()).split("Deploying — 2 of 3").length;
-    vi.advanceTimersByTime(FRAME);
+    clock.advance(FRAME);
 
     expect(plain(screen.shown()).split("Deploying — 2 of 3").length).toBeGreaterThan(before);
     running.clear();

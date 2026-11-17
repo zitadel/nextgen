@@ -102,7 +102,7 @@ describe("brandingConfigSchema", () => {
       typography: { font_url: "https://fonts.example.com/css2" },
     });
     expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("needs a typography.font_family");
+    expect(JSON.stringify(result.error?.issues)).toContain("font_family is required when font_url");
   });
 
   it("accepts font_url alongside the family it loads", () => {
@@ -126,8 +126,7 @@ describe("brandingConfigSchema", () => {
     const IMAGE_URL =
       "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)";
     const STYLESHEET_URL = "must be a valid absolute https URL without credentials";
-    const NEEDS_FAMILY =
-      "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in";
+    const NEEDS_FAMILY = "typography.font_family font_family is required when font_url is present";
     const FONT_STACK_NO_COMMA =
       'must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural") with no comma inside the quotes';
     const INTER = "Inter";
@@ -211,7 +210,7 @@ describe("brandingConfigSchema", () => {
       [
         "an empty font_url, which the API cannot decode",
         { typography: { font_url: "" } },
-        [`typography.font_url ${STYLESHEET_URL}`],
+        [`typography.font_url ${STYLESHEET_URL}`, NEEDS_FAMILY],
       ],
       [
         "a font_url carrying credentials",
@@ -304,9 +303,9 @@ describe("brandingConfigSchema", () => {
         [NEEDS_FAMILY],
       ],
       [
-        "a font_url without a font family beside a mistake of type in another typography field",
+        "a font_url without a font family beside a mistake of type in another typography field, which is said first",
         { typography: { scale: "big", font_url: "https://fonts.example.com/css2" } },
-        ["typography.scale Invalid input: expected number, received string", NEEDS_FAMILY],
+        ["typography.scale Invalid input: expected number, received string"],
       ],
       [
         "a font_url that is refused and has no font family",

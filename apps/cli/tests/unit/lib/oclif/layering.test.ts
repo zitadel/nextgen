@@ -19,52 +19,35 @@ const LAYER = posix.join("lib", "oclif");
  */
 const GENERIC = [
   "lib/backend",
-  "lib/box",
   "lib/cmd",
   "lib/consent",
   "lib/errors",
-  "lib/host",
-  "lib/input",
   "lib/json",
-  "lib/log",
   "lib/names",
   "lib/paths",
   "lib/plural",
-  "lib/public-cli",
   "lib/server",
-  "lib/style",
   "lib/suggestion",
   "lib/telemetry",
   "lib/ui",
   "lib/terminal-text",
-  "lib/user-agent",
-  "lib/warnings",
+  "lib/runtime",
 ];
 
 /**
  * Product knowledge the glue still reaches for, each one a leak to move into
  * the commands that own it. The list only shrinks: a new one fails the test.
  */
-const LEAKS = [
-  "lib/environment",
-  "lib/journey-guidance",
-  "lib/local-server/processes",
-  "lib/skills-hint",
-];
+const LEAKS = ["lib/environment", "lib/skills"];
 
 /**
  * Domain libs that still reach into the layer, each one a dependency pointing
- * the wrong way. The list only shrinks: a new one fails the test. `lib/server`
- * and `lib/telemetry/consent` want a type the envelope owns, `lib/claim-state`
- * wants the server-kind bucket, and `lib/api-request` is the `zitadel api`
+ * the wrong way. The list only shrinks: a new one fails the test. `lib/telemetry/consent`
+ * wants a type the envelope owns, and `lib/api/call`
+ * is the `zitadel api`
  * argument parser, which reads the generated commands' own helpers.
  */
-const INBOUND = [
-  "lib/api-request.ts",
-  "lib/claim-state.ts",
-  "lib/server.ts",
-  "lib/telemetry/consent.ts",
-];
+const INBOUND = ["lib/api/call.ts", "lib/telemetry/consent.ts"];
 
 /**
  * A path as this file reads one: `readdir` answers in the platform's

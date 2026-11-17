@@ -1,4 +1,4 @@
-/** What may be taken from clack outside `lib/input.ts`: output, never input. */
+/** What may be taken from clack outside `lib/ui/prompter.ts`: output, never input. */
 const OUTPUT_ONLY = new Set(["spinner", "note", "intro", "outro", "log"]);
 
 const FROM = String.raw`from\s*["']@clack/prompts["']`;

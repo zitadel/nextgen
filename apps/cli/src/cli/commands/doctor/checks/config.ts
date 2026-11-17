@@ -1,6 +1,5 @@
-import { readZitadelConfig } from "@/lib/project";
-
 import { AbstractSanityCheck, type CheckContext } from "./types";
+import { Project } from "@/lib/project";
 
 /** Verifies `zitadel.json` exists and parses. */
 export class ConfigCheck extends AbstractSanityCheck {
@@ -9,6 +8,6 @@ export class ConfigCheck extends AbstractSanityCheck {
   protected readonly summary = "zitadel.json parses";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    await readZitadelConfig(ctx.cwd);
+    await Project.at(ctx.cwd).config();
   }
 }

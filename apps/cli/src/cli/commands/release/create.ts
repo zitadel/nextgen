@@ -1,11 +1,12 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, reads } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -35,7 +36,8 @@ const MESSAGE = {
  */
 export default class ReleaseCreate extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ without deploying it.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> release create",
@@ -64,10 +66,9 @@ export default class ReleaseCreate extends EnvironmentCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
-      reportWarning(warning);
+      warnings.report(warning);
     }
     this.narrate(prepared.notices);
     // `release create` carries the same no-mutation promise every command does

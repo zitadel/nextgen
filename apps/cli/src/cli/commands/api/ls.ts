@@ -1,13 +1,8 @@
 import { Args } from "@oclif/core";
 
 import { Operation } from "@/lib/backend";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */
@@ -39,7 +34,8 @@ function entryOf(operation: Operation) {
 export default class ApiLs extends Tabulatable(BaseCommand) {
   static override description =
     "List the operations of the Zitadel API that the api command calls.";
-  static override group = CommandGroups.diagnostics;
+  static override group = CommandGroups.apiAndEvents;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> api ls",

@@ -1,14 +1,13 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = "https://api.zitadel.example";
@@ -31,17 +30,7 @@ it.beforeEach(({ server }) => {
   );
 });
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function anAppDir(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-origin-list-"));
-  dirs.push(cwd);
+async function anAppDir(cwd: string): Promise<string> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ framework: { id: "next" } }));
   await writeFile(
@@ -63,8 +52,8 @@ function list(cwd: string, extra: string[] = []) {
 
 /** Runs `run` with stdout reporting as a terminal, so the aligned table renders. */
 describe("origin list", () => {
-  it("returns the origins in the --json envelope", async () => {
-    const cwd = await anAppDir();
+  it("returns the origins in the --json envelope", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
     origins.push({ pattern: PRIMARY_ORIGIN, kind: "primary" });
 
     const result = await list(cwd, ["--json"]);
@@ -74,8 +63,8 @@ describe("origin list", () => {
     });
   });
 
-  it("renders a pattern/kind table on a terminal", async () => {
-    const cwd = await anAppDir();
+  it("renders a pattern/kind table on a terminal", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
     origins.push({ pattern: PRIMARY_ORIGIN, kind: "primary" });
 
     const result = await asTerminal(() => list(cwd));
@@ -87,16 +76,16 @@ describe("origin list", () => {
     expect(text).toContain("1 origin");
   });
 
-  it("says nothing was found in the words every list uses when it is empty", async () => {
-    const cwd = await anAppDir();
+  it("says nothing was found in the words every list uses when it is empty", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
 
     const result = await asTerminal(() => list(cwd));
 
     expect(stripAnsi(result.stdout)).toContain("No origins found");
   });
 
-  it("prints tab-separated rows with no header when piped", async () => {
-    const cwd = await anAppDir();
+  it("prints tab-separated rows with no header when piped", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
     origins.push({ pattern: PRIMARY_ORIGIN, kind: "primary" });
 
     const result = await list(cwd, ["--plain"]);

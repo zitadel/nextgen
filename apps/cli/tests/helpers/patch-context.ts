@@ -1,4 +1,5 @@
 import type { PatchContext } from "@/lib/orca/patchers/types";
+import { CliPackage } from "@/lib/upgrade";
 
 /**
  * What a patcher plans from, for `framework`, with a project and the local
@@ -12,6 +13,7 @@ export function aPatchContext(
   framework: string,
   overrides: Partial<PatchContext> = {},
 ): PatchContext {
+  const cliVersion = overrides.cliVersion ?? "0.1.0";
   return {
     framework: { id: framework, appDir: "app", devPort: 3000, url: "http://localhost:3000" },
     rendererId: "react",
@@ -24,7 +26,9 @@ export function aPatchContext(
     },
     issuer: "http://localhost:3000",
     server: "http://localhost:8080",
-    cliVersion: "0.1.0",
+    defaultServer: "https://api.zitadel.cloud",
+    cliVersion,
+    sdkVersion: CliPackage.at(cliVersion).selector(),
     ...overrides,
   };
 }

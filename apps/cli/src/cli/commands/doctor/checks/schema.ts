@@ -1,11 +1,12 @@
 import { createZitadelClient, IdpService } from "@/lib/backend";
+import { ZitadelRuntime } from "@/lib/server";
 import { isCancellation } from "@/lib/errors";
-import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
 import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
 
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
+import { Project } from "@/lib/project";
 
 /**
  * What one read of the configuration found.
@@ -185,15 +186,15 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   private async deployedConnections(ctx: CheckContext): Promise<ReadonlySet<string> | undefined> {
     try {
-      const secret = await readZitadelSecret(ctx.cwd);
-      const server = readProjectServer(await readZitadelConfig(ctx.cwd));
+      const secret = await Project.at(ctx.cwd).secret();
+      const server = (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
       const client = createZitadelClient({
-        userAgent: userAgent(),
+        userAgent: Runtime.current().userAgent(),
         baseUrl: server,
-        token: secret.project_secret,
+        token: secret.data.project_secret,
         signal: ctx.signal,
       });
-      return await new IdpService(client, secret.project_id).deployedSlugs();
+      return await new IdpService(client, secret.data.project_id).deployedSlugs();
     } catch (error) {
       if (isCancellation(error)) {
         throw error;
