@@ -591,8 +591,8 @@ describe("claim", () => {
       // The resume keeps this run's server and directory, or it would wait on
       // the default project instead.
       expect(json.data.next_commands).toEqual([
-        expect.stringMatching(
-          new RegExp(`claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `),
+        expect.stringContaining(
+          `claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `,
         ),
       ]);
     });
