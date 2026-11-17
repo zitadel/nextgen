@@ -1,0 +1,87 @@
+name: spike-cli-windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [spike/windows-aside-frameworks]
+  pull_request:
+    paths:
+      - .github/workflows/spike-cli-windows.yml
+      - .github/spike/**
+
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            binary: server-win32-x64
+          - os: ubuntu-24.04
+            binary: server-linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the CLI and the server binary from this ref
+        run: |
+          corepack pnpm exec turbo run build --filter=@zitadel/cli
+          corepack pnpm exec turbo run build-binary --filter=@zitadel/${{ matrix.binary }} --output-logs=errors-only
+
+      - name: Exercise the CLI
+        run: bash .github/spike/exercise.sh
+
+      - name: CLI unit tests
+        continue-on-error: true
+        timeout-minutes: 25
+        run: corepack pnpm exec turbo run test --filter=@zitadel/cli --output-logs=errors-only 2>&1 | tail -n 60
+
+      - name: Go vet and the whole Go suite
+        continue-on-error: true
+        timeout-minutes: 30
+        working-directory: apps/api
+        shell: bash
+        run: |
+          {
+            echo "## Go on $RUNNER_OS"
+            echo '### go vet ./...'; echo '```'
+            go vet ./... 2>&1 | tail -n 60
+            echo '```'
+            echo '### go test ./... -short (packages that fail)'; echo '```'
+            go test ./... -short -count=1 -timeout 20m > "$RUNNER_TEMP/go-test.log" 2>&1
+            grep -E '^(FAIL|--- FAIL|panic)' "$RUNNER_TEMP/go-test.log" | head -n 80
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" "$RUNNER_TEMP/go.md"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: findings-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/summary.md
+            ${{ runner.temp }}/go.md
+            ${{ runner.temp }}/go-test.log
+            ${{ runner.temp }}/dev.log
+            ${{ runner.temp }}/host/.zitadel/local/server.log
