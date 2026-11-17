@@ -6,7 +6,10 @@ OUT="$RUNNER_TEMP/findings.md"
 : > "$OUT"
 PASS=0; FAIL=0
 
-z() { node "$CLI" "$@" --no-telemetry; }
+mkdir -p "$RUNNER_TEMP/bin"
+printf '#!/usr/bin/env bash\nexec node "%s" "$@" --no-telemetry\n' "$CLI" > "$RUNNER_TEMP/bin/z"
+chmod +x "$RUNNER_TEMP/bin/z"
+export PATH="$RUNNER_TEMP/bin:$PATH"
 
 # t <name> <command...>: run, log, never abort.
 t() {
