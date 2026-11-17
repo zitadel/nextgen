@@ -948,6 +948,9 @@ describe("auth-method sso disable", () => {
             expectedPublicCliCommand(
               `auth-method passkey enable --schema default-human-user --cwd ${dir}`,
             ),
+            expectedPublicCliCommand(
+              `auth-method sso enable --provider '<name>' --schema default-human-user --cwd ${dir}`,
+            ),
           ],
         });
       });
@@ -1014,6 +1017,17 @@ describe("auth-method sso disable", () => {
               ],
               ["auth-method", "password", "enable", "--schema", DEFAULT_SCHEMA, "--cwd", dir],
               ["auth-method", "passkey", "enable", "--schema", DEFAULT_SCHEMA, "--cwd", dir],
+              [
+                "auth-method",
+                "sso",
+                "enable",
+                "--provider",
+                "<name>",
+                "--schema",
+                DEFAULT_SCHEMA,
+                "--cwd",
+                dir,
+              ],
             ],
           },
         });
@@ -1046,6 +1060,18 @@ describe("auth-method sso disable", () => {
 
         expect(parseJson(result.stdout)).toMatchObject({
           message: expect.stringContaining(UNCHECKABLE_FLOW),
+        });
+      });
+
+      it("suggests a dry run of deploy, which reports those flow errors", async ({ dir }) => {
+        await writeProject(dir, broken);
+
+        const result = await runCliForTest(
+          authMethodJson(dir, "sso", "disable", "--provider", "google"),
+        );
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          next_commands: expect.arrayContaining([expect.stringContaining("deploy --dry-run")]),
         });
       });
 

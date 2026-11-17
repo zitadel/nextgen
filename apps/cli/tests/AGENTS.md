@@ -35,7 +35,8 @@ reclassified until it is one.
   "round-trip" files.
 - A property every command must have lives in the fixture: `ScaffoldedApp`
   checks the envelope contract on every `--json` run, and holds every run to
-  printing nothing that drives the reader's terminal.
+  printing nothing that drives the reader's terminal, and no suggestion that drops the run's `--cwd` or
+  environment.
 - Every command's spec has one `inEveryRendering` test: the fixture runs that
   command as a script reads it, piped, and on a terminal in colour and without,
   holding each to the invariants. It asserts no outcome, so a command that

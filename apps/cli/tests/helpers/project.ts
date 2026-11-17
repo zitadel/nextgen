@@ -36,7 +36,7 @@ import { aBinaryRecord } from "./runtime-record";
 import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
-import { assertRunnableSuggestions } from "./suggestions";
+import { assertRunnableSuggestions, assertSuggestionsCarryTheRun } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
 
@@ -1495,10 +1495,12 @@ export class ScaffoldedApp {
 
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
-    const result = await runCliForTest([...args, "--cwd", this.path], env);
+    const ran = [...args, "--cwd", this.path];
+    const result = await runCliForTest(ran, env);
     assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
+      assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);
     }
     return result;
   }
@@ -2304,13 +2306,12 @@ export class ScaffoldedApp {
     env: NodeJS.ProcessEnv = {},
     { envelope = true }: { envelope?: boolean } = {},
   ): Promise<CliResult> {
-    const result = await runCliForTest(
-      [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL],
-      env,
-    );
+    const ran = [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL];
+    const result = await runCliForTest(ran, env);
     assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
+      assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);
     }
     return result;
   }
@@ -2589,6 +2590,12 @@ function assertAJsonBodyParses(result: { stdout: string }, where: string): void 
         `stdout: ${JSON.stringify(result.stdout)}`,
     );
   }
+}
+
+/** The envelope a `--json` run printed: an empty one when it printed none, which the contract check refuses. */
+function envelopeIn(result: CliResult): { next_commands?: string[]; data?: unknown } {
+  const parsed = parseJsonOrUndefined(result.stdout);
+  return typeof parsed === "object" && parsed !== null ? parsed : {};
 }
 
 /**

@@ -26,6 +26,7 @@ import {
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { Suggested } from "@/lib/suggestion";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
@@ -161,10 +162,11 @@ export async function requestOf(
     input?: string;
   }>,
   projectId: string | undefined,
+  retry: Suggested,
 ): Promise<ApiRequest> {
   return ApiCall.to(target).request({
     fields: flags.field ?? [],
-    input: await ApiCall.readInput(flags.input),
+    input: await ApiCall.readInput(flags.input, retry),
     projectId,
   });
 }
@@ -323,7 +325,12 @@ export default class Api extends Destructive(EnvironmentCommand) {
     });
     const { server, projectId, client } = await this.reach(operation);
 
-    const built = await requestOf(target, flags, projectId);
+    const built = await requestOf(
+      target,
+      flags,
+      projectId,
+      await this.again("api", { with: { input: "<path>" }, without: ["field"] }),
+    );
     // The question a person is asked, and the one a refusal hands to whoever must ask them.
     const question = [
       `Call ${operation.id}${
