@@ -81,6 +81,7 @@ import { SettleAnswers } from "./steps/settle-answers";
 import { ShowResult } from "./steps/show-result";
 import { WriteConfiguration } from "./steps/write-configuration";
 import { WriteManifest } from "./steps/write-manifest";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * How `--design`, which setup no longer takes, is refused.
@@ -186,7 +187,7 @@ const RENDERER_FLAG_DESCRIPTION =
  * `--design` is hidden so scripts and agents passing it get a targeted error
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
-export default class Setup extends Destructive(BaseCommand) {
+export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
   /**
    * What `--help` says the command does.
    */
@@ -327,13 +328,6 @@ export default class Setup extends Destructive(BaseCommand) {
   };
 
   /**
-   * That setup resolves its own server, in the preconditions.
-   */
-  static override meta = {
-    resolveServer: false,
-  };
-
-  /**
    * The server a recovery names instead of the env file, for a project setup
    * moved to another port that has no env file to pin.
    */
@@ -358,6 +352,15 @@ export default class Setup extends Destructive(BaseCommand) {
         ? { envFile: projectEnvFile(cwd, RECOVERY_ENV_FILE) }
         : { server: this.recoveryServer }),
     };
+  }
+
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
   }
 
   /**

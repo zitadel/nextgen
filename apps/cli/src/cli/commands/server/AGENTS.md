@@ -12,10 +12,21 @@ server package they call is described in
   table in `src/index.ts`, so `server/start.ts` is still `start`.
 - Tests mirror it: `tests/unit/cli/commands/server/<command>.test.ts`.
 
-## The base: `ServerCommand` (`base.ts`)
+## The mixins: `LocalServerCommand` (`src/cli/commands/server-command.ts`)
 
-One base for every command about the local server, so none repeats the same
-four things (the group, `meta`, a `sourceOf`, and the `ps` seam).
+One module holds every way a command takes a server, as mixins in the style of
+`Promptable` and `Destructive`:
+
+- `ServerCommand(Base)` is a command that takes `--server`: the run's server is
+  resolved before it starts. No command resolves, parses or normalises a server
+  address itself.
+- `ChoosingServerCommand(Base)` is a `ServerCommand` that asks for the server
+  when none was given (`serverOrAsk`), as `env add` does.
+- `LocalServerCommand(Base)` is a command about the server on this machine, and
+  the one these commands extend, so none repeats the same four things (the
+  group, `meta`, a `sourceOf`, and the `ps` seam).
+
+What `LocalServerCommand` adds:
 
 - `static folderRule`: `"exact"` acts on the folder the command runs in
   (`start`, `stop`, `reset`); `"nearest"` acts on the closest folder, that one
@@ -27,8 +38,9 @@ four things (the group, `meta`, a `sourceOf`, and the `ps` seam).
 - `localServers()` is the test seam for the machine's process list. It lives
   here and not in `BaseCommand` because only these commands ask it.
 - `status` is the one command about this server that does not extend it: it
-  also reads the project's environment, so it extends `EnvironmentCommand`.
-  `console` and `doctor` keep their own `sourceOf`.
+  also reads the project's environment, so it extends
+  `ServerCommand(EnvironmentCommand)`. `console` and `doctor` keep their own
+  `sourceOf`.
 
 ## How a command reads
 
@@ -44,6 +56,4 @@ only turns the answer into a result.
 
 ## Known limits
 
-- `Destructive(ServerCommand)` loses the base's `static group`, so `reset`
-  declares its group itself; `doctor` does too.
 - `status` and `console` do not yet use `folderRule`.

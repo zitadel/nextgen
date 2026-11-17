@@ -87,7 +87,7 @@ namespace over loose functions. They disagreed on order, and this is the call:
 ## The commands
 
 The commands live in [`src/cli/commands/server`](../../cli/commands/server/AGENTS.md)
-and extend one `ServerCommand`. They call `plan()`, `launch()`, `stop()`,
+and extend `LocalServerCommand(...)`. They call `plan()`, `launch()`, `stop()`,
 `reset()` and `follow()` and render the answer; none builds a path, a container
 name or an address.
 

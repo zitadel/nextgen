@@ -210,6 +210,11 @@
   first question, and each one that does as soon as its answer is given.
 - Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
+- A command that talks to a Zitadel server extends `ServerCommand(...)`, one
+  that may have to ask for it `ChoosingServerCommand(...)`, and one about the
+  server on this machine `LocalServerCommand(...)`, all from
+  `src/cli/commands/server-command.ts`. A command never resolves, parses or
+  normalises a server address itself.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so

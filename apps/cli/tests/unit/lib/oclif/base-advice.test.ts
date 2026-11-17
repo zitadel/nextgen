@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { ServerCommand } from "@/cli/commands/server/base";
+import { ServerCommand } from "@/cli/commands/server-command";
+import { BaseCommand } from "@/lib/oclif";
 import { LOCAL_SERVER_ADVICE } from "@/lib/suggestion/local-server-advice";
 import { Spelling } from "@/lib/suggestion/spelling";
 import { LocalServerError, type LocalServerErrorKind } from "@/lib/server";
 import { aConfigAt } from "@tests/helpers/suggestions";
 
 /** A server command that records the failure envelope it would print. */
-class Failing extends ServerCommand {
+class Failing extends ServerCommand(BaseCommand) {
   public static override readonly id = "failing-server-test";
   public readonly json: unknown[] = [];
 
@@ -24,7 +25,7 @@ class Failing extends ServerCommand {
   }
 
   public async fail(error: Error): Promise<void> {
-    await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
+    await this.toMeta({ "no-telemetry": true }, { source: "mock" });
     try {
       await this.catch(error);
     } catch {

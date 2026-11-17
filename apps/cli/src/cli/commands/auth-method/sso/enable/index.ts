@@ -123,7 +123,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   };
 
   static override meta = {
-    resolveServer: true,
     environment: true,
   };
 

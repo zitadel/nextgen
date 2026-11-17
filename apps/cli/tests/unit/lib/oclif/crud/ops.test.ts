@@ -31,6 +31,7 @@ import {
   UpdateOperation,
   type UpdateSpec,
 } from "@/lib/oclif/crud";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The generated command each operation stands in for. A run suggests commands
@@ -59,9 +60,12 @@ function inCli<Bound extends typeof Command>(command: Bound, id: string): Bound 
 }
 
 /** {@link bindOperationOnly}, named as the command it stands in for. */
-const bindOperation: typeof bindOperationOnly = (operation, definition) => {
+const bindOperation = <Ctx, Spec>(
+  operation: OperationClass<Ctx, Spec>,
+  definition: OperationDefinition<Ctx, Spec>,
+) => {
   return inCli(
-    bindOperationOnly(operation, definition),
+    bindOperationOnly(operation, definition, ServerCommand),
     STAND_IN.get(operation) ?? "team:deactivate",
   );
 };
@@ -280,7 +284,7 @@ describe("operation statics", () => {
 describe("bindOperation", () => {
   it("produces a BaseCommand subclass carrying the definition and statics", () => {
     const Bound = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
-    expect(Object.getPrototypeOf(Bound)).toBe(GetOperation);
+    expect(Object.getPrototypeOf(Object.getPrototypeOf(Bound))).toBe(GetOperation);
     expect(Bound.prototype).toBeInstanceOf(BaseCommand);
     expect(Bound.description).toBe("Get one team by id.");
     expect(Object.keys(Bound.flags)).toEqual(["fields", "extra"]);
@@ -954,6 +958,7 @@ describe("delete confirmation", () => {
         bindOperationOnly(
           DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
           definition<DeleteSpec<Ctx>>({ verb, call }),
+          ServerCommand,
         ),
         DELETING[verb],
       ),

@@ -12,7 +12,7 @@ import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { log, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { ServerCommand } from "@/cli/commands/server/base";
+import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
@@ -45,6 +45,7 @@ import {
 import { LocalRuntimeChecks } from "./checks/local-runtime";
 import { doctorReport, renderDoctorReport, withCategories } from "./report";
 import { Project } from "@/lib/project";
+import { BaseCommand } from "@/lib/oclif";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -110,7 +111,7 @@ type Checking = Readonly<{
 /**
  * `zitadel doctor` — verify local runtime and project state.
  */
-export default class Doctor extends Destructive(ServerCommand) {
+export default class Doctor extends Destructive(LocalServerCommand(ServerCommand(BaseCommand))) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 3;
@@ -140,10 +141,6 @@ export default class Doctor extends Destructive(ServerCommand) {
     },
     { force: { dependsOn: ["fix"] } },
   );
-
-  static override meta = {
-    resolveServer: false,
-  };
 
   /**
    * What doctor is about, worked out once: the port it checks and the hosted

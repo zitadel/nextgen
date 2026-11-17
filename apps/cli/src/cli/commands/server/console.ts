@@ -4,11 +4,13 @@ import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
 import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { section, log } from "@/lib/ui";
-import { ServerCommand } from "@/cli/commands/server/base";
+import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { BaseCommand } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
 
 /** How a directory with no local admin, and no parent holding one, is refused. */
 const NO_LOCAL_ADMIN_REFUSAL = {
@@ -25,7 +27,8 @@ const NO_LOCAL_ADMIN_REFUSAL = {
  * project on a cloud or self-hosted server, it is that server's console, where
  * you sign in yourself.
  */
-export default class Console extends ServerCommand {
+export default class Console extends LocalServerCommand(ServerCommand(BaseCommand)) {
+  static override group = CommandGroups.localServer;
   static override description =
     "Open the console of the server the project uses.\n\nWhere a local server was started, the console opens signed in as the local admin the start command created: run this in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.";
   static override groupOrder = 5;

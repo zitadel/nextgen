@@ -1,11 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { DestroyPermit } from "@/lib/server";
-import { CommandGroups } from "@/cli/commands/groups";
-import { ServerCommand } from "@/cli/commands/server/base";
+import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { type Fact, section } from "@/lib/ui";
+import { BaseCommand } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
 
 /**
  * What a reset reports about the server it removes: a process, a container, or
@@ -20,7 +21,9 @@ type ResetTarget =
  * A folder with no server is not refused: there is nothing to reset, and the
  * result says so.
  */
-export default class Reset extends Destructive(ServerCommand) {
+export default class Reset extends Destructive(
+  LocalServerCommand(ServerCommand(BaseCommand), "exact"),
+) {
   static override group = CommandGroups.localServer;
   static override description = "Delete the local Zitadel server runtime and data.";
   static override groupOrder = 6;
@@ -32,6 +35,15 @@ export default class Reset extends Destructive(ServerCommand) {
         "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
     }),
   };
+
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute(): Promise<JsonEnvelope> {
     const record = await this.serverInThisFolder().record();

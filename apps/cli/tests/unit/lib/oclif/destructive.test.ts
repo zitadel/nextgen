@@ -67,7 +67,7 @@ class Removing extends Destructive(BaseCommand) {
         force: this.invocation.force ?? false,
         "dry-run": this.invocation.dryRun ?? false,
       },
-      { resolveServer: false, source: "mock" },
+      { source: "mock" },
     );
     this.meta = { ...this.meta, nonInteractive: !(this.invocation.interactive ?? false) };
     return this.confirmed<string | undefined>({

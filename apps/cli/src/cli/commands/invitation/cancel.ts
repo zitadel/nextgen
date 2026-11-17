@@ -10,6 +10,7 @@ import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The invitation `invitation cancel` cancels, as the API spells an invitation id. */
 // Annotated: its `next` names this topic's list, which would make the type circular.
@@ -47,7 +48,7 @@ const NOTHING_PENDING_REFUSAL = {
  * so its link can no longer be redeemed. Without an id it offers the pending
  * invitations to pick from.
  */
-export default class InvitationCancel extends Destructive(EnvironmentCommand) {
+export default class InvitationCancel extends Destructive(ServerCommand(EnvironmentCommand)) {
   static override description = "Cancel a pending invitation so its link stops working.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 8;

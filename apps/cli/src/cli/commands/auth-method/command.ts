@@ -29,6 +29,7 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { Cmd } from "@/lib/cmd";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The flags the re-run of a refused change sets: the schema every `auth-method`
@@ -333,7 +334,7 @@ const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"
  * credentials. Every other edit is local, and `deploy` publishes it like any
  * configuration change.
  */
-export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) {
+export abstract class AuthMethodCommand extends Destructive(ServerCommand(EnvironmentCommand)) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.
@@ -346,8 +347,16 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     }),
   };
 
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
+
   static override meta = {
-    resolveServer: false,
     environment: false,
   };
 

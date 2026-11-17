@@ -12,14 +12,13 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { type Refused, reads, taken } from "@/lib/oclif/flags";
-import { Promptable } from "@/lib/oclif/promptable";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
-import { ZitadelRuntime } from "@/lib/server";
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
 import { Project } from "@/lib/project";
+import { ChoosingServerCommand } from "@/cli/commands/server-command";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL = {
@@ -125,7 +124,7 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends Promptable(BaseCommand) {
+export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 2;
@@ -156,24 +155,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     force: Flags.boolean({ description: "Overwrite an existing .env.<name>.local." }),
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
-
   protected async execute({ args, flags }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
     const { cwd, env, nonInteractive, dryRun } = this.meta;
     const environment = await environmentFile(cwd, args.name, flags.force);
-    // `--server` resolves to an origin as it does everywhere; one that was not
-    // given is left to the prompt below.
-    const givenServer = this.meta.serverFlag
-      ? (
-          await ZitadelRuntime.resolve({
-            cwd,
-            serverFlag: this.meta.serverFlag,
-          })
-        ).value
-      : undefined;
-
     const config = await Project.at(cwd).config();
     const frameworkId = config.frameworkId;
     const publicVariable =
@@ -181,18 +165,12 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         ? PUBLIC_PROJECT_ID_VARIABLE[frameworkId as keyof typeof PUBLIC_PROJECT_ID_VARIABLE]
         : undefined;
 
-    const server =
-      givenServer ??
-      (await this.ask.text({
-        name: "server",
-        message: "What is the URL of your Zitadel server?",
-        flag: "--server",
-        initialValue: ZitadelRuntime.DEFAULT,
-        parse: ZitadelRuntime.parse,
-        // The rerun keeps every choice this run made, so binding a project
-        // (`--project`) stays a bind rather than creating a new project.
-        retry: await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),
-      }));
+    // `--server` resolves to an origin as it does everywhere; one that was not
+    // given is asked for. The rerun keeps every choice this run made, so binding
+    // a project (`--project`) stays a bind rather than creating a new project.
+    const server = await this.serverOrAsk(
+      await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),
+    );
 
     const appUrl =
       flags.appUrl ??

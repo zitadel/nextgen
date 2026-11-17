@@ -34,7 +34,6 @@ export class NotFound extends BaseCommand {
   static override hidden = true;
   // Whatever was typed is its arguments.
   static override strict = false;
-  static override meta = { resolveServer: false };
 
   /** Whether it refused the words as naming no command, which exits as a shell does. */
   private unknown = false;
