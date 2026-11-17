@@ -50,7 +50,3 @@ only turns the answer into a result.
 - Explanations go in TSDoc on the class, not in comments inside a body.
 - A dry run reports `plan()`: a `DockerStart` or a `BinaryStart`, never a loose
   record, so a binary start cannot carry an image or a container.
-
-## Known limits
-
-- `status` and `console` do not yet use `folderRule`.

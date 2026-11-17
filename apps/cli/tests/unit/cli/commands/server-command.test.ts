@@ -40,7 +40,7 @@ class ChoosesAServer extends ChoosingServerCommand(BaseCommand) {
 
   public async chooseWith(flags: Record<string, unknown>) {
     await this.toMeta({ "no-telemetry": true, "non-interactive": true, ...flags });
-    return this.serverOrAsk(shellCommand("docker", "version"));
+    return (await this.givenServer()) ?? this.askServer(shellCommand("docker", "version"));
   }
 }
 

@@ -18,7 +18,7 @@ import { log } from "@/lib/ui";
  * `--server`: the one flag every {@link ServerCommand} takes, declared once so
  * every command carries the same one.
  */
-const SERVER = serverFlag({
+export const SERVER = serverFlag({
   char: "s",
   description: "Override the resolved server URL.",
 });
@@ -66,7 +66,7 @@ export function ServerCommand<
       cwd: string,
       serverFlag: string | undefined,
     ): Promise<string> {
-      return (await ZitadelRuntime.resolve({ cwd, serverFlag })).value;
+      return (await this.servers().resolve({ cwd, serverFlag })).value;
     }
 
     /**
@@ -107,8 +107,8 @@ export function ServerCommand<
  * ```
  *
  * It resolves nothing until it is asked to: with no `--server` its `source`
- * stays empty rather than becoming the cloud, and {@link serverOrAsk} says which
- * server the run is about.
+ * stays empty rather than becoming the cloud, and {@link givenServer} and
+ * {@link askServer} say which server the run is about.
  *
  * @param Base - The command class to extend.
  * @returns The class, taking a server and able to ask for one.
@@ -121,7 +121,7 @@ export function ChoosingServerCommand<
     /**
      * Resolves nothing before the person is asked: the run's `source` stays
      * empty, as it does for a command that names no server, and
-     * {@link serverOrAsk} resolves `--server` when it was given.
+     * {@link givenServer} resolves `--server` when it was given.
      *
      * @returns No server.
      */
@@ -130,28 +130,37 @@ export function ChoosingServerCommand<
     }
 
     /**
-     * The server the run is about: the one `--server` named, resolved as every
-     * command resolves it, or else the one the person answers, with the cloud as
-     * the suggestion. With no one to ask, it refuses the missing flag.
+     * The server `--server` named, resolved as every command resolves it.
+     *
+     * @returns The server's address, or `undefined` when none was given.
+     * @throws {ZitadelError} When the flag is not a server, or `local` and none runs.
+     */
+    protected async givenServer(): Promise<string | undefined> {
+      const { cwd, serverFlag } = this.meta;
+      if (serverFlag) {
+        return (await this.servers().resolve({ cwd, serverFlag })).value;
+      } else {
+        return undefined;
+      }
+    }
+
+    /**
+     * Asks which server the run is about, with the cloud as the suggestion. With
+     * no one to ask, it refuses the missing flag.
      *
      * @param retry - The command that reruns this one, so a refusal can offer it.
      * @returns The server's address.
      * @throws {ZitadelError} When the answer is not a server, or no one can be asked.
      */
-    protected async serverOrAsk(retry: SuggestedCommand): Promise<string> {
-      const { cwd, serverFlag } = this.meta;
-      if (serverFlag) {
-        return (await ZitadelRuntime.resolve({ cwd, serverFlag })).value;
-      } else {
-        return this.ask.text({
-          name: "server",
-          message: "What is the URL of your Zitadel server?",
-          flag: "--server",
-          initialValue: ZitadelRuntime.DEFAULT,
-          parse: ZitadelRuntime.parse,
-          retry,
-        });
-      }
+    protected async askServer(retry: SuggestedCommand): Promise<string> {
+      return this.ask.text({
+        name: "server",
+        message: "What is the URL of your Zitadel server?",
+        flag: "--server",
+        initialValue: ZitadelRuntime.DEFAULT,
+        parse: (value) => this.servers().parse(value),
+        retry,
+      });
     }
   }
   return ServerChoosing;

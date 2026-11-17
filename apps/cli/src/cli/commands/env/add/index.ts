@@ -158,6 +158,9 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
   protected async execute({ args, flags }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
     const { cwd, env, nonInteractive, dryRun } = this.meta;
     const environment = await environmentFile(cwd, args.name, flags.force);
+    // `--server` resolves to an origin as it does everywhere, before anything else
+    // is read; one that was not given is asked for below.
+    const givenServer = await this.givenServer();
     const config = await Project.at(cwd).config();
     const frameworkId = config.frameworkId;
     const publicVariable =
@@ -165,12 +168,13 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
         ? PUBLIC_PROJECT_ID_VARIABLE[frameworkId as keyof typeof PUBLIC_PROJECT_ID_VARIABLE]
         : undefined;
 
-    // `--server` resolves to an origin as it does everywhere; one that was not
-    // given is asked for. The rerun keeps every choice this run made, so binding
-    // a project (`--project`) stays a bind rather than creating a new project.
-    const server = await this.serverOrAsk(
-      await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),
-    );
+    // The rerun keeps every choice this run made, so binding a project
+    // (`--project`) stays a bind rather than creating a new project.
+    const server =
+      givenServer ??
+      (await this.askServer(
+        await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),
+      ));
 
     const appUrl =
       flags.appUrl ??

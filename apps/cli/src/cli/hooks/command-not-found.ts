@@ -2,6 +2,7 @@ import type { Hook } from "@oclif/core";
 import { distance } from "fastest-levenshtein";
 
 import { EXIT_CODES, ZitadelError } from "@/lib/errors";
+import { SERVER, ServerCommand } from "@/cli/commands/server-command";
 import { type Admitted, BaseCommand } from "@/lib/oclif/base";
 import { aliasedNouns } from "@/lib/oclif/plural-aliases";
 import type { JsonEnvelope } from "@/lib/oclif/types";
@@ -29,11 +30,20 @@ export const UNKNOWN_COMMAND_EXIT_CODE = 127;
  * would run without the flags typed, so a typo can never turn into a
  * different, possibly destructive, command.
  */
-export class NotFound extends BaseCommand {
+export class NotFound extends ServerCommand(BaseCommand) {
   static override readonly id = "not-found";
   static override hidden = true;
   // Whatever was typed is its arguments.
   static override strict = false;
+
+  /**
+   * It names no server of its own: what was typed is refused whatever the server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   /** Whether it refused the words as naming no command, which exits as a shell does. */
   private unknown = false;
@@ -219,20 +229,8 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   // in every command, so only the base flags' letters are known. A flag every
   // command takes a value for takes the next word whatever it is, as oclif
   // would; any other leaves a word that is a flag itself, such as `--json`.
-  // The flags every command takes: the base flags, and any a mixin adds to all
-  // of them, such as `--server`.
-  const base = [
-    ...Object.entries(BaseCommand.baseFlags),
-    ...Object.entries(config.commands[0]?.flags ?? {}).filter(([name, flag]) => {
-      return (
-        !(name in BaseCommand.baseFlags) &&
-        config.commands.every((command) => {
-          const other = command.flags[name];
-          return other?.type === flag.type && other.char === flag.char;
-        })
-      );
-    }),
-  ];
+  // The flags every command takes: the base flags, and `--server`.
+  const base = Object.entries({ ...BaseCommand.baseFlags, server: SERVER });
   const switches = new Map<string, boolean>([["json", true]]);
   for (const [name, flag] of [
     ...base,
