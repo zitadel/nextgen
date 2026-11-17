@@ -36,6 +36,9 @@ jobs:
       - name: Build the CLI from this ref
         run: corepack pnpm exec turbo run build --filter=@zitadel/cli
 
+      - name: Build the Windows server binary
+        run: corepack pnpm exec turbo run build-binary --filter=@zitadel/server-win32-x64 --output-logs=errors-only
+
       - name: CLI runs
         run: node apps/cli/bin/run.js --version && node apps/cli/bin/run.js --help
 
