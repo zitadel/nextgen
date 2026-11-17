@@ -1,4 +1,4 @@
-import { chmod, stat, writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 
 import { warnings } from "@/lib/ui/warnings";
 
@@ -43,48 +43,6 @@ export class SecretFile {
       warnings.report(
         `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
       );
-    }
-  }
-
-  /**
-   * Whether the platform keeps POSIX permission bits on a file. Windows reports
-   * every file as `0666` and ignores `chmod`, so no mode can be read or set
-   * there. This is the one place that says so: callers ask {@link isLockedDown}
-   * and {@link relock} and never look at the platform.
-   *
-   * @param platform - The Node.js platform name.
-   * @returns `true` when a file's mode can be read and set.
-   */
-  static keepsModes(platform: NodeJS.Platform = process.platform): boolean {
-    return platform !== "win32";
-  }
-
-  /**
-   * Whether the file is owner read/write only, or sits on a platform with no
-   * modes to be wrong.
-   *
-   * @param path - The file.
-   * @param platform - The Node.js platform name.
-   * @returns The mode it has when that is not `0600`, or `undefined` when it is locked down.
-   * @throws Any `stat` error, such as the file being missing.
-   */
-  static async looseMode(
-    path: string,
-    platform: NodeJS.Platform = process.platform,
-  ): Promise<number | undefined> {
-    const mode = (await stat(path)).mode & 0o777;
-    return SecretFile.keepsModes(platform) && mode !== SECRET_MODE ? mode : undefined;
-  }
-
-  /**
-   * Locks the file down to `0600`, doing nothing where there are no modes.
-   *
-   * @param path - The file.
-   * @param platform - The Node.js platform name.
-   */
-  static async relock(path: string, platform: NodeJS.Platform = process.platform): Promise<void> {
-    if (SecretFile.keepsModes(platform)) {
-      await chmod(path, SECRET_MODE);
     }
   }
 

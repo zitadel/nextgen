@@ -355,11 +355,11 @@ describe("Orca.scaffold", () => {
     const cwd = await tmpPackageSafe(dir);
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/local/runtime.json"), '{"server_url":"http://localhost"}');
-    let ranIn = "";
+    const ranIn: string[] = [];
     const watchingScaffolder: Scaffolder = {
       ...fakeScaffolder,
       async scaffold(scaffoldCwd) {
-        ranIn = scaffoldCwd;
+        ranIn.push(scaffoldCwd);
         // A running server holds files open here, so they must stay where they are.
         await expect(stat(join(cwd, ".zitadel/local/runtime.json"))).resolves.toBeTruthy();
         await writeFile(join(scaffoldCwd, "package.json"), "{}");
@@ -369,8 +369,9 @@ describe("Orca.scaffold", () => {
 
     await watchingOrca.scaffold(cwd, "fake");
 
-    expect(ranIn).not.toBe(cwd);
-    expect(basename(ranIn)).toBe(basename(cwd));
+    expect(ranIn).toHaveLength(1);
+    expect(ranIn[0]).not.toBe(cwd);
+    expect(basename(ranIn[0] ?? "")).toBe(basename(cwd));
     expect(await readdir(dirname(cwd))).toEqual([basename(cwd)]);
   });
 
