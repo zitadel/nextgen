@@ -14,9 +14,10 @@ export const FLOW_FAILED = "flow_failed";
  */
 export type FlowStep<Known extends object> = {
   /**
-   * The name the event catalog gives the step.
+   * The name the event catalog gives the step. A step without one is not
+   * reported as completed; its choice still goes on the flow's ending.
    */
-  readonly step: string;
+  readonly step?: string;
   /**
    * The choice the step settled, as properties. Only enums, booleans and
    * counts: never an entered value.
@@ -53,9 +54,9 @@ export type FlowOptions<Known extends object> = {
   readonly completesAt: string;
   /**
    * The step a failure is reported under when the step that failed is not in
-   * `steps`.
+   * `steps`. A flow without one reports its failures with no step.
    */
-  readonly otherwise: string;
+  readonly otherwise?: string;
   /**
    * Whether the run changes nothing, so that finishing it is not a success
    * worth counting.
@@ -131,7 +132,9 @@ export class FlowTelemetry<Known extends object> {
     if (reported !== undefined) {
       const choice = this.choiceOf(reported, known);
       this.facts = { ...this.facts, ...choice };
-      this.send(FLOW_STEP_COMPLETED, { flow: this.options.flow, step: reported.step, ...choice });
+      if (reported.step !== undefined) {
+        this.send(FLOW_STEP_COMPLETED, { flow: this.options.flow, step: reported.step, ...choice });
+      }
     }
     if (key === this.options.completesAt && !this.options.preview()) {
       this.ended = true;

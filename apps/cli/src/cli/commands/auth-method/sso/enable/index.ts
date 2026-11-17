@@ -12,7 +12,12 @@ import {
 } from "@zitadel/config/idp";
 
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
-import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import {
+  type EnableFacts,
+  type Fact,
+  PROVIDER_SETUP_STEPS,
+} from "@/cli/commands/auth-method/sso/enable/shared";
+import { FlowTelemetry } from "@/lib/oclif/flow-telemetry";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
@@ -145,6 +150,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
 
+    const setup = new FlowTelemetry<Partial<EnableFacts>>({
+      flow: "oidc_provider_setup",
+      steps: PROVIDER_SETUP_STEPS,
+      completesAt: "write",
+      preview: () => {
+        return this.dryRun;
+      },
+      send: (event, properties) => {
+        this.trackEvent(event, properties);
+      },
+    });
+    setup.begin({ entry_point: "standalone" });
+
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
         .step(
@@ -236,6 +254,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .run(
           { flags },
           {
+            watch: setup.watcher,
             onUndoError: (key, error) => {
               warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

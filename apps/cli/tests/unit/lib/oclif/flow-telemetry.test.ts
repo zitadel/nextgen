@@ -162,4 +162,50 @@ describe("FlowTelemetry", () => {
       flow.watcher.finished("last", {});
     }).not.toThrow();
   });
+
+  it("carries the choice of a step with no name onto the ending, without a step event", () => {
+    const sent: Sent[] = [];
+    const flow = new FlowTelemetry<Known>({
+      flow: "oidc_provider_setup",
+      steps: {
+        picked: {
+          choice: ({ answer }) => {
+            return { provider_type: answer };
+          },
+        },
+      },
+      completesAt: "last",
+      preview: () => {
+        return false;
+      },
+      send: (event, properties) => {
+        sent.push({ event, properties });
+      },
+      now: () => {
+        return 0;
+      },
+    });
+
+    flow.begin({ entry_point: "standalone" });
+    flow.watcher.finished("picked", { answer: "google" });
+    flow.watcher.failed("later", new Error("no"));
+
+    expect(sent).toEqual([
+      {
+        event: "flow_started",
+        properties: { flow: "oidc_provider_setup", entry_point: "standalone" },
+      },
+      {
+        event: "flow_failed",
+        properties: {
+          flow: "oidc_provider_setup",
+          entry_point: "standalone",
+          provider_type: "google",
+          step: undefined,
+          reason: undefined,
+          duration_ms: 0,
+        },
+      },
+    ]);
+  });
 });
