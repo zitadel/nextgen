@@ -699,9 +699,7 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		// The root document is supplied inline, so compilation performs no
 		// I/O that would observe the context; only the post-compile check
-		// can catch the already-expired envelope. A negative timeout is expired
-		// at once on every platform; a 1ns one is not on Windows, whose clock
-		// ticks too coarsely to have moved by the time compilation ends.
+		// can catch the already-expired envelope.
 		client := newEgressClient(t, httputil.ClientConfig{})
 		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, -time.Second, client, nil)
 

@@ -270,7 +270,6 @@ describe("Orca.scaffold", () => {
     const guardedScaffolder: Scaffolder = {
       ...fakeScaffolder,
       async scaffold(scaffoldCwd) {
-        // The generator runs in an empty directory beside the project.
         await expect(stat(join(scaffoldCwd, ".zitadel"))).rejects.toMatchObject({
           code: "ENOENT",
         });
@@ -360,7 +359,6 @@ describe("Orca.scaffold", () => {
       ...fakeScaffolder,
       async scaffold(scaffoldCwd) {
         ranIn.push(scaffoldCwd);
-        // A running server holds files open here, so they must stay where they are.
         await expect(stat(join(cwd, ".zitadel/local/runtime.json"))).resolves.toBeTruthy();
         await writeFile(join(scaffoldCwd, "package.json"), "{}");
       },

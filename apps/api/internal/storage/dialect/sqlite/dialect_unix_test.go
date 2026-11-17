@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Windows has no POSIX file modes and forbids "?" in a name, so these run elsewhere.
-
 func TestConnectTightensFilePermissions(t *testing.T) {
 	t.Parallel()
 

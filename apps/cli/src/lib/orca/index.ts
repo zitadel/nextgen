@@ -275,10 +275,6 @@ export class Orca {
     // parent it took to create it.
     const created = await mkdir(cwd, { recursive: true });
     const before = await listEntries(cwd);
-    // The underlying scaffolders require an empty directory. When it holds the
-    // local runtime `start` left, or --force lets us scaffold into a non-empty
-    // one, scaffold in an empty directory beside it and move the result in, so
-    // nothing already there, such as files a running server holds open, is moved.
     const workspace = await openScaffoldWorkspace(cwd, target.entries);
     const undo = () => {
       return created === undefined
