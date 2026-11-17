@@ -82,7 +82,7 @@ const CHECK = {
   secretPermissions: {
     name: "secret-permissions",
     status: "pass",
-    message: ".zitadel/secret has 0600 permissions",
+    message: ".zitadel/secret is owner-only",
     path: ".zitadel/secret",
     category: "credentials",
   },

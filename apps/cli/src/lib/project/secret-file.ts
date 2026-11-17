@@ -1,5 +1,6 @@
-import { chmod, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { warnings } from "@/lib/ui/warnings";
 
@@ -57,7 +58,7 @@ export class SecretFile {
    */
   static async isSecure(path: string): Promise<boolean> {
     const mode = (await stat(path)).mode & 0o777;
-    return mode === SECRET_MODE || !(await SecretFile.keepsModes(dirname(path)));
+    return mode === SECRET_MODE || !(await SecretFile.keepsModes());
   }
 
   /**
@@ -70,20 +71,24 @@ export class SecretFile {
   }
 
   /**
-   * Whether a file made in `dir` keeps the mode it is given, found by trying
-   * one, so it needs no list of the platforms and filesystems that do not.
-   * A directory that cannot be tried in is taken to keep modes.
+   * Whether a file keeps the mode it is given, found by trying one in a
+   * directory of its own under the temp directory, so it needs no list of the
+   * platforms and filesystems that do not and leaves nothing in the project.
+   * Where it cannot be tried, modes are taken to be kept.
    */
-  private static async keepsModes(dir: string): Promise<boolean> {
-    const probe = join(dir, `.mode-probe-${String(process.pid)}`);
+  private static async keepsModes(): Promise<boolean> {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-modes-"));
     try {
+      const probe = join(dir, "probe");
       await writeFile(probe, "", { mode: SECRET_MODE });
       await chmod(probe, 0o640);
       return ((await stat(probe)).mode & 0o777) === 0o640;
     } catch {
       return true;
     } finally {
-      await rm(probe, { force: true });
+      await rm(dir, { recursive: true, force: true }).catch(() => {
+        return undefined;
+      });
     }
   }
 

@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import fse from "fs-extra";
@@ -30,10 +30,9 @@ export class ScaffoldWorkspace {
     }
     const dir = join(
       dirname(cwd),
-      `${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
+      `.${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
     );
     const work = join(dir, "work", basename(cwd));
-    await mkdir(join(dir, "backup"), { recursive: true, mode: 0o700 });
     await mkdir(work, { recursive: true, mode: 0o700 });
     return new ScaffoldWorkspace(dir, work);
   }
@@ -53,15 +52,19 @@ export class ScaffoldWorkspace {
    * holds under the same name is backed up first. For `.gitignore` the backed-up
    * rules are merged in, so ignores the existing setup relied on, notably
    * `.zitadel/local/`, which keeps the local admin credential out of git, are
-   * not dropped. Any other collision keeps the scaffold's version, which is what
-   * `--force` is for.
+   * not dropped. A `.git` the project holds is never replaced. Any other
+   * collision keeps the scaffold's version, which is what `--force` is for.
    *
    * @param cwd - The project directory.
    */
   async moveInto(cwd: string): Promise<void> {
-    for (const name of await readDirIfExists(this.work)) {
+    await mkdir(this.backup, { recursive: true, mode: 0o700 });
+    for (const name of await readdir(this.work)) {
       const dest = join(cwd, name);
       const replaces = await entryExists(dest);
+      if (replaces && name === ".git") {
+        continue;
+      }
       if (replaces) {
         await fse.move(dest, join(this.backup, name));
       }

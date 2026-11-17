@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { SecretFile } from "@/lib/project/secret-file";
@@ -11,8 +12,9 @@ export class SecretPermissionsCheck extends AbstractSanityCheck {
   protected readonly summary = ".zitadel/secret is owner-only";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    if (!(await SecretFile.isSecure(join(ctx.cwd, this.path)))) {
-      throw new Error(".zitadel/secret can be read by others; expected 0600");
+    const file = join(ctx.cwd, this.path);
+    if (!(await SecretFile.isSecure(file))) {
+      throw new Error(`expected 0600, got ${((await stat(file)).mode & 0o777).toString(8)}`);
     }
   }
 

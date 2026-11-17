@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { describe, expect } from "vitest";
@@ -71,6 +71,28 @@ describe("ScaffoldWorkspace", () => {
     await workspace?.moveInto(cwd);
 
     expect(await workspace?.replaced()).toEqual([".env"]);
+  });
+
+  it("never replaces a .git the project holds", async ({ dir }) => {
+    const cwd = await aProjectHolding(dir, {});
+    await mkdir(join(cwd, ".git"));
+    await writeFile(join(cwd, ".git/HEAD"), "mine");
+    const workspace = await ScaffoldWorkspace.open(cwd, [".git"]);
+    await mkdir(join(workspace?.work ?? "", ".git"));
+    await writeFile(join(workspace?.work ?? "", ".git/HEAD"), "theirs");
+
+    await workspace?.moveInto(cwd);
+
+    expect(await readFile(join(cwd, ".git/HEAD"), "utf8")).toBe("mine");
+    expect(await workspace?.replaced()).toEqual([]);
+  });
+
+  it("fails when the scaffold removed the directory it ran in", async ({ dir }) => {
+    const cwd = await aProjectHolding(dir, { "a.txt": "x" });
+    const workspace = await ScaffoldWorkspace.open(cwd, ["a.txt"]);
+    await rm(workspace?.work ?? "", { recursive: true });
+
+    await expect(workspace?.moveInto(cwd)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it.skipIf(process.platform === "win32")("keeps the backup to its owner", async ({ dir }) => {
