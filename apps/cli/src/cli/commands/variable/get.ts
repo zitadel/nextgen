@@ -9,6 +9,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 
 import { variableNameArg } from "./name";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -18,7 +19,7 @@ import { variableNameArg } from "./name";
  * `--preview` it reads the primary value; with it, the preview value. A name with
  * no value of the kind asked for is a miss.
  */
-export default class VariableGet extends Tabulatable(EnvironmentCommand) {
+export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

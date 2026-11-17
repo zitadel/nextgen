@@ -1,4 +1,4 @@
-import { SystemMachine, LocalRuntime } from "@/lib/server";
+import { RealMachine, LocalRuntime } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   BRANDING_DESIGNS,
@@ -85,6 +85,7 @@ import { SettleAnswers } from "./steps/settle-answers";
 import { ShowResult } from "./steps/show-result";
 import { WriteConfiguration } from "./steps/write-configuration";
 import { WriteManifest } from "./steps/write-manifest";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * How `--design`, which setup no longer takes, is refused.
@@ -198,7 +199,7 @@ const RENDERER_FLAG_DESCRIPTION =
  * `--design` is hidden so scripts and agents passing it get a targeted error
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
-export default class Setup extends Destructive(BaseCommand) {
+export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
   /**
    * What `--help` says the command does.
    */
@@ -359,13 +360,6 @@ export default class Setup extends Destructive(BaseCommand) {
   };
 
   /**
-   * That setup resolves its own server, in the preconditions.
-   */
-  static override meta = {
-    resolveServer: false,
-  };
-
-  /**
    * The server a recovery names instead of the env file, for a project setup
    * moved to another port that has no env file to pin.
    */
@@ -393,6 +387,18 @@ export default class Setup extends Destructive(BaseCommand) {
   }
 
   /**
+   * `--server` is not ignored: setup resolves it itself in its preconditions
+   * (`meta.serverFlag`), and its server question is skipped when it is given.
+   * This only defers the base's resolution, so the run names no server before
+   * then.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
+
+  /**
    * Refuses a command line setup cannot act on, then runs the steps of `setup`
    * in the order they run: end early for an app that is already set up, work out
    * what the run is about and what to write, create the app and the project,
@@ -413,7 +419,7 @@ export default class Setup extends Destructive(BaseCommand) {
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
 
-    const machine = new SystemMachine();
+    const machine = new RealMachine();
 
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("setup")

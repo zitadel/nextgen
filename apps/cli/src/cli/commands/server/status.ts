@@ -23,6 +23,7 @@ import {
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { TestKit } from "@/lib/test-kit";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -31,7 +32,7 @@ import { TestKit } from "@/lib/test-kit";
  * local server, or orphaned config should be visible without making `status`
  * itself fail.
  */
-export default class Status extends EnvironmentCommand {
+export default class Status extends ServerCommand(EnvironmentCommand) {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 3;
@@ -47,7 +48,6 @@ export default class Status extends EnvironmentCommand {
       resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
     );
     return super.toMeta(flags, {
-      resolveServer: false,
       source: runtime?.server_url ?? LocalRuntime.DEFAULT_URL,
     });
   }

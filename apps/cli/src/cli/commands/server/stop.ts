@@ -1,9 +1,11 @@
 import { Flags } from "@oclif/core";
 
 import { LocalRuntime } from "@/lib/server";
-import { ServerCommand } from "@/cli/commands/server/base";
+import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 import { type Fact, section } from "@/lib/ui";
+import { BaseCommand } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
 
 /**
  * `zitadel stop`: stops this folder's server and keeps its data, or, with
@@ -11,7 +13,8 @@ import { type Fact, section } from "@/lib/ui";
  * started it. Stopping a folder with no server is not an error: there is
  * nothing to stop, and the result says so.
  */
-export default class Stop extends ServerCommand {
+export default class Stop extends LocalServerCommand(ServerCommand(BaseCommand), "exact") {
+  static override group = CommandGroups.localServer;
   static override description = "Stop the local Zitadel server.";
   static override groupOrder = 2;
 
@@ -20,6 +23,15 @@ export default class Stop extends ServerCommand {
       description: "Stop all discovered CLI-managed local Zitadel runtime processes.",
     }),
   };
+
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ flags }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
     if (flags.all) {

@@ -120,7 +120,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   current directory, not from `--cwd` (`--cwd app --env-file app/.env.ci`):
   Node reads `--env-file` itself before the CLI starts and exits 9 with
   `node: <path>: not found`, and no envelope, when the file is not there.
-- **Server and project.** A command that talks to a project reads
+- **Server and project.** `--server` is a flag of each command that takes a server,
+  not a global one. A command that talks to a project reads
   `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
   first source that has it: `--server` (the URL only), `--env-file <path>`, the
   process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,

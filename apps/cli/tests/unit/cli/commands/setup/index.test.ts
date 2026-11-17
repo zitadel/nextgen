@@ -177,7 +177,7 @@ const PRE_PROJECT_CONFLICTS: ReadonlyArray<{
 /**
  * The cloud platform the mock answers for.
  */
-const CLOUD = "https://api.zitadel.cloud";
+const CLOUD = "https://preview.zitadel.com";
 
 /**
  * A local server the mock answers for, as `zitadel start` would run one.

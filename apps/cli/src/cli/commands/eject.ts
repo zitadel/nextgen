@@ -23,6 +23,7 @@ import {
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -361,7 +362,7 @@ function ejected(
  * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
  * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
  */
-export default class Eject extends Destructive(BaseCommand) {
+export default class Eject extends Destructive(ServerCommand(BaseCommand)) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 7;
@@ -375,9 +376,14 @@ export default class Eject extends Destructive(BaseCommand) {
     }),
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ flags }: Admitted<typeof Eject>): Promise<JsonEnvelope> {
     const dir = typeof flags.cwd === "string" ? flags.cwd : undefined;

@@ -1,4 +1,4 @@
-import { SystemMachine } from "@/lib/server";
+import { RealMachine } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   type ClientId,
@@ -174,7 +174,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * That the command resolves the server and the environment before it runs.
    */
   static override meta = {
-    resolveServer: true,
     environment: true,
   };
 
@@ -235,7 +234,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .step(new ReadClaims())
         .step(
           new PlanChange({
-            machine: new SystemMachine(),
+            machine: new RealMachine(),
           }),
         )
         .step(new IntroduceProvider())

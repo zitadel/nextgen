@@ -18,6 +18,7 @@ import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -147,7 +148,7 @@ const CHALLENGE_ID: Refused<string> = {
  * `--no-wait` returns the link as the result, and `--challenge-id` resumes
  * waiting on it in a second run.
  */
-export default class Claim extends EnvironmentCommand {
+export default class Claim extends ServerCommand(EnvironmentCommand) {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;

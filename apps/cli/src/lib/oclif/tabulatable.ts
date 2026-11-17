@@ -9,6 +9,7 @@ import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
 import { painted, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
+import type { CommandClass } from "./command-class";
 
 /**
  * The flags a paged list declares, which the command for its next page sets:
@@ -20,10 +21,6 @@ type PagingFlags = Readonly<{
   "page-token": Interfaces.OptionFlag<string | undefined>;
   all: Interfaces.BooleanFlag<boolean>;
 }>;
-
-/** A class that can be extended, abstract or not, whatever arguments it takes. */
-// biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
-type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 
 /** What a command draws a table with: its own `tabulate`, for code that formats around the table. */
 export type Tabulate = (columns: readonly string[], items: readonly unknown[]) => Promise<string>;
