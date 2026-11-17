@@ -63,8 +63,6 @@ type ScaffoldStash = Readonly<{
   root: string;
   /** The empty directory the scaffold runs in, beside the project. */
   work: string;
-  /** The names the scaffold replaced. */
-  names: string[];
 }>;
 
 /**
@@ -501,7 +499,7 @@ async function stashScaffoldDir(
   const root = join(beside, "backup");
   await mkdir(work, { recursive: true, mode: 0o700 });
   await mkdir(root, { mode: 0o700 });
-  return { root, work, names: [] };
+  return { root, work };
 }
 
 /**
@@ -518,12 +516,12 @@ async function mergeScaffold(cwd: string, stash: ScaffoldStash | undefined): Pro
   }
   for (const name of await readdir(stash.work)) {
     const dest = join(cwd, name);
-    if (await pathExists(dest)) {
+    const replaces = await pathExists(dest);
+    if (replaces) {
       await fse.move(dest, join(stash.root, name));
-      stash.names.push(name);
     }
     await fse.move(join(stash.work, name), dest);
-    if (name === ".gitignore" && stash.names.includes(name)) {
+    if (replaces && name === ".gitignore") {
       await mergeGitignore(join(stash.root, name), dest);
     }
   }
