@@ -150,6 +150,63 @@ function serving(server: SetupServer, invitation: ReturnType<typeof pending>, st
   );
 }
 
+describe("invitation cancel, run by a person with an id", () => {
+  it.for([
+    ["pending", "so its link stops working?"],
+    ["rejected", "and remove its record?"],
+  ] as const)(
+    "names who a %s invitation is for, its role and what the cancel does",
+    async ([status, consequence], { server }) => {
+      serving(server, { ...pending("inv_1", "John Doe"), status });
+      const cwd = await anApp();
+      const talk = answering(false);
+
+      await rejectionOf(() => {
+        return asTerminal(() => {
+          return runCommand(InvitationCancel, "invitation:cancel", [
+            "inv_1",
+            "--cwd",
+            cwd,
+            "--server",
+            SERVER,
+          ]);
+        });
+      });
+
+      expect(talk.asked()).toEqual([
+        expect.stringContaining(`Cancel inv_1 for John Doe (viewer) ${consequence}`),
+      ]);
+      expect(cancelled).toEqual([]);
+    },
+  );
+
+  it.for(["accepted", "expired"])(
+    "refuses an %s invitation before asking",
+    async (status, { server }) => {
+      serving(server, { ...pending("inv_1", "John Doe"), status });
+      const cwd = await anApp();
+      const talk = answering(true);
+
+      const refused = await rejectionOf(() => {
+        return asTerminal(() => {
+          return runCommand(InvitationCancel, "invitation:cancel", [
+            "inv_1",
+            "--cwd",
+            cwd,
+            "--server",
+            SERVER,
+          ]);
+        });
+      });
+
+      // E_VALIDATION exits with 3.
+      expect(refused).toMatchObject({ oclif: { exit: 3 } });
+      expect(talk.asked()).toEqual([]);
+      expect(cancelled).toEqual([]);
+    },
+  );
+});
+
 /** Watches the product events the command sends. */
 function trackedEvents() {
   return vi.spyOn(
