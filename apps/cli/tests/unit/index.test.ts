@@ -178,3 +178,37 @@ describe("COMMANDS", () => {
     });
   });
 });
+
+describe("the flags each command takes", () => {
+  /** What a command accepts besides its arguments: its own flags and the ones its bases add. */
+  const effective = (command: (typeof COMMANDS)[string]): string[] => {
+    return Object.keys({ ...command.baseFlags, ...command.flags }).sort();
+  };
+
+  it("are the same as they were before servers were taken by a mixin", () => {
+    expect(
+      Object.fromEntries(
+        Object.entries(COMMANDS)
+          .sort(([left], [right]) => {
+            return left.localeCompare(right);
+          })
+          .map(([id, command]) => {
+            return [id, effective(command)];
+          }),
+      ),
+    ).toMatchSnapshot();
+  });
+
+  it("take --server in every command that takes it today", () => {
+    expect(
+      Object.entries(COMMANDS)
+        .filter(([, command]) => {
+          return effective(command).includes("server");
+        })
+        .map(([id]) => {
+          return id;
+        })
+        .sort(),
+    ).toEqual(Object.keys(COMMANDS).sort());
+  });
+});
