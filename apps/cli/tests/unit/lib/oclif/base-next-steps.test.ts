@@ -32,7 +32,7 @@ class NextStepsCommand extends BaseCommand {
   }
 
   public async finish(result: CommandResult): Promise<JsonEnvelope> {
-    await this.toMeta({ telemetry: false }, { resolveServer: false, source: "mock" });
+    await this.toMeta({ telemetry: false }, { source: "mock" });
     return this.emit(result);
   }
 }
