@@ -58,10 +58,21 @@ jobs:
         timeout-minutes: 25
         run: corepack pnpm exec turbo run test --filter=@zitadel/cli --output-logs=errors-only 2>&1 | tail -n 60
 
-      - name: Go SQLite dialect tests
+      - name: Go vet and the whole Go suite
         continue-on-error: true
+        timeout-minutes: 30
         working-directory: apps/api
-        run: go test ./internal/storage/dialect/sqlite/ -run 'TestFileURI|TestMergeSQLitePragmas' -count=1
+        shell: bash
+        run: |
+          {
+            echo "## Go on $RUNNER_OS"
+            echo '### go vet ./...'; echo '```'
+            go vet ./... 2>&1 | tail -n 60
+            echo '```'
+            echo '### go test ./... -short (packages that fail)'; echo '```'
+            go test ./... -short -count=1 -timeout 20m 2>&1 | grep -E '^(FAIL|--- FAIL|panic)' | head -n 80
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" "$RUNNER_TEMP/go.md"
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -69,5 +80,6 @@ jobs:
           name: findings-${{ runner.os }}
           path: |
             ${{ runner.temp }}/summary.md
+            ${{ runner.temp }}/go.md
             ${{ runner.temp }}/dev.log
             ${{ runner.temp }}/host/.zitadel/local/server.log
