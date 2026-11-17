@@ -122,11 +122,17 @@ function calls(name: string): (call: ts.CallExpression) => boolean {
     ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === name;
 }
 
-/** The command id oclif gives a file under `src/cli/commands`, such as `variables:set`. */
+/**
+ * The command id oclif gives a file under `src/cli/commands`, such as `variables:set`.
+ * The `server` folder only groups its commands, so it adds nothing to their ids.
+ */
 function commandId(file: string): string {
   const segments = file.replace(/\.ts$/, "").split(sep);
   if (segments.at(-1) === "index") {
     segments.pop();
+  }
+  if (segments[0] === "server") {
+    segments.shift();
   }
   return segments.join(":");
 }
@@ -168,7 +174,10 @@ async function lifecycleExtras(constant: string): Promise<string[]> {
   );
   return tracks.flatMap((track) => {
     const bag = track.arguments[1];
-    return bag && ts.isCallExpression(bag) ? keysOf(bag.arguments[2]) : [];
+    if (bag && ts.isCallExpression(bag)) {
+      return keysOf(bag.arguments[3]);
+    }
+    return [];
   });
 }
 
@@ -327,7 +336,7 @@ describe("CLI telemetry against the catalog", () => {
 
   it("sends the header on every lifecycle event, with cli as its surface", async () => {
     const header = headerOf(await loadCatalog(), "cli");
-    const sent = commandEventProperties(meta(), "invocation-1");
+    const sent = commandEventProperties(meta(), "cloud", "invocation-1");
     expect(Object.keys(sent)).toEqual(expect.arrayContaining(header));
     expect(sent.surface).toBe("cli");
   });
@@ -335,7 +344,10 @@ describe("CLI telemetry against the catalog", () => {
   it("sends exactly the properties the catalog lists on each lifecycle event", async () => {
     const catalog = await loadCatalog();
     const { events } = cliOf(catalog);
-    const base = [...Object.keys(commandEventProperties(meta(), "invocation-1")), ...STAMPED];
+    const base = [
+      ...Object.keys(commandEventProperties(meta(), "cloud", "invocation-1")),
+      ...STAMPED,
+    ];
     for (const [constant, event] of LIFECYCLE_EVENTS) {
       const definition = events[event];
       if (!definition) {

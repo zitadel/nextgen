@@ -26,6 +26,7 @@ export function aPatchContext(
     },
     issuer: "http://localhost:3000",
     server: "http://localhost:8080",
+    defaultServer: "https://api.zitadel.cloud",
     cliVersion,
     sdkVersion: CliPackage.at(cliVersion).selector(),
     ...overrides,

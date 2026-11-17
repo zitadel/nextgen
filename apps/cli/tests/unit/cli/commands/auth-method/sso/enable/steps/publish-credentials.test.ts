@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PublishCredentials } from "@/cli/commands/auth-method/sso/enable/steps/publish-credentials";
+import { ZitadelRuntime } from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
 import { Environment } from "@/lib/environment";
 import { CredentialDelivery } from "@/lib/idp";
@@ -24,7 +25,11 @@ describe("PublishCredentials", () => {
         }),
         projectId: "proj_1",
         server: "http://localhost:1",
-        environment: await Environment.resolve({ cwd: "/tmp/app", env: {} }),
+        environment: await Environment.resolve({
+          cwd: "/tmp/app",
+          env: {},
+          servers: ZitadelRuntime,
+        }),
       },
       delivery: new CredentialDelivery({
         connection: Connection.of({

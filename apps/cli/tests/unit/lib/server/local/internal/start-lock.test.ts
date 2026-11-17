@@ -288,7 +288,11 @@ describe("withStartLock", () => {
         pollMs: 10,
         clock: new ManualClock(),
       }),
-    ).rejects.toMatchObject({ code: "E_CONFLICT", hint: expect.stringContaining(lock) });
+    ).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      kind: "start-in-progress",
+      details: expect.objectContaining({ lock_file: lock }),
+    });
     await release?.();
   });
 });

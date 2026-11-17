@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
@@ -43,7 +44,7 @@ describe("Orca.scaffold stash", () => {
     canScaffold: (framework) => framework === "fake",
     scaffold,
   };
-  const orca = new Orca([fakeDetector], [fakeScaffolder], []);
+  const orca = new Orca([fakeDetector], [fakeScaffolder], [], LocalRuntime.DIR);
 
   it("puts back what it moved when moving an entry aside fails", async ({ dir: parent }) => {
     const cwd = join(parent, "my-zitadel-app");

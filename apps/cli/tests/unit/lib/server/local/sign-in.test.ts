@@ -224,18 +224,13 @@ describe("local admin sign-in", () => {
     expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("does not host the platform project") as string,
-      nextCommands: [{ id: "stop" }, { id: "start" }],
+      kind: "platform-missing",
     });
     // Nothing is attempted against a server that cannot sign the admin in.
     expect(calls).toEqual([]);
   });
 
-  // The server reports a failed lookup with the same code as a missing user, so
-  // the advice names both causes and never suggests the destructive reset as a
-  // command an agent would run.
-  it("explains a rejected identifier without steering an agent into a reset", async ({
-    server,
-  }) => {
+  it("names a rejected identifier as a missing admin", async ({ server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json(
@@ -250,12 +245,7 @@ describe("local admin sign-in", () => {
     expect(error).toMatchObject({
       code: "E_AUTH",
       message: "The local server could not find the local admin",
-      nextCommands: [{ id: "logs" }],
-    });
-    expect((error as { hint: string }).hint).toContain("zitadel reset --force");
-    expect((error as { nextCommands: unknown[] }).nextCommands).not.toContainEqual({
-      id: "reset",
-      flags: { force: true },
+      kind: "admin-not-found",
     });
   });
 
