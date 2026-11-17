@@ -18,6 +18,72 @@ export const CLI_COMMAND_STARTED = "cli_command_started";
 export const CLI_COMMAND_COMPLETED = "cli_command_completed";
 export const CLI_COMMAND_FAILED = "cli_command_failed";
 
+export const ACTION_COMPLETED = "action_completed";
+export const ACTION_FAILED = "action_failed";
+
+/**
+ * What a command's success or failure reports as an action event, by command
+ * id. A command not listed reports none.
+ */
+export const COMMAND_ACTIONS: ReadonlyMap<string, Properties> = new Map<string, Properties>([
+  ["user:create", { action: "create", resource_type: "user" }],
+  ["user:update", { action: "update", resource_type: "user" }],
+  ["user:delete", { action: "delete", resource_type: "user" }],
+  ["team:create", { action: "create", resource_type: "team" }],
+  ["team:update", { action: "update", resource_type: "team" }],
+  ["team:deactivate", { action: "deactivate", resource_type: "team" }],
+  ["grant:create", { action: "create", resource_type: "grant" }],
+  ["grant:delete", { action: "delete", resource_type: "grant" }],
+  ...(["password", "passkey", "sso"] as const).flatMap((method) => {
+    return (["enable", "disable"] as const).map((action): [string, Properties] => {
+      return [
+        `auth-method:${method}:${action}`,
+        { action, resource_type: "authentication_method", method, entry_point: "standalone" },
+      ];
+    });
+  }),
+  ["deploy", { action: "deploy", resource_type: "deployment" }],
+  ["deployment:create", { action: "redeploy", resource_type: "deployment" }],
+  ["deployment:rollback", { action: "rollback", resource_type: "deployment" }],
+]);
+
+/**
+ * The dimensions a command records that an action event carries too.
+ */
+const ACTION_DIMENSIONS = [
+  "access_level",
+  "test_mode",
+  "test_result",
+  "changed_configuration_types",
+  "stage",
+] as const;
+
+/**
+ * The properties of the action event a command's outcome reports, or
+ * `undefined` when the command reports none.
+ *
+ * @param command - The command id.
+ * @param recorded - What the command recorded as it ran.
+ * @param outcome - What the outcome adds: its duration, and its error code when it failed.
+ * @returns The event's own properties, before the run's common ones.
+ */
+export function actionProperties(
+  command: string,
+  recorded: Properties,
+  outcome: Properties,
+): Properties | undefined {
+  const action = COMMAND_ACTIONS.get(command);
+  if (action === undefined) {
+    return undefined;
+  }
+  const dimensions = Object.fromEntries(
+    ACTION_DIMENSIONS.map((name) => {
+      return [name, recorded[name]];
+    }),
+  );
+  return { ...dimensions, ...action, ...outcome };
+}
+
 /**
  * The one dimension of its own a command's Vercel Web Analytics copy keeps, by
  * command id; the rest go to Mixpanel only.

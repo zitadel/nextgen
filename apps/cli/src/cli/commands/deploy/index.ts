@@ -213,6 +213,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     if (!this.dryRun) {
       await this.requirePrimaryOrigin(publisher, projectId, environment);
     }
+    this.recordTelemetry({ stage: "validation" });
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -279,10 +280,15 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       );
     }
 
-    const { release, publication } = await publisher.deploy({
-      prepared,
-      message,
-    });
+    const { release, publication } = await publisher.deploy(
+      {
+        prepared,
+        message,
+      },
+      (stage) => {
+        this.recordTelemetry({ stage });
+      },
+    );
     switch (publication.outcome) {
       case "revoked": {
         throw new ZitadelError(
@@ -316,6 +322,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       }
     }
     const { deployment } = publication;
+    this.recordTelemetry({ stage: undefined });
 
     const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });

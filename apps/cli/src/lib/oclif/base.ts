@@ -38,6 +38,9 @@ import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import {
+  ACTION_COMPLETED,
+  ACTION_FAILED,
+  actionProperties,
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
   CLI_COMMAND_STARTED,
@@ -827,6 +830,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
           duration_ms: Date.now() - this.telemetryStartedAt,
         }),
       );
+      if (result.status === "ok" && !this.meta.dryRun) {
+        const action = actionProperties(this.meta.command, this.telemetryProps, {
+          duration_ms: Date.now() - this.telemetryStartedAt,
+        });
+        if (action !== undefined) {
+          this.trackEvent(ACTION_COMPLETED, action);
+        }
+      }
     }
     const next =
       normalized.status === "ok" && normalized.nextShown !== undefined
@@ -1072,6 +1083,18 @@ export abstract class BaseCommand extends Interruptible(Command) {
           duration_ms: Date.now() - this.telemetryStartedAt,
         }),
       );
+      const action = meta.dryRun
+        ? undefined
+        : actionProperties(meta.command, this.telemetryProps, {
+            reason: zitadelError.code,
+            duration_ms: Date.now() - this.telemetryStartedAt,
+          });
+      if (action !== undefined) {
+        this.telemetry.track(
+          ACTION_FAILED,
+          commandEventProperties(meta, this.telemetryInvocationId, action),
+        );
+      }
     }
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), warnings.take()));

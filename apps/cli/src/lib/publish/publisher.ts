@@ -348,10 +348,16 @@ export class Publisher {
    * a deploy that raced in.
    *
    * @param request - The prepared bundle, the message and the origins it lands on.
+   * @param onStage - Told which stage the deploy is entering, so a failure can say where it was.
    * @returns The release, and whether the deploy landed, lost a race, or met a revoked release.
    */
-  async deploy(request: DeployRequest): Promise<DeployOutcome> {
+  async deploy(
+    request: DeployRequest,
+    onStage?: (stage: "release_creation" | "deployment") => void,
+  ): Promise<DeployOutcome> {
+    onStage?.("release_creation");
     const release = await this.createRelease(request);
+    onStage?.("deployment");
     const publication = await this.deployments.deployToPrimary({
       releaseId: release.id,
       message: request.message,

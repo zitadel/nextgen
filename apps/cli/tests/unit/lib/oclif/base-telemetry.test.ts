@@ -7,12 +7,14 @@ import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 /** Minimal recording stand-in for the generic Telemetry client. */
 class RecordingTelemetry {
   public readonly events: string[] = [];
+  public readonly sent: { event: string; properties: Record<string, unknown> }[] = [];
   public enabled = true;
   public readonly isFirstRun = false;
   public readonly distinctId = "did-test";
 
-  public track(event: string): void {
+  public track(event: string, properties: Record<string, unknown> = {}): void {
     this.events.push(event);
+    this.sent.push({ event, properties });
   }
 
   public profile(): void {
@@ -30,7 +32,7 @@ class RecordingTelemetry {
  * drive them without oclif's parse/dispatch machinery.
  */
 class TestCommand extends BaseCommand {
-  public static override readonly id = "telemetry-test";
+  public static override readonly id: string = "telemetry-test";
   public readonly recorder = new RecordingTelemetry();
   public optOut = false;
 
@@ -57,6 +59,9 @@ class TestCommand extends BaseCommand {
   public complete(): void {
     this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
+  public record(patch: Record<string, string | undefined>): void {
+    this.recordTelemetry(patch);
+  }
   public async failWith(error: unknown): Promise<void> {
     try {
       await this.catch(error);
@@ -68,6 +73,15 @@ class TestCommand extends BaseCommand {
 
 function makeCommand(): TestCommand {
   return new TestCommand([], aConfigAt("0.0.0-test"));
+}
+
+/** A command whose id is one that reports an action, so its outcome is one too. */
+class GrantCreate extends TestCommand {
+  public static override readonly id: string = "grant:create";
+}
+
+function makeActionCommand(): GrantCreate {
+  return new GrantCreate([], aConfigAt("0.0.0-test"));
 }
 
 describe("BaseCommand telemetry lifecycle", () => {
@@ -91,5 +105,57 @@ describe("BaseCommand telemetry lifecycle", () => {
     await cmd.open();
     cmd.complete();
     expect(cmd.recorder.events).toEqual([]);
+  });
+
+
+  describe("action events", () => {
+    it("reports a successful command's action after its completed event, with what it recorded", async () => {
+      const cmd = makeActionCommand();
+      await cmd.open();
+      cmd.record({ access_level: "project_admin" });
+      cmd.complete();
+
+      expect(cmd.recorder.events).toEqual([
+        "cli_command_started",
+        "cli_command_completed",
+        "action_completed",
+      ]);
+      expect(cmd.recorder.sent.at(-1)?.properties).toMatchObject({
+        action: "create",
+        resource_type: "grant",
+        access_level: "project_admin",
+        surface: "cli",
+      });
+    });
+
+    it("reports a failed command's action with the error code", async () => {
+      const cmd = makeActionCommand();
+      await cmd.open();
+      await cmd.failWith(new Error("boom"));
+
+      expect(cmd.recorder.events.at(-1)).toBe("action_failed");
+      expect(cmd.recorder.sent.at(-1)?.properties).toMatchObject({
+        action: "create",
+        resource_type: "grant",
+        reason: "E_VALIDATION",
+      });
+    });
+
+    it("reports no action for a command that has none", async () => {
+      const cmd = makeCommand();
+      await cmd.open();
+      cmd.complete();
+
+      expect(cmd.recorder.events).not.toContain("action_completed");
+    });
+
+    it("reports no action when telemetry is opted out", async () => {
+      const cmd = makeActionCommand();
+      cmd.optOut = true;
+      await cmd.open();
+      cmd.complete();
+
+      expect(cmd.recorder.events).toEqual([]);
+    });
   });
 });

@@ -214,6 +214,11 @@ export type WriteShape = Readonly<{
    * `team`, which no generated example can know.
    */
   example?: string;
+  /**
+   * What the write records as telemetry dimensions from the body it sends:
+   * enums and counts only, never a value the developer typed.
+   */
+  record?(body: Json): Readonly<Record<string, string | undefined>>;
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
   /**

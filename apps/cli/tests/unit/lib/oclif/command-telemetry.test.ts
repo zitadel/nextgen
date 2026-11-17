@@ -2,6 +2,8 @@ import type { Properties } from "mixpanel";
 import { describe, expect, it } from "vitest";
 
 import {
+  actionProperties,
+  COMMAND_ACTIONS,
   commandEventProperties,
   deviceProfileProperties,
   vercelEventKeys,
@@ -125,5 +127,43 @@ describe("deviceProfileProperties", () => {
     const serialized = JSON.stringify(props);
     expect(serialized).not.toContain("/work/app");
     expect(serialized).not.toContain("zitadel.cloud");
+  });
+});
+
+describe("actionProperties", () => {
+  it("names the action and resource of a command that reports one, with the dimensions it recorded", () => {
+    expect(
+      actionProperties(
+        "grant:create",
+        { access_level: "project_admin", resources: 3 },
+        { duration_ms: 12 },
+      ),
+    ).toEqual({
+      access_level: "project_admin",
+      test_mode: undefined,
+      test_result: undefined,
+      changed_configuration_types: undefined,
+      stage: undefined,
+      action: "create",
+      resource_type: "grant",
+      duration_ms: 12,
+    });
+  });
+
+  it("reports nothing for a command that has no action", () => {
+    expect(actionProperties("doctor", {}, {})).toBeUndefined();
+  });
+
+  it.each([
+    ["auth-method:sso:enable", "enable", "sso"],
+    ["auth-method:passkey:disable", "disable", "passkey"],
+    ["auth-method:password:enable", "enable", "password"],
+  ])("reports %s as %s of the %s method, on its own", (command, action, method) => {
+    expect(COMMAND_ACTIONS.get(command)).toEqual({
+      action,
+      resource_type: "authentication_method",
+      method,
+      entry_point: "standalone",
+    });
   });
 });

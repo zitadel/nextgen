@@ -529,8 +529,7 @@ components:
         destinations: [mixpanel]
         properties: [flow, step, duration_ms, reason, framework, server_type, use_case, preset, provider_types, entry_point, provider_type]
       action_completed:
-        status: planned
-        plan: "#2200"
+        status: emitted
         trigger: >-
           A user, team or grant change, a sign-in method change, an identity
           provider test, a deployment or a rollback succeeds.
@@ -546,8 +545,7 @@ components:
           - duration_ms
           - changed_configuration_types
       action_failed:
-        status: planned
-        plan: "#2200"
+        status: emitted
         trigger: One of the operations `action_completed` covers fails.
         destinations: [mixpanel]
         properties: [action, resource_type, access_level, method, entry_point, test_mode, duration_ms, stage, reason]
@@ -569,7 +567,7 @@ components:
         - files_written_count
         - package_manager
       branding:eject: [design]
-      deploy: [resources, origin_count]
+      deploy: [resources, origin_count, stage]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
       policy:test: [policy_source, case_count, failed_count]
       start: [runtime]

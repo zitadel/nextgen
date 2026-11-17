@@ -285,6 +285,7 @@ export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
   protected readonly verb = "create";
 
   protected send(ctx: Ctx, body: Json): Promise<WriteResult> {
+    this.recordTelemetry(this.definition.spec.record?.(body) ?? {});
     return this.definition.spec.call(ctx, body);
   }
 }

@@ -739,7 +739,12 @@ export const RESOURCES = {
       },
       // A grant names exactly one of `user` and `team`, which the required
       // fields alone cannot say, so the example names the principal itself.
-      { example: "--relation viewer --user-identifier alice@acme.com" },
+      {
+        example: "--relation viewer --user-identifier alice@acme.com",
+        record: (body) => {
+          return { access_level: typeof body.relation === "string" ? body.relation : undefined };
+        },
+      },
     ),
     delete: {
       call: ({ client, projectId }, id, consent) => {
