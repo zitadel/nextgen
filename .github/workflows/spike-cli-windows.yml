@@ -44,25 +44,25 @@ jobs:
 
       - name: Start the local server
         run: |
-          mkdir -p "$RUNNER_TEMP/app"
-          cd "$RUNNER_TEMP/app"
+          mkdir -p "$RUNNER_TEMP/host/app"
+          cd "$RUNNER_TEMP/host"
           node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" start --help
           node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" start --non-interactive --no-telemetry || true
 
       - name: Server logs
         if: always()
         run: |
-          cd "$RUNNER_TEMP/app"
+          cd "$RUNNER_TEMP/host"
           node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" logs --no-telemetry || true
           find .zitadel -type f | head -30
 
       - name: Scaffold a project
         run: |
-          cd "$RUNNER_TEMP/app"
+          cd "$RUNNER_TEMP/host/app"
           node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" setup --framework react --server local --non-interactive --no-telemetry --no-git
 
       - name: Run the project
-        working-directory: ${{ runner.temp }}/app
+        working-directory: ${{ runner.temp }}/host/app
         run: |
           ls -la
           npm run build
