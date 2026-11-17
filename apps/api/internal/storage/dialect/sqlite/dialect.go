@@ -92,9 +92,15 @@ func (c Config) dsn() (dsn string, filePath string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("sqlite: resolve path: %w", err)
 	}
+	uriPath := filepath.ToSlash(abs)
+	if !strings.HasPrefix(uriPath, "/") {
+		// A Windows drive path ("D:/x") needs the leading slash, or the URI
+		// reads the drive letter as its authority.
+		uriPath = "/" + uriPath
+	}
 	u := &url.URL{
 		Scheme:   "file",
-		Path:     filepath.ToSlash(abs),
+		Path:     uriPath,
 		RawQuery: migration.PragmaQuery,
 	}
 	return u.String(), abs, nil
