@@ -82,7 +82,7 @@ export function ServerCommand<
      *   that came before the flags were parsed.
      */
     protected override serverFlagFromArgv(): string | undefined {
-      return this.argvFlag("--server");
+      return this.argvFlag("--server", "-s");
     }
 
     /**
