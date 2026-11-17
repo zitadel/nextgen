@@ -2,7 +2,7 @@ import type { Hook } from "@oclif/core";
 import { distance } from "fastest-levenshtein";
 
 import { EXIT_CODES, ZitadelError } from "@/lib/errors";
-import { SERVER, ServerCommand } from "@/cli/commands/server-command";
+import { SERVER_FLAG, ServerCommand } from "@/cli/commands/server-command";
 import { type Admitted, BaseCommand } from "@/lib/oclif/base";
 import { aliasedNouns } from "@/lib/oclif/plural-aliases";
 import type { JsonEnvelope } from "@/lib/oclif/types";
@@ -230,7 +230,7 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   // command takes a value for takes the next word whatever it is, as oclif
   // would; any other leaves a word that is a flag itself, such as `--json`.
   // The flags every command takes: the base flags, and `--server`.
-  const base = Object.entries({ ...BaseCommand.baseFlags, server: SERVER });
+  const base = Object.entries({ ...BaseCommand.baseFlags, server: SERVER_FLAG });
   const switches = new Map<string, boolean>([["json", true]]);
   for (const [name, flag] of [
     ...base,

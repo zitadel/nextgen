@@ -18,7 +18,7 @@ import { log } from "@/lib/ui";
  * `--server`: the one flag every {@link ServerCommand} takes, declared once so
  * every command carries the same one.
  */
-export const SERVER = serverFlag({
+export const SERVER_FLAG = serverFlag({
   char: "s",
   description: "Override the resolved server URL.",
 });
@@ -50,7 +50,7 @@ export function ServerCommand<
     // oclif reads a command's statics up the chain of classes only while each
     // declares a static of its own, so this mixin declares the two it passes on.
     // `--server` sits after `--cwd`, where the help and the reference list it.
-    static override baseFlags = { cwd: cwd, server: SERVER, ...others };
+    static override baseFlags = { cwd: cwd, server: SERVER_FLAG, ...others };
     static override enableJsonFlag = Base.enableJsonFlag;
 
     /**
