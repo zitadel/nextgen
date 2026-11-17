@@ -610,7 +610,7 @@ describe("SecretPermissionsCheck", () => {
     await aNextProject(dir);
     await chmod(join(dir, SECRET_FILE), 0o644);
 
-    const outcome = await new SecretPermissionsCheck("win32").run(aCheckContext(dir));
+    const outcome = await new SecretPermissionsCheck(false).run(aCheckContext(dir));
 
     expect(outcome).toMatchObject({
       status: "pass",

@@ -1,6 +1,8 @@
 import { chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 
+import { holdsFileModes } from "@/lib/fs";
+
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /**
@@ -15,11 +17,11 @@ export class SecretPermissionsCheck extends AbstractSanityCheck {
   private readonly keepsModes: boolean;
 
   /**
-   * @param platform - The Node.js platform name; only tests pass it.
+   * @param keepsModes - Whether files here hold modes; only tests pass it.
    */
-  constructor(platform: NodeJS.Platform = process.platform) {
+  constructor(keepsModes = holdsFileModes()) {
     super();
-    this.keepsModes = platform !== "win32";
+    this.keepsModes = keepsModes;
     this.summary = this.keepsModes
       ? ".zitadel/secret has 0600 permissions"
       : ".zitadel/secret exists (Windows has no file modes to check)";

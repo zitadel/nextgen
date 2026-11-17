@@ -1,4 +1,4 @@
-import { access, readdir, readFile, stat } from "node:fs/promises";
+import { access, lstat, readdir, readFile, stat } from "node:fs/promises";
 
 import { isErrno } from "./errno";
 
@@ -92,6 +92,36 @@ export async function pathExistsStrict(path: string): Promise<boolean> {
     }
     throw error;
   }
+}
+
+/**
+ * Whether an entry exists at `path`, a link counting as an entry even when what
+ * it points at is missing. False only when nothing is there; any other failure
+ * to look throws.
+ */
+export async function entryExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Whether the platform keeps POSIX permission bits on a file. Windows reports
+ * every file as `0666` and ignores `chmod`, so no mode can be read or set there.
+ * This is where the platform is asked, so callers ask this and never look at
+ * `process.platform` themselves.
+ *
+ * @param platform - The Node.js platform name.
+ * @returns `true` when a file's mode can be read and set.
+ */
+export function holdsFileModes(platform: NodeJS.Platform = process.platform): boolean {
+  return platform !== "win32";
 }
 
 /**

@@ -1,11 +1,9 @@
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-
-import fse from "fs-extra";
 
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
-import { pathExists, readDirIfExists } from "@/lib/fs";
+import { readDirIfExists } from "@/lib/fs";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -16,6 +14,7 @@ import type { Patcher } from "./patchers/types";
 import { ScaffoldManifestFile } from "./scaffold-manifest";
 import type { ScaffoldManifest } from "@/lib/sync/types";
 import { scaffolders } from "./scaffolders";
+import { ScaffoldWorkspace } from "./scaffold-workspace";
 import type { Scaffolder } from "./scaffolders/types";
 
 export { issuerFromPort } from "./detectors/port";
@@ -56,16 +55,6 @@ export type PlannedApp = Readonly<{
    * the scaffold keeps, else the default.
    */
   devPort: number;
-}>;
-
-/** The directories a scaffold into a non-empty project uses, all beside the project. */
-type ScaffoldWorkspace = Readonly<{
-  /** Holds the other two; removing it removes both. */
-  dir: string;
-  /** The empty directory the scaffold runs in. */
-  work: string;
-  /** Receives what the scaffold replaces, so an undo can put it back. Made when first used. */
-  backup: string;
 }>;
 
 /**
@@ -275,7 +264,7 @@ export class Orca {
     // parent it took to create it.
     const created = await mkdir(cwd, { recursive: true });
     const before = await listEntries(cwd);
-    const workspace = await openScaffoldWorkspace(cwd, target.entries);
+    const workspace = await ScaffoldWorkspace.open(cwd, target.entries);
     const undo = () => {
       return created === undefined
         ? undoScaffold(cwd, before, workspace)
@@ -288,7 +277,7 @@ export class Orca {
         return this.scaffolderFor(framework).scaffold(workspace?.work ?? cwd, framework);
       })
       .then(() => {
-        return mergeScaffold(cwd, workspace);
+        return workspace?.moveInto(cwd);
       })
       .then(() => {
         return this.detect(cwd, framework);
@@ -300,8 +289,8 @@ export class Orca {
     return {
       facts,
       undo,
-      keep: () => {
-        return dropWorkspace(workspace);
+      keep: async () => {
+        await workspace?.drop();
       },
     };
   }
@@ -483,47 +472,6 @@ async function isLocalRuntimeEntry(
   return false;
 }
 
-async function openScaffoldWorkspace(
-  cwd: string,
-  names: ReadonlyArray<string>,
-): Promise<ScaffoldWorkspace | undefined> {
-  if (names.length === 0) {
-    return undefined;
-  }
-  const dir = join(
-    dirname(cwd),
-    `.${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
-  );
-  const work = join(dir, "work", basename(cwd));
-  await mkdir(work, { recursive: true, mode: 0o700 });
-  return { dir, work, backup: join(dir, "backup") };
-}
-
-/**
- * Moves what the scaffold created into the project. What the project already
- * holds under the same name is backed up first, so an undo can put it back. For
- * `.gitignore`, the backed-up rules are merged in so ignores the existing setup
- * relied on, notably `.zitadel/local/`, which keeps the local admin credential
- * out of git, are not dropped. Any other collision keeps the scaffold's version
- * (that is what `--force` is for).
- */
-async function mergeScaffold(cwd: string, workspace: ScaffoldWorkspace | undefined): Promise<void> {
-  if (!workspace) {
-    return;
-  }
-  for (const name of await readdir(workspace.work)) {
-    const dest = join(cwd, name);
-    const replaces = await pathExists(dest);
-    if (replaces) {
-      await fse.move(dest, join(workspace.backup, name));
-    }
-    await fse.move(join(workspace.work, name), dest);
-    if (replaces && name === ".gitignore") {
-      await mergeGitignore(join(workspace.backup, name), dest);
-    }
-  }
-}
-
 /**
  * What a directory holds: each entry, with the entries inside it when it is a
  * directory, so an undo can tell what was added since.
@@ -552,7 +500,7 @@ async function undoScaffold(
   before: DirectoryListing,
   workspace: ScaffoldWorkspace | undefined,
 ): Promise<void> {
-  const replaced = new Set(workspace ? await readDirIfExists(workspace.backup) : []);
+  const replaced = new Set(await workspace?.replaced());
   for (const entry of await readdir(cwd)) {
     const inside = before.get(entry);
     if (!before.has(entry) || replaced.has(entry)) {
@@ -565,33 +513,6 @@ async function undoScaffold(
       }
     }
   }
-  if (workspace) {
-    for (const name of replaced) {
-      await rename(join(workspace.backup, name), join(cwd, name));
-    }
-  }
-  await dropWorkspace(workspace);
-}
-
-async function dropWorkspace(workspace: ScaffoldWorkspace | undefined): Promise<void> {
-  if (workspace) {
-    await rm(workspace.dir, { recursive: true, force: true });
-  }
-}
-
-/** Append any lines from the replaced `.gitignore` that the scaffold's own one lacks. */
-async function mergeGitignore(replaced: string, dest: string): Promise<void> {
-  const [from, into] = await Promise.all([readFile(replaced, "utf8"), readFile(dest, "utf8")]);
-  const present = new Set(
-    into.split("\n").map((line) => {
-      return line.trim();
-    }),
-  );
-  const missing = from.split("\n").filter((line) => {
-    return line.trim() && !present.has(line.trim());
-  });
-  if (missing.length === 0) {
-    return;
-  }
-  await writeFile(dest, `${into}${into.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
+  await workspace?.restoreInto(cwd);
+  await workspace?.drop();
 }
