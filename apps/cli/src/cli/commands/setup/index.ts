@@ -355,7 +355,10 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
   }
 
   /**
-   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   * `--server` is not ignored: setup resolves it itself in its preconditions
+   * (`meta.serverFlag`), and its server question is skipped when it is given.
+   * This only defers the base's resolution, so the run names no server before
+   * then.
    *
    * @returns No server.
    */
