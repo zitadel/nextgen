@@ -322,7 +322,10 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       }
     }
     const { deployment } = publication;
-    this.recordTelemetry({ stage: undefined });
+    this.recordTelemetry({
+      stage: undefined,
+      changed_configuration_types: prepared.changedConfiguration,
+    });
 
     const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });

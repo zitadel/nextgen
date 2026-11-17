@@ -73,6 +73,14 @@ Some commands add what they did, as counts and fixed values:
 | `invitation create` | The role it invited someone into, and whether it replaced an invitation, never a name, an ID or the link. |
 | `api` | The operation it called, and whether it followed pagination. |
 
+When it sends again, a few journeys also send events of their own. They carry the properties above, and only fixed names, counts and durations:
+
+| Event | When | What it adds |
+| --- | --- | --- |
+| `flow_started`, `flow_completed`, `flow_failed` | `setup` (the `onboarding` flow) or `auth-method sso enable` (the `oidc_provider_setup` flow) begins, succeeds or fails. | The flow, how long it took, the step a failure stopped at, an error code, and the choices made so far: framework, server (`local` or `remote`), use case, preset and the kinds of sign-in provider. |
+| `viewed_step`, `step_completed` | A `setup` prompt is shown, or a choice is settled. | The flow, the step, and the choice made at it. Never the port, a provider name, an issuer URL, a client ID or a secret. |
+| `action_completed`, `action_failed` | A user, team, grant, sign-in method, deploy or rollback command succeeds or fails. Dry runs and previews send nothing. | The action (`create`, `enable`, `deploy`, `rollback` and so on), what it acted on, how long it took, an error code, and for a grant the access level it gives, never who receives it. |
+
 Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead.
 
 ## What it never sends

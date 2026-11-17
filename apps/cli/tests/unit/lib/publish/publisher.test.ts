@@ -26,6 +26,7 @@ const PREPARED: PreparedRelease = {
   warnings: [],
   notices: [],
   lockouts: [],
+  changedConfiguration: undefined,
   gitSha: "abc1234",
   gitDirty: false,
 };

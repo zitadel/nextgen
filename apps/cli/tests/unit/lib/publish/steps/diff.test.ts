@@ -226,6 +226,32 @@ describe("diffStep", () => {
       expect(result?.learned?.schemasOrFlowsChanged).toBe(false);
     });
 
+    it("records which kinds of configuration changed, and only those", async ({ dir }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, {
+        [SCHEMA]: '{ "type": "string" }\n',
+        ".zitadel/branding/brand.json": "{}\n",
+      });
+
+      const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(result?.learned?.changedConfiguration).toEqual(["user_schema", "branding"]);
+    });
+
+    it("records no kind of configuration when the primary origins serve different releases", async ({
+      dir,
+    }) => {
+      const sha = await aLiveCommit(dir);
+      const live = [
+        { targets: [PRIMARY], sha, release: "rel_2" },
+        { targets: [SECOND_PRIMARY], sha, release: "rel_1" },
+      ];
+
+      const result = await diffStep.run(aRunIn(dir, live));
+
+      expect(result?.learned?.changedConfiguration).toBeUndefined();
+    });
+
     it("records nothing when the primary origins serve different releases", async ({ dir }) => {
       const sha = await aLiveCommit(dir);
       const live = [

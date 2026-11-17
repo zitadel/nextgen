@@ -1,6 +1,12 @@
 import type { DiffedFile } from "@/lib/git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "@/lib/publish/git";
-import type { Learned, Step, StepContext, StepResult } from "@/lib/publish/pipeline";
+import type {
+  ConfigurationType,
+  Learned,
+  Step,
+  StepContext,
+  StepResult,
+} from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 
 /**
@@ -11,6 +17,17 @@ import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
  * Branding, policies and connections cannot lock anyone out.
  */
 const LOCKOUT_DIRECTORIES = [CONFIG_DIRECTORIES.schemas, CONFIG_DIRECTORIES.flows] as const;
+
+/**
+ * The kind of configuration each directory holds, as the event catalog names it.
+ */
+const CONFIGURATION_TYPES: readonly (readonly [string, ConfigurationType])[] = [
+  [CONFIG_DIRECTORIES.schemas, "user_schema"],
+  [CONFIG_DIRECTORIES.flows, "login_flow"],
+  [CONFIG_DIRECTORIES.connections, "identity_provider"],
+  [CONFIG_DIRECTORIES.policies, "policy"],
+  [CONFIG_DIRECTORIES.branding, "branding"],
+];
 
 /**
  * How many characters of a commit sha a message shows.
@@ -153,7 +170,16 @@ function learnedFrom(touched: readonly DiffedFile[] | null, releases: number): L
       });
     });
   });
-  return { schemasOrFlowsChanged: changed };
+  const changedConfiguration = CONFIGURATION_TYPES.filter(([directory]) => {
+    return touched.some((file) => {
+      return [file.path, file.previous_path ?? ""].some((path) => {
+        return path.startsWith(`${directory}/`);
+      });
+    });
+  }).map(([, type]) => {
+    return type;
+  });
+  return { schemasOrFlowsChanged: changed, changedConfiguration };
 }
 
 /**

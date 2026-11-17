@@ -566,7 +566,7 @@ components:
         - files_written_count
         - package_manager
       branding:eject: [design]
-      deploy: [resources, origin_count, stage]
+      deploy: [resources, origin_count, stage, changed_configuration_types]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
       policy:test: [policy_source, case_count, failed_count]
       start: [runtime]
