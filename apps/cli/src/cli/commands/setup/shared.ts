@@ -1690,3 +1690,11 @@ export const ONBOARDING_CHECKS: Readonly<Record<string, string>> = {
   alreadySetUp: "initial_checks",
   ssoFlags: "initial_checks",
 };
+
+/**
+ * The steps of `setup` that ask without settling a choice of their own, and the
+ * onboarding step their prompt is reported under.
+ */
+export const ONBOARDING_PROMPTS: Readonly<Record<string, string>> = {
+  frameworkConfirm: "framework_selection",
+};

@@ -208,4 +208,35 @@ describe("FlowTelemetry", () => {
       },
     ]);
   });
+
+
+  it("reports a prompt once for the step that is running, under its own or its prompt name", () => {
+    const sent: Sent[] = [];
+    const flow = new FlowTelemetry<Known>({
+      flow: "onboarding",
+      steps: { second: { step: "preset_selection" } },
+      viewed: { confirm: "framework_selection" },
+      completesAt: "last",
+      preview: () => {
+        return false;
+      },
+      send: (event, properties) => {
+        sent.push({ event, properties });
+      },
+    });
+
+    flow.prompted();
+    flow.watcher.started("second");
+    flow.prompted();
+    flow.prompted();
+    flow.watcher.started("confirm");
+    flow.prompted();
+    flow.watcher.started("unnamed");
+    flow.prompted();
+
+    expect(sent).toEqual([
+      { event: "viewed_step", properties: { flow: "onboarding", step: "preset_selection" } },
+      { event: "viewed_step", properties: { flow: "onboarding", step: "framework_selection" } },
+    ]);
+  });
 });

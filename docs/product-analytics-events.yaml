@@ -508,8 +508,7 @@ components:
         destinations: [mixpanel]
         properties: [flow, entry_point, provider_type]
       viewed_step:
-        status: planned
-        plan: "#2200"
+        status: emitted
         trigger: A setup prompt is shown.
         destinations: [mixpanel]
         properties: [flow, step]

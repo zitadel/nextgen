@@ -2,6 +2,7 @@ import { ZitadelError } from "@/lib/errors";
 import type { Properties } from "@/lib/telemetry";
 
 export const FLOW_STARTED = "flow_started";
+export const FLOW_STEP_VIEWED = "viewed_step";
 export const FLOW_STEP_COMPLETED = "step_completed";
 export const FLOW_COMPLETED = "flow_completed";
 export const FLOW_FAILED = "flow_failed";
@@ -47,6 +48,11 @@ export type FlowOptions<Known extends object> = {
    */
   readonly failures?: Readonly<Record<string, string>>;
   /**
+   * The names a prompt is reported under for steps that ask but are not
+   * reported as completed under their own name, by the step's key.
+   */
+  readonly viewed?: Readonly<Record<string, string>>;
+  /**
    * The key of the step whose finishing means the flow succeeded. A run that
    * ends before it, such as one that finds the work already done, never
    * completes.
@@ -89,6 +95,8 @@ export class FlowTelemetry<Known extends object> {
   private beganAt = 0;
   private facts: Properties = {};
   private ended = false;
+  private active: string | undefined;
+  private readonly seen = new Set<string>();
 
   /**
    * Set up the reporting of one run of a flow.
@@ -114,10 +122,14 @@ export class FlowTelemetry<Known extends object> {
    * What to give the wizard run, so its steps are reported as they go.
    */
   get watcher(): {
+    readonly started: (key: string) => void;
     readonly finished: (key: string, known: object) => void;
     readonly failed: (key: string, error: unknown) => void;
   } {
     return {
+      started: (key) => {
+        this.active = key;
+      },
       finished: (key, known) => {
         this.finished(key, known as Known);
       },
@@ -126,6 +138,21 @@ export class FlowTelemetry<Known extends object> {
       },
     };
   }
+
+  /**
+   * Report that a prompt is about to be drawn for the step that is running.
+   * Each step is reported once, however many questions it asks.
+   */
+  readonly prompted = (): void => {
+    const key = this.active;
+    const step =
+      key === undefined ? undefined : (this.options.steps[key]?.step ?? this.options.viewed?.[key]);
+    if (key === undefined || step === undefined || this.seen.has(key)) {
+      return;
+    }
+    this.seen.add(key);
+    this.send(FLOW_STEP_VIEWED, { flow: this.options.flow, step });
+  };
 
   private finished(key: string, known: Known): void {
     const reported = this.options.steps[key];

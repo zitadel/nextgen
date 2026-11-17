@@ -56,6 +56,7 @@ import {
   DEFAULT_RENDERER,
   type Fact,
   ONBOARDING_CHECKS,
+  ONBOARDING_PROMPTS,
   ONBOARDING_STEPS,
   PORT,
   type SetupFacts,
@@ -403,6 +404,7 @@ export default class Setup extends Destructive(BaseCommand) {
       flow: "onboarding",
       steps: ONBOARDING_STEPS,
       failures: ONBOARDING_CHECKS,
+      viewed: ONBOARDING_PROMPTS,
       completesAt: "result",
       otherwise: "application_setup",
       preview: () => {
@@ -413,6 +415,7 @@ export default class Setup extends Destructive(BaseCommand) {
       },
     });
     onboarding.begin();
+    this.ui.onPrompt(onboarding.prompted);
 
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("setup")

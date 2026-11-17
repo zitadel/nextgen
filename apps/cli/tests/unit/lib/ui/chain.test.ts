@@ -387,6 +387,35 @@ describe("a normal command's chain, which is no chain at all", () => {
     },
   );
 
+  it.for([
+    ["plain", normally],
+    ["wizard", watching],
+  ] as const)(
+    "tells a listener each time a prompt is drawn in a %s chain, and not when a flag answers",
+    async ([_shape, make]) => {
+      answering(true);
+      const chain = make();
+      const drawn: string[] = [];
+      chain.listenToPrompts(() => {
+        drawn.push("prompt");
+      });
+
+      await asTerminal(async () => {
+        await chain.questions().text({
+          name: "name",
+          message: "What is the name?",
+          given: "from a flag",
+          parse: (raw) => {
+            return { ok: true, value: raw };
+          },
+        });
+        await chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
+      });
+
+      expect(drawn).toEqual(["prompt"]);
+    },
+  );
+
   it("clears a spinner still running when the run is cancelled, before Cancelled is said", () => {
     const chain = watching();
     chain.spinner("Deploying");
