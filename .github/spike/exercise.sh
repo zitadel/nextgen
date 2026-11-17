@@ -149,6 +149,26 @@ for fw in vue svelte next; do
   cd "$RUNNER_TEMP/host"
 done
 
+# --- 7c. Port in use, free-port fallback and shutdown hygiene ---
+mkdir -p "$RUNNER_TEMP/ports" && cd "$RUNNER_TEMP/ports"
+node -e 'require("net").createServer().listen(8080,"127.0.0.1");require("net").createServer().listen(8080,"::");setInterval(()=>{},1000)' > /dev/null 2>&1 &
+BLOCKER=$!
+sleep 2
+tx "port: start --port on a held port is refused" z start --port 8080 --non-interactive --json
+if grep -q E_PORT_IN_USE "$RUNNER_TEMP/last.log"; then PASS=$((PASS+1)); echo "| PASS | port: refusal code is E_PORT_IN_USE | - |" >> "$OUT"
+else FAIL=$((FAIL+1)); echo "| FAIL | port: refusal code is E_PORT_IN_USE | - |" >> "$OUT"; { echo "<details><summary>port refusal output</summary>"; echo '```'; tail -n 30 "$RUNNER_TEMP/last.log" | cut -c1-200; echo '```'; echo "</details>"; } >> "$RUNNER_TEMP/details.md"; fi
+t "port: start without --port takes a free port" z start --non-interactive --json
+t "port: status reports a running server" z status --json
+t "port: stop" z stop
+if pgrep -f "zitadel-server\|nextgen" > /dev/null 2>&1 || tasklist 2>/dev/null | grep -qi "zitadel\|nextgen"; then
+  FAIL=$((FAIL+1)); echo "| FAIL | stop leaves no server process behind | - |" >> "$OUT"
+else PASS=$((PASS+1)); echo "| PASS | stop leaves no server process behind | - |" >> "$OUT"; fi
+if [ -n "$(find "$RUNNER_TEMP/ports/.zitadel/local" -name '*-wal' -size +0 2>/dev/null)" ]; then
+  FAIL=$((FAIL+1)); echo "| FAIL | stop leaves a non-empty SQLite WAL (not a clean shutdown) | - |" >> "$OUT"
+else PASS=$((PASS+1)); echo "| PASS | stop leaves no pending SQLite WAL | - |" >> "$OUT"; fi
+kill "$BLOCKER" 2>/dev/null || true
+cd "$RUNNER_TEMP"
+
 # --- 8. Teardown ---
 pkill -f vite 2>/dev/null || true
 cd "$RUNNER_TEMP/host"
