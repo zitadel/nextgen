@@ -32,8 +32,6 @@ const argvParts = (
       : []),
     ...fields.flatMap((field) => {
       const given = field.flag === undefined ? undefined : flags[named(field.flag)];
-      // A repeated record flag is checked entry by entry: the body keeps only the
-      // last of two entries for a key, so a secret typed first would pass unseen.
       if (field.kind === "record" && Array.isArray(given)) {
         return given.map((entry) => {
           return {
@@ -131,8 +129,6 @@ const MISSING_FIELDS_REFUSAL = {
 export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
   const fromFlags = bodyFromFlags(source.fields, flags);
   const assignments = (flags.set ?? []) as readonly Assignment[];
-  // The field flags and `--set` are checked before stdin is read: a refusal to
-  // read it suggests the run again with them as typed, a secret included.
   refuseArgvCredentials(
     argvParts(flags, undefined, source.fields, fromFlags, assignments),
     source.document,

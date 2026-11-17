@@ -284,7 +284,6 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
-      // Flows that are broken or still in use are checked with a dry run of deploy.
       ...(error instanceof BrokenFlowsError
         ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
         : {}),
