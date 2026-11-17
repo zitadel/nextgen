@@ -40,6 +40,9 @@ const (
 	// temporarilyUnavailable tells the client it may retry (RFC 6749
 	// §4.1.2.1). The library has no constructor for it.
 	temporarilyUnavailable = "temporarily_unavailable"
+	// requestURINotSupported refuses a request object passed by reference
+	// (RFC 9101 §6.3). The library has no constructor for it.
+	requestURINotSupported = "request_uri_not_supported"
 )
 
 // AuthRequestStore stores an authorization request with its expiry and
@@ -81,6 +84,17 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 	if settings.DeploymentID == "" || settings.ReleaseID == "" {
 		return nil, metadataError(domain.ErrInternal(errors.New("the OAuth settings name no deployment or release")))
 	}
+	// RFC 6749 §3.1: GET or POST, and no parameter twice. A HEAD would store a
+	// request no browser follows, and with a repeated parameter this server
+	// and a filter in front of it may each read another value.
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("the method must be GET or POST"), http.StatusBadRequest)
+	}
+	for name, values := range r.Form {
+		if len(values) > 1 {
+			return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("a parameter is repeated").WithParent(fmt.Errorf("the parameter %.100q is repeated", name)), http.StatusBadRequest)
+		}
+	}
 	unknownClient := op.NewStatusError(oidc.ErrInvalidClient().WithDescription("unknown client"), http.StatusBadRequest)
 	// A lookup with text a dialect cannot hold fails as a 500.
 	if !storable(r.Data.ClientID) {
@@ -112,7 +126,7 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	defer func() { keepError(ctx, err) }()
 	req := r.Data
 	c := r.Client.(*client)
-	if err := checkAuthRequest(req, c); err != nil {
+	if err := checkAuthRequest(req, r.Form.Get("request_uri"), c); err != nil {
 		return nil, err
 	}
 	issuer, _ := IssuerFromContext(ctx)
@@ -177,9 +191,14 @@ func logError(ctx context.Context, err error, status int, body []byte) {
 
 // checkAuthRequest refuses what this server cannot serve. The redirect URI
 // is valid by now, so each error goes back to the client.
-func checkAuthRequest(req *oidc.AuthRequest, c *client) error {
+func checkAuthRequest(req *oidc.AuthRequest, requestURI string, c *client) error {
 	if req.RequestParam != "" {
 		return oidc.ErrRequestNotSupported()
+	}
+	// The library does not read request_uri, so the request would pass
+	// without the object the client meant to send.
+	if requestURI != "" {
+		return &oidc.Error{ErrorType: requestURINotSupported}
 	}
 	// With PKCE optional, state is what protects the client from CSRF.
 	if req.State == "" {
@@ -234,7 +253,7 @@ func loginURL(issuer Issuer, loginPath string) (*url.URL, error) {
 	}
 	// A leading slash keeps the origin: ParseRedirectTarget refuses "//host".
 	if !strings.HasPrefix(loginPath, "/") {
-		return nil, fmt.Errorf("the login path %q does not start with a slash", loginPath)
+		return nil, fmt.Errorf("the login path %.200q does not start with a slash", loginPath)
 	}
 	raw := issuer.Origin() + loginPath
 	u, err := httputil.ParseRedirectTarget(raw)

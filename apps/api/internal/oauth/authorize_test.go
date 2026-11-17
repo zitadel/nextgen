@@ -222,10 +222,13 @@ func TestAuthorizeLoginPath(t *testing.T) {
 func TestAuthorizeShowsTheErrorPage(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name       string
-		settings   SettingsSource
-		clients    ClientResolver
-		set        map[string]string
+		name     string
+		settings SettingsSource
+		clients  ClientResolver
+		set      map[string]string
+		method   string
+		// repeated is appended to the query as it is.
+		repeated   string
 		wantStatus int
 	}{
 		{name: "unknown_client", set: map[string]string{"client_id": "nobody"}, wantStatus: http.StatusBadRequest},
@@ -242,6 +245,10 @@ func TestAuthorizeShowsTheErrorPage(t *testing.T) {
 		{name: "settings_without_deployment", settings: settings{settings: Settings{Enabled: true, ReleaseID: "rel_1"}}, wantStatus: http.StatusInternalServerError},
 		{name: "settings_without_release", settings: settings{settings: Settings{Enabled: true, DeploymentID: "dep_1"}}, wantStatus: http.StatusInternalServerError},
 		{name: "settings_fail", settings: settings{err: domain.ErrInternal(errors.New("boom"))}, wantStatus: http.StatusInternalServerError},
+		{name: "head", method: http.MethodHead, wantStatus: http.StatusBadRequest},
+		{name: "repeated_client_id", repeated: "&client_id=shop", wantStatus: http.StatusBadRequest},
+		{name: "repeated_redirect_uri", repeated: "&redirect_uri=https%3A%2F%2Fevil.example%2Fcallback", wantStatus: http.StatusBadRequest},
+		{name: "repeated_state", repeated: "&state=xyz", wantStatus: http.StatusBadRequest},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -255,7 +262,7 @@ func TestAuthorizeShowsTheErrorPage(t *testing.T) {
 			store := &authRequests{}
 			mux := newMux(t, Config{Settings: tt.settings, Clients: tt.clients, AuthRequests: store})
 
-			rec := send(t, mux, http.MethodGet, authorizePath+authorizeQuery(tt.set), "app.example.com", browser)
+			rec := send(t, mux, cmp.Or(tt.method, http.MethodGet), authorizePath+authorizeQuery(tt.set)+tt.repeated, "app.example.com", browser)
 
 			assertErrorPage(t, rec, tt.wantStatus)
 			assert.Empty(t, store.stored)
@@ -396,6 +403,7 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "prompt_none", set: map[string]string{"prompt": "none"}, wantError: "interaction_required"},
 		{name: "fragment_mode", set: map[string]string{"response_mode": "fragment"}, wantError: "invalid_request"},
 		{name: "request_object", set: map[string]string{"request": "eyJhbGciOiJub25lIn0.e30."}, wantError: "request_not_supported"},
+		{name: "request_uri", set: map[string]string{"request_uri": "https://app.example.com/request.jwt"}, wantError: "request_uri_not_supported"},
 		{name: "store_unavailable", storeErr: domain.ErrUnavailable().WithParent(errors.New("contention")), wantError: "temporarily_unavailable"},
 		{name: "store_fails", storeErr: domain.ErrInternal(errors.New("boom")), wantError: "server_error"},
 	}
