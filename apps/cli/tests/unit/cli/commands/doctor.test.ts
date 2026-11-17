@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 import { type Serve, test } from "@tests/fixtures";
 
 import { failureAdvice } from "@/cli/commands/doctor";
-import type { LocalServers } from "@/lib/server/local/processes";
+import { type LocalServers, ZitadelRuntime } from "@/lib/server";
 import { MetaSchemas } from "@/lib/meta-schemas";
 import { advisoryForWarnings, type DoctorAgain } from "@/cli/commands/doctor/index";
 import type { Suggest } from "@/lib/suggestion";
@@ -58,6 +58,16 @@ async function setProjectServer(cwd: string, server: string): Promise<void> {
   const path = join(cwd, "zitadel.json");
   const config = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
   await writeFile(path, JSON.stringify({ ...config, server }));
+}
+
+/** Drops the `server` key from the project's `zitadel.json`, as a hand-written one may lack it. */
+async function removeProjectServer(cwd: string): Promise<void> {
+  const path = join(cwd, "zitadel.json");
+  const { server: _server, ...config } = JSON.parse(await readFile(path, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  await writeFile(path, JSON.stringify(config));
 }
 
 /** Records a healthy local server in `dir`, as `zitadel start` does, and returns its port. */
@@ -641,6 +651,19 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       const res = await doctorWithoutPort(cwd);
 
       expect(checkNamesOf(res.stdout).filter((name) => LOCAL_RUNTIME_CHECKS.has(name))).toEqual([]);
+    });
+
+    it("checks no local runtime when zitadel.json names no server", async ({
+      dir,
+      doctorWithoutPort,
+    }) => {
+      const cwd = await makeHealthyProject(dir);
+      await removeProjectServer(cwd);
+
+      const res = await doctorWithoutPort(cwd);
+
+      expect(checkNamesOf(res.stdout).filter((name) => LOCAL_RUNTIME_CHECKS.has(name))).toEqual([]);
+      expect((parseJson(res.stdout) as { source: string }).source).toBe(ZitadelRuntime.DEFAULT);
     });
 
     it("reports no local port", async ({ dir, doctorWithoutPort }) => {

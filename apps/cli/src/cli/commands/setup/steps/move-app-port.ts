@@ -1,4 +1,5 @@
 import { basename, join } from "node:path";
+import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
 import {
@@ -133,12 +134,12 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
         hint: "Pass --dev-port with the port the app should run on.",
       });
     }
-    const source = (await Project.at(this.deps.cwd).config()).server;
+    const source = (await Project.at(this.deps.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
     const moving = this.deps.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${this.deps.dryRun ? " (dry run)" : ""}`,
     );
     try {
-      const orca = createOrca();
+      const orca = createOrca(LocalRuntime.DIR);
       const context = await loadPatchContext(this.deps.cwd, orca, this.deps.cliVersion);
       const previousIssuer = context.issuer;
       const issuer = issuerFromPort(devPort);

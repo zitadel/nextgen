@@ -1,4 +1,5 @@
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { join } from "node:path";
 import { Flags } from "@oclif/core";
 
@@ -39,7 +40,7 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     configEdits: [],
     guidanceFiles: ["AGENTS.md", "README.md"],
   };
-  const orca = createOrca();
+  const orca = createOrca(LocalRuntime.DIR);
   const framework = await orca.tryDetect(cwd);
   if (!framework) {
     return fallback;

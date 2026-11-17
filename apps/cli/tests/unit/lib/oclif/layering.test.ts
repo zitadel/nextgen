@@ -22,7 +22,6 @@ const GENERIC = [
   "lib/cmd",
   "lib/consent",
   "lib/errors",
-  "lib/host",
   "lib/json",
   "lib/names",
   "lib/paths",
@@ -39,16 +38,16 @@ const GENERIC = [
  * Product knowledge the glue still reaches for, each one a leak to move into
  * the commands that own it. The list only shrinks: a new one fails the test.
  */
-const LEAKS = ["lib/environment", "lib/server/local/processes", "lib/skills"];
+const LEAKS = ["lib/environment", "lib/skills"];
 
 /**
  * Domain libs that still reach into the layer, each one a dependency pointing
- * the wrong way. The list only shrinks: a new one fails the test. `lib/server`
- * and `lib/telemetry/consent` want a type the envelope owns, and `lib/api/call`
+ * the wrong way. The list only shrinks: a new one fails the test. `lib/telemetry/consent`
+ * wants a type the envelope owns, and `lib/api/call`
  * is the `zitadel api`
  * argument parser, which reads the generated commands' own helpers.
  */
-const INBOUND = ["lib/api/call.ts", "lib/server/server.ts", "lib/telemetry/consent.ts"];
+const INBOUND = ["lib/api/call.ts", "lib/telemetry/consent.ts"];
 
 /**
  * A path as this file reads one: `readdir` answers in the platform's

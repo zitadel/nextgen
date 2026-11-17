@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readdir, readFile, rm, stat, symlink } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { join } from "node:path";
 
 import { beforeEach, describe, expect, vi } from "vitest";
@@ -2762,7 +2763,7 @@ describe("loadPatchContext", () => {
   it("reconstructs the patch context from on-disk project files", async ({ dir }) => {
     await aNextProject(dir);
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context).toMatchObject({
       framework: { id: "next" },
@@ -2789,7 +2790,7 @@ describe("loadPatchContext", () => {
     });
     await writeScaffold(dir, { files: {}, scaffolded_framework: true, dev_port: 3005 });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context).toMatchObject({
       preset: "passkey-first",
@@ -2805,7 +2806,7 @@ describe("loadPatchContext", () => {
       "zitadel.json": JSON.stringify({ project: PROJECT_ID, framework: { id: "next" } }),
     });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.server).toBe("");
   });
@@ -2816,7 +2817,7 @@ describe("loadPatchContext", () => {
   ])("pins the SDK for CLI %s at %s", async ([cliVersion, expected], { dir }) => {
     await aNextProject(dir);
 
-    const context = await loadPatchContext(dir, createOrca(), cliVersion ?? "");
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), cliVersion ?? "");
 
     expect(context.sdkVersion).toBe(expected);
   });
@@ -2828,7 +2829,7 @@ describe("loadPatchContext", () => {
     vi.stubEnv("ZITADEL_ENV", "production");
     vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.issuer).toBe(ISSUER);
   });
@@ -2838,7 +2839,7 @@ describe("loadPatchContext", () => {
     await rm(join(dir, ".env.local"));
     await writeScaffold(dir, { files: {}, dev_port: 3005 });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.issuer).toBe("http://localhost:3005");
   });
@@ -2855,7 +2856,7 @@ describe("loadPatchContext", () => {
     await aNextProject(dir);
     await writeScaffold(dir, scaffold);
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.posture).toBe(posture);
   });

@@ -47,8 +47,8 @@
   `{ id, … }` object; the failure handler renders it with the run's scope.
 - A helper that renders now takes a `Suggest` (`this.suggest`, or `suggestWith(scope)`
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
-- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/`,
-  `oclif/` and `local-server/` may): hand the command data or a `{ id, … }` suggestion object, or
+- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/` and
+  `oclif/` may): hand the command data or a `{ id, … }` suggestion object, or
   take a function the command supplies. `tests/unit/lib/suggestion/layering.test.ts` fails on it.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
@@ -179,6 +179,9 @@
   warning or a box line names its command with `suggest`, because the scan
   above rejects backticks and a bare `zitadel …` anywhere else in
   `src/cli/commands`.
+- Put a command that takes `--env-file` in `nextCommands`; a `hint:` may name it for a person to
+  read, but a message or a box line never may: prose drops the selector
+  (`tests/unit/lib/oclif/environment-flags.test.ts`).
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per

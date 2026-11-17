@@ -146,7 +146,7 @@ describe("local server binary helpers", () => {
 
     await expect(launching).rejects.toMatchObject({
       code: "E_VALIDATION",
-      hint: expect.stringContaining("exists and can be run"),
+      kind: "cannot-launch",
     });
   });
 
@@ -180,7 +180,7 @@ describe("local server binary helpers", () => {
 
     await expect(launching).rejects.toMatchObject({
       code: "E_VALIDATION",
-      hint: expect.stringContaining("Reinstall @zitadel/cli"),
+      kind: "package-missing",
     });
     resolver.missing = false;
   });

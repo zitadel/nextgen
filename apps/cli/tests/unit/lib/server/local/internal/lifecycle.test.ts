@@ -730,4 +730,18 @@ describe("claimFreePort", () => {
     await expect(claimFreePort(ports, undefined, 8080)).rejects.toBeInstanceOf(NoFreePortError);
     expect(tried).toHaveLength(100);
   });
+
+  it("does not look past the last port there is", async () => {
+    const tried: number[] = [];
+    const ports: PortProbe = {
+      isFree: async (port) => {
+        tried.push(port);
+        return false;
+      },
+      reserve: async () => async () => undefined,
+    };
+
+    await expect(claimFreePort(ports, undefined, 65_530)).rejects.toBeInstanceOf(NoFreePortError);
+    expect(Math.max(...tried)).toBe(65_535);
+  });
 });
