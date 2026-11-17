@@ -25,7 +25,7 @@ export const SERVER = serverFlag({
 
 /**
  * Marks a command that talks to a Zitadel server, and gives it the one way a
- * server is read: `--server` (or `ZITADEL_API_BASE`, or the cloud default) is
+ * server is read: `--server` (or the cloud default) is
  * resolved into the run's server before the command starts, so its events,
  * failures and follow-up commands all name the same one.
  *

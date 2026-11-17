@@ -217,7 +217,7 @@
 
   | The command | It extends |
   | --- | --- |
-  | never talks to a server | `BaseCommand` or `EnvironmentCommand` |
+  | never talks to a server | `BaseCommand` |
   | talks to one through `--server` or its environment | `ServerCommand(Base)` |
   | may have to ask which server | `ChoosingServerCommand(Base)` |
   | is about the local server | `LocalServerCommand(Base, folderRule)` |

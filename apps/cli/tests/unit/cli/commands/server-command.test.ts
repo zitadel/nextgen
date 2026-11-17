@@ -1,8 +1,5 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
+import type { Callback, Mixpanel as MixpanelClient, Modifiers } from "mixpanel";
+import { describe, expect, expectTypeOf } from "vitest";
 
 import {
   ChoosingServerCommand,
@@ -13,9 +10,12 @@ import { type Admitted, BaseCommand, EnvironmentCommand } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { LocalRuntime, PsLocalServers, RealMachine, ZitadelRuntime } from "@/lib/server";
 import { shellCommand } from "@/lib/suggestion";
-import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
+import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { CommandGroups } from "@/cli/commands/groups";
+import { ZitadelError } from "@/lib/errors";
+import { it } from "@tests/fixtures";
 import { aConfigAt } from "@tests/helpers/suggestions";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /** A command that takes a server, with its protected reading opened for the test. */
 class TakesAServer extends ServerCommand(BaseCommand) {
@@ -92,21 +92,14 @@ class AboutAnyLocalServer extends LocalServerCommand(BaseCommand) {
 }
 
 const VERSION = "0.0.0-test";
-const folders: string[] = [];
-
-async function aFolder(): Promise<string> {
-  const folder = await mkdtemp(join(tmpdir(), "zitadel-server-command-"));
-  folders.push(folder);
-  return folder;
+/** What a command's `logJson` was given, as the record an envelope is. */
+function recordOf(json: unknown): Record<string, unknown> {
+  if (typeof json === "object" && json !== null) {
+    return Object.fromEntries(Object.entries(json));
+  } else {
+    return {};
+  }
 }
-
-afterEach(async () => {
-  await Promise.all(
-    folders.splice(0).map((folder) => {
-      return rm(folder, { recursive: true, force: true });
-    }),
-  );
-});
 
 describe("ServerCommand", () => {
   it("resolves a run with no --server to the cloud", async () => {
@@ -148,7 +141,10 @@ describe("ChoosingServerCommand", () => {
   it("refuses to ask when no one can be asked and no server was given", async () => {
     const command = new ChoosesAServer([], aConfigAt(VERSION));
 
-    await expect(command.chooseWith({})).rejects.toMatchObject({ code: "E_VALIDATION" });
+    const refusal = await rejectionOf(() => command.chooseWith({}));
+
+    expect(refusal).toBeInstanceOf(ZitadelError);
+    expect(refusal).toMatchObject({ code: "E_VALIDATION" });
   });
 });
 
@@ -160,9 +156,9 @@ describe("LocalServerCommand", () => {
     expect(AboutTheLocalServer.group).toBeUndefined();
   });
 
-  it("leaves the server of a command with no rule to the command", async () => {
+  it("leaves the server of a command with no rule to the command", async ({ dir }) => {
     await expect(
-      new AboutAnyLocalServer([], aConfigAt(VERSION)).sourceIn(await aFolder()),
+      new AboutAnyLocalServer([], aConfigAt(VERSION)).sourceIn(dir),
     ).resolves.toBeUndefined();
   });
 
@@ -173,9 +169,9 @@ describe("LocalServerCommand", () => {
     expect(command.theServers).toBeInstanceOf(PsLocalServers);
   });
 
-  it("names the default server for a folder that started none, in either rule", async () => {
-    const folder = await aFolder();
-
+  it("names the default server for a folder that started none, in either rule", async ({
+    dir: folder,
+  }) => {
     await expect(new AboutTheLocalServer([], aConfigAt(VERSION)).sourceIn(folder)).resolves.toBe(
       LocalRuntime.DEFAULT_URL,
     );
@@ -195,7 +191,7 @@ class Capturing extends ServerCommand(BaseCommand) {
   }
 
   public override logJson(json: unknown): void {
-    this.json.push(json as Record<string, unknown>);
+    this.json.push(recordOf(json));
   }
 
   protected async execute(): Promise<never> {
@@ -212,11 +208,8 @@ class Capturing extends ServerCommand(BaseCommand) {
   }
 
   private async failWith(error: Error): Promise<Record<string, unknown>> {
-    try {
-      await this.catch(error);
-    } catch {
-      /* catch() ends by throwing oclif's ExitError */
-    }
+    // catch() ends by throwing oclif's ExitError
+    await rejectionOf(() => this.catch(error));
     return this.json[0] ?? {};
   }
 }
@@ -231,7 +224,7 @@ class CapturingNoServer extends BaseCommand {
   }
 
   public override logJson(json: unknown): void {
-    this.json.push(json as Record<string, unknown>);
+    this.json.push(recordOf(json));
   }
 
   protected async execute(): Promise<never> {
@@ -239,11 +232,8 @@ class CapturingNoServer extends BaseCommand {
   }
 
   public async failBeforeFlags(): Promise<Record<string, unknown>> {
-    try {
-      await this.catch(new Error("It failed"));
-    } catch {
-      /* catch() ends by throwing oclif's ExitError */
-    }
+    // catch() ends by throwing oclif's ExitError
+    await rejectionOf(() => this.catch(new Error("It failed")));
     return this.json[0] ?? {};
   }
 }
@@ -292,21 +282,42 @@ class CapturingEnvironment extends ServerCommand(EnvironmentCommand) {
   }
 
   public override logJson(json: unknown): void {
-    this.json.push(json as Record<string, unknown>);
+    this.json.push(recordOf(json));
   }
 
-  protected override createTelemetry(_deps: TelemetryDeps): Telemetry {
+  protected override createTelemetry(deps: TelemetryDeps): Telemetry {
     const events = this.events;
-    return {
-      enabled: true,
-      isFirstRun: false,
-      distinctId: "did-test",
-      track: (event: string, properties: Properties = {}) => {
+    const client: MixpanelClient = {
+      track(event: string, properties: Properties, callback?: Callback): void {
         events.push({ event, properties });
+        callback?.(undefined);
       },
-      profile: () => undefined,
-      shutdown: async () => undefined,
-    } as unknown as Telemetry;
+      people: {
+        set(
+          _distinctId: string,
+          _properties: Properties,
+          _modifiers?: Modifiers,
+          callback?: Callback,
+        ): void {
+          callback?.(undefined);
+        },
+        set_once(
+          _distinctId: string,
+          _properties: Properties,
+          _modifiers?: Modifiers,
+          callback?: Callback,
+        ): void {
+          callback?.(undefined);
+        },
+      },
+    };
+    return Telemetry.create({
+      ...deps,
+      env: { ...deps.env, ZITADEL_TELEMETRY_TOKEN: "tok" },
+      flag: true,
+      initClient: () => client,
+      loadIdentity: () => ({ distinctId: "did-test", isFirstRun: false }),
+    });
   }
 
   protected async execute(): Promise<never> {
@@ -315,11 +326,8 @@ class CapturingEnvironment extends ServerCommand(EnvironmentCommand) {
 
   public async failAfterFlags(flags: Record<string, unknown>): Promise<Record<string, unknown>> {
     await this.toMeta(flags);
-    try {
-      await this.catch(new Error("It failed"));
-    } catch {
-      /* catch() ends by throwing oclif's ExitError */
-    }
+    // catch() ends by throwing oclif's ExitError
+    await rejectionOf(() => this.catch(new Error("It failed")));
     return this.json[0] ?? {};
   }
 }
