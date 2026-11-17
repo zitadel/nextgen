@@ -8,10 +8,9 @@ import {
   errorMessage,
   failureText,
   isCancellation,
-  isErrno,
   toZitadelError,
 } from "@/lib/errors";
-import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
+import { BrokenFlowsError, ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -134,6 +133,35 @@ describe("toZitadelError", () => {
       "do this",
       { file: "a.json" },
     ]);
+  });
+
+  it.each([
+    [
+      "a method still in use",
+      { kind: "method-in-use", uses: [], hint: "`zitadel deploy --dry-run` checks the edit." },
+      [{ id: "deploy", flags: { dryRun: true } }],
+    ],
+    [
+      "flows already broken on disk",
+      { kind: "broken", hint: "Fix those errors first (`zitadel deploy --dry-run` reports them)." },
+      [{ id: "deploy", flags: { dryRun: true } }],
+    ],
+    [
+      "an edit that would break a flow, which is never saved",
+      { kind: "broken", hint: "Fix the steps named above, then run the command again." },
+      undefined,
+    ],
+  ] as const)("gives %s its follow-up", (_name, report, next) => {
+    const result = toZitadelError(
+      new BrokenFlowsError({
+        ...report,
+        file: "default-human-user.json",
+        heading: "A login flow would break:",
+        issues: [],
+      }),
+    );
+
+    expect(result.nextCommands).toEqual(next);
   });
 
   it("leaves out the hint and details a ConfigError has none of", () => {
@@ -559,19 +587,6 @@ describe("resources the platform rejected", () => {
     expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
       undefined,
     );
-  });
-});
-
-describe("isErrno", () => {
-  it("matches an error carrying the given code", () => {
-    expect(isErrno(Object.assign(new Error("gone"), { code: "ENOENT" }), "ENOENT")).toBe(true);
-  });
-
-  it("does not match another code, a missing code or a non-object", () => {
-    expect(isErrno(Object.assign(new Error("gone"), { code: "EACCES" }), "ENOENT")).toBe(false);
-    expect(isErrno(new Error("no code"), "ENOENT")).toBe(false);
-    expect(isErrno(undefined, "ENOENT")).toBe(false);
-    expect(isErrno("ENOENT", "ENOENT")).toBe(false);
   });
 });
 

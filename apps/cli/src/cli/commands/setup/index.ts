@@ -1,3 +1,4 @@
+import { SystemMachine, LocalRuntime } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   BRANDING_DESIGNS,
@@ -29,10 +30,10 @@ import {
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Admitted,
   BaseCommand,
-  CommandGroups,
   type CommandResult,
   type JsonEnvelope,
   nonBlankString,
@@ -47,7 +48,7 @@ import {
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { Scope } from "@/lib/suggestion";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
@@ -144,7 +145,7 @@ const SSO_NEEDS_CLIENT_ID_REFUSAL = {
  * `createOrca` is pure, as it only builds the in-memory registries, so calling
  * it at module load is safe.
  */
-const FRAMEWORK_OPTIONS = createOrca()
+const FRAMEWORK_OPTIONS = createOrca(LocalRuntime.DIR)
   .availableFrameworks()
   .map((framework) => {
     return framework.id;
@@ -381,10 +382,12 @@ export default class Setup extends Destructive(BaseCommand) {
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
 
+    const machine = new SystemMachine();
     const prompting = {
       ask: this.ask,
       cwd: this.cwd,
       dryRun: this.dryRun,
+      machine,
       nonInteractive: this.nonInteractive,
       serverFlag: this.meta.serverFlag,
       suggest: this.suggest,
@@ -395,6 +398,7 @@ export default class Setup extends Destructive(BaseCommand) {
       await Wizard.named<Fact<"flags">, CommandResult>("setup")
         .step(
           new CheckPreconditions({
+            machine,
             meta: this.meta,
             suggest: this.suggest,
             useServer: (server) => {
@@ -473,6 +477,7 @@ export default class Setup extends Destructive(BaseCommand) {
         .step(
           new SettleAnswers({
             dryRun: this.dryRun,
+            machine,
             nonInteractive: this.nonInteractive,
             suggest: this.suggest,
           }),
@@ -643,7 +648,7 @@ export default class Setup extends Destructive(BaseCommand) {
           { flags },
           {
             onUndoError: (key, error) => {
-              reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+              warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },
           },
         ),

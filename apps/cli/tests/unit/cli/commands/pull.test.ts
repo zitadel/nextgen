@@ -59,7 +59,7 @@ const RELEASE_ID = "rel_01KX3RG8A7F0N9WD3P2E4YM5C1";
  */
 const DEPLOYMENT_ID = "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6";
 
-const { server, dirs } = usePlatformServer();
+const { server } = usePlatformServer();
 
 /**
  * Answers a read of {@link LIVE_RELEASE} with a release that pins nothing, so
@@ -91,7 +91,6 @@ describe("pull", () => {
   describe("with latest as the target", () => {
     it("pulls the release of the primary that is live, past the first page", async () => {
       const project = await aProjectWithTwoDeploys("zitadel-pull-");
-      dirs.push(project.cwd);
       server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
 
       const result = await runCliForTest([
@@ -109,7 +108,6 @@ describe("pull", () => {
 
     it("is not stopped by a branding file it cannot read", async () => {
       const project = await aProjectWithTwoDeploys("zitadel-pull-");
-      dirs.push(project.cwd);
       await mkdir(join(project.cwd, ".zitadel/branding/unreadable.json"), { recursive: true });
       server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
 
@@ -165,7 +163,6 @@ describe("pull of a release pinning a handle that has no file", () => {
 
   it.each([[[]], [["--dry-run"]]])("writes no file, with flags %j", async (flags) => {
     const project = await aProjectWithTwoDeploys("zitadel-pull-");
-    dirs.push(project.cwd);
     server.use(...pinningAGoodSchemaThenABadHandle());
 
     await runCliForTest([
@@ -221,7 +218,6 @@ describe("pull of a release pinning two handles that resolve to one file", () =>
     "refuses it, naming both handles and the file, pinned as %j",
     async (handles) => {
       const project = await aProjectWithTwoDeploys("zitadel-pull-");
-      dirs.push(project.cwd);
       const file = join(project.cwd, ".zitadel/schemas/signup.json");
       await mkdir(join(project.cwd, ".zitadel/schemas"), { recursive: true });
       await writeFile(file, JSON.stringify({ objectType: "register" }));
@@ -260,7 +256,6 @@ describe("pull's --json envelope", () => {
     [["--dry-run"], ["title", "release_id", "pulled", "skipped", "dry_run", "next_commands"]],
   ])("holds exactly the keys of a run with flags %j", async (flags, keys) => {
     const project = await aProjectWithTwoDeploys("zitadel-pull-");
-    dirs.push(project.cwd);
     server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
 
     const envelope = await runCommand(Pull, "pull", [
@@ -284,7 +279,6 @@ describe("pull's --json envelope", () => {
 describe("pull of a release whose revisions cannot be fetched", () => {
   it("raises the first failure in the order the release pins them", async () => {
     const project = await aProjectWithTwoDeploys("zitadel-pull-");
-    dirs.push(project.cwd);
     server.use(
       http.get(`${PLATFORM_URL}/api/v1/releases/${RELEASE_ID}`, ({ request }) => {
         return HttpResponse.json({

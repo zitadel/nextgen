@@ -1510,7 +1510,7 @@ describe("user detail", () => {
     expect(screen.getByText(expected)).toBeInTheDocument();
   });
 
-  it("leads with the display and subtitles the identifier when both resolve", async () => {
+  it("leads with the display and puts the identifier first on the identity line", async () => {
     stub({
       user: {
         id: USER_ID,
@@ -1523,7 +1523,9 @@ describe("user detail", () => {
     });
     await renderDetail();
     expect(await screen.findByRole("heading", { name: "Maya Patel" })).toBeInTheDocument();
-    expect(screen.getAllByText("maya@acme.com").length).toBeGreaterThanOrEqual(1);
+    const terms = screen.getAllByRole("term").map((term) => term.textContent);
+    expect(terms.slice(0, 2)).toEqual(["Identifier", "User ID"]);
+    expect(screen.getAllByRole("definition")[0]).toHaveTextContent("maya@acme.com");
   });
 
   it("omits status and created on a record the server has not stamped", async () => {

@@ -7,7 +7,7 @@ import { aConfigAt } from "@tests/helpers/suggestions";
 import { BaseCommand } from "@/lib/oclif/base";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { printing, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {

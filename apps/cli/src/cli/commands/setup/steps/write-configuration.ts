@@ -17,10 +17,9 @@ import {
 } from "@/cli/commands/setup/shared";
 import { createZitadelClient, InvalidError, PolicyService } from "@/lib/backend";
 import { isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
-import { normalizePublicCliProse } from "@/lib/public-cli";
-import { WHAT_CHANGED } from "@/lib/suggestion";
-import { userAgent } from "@/lib/user-agent";
-import { reportWarning } from "@/lib/warnings";
+import { Spelling, WHAT_CHANGED } from "@/lib/suggestion";
+import { Runtime } from "@/lib/runtime";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import {
   CONFIG_DIRECTORIES,
@@ -112,7 +111,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
       }
       const signupPolicy = await new PolicyService(
         createZitadelClient({
-          userAgent: userAgent(),
+          userAgent: Runtime.current().userAgent(),
           baseUrl: answers.server,
           token: project.project_secret,
           signal: this.deps.signal,
@@ -137,7 +136,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
         );
       const scaffold = await scaffoldOf(this.deps.cwd, this.deps.force, answers, signupPolicy);
       if (!signupPolicy) {
-        reportWarning(
+        warnings.report(
           scaffold.signupPolicy === undefined
             ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${this.deps.suggest(
                 {
@@ -175,7 +174,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
           },
         ].map(async (readme): Promise<readonly string[]> => {
           const path = `${readme.directory}/${README}`;
-          const text = normalizePublicCliProse(readme.text, this.deps.cliVersion);
+          const text = Spelling.at(this.deps.cliVersion).normalizeProse(readme.text);
           try {
             await store.writeText(path, text, "create");
             return [path];

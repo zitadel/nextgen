@@ -373,18 +373,19 @@ Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 
 On Vercel, every service of the hosted cloud builds through turbo (repo-root
 `vercel.json`): the console, the docs and the website with
-`turbo run build`, the server with `@zitadel/cloud`'s `build`, `migrate`
-and `deploy`, in that order (`dependsOn`), and the schemas with its `schemas`.
-The launcher build, migrations and deployment always run; Go's compiler cache
+`turbo run build`, the server with `@zitadel/cloud`'s `build`, `migrate`,
+`seed` and `deploy`, in that order (`dependsOn`), and the schemas with its
+`schemas`. The launcher build, migrations, seeding and deployment always run; Go's compiler cache
 persists in Vercel's branch build cache. See [apps/cloud/turbo.json](../../../apps/cloud/turbo.json)
 for the cache boundary and deployment ordering, and the
 [cloud runbook](../../runbooks/cloud.md#operating) for cache diagnostics.
 The server's service installs the cloud services and their dependencies
 (`installCommand`) and puts Go on PATH (`apps/cloud/install-go.sh`) before
 its build command runs Turbo: it is a Node.js function, and Vercel's Node.js
-build image has no Go. `migrate` passes the whole environment through
+build image has no Go. `migrate` and `seed` pass the whole environment through
 (`passThroughEnv: ["*"]`): the launcher checks every variable the function
-needs, and strict mode would hide one nobody listed. Two project variables, `TURBO_TELEMETRY_DISABLED`
+needs and seeds with the function's configuration, and strict mode would hide
+one nobody listed. Two project variables, `TURBO_TELEMETRY_DISABLED`
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
 about each project variable `turbo.json` does not pass
 ([runbook](../../runbooks/cloud.md)). The other services use the cache as Vercel sets it up:

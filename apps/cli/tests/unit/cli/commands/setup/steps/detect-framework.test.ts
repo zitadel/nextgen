@@ -9,9 +9,8 @@ import { isCancel, select } from "@clack/prompts";
 import type { SetupFlags } from "@/cli/commands/setup";
 import { DetectFramework } from "@/cli/commands/setup/steps/detect-framework";
 import { ZitadelError } from "@/lib/errors";
-import { asker } from "@/lib/input";
 import { Ui } from "@/lib/ui";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -33,7 +32,7 @@ const AUDIENCE = { interactive: true, force: false };
  */
 function detectIn(cwd: string) {
   return new DetectFramework({
-    ask: asker(AUDIENCE),
+    ask: Ui.asker(AUDIENCE),
     cwd,
     env: {},
     force: false,

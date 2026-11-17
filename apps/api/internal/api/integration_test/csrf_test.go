@@ -144,16 +144,20 @@ func TestSessionCSRF(t *testing.T) {
 		})
 	}
 
-	// Invitation lookup is a read (ADR 086 CSRF-on-writes): same-origin may
-	// omit the token and reaches the stub; cross-site is still refused.
+	// Invitation lookup is a read (ADR 086 §7): same-origin may omit the token
+	// and reaches the lookup; cross-site is still refused. Only platform users
+	// redeem, so it signs one in.
 	t.Run("invitation lookup needs no token but must be same-origin", func(t *testing.T) {
 		t.Parallel()
-		status, body := raw(t, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
+		userID, _ := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+		cleanupPlatformUserAndTeam(t, userID)
+		platformCookie := platformSessionCookie(t, userID)
+		status, body := cookieRequest(t, platformCookie, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
 			"Sec-Fetch-Site": "same-origin",
 		})
-		assert.Equal(t, http.StatusNotImplemented, status, body)
+		assert.Equal(t, http.StatusNotFound, status, body)
 
-		status, body = raw(t, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
+		status, body = cookieRequest(t, platformCookie, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
 			"Sec-Fetch-Site": "cross-site",
 			"Origin":         "https://evil.example",
 		})

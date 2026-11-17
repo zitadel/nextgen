@@ -14,6 +14,7 @@ import type { Suggested } from "./suggestion";
 import {
   ConflictError as ConfigConflictError,
   ConfigError,
+  BrokenFlowsError,
   NotFoundError as ConfigNotFoundError,
 } from "./zitadel";
 
@@ -273,6 +274,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
+      ...(error instanceof BrokenFlowsError && error.hint?.includes("deploy --dry-run")
+        ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
+        : {}),
     });
   }
 
@@ -534,11 +538,6 @@ function isZodLikeError(error: unknown): boolean {
     "issues" in error &&
     Array.isArray((error as { issues: unknown }).issues)
   );
-}
-
-/** Whether a caught error is the given `errno` code. */
-export function isErrno(error: unknown, code: string): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
 /** The message of a caught value, whatever it is. */

@@ -2,7 +2,7 @@ import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/backend/errors";
 import {

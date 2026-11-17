@@ -1,4 +1,4 @@
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
@@ -34,7 +34,7 @@ export function appTemplate(ctx: PatchContext): string {
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
   return `<script lang="ts">
-${MANAGED_MARKER}
+${ManagedFile.MARKER}
 import { onMount } from "svelte";
 import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
 

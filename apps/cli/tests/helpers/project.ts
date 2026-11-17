@@ -1,24 +1,13 @@
 import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  realpath,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { parseEnv, promisify } from "node:util";
 
 import { snapshotPlatformStore } from "@zitadel/api-mock/platform";
-import { expect, vi } from "vitest";
+import { expect, onTestFinished, vi } from "vitest";
 import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
@@ -28,6 +17,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** How long a run gets to unwind after an interrupt before the test gives up on it. */
 const INTERRUPT_GRACE_MS = 10_000;
@@ -44,9 +34,9 @@ export type InterruptedRun = Readonly<{
 }>;
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
-import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
-import { assertRunnableSuggestions } from "./suggestions";
+import { assertRunnableSuggestions, assertSuggestionsCarryTheRun } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
 
@@ -1137,43 +1127,42 @@ export class ScaffoldedApp {
     await new Promise<void>((listening) => {
       stalled.listen(port, "127.0.0.1", listening);
     });
-    const startedAt = Date.now();
-    try {
-      const result = await new Promise<CliResult>((resolve) => {
-        execFile(
-          process.execPath,
-          [
-            join(cliPackageRoot, "bin/run.js"),
-            ...["status", "--json", "--cwd", this.path],
-            ...["--server", `http://127.0.0.1:${String(port)}`],
-          ],
-          {
-            env: {
-              ...process.env,
-              DO_NOT_TRACK: "1",
-            },
-          },
-          (error, stdout, stderr) => {
-            return resolve({
-              exitCode: typeof error?.code === "number" ? error.code : 0,
-              stdout,
-              stderr,
-            });
-          },
-        );
-      });
-      return {
-        result,
-        elapsedMs: Date.now() - startedAt,
-      };
-    } finally {
+    onTestFinished(async () => {
       stalled.closeAllConnections();
       await new Promise<void>((closed) => {
         stalled.close(() => {
           return closed();
         });
       });
-    }
+    });
+    const startedAt = Date.now();
+    const result = await new Promise<CliResult>((resolve) => {
+      execFile(
+        process.execPath,
+        [
+          join(cliPackageRoot, "bin/run.js"),
+          ...["status", "--json", "--cwd", this.path],
+          ...["--server", `http://127.0.0.1:${String(port)}`],
+        ],
+        {
+          env: {
+            ...process.env,
+            DO_NOT_TRACK: "1",
+          },
+        },
+        (error, stdout, stderr) => {
+          return resolve({
+            exitCode: typeof error?.code === "number" ? error.code : 0,
+            stdout,
+            stderr,
+          });
+        },
+      );
+    });
+    return {
+      result,
+      elapsedMs: Date.now() - startedAt,
+    };
   }
 
   /**
@@ -1201,63 +1190,62 @@ export class ScaffoldedApp {
     await new Promise<void>((listening) => {
       stalled.listen(port, "127.0.0.1", listening);
     });
-    try {
-      return await new Promise<InterruptedRun>((resolve, reject) => {
-        const child = spawn(
-          process.execPath,
-          [
-            join(cliPackageRoot, "bin/run.js"),
-            ...["status", "--json", "--cwd", this.path],
-            ...["--server", `http://127.0.0.1:${String(port)}`],
-          ],
-          {
-            env: {
-              ...process.env,
-              DO_NOT_TRACK: "1",
-            },
-          },
-        );
-        const out: string[] = [];
-        const err: string[] = [];
-        child.stdout.on("data", (chunk: Buffer) => {
-          out.push(chunk.toString());
-        });
-        child.stderr.on("data", (chunk: Buffer) => {
-          err.push(chunk.toString());
-        });
-        reached.interrupt = () => {
-          child.kill("SIGINT");
-        };
-        // A run that neither unwinds nor dies would otherwise hold the suite
-        // until its own deadline, and the failure would read as a timeout
-        // somewhere else rather than as a command that ignored the interrupt.
-        const gaveUp = setTimeout(() => {
-          child.kill("SIGKILL");
-          reject(new Error(`status kept running ${String(INTERRUPT_GRACE_MS)}ms after SIGINT`));
-        }, INTERRUPT_GRACE_MS);
-        child.on("close", (code, signal) => {
-          clearTimeout(gaveUp);
-          // A run the signal killed outright never installed its handler, which
-          // is a different failure from one that unwound: it answers no exit
-          // code and names the signal instead, so neither reads as the other.
-          const run = {
-            exitCode: code,
-            signal,
-            stdout: out.join(""),
-            stderr: err.join(""),
-          };
-          assertNothingDrivesTheTerminal(run, ["status"]);
-          return resolve(run);
-        });
-      });
-    } finally {
+    onTestFinished(async () => {
       stalled.closeAllConnections();
       await new Promise<void>((closed) => {
         stalled.close(() => {
           return closed();
         });
       });
-    }
+    });
+    return await new Promise<InterruptedRun>((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        [
+          join(cliPackageRoot, "bin/run.js"),
+          ...["status", "--json", "--cwd", this.path],
+          ...["--server", `http://127.0.0.1:${String(port)}`],
+        ],
+        {
+          env: {
+            ...process.env,
+            DO_NOT_TRACK: "1",
+          },
+        },
+      );
+      const out: string[] = [];
+      const err: string[] = [];
+      child.stdout.on("data", (chunk: Buffer) => {
+        out.push(chunk.toString());
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        err.push(chunk.toString());
+      });
+      reached.interrupt = () => {
+        child.kill("SIGINT");
+      };
+      // A run that neither unwinds nor dies would otherwise hold the suite
+      // until its own deadline, and the failure would read as a timeout
+      // somewhere else rather than as a command that ignored the interrupt.
+      const gaveUp = setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(new Error(`status kept running ${String(INTERRUPT_GRACE_MS)}ms after SIGINT`));
+      }, INTERRUPT_GRACE_MS);
+      child.on("close", (code, signal) => {
+        clearTimeout(gaveUp);
+        // A run the signal killed outright never installed its handler, which
+        // is a different failure from one that unwound: it answers no exit
+        // code and names the signal instead, so neither reads as the other.
+        const run = {
+          exitCode: code,
+          signal,
+          stdout: out.join(""),
+          stderr: err.join(""),
+        };
+        assertNothingDrivesTheTerminal(run, ["status"]);
+        return resolve(run);
+      });
+    });
   }
 
   /** Add a primary origin, so a deploy to `primary` has somewhere to land. */
@@ -1272,6 +1260,40 @@ export class ScaffoldedApp {
       "--json",
     ]);
     expect(result, "origin add should have succeeded").toSucceed();
+  }
+
+  /**
+   * Invite someone into the project with `invitation create`.
+   *
+   * @returns The invitation's id.
+   */
+  async invite(): Promise<string> {
+    const result = await this.cli(["invitation", "create", "--relation", "viewer", "--json"]);
+    expect(result, "invitation create should have succeeded").toSucceed();
+    return this.envelopeOf<{ id: string }>(result).data.id;
+  }
+
+  /** The ids of the project's invitations, newest first, as `invitation list --all` reports them. */
+  async invitationIds(): Promise<string[]> {
+    const result = await this.cli(["invitation", "list", "--all", "--json"]);
+    expect(result, "invitation list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: { id: string }[] }>(result).data.items.map((invitation) => {
+      return invitation.id;
+    });
+  }
+
+  /** Everything `invitation list --all --json` prints, for a value that must not be in it. */
+  async invitationListing(): Promise<string> {
+    const result = await this.cli(["invitation", "list", "--all", "--json"]);
+    expect(result, "invitation list should have succeeded").toSucceed();
+    return result.stdout + result.stderr;
+  }
+
+  /** Everything `invitation get --json` prints for one invitation, for a value that must not be in it. */
+  async invitationReading(invitationId: string): Promise<string> {
+    const result = await this.cli(["invitation", "get", invitationId, "--json"]);
+    expect(result, "invitation get should have succeeded").toSucceed();
+    return result.stdout + result.stderr;
   }
 
   /** How many deployments the project serves, as `deployment list` reports them. */
@@ -1327,6 +1349,28 @@ export class ScaffoldedApp {
     const result = await this.run(["preview", "--origin", url, "--json"]);
     expect(result, "preview should have succeeded").toSucceed();
     return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
+  /**
+   * The expiry `preview list` shows for a preview, read back as a developer
+   * would, to arrange what another command is expected to print.
+   *
+   * @param url - The preview URL that was deployed.
+   * @returns The expiry `preview list` reports for it.
+   * @throws Error when `preview list` does not show the preview.
+   */
+  async previewExpiry(url: string): Promise<string> {
+    const result = await this.run(["preview", "list", "--json"]);
+    const { items } = this.envelopeOf<{ items: { origin: string; expires_at: string }[] }>(
+      result,
+    ).data;
+    const found = items.find((item) => {
+      return item.origin === url;
+    });
+    if (found === undefined) {
+      throw new Error(`preview list does not show ${url}`);
+    }
+    return found.expires_at;
   }
 
   /** `deploy --dry-run`: validates and shows the diff without writing. */
@@ -1451,10 +1495,12 @@ export class ScaffoldedApp {
 
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
-    const result = await runCliForTest([...args, "--cwd", this.path], env);
+    const ran = [...args, "--cwd", this.path];
+    const result = await runCliForTest(ran, env);
     assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
+      assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);
     }
     return result;
   }
@@ -2260,13 +2306,12 @@ export class ScaffoldedApp {
     env: NodeJS.ProcessEnv = {},
     { envelope = true }: { envelope?: boolean } = {},
   ): Promise<CliResult> {
-    const result = await runCliForTest(
-      [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL],
-      env,
-    );
+    const ran = [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL];
+    const result = await runCliForTest(ran, env);
     assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
+      assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);
     }
     return result;
   }
@@ -2547,6 +2592,12 @@ function assertAJsonBodyParses(result: { stdout: string }, where: string): void 
   }
 }
 
+/** The envelope a `--json` run printed: an empty one when it printed none, which the contract check refuses. */
+function envelopeIn(result: CliResult): { next_commands?: string[]; data?: unknown } {
+  const parsed = parseJsonOrUndefined(result.stdout);
+  return typeof parsed === "object" && parsed !== null ? parsed : {};
+}
+
 /**
  * The envelope contract, checked on every `--json` invocation a spec makes.
  *
@@ -2770,10 +2821,7 @@ function assertDataShape(where: string, envelope: ContractEnvelope): void {
 
 /**
  * A minimal app in a temp directory, the pre-existing-app posture setup
- * scaffolds into. The dir is left under the OS temp dir rather than deleted on
- * teardown: CI runners are ephemeral and the OS reclaims `tmpdir()` entries, so
- * skipping the recursive delete avoids the transient ENOTEMPTY/EBUSY race it can
- * hit on a busy filesystem (the CLI awaits every write, so nothing is in flight).
+ * scaffolds into. The directory is removed when the test ends.
  */
 export async function anApp({
   nextVersion = "^16.0.0",
@@ -2782,7 +2830,7 @@ export async function anApp({
   nextVersion?: string;
   usesClaudeCode?: boolean;
 } = {}): Promise<ScaffoldedApp> {
-  const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
+  const path = await scratchDir("zitadel-next-");
   if (usesClaudeCode) {
     await mkdir(join(path, ".claude"), { recursive: true });
   }
@@ -2813,7 +2861,7 @@ const VITE_CONFIG = "vite.config.ts";
 
 /** A React app as create-vite's react-ts template leaves it, before setup. */
 export async function aReactApp(): Promise<ScaffoldedApp> {
-  const path = await mkdtemp(join(tmpdir(), "zitadel-react-"));
+  const path = await scratchDir("zitadel-react-");
   await mkdir(join(path, "src"), { recursive: true });
   const files = {
     "package.json": JSON.stringify(
@@ -2858,7 +2906,7 @@ export async function aSetUpReactApp(): Promise<ScaffoldedApp> {
  * accepts for a package unless a `name` says otherwise.
  */
 export async function aNewAppDirectory(name = "my-app"): Promise<ScaffoldedApp> {
-  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  const parent = await scratchDir("zitadel-new-");
   const path = join(parent, name);
   await mkdir(path);
   return new ScaffoldedApp(path);
@@ -2869,7 +2917,7 @@ export async function aNewAppDirectory(name = "my-app"): Promise<ScaffoldedApp> 
  * one that does: how `--cwd` names the folder a new app should live in.
  */
 export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
-  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  const parent = await scratchDir("zitadel-new-");
   return new ScaffoldedApp(join(parent, "my-app"));
 }
 
@@ -2959,7 +3007,7 @@ async function fakePackageManager(
   exitCode = 0,
   slow = false,
 ): Promise<{ binDir: string; logPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
+  const binDir = await scratchDir("zitadel-fake-pm-");
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
   await writeFile(
@@ -2989,7 +3037,7 @@ type UpgradeBehavior = {
 async function fakeNpx(
   outcome: "done" | "issues" | "broken" | "slow",
 ): Promise<{ binDir: string; logPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-npx-"));
+  const binDir = await scratchDir("zitadel-fake-npx-");
   const logPath = join(binDir, "npx.log");
   const answer = {
     done: '{"status":"ok"}',
@@ -3014,7 +3062,7 @@ ${outcome === "slow" ? "setTimeout(() => {" : ""}process.stdout.write(${JSON.str
 
 /** A `git` on PATH that runs the real one for everything but `commit`, which it refuses. Returns its directory. */
 async function gitThatCannotCommit(): Promise<string> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-git-no-commit-"));
+  const binDir = await scratchDir("zitadel-git-no-commit-");
   const { stdout } = await execFileAsync("sh", ["-c", "command -v git"]);
   await writeFile(
     join(binDir, "git"),
@@ -3026,7 +3074,7 @@ async function gitThatCannotCommit(): Promise<string> {
 
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
+  const binDir = await scratchDir("zitadel-fake-docker-");
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
   await writeFile(

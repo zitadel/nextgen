@@ -129,10 +129,11 @@ still read the newest revisions, because no release serves them.
 
 - `zitadel setup` deploys `.zitadel/` once the app is scaffolded and committed.
 - `zitadel deploy` and the console deploy to `primary`.
-- With platform bootstrap on, every start makes `server.public_base`'s origin
+- With platform bootstrap on, every seeding (a start, or the `seed` command
+  where servers start with `--seed=false`) makes `server.public_base`'s origin
   the platform project's one primary origin and deploys the configuration the
-  server ships to it. A start that changes nothing deploys nothing, and a server
-  older than the live release's leaves it alone.
+  server ships to it. A seeding that changes nothing deploys nothing, and a
+  server older than the live release's leaves it alone.
 
 ## Consequences
 

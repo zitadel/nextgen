@@ -180,3 +180,13 @@ describe("Cmd immutability", () => {
     expect(Object.isFrozen(Cmd.of(["rm"]))).toBe(true);
   });
 });
+
+describe("Cmd.optionArgs", () => {
+  it("passes the option and its value as two arguments", () => {
+    expect(Cmd.optionArgs("--schema", "customers")).toEqual(["--schema", "customers"]);
+  });
+
+  it("joins a value that starts with a dash to its option", () => {
+    expect(Cmd.optionArgs("--schema", "--force")).toEqual(["--schema=--force"]);
+  });
+});

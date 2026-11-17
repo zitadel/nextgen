@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
-    "@tailwindcss/turbopack": "^4",
+    "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
