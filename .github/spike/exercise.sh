@@ -138,6 +138,17 @@ t "skills add" z skills add --non-interactive
 tx "tests add --skip-install (react unsupported)" z tests add --skip-install
 t "eject --dry-run" z eject --dry-run --json
 
+# --- 7b. Other frameworks and a path with spaces ---
+pkill -f vite 2>/dev/null || true
+cd "$RUNNER_TEMP/host"
+for fw in vue svelte next; do
+  mkdir -p "$RUNNER_TEMP/host/fw $fw" && cd "$RUNNER_TEMP/host/fw $fw"
+  t "setup $fw (path with a space)" z setup --framework "$fw" --server local --non-interactive --no-git --dev-port 3200
+  t "doctor in $fw project" z doctor
+  t "project list in $fw project" z project list --json
+  cd "$RUNNER_TEMP/host"
+done
+
 # --- 8. Teardown ---
 pkill -f vite 2>/dev/null || true
 cd "$RUNNER_TEMP/host"
