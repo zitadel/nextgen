@@ -9,6 +9,7 @@ import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { createOrca } from "@/lib/orca";
+import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
 import { type DependencyInstall, type PackageCommand, PM } from "@/lib/pm";
@@ -138,7 +139,7 @@ export default class TestsAdd extends BaseCommand {
     const written = result.filesWritten.map((file) => {
       return relative(this.cwd, file).split(sep).join("/");
     });
-    const suite = `${createOrca().displayName(framework)} test suite on ${TestKit.PACKAGE}`;
+    const suite = `${createOrca(LocalRuntime.DIR).displayName(framework)} test suite on ${TestKit.PACKAGE}`;
     const title = this.dryRun
       ? `Would add a ${suite} (dry run)`
       : written.length === 0
@@ -208,7 +209,7 @@ export default class TestsAdd extends BaseCommand {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
     if (!new TestKit(framework).supported()) {
-      const orca = createOrca();
+      const orca = createOrca(LocalRuntime.DIR);
       throw refusalError(FRAMEWORK_REFUSAL, {
         framework,
         supported: TestKit.FRAMEWORKS.map((id) => {

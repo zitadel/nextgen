@@ -1,4 +1,5 @@
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { ZitadelRuntime } from "@/lib/server";
 import { Environment } from "@/lib/environment";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { WizardStep } from "@/lib/wizard";
@@ -56,6 +57,7 @@ export class ReadIssuer extends WizardStep<"issuer", Fact<"issuer">, Needs> {
    */
   async run(needs: Needs): Promise<Fact<"issuer">> {
     const environment = await Environment.resolve({
+      servers: ZitadelRuntime,
       cwd: this.deps.cwd,
       env: this.deps.env,
       serverFlag: needs.flags.server,

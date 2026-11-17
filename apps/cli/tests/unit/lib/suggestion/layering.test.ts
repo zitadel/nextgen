@@ -6,10 +6,9 @@ import { describe, expect, it } from "vitest";
 
 /**
  * The `lib` directories that may render a suggestion: the renderer itself, the
- * oclif layer that runs a command, and the local server, which is refactored
- * apart from this rule.
+ * oclif layer that runs a command.
  */
-const MAY_RENDER = ["lib/suggestion/", "lib/oclif/", "lib/server/local/"];
+const MAY_RENDER = ["lib/suggestion/", "lib/oclif/"];
 
 /**
  * What renders a suggestion, as `lib/suggestion` exports it.

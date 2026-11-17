@@ -1,6 +1,6 @@
 import { execa } from "execa";
 
-import { ZitadelError } from "@/lib/errors";
+import { LocalServerError } from "../local-server-error";
 import { isErrno } from "@/lib/errno";
 
 import {
@@ -17,7 +17,7 @@ import {
   type DockerRuntimeMetadata,
 } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
-import { stopSignal } from "./clock";
+import { stopSignal } from "./stop-signal";
 import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
 
 export type DockerResult = {
@@ -133,7 +133,11 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * Stops and removes the container; `stale` when it was already gone.
    */
   async terminate(record: DockerRuntimeMetadata): Promise<StopOutcome> {
-    return { status: (await DockerLauncher.remove(record.container_name)) ? "stopped" : "stale" };
+    if (await DockerLauncher.remove(record.container_name)) {
+      return { status: "stopped" };
+    } else {
+      return { status: "stale" };
+    }
   }
 
   /**
@@ -404,9 +408,11 @@ async function streamDocker(
   );
   const result = await subprocess;
   if (result.failed && !result.isCanceled) {
-    throw result.exitCode === undefined
-      ? result
-      : new Error(`docker ${args.join(" ")} exited with status ${result.exitCode}`);
+    if (result.exitCode === undefined) {
+      throw result;
+    } else {
+      throw new Error(`docker ${args.join(" ")} exited with status ${result.exitCode}`);
+    }
   }
 }
 
@@ -457,14 +463,16 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
 /**
  * Wraps a failed `docker` call, keeping its command and stderr for whoever is debugging.
  */
-function dockerError(action: string, args: string[], cause: unknown): ZitadelError {
-  const details =
-    cause && typeof cause === "object" && "stderr" in cause
-      ? { command: ["docker", ...args], stderr: String((cause as { stderr?: unknown }).stderr) }
-      : { command: ["docker", ...args], cause };
-  return new ZitadelError("E_VALIDATION", `${action} failed`, {
-    hint: "Check that Docker is installed, running, and reachable from this shell.",
-    nextCommands: [{ id: "doctor" }],
-    details,
-  });
+function dockerError(action: string, args: string[], cause: unknown): LocalServerError {
+  if (cause && typeof cause === "object" && "stderr" in cause) {
+    return new LocalServerError("docker-failed", "E_VALIDATION", `${action} failed`, {
+      command: ["docker", ...args],
+      stderr: String((cause as { stderr?: unknown }).stderr),
+    });
+  } else {
+    return new LocalServerError("docker-failed", "E_VALIDATION", `${action} failed`, {
+      command: ["docker", ...args],
+      cause,
+    });
+  }
 }

@@ -67,6 +67,7 @@ function ctx(projectId = "proj-1"): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
+    defaultServer: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
     sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
   };

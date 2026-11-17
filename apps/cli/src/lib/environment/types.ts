@@ -1,3 +1,5 @@
+import type { Parsed } from "@zitadel/config/idp";
+
 import type { Questions } from "@/lib/ui";
 import type { ZitadelClient } from "@/lib/backend";
 
@@ -21,11 +23,44 @@ export type Consulted = Readonly<{
   supplied: readonly EnvironmentKey[];
 }>;
 
+/**
+ * How a server is told from what a person gave, so the environment does not
+ * have to know what a server is: the command that resolves one passes it.
+ */
+export interface ServerAddresses {
+  /**
+   * The server a `--server` flag names, or the default one.
+   *
+   * @param input - The folder, for `local`, and the flag, if one was given.
+   * @returns The server's address.
+   */
+  resolve(input: { cwd: string; serverFlag?: string }): Promise<{ value: string }>;
+
+  /**
+   * A typed answer, checked as a server address.
+   *
+   * @param value - What was typed.
+   * @returns The address, or what is wrong with it.
+   */
+  parse(value: string): Parsed<string>;
+
+  /**
+   * A server address as its origin.
+   *
+   * @param value - The address.
+   * @returns The origin.
+   * @throws {ZitadelError} `E_VALIDATION` when it is not an http(s) URL.
+   */
+  origin(value: string): string;
+}
+
 /** What {@link Environment.resolve} reads. */
 export type ResolveEnvironmentInput = Readonly<{
   cwd: string;
   env: NodeJS.ProcessEnv;
   serverFlag?: string;
+  /** How a server address is told from what was given; the command's. */
+  servers: ServerAddresses;
   envName?: string;
   envFile?: string;
 }>;

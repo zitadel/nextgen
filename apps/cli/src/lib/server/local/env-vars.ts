@@ -19,14 +19,15 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
-import { ZitadelError, errorMessage } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerError } from "./local-server-error";
 import { isObject } from "@/lib/json";
 
 /** Highest priority first. */
-export const ENV_FILES = [".env.local", ".env"] as const;
+const ENV_FILES = [".env.local", ".env"] as const;
 
 /** Variables handed to the runtime: the server's config prefix, upper-case. */
-export const ENV_PREFIX = "NEXTGEN_";
+const ENV_PREFIX = "NEXTGEN_";
 
 /** Keys the CLI sets itself at spawn; a file may not set them, so they are not read. */
 const CLI_OWNED = new Set([
@@ -97,9 +98,9 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
     if (isObject(error) && error.code === "ENOENT") {
       return undefined;
     }
-    throw new ZitadelError("E_VALIDATION", `Cannot read ${path}`, {
-      hint: "The file exists but could not be read; fix its permissions or remove it.",
-      details: { path, message: errorMessage(error) },
+    throw new LocalServerError("env-unreadable", "E_VALIDATION", `Cannot read ${path}`, {
+      path,
+      message: errorMessage(error),
     });
   });
   if (contents === undefined) {

@@ -1,5 +1,6 @@
 import type { CheckContext } from "@/cli/commands/doctor/checks";
 import { Consent } from "@/lib/consent";
+import { LocalRuntime } from "@/lib/server";
 import { createOrca } from "@/lib/orca";
 
 import { aSuggest } from "./suggestions";
@@ -52,7 +53,7 @@ async function unasked(gate: Parameters<CheckContext["consent"]>[0]): Promise<ne
 export function aCheckContext(cwd: string, overrides: Partial<CheckContext> = {}): CheckContext {
   return {
     cwd,
-    orca: createOrca(),
+    orca: createOrca(LocalRuntime.DIR),
     cliVersion: CHECK_CLI_VERSION,
     suggest: aSuggest({}, CHECK_CLI_VERSION),
     dryRun: false,

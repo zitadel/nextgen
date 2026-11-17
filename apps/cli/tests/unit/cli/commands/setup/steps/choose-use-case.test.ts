@@ -4,13 +4,6 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/server/local/server", async (importOriginal) => {
-  return {
-    ...(await importOriginal<object>()),
-    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
-  };
-});
-
 import { isCancel, select } from "@clack/prompts";
 
 import { ChooseUseCase } from "@/cli/commands/setup/steps/choose-use-case";
@@ -18,7 +11,7 @@ import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
-import { LocalServer } from "@/lib/server/local/server";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { aPromptDeps } from "@tests/helpers/setup";
@@ -92,18 +85,18 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
+const machine = new FakeMachine();
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
-  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
 describe("ChooseUseCase", () => {
   it("writes the selected use case into the answers", async () => {
     vi.mocked(select).mockResolvedValueOnce("business");
 
-    const answers = await new ChooseUseCase(aPromptDeps()).ask(
+    const answers = await new ChooseUseCase(aPromptDeps(undefined, machine)).ask(
       setupAnswers({ useCase: "minimal" }),
       CONTEXT,
     );
@@ -114,7 +107,10 @@ describe("ChooseUseCase", () => {
   it("preselects the use case already answered", async () => {
     vi.mocked(select).mockResolvedValueOnce("business");
 
-    await new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+    await new ChooseUseCase(aPromptDeps(undefined, machine)).ask(
+      setupAnswers({ useCase: "minimal" }),
+      CONTEXT,
+    );
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "minimal" });
   });
@@ -122,7 +118,10 @@ describe("ChooseUseCase", () => {
   it("asks which registration fields to collect, with every field set in its label", async () => {
     vi.mocked(select).mockResolvedValueOnce("minimal");
 
-    await new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+    await new ChooseUseCase(aPromptDeps(undefined, machine)).ask(
+      setupAnswers({ useCase: "minimal" }),
+      CONTEXT,
+    );
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       message: "Which fields should registration collect? You can change them later.",
@@ -136,7 +135,7 @@ describe("ChooseUseCase", () => {
 
   describe("with --use-case", () => {
     it("keeps the flagged use case", async () => {
-      const answers = await new ChooseUseCase(aPromptDeps()).ask(
+      const answers = await new ChooseUseCase(aPromptDeps(undefined, machine)).ask(
         setupAnswers({ useCase: "consumer" }),
         {
           ...CONTEXT,
@@ -148,10 +147,13 @@ describe("ChooseUseCase", () => {
     });
 
     it("does not ask", async () => {
-      await new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "consumer" }), {
-        ...CONTEXT,
-        useCaseFromFlag: true,
-      });
+      await new ChooseUseCase(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ useCase: "consumer" }),
+        {
+          ...CONTEXT,
+          useCaseFromFlag: true,
+        },
+      );
 
       expect(select).not.toHaveBeenCalled();
     });
@@ -162,7 +164,10 @@ describe("ChooseUseCase", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+      return new ChooseUseCase(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ useCase: "minimal" }),
+        CONTEXT,
+      );
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

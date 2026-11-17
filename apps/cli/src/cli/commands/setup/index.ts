@@ -1,3 +1,4 @@
+import { SystemMachine, LocalRuntime } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   BRANDING_DESIGNS,
@@ -144,7 +145,7 @@ const SSO_NEEDS_CLIENT_ID_REFUSAL = {
  * `createOrca` is pure, as it only builds the in-memory registries, so calling
  * it at module load is safe.
  */
-const FRAMEWORK_OPTIONS = createOrca()
+const FRAMEWORK_OPTIONS = createOrca(LocalRuntime.DIR)
   .availableFrameworks()
   .map((framework) => {
     return framework.id;
@@ -381,10 +382,12 @@ export default class Setup extends Destructive(BaseCommand) {
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
 
+    const machine = new SystemMachine();
     const prompting = {
       ask: this.ask,
       cwd: this.cwd,
       dryRun: this.dryRun,
+      machine,
       nonInteractive: this.nonInteractive,
       serverFlag: this.meta.serverFlag,
       suggest: this.suggest,
@@ -395,6 +398,7 @@ export default class Setup extends Destructive(BaseCommand) {
       await Wizard.named<Fact<"flags">, CommandResult>("setup")
         .step(
           new CheckPreconditions({
+            machine,
             meta: this.meta,
             suggest: this.suggest,
             useServer: (server) => {
@@ -473,6 +477,7 @@ export default class Setup extends Destructive(BaseCommand) {
         .step(
           new SettleAnswers({
             dryRun: this.dryRun,
+            machine,
             nonInteractive: this.nonInteractive,
             suggest: this.suggest,
           }),
