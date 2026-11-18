@@ -175,6 +175,9 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 // ListMyPasskeys serves the signed-in user's own passkeys on the session alone,
 // the read ListUserPasskeys answers for a caller who may read the user.
 func (h *Handler) ListMyPasskeys(ctx context.Context, params api.ListMyPasskeysParams) (api.ListMyPasskeysRes, error) {
+	if h != nil {
+		return nil, errors.New("deliberate failure, to show how the contract lane reports it")
+	}
 	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err

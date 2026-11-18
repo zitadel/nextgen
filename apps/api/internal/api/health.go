@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -35,6 +36,9 @@ func (h *Handler) WithReadinessCheck(database Pinger) *Handler {
 // GetLive checks nothing behind the process: a liveness probe that checked the
 // database would restart every instance whenever the database blips.
 func (h *Handler) GetLive(ctx context.Context) (api.GetLiveRes, error) {
+	if h != nil {
+		return nil, errors.New("deliberate failure, to show how the contract lane reports it")
+	}
 	return &api.GetLiveOK{Data: strings.NewReader("ok")}, nil
 }
 
