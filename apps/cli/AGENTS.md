@@ -16,7 +16,7 @@
   a test.
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
   `setup` finds a local server:
-  [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
+  [`src/lib/server/local/AGENTS.md`](src/lib/server/local/AGENTS.md).
 - No `let` in `src` or `tests`: `biome-plugins/no-let.grit` rejects it; the only escape is a
   `// biome-ignore lint/plugin: <reason>` stating the mechanism.
 - `src/lib/orca/patchers` edits and drops code into the customer's project, so no
@@ -47,8 +47,8 @@
   `{ id, … }` object; the failure handler renders it with the run's scope.
 - A helper that renders now takes a `Suggest` (`this.suggest`, or `suggestWith(scope)`
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
-- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/`,
-  `oclif/` and `local-server/` may): hand the command data or a `{ id, … }` suggestion object, or
+- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/` and
+  `oclif/` may): hand the command data or a `{ id, … }` suggestion object, or
   take a function the command supplies. `tests/unit/lib/suggestion/layering.test.ts` fails on it.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
@@ -179,6 +179,9 @@
   warning or a box line names its command with `suggest`, because the scan
   above rejects backticks and a bare `zitadel …` anywhere else in
   `src/cli/commands`.
+- Put a command that takes `--env-file` in `nextCommands`; a `hint:` may name it for a person to
+  read, but a message or a box line never may: prose drops the selector
+  (`tests/unit/lib/oclif/environment-flags.test.ts`).
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
@@ -207,6 +210,31 @@
   first question, and each one that does as soon as its answer is given.
 - Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
+- Pick the command's base by what it does with a server (all from
+  `src/cli/commands/server-command.ts`, wrapping what a command extends the way
+  `Promptable` does); a command never resolves, parses or normalises a server
+  address itself:
+
+  | The command | It extends |
+  | --- | --- |
+  | never talks to a server | `BaseCommand` |
+  | talks to one through `--server` or its environment | `ServerCommand(Base)` |
+  | may have to ask which server | `ChoosingServerCommand(Base)` |
+  | is about the local server | `LocalServerCommand(Base, folderRule)` |
+  | is destructive | `Destructive(...)`, outermost |
+
+  A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
+  the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
+  `Destructive` around it. `LocalServerCommand` does not take `--server`; a
+  command that also reads one is `LocalServerCommand(ServerCommand(Base))`.
+  Each local-server command declares its own `group`.
+  `start`, `stop`, `logs`, `reset`, `setup`, `upgrade`, `eject` and a few more
+  still wrap `ServerCommand(...)` only to keep accepting `--server`, which they
+  ignore, each overriding `resolveServer` to name no server: leave them as they
+  are until the flag is removed from them.
+- "Server" on its own is the Zitadel instance a command talks to by URL. The
+  "local server" is the one `zitadel start` runs in a folder. The "server
+  binary" is `@zitadel/server`.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so

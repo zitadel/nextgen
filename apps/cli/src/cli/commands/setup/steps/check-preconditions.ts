@@ -1,16 +1,16 @@
-import semver from "semver";
-
-import { toZitadelError } from "@/lib/errors";
-import { readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { isObject } from "@/lib/json";
+import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
-import { Server } from "@/lib/server";
+import { LocalServerError, ZitadelRuntime } from "@/lib/server";
+import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
+import { Cmd } from "@/lib/cmd";
+import { resolve } from "node:path";
 import { WizardStep } from "@/lib/wizard";
 
 import {
   type Fact,
   inspectWorktree,
+  refuseOutdatedLocalServer,
   retryOptionsFromFlags,
   type SetupServices,
   setupRetryFlags,
@@ -23,7 +23,7 @@ const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
   hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
-  next: [{ id: "start" }, "{setup}"],
+  next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
@@ -64,19 +64,6 @@ const WORKTREE_DIRTY_REFUSAL = {
   },
 } as const satisfies Refusal;
 
-/** How a local server another CLI release started is refused. */
-const SERVER_VERSION_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
-  hint: "A server another CLI release started serves that release's API, so setup would stop halfway. Run start to restart it on {expected}; its data stays. {where}Then rerun setup.",
-  next: ["{start}", "{setup}"],
-  details: {
-    server_url: "{serverUrl}",
-    server_version: "{running}",
-    cli_server_version: "{expected}",
-  },
-} as const satisfies Refusal;
-
 /**
  * What the step reads from what is known.
  */
@@ -85,7 +72,7 @@ type Needs = Fact<"flags">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<SetupServices, "meta" | "suggest" | "useServer">;
+type Deps = Pick<SetupServices, "machine" | "meta" | "suggest" | "useServer">;
 
 /**
  * Checks everything that does not depend on an answer before anything is
@@ -129,14 +116,9 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
    * A repository setup must not commit in is refused. One snapshot answers all three questions:
    * git is asked once, not once per refusal.
    *
-   * A local server another CLI release started is refused. `start` restarts such a server, but one
-   * left running stays that release's until `start` runs again, and its API is that release's:
-   * setup would create the project, then fail deploying the default schema and flow, and `--force`
-   * would not help. Only a binary runtime records the version it runs, and only release versions
-   * are compared: an override records `override`, which says nothing about its API. An unreadable
-   * `runtime.json` is doctor's to report, not setup's. The version check compares against the
-   * server this run is about. The start command names the server's own directory, so the typed
-   * `--cwd` is not added to it.
+   * A local server another CLI release started is refused when `--server` names it
+   * ({@link refuseOutdatedLocalServer}). Without `--server` the run is about the cloud until the
+   * wizard asks, and its question does not offer such a server.
    *
    * @param needs - The flags.
    * @returns What was settled about the run.
@@ -145,20 +127,34 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    const server = await Server.resolve({
+    const server = await ZitadelRuntime.resolve({
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
     }).catch((error: unknown) => {
-      const normalized = toZitadelError(error);
-      if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+      if (!(error instanceof LocalServerError) || error.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
         throw error;
       }
+      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
+      const details = isObject(error.details) ? error.details : {};
+      const { directory } = details;
+      const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
+      const startFlags: { cwd?: string } = {};
+      if (elsewhere) {
+        startFlags.cwd = directory;
+      }
+      const text = [elsewhere && advice.elsewhere, advice.hint].find((candidate) => {
+        return typeof candidate === "string";
+      });
+      const hint = interpolate(text ?? advice.hint, {
+        ...details,
+        ...(elsewhere && { directory: Cmd.quote(directory) }),
+      });
       const retry = retryOptionsFromFlags(flags);
       const recovery = ssoRecovery(retry, suggest);
       throw refusalError(
         NO_LOCAL_SERVER_REFUSAL,
         {
-          reason: normalized.hint ? `${normalized.hint} ` : "",
+          reason: `${hint} `,
           scripting:
             retry.sso && retry.sso.length > 0
               ? "The rerun asks for the client id and secret, because a command carries neither. " +
@@ -170,6 +166,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
               : recovery.hint,
         },
         {
+          start: { id: "start", flags: startFlags },
           setup: {
             id: "setup",
             flags: setupRetryFlags(retry),
@@ -223,47 +220,13 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         });
       }
     }
-    const nearest = configured
-      ? undefined
-      : await readNearestRuntimeMetadata(meta.cwd).catch(() => {
-          return undefined;
-        });
-    const runtime = nearest?.runtime;
-    const expected = LocalServer.bundledVersion();
-    if (
-      nearest &&
-      runtime?.backend === "binary" &&
-      runtime.server_url === server.value &&
-      expected !== undefined &&
-      semver.valid(expected) &&
-      semver.valid(runtime.server_version) &&
-      runtime.server_version !== expected
-    ) {
-      throw refusalError(
-        SERVER_VERSION_REFUSAL,
-        {
-          running: runtime.server_version,
-          expected,
-          serverUrl: runtime.server_url,
-          where:
-            nearest.dir === meta.cwd
-              ? ""
-              : `Run start in ${nearest.dir}, where the server was started. `,
-        },
-        {
-          start:
-            nearest.dir === meta.cwd
-              ? { id: "start" }
-              : {
-                  id: "start",
-                  flags: { cwd: nearest.dir },
-                },
-          setup: {
-            id: "setup",
-            flags: setupRetryFlags(retryOptionsFromFlags(flags)),
-          },
-        },
-      );
+    if (!configured) {
+      await refuseOutdatedLocalServer({
+        cwd: meta.cwd,
+        machine: this.deps.machine,
+        serverUrl: server.value,
+        flags,
+      });
     }
     this.deps.useServer(server.value);
     return {

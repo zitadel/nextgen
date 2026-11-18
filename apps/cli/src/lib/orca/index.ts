@@ -4,7 +4,6 @@ import { basename, dirname, join } from "node:path";
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExists, readDirIfExists } from "@/lib/fs";
-import { LOCAL_RUNTIME_DIR } from "@/lib/local-server/runtime";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -120,15 +119,26 @@ export class Orca {
   private readonly detectors: ReadonlyArray<Detector>;
   private readonly scaffolders: ReadonlyArray<Scaffolder>;
   private readonly patchers: ReadonlyArray<Patcher>;
+  private readonly localDirectory: string;
 
+  /**
+   * @param detectors - The strategies that recognise an existing project.
+   * @param scaffolders - The strategies that create a project.
+   * @param patchers - The strategies that integrate Zitadel.
+   * @param localDirectory - The folder, relative to a project, where a started
+   *   local server keeps its state (`.zitadel/runtime`). A scaffold treats it as
+   *   not being in the way.
+   */
   constructor(
     detectors: ReadonlyArray<Detector>,
     scaffolders: ReadonlyArray<Scaffolder>,
     patchers: ReadonlyArray<Patcher>,
+    localDirectory: string,
   ) {
     this.detectors = detectors;
     this.scaffolders = scaffolders;
     this.patchers = patchers;
+    this.localDirectory = localDirectory;
   }
 
   /**
@@ -197,9 +207,19 @@ export class Orca {
     }
   }
 
+  /**
+   * What stands in the way of scaffolding into `cwd`.
+   *
+   * @param cwd - The directory to scaffold into.
+   * @returns Whether it can be scaffolded, and what it holds.
+   */
+  inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget> {
+    return inspectScaffoldTarget(cwd, this.localDirectory);
+  }
+
   /** Whether `cwd` is safe for an in-place framework scaffold. */
   async isFreshScaffoldTarget(cwd: string): Promise<boolean> {
-    return (await inspectScaffoldTarget(cwd)).scaffoldable;
+    return (await this.inspectScaffoldTarget(cwd)).scaffoldable;
   }
 
   /**
@@ -234,7 +254,7 @@ export class Orca {
    * before this throws.
    */
   async scaffoldUndoably(cwd: string, framework: string, force = false): Promise<UndoableScaffold> {
-    const target = await inspectScaffoldTarget(cwd);
+    const target = await this.inspectScaffoldTarget(cwd);
     if (!target.scaffoldable && !force) {
       throw new ZitadelError("E_CONFLICT", `Cannot scaffold: ${cwd} is not empty`, {
         hint:
@@ -364,11 +384,22 @@ export class Orca {
 }
 
 /** {@link Orca} wired with the default detector, scaffolder, and patcher registries. */
-export function createOrca(): Orca {
-  return new Orca(detectors, scaffolders, patchers);
+export function createOrca(localDirectory: string): Orca {
+  return new Orca(detectors, scaffolders, patchers, localDirectory);
 }
 
-export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget> {
+/**
+ * What stands in the way of scaffolding a framework into `cwd`.
+ *
+ * @param cwd - The directory to scaffold into.
+ * @param localDirectory - Where a started local server keeps its state, which
+ *   does not count as in the way.
+ * @returns Whether the directory can be scaffolded, and what it holds.
+ */
+export async function inspectScaffoldTarget(
+  cwd: string,
+  localDirectory: string,
+): Promise<ScaffoldTarget> {
   // A fresh scaffold needs an empty directory. We deliberately keep no allowlist
   // of other tools' "harmless" entries (`.claude`, editor settings, …): that list
   // is a maintenance treadmill, and each tool invents new metadata. Anything
@@ -384,7 +415,7 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
   const names = [...(await readDirIfExists(cwd))].sort();
   const others: string[] = [];
   for (const name of names) {
-    if (!(await isLocalRuntimeEntry(cwd, name))) {
+    if (!(await isLocalRuntimeEntry(cwd, name, localDirectory))) {
       others.push(name);
     }
   }
@@ -425,18 +456,22 @@ export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
  * or a `.gitignore` that holds nothing but the line ignoring it. Either may be
  * empty once `reset` has removed the runtime.
  */
-async function isLocalRuntimeEntry(cwd: string, name: string): Promise<boolean> {
+async function isLocalRuntimeEntry(
+  cwd: string,
+  name: string,
+  localDirectory: string,
+): Promise<boolean> {
   try {
-    if (name === dirname(LOCAL_RUNTIME_DIR)) {
+    if (name === dirname(localDirectory)) {
       const inside = await readdir(join(cwd, name));
       return inside.every((entry) => {
-        return entry === basename(LOCAL_RUNTIME_DIR);
+        return entry === basename(localDirectory);
       });
     }
     if (name === ".gitignore") {
       const lines = (await readFile(join(cwd, name), "utf8")).split(/\r?\n/);
       return lines.every((line) => {
-        return ["", `${LOCAL_RUNTIME_DIR}/`].includes(line.trim());
+        return ["", `${localDirectory}/`].includes(line.trim());
       });
     }
   } catch {

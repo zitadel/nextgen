@@ -26,6 +26,7 @@ import {
   slugFromDisplayName,
 } from "@zitadel/config/idp";
 import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
+import semver from "semver";
 
 import type { CreatedProject } from "@/lib/backend";
 import type { Consent, Gate } from "@/lib/consent";
@@ -46,7 +47,9 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import type { ResolvedServer } from "@/lib/server";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { LocalRuntime, type LocalMachine, type ResolvedServer } from "@/lib/server";
+
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -448,6 +451,11 @@ export type Fact<Key extends keyof SetupFacts> = Pick<SetupFacts, Key>;
  * in the command.
  */
 export type SetupServices = Readonly<{
+  /**
+   * What this machine knows about local servers.
+   */
+  machine: LocalMachine;
+
   /**
    * The command's global options, as the run was given them.
    */
@@ -1499,4 +1507,137 @@ export function promptContext(
     passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
     developmentBuild: Runtime.current().isDevelopment(),
   };
+}
+
+/** How a local server another CLI release started is refused. */
+const SERVER_VERSION_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
+  hint: "A server another CLI release started serves that release's API, so setup would stop halfway. Run start to restart it on {expected}; its data stays. {where}Then rerun setup.",
+  next: ["{start}", "{setup}"],
+  details: {
+    server_url: "{serverUrl}",
+    server_version: "{running}",
+    cli_server_version: "{expected}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * The nearest local server another CLI release started.
+ */
+export type OutdatedLocalServer = Readonly<{
+  /**
+   * The directory `start` ran in.
+   */
+  dir: string;
+
+  /**
+   * The server's URL, as `start` recorded it.
+   */
+  serverUrl: string;
+
+  /**
+   * The server version it runs.
+   */
+  running: string;
+
+  /**
+   * The server version this CLI ships.
+   */
+  expected: string;
+}>;
+
+/**
+ * Finds the local server nearest to `cwd` when another CLI release started it.
+ *
+ * @remarks
+ * `start` restarts such a server, but one left running stays that release's
+ * until `start` runs again, and its API is that release's: setup would create
+ * the project, then fail deploying the default schema and flow, and `--force`
+ * would not help. Only a binary runtime records the version it runs, and only
+ * release versions are compared: an override records `override`, which says
+ * nothing about its API. An unreadable `runtime.json` is doctor's to report,
+ * not setup's.
+ *
+ * @param cwd - Where setup runs.
+ * @returns The server, or `undefined` when the nearest one is this CLI's own
+ *   release or says nothing about its version.
+ */
+export async function outdatedLocalServer(
+  cwd: string,
+  machine: LocalMachine,
+): Promise<OutdatedLocalServer | undefined> {
+  const nearest = await LocalRuntime.readNearest(cwd).catch(() => {
+    return undefined;
+  });
+  const runtime = nearest?.runtime;
+  const expected = machine.bundledVersion();
+  if (
+    !nearest ||
+    runtime?.backend !== "binary" ||
+    expected === undefined ||
+    !semver.valid(expected) ||
+    !semver.valid(runtime.server_version) ||
+    runtime.server_version === expected
+  ) {
+    return undefined;
+  }
+  return {
+    dir: nearest.dir,
+    serverUrl: runtime.server_url,
+    running: runtime.server_version,
+    expected,
+  };
+}
+
+/**
+ * Refuses a local server another CLI release started, when `--server` makes it
+ * the server this run is about.
+ *
+ * @remarks
+ * The start command names the server's own directory, so the typed `--cwd` is
+ * not added to it. A run without `--server` is about the cloud until the
+ * wizard asks, and its question does not offer such a server.
+ *
+ * @param input - Where setup runs, the server it is about, and the flags a
+ *   rerun keeps.
+ * @throws {@link ZitadelError} When the nearest local server is the one the
+ *   run is about and runs another release.
+ */
+export async function refuseOutdatedLocalServer(
+  input: Readonly<{
+    cwd: string;
+    machine: LocalMachine;
+    serverUrl: string;
+    flags: Parameters<typeof retryOptionsFromFlags>[0];
+  }>,
+): Promise<void> {
+  const { cwd, machine, serverUrl, flags } = input;
+  const outdated = await outdatedLocalServer(cwd, machine);
+  if (!outdated || !LocalRuntime.same(outdated.serverUrl, serverUrl)) {
+    return;
+  }
+  throw refusalError(
+    SERVER_VERSION_REFUSAL,
+    {
+      running: outdated.running,
+      expected: outdated.expected,
+      serverUrl: outdated.serverUrl,
+      where:
+        outdated.dir === cwd ? "" : `Run start in ${outdated.dir}, where the server was started. `,
+    },
+    {
+      start:
+        outdated.dir === cwd
+          ? { id: "start" }
+          : {
+              id: "start",
+              flags: { cwd: outdated.dir },
+            },
+      setup: {
+        id: "setup",
+        flags: setupRetryFlags(retryOptionsFromFlags(flags)),
+      },
+    },
+  );
 }

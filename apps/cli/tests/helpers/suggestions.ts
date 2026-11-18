@@ -170,6 +170,15 @@ function problemWith(command: string): string | undefined {
   return undefined;
 }
 
+/** Every command an envelope suggests, at its top level and in its data. */
+function suggestedBy(envelope: Readonly<{ next_commands?: string[]; data?: unknown }>): string[] {
+  const data = envelope.data as { next_commands?: unknown } | undefined;
+  return [
+    ...(envelope.next_commands ?? []),
+    ...(Array.isArray(data?.next_commands) ? (data.next_commands as string[]) : []),
+  ];
+}
+
 /**
  * Every command an envelope suggests runs as the CLI reads it, and a refusal
  * for want of `--force` says how to get past it. Checked on every spec's
@@ -185,11 +194,7 @@ export function assertRunnableSuggestions(
     data?: unknown;
   }>,
 ): void {
-  const data = envelope.data as { next_commands?: unknown } | undefined;
-  const suggested = [
-    ...(envelope.next_commands ?? []),
-    ...(Array.isArray(data?.next_commands) ? (data.next_commands as string[]) : []),
-  ];
+  const suggested = suggestedBy(envelope);
   for (const command of suggested) {
     expect(problemWith(command), `${where} suggests \`${command}\``).toBeUndefined();
   }
@@ -199,6 +204,80 @@ export function assertRunnableSuggestions(
         (envelope.hint ?? "").includes("--force"),
       `${where}: a refusal for want of --force names no way to pass it`,
     ).toBe(true);
+  }
+}
+
+/** The flags that pick which project a run acts on. */
+const SELECTORS: ReadonlySet<string> = new Set(["--server", "--env", "-e", "--env-file"]);
+
+/**
+ * The CLI command a suggestion runs, and every flag it names: `undefined` for
+ * a suggestion that is no command of the CLI's (`npm run dev`), or asks for help.
+ */
+function ownCommand(command: string): { id: string; flags: ReadonlySet<string> } | undefined {
+  const words = shellWords(command);
+  const runner = words.findIndex((word) => RUNNER.test(word));
+  if (runner === -1) {
+    return undefined;
+  }
+  const end = words.findIndex(
+    (word, at) => at > runner && ["|", "&&", "||", ";", "<", ">", "2>&1"].includes(word),
+  );
+  const rest = words.slice(runner + 1, end === -1 ? undefined : end);
+  const reference = REFERENCE.commands
+    .filter(({ id }) => id.split(" ").every((part, at) => rest[at] === part))
+    .sort((a, b) => b.id.split(" ").length - a.id.split(" ").length)[0];
+  if (reference === undefined || HELP.has(rest.at(-1) as string)) {
+    return undefined;
+  }
+
+  return {
+    id: reference.id.replaceAll(" ", ":"),
+    flags: new Set(
+      rest
+        .slice(reference.id.split(" ").length)
+        .filter((word) => word.startsWith("-"))
+        .map((word) => word.split("=")[0] as string),
+    ),
+  };
+}
+
+/**
+ * Every command an envelope suggests aims at the project the run did: it names
+ * the run's `--cwd`, and, for a command that takes an environment, a selector
+ * (`--server`, `--env` or `--env-file`), or it would act on the default
+ * project. A suggestion may name another selector, to aim elsewhere, but never
+ * none. Checked on every spec's `--json` run, for every command, so one that
+ * forgets fails in its own spec.
+ *
+ * @param where - The run, as a failure names it.
+ * @param envelope - What the run printed.
+ * @param ranWith - The whole command line the run was given, scope included.
+ */
+export function assertSuggestionsCarryTheRun(
+  where: string,
+  envelope: Readonly<{ next_commands?: string[]; data?: unknown }>,
+  ranWith: readonly string[],
+): void {
+  const given = new Set(ranWith.map((word) => word.split("=")[0]));
+  const selected = [...SELECTORS].some((flag) => given.has(flag));
+  for (const command of suggestedBy(envelope)) {
+    const own = ownCommand(command);
+    if (own === undefined) {
+      continue;
+    }
+    const declared = declaredOf(own.id, config.findCommand(own.id)).flags;
+    if (given.has("--cwd") && declared.has("cwd")) {
+      expect(own.flags.has("--cwd"), `${where} suggests \`${command}\`, which drops --cwd`).toBe(
+        true,
+      );
+    }
+    if (selected && declared.has("env-file")) {
+      expect(
+        [...own.flags].some((flag) => SELECTORS.has(flag)),
+        `${where} suggests \`${command}\`, which names no environment and so acts on the default project`,
+      ).toBe(true);
+    }
   }
 }
 

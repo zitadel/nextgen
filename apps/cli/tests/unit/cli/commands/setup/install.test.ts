@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import type { SetupFlags } from "@/cli/commands/setup";
+import { LocalRuntime } from "@/lib/server";
 import { InstallDependencies } from "@/cli/commands/setup/steps/install-dependencies";
 import { Ui, log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
@@ -193,7 +194,7 @@ async function installWith(input: InstallInput) {
       ...(input.cwdFlag === undefined ? {} : { cwd: input.cwdFlag }),
       skipInstall: input.skipInstall,
     } as SetupFlags,
-    orca: createOrca(),
+    orca: createOrca(LocalRuntime.DIR),
     app: { framework: input.framework, devPort: 3000 },
     patched: {
       dryRun: input.dryRun,

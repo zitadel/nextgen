@@ -7,7 +7,7 @@ import { it } from "@tests/fixtures";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/fixtures/terminal";
 
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = "https://preview.zitadel.com";
 
 async function aProject(cwd: string): Promise<string> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
@@ -45,7 +45,7 @@ describe("zitadel env", () => {
   it("names the project and server it resolved in that footer", async ({ dir }) => {
     const out = await shown(dir);
 
-    expect(out).toContain("· project proj_test on api.zitadel.cloud");
+    expect(out).toContain("· project proj_test on preview.zitadel.com");
   });
 
   it("does not head its answer with a row that reads as a table", async ({ dir }) => {

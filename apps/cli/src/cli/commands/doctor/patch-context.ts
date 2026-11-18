@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { ZitadelRuntime } from "@/lib/server";
 import { parseEnv } from "node:util";
 
 import { Environment } from "@/lib/environment";
@@ -33,6 +34,7 @@ export async function loadPatchContext(
     rendererId: config.rendererId,
     issuer: await resolveIssuer(cwd, framework),
     server: typeof config.data.server === "string" ? config.data.server : "",
+    defaultServer: ZitadelRuntime.DEFAULT,
     cliVersion,
     sdkVersion: CliPackage.at(cliVersion).selector(),
     scaffoldedFramework: scaffold?.scaffolded_framework,
@@ -74,6 +76,7 @@ export async function loadPatchContext(
  */
 export async function configuredIssuer(cwd: string): Promise<string | undefined> {
   return Environment.resolve({
+    servers: ZitadelRuntime,
     cwd,
     env: {},
   }).then(

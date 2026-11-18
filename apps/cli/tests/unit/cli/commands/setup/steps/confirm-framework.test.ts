@@ -4,13 +4,6 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/local-server/server", async (importOriginal) => {
-  return {
-    ...(await importOriginal<object>()),
-    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
-  };
-});
-
 import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 
 import { ConfirmFramework } from "@/cli/commands/setup/steps/confirm-framework";
@@ -18,7 +11,7 @@ import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
-import { LocalServer } from "@/lib/local-server/server";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { aPromptDeps } from "@tests/helpers/setup";
@@ -87,11 +80,11 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
+const machine = new FakeMachine();
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
-  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
 describe("ConfirmFramework", () => {
@@ -99,7 +92,10 @@ describe("ConfirmFramework", () => {
     it("returns the answers unchanged", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      const answers = await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await new ConfirmFramework(aPromptDeps(undefined, machine)).ask(
+        setupAnswers(),
+        CONTEXT,
+      );
 
       expect(answers).toEqual(setupAnswers());
     });
@@ -107,7 +103,7 @@ describe("ConfirmFramework", () => {
     it("asks whether to set up Zitadel in the detected app", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await new ConfirmFramework(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
 
       expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
         message: "Would you like to set up Zitadel in this Next.js app?",
@@ -117,16 +113,19 @@ describe("ConfirmFramework", () => {
 
   describe("when the developer already chose the framework", () => {
     it("returns the answers unchanged", async () => {
-      const answers = await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), {
-        ...CONTEXT,
-        frameworkChosen: true,
-      });
+      const answers = await new ConfirmFramework(aPromptDeps(undefined, machine)).ask(
+        setupAnswers(),
+        {
+          ...CONTEXT,
+          frameworkChosen: true,
+        },
+      );
 
       expect(answers).toEqual(setupAnswers());
     });
 
     it("does not ask", async () => {
-      await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), {
+      await new ConfirmFramework(aPromptDeps(undefined, machine)).ask(setupAnswers(), {
         ...CONTEXT,
         frameworkChosen: true,
       });
@@ -140,7 +139,7 @@ describe("ConfirmFramework", () => {
       vi.mocked(confirm).mockResolvedValueOnce(false);
 
       const error = await rejectionOf(() => {
-        return new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+        return new ConfirmFramework(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -151,7 +150,7 @@ describe("ConfirmFramework", () => {
       vi.mocked(confirm).mockResolvedValueOnce(false);
 
       const error = await rejectionOf(() => {
-        return new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+        return new ConfirmFramework(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -167,7 +166,7 @@ describe("ConfirmFramework", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      return new ConfirmFramework(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

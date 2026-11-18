@@ -13,11 +13,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { it, type Serve } from "@tests/fixtures";
 
-import {
-  localRuntimePaths,
-  writeRuntimeMetadata,
-  type RuntimeMetadata,
-} from "@/lib/local-server/runtime";
+import { LocalRuntime, type RuntimeMetadata } from "@/lib/server";
 import Claim from "@/cli/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
@@ -33,7 +29,7 @@ import { aBinaryRecord } from "@tests/helpers/runtime-record";
  * `claim/complete` route is cookie-authenticated and Express-only, so it is
  * not reachable through msw handlers.
  */
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = "https://preview.zitadel.com";
 const { server } = usePlatformServer();
 type Project = { id: string; project_secret: string };
 
@@ -595,8 +591,8 @@ describe("claim", () => {
       // The resume keeps this run's server and directory, or it would wait on
       // the default project instead.
       expect(json.data.next_commands).toEqual([
-        expect.stringMatching(
-          new RegExp(`claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `),
+        expect.stringContaining(
+          `claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `,
         ),
       ]);
     });
@@ -739,7 +735,7 @@ describe("claim", () => {
 
     it("points at `zitadel start` when no local runtime is reachable", async ({ dir: cwd }) => {
       await makeProject(cwd);
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:9"));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--json", "--server", "local"]);
 
@@ -752,7 +748,7 @@ describe("claim", () => {
     it("claims against the resolved local server", async ({ serve, dir: cwd }) => {
       await makeProject(cwd);
       const serverUrl = await startClaimServer(serve);
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest([
         "claim",
@@ -778,9 +774,9 @@ describe("claim", () => {
       await makeProject(cwd);
       const serverUrl = await startClaimServer(
         serve,
-        "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_localstub",
+        "https://preview.zitadel.com/ui/console/claim?challenge_id=ch_localstub",
       );
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
 
@@ -794,7 +790,7 @@ describe("claim", () => {
         serve,
         "http://localhost/claim/ch_localstub\u001b[2Jwiped",
       );
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
 
@@ -809,7 +805,7 @@ describe("claim", () => {
     }) => {
       await makeProject(cwd);
       const serverUrl = await startClaimServer(serve);
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
 
@@ -866,9 +862,9 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return aBinaryRecord({
     pid: process.pid,
     command: process.execPath,
-    log_path: localRuntimePaths(cwd).logFile,
+    log_path: LocalRuntime.paths(cwd).logFile,
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
-    data_dir: localRuntimePaths(cwd).dataDir,
+    data_dir: LocalRuntime.paths(cwd).dataDir,
   });
 }

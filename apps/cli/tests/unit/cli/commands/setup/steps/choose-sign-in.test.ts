@@ -4,13 +4,6 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/local-server/server", async (importOriginal) => {
-  return {
-    ...(await importOriginal<object>()),
-    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
-  };
-});
-
 import { isCancel, select } from "@clack/prompts";
 
 import { ChooseSignIn } from "@/cli/commands/setup/steps/choose-sign-in";
@@ -18,7 +11,7 @@ import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
-import { LocalServer } from "@/lib/local-server/server";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { aPromptDeps } from "@tests/helpers/setup";
@@ -92,18 +85,18 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
+const machine = new FakeMachine();
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
-  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
 describe("ChooseSignIn", () => {
   it("writes the selected preset into the answers", async () => {
     vi.mocked(select).mockResolvedValueOnce("passkey-first");
 
-    const answers = await new ChooseSignIn(aPromptDeps()).ask(
+    const answers = await new ChooseSignIn(aPromptDeps(undefined, machine)).ask(
       setupAnswers({ preset: "password-first" }),
       CONTEXT,
     );
@@ -114,7 +107,10 @@ describe("ChooseSignIn", () => {
   it("preselects the preset already answered", async () => {
     vi.mocked(select).mockResolvedValueOnce("passkey-first");
 
-    await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+    await new ChooseSignIn(aPromptDeps(undefined, machine)).ask(
+      setupAnswers({ preset: "password-first" }),
+      CONTEXT,
+    );
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "password-first" });
   });
@@ -122,7 +118,10 @@ describe("ChooseSignIn", () => {
   it("says what users see first and what is secondary, which both presets enable", async () => {
     vi.mocked(select).mockResolvedValueOnce("password-first");
 
-    await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+    await new ChooseSignIn(aPromptDeps(undefined, machine)).ask(
+      setupAnswers({ preset: "password-first" }),
+      CONTEXT,
+    );
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       message: "Which sign-in method would you like your users to see first?",
@@ -141,7 +140,7 @@ describe("ChooseSignIn", () => {
 
   describe("with --preset", () => {
     it("keeps the flagged preset", async () => {
-      const answers = await new ChooseSignIn(aPromptDeps()).ask(
+      const answers = await new ChooseSignIn(aPromptDeps(undefined, machine)).ask(
         setupAnswers({ preset: "passkey-first" }),
         {
           ...CONTEXT,
@@ -153,10 +152,13 @@ describe("ChooseSignIn", () => {
     });
 
     it("does not ask", async () => {
-      await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "passkey-first" }), {
-        ...CONTEXT,
-        presetFromFlag: true,
-      });
+      await new ChooseSignIn(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ preset: "passkey-first" }),
+        {
+          ...CONTEXT,
+          presetFromFlag: true,
+        },
+      );
 
       expect(select).not.toHaveBeenCalled();
     });
@@ -167,7 +169,7 @@ describe("ChooseSignIn", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ChooseSignIn(aPromptDeps()).ask(
+      return new ChooseSignIn(aPromptDeps(undefined, machine)).ask(
         setupAnswers({ preset: "password-first" }),
         CONTEXT,
       );

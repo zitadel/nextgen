@@ -14,7 +14,7 @@ describe("Box", () => {
 
   it("never splits a token, so URLs survive the journey e2e scrape", () => {
     const url =
-      "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_abcdefghijklmnop&project_id=proj_0123456789";
+      "https://preview.zitadel.com/ui/console/claim?challenge_id=ch_abcdefghijklmnop&project_id=proj_0123456789";
     const wrapped = Box.at(40).wrap(`${url}\n\nSign in there to attach this project.`);
     expect(wrapped).toContain(url);
   });

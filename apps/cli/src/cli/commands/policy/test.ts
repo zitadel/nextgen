@@ -20,6 +20,7 @@ import {
   USER_CREATE_POLICY_OPERATION,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * Where a tested config came from: a policy file, a release's revision, or
@@ -171,7 +172,7 @@ const EVALUATE_CONCURRENCY = 8;
  * nothing is read from or written to the project's policies. A failing case
  * fails the command with `E_VALIDATION`, carrying the full results.
  */
-export default class PolicyTestCommand extends EnvironmentCommand {
+export default class PolicyTestCommand extends ServerCommand(EnvironmentCommand) {
   static override description = `Run the test cases in .zitadel/policies/ against the policies.
 
 A policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.

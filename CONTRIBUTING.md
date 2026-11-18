@@ -83,7 +83,9 @@ With no database configured, the server uses SQLite at
 `NEXTGEN_DATABASE_SQLITE`, or `NEXTGEN_DATABASE_POSTGRES` when you want a
 path or DSN you manage. Schema migrations run when you pass `--migrate`;
 `pnpm run server` adds that flag. To apply schema and exit without
-serving, run `pnpm run server -- migrate`.
+serving, run `pnpm run server -- migrate`. The server seeds its database
+when it starts; `pnpm run server -- seed` seeds and exits, for a server
+started with `--seed=false`.
 
 Open http://localhost:8080/ui/console/
 

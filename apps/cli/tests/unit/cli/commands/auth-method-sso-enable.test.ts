@@ -1201,14 +1201,14 @@ describe("auth-method sso enable", () => {
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(
-          authMethodJson(cwd, ...GOOGLE, "--server", "https://api.zitadel.cloud"),
+          authMethodJson(cwd, ...GOOGLE, "--server", "https://preview.zitadel.com"),
         );
       });
 
       expect(parseJson(result.stdout)).toMatchObject({
         next_commands: [
           expect.stringContaining(
-            "auth-method sso enable --provider google --client-id '<client-id>' --server https://api.zitadel.cloud",
+            "auth-method sso enable --provider google --client-id '<client-id>' --server https://preview.zitadel.com",
           ),
         ],
       });
@@ -1477,6 +1477,22 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         message: expect.stringContaining("cannot be checked against the changed schema"),
+      });
+    });
+
+    it("suggests a dry run of deploy, which reports those flow errors", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        next_commands: expect.arrayContaining([expect.stringContaining("deploy --dry-run")]),
       });
     });
 

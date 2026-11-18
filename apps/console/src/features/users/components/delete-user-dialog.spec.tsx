@@ -50,7 +50,7 @@ async function openDialog() {
   });
   render(<RouterProvider router={router} />);
   await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
-  await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "Delete user" }));
   return router;
 }
 
@@ -69,10 +69,10 @@ describe("delete user dialog", () => {
 
     // Exactly these: Edit user, Reset password and Deactivate stay out until
     // something serves them, and nothing new slips in unnoticed.
-    await screen.findByRole("menuitem", { name: "View details" });
+    await screen.findByRole("menuitem", { name: "View user" });
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "View details",
-      "Delete",
+      "View user",
+      "Delete user",
     ]);
   });
 
@@ -158,7 +158,7 @@ describe("delete user dialog", () => {
     // Reopening starts blank: the form remounts per opening, so the typed
     // confirmation does not carry over.
     await userEvent.click(screen.getByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete user" }));
     expect(await screen.findByLabelText("Type DELETE to confirm")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
   });

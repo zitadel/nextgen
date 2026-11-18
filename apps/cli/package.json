@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -92,6 +92,9 @@
       },
       "origin": {
         "description": "Manage the project's allowed origins."
+      },
+      "invitation": {
+        "description": "Invite people into the project with a link."
       },
       "release": {
         "description": "Build and manage releases."
