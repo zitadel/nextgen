@@ -142,15 +142,20 @@ export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefine
 
 /**
  * Resolve where Mixpanel events go: the region of the project the run sends to,
- * or the one `ZITADEL_TELEMETRY_REGION` names. Events sent to the wrong region
+ * or, for a `ZITADEL_TELEMETRY_TOKEN` of one's own, the one `ZITADEL_TELEMETRY_REGION` names. Events sent to the wrong region
  * are silently dropped, so verify the first event lands in Live View.
  *
  * @param env - The environment the run reads.
  * @returns The endpoint of the region.
  */
 export function resolveTelemetryEndpoint(env: NodeJS.ProcessEnv): TelemetryEndpoint {
-  const named = env.ZITADEL_TELEMETRY_REGION?.trim().toLowerCase();
-  const region = named === "us" || named === "eu" ? named : (resolveProject(env)?.region ?? "eu");
+  const project = resolveProject(env);
+  // A baked-in project keeps the region it lives in: naming another would send its
+  // token to a region that drops its events. Only a token of one's own is told apart.
+  const named = env.ZITADEL_TELEMETRY_TOKEN?.trim()
+    ? env.ZITADEL_TELEMETRY_REGION?.trim().toLowerCase()
+    : undefined;
+  const region = named === "us" || named === "eu" ? named : (project?.region ?? "eu");
 
   return ENDPOINTS[region];
 }

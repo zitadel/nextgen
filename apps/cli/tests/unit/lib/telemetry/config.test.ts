@@ -80,12 +80,35 @@ describe("resolveTelemetryEndpoint", () => {
 
   it("lets ZITADEL_TELEMETRY_REGION name the region, and takes a token of one's own as EU", () => {
     expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_TOKEN: "own" })).toEqual(CLOUD_PROXY);
-    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: "us" })).toEqual(US_DIRECT);
-    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: "EU" })).toEqual(CLOUD_PROXY);
+    const own = { ZITADEL_TELEMETRY_TOKEN: "own" };
+    expect(resolveTelemetryEndpoint({ ...own, ZITADEL_TELEMETRY_REGION: "us" })).toEqual(US_DIRECT);
+    expect(resolveTelemetryEndpoint({ ...own, ZITADEL_TELEMETRY_REGION: "EU" })).toEqual(
+      CLOUD_PROXY,
+    );
   });
 
   it("trims surrounding whitespace on the region env", () => {
-    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: " us " })).toEqual(US_DIRECT);
+    expect(
+      resolveTelemetryEndpoint({
+        ZITADEL_TELEMETRY_TOKEN: "own",
+        ZITADEL_TELEMETRY_REGION: " us ",
+      }),
+    ).toEqual(US_DIRECT);
+  });
+
+  it("keeps a baked-in project on its own region, whatever the region env names", () => {
+    expect(
+      resolveTelemetryEndpoint({
+        ZITADEL_TELEMETRY_ENV: "development",
+        ZITADEL_TELEMETRY_REGION: "us",
+      }),
+    ).toEqual(CLOUD_PROXY);
+    expect(
+      resolveTelemetryEndpoint({
+        ZITADEL_TELEMETRY_ENV: "production",
+        ZITADEL_TELEMETRY_REGION: "eu",
+      }),
+    ).toEqual(US_DIRECT);
   });
 
   // Released CLIs send to this path, so the cloud has to keep forwarding it.
