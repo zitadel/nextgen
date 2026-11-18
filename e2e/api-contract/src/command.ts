@@ -15,7 +15,7 @@ export const MAX_EXAMPLES = 25;
  * share the one server, so this is where the lane's speed comes from.
  * `API_CONTRACT_WORKERS` overrides it.
  */
-export const WORKERS = Number(process.env.API_CONTRACT_WORKERS ?? 4);
+export const WORKERS = Number(process.env.API_CONTRACT_WORKERS ?? 1);
 
 /**
  * Schemathesis fails a response slower than its request timeout (10s by
