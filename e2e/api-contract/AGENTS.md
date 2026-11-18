@@ -14,20 +14,23 @@ root.
   `/api/v1/openapi.json` is the spec under test, and one idle Schemathesis
   container (the pinned image, through Testcontainers) with that spec mounted.
   Docker is required.
-- `src/contract.ts` runs two commands in that one container,
-  at the same time: every operation but the logout, and the
-  logout alone. The spec decides which, from each operation's declared
-  `security` (`src/spec.ts`). The main command holds the project secret for the
-  bearer scheme and a seeded end user's cookie for the cookie scheme, and
-  Schemathesis applies the credential each operation's own security entry asks
-  for. The CSRF token rides only on the cookie operations
-  (`[operations.headers]`). The logout runs on a session of its own, because it
-  ends the session.
+- `src/contract.ts` runs several commands in that one container at the same
+  time, each on a project of its own on the instance (its own secret, users,
+  sessions and branding), so what one creates, changes or deletes is never seen
+  by another: `shard-N` commands, each a share of the operations but the logout
+  (`src/shards.ts` deals them by a hash of the operation's name, so an
+  operation stays in its shard when others come and go), a `stateful` command
+  for the multi-step phase, which needs them all in one run, and a `logout`
+  command, because it ends the session it runs on. The spec decides the
+  operations and, from each one's declared `security` (`src/spec.ts`), which
+  credential it gets: Schemathesis applies the project secret to the bearer
+  operations and a seeded end user's cookie to the cookie ones. The CSRF token
+  rides only on the cookie operations (`[operations.headers]`).
 - The suite has one test for the run's completion, one for its accounting and
   one for the baseline verdict, which lists every operation that differs. The
-  raw report and output are in `api-contract/test-output/schemathesis/<command>/`
+  raw report and output are in `api-contract/test-output/schemathesis/<command>/` (`shard-N`, `stateful`, `logout`)
   (gitignored), and `st replay <id>` in the image replays a case.
-- The run takes about four minutes. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
+- The run takes about a minute and a half on CI. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
 - The verdict is written to `api-contract/test-output/summary.md`, to the job summary on GitHub, and as error annotations on the check.
 
 ## The baseline
@@ -52,12 +55,15 @@ Never add a line to hide a failure you introduced. Fix it, or fix the spec.
 
 A baseline is only worth anything if a run repeats.
 
-- `API_CONTRACT_WORKERS` (default 1) is the requests in flight inside the main
-  command. Measured on CI with identical commits, one worker repeats exactly
-  (about 210s), and four are faster (about 125s) but share one server and so
-  find a different set of failures from run to run. Keep it at 1.
-- One command draws the inputs of all its operations from a single seeded
-  stream, so adding or removing an operation can change what the others
+- Each command is one process with one worker, on a project of its own, so
+  nothing one command does can reach another. Parallelism comes from the
+  number of commands (`API_CONTRACT_SHARDS`, default 4), not from workers:
+  `API_CONTRACT_WORKERS` (default 1) is requests in flight inside a command,
+  and with more than 1 they share that command's project and find failures
+  that come and go. Measured on CI with identical commits, this setup repeats
+  exactly.
+- A command draws the inputs of its operations from a single seeded stream, so
+  adding or removing an operation can change what the others in its shard
   receive. A change to the spec can therefore change the baseline: regenerate
   it from the new run and read the diff.
 - The Schemathesis release and the seed are pinned in `src/schemathesis.ts` (release) and `src/command.ts` (seed).

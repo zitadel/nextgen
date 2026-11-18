@@ -11,9 +11,11 @@ export const SEED = 24184733292255574161660497485948756999n;
 export const MAX_EXAMPLES = 25;
 
 /**
- * How many requests Schemathesis sends at once within one run: its threads
- * share the one server, so this is where the lane's speed comes from.
- * `API_CONTRACT_WORKERS` overrides it.
+ * How many requests Schemathesis sends at once within one command. It stays at
+ * 1: the threads share the command's project, and with more, which requests
+ * overlap changes from run to run, and so does what fails. The lane gets its
+ * speed from running commands side by side, each on a project of its own (see
+ * `Contract`). `API_CONTRACT_WORKERS` overrides it to measure that.
  */
 export const WORKERS = Number(process.env.API_CONTRACT_WORKERS ?? 1);
 
