@@ -5,11 +5,11 @@ import { SecretFile } from "@/lib/project/secret-file";
 
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
-/** Verifies `.zitadel/secret` is owner-only, and secures it on fix. */
+/** Verifies `.zitadel/secret` is as private as its filesystem allows, and secures it on fix. */
 export class SecretPermissionsCheck extends AbstractSanityCheck {
   readonly name = "secret-permissions";
   readonly path = ".zitadel/secret";
-  protected readonly summary = ".zitadel/secret is owner-only";
+  protected readonly summary = ".zitadel/secret is as private as its filesystem allows";
 
   protected async verify(ctx: CheckContext): Promise<void> {
     const file = join(ctx.cwd, this.path);

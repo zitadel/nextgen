@@ -1,6 +1,5 @@
-import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { chmod, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { warnings } from "@/lib/ui/warnings";
 
@@ -58,7 +57,7 @@ export class SecretFile {
    */
   static async isSecure(path: string): Promise<boolean> {
     const mode = (await stat(path)).mode & 0o777;
-    return mode === SECRET_MODE || !(await SecretFile.keepsModes());
+    return mode === SECRET_MODE || !(await SecretFile.keepsModes(dirname(path)));
   }
 
   /**
@@ -71,24 +70,18 @@ export class SecretFile {
   }
 
   /**
-   * Whether a file keeps the mode it is given, found by trying one in a
-   * directory of its own under the temp directory, so it needs no list of the
-   * platforms and filesystems that do not and leaves nothing in the project.
-   * It reports on the temp directory's filesystem, which is the project's on
-   * every ordinary setup. A filesystem that refuses `chmod` keeps no modes; where
-   * the probe cannot be made at all, modes are taken to be kept.
+   * Whether a file keeps the mode it is given, found by trying one in the
+   * directory the secret lives in, so it needs no list of the platforms and
+   * filesystems that do not and answers for the filesystem the secret is on.
+   * The probe file is removed again. A filesystem that refuses `chmod` keeps
+   * no modes; where the probe cannot be made at all, modes are taken to be kept.
    *
+   * @param dir - The directory the secret is in.
    * @returns `true` when the mode a file is given is the mode it reads back.
    */
-  private static async keepsModes(): Promise<boolean> {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-modes-")).catch(() => {
-      return undefined;
-    });
-    if (dir === undefined) {
-      return true;
-    }
+  private static async keepsModes(dir: string): Promise<boolean> {
+    const probe = join(dir, `.modes-probe-${process.pid}`);
     try {
-      const probe = join(dir, "probe");
       await writeFile(probe, "", { mode: SECRET_MODE });
       const accepted = await chmod(probe, 0o640).then(
         () => {
@@ -102,7 +95,7 @@ export class SecretFile {
     } catch {
       return true;
     } finally {
-      await rm(dir, { recursive: true, force: true }).catch(() => {
+      await rm(probe, { force: true }).catch(() => {
         return undefined;
       });
     }

@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import fse from "fs-extra";
@@ -95,7 +95,7 @@ export class ScaffoldWorkspace {
    */
   async restoreInto(cwd: string): Promise<void> {
     for (const name of await this.replaced()) {
-      await rename(join(this.backup, name), join(cwd, name));
+      await fse.move(join(this.backup, name), join(cwd, name));
     }
   }
 
