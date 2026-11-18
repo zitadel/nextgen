@@ -2352,18 +2352,18 @@ func decodeGetApplicationParams(args [1]string, argsEscaped bool, r *http.Reques
 	return params, nil
 }
 
-// GetApplicationRevisionByIdParams is parameters of getApplicationRevisionById operation.
-type GetApplicationRevisionByIdParams struct {
+// GetApplicationRevisionParams is parameters of getApplicationRevision operation.
+type GetApplicationRevisionParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
 	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
 	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The revision ID: the `revision_id` that `createApplication` (`POST /applications`) or
-	// `getApplicationById` returns, or that a release pins.
-	RevisionID string
+	// The revision ID: the `revision_id` that `publishApplication` (`POST /applications`) or
+	// `getApplication` returns, or that a release pins.
+	RevisionID ApplicationRevisionID
 }
 
-func unpackGetApplicationRevisionByIdParams(packed middleware.Parameters) (params GetApplicationRevisionByIdParams) {
+func unpackGetApplicationRevisionParams(packed middleware.Parameters) (params GetApplicationRevisionParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -2376,12 +2376,12 @@ func unpackGetApplicationRevisionByIdParams(packed middleware.Parameters) (param
 			Name: "revision_id",
 			In:   "path",
 		}
-		params.RevisionID = packed[key].(string)
+		params.RevisionID = packed[key].(ApplicationRevisionID)
 	}
 	return params
 }
 
-func decodeGetApplicationRevisionByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetApplicationRevisionByIdParams, _ error) {
+func decodeGetApplicationRevisionParams(args [1]string, argsEscaped bool, r *http.Request) (params GetApplicationRevisionParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -2453,17 +2453,32 @@ func decodeGetApplicationRevisionByIdParams(args [1]string, argsEscaped bool, r 
 			})
 
 			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
+				var paramsDotRevisionIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotRevisionIDVal = c
+					return nil
+				}(); err != nil {
 					return err
 				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
+				params.RevisionID = ApplicationRevisionID(paramsDotRevisionIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.RevisionID.Validate(); err != nil {
 					return err
 				}
-
-				params.RevisionID = c
 				return nil
 			}(); err != nil {
 				return err

@@ -60,13 +60,13 @@ func (h *Handler) GetApplication(ctx context.Context, params api.GetApplicationP
 	return &resp, nil
 }
 
-func (h *Handler) GetApplicationRevisionById(ctx context.Context, params api.GetApplicationRevisionByIdParams) (api.GetApplicationRevisionByIdRes, error) {
+func (h *Handler) GetApplicationRevision(ctx context.Context, params api.GetApplicationRevisionParams) (api.GetApplicationRevisionRes, error) {
 	projectID := string(params.ProjectID)
-	entity, err := h.applicationService.GetRevision(ctx, projectID, params.RevisionID)
+	entity, err := h.applicationService.GetRevision(ctx, projectID, string(params.RevisionID))
 	if err != nil {
 		// A miss answers as a revision of an application outside the caller's
 		// scope does, so an unknown id reads like a hidden one (#2112).
-		if accessErr := h.requireTargetAccess(ctx, projectID, params.RevisionID, applicationAccess, opRead); accessErr != nil {
+		if accessErr := h.requireTargetAccess(ctx, projectID, string(params.RevisionID), applicationAccess, opRead); accessErr != nil {
 			return nil, accessErr
 		}
 		return nil, err

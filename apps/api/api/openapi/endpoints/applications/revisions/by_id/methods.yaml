@@ -1,5 +1,5 @@
 get:
-  operationId: getApplicationRevisionById
+  operationId: getApplicationRevision
   summary: Get a revision of an application
   description: |
     Returns one revision of an application that authenticates its users via
@@ -69,4 +69,4 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     default:
-      $ref: getApplicationRevisionById-error-response.yaml
+      $ref: getApplicationRevision-error-response.yaml

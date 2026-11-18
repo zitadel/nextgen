@@ -2469,7 +2469,7 @@ func encodeGetApplicationResponse(response GetApplicationRes, w http.ResponseWri
 	}
 }
 
-func encodeGetApplicationRevisionByIdResponse(response GetApplicationRevisionByIdRes, w http.ResponseWriter, span trace.Span) error {
+func encodeGetApplicationRevisionResponse(response GetApplicationRevisionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *ApplicationResponse:
 		if err := func() error {
@@ -2491,7 +2491,7 @@ func encodeGetApplicationRevisionByIdResponse(response GetApplicationRevisionByI
 
 		return nil
 
-	case *GetApplicationRevisionByIdUnauthorized:
+	case *GetApplicationRevisionUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -2503,7 +2503,7 @@ func encodeGetApplicationRevisionByIdResponse(response GetApplicationRevisionByI
 
 		return nil
 
-	case *GetApplicationRevisionByIdForbidden:
+	case *GetApplicationRevisionForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -2515,7 +2515,7 @@ func encodeGetApplicationRevisionByIdResponse(response GetApplicationRevisionByI
 
 		return nil
 
-	case *GetApplicationRevisionByIdNotFound:
+	case *GetApplicationRevisionNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2527,7 +2527,7 @@ func encodeGetApplicationRevisionByIdResponse(response GetApplicationRevisionByI
 
 		return nil
 
-	case *GetApplicationRevisionByIdErrorResponseStatusCode:
+	case *GetApplicationRevisionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {

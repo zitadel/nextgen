@@ -33,6 +33,7 @@ var regexMap = map[string]ogenregex.Regexp{
 	"^\\$\\{\\{ *[A-Za-z0-9_]{1,255} *\\}\\}$": ogenregex.MustCompile("^\\$\\{\\{ *[A-Za-z0-9_]{1,255} *\\}\\}$"),
 	"^\\d+\\.\\d+\\.\\d+$":                     ogenregex.MustCompile("^\\d+\\.\\d+\\.\\d+$"),
 	"^\\w+$":                                   ogenregex.MustCompile("^\\w+$"),
+	"^apprev_[a-zA-Z0-9_-]+$":                  ogenregex.MustCompile("^apprev_[a-zA-Z0-9_-]+$"),
 	"^att_[a-zA-Z0-9_-]+$":                     ogenregex.MustCompile("^att_[a-zA-Z0-9_-]+$"),
 	"^ch_[a-zA-Z0-9_-]+$":                      ogenregex.MustCompile("^ch_[a-zA-Z0-9_-]+$"),
 	"^dep_[a-zA-Z0-9_-]+$":                     ogenregex.MustCompile("^dep_[a-zA-Z0-9_-]+$"),

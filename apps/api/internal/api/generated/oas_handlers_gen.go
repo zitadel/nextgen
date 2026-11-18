@@ -5844,7 +5844,7 @@ func (s *Server) handleGetApplicationRequest(args [1]string, argsEscaped bool, w
 	}
 }
 
-// handleGetApplicationRevisionByIdRequest handles getApplicationRevisionById operation.
+// handleGetApplicationRevisionRequest handles getApplicationRevision operation.
 //
 // Returns one revision of an application that authenticates its users via Zitadel, by its
 // `revision_id`, the value a release pins. A declared application is served at the revision its
@@ -5854,11 +5854,11 @@ func (s *Server) handleGetApplicationRequest(args [1]string, argsEscaped bool, w
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /applications/revisions/{revision_id}
-func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetApplicationRevisionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getApplicationRevisionById"),
+		otelogen.OperationID("getApplicationRevision"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/applications/revisions/{revision_id}"),
 	}
@@ -5866,7 +5866,7 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetApplicationRevisionByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetApplicationRevisionOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -5921,15 +5921,15 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetApplicationRevisionByIdOperation,
-			ID:   "getApplicationRevisionById",
+			Name: GetApplicationRevisionOperation,
+			ID:   "getApplicationRevision",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetApplicationRevisionByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetApplicationRevisionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -5946,7 +5946,7 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetApplicationRevisionByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetApplicationRevisionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -5987,7 +5987,7 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 			return
 		}
 	}
-	params, err := decodeGetApplicationRevisionByIdParams(args, argsEscaped, r)
+	params, err := decodeGetApplicationRevisionParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -6000,13 +6000,13 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 
 	var rawBody []byte
 
-	var response GetApplicationRevisionByIdRes
+	var response GetApplicationRevisionRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetApplicationRevisionByIdOperation,
+			OperationName:    GetApplicationRevisionOperation,
 			OperationSummary: "Get a revision of an application",
-			OperationID:      "getApplicationRevisionById",
+			OperationID:      "getApplicationRevision",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -6024,8 +6024,8 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 
 		type (
 			Request  = struct{}
-			Params   = GetApplicationRevisionByIdParams
-			Response = GetApplicationRevisionByIdRes
+			Params   = GetApplicationRevisionParams
+			Response = GetApplicationRevisionRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -6034,14 +6034,14 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 		](
 			m,
 			mreq,
-			unpackGetApplicationRevisionByIdParams,
+			unpackGetApplicationRevisionParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetApplicationRevisionById(ctx, params)
+				response, err = s.h.GetApplicationRevision(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetApplicationRevisionById(ctx, params)
+		response, err = s.h.GetApplicationRevision(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -6049,7 +6049,7 @@ func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEsc
 		return
 	}
 
-	if err := encodeGetApplicationRevisionByIdResponse(response, w, span); err != nil {
+	if err := encodeGetApplicationRevisionResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

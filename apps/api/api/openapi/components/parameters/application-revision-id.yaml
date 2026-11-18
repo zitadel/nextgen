@@ -2,8 +2,7 @@ name: revision_id
 in: path
 required: true
 description: |
-  The revision ID: the `revision_id` that `createApplication` (`POST /applications`)
-  or `getApplicationById` returns, or that a release pins.
+  The revision ID: the `revision_id` that `publishApplication` (`POST /applications`)
+  or `getApplication` returns, or that a release pins.
 schema:
-  type: string
-example: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
+  $ref: '../schemas/application-revision-id.yaml'

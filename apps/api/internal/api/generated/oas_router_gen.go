@@ -379,7 +379,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								// Leaf node.
 								switch r.Method {
 								case "GET":
-									s.handleGetApplicationRevisionByIdRequest([1]string{
+									s.handleGetApplicationRevisionRequest([1]string{
 										args[0],
 									}, elemIsEscaped, w, r)
 								default:
@@ -3387,9 +3387,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								// Leaf node.
 								switch method {
 								case "GET":
-									r.name = GetApplicationRevisionByIdOperation
+									r.name = GetApplicationRevisionOperation
 									r.summary = "Get a revision of an application"
-									r.operationID = "getApplicationRevisionById"
+									r.operationID = "getApplicationRevision"
 									r.operationGroup = ""
 									r.pathPattern = "/applications/revisions/{revision_id}"
 									r.args = args

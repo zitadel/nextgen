@@ -62883,16 +62883,16 @@ func (s *GetApplicationNotFound) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationRevisionByIdErrorResponse as json.
-func (s GetApplicationRevisionByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationRevisionErrorResponse as json.
+func (s GetApplicationRevisionErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetApplicationRevisionErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AppNotFoundGetApplicationRevisionByIdErrorResponse:
+	case AppNotFoundGetApplicationRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.not_found")
 		{
@@ -62908,7 +62908,7 @@ func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AppPermissionDeniedGetApplicationRevisionByIdErrorResponse:
+	case AppPermissionDeniedGetApplicationRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.permission_denied")
 		{
@@ -62924,7 +62924,7 @@ func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AuthUnauthorizedGetApplicationRevisionByIdErrorResponse:
+	case AuthUnauthorizedGetApplicationRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -62940,7 +62940,7 @@ func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetApplicationRevisionByIdErrorResponse:
+	case InternalGetApplicationRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -62956,7 +62956,7 @@ func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetApplicationRevisionByIdErrorResponse:
+	case NotImplementedGetApplicationRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -62972,7 +62972,7 @@ func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetApplicationRevisionByIdErrorResponse:
+	case ReqInvalidGetApplicationRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -62988,7 +62988,7 @@ func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetApplicationRevisionByIdErrorResponse:
+	case UnavailableGetApplicationRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -63007,10 +63007,10 @@ func (s GetApplicationRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetApplicationRevisionByIdErrorResponse from json.
-func (s *GetApplicationRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationRevisionErrorResponse from json.
+func (s *GetApplicationRevisionErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationRevisionByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetApplicationRevisionErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -63031,25 +63031,25 @@ func (s *GetApplicationRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "app.not_found":
-					s.Type = AppNotFoundGetApplicationRevisionByIdErrorResponse
+					s.Type = AppNotFoundGetApplicationRevisionErrorResponse
 					found = true
 				case "app.permission_denied":
-					s.Type = AppPermissionDeniedGetApplicationRevisionByIdErrorResponse
+					s.Type = AppPermissionDeniedGetApplicationRevisionErrorResponse
 					found = true
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetApplicationRevisionByIdErrorResponse
+					s.Type = AuthUnauthorizedGetApplicationRevisionErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetApplicationRevisionByIdErrorResponse
+					s.Type = InternalGetApplicationRevisionErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetApplicationRevisionByIdErrorResponse
+					s.Type = NotImplementedGetApplicationRevisionErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetApplicationRevisionByIdErrorResponse
+					s.Type = ReqInvalidGetApplicationRevisionErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetApplicationRevisionByIdErrorResponse
+					s.Type = UnavailableGetApplicationRevisionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -63065,31 +63065,31 @@ func (s *GetApplicationRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AppNotFoundGetApplicationRevisionByIdErrorResponse:
+	case AppNotFoundGetApplicationRevisionErrorResponse:
 		if err := s.AppNotFound.Decode(d); err != nil {
 			return err
 		}
-	case AppPermissionDeniedGetApplicationRevisionByIdErrorResponse:
+	case AppPermissionDeniedGetApplicationRevisionErrorResponse:
 		if err := s.AppPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case AuthUnauthorizedGetApplicationRevisionByIdErrorResponse:
+	case AuthUnauthorizedGetApplicationRevisionErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetApplicationRevisionByIdErrorResponse:
+	case InternalGetApplicationRevisionErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetApplicationRevisionByIdErrorResponse:
+	case NotImplementedGetApplicationRevisionErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetApplicationRevisionByIdErrorResponse:
+	case ReqInvalidGetApplicationRevisionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetApplicationRevisionByIdErrorResponse:
+	case UnavailableGetApplicationRevisionErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -63100,29 +63100,29 @@ func (s *GetApplicationRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetApplicationRevisionByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetApplicationRevisionErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationRevisionByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationRevisionErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationRevisionByIdForbidden as json.
-func (s *GetApplicationRevisionByIdForbidden) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationRevisionForbidden as json.
+func (s *GetApplicationRevisionForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetApplicationRevisionByIdForbidden from json.
-func (s *GetApplicationRevisionByIdForbidden) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationRevisionForbidden from json.
+func (s *GetApplicationRevisionForbidden) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationRevisionByIdForbidden to nil")
+		return errors.New("invalid: unable to decode GetApplicationRevisionForbidden to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -63133,34 +63133,34 @@ func (s *GetApplicationRevisionByIdForbidden) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetApplicationRevisionByIdForbidden(unwrapped)
+	*s = GetApplicationRevisionForbidden(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetApplicationRevisionByIdForbidden) MarshalJSON() ([]byte, error) {
+func (s *GetApplicationRevisionForbidden) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationRevisionByIdForbidden) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationRevisionForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationRevisionByIdNotFound as json.
-func (s *GetApplicationRevisionByIdNotFound) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationRevisionNotFound as json.
+func (s *GetApplicationRevisionNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetApplicationRevisionByIdNotFound from json.
-func (s *GetApplicationRevisionByIdNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationRevisionNotFound from json.
+func (s *GetApplicationRevisionNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationRevisionByIdNotFound to nil")
+		return errors.New("invalid: unable to decode GetApplicationRevisionNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -63171,34 +63171,34 @@ func (s *GetApplicationRevisionByIdNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetApplicationRevisionByIdNotFound(unwrapped)
+	*s = GetApplicationRevisionNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetApplicationRevisionByIdNotFound) MarshalJSON() ([]byte, error) {
+func (s *GetApplicationRevisionNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationRevisionByIdNotFound) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationRevisionNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationRevisionByIdUnauthorized as json.
-func (s *GetApplicationRevisionByIdUnauthorized) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationRevisionUnauthorized as json.
+func (s *GetApplicationRevisionUnauthorized) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetApplicationRevisionByIdUnauthorized from json.
-func (s *GetApplicationRevisionByIdUnauthorized) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationRevisionUnauthorized from json.
+func (s *GetApplicationRevisionUnauthorized) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationRevisionByIdUnauthorized to nil")
+		return errors.New("invalid: unable to decode GetApplicationRevisionUnauthorized to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -63209,19 +63209,19 @@ func (s *GetApplicationRevisionByIdUnauthorized) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetApplicationRevisionByIdUnauthorized(unwrapped)
+	*s = GetApplicationRevisionUnauthorized(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetApplicationRevisionByIdUnauthorized) MarshalJSON() ([]byte, error) {
+func (s *GetApplicationRevisionUnauthorized) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationRevisionByIdUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationRevisionUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

@@ -665,7 +665,7 @@ func (UnimplementedHandler) GetApplication(ctx context.Context, params GetApplic
 	return r, ht.ErrNotImplemented
 }
 
-// GetApplicationRevisionById implements getApplicationRevisionById operation.
+// GetApplicationRevision implements getApplicationRevision operation.
 //
 // Returns one revision of an application that authenticates its users via Zitadel, by its
 // `revision_id`, the value a release pins. A declared application is served at the revision its
@@ -675,7 +675,7 @@ func (UnimplementedHandler) GetApplication(ctx context.Context, params GetApplic
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /applications/revisions/{revision_id}
-func (UnimplementedHandler) GetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (r GetApplicationRevisionByIdRes, _ error) {
+func (UnimplementedHandler) GetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (r GetApplicationRevisionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

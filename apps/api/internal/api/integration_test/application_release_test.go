@@ -46,7 +46,7 @@ func TestDeclaredApplication(t *testing.T) {
 	})
 
 	t.Run("the revision the release pins reads back by its id", func(t *testing.T) {
-		resp, err := f.client.GetApplicationRevisionById(t.Context(), api.GetApplicationRevisionByIdParams{ProjectID: api.ProjectID(f.project), RevisionID: v1.Pointers[0].RevisionID})
+		resp, err := f.client.GetApplicationRevision(t.Context(), api.GetApplicationRevisionParams{ProjectID: api.ProjectID(f.project), RevisionID: api.ApplicationRevisionID(v1.Pointers[0].RevisionID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ApplicationResponse{}, resp, helpers.MustMarshal(t, resp))
 		app := resp.(*api.ApplicationResponse)
@@ -54,10 +54,10 @@ func TestDeclaredApplication(t *testing.T) {
 		assert.True(t, app.Declared)
 		assert.Equal(t, "${{ SHOP_WEB_SECRET }}", app.Definition.Clients[0].Secret.Value)
 
-		missing, err := f.client.GetApplicationRevisionById(t.Context(), api.GetApplicationRevisionByIdParams{ProjectID: api.ProjectID(f.project), RevisionID: "apprev_unknown"})
+		missing, err := f.client.GetApplicationRevision(t.Context(), api.GetApplicationRevisionParams{ProjectID: api.ProjectID(f.project), RevisionID: "apprev_unknown"})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetApplicationRevisionByIdNotFound{}, missing, helpers.MustMarshal(t, missing))
-		assert.Equal(t, api.ErrorCode(domain.ErrApplicationNotFound().Code), missing.(*api.GetApplicationRevisionByIdNotFound).Code)
+		require.IsType(t, &api.GetApplicationRevisionNotFound{}, missing, helpers.MustMarshal(t, missing))
+		assert.Equal(t, api.ErrorCode(domain.ErrApplicationNotFound().Code), missing.(*api.GetApplicationRevisionNotFound).Code)
 	})
 
 	t.Run("the same files build the same release", func(t *testing.T) {

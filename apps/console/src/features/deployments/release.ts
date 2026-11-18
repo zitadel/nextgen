@@ -111,13 +111,13 @@ export async function resolvePointer(
         return { ...base, name: handleName(pointer), document: body.definition };
       }
       case "application": {
-        const body = await api.getApplicationRevisionById(pointer.revision_id, {
+        const body = await api.getApplicationRevision(pointer.revision_id, {
           project_id: projectId,
         });
         return { ...base, name: body.definition.name, document: body.definition };
       }
       case "oauth": {
-        const body = await api.getOAuthSettingsById(pointer.revision_id);
+        const body = await api.getOAuthSettings(pointer.revision_id);
         return { ...base, name: handleName(pointer), document: body.oauth };
       }
       case "policy": {

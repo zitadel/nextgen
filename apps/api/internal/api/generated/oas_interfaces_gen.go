@@ -197,8 +197,8 @@ type GetApplicationRes interface {
 	getApplicationRes()
 }
 
-type GetApplicationRevisionByIdRes interface {
-	getApplicationRevisionByIdRes()
+type GetApplicationRevisionRes interface {
+	getApplicationRevisionRes()
 }
 
 type GetAuthAttemptRes interface {

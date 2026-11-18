@@ -7328,7 +7328,7 @@
     },
     "/applications/revisions/{revision_id}": {
       "get": {
-        "operationId": "getApplicationRevisionById",
+        "operationId": "getApplicationRevision",
         "summary": "Get a revision of an application",
         "description": "Returns one revision of an application that authenticates its users via\nZitadel, by its `revision_id`, the value a release pins. A declared\napplication is served at the revision its deployment's release pins, so\nthis is how to read what a release serves. It never returns a client\nsecret.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [
@@ -7426,7 +7426,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getApplicationRevisionById-error-response"
+            "$ref": "#/components/responses/getApplicationRevision-error-response"
           }
         }
       }
@@ -20602,6 +20602,13 @@
             }
           }
         ]
+      },
+      "application-revision-id": {
+        "type": "string",
+        "description": "The identifier of one immutable revision of an application.",
+        "pattern": "^apprev_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be an application revision ID: apprev_ followed by letters, digits, _ or -",
+        "example": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN"
       },
       "policy-operation": {
         "title": "PolicyOperation",
@@ -34413,7 +34420,7 @@
           }
         }
       },
-      "getApplicationRevisionById-error-response": {
+      "getApplicationRevision-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -37660,11 +37667,10 @@
         "name": "revision_id",
         "in": "path",
         "required": true,
-        "description": "The revision ID: the `revision_id` that `createApplication` (`POST /applications`)\nor `getApplicationById` returns, or that a release pins.\n",
+        "description": "The revision ID: the `revision_id` that `publishApplication` (`POST /applications`)\nor `getApplication` returns, or that a release pins.\n",
         "schema": {
-          "type": "string"
-        },
-        "example": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN"
+          "$ref": "#/components/schemas/application-revision-id"
+        }
       },
       "policy-id": {
         "name": "policy_id",

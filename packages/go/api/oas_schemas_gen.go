@@ -2295,8 +2295,10 @@ func (s *ApplicationResponse) SetDefinition(val Application) {
 	s.Definition = val
 }
 
-func (*ApplicationResponse) getApplicationRes()             {}
-func (*ApplicationResponse) getApplicationRevisionByIdRes() {}
+func (*ApplicationResponse) getApplicationRes()         {}
+func (*ApplicationResponse) getApplicationRevisionRes() {}
+
+type ApplicationRevisionID string
 
 // Merged schema.
 // Ref: #
@@ -35768,10 +35770,10 @@ type GetApplicationNotFound ErrorDetails
 
 func (*GetApplicationNotFound) getApplicationRes() {}
 
-// GetApplicationRevisionByIdErrorResponse represents sum type.
-type GetApplicationRevisionByIdErrorResponse struct {
+// GetApplicationRevisionErrorResponse represents sum type.
+type GetApplicationRevisionErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
-	Type                GetApplicationRevisionByIdErrorResponseType
+	Type                GetApplicationRevisionErrorResponseType
 	AppNotFound         AppNotFound
 	AppPermissionDenied AppPermissionDenied
 	AuthUnauthorized    AuthUnauthorized
@@ -35781,241 +35783,241 @@ type GetApplicationRevisionByIdErrorResponse struct {
 	Unavailable         Unavailable
 }
 
-// GetApplicationRevisionByIdErrorResponseType is oneOf type of GetApplicationRevisionByIdErrorResponse.
-type GetApplicationRevisionByIdErrorResponseType string
+// GetApplicationRevisionErrorResponseType is oneOf type of GetApplicationRevisionErrorResponse.
+type GetApplicationRevisionErrorResponseType string
 
-// Possible values for GetApplicationRevisionByIdErrorResponseType.
+// Possible values for GetApplicationRevisionErrorResponseType.
 const (
-	AppNotFoundGetApplicationRevisionByIdErrorResponse         GetApplicationRevisionByIdErrorResponseType = "app.not_found"
-	AppPermissionDeniedGetApplicationRevisionByIdErrorResponse GetApplicationRevisionByIdErrorResponseType = "app.permission_denied"
-	AuthUnauthorizedGetApplicationRevisionByIdErrorResponse    GetApplicationRevisionByIdErrorResponseType = "auth.unauthorized"
-	InternalGetApplicationRevisionByIdErrorResponse            GetApplicationRevisionByIdErrorResponseType = "internal"
-	NotImplementedGetApplicationRevisionByIdErrorResponse      GetApplicationRevisionByIdErrorResponseType = "not_implemented"
-	ReqInvalidGetApplicationRevisionByIdErrorResponse          GetApplicationRevisionByIdErrorResponseType = "req.invalid"
-	UnavailableGetApplicationRevisionByIdErrorResponse         GetApplicationRevisionByIdErrorResponseType = "unavailable"
+	AppNotFoundGetApplicationRevisionErrorResponse         GetApplicationRevisionErrorResponseType = "app.not_found"
+	AppPermissionDeniedGetApplicationRevisionErrorResponse GetApplicationRevisionErrorResponseType = "app.permission_denied"
+	AuthUnauthorizedGetApplicationRevisionErrorResponse    GetApplicationRevisionErrorResponseType = "auth.unauthorized"
+	InternalGetApplicationRevisionErrorResponse            GetApplicationRevisionErrorResponseType = "internal"
+	NotImplementedGetApplicationRevisionErrorResponse      GetApplicationRevisionErrorResponseType = "not_implemented"
+	ReqInvalidGetApplicationRevisionErrorResponse          GetApplicationRevisionErrorResponseType = "req.invalid"
+	UnavailableGetApplicationRevisionErrorResponse         GetApplicationRevisionErrorResponseType = "unavailable"
 )
 
-// IsAppNotFound reports whether GetApplicationRevisionByIdErrorResponse is AppNotFound.
-func (s GetApplicationRevisionByIdErrorResponse) IsAppNotFound() bool {
-	return s.Type == AppNotFoundGetApplicationRevisionByIdErrorResponse
+// IsAppNotFound reports whether GetApplicationRevisionErrorResponse is AppNotFound.
+func (s GetApplicationRevisionErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundGetApplicationRevisionErrorResponse
 }
 
-// IsAppPermissionDenied reports whether GetApplicationRevisionByIdErrorResponse is AppPermissionDenied.
-func (s GetApplicationRevisionByIdErrorResponse) IsAppPermissionDenied() bool {
-	return s.Type == AppPermissionDeniedGetApplicationRevisionByIdErrorResponse
+// IsAppPermissionDenied reports whether GetApplicationRevisionErrorResponse is AppPermissionDenied.
+func (s GetApplicationRevisionErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedGetApplicationRevisionErrorResponse
 }
 
-// IsAuthUnauthorized reports whether GetApplicationRevisionByIdErrorResponse is AuthUnauthorized.
-func (s GetApplicationRevisionByIdErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedGetApplicationRevisionByIdErrorResponse
+// IsAuthUnauthorized reports whether GetApplicationRevisionErrorResponse is AuthUnauthorized.
+func (s GetApplicationRevisionErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetApplicationRevisionErrorResponse
 }
 
-// IsInternal reports whether GetApplicationRevisionByIdErrorResponse is Internal.
-func (s GetApplicationRevisionByIdErrorResponse) IsInternal() bool {
-	return s.Type == InternalGetApplicationRevisionByIdErrorResponse
+// IsInternal reports whether GetApplicationRevisionErrorResponse is Internal.
+func (s GetApplicationRevisionErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetApplicationRevisionErrorResponse
 }
 
-// IsNotImplemented reports whether GetApplicationRevisionByIdErrorResponse is NotImplemented.
-func (s GetApplicationRevisionByIdErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedGetApplicationRevisionByIdErrorResponse
+// IsNotImplemented reports whether GetApplicationRevisionErrorResponse is NotImplemented.
+func (s GetApplicationRevisionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetApplicationRevisionErrorResponse
 }
 
-// IsReqInvalid reports whether GetApplicationRevisionByIdErrorResponse is ReqInvalid.
-func (s GetApplicationRevisionByIdErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidGetApplicationRevisionByIdErrorResponse
+// IsReqInvalid reports whether GetApplicationRevisionErrorResponse is ReqInvalid.
+func (s GetApplicationRevisionErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetApplicationRevisionErrorResponse
 }
 
-// IsUnavailable reports whether GetApplicationRevisionByIdErrorResponse is Unavailable.
-func (s GetApplicationRevisionByIdErrorResponse) IsUnavailable() bool {
-	return s.Type == UnavailableGetApplicationRevisionByIdErrorResponse
+// IsUnavailable reports whether GetApplicationRevisionErrorResponse is Unavailable.
+func (s GetApplicationRevisionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetApplicationRevisionErrorResponse
 }
 
-// SetAppNotFound sets GetApplicationRevisionByIdErrorResponse to AppNotFound.
-func (s *GetApplicationRevisionByIdErrorResponse) SetAppNotFound(v AppNotFound) {
-	s.Type = AppNotFoundGetApplicationRevisionByIdErrorResponse
+// SetAppNotFound sets GetApplicationRevisionErrorResponse to AppNotFound.
+func (s *GetApplicationRevisionErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundGetApplicationRevisionErrorResponse
 	s.AppNotFound = v
 }
 
-// GetAppNotFound returns AppNotFound and true boolean if GetApplicationRevisionByIdErrorResponse is AppNotFound.
-func (s GetApplicationRevisionByIdErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+// GetAppNotFound returns AppNotFound and true boolean if GetApplicationRevisionErrorResponse is AppNotFound.
+func (s GetApplicationRevisionErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
 	if !s.IsAppNotFound() {
 		return v, false
 	}
 	return s.AppNotFound, true
 }
 
-// NewAppNotFoundGetApplicationRevisionByIdErrorResponse returns new GetApplicationRevisionByIdErrorResponse from AppNotFound.
-func NewAppNotFoundGetApplicationRevisionByIdErrorResponse(v AppNotFound) GetApplicationRevisionByIdErrorResponse {
-	var s GetApplicationRevisionByIdErrorResponse
+// NewAppNotFoundGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from AppNotFound.
+func NewAppNotFoundGetApplicationRevisionErrorResponse(v AppNotFound) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
 	s.SetAppNotFound(v)
 	return s
 }
 
-// SetAppPermissionDenied sets GetApplicationRevisionByIdErrorResponse to AppPermissionDenied.
-func (s *GetApplicationRevisionByIdErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
-	s.Type = AppPermissionDeniedGetApplicationRevisionByIdErrorResponse
+// SetAppPermissionDenied sets GetApplicationRevisionErrorResponse to AppPermissionDenied.
+func (s *GetApplicationRevisionErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedGetApplicationRevisionErrorResponse
 	s.AppPermissionDenied = v
 }
 
-// GetAppPermissionDenied returns AppPermissionDenied and true boolean if GetApplicationRevisionByIdErrorResponse is AppPermissionDenied.
-func (s GetApplicationRevisionByIdErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if GetApplicationRevisionErrorResponse is AppPermissionDenied.
+func (s GetApplicationRevisionErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
 	if !s.IsAppPermissionDenied() {
 		return v, false
 	}
 	return s.AppPermissionDenied, true
 }
 
-// NewAppPermissionDeniedGetApplicationRevisionByIdErrorResponse returns new GetApplicationRevisionByIdErrorResponse from AppPermissionDenied.
-func NewAppPermissionDeniedGetApplicationRevisionByIdErrorResponse(v AppPermissionDenied) GetApplicationRevisionByIdErrorResponse {
-	var s GetApplicationRevisionByIdErrorResponse
+// NewAppPermissionDeniedGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedGetApplicationRevisionErrorResponse(v AppPermissionDenied) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
 	s.SetAppPermissionDenied(v)
 	return s
 }
 
-// SetAuthUnauthorized sets GetApplicationRevisionByIdErrorResponse to AuthUnauthorized.
-func (s *GetApplicationRevisionByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedGetApplicationRevisionByIdErrorResponse
+// SetAuthUnauthorized sets GetApplicationRevisionErrorResponse to AuthUnauthorized.
+func (s *GetApplicationRevisionErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetApplicationRevisionErrorResponse
 	s.AuthUnauthorized = v
 }
 
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetApplicationRevisionByIdErrorResponse is AuthUnauthorized.
-func (s GetApplicationRevisionByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetApplicationRevisionErrorResponse is AuthUnauthorized.
+func (s GetApplicationRevisionErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
 	if !s.IsAuthUnauthorized() {
 		return v, false
 	}
 	return s.AuthUnauthorized, true
 }
 
-// NewAuthUnauthorizedGetApplicationRevisionByIdErrorResponse returns new GetApplicationRevisionByIdErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedGetApplicationRevisionByIdErrorResponse(v AuthUnauthorized) GetApplicationRevisionByIdErrorResponse {
-	var s GetApplicationRevisionByIdErrorResponse
+// NewAuthUnauthorizedGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetApplicationRevisionErrorResponse(v AuthUnauthorized) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
 	s.SetAuthUnauthorized(v)
 	return s
 }
 
-// SetInternal sets GetApplicationRevisionByIdErrorResponse to Internal.
-func (s *GetApplicationRevisionByIdErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalGetApplicationRevisionByIdErrorResponse
+// SetInternal sets GetApplicationRevisionErrorResponse to Internal.
+func (s *GetApplicationRevisionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetApplicationRevisionErrorResponse
 	s.Internal = v
 }
 
-// GetInternal returns Internal and true boolean if GetApplicationRevisionByIdErrorResponse is Internal.
-func (s GetApplicationRevisionByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+// GetInternal returns Internal and true boolean if GetApplicationRevisionErrorResponse is Internal.
+func (s GetApplicationRevisionErrorResponse) GetInternal() (v Internal, ok bool) {
 	if !s.IsInternal() {
 		return v, false
 	}
 	return s.Internal, true
 }
 
-// NewInternalGetApplicationRevisionByIdErrorResponse returns new GetApplicationRevisionByIdErrorResponse from Internal.
-func NewInternalGetApplicationRevisionByIdErrorResponse(v Internal) GetApplicationRevisionByIdErrorResponse {
-	var s GetApplicationRevisionByIdErrorResponse
+// NewInternalGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from Internal.
+func NewInternalGetApplicationRevisionErrorResponse(v Internal) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
 	s.SetInternal(v)
 	return s
 }
 
-// SetNotImplemented sets GetApplicationRevisionByIdErrorResponse to NotImplemented.
-func (s *GetApplicationRevisionByIdErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedGetApplicationRevisionByIdErrorResponse
+// SetNotImplemented sets GetApplicationRevisionErrorResponse to NotImplemented.
+func (s *GetApplicationRevisionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetApplicationRevisionErrorResponse
 	s.NotImplemented = v
 }
 
-// GetNotImplemented returns NotImplemented and true boolean if GetApplicationRevisionByIdErrorResponse is NotImplemented.
-func (s GetApplicationRevisionByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+// GetNotImplemented returns NotImplemented and true boolean if GetApplicationRevisionErrorResponse is NotImplemented.
+func (s GetApplicationRevisionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
 	if !s.IsNotImplemented() {
 		return v, false
 	}
 	return s.NotImplemented, true
 }
 
-// NewNotImplementedGetApplicationRevisionByIdErrorResponse returns new GetApplicationRevisionByIdErrorResponse from NotImplemented.
-func NewNotImplementedGetApplicationRevisionByIdErrorResponse(v NotImplemented) GetApplicationRevisionByIdErrorResponse {
-	var s GetApplicationRevisionByIdErrorResponse
+// NewNotImplementedGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from NotImplemented.
+func NewNotImplementedGetApplicationRevisionErrorResponse(v NotImplemented) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
 	s.SetNotImplemented(v)
 	return s
 }
 
-// SetReqInvalid sets GetApplicationRevisionByIdErrorResponse to ReqInvalid.
-func (s *GetApplicationRevisionByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidGetApplicationRevisionByIdErrorResponse
+// SetReqInvalid sets GetApplicationRevisionErrorResponse to ReqInvalid.
+func (s *GetApplicationRevisionErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetApplicationRevisionErrorResponse
 	s.ReqInvalid = v
 }
 
-// GetReqInvalid returns ReqInvalid and true boolean if GetApplicationRevisionByIdErrorResponse is ReqInvalid.
-func (s GetApplicationRevisionByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+// GetReqInvalid returns ReqInvalid and true boolean if GetApplicationRevisionErrorResponse is ReqInvalid.
+func (s GetApplicationRevisionErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 	if !s.IsReqInvalid() {
 		return v, false
 	}
 	return s.ReqInvalid, true
 }
 
-// NewReqInvalidGetApplicationRevisionByIdErrorResponse returns new GetApplicationRevisionByIdErrorResponse from ReqInvalid.
-func NewReqInvalidGetApplicationRevisionByIdErrorResponse(v ReqInvalid) GetApplicationRevisionByIdErrorResponse {
-	var s GetApplicationRevisionByIdErrorResponse
+// NewReqInvalidGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from ReqInvalid.
+func NewReqInvalidGetApplicationRevisionErrorResponse(v ReqInvalid) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
 	s.SetReqInvalid(v)
 	return s
 }
 
-// SetUnavailable sets GetApplicationRevisionByIdErrorResponse to Unavailable.
-func (s *GetApplicationRevisionByIdErrorResponse) SetUnavailable(v Unavailable) {
-	s.Type = UnavailableGetApplicationRevisionByIdErrorResponse
+// SetUnavailable sets GetApplicationRevisionErrorResponse to Unavailable.
+func (s *GetApplicationRevisionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetApplicationRevisionErrorResponse
 	s.Unavailable = v
 }
 
-// GetUnavailable returns Unavailable and true boolean if GetApplicationRevisionByIdErrorResponse is Unavailable.
-func (s GetApplicationRevisionByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+// GetUnavailable returns Unavailable and true boolean if GetApplicationRevisionErrorResponse is Unavailable.
+func (s GetApplicationRevisionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
 	if !s.IsUnavailable() {
 		return v, false
 	}
 	return s.Unavailable, true
 }
 
-// NewUnavailableGetApplicationRevisionByIdErrorResponse returns new GetApplicationRevisionByIdErrorResponse from Unavailable.
-func NewUnavailableGetApplicationRevisionByIdErrorResponse(v Unavailable) GetApplicationRevisionByIdErrorResponse {
-	var s GetApplicationRevisionByIdErrorResponse
+// NewUnavailableGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from Unavailable.
+func NewUnavailableGetApplicationRevisionErrorResponse(v Unavailable) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
 	s.SetUnavailable(v)
 	return s
 }
 
-// GetApplicationRevisionByIdErrorResponseStatusCode wraps GetApplicationRevisionByIdErrorResponse with StatusCode.
-type GetApplicationRevisionByIdErrorResponseStatusCode struct {
+// GetApplicationRevisionErrorResponseStatusCode wraps GetApplicationRevisionErrorResponse with StatusCode.
+type GetApplicationRevisionErrorResponseStatusCode struct {
 	StatusCode int
-	Response   GetApplicationRevisionByIdErrorResponse
+	Response   GetApplicationRevisionErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
-func (s *GetApplicationRevisionByIdErrorResponseStatusCode) GetStatusCode() int {
+func (s *GetApplicationRevisionErrorResponseStatusCode) GetStatusCode() int {
 	return s.StatusCode
 }
 
 // GetResponse returns the value of Response.
-func (s *GetApplicationRevisionByIdErrorResponseStatusCode) GetResponse() GetApplicationRevisionByIdErrorResponse {
+func (s *GetApplicationRevisionErrorResponseStatusCode) GetResponse() GetApplicationRevisionErrorResponse {
 	return s.Response
 }
 
 // SetStatusCode sets the value of StatusCode.
-func (s *GetApplicationRevisionByIdErrorResponseStatusCode) SetStatusCode(val int) {
+func (s *GetApplicationRevisionErrorResponseStatusCode) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
 // SetResponse sets the value of Response.
-func (s *GetApplicationRevisionByIdErrorResponseStatusCode) SetResponse(val GetApplicationRevisionByIdErrorResponse) {
+func (s *GetApplicationRevisionErrorResponseStatusCode) SetResponse(val GetApplicationRevisionErrorResponse) {
 	s.Response = val
 }
 
-func (*GetApplicationRevisionByIdErrorResponseStatusCode) getApplicationRevisionByIdRes() {}
+func (*GetApplicationRevisionErrorResponseStatusCode) getApplicationRevisionRes() {}
 
-type GetApplicationRevisionByIdForbidden ErrorDetails
+type GetApplicationRevisionForbidden ErrorDetails
 
-func (*GetApplicationRevisionByIdForbidden) getApplicationRevisionByIdRes() {}
+func (*GetApplicationRevisionForbidden) getApplicationRevisionRes() {}
 
-type GetApplicationRevisionByIdNotFound ErrorDetails
+type GetApplicationRevisionNotFound ErrorDetails
 
-func (*GetApplicationRevisionByIdNotFound) getApplicationRevisionByIdRes() {}
+func (*GetApplicationRevisionNotFound) getApplicationRevisionRes() {}
 
-type GetApplicationRevisionByIdUnauthorized ErrorDetails
+type GetApplicationRevisionUnauthorized ErrorDetails
 
-func (*GetApplicationRevisionByIdUnauthorized) getApplicationRevisionByIdRes() {}
+func (*GetApplicationRevisionUnauthorized) getApplicationRevisionRes() {}
 
 type GetApplicationUnauthorized ErrorDetails
 

@@ -579,7 +579,7 @@ type Handler interface {
 	//
 	// GET /applications/{application_id}
 	GetApplication(ctx context.Context, params GetApplicationParams) (GetApplicationRes, error)
-	// GetApplicationRevisionById implements getApplicationRevisionById operation.
+	// GetApplicationRevision implements getApplicationRevision operation.
 	//
 	// Returns one revision of an application that authenticates its users via Zitadel, by its
 	// `revision_id`, the value a release pins. A declared application is served at the revision its
@@ -589,7 +589,7 @@ type Handler interface {
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /applications/revisions/{revision_id}
-	GetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (GetApplicationRevisionByIdRes, error)
+	GetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (GetApplicationRevisionRes, error)
 	// GetAuthAttempt implements getAuthAttempt operation.
 	//
 	// Returns the current state of an authentication attempt, one sign-in round.

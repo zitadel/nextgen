@@ -190,7 +190,7 @@ var gateRows = []gateRow{
 	// An application revision is gated on its application, an unknown one on
 	// its own id as the target (#2112).
 	{
-		op: "GetApplicationRevisionById", variant: "revision found", cookie: true, relation: viewer, target: onResource,
+		op: "GetApplicationRevision", variant: "revision found", cookie: true, relation: viewer, target: onResource,
 		idField: "RevisionID", kind: domain.ResourceKindApplication, rsiID: "app_of_revision",
 		denied: applicationCodes.denied, miss: applicationCodes.readMiss,
 		setup: func(_ *testing.T, f *gateFixture, c gateCall) {
@@ -198,7 +198,7 @@ var gateRows = []gateRow{
 		},
 	},
 	{
-		op: "GetApplicationRevisionById", variant: "revision unknown", cookie: true, relation: viewer, target: onTarget,
+		op: "GetApplicationRevision", variant: "revision unknown", cookie: true, relation: viewer, target: onTarget,
 		idField: "RevisionID", denied: applicationCodes.denied, miss: applicationCodes.readMiss,
 		setup: func(_ *testing.T, f *gateFixture, c gateCall) {
 			f.applications.EXPECT().GetRevision(gomock.Any(), c.project, c.id).Return(nil, domain.ErrApplicationNotFound())

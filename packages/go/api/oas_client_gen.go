@@ -600,7 +600,7 @@ type Invoker interface {
 	//
 	// GET /applications/{application_id}
 	GetApplication(ctx context.Context, params GetApplicationParams) (GetApplicationRes, error)
-	// GetApplicationRevisionById invokes getApplicationRevisionById operation.
+	// GetApplicationRevision invokes getApplicationRevision operation.
 	//
 	// Returns one revision of an application that authenticates its users via Zitadel, by its
 	// `revision_id`, the value a release pins. A declared application is served at the revision its
@@ -610,7 +610,7 @@ type Invoker interface {
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /applications/revisions/{revision_id}
-	GetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (GetApplicationRevisionByIdRes, error)
+	GetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (GetApplicationRevisionRes, error)
 	// GetAuthAttempt invokes getAuthAttempt operation.
 	//
 	// Returns the current state of an authentication attempt, one sign-in round.
@@ -6244,7 +6244,7 @@ func (c *Client) sendGetApplication(ctx context.Context, params GetApplicationPa
 	return result, nil
 }
 
-// GetApplicationRevisionById invokes getApplicationRevisionById operation.
+// GetApplicationRevision invokes getApplicationRevision operation.
 //
 // Returns one revision of an application that authenticates its users via Zitadel, by its
 // `revision_id`, the value a release pins. A declared application is served at the revision its
@@ -6254,14 +6254,14 @@ func (c *Client) sendGetApplication(ctx context.Context, params GetApplicationPa
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /applications/revisions/{revision_id}
-func (c *Client) GetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (GetApplicationRevisionByIdRes, error) {
-	res, err := c.sendGetApplicationRevisionById(ctx, params)
+func (c *Client) GetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (GetApplicationRevisionRes, error) {
+	res, err := c.sendGetApplicationRevision(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (res GetApplicationRevisionByIdRes, err error) {
+func (c *Client) sendGetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (res GetApplicationRevisionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getApplicationRevisionById"),
+		otelogen.OperationID("getApplicationRevision"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.URLTemplateKey.String("/applications/revisions/{revision_id}"),
 	}
@@ -6279,7 +6279,7 @@ func (c *Client) sendGetApplicationRevisionById(ctx context.Context, params GetA
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetApplicationRevisionByIdOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, GetApplicationRevisionOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -6306,7 +6306,10 @@ func (c *Client) sendGetApplicationRevisionById(ctx context.Context, params GetA
 			Explode: false,
 		})
 		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.RevisionID))
+			if unwrapped := string(params.RevisionID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
 		}(); err != nil {
 			return res, errors.Wrap(err, "encode path")
 		}
@@ -6350,7 +6353,7 @@ func (c *Client) sendGetApplicationRevisionById(ctx context.Context, params GetA
 		var satisfied bitset
 		{
 			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetApplicationRevisionByIdOperation, r); {
+			switch err := c.securityOAuth2(ctx, GetApplicationRevisionOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -6361,7 +6364,7 @@ func (c *Client) sendGetApplicationRevisionById(ctx context.Context, params GetA
 		}
 		{
 			stage = "Security:SessionCookie"
-			switch err := c.securitySessionCookie(ctx, GetApplicationRevisionByIdOperation, r); {
+			switch err := c.securitySessionCookie(ctx, GetApplicationRevisionOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -6405,7 +6408,7 @@ func (c *Client) sendGetApplicationRevisionById(ctx context.Context, params GetA
 	}()
 
 	stage = "DecodeResponse"
-	result, err := decodeGetApplicationRevisionByIdResponse(resp)
+	result, err := decodeGetApplicationRevisionResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

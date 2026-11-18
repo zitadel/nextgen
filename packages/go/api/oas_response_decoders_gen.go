@@ -5559,7 +5559,7 @@ func decodeGetApplicationResponse(resp *http.Response) (res GetApplicationRes, _
 	return res, nil
 }
 
-func decodeGetApplicationRevisionByIdResponse(resp *http.Response) (res GetApplicationRevisionByIdRes, _ error) {
+func decodeGetApplicationRevisionResponse(resp *http.Response) (res GetApplicationRevisionRes, _ error) {
 	switch resp.StatusCode {
 	case 200:
 		// Code 200.
@@ -5619,7 +5619,7 @@ func decodeGetApplicationRevisionByIdResponse(resp *http.Response) (res GetAppli
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetApplicationRevisionByIdUnauthorized
+			var response GetApplicationRevisionUnauthorized
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5654,7 +5654,7 @@ func decodeGetApplicationRevisionByIdResponse(resp *http.Response) (res GetAppli
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetApplicationRevisionByIdForbidden
+			var response GetApplicationRevisionForbidden
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5689,7 +5689,7 @@ func decodeGetApplicationRevisionByIdResponse(resp *http.Response) (res GetAppli
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetApplicationRevisionByIdNotFound
+			var response GetApplicationRevisionNotFound
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5712,7 +5712,7 @@ func decodeGetApplicationRevisionByIdResponse(resp *http.Response) (res GetAppli
 		}
 	}
 	// Default response.
-	res, err := func() (res GetApplicationRevisionByIdRes, err error) {
+	res, err := func() (res GetApplicationRevisionRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -5725,7 +5725,7 @@ func decodeGetApplicationRevisionByIdResponse(resp *http.Response) (res GetAppli
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetApplicationRevisionByIdErrorResponse
+			var response GetApplicationRevisionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5742,7 +5742,7 @@ func decodeGetApplicationRevisionByIdResponse(resp *http.Response) (res GetAppli
 				}
 				return res, err
 			}
-			return &GetApplicationRevisionByIdErrorResponseStatusCode{
+			return &GetApplicationRevisionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
