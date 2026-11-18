@@ -112,7 +112,9 @@ type Checking = Readonly<{
 /**
  * `zitadel doctor` — verify local runtime and project state.
  */
-export default class Doctor extends Telemetered(Destructive(LocalServerCommand(ServerCommand(BaseCommand)))) {
+export default class Doctor extends Telemetered(
+  Destructive(LocalServerCommand(ServerCommand(BaseCommand))),
+) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.gettingStarted;
   static override readonly headline = "failed_checks";

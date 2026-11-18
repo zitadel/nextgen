@@ -118,11 +118,10 @@ export const diffStep: Step = {
     // a diff against the newest says nothing about the others.
     const learned = learnedFrom(touched, releases.size, referenced);
     if (ctx.json) {
-      const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
-      if (files === null) {
+      if (touched === null) {
         return { ...noDiff(ctx, sha, unknown), learned };
       }
-      const diff: ConfigDiff = { against: sha, files, note };
+      const diff: ConfigDiff = { against: sha, files: touched, note };
       return { data: { diff }, learned };
     }
 

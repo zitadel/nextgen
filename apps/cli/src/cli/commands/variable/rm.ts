@@ -18,7 +18,9 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
  * `--preview` removes the preview value and leaves the primary one standing;
  * without it the variable is removed for both kinds.
  */
-export default class VariableRm extends Telemetered(Destructive(ServerCommand(EnvironmentCommand))) {
+export default class VariableRm extends Telemetered(
+  Destructive(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

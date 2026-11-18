@@ -20,7 +20,9 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
  * `--preview` it reads the primary value; with it, the preview value. A name with
  * no value of the kind asked for is a miss.
  */
-export default class VariableGet extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
+export default class VariableGet extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

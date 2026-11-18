@@ -9,7 +9,7 @@ This is the list of questions the CLI's events answer, and how to build each one
 - **A person.** One install is one person: `distinct_id` is the install's random id. The same human on two machines is two installs. Joining the CLI to the console needs the shared identity of #2125.
 - **People or agents.** `is_agent` says the CLI ran inside a coding agent and `host_agent` says which one (`claude_code`, `cursor`, `codex`, `vscode`, `unknown`). It says where the CLI ran, not who typed the command.
 - **Installed.** There is no install event. An install is its first `cli_command_started`. The Users tab counts them too, one card per install.
-- **Up and running.** A successful `deploy`: `cli_command_completed` with `command = deploy`. A failed deploy is `cli_command_failed`, so it never counts.
+- **Up and running.** A successful `deploy`: `cli_command_completed` with `command = deploy`, `dry_run = false` and `status = ok`. A dry run and a deploy the person declined (`status = skipped`) also send `cli_command_completed`, so every deploy step below carries those two filters. A failed deploy is `cli_command_failed`, so it never counts.
 
 ## Splits every report supports
 
@@ -32,11 +32,11 @@ All funnels count unique users, use a 30-day window, and read the median time to
 
 | # | Name | Steps | Split by | Answers |
 | --- | --- | --- | --- | --- |
-| F1 | Adoption: installed to deployed | any `cli_command_started` → `flow_started` (`flow = onboarding`) → `flow_completed` (`flow = onboarding`) → `cli_command_completed` (`command = deploy`) | `is_agent`, `framework`, `server_type` | How many installs got to a working, deployed app, and how long it took |
+| F1 | Adoption: installed to deployed | any `cli_command_started` → `flow_started` (`flow = onboarding`) → `flow_completed` (`flow = onboarding`) → `cli_command_completed` (`command = deploy`, `dry_run = false`, `status = ok`) | `is_agent`, `framework`, `server_type` | How many installs got to a working, deployed app, and how long it took |
 | F2 | Setup journey drop-off | `flow_started` → `step_completed` (`step = framework_selection`) → `step_completed` (`step = preset_selection`) → `flow_completed` (`flow = onboarding`) | `framework` | Where people give up during setup |
-| F3 | Authentication set up and deployed | `flow_completed` (`flow = onboarding`) → `cli_command_completed` (`command = deploy`) | `preset` | Of those who set up sign-in, how many deployed, by password-first or passkey-first |
+| F3 | Authentication set up and deployed | `flow_completed` (`flow = onboarding`) → `cli_command_completed` (`command = deploy`, `dry_run = false`, `status = ok`) | `preset` | Of those who set up sign-in, how many deployed, by password-first or passkey-first |
 | F4 | Identity provider setup | `flow_started` (`flow = oidc_provider_setup`) → `flow_completed` (`flow = oidc_provider_setup`) | `provider_type` | How many finish adding an OpenID Connect provider, and which kind |
-| F5 | Deploy reliability | `cli_command_started` (`command = deploy`) → `cli_command_completed` (`command = deploy`) | `server_kind` | How many deploys succeed |
+| F5 | Deploy reliability | `cli_command_started` (`command = deploy`, `dry_run = false`) → `cli_command_completed` (`command = deploy`, `dry_run = false`, `status = ok`) | `server_kind` | How many deploys succeed |
 
 ## Charts
 

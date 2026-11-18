@@ -22,9 +22,9 @@ type ResetTarget =
  * A folder with no server is not refused: there is nothing to reset, and the
  * result says so.
  */
-export default class Reset extends Telemetered(Destructive(
-  LocalServerCommand(ServerCommand(BaseCommand), "exact"),
-)) {
+export default class Reset extends Telemetered(
+  Destructive(LocalServerCommand(ServerCommand(BaseCommand), "exact")),
+) {
   static override group = CommandGroups.localServer;
   static override description = "Delete the local Zitadel server runtime and data.";
   static override groupOrder = 6;

@@ -14,7 +14,9 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
  * started it. Stopping a folder with no server is not an error: there is
  * nothing to stop, and the result says so.
  */
-export default class Stop extends Telemetered(LocalServerCommand(ServerCommand(BaseCommand), "exact")) {
+export default class Stop extends Telemetered(
+  LocalServerCommand(ServerCommand(BaseCommand), "exact"),
+) {
   static override group = CommandGroups.localServer;
   static override description = "Stop the local Zitadel server.";
   static override groupOrder = 2;

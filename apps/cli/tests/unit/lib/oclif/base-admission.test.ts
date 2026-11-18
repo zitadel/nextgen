@@ -33,7 +33,7 @@ class Admission extends BaseCommand {
 }
 
 function command(argv: string[]): Admission {
-  return new Admission(["--no-telemetry", ...argv], config);
+  return new Admission(argv, config);
 }
 
 describe("the lifecycle every command shares", () => {

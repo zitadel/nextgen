@@ -123,10 +123,6 @@ properties:
   step:
     type: string
     values:
-      - framework_resolved
-      - project_created
-      - files_patched
-      - dependencies_installed
       - initial_checks
       - framework_selection
       - server_selection
@@ -135,11 +131,11 @@ properties:
       - preset_selection
       - provider_selection
       - application_setup
-    description: >-
-      A journey's step. Today `setup` records the furthest stage it reached
-      (framework_resolved to dependencies_installed); #2200 plans the
-      onboarding flow's steps (initial_checks to application_setup). Settle one
-      meaning before #2200 ships.
+    description: A journey's step, on the events of a flow.
+  setup_stage:
+    type: string
+    values: [framework_resolved, project_created, files_patched, dependencies_installed]
+    description: The furthest stage `setup` reached, on its completed and failed events.
   action:
     type: string
     values: [create, update, delete, deactivate, enable, disable, test, deploy, redeploy, rollback]
@@ -592,7 +588,7 @@ components:
         - use_case
         - sso
         - password_policy
-        - step
+        - setup_stage
         - files_written_count
         - package_manager
       branding:eject: [design]
@@ -612,7 +608,7 @@ components:
     profile:
       trigger: >-
         An install's first run, then whenever what the profile says changes (a new
-        CLI or Node version, another host) and at most once a day, so its "Updated
+        CLI or Node version) and at most once a day, so its "Updated
         at" shows the install's last day of use. `first_cli_version` is written
         only the first time.
       destinations: [mixpanel]

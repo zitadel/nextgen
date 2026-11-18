@@ -49,7 +49,9 @@ const NOTHING_PENDING_REFUSAL = {
  * so its link can no longer be redeemed. Without an id it offers the pending
  * invitations to pick from.
  */
-export default class InvitationCancel extends Telemetered(Destructive(ServerCommand(EnvironmentCommand))) {
+export default class InvitationCancel extends Telemetered(
+  Destructive(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Cancel a pending invitation so its link stops working.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 8;

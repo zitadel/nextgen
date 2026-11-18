@@ -83,11 +83,7 @@ const FORCE_COLOR: FlagVariable = {
  * beside the code that reads it. The CLI reference lists them beside the
  * flags (`./reference.ts`).
  */
-export const FLAG_VARIABLES: readonly FlagVariable[] = [
-  SERVER,
-  NO_COLOR,
-  FORCE_COLOR,
-];
+export const FLAG_VARIABLES: readonly FlagVariable[] = [SERVER, NO_COLOR, FORCE_COLOR];
 
 /**
  * What a command knows about its run, by name: enums, booleans, counts or lists
@@ -297,7 +293,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
   private settled = false;
-
 
   /**
    * The one lifecycle every command shares: parse the flags, resolve the

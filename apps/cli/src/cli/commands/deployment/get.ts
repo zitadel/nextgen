@@ -35,7 +35,9 @@ const DEPLOYMENT_ID: Refused<string> = {
  * release it made live, the origins it went to, when, and the variables it
  * froze.
  */
-export default class DeploymentGet extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
+export default class DeploymentGet extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Read one deployment by id.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;

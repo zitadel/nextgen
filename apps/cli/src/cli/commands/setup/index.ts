@@ -52,12 +52,7 @@ import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
-import {
-  DEFAULT_RENDERER,
-  type Fact,
-  onboardingStep,
-  PORT,
-} from "./shared";
+import { DEFAULT_RENDERER, type Fact, onboardingStep, PORT } from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
 import { CheckPatch } from "./steps/check-patch";
 import { CheckPreconditions } from "./steps/check-preconditions";
@@ -475,7 +470,7 @@ export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCom
               use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
               sso: flags.sso ?? "none",
               password_policy: flags.passwordMinLength === null ? "empty" : "set",
-              step: "framework_resolved",
+              setup_stage: "framework_resolved",
             });
           },
         )
@@ -540,7 +535,7 @@ export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCom
             ui: this.ui,
           }),
           () => {
-            this.annotate({ step: "project_created" });
+            this.annotate({ setup_stage: "project_created" });
           },
         )
         .step(
@@ -569,7 +564,7 @@ export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCom
           }),
           ({ allFilesWritten, scaffolded }) => {
             this.annotate({
-              step: "files_patched",
+              setup_stage: "files_patched",
               files_written_count: allFilesWritten.length,
             });
             if (!this.dryRun) {
@@ -605,7 +600,7 @@ export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCom
           }),
           ({ installOutcome }) => {
             this.annotate({
-              step: "dependencies_installed",
+              setup_stage: "dependencies_installed",
               package_manager: installOutcome.install.package_manager,
             });
           },

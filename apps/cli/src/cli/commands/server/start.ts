@@ -131,7 +131,9 @@ const NOT_READY_REASONS = {
  * exists, and the port it actually got afterwards, so an agent that follows it
  * targets the server that was started.
  */
-export default class Start extends Telemetered(LocalServerCommand(ServerCommand(BaseCommand), "exact")) {
+export default class Start extends Telemetered(
+  LocalServerCommand(ServerCommand(BaseCommand), "exact"),
+) {
   static override group = CommandGroups.localServer;
   static override readonly headline = "runtime";
   static override description = "Start a local Zitadel server.";

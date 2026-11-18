@@ -52,9 +52,9 @@ const VALUE_TYPE_REFUSAL = {
  * the primary kind only, removing any preview value so a preview never keeps a
  * plaintext copy. `--preview` writes the preview kind alone.
  */
-export default class VariableSet extends Telemetered(Tabulatable(
-  Promptable(ServerCommand(EnvironmentCommand)),
-)) {
+export default class VariableSet extends Telemetered(
+  Tabulatable(Promptable(ServerCommand(EnvironmentCommand))),
+) {
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

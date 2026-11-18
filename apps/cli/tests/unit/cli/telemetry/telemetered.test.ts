@@ -22,9 +22,12 @@ type Sent = {
 /** Minimal recording stand-in for the generic Telemetry client. */
 class RecordingTelemetry {
   public readonly sent: Sent[] = [];
+  /** Events and the first-run notice, in the order they happened. */
+  public readonly order: string[] = [];
+  public shutdowns = 0;
   public readonly profiles: { set: Record<string, unknown>; once: Record<string, unknown> }[] = [];
   public enabled = true;
-  public readonly isFirstRun = false;
+  public isFirstRun = false;
   public readonly distinctId = "did-test";
 
   public track(
@@ -33,6 +36,7 @@ class RecordingTelemetry {
     only?: readonly string[],
   ): void {
     this.sent.push({ event, properties, only });
+    this.order.push(event);
   }
 
   public profile(
@@ -44,7 +48,7 @@ class RecordingTelemetry {
   }
 
   public async shutdown(): Promise<void> {
-    /* no pending sends in tests */
+    this.shutdowns += 1;
   }
 }
 
@@ -58,10 +62,33 @@ class TestCommand extends Telemetered(BaseCommand) {
   public readonly recorder = new RecordingTelemetry();
   public optOut = false;
   public learned: Facts = {};
+  /** Whether a person is at the terminal, answering what the run would. */
+  public interactive = false;
+  public watchdogs = 0;
 
-  protected override createTelemetry(_deps: TelemetryDeps): Telemetry {
-    this.recorder.enabled = !this.optOut;
+  protected override createTelemetry(deps: TelemetryDeps): Telemetry {
+    this.recorder.enabled = deps.flag !== false && !this.optOut;
     return this.recorder as unknown as Telemetry;
+  }
+
+  protected override get nonInteractive(): boolean {
+    return !this.interactive;
+  }
+
+  protected override get isTTY(): boolean {
+    return this.interactive;
+  }
+
+  public override logToStderr(): void {
+    this.recorder.order.push("notice");
+  }
+
+  protected override armExitWatchdog(): void {
+    this.watchdogs += 1;
+  }
+
+  public async wrapUp(): Promise<void> {
+    await this.finally(undefined);
   }
 
   protected override describe(): Facts {
@@ -190,6 +217,84 @@ describe("Telemetered lifecycle", () => {
     cmd.complete();
 
     expect(cmd.recorder.sent.map(({ only }) => only)).toEqual([undefined, undefined]);
+  });
+});
+
+describe("Telemetered first-run notice", () => {
+  it("shows the notice to a person at a terminal before the first event is sent", async () => {
+    const cmd = makeCommand();
+    cmd.recorder.isFirstRun = true;
+    cmd.interactive = true;
+    await cmd.open();
+
+    expect(cmd.recorder.order.slice(0, 2)).toEqual(["notice", "cli_command_started"]);
+  });
+
+  it("does not show it to a run that cannot ask", async () => {
+    const cmd = makeCommand();
+    cmd.recorder.isFirstRun = true;
+    await cmd.open();
+
+    expect(cmd.recorder.order).not.toContain("notice");
+  });
+
+  it("remembers that it was shown, so no later run shows it", async () => {
+    const cmd = makeCommand();
+    cmd.recorder.isFirstRun = true;
+    cmd.interactive = true;
+    await cmd.open();
+
+    expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: config.dir }).isFirstRun).toBe(false);
+  });
+
+  it("leaves it for a later run when the first run could not show it", async () => {
+    const cmd = makeCommand();
+    cmd.recorder.isFirstRun = true;
+    await cmd.open();
+
+    expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: config.dir }).isFirstRun).toBe(true);
+  });
+});
+
+describe("Telemetered run that fails early", () => {
+  it("reports a failure before the context was settled", async () => {
+    const cmd = makeCommand();
+    await cmd.failWith(new Error("boom"));
+
+    expect(names(cmd)).toEqual(["cli_command_started", "cli_command_failed"]);
+  });
+
+  it("sends nothing when --no-telemetry is on the command line", async () => {
+    const argv = process.argv;
+    process.argv = [...argv, "--no-telemetry"];
+    try {
+      const cmd = makeCommand();
+      await cmd.failWith(new Error("boom"));
+
+      expect(names(cmd)).toEqual([]);
+    } finally {
+      process.argv = argv;
+    }
+  });
+});
+
+describe("Telemetered end of run", () => {
+  it("flushes what is unsent and arms the exit watchdog", async () => {
+    const cmd = makeCommand();
+    await cmd.open();
+    cmd.complete();
+    await cmd.wrapUp();
+
+    expect([cmd.recorder.shutdowns, cmd.watchdogs]).toEqual([1, 1]);
+  });
+
+  it("arms no watchdog for a run that sent nothing", async () => {
+    const cmd = makeCommand();
+    cmd.optOut = true;
+    await cmd.open();
+    await cmd.wrapUp();
+
+    expect(cmd.watchdogs).toBe(0);
   });
 });
 

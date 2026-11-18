@@ -199,7 +199,10 @@ type Progress = {
  * @throws Whatever a step throws, which stops the steps after it.
  */
 export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepsOutcome> {
-  const start: Progress = { outcome: { data: {}, warnings: [], notices: [], lockouts: [], learned: {} }, ctx };
+  const start: Progress = {
+    outcome: { data: {}, warnings: [], notices: [], lockouts: [], learned: {} },
+    ctx,
+  };
   const done = await steps.reduce(async (previous: Promise<Progress>, step) => {
     const progress = await previous;
     if (!step.runsFor.includes(ctx.mode)) {

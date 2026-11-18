@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 /**
  * A stable, anonymous identifier for this install. It is a random UUID tied to
  * no account, email, or machine fingerprint — its only job is to let Mixpanel
- * group events from the same install into a funnel. `isFirstRun` is true the
- * one time we mint and persist the id, which drives the one-time consent notice.
+ * group events from the same install into a funnel. `isFirstRun` is true until
+ * the one-time consent notice has been shown on this install (see
+ * {@link markNoticed}), so a first run that cannot show it leaves it for the
+ * next run that can.
  */
 export type Identity = {
   readonly distinctId: string;
@@ -16,9 +18,22 @@ export type Identity = {
 
 type StoredIdentity = {
   distinctId: string;
+  /** Set once the first-run notice has been shown on this install. */
+  noticed?: true;
   /** When the install's profile was last written, and a hash of what was written. */
   profile?: { at: number; hash: string };
 };
+
+/**
+ * Writes the install's record whole or not at all: a run reading it while
+ * another writes never sees a half-written file, which would read as no
+ * identity and mint a second id.
+ */
+function writeStored(file: string, stored: StoredIdentity): void {
+  const temporary = `${file}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
+  renameSync(temporary, file);
+}
 
 /** How long a written profile stands before it is written again: a day. */
 const PROFILE_EVERY_MS = 24 * 60 * 60 * 1000;
@@ -67,7 +82,7 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
   try {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
     if (typeof parsed.distinctId === "string" && parsed.distinctId.length > 0) {
-      return { distinctId: parsed.distinctId, isFirstRun: false };
+      return { distinctId: parsed.distinctId, isFirstRun: parsed.noticed !== true };
     }
   } catch {
     /* fall through to mint a fresh id */
@@ -76,9 +91,7 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
   const distinctId = randomUUID();
   try {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(file, `${JSON.stringify({ distinctId } satisfies StoredIdentity)}\n`, {
-      mode: 0o600,
-    });
+    writeStored(file, { distinctId });
     return { distinctId, isFirstRun: true };
   } catch {
     return { distinctId, isFirstRun: false };
@@ -90,8 +103,10 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
  * that it was: when it has never been written, when what it would say differs
  * from what it last said, or when a day has passed since it was last written.
  * That keeps the profile's version facts current within a day of an upgrade,
- * and its "last seen" within a day of the install's last run, for at most one
- * request per install per day.
+ * and its "last seen" within a day of the install's last run. The hash holds
+ * only what changes with the install (versions, platform), never what changes
+ * with the run (the host, the package manager), so the profile is written at
+ * most once a day unless the install itself changed.
  *
  * Fail-closed: an install that cannot remember what it wrote (no config
  * directory, a read-only home) never writes a profile, so it cannot add a new
@@ -119,12 +134,31 @@ export function profileDue(
     if (!due) {
       return false;
     }
-    writeFileSync(file, `${JSON.stringify({ ...stored, profile: { at: now, hash } })}\n`, {
-      mode: 0o600,
-    });
+    writeStored(file, { ...stored, profile: { at: now, hash } });
 
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Remembers that the first-run notice was shown, so no later run shows it again.
+ * Best-effort: an install that cannot write its record shows it once per run
+ * instead of never.
+ *
+ * @param env - The environment the run reads.
+ */
+export function markNoticed(env: NodeJS.ProcessEnv): void {
+  const dir = telemetryConfigDir(env);
+  if (dir === undefined) {
+    return;
+  }
+  const file = join(dir, "telemetry.json");
+  try {
+    const stored = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
+    writeStored(file, { ...stored, noticed: true });
+  } catch {
+    /* the notice may show again */
   }
 }

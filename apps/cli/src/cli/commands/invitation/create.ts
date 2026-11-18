@@ -79,7 +79,9 @@ const REPLACES_ACCEPTED_REFUSAL = {
  * never recorded anywhere but the output. `--replaces` makes a new link for an
  * invitation that was lost or expired, keeping its journey (ADR 086).
  */
-export default class InvitationCreate extends Telemetered(Promptable(ServerCommand(EnvironmentCommand))) {
+export default class InvitationCreate extends Telemetered(
+  Promptable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Invite someone into the project with a link to share.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 5;

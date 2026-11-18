@@ -33,7 +33,9 @@ const INVITATION_ID: Refused<string> = {
  * for, the role it grants, its status and when it expires. The link is never
  * shown again after `invitation create`.
  */
-export default class InvitationGet extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
+export default class InvitationGet extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Read one invitation by id.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 7;

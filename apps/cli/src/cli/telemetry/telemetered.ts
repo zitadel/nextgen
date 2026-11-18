@@ -2,14 +2,14 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { Flags } from "@oclif/core";
 
-import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { toZitadelError } from "@/lib/errors";
 import type { BaseCommand, Facts, MetaOptions } from "@/lib/oclif/base";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
-import { profileDue } from "@/lib/telemetry/identity";
+import { markNoticed, profileDue } from "@/lib/telemetry/identity";
 import type { RunWatcher } from "@/lib/wizard";
 
 import {
@@ -33,6 +33,12 @@ export const TELEMETRY_FLAG = Flags.boolean({
   allowNo: true,
   description: "Send anonymous usage analytics. Disable with --no-telemetry.",
 });
+
+/**
+ * The events of a flow go to Mixpanel only; the three lifecycle events go
+ * everywhere, as the hosted intake's copy is for them alone.
+ */
+const FLOW_DESTINATIONS = ["mixpanel"] as const;
 
 /**
  * How a wizard command names its steps for reports of the flow.
@@ -260,8 +266,16 @@ export function Telemetered<
       await super.finally(error);
       await this.reportClient?.shutdown(1000).catch(() => undefined);
       if (this.reportClient?.enabled) {
-        setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
+        this.armExitWatchdog();
       }
+    }
+
+    /**
+     * Forces the process to end with the resolved code if a telemetry socket
+     * still holds the event loop open shortly after the run is over.
+     */
+    protected armExitWatchdog(): void {
+      setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
     }
 
     private reportBegin(reporting: boolean | undefined): void {
@@ -269,7 +283,7 @@ export function Telemetered<
         return;
       }
       const client = this.createTelemetry({
-        env: process.env,
+        env: this.env,
         flag: reporting,
         debug: this.meta.debug,
         vercelKeys: vercelEventKeys((this.constructor as typeof Reporting).headline),
@@ -278,11 +292,14 @@ export function Telemetered<
       if (!client.enabled) {
         return;
       }
-      this.reportTrack(CLI_COMMAND_STARTED, { ...this.reportNotes });
-      this.reportProfile(client);
+      // The notice comes before the first send, and until a run that can show
+      // it has, every run is the first.
       if (client.isFirstRun && this.reportInteractive()) {
         this.logToStderr(FIRST_RUN_NOTICE);
+        markNoticed(this.env);
       }
+      this.reportTrack(CLI_COMMAND_STARTED, { ...this.reportNotes });
+      this.reportProfile(client);
     }
 
     /**
@@ -292,8 +309,12 @@ export function Telemetered<
      */
     private reportProfile(client: Telemetry): void {
       const facts = deviceProfileProperties(this.meta, client.distinctId);
-      const hash = createHash("sha256").update(JSON.stringify(facts)).digest("hex");
-      if (profileDue(process.env, hash)) {
+      // What changes with the install, not with the run: the host and the package
+      // manager differ between runs and would rewrite the profile on each.
+      const hash = createHash("sha256")
+        .update(JSON.stringify([facts.cli_version, facts.node_version, facts.os, facts.arch]))
+        .digest("hex");
+      if (profileDue(this.env, hash)) {
         client.profile(facts, { $ip: 0 }, firstSeenProperties(this.meta));
       }
     }
@@ -307,7 +328,7 @@ export function Telemetered<
         return false;
       }
 
-      return Boolean(process.stdout.isTTY && process.stdin.isTTY);
+      return this.isTTY;
     }
 
     private reportFacts(): Facts {
@@ -319,7 +340,11 @@ export function Telemetered<
       }
     }
 
-    private reportTrack(name: string, facts: Facts): void {
+    private reportTrack(
+      name: string,
+      facts: Facts,
+      only?: readonly ("mixpanel" | "vercel")[],
+    ): void {
       if (this.reportClient?.enabled !== true) {
         return;
       }
@@ -331,8 +356,7 @@ export function Telemetered<
           this.reportInvocationId,
           facts,
         ),
-        // The hosted intake's copy is for the three lifecycle events only.
-        name.startsWith("cli_command_") ? undefined : ["mixpanel"],
+        only,
       );
     }
 
@@ -351,7 +375,11 @@ export function Telemetered<
       }
       if (flow.began === undefined) {
         flow.began = Date.now();
-        this.reportTrack("flow_started", { flow: flow.report.flow, ...flow.facts });
+        this.reportTrack(
+          "flow_started",
+          { flow: flow.report.flow, ...flow.facts },
+          FLOW_DESTINATIONS,
+        );
       }
       flow.step = flow.report.step(key)?.step;
     }
@@ -365,11 +393,11 @@ export function Telemetered<
       if (named.choice !== undefined) {
         flow.facts = { ...flow.facts, ...named.choice };
         if (named.step !== undefined) {
-          this.reportTrack("step_completed", {
-            flow: flow.report.flow,
-            step: named.step,
-            ...named.choice,
-          });
+          this.reportTrack(
+            "step_completed",
+            { flow: flow.report.flow, step: named.step, ...named.choice },
+            FLOW_DESTINATIONS,
+          );
         }
       }
     }
@@ -380,13 +408,17 @@ export function Telemetered<
         return;
       }
       flow.over = true;
-      this.reportTrack("flow_failed", {
-        flow: flow.report.flow,
-        step: flow.report.step(key)?.step ?? flow.report.otherwise,
-        ...flow.facts,
-        reason: error instanceof ZitadelError ? error.code : undefined,
-        duration_ms: Date.now() - (flow.began ?? Date.now()),
-      });
+      this.reportTrack(
+        "flow_failed",
+        {
+          flow: flow.report.flow,
+          step: flow.report.step(key)?.step ?? flow.report.otherwise,
+          ...flow.facts,
+          reason: toZitadelError(error).code,
+          duration_ms: Date.now() - (flow.began ?? Date.now()),
+        },
+        FLOW_DESTINATIONS,
+      );
     }
 
     private reportFlowEnded(): void {
@@ -404,11 +436,15 @@ export function Telemetered<
       if (this.meta.dryRun) {
         return;
       }
-      this.reportTrack("flow_completed", {
-        flow: flow.report.flow,
-        ...flow.facts,
-        duration_ms: Date.now() - (flow.began ?? Date.now()),
-      });
+      this.reportTrack(
+        "flow_completed",
+        {
+          flow: flow.report.flow,
+          ...flow.facts,
+          duration_ms: Date.now() - (flow.began ?? Date.now()),
+        },
+        FLOW_DESTINATIONS,
+      );
     }
 
     private reportPrompted(): void {
@@ -418,7 +454,7 @@ export function Telemetered<
         return;
       }
       flow.viewed.add(step);
-      this.reportTrack("viewed_step", { flow: flow.report.flow, step });
+      this.reportTrack("viewed_step", { flow: flow.report.flow, step }, FLOW_DESTINATIONS);
     }
   }
 

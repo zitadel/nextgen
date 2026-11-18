@@ -72,11 +72,19 @@ function deviceFacts(meta: GlobalOptions): DeviceFacts {
   };
 }
 
-function eventDeviceProperties(meta: GlobalOptions): Properties {
+/**
+ * The device facts of an event or of the install's profile, which name the
+ * country differently (`mp_country_code` on an event, `$country_code` on the
+ * profile).
+ */
+function deviceProperties(
+  meta: GlobalOptions,
+  countryKey: "mp_country_code" | "$country_code",
+): Properties {
   const facts = deviceFacts(meta);
   return {
     $os: facts.osLabel,
-    mp_country_code: facts.countryCode,
+    [countryKey]: facts.countryCode,
     os: facts.platform,
     arch: facts.arch,
     node_version: facts.nodeVersion,
@@ -84,17 +92,11 @@ function eventDeviceProperties(meta: GlobalOptions): Properties {
   };
 }
 
-function profileDeviceProperties(meta: GlobalOptions): Properties {
-  const facts = deviceFacts(meta);
-  return {
-    $os: facts.osLabel,
-    $country_code: facts.countryCode,
-    os: facts.platform,
-    arch: facts.arch,
-    node_version: facts.nodeVersion,
-    cli_version: facts.cliVersion,
-  };
-}
+/**
+ * Whether the CLI runs from an installed package, which cannot change within a
+ * process.
+ */
+const INSTALL_SOURCE = installedFromPackage() ? "package" : "source";
 
 /**
  * Build the dimensions shared by every lifecycle event, merged with any
@@ -114,12 +116,13 @@ export function commandEventProperties(
   extra: Properties = {},
 ): Properties {
   const { env } = meta;
+  const host = hostAgent.value(env);
   return {
     ...extra,
     surface: "cli",
     environment: resolveChannel(env),
-    install_source: installedFromPackage() ? "package" : "source",
-    ...eventDeviceProperties(meta),
+    install_source: INSTALL_SOURCE,
+    ...deviceProperties(meta, "mp_country_code"),
     ip: 0,
     invocation_id: invocationId,
     command: meta.command,
@@ -127,8 +130,8 @@ export function commandEventProperties(
     is_tty: meta.isTTY,
     is_ci: ciFlag.value(env),
     ci_provider: ciProvider.value(env),
-    host_agent: hostAgent.value(env),
-    is_agent: isAgent(hostAgent.value(env)),
+    host_agent: host,
+    is_agent: isAgent(host),
     invocation_channel: invocationChannel.value(env),
     dry_run: meta.dryRun,
     force: meta.force,
@@ -157,12 +160,12 @@ export function deviceProfileProperties(meta: GlobalOptions, distinctId: string)
   const agent = hostAgent.value(meta.env);
   const label = agent === "unknown" ? process.platform : agent;
   return {
-    ...profileDeviceProperties(meta),
+    ...deviceProperties(meta, "$country_code"),
     $name: `${label} · ${distinctId.slice(0, 8)}`,
     host_agent: agent,
     is_agent: isAgent(agent),
     invocation_channel: invocationChannel.value(meta.env),
-    install_source: installedFromPackage() ? "package" : "source",
+    install_source: INSTALL_SOURCE,
   };
 }
 

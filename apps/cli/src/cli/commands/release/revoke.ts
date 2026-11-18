@@ -63,7 +63,9 @@ const RELEASE_IN_USE_REFUSAL: Refusal = {
  * A release an origin still serves cannot be revoked; deploy another release
  * there or roll it back first. Revoking is idempotent and cannot be undone.
  */
-export default class ReleaseRevoke extends Telemetered(Destructive(ServerCommand(EnvironmentCommand))) {
+export default class ReleaseRevoke extends Telemetered(
+  Destructive(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.releases;
   static override groupOrder = 4;

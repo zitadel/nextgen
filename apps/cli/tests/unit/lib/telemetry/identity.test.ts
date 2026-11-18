@@ -3,7 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { loadOrCreateIdentity, profileDue, telemetryConfigDir } from "@/lib/telemetry/identity";
+import {
+  loadOrCreateIdentity,
+  markNoticed,
+  profileDue,
+  telemetryConfigDir,
+} from "@/lib/telemetry/identity";
 import { it } from "@tests/fixtures";
 
 const { homedir } = vi.hoisted(() => {
@@ -44,8 +49,11 @@ describe("loadOrCreateIdentity", () => {
     expect(first.distinctId).toMatch(/[0-9a-f-]{36}/);
 
     const second = loadOrCreateIdentity(env);
-    expect(second.isFirstRun).toBe(false);
+    expect(second.isFirstRun).toBe(true);
     expect(second.distinctId).toBe(first.distinctId);
+
+    markNoticed(env);
+    expect(loadOrCreateIdentity(env).isFirstRun).toBe(false);
 
     const stored = JSON.parse(
       readFileSync(join(env.XDG_CONFIG_HOME, "zitadel", "cli", "telemetry.json"), "utf8"),

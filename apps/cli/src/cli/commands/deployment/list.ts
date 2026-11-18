@@ -53,7 +53,9 @@ const COLUMNS = [
  * empty for any other deployment. It is also empty, with a warning, when the
  * live view or the previews cannot be read.
  */
-export default class DeploymentList extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
+export default class DeploymentList extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;

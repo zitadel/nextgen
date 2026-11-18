@@ -21,7 +21,9 @@ const PREVIEW_COLUMNS = ["name", "value"] as const;
  * `--preview` it lists the preview values alone, which are never merged with the
  * primary ones — only the names that hold one.
  */
-export default class VariableList extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
+export default class VariableList extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

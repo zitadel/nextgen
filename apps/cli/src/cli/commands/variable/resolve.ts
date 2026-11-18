@@ -58,7 +58,9 @@ const COLUMNS = ["name", "value"] as const;
  * deploy, and a preview origin is only ever served by a pull-request build,
  * never by `deploy`.
  */
-export default class VariableResolve extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
+export default class VariableResolve extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Show the variables a deployment froze, the live one by default.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

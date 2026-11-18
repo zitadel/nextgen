@@ -47,7 +47,9 @@ const LIMIT = {
  * with their status and expiry. `--status` and `--type` narrow the page; like
  * every list verb it fetches one page and reports `next_page_token`.
  */
-export default class InvitationList extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
+export default class InvitationList extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "List the project's invitations, newest first.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 6;
