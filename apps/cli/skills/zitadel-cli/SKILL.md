@@ -391,6 +391,12 @@ Each invocation prints one JSON object:
   when no identifier step comes before it. A step reached through a
   `user_already_exists` collision, such as `sso-conflict`, is exempt: the
   collision names the user.
+- `deploy`, `deploy --dry-run` and `preview` probe the branding image URLs
+  (`logo_url`, `hero_url`, `theme.light.logo_url`, `theme.dark.logo_url`) and
+  add one `warnings` line per field whose public `https` URL is unreachable,
+  not a 2xx or not an image, naming the field. It never fails the command; set
+  `ZITADEL_SKIP_ASSET_PROBE` to skip it, or `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to
+  change the per-URL budget.
 - `deploy` and `deploy --dry-run` read the project's users and refuse when the
   config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
