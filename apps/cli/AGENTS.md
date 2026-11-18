@@ -292,8 +292,7 @@
 ## Telemetry
 
 Anonymous product analytics: a copy of each event to Vercel Web Analytics
-(`src/lib/telemetry/vercel.ts`), and Mixpanel's Node SDK (`mixpanel`), which is
-paused.
+(`src/lib/telemetry/vercel.ts`), and Mixpanel's Node SDK (`mixpanel`).
 
 - Add no other analytics tool or SDK, browser SDK included.
 - The Vercel copy sends only the keys `vercelEventKeys` (`src/cli/telemetry/properties.ts`)
@@ -339,6 +338,6 @@ paused.
    telemetry page; `tests/unit/lib/telemetry/catalog.test.ts` fails when the
    code and the catalog disagree.
 4. Check that it arrives in Mixpanel's Live View, with `ZITADEL_TELEMETRY_TOKEN`
-   naming the dev project while Mixpanel is paused. The region defaults to
+   naming a project of your own, or rely on the development project a development run sends to. The region defaults to
    `eu`; set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are
    silently dropped.

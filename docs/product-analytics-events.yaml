@@ -10,9 +10,9 @@
 # (apps/cli/tests/unit/lib/telemetry/catalog.test.ts) check what it sends
 # against this file.
 #
-# Mixpanel is paused: the CLI bakes in no token and the service ping has no
-# default one, so neither sends to it (apps/cli/src/lib/telemetry/config.ts).
-# Events keep `mixpanel` as a destination for when it returns.
+# The CLI sends to Mixpanel, production runs to the production project and the rest to a
+# development project (apps/cli/src/lib/telemetry/config.ts);
+# the service ping has no default token, so it does not.
 
 # What every event carries, whichever component sends it. `<surface>` stands
 # for the component, as in `cli_version`: the release version of a build that
@@ -509,7 +509,7 @@ components:
     # where `reason` holds the eighth value, it takes non_interactive's place.
     vercel:
       properties: [surface, cli_version, server_kind, command, status, reason, host_agent, <dimension>, non_interactive]
-      # Each answers one question while Mixpanel is paused.
+      # Each answers one question the hosted intake's copy can.
       dimensions:
         setup: framework # Which frameworks do people set up, and which fail?
         claim: claim_outcome # Do claims complete in the browser, or expire or time out?

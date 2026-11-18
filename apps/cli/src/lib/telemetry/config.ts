@@ -7,11 +7,12 @@ import { ciFlag } from "./dimensions/ci-flag";
  * Resolves the Mixpanel ingestion token and endpoint for a CLI invocation, and
  * the channel that decides whether a run is production traffic.
  *
- * Mixpanel is paused: the production project the CLI sent to is in Mixpanel's
- * US region while its events went to the EU endpoint, which drops them. Until
- * a project and its region agree, no token is baked in, so only
- * `ZITADEL_TELEMETRY_TOKEN` sends to Mixpanel. The events still go to Vercel
- * Web Analytics (`vercel.ts`).
+ * Both Mixpanel projects are in the EU region, which is the default endpoint,
+ * so each one's token is baked in: a production run sends to the production
+ * project, and a development run (CI, the CLI's own development mode, a source
+ * checkout) to the development project, so test traffic never reaches customer
+ * data. `ZITADEL_TELEMETRY_TOKEN` overrides both. Lifecycle events also go to
+ * Vercel Web Analytics (`vercel.ts`), from production runs only.
  *
  * A Mixpanel token is a *write-only* project token: it can ingest events but
  * cannot read data back, so — unlike the project service-key — it is safe to
@@ -95,15 +96,40 @@ function isDevelopmentFlag(value: string | undefined): boolean {
  * @returns Whether the running code lives under `node_modules`.
  */
 export function installedFromPackage(): boolean {
-  return fileURLToPath(import.meta.url).split(/[\\/]/).includes("node_modules");
+  return fileURLToPath(import.meta.url)
+    .split(/[\\/]/)
+    .includes("node_modules");
 }
 
 /**
+ * The production Mixpanel project's token, in its EU region. It is write-only
+ * and published on purpose, like the one in Next.js. Left unset until the
+ * production project's token is added, so a production run sends to Mixpanel
+ * only with `ZITADEL_TELEMETRY_TOKEN`.
+ */
+const PRODUCTION_TOKEN: string | undefined = undefined;
+
+/**
+ * The development Mixpanel project's token, in its EU region; write-only and
+ * published on purpose, like {@link PRODUCTION_TOKEN}.
+ */
+const DEVELOPMENT_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
+
+/**
  * Resolve the Mixpanel ingestion token, or `undefined` for no Mixpanel events.
- * Mixpanel is paused, so only a `ZITADEL_TELEMETRY_TOKEN` override names one.
+ * A `ZITADEL_TELEMETRY_TOKEN` override wins; without one, a production run uses
+ * the production project's token and any other run the development project's.
+ *
+ * @param env - The environment the run reads.
+ * @returns The token, if the run has one.
  */
 export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefined {
-  return env.ZITADEL_TELEMETRY_TOKEN?.trim() || undefined;
+  const override = env.ZITADEL_TELEMETRY_TOKEN?.trim();
+  if (override) {
+    return override;
+  }
+
+  return resolveChannel(env) === "production" ? PRODUCTION_TOKEN : DEVELOPMENT_TOKEN;
 }
 
 /**
