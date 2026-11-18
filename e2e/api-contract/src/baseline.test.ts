@@ -69,7 +69,8 @@ describe("Baseline", () => {
 
 describe("BaselineUpdate", () => {
   const complete: CommandRun = {
-    name: "all",
+    name: "shard-0",
+    counted: true,
     operations: ["GET /z"],
     expected: 1,
     accounting: { selected: 1, tested: 1, skipped: 0, errored: 0, unmatched: [] },
@@ -115,7 +116,7 @@ describe("BaselineUpdate", () => {
 
       expect(() => {
         new BaselineUpdate([{ ...complete, ...change }]).apply(new Baseline(path));
-      }).toThrow("refusing to rewrite the baseline from an unfinished run: all");
+      }).toThrow("refusing to rewrite the baseline from an unfinished run: shard-0");
       expect(await readFile(path, "utf8")).toBe(before);
     },
   );

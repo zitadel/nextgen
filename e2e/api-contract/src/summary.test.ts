@@ -7,6 +7,7 @@ import { ContractSummary } from "./summary";
 function run(failures: CommandRun["failures"]): CommandRun {
   return {
     name: "all",
+    counted: true,
     operations: ["GET /teams", "Stateful tests"],
     expected: 1,
     accounting: { selected: 1, tested: 1, skipped: 0, errored: 0, unmatched: [] },

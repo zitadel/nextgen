@@ -47,27 +47,29 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-/** Hands out a new session each time, as the real credentials do. */
-function credentials(): CredentialSource {
-  return {
+/** Makes a project of its own each time, as the instance does: its own secret and its own session. */
+function project(): Promise<CredentialSource> {
+  minted += 1;
+  const own = minted;
+  return Promise.resolve({
     bearer: () => {
-      return { oauth2: { kind: "bearer", value: "secret" } };
+      return { oauth2: { kind: "bearer", value: `secret-${String(own)}` } };
     },
     session: () => {
-      minted += 1;
       return Promise.resolve({
-        scheme: { sessionCookie: { kind: "cookie", value: `cookie-${String(minted)}` } },
-        csrfToken: `csrf-${String(minted)}`,
+        scheme: { sessionCookie: { kind: "cookie", value: `cookie-${String(own)}` } },
+        csrfToken: `csrf-${String(own)}`,
       });
     },
-  };
+  });
 }
 
-function contract(runner: Runner): Contract {
+function contract(runner: Runner, shards = 2): Contract {
   return new Contract({
     spec,
     baseUrl: "http://x/api/v1",
-    credentials: credentials(),
+    project,
+    shards,
     runner,
     artifactsDir: join(directory, "out"),
     log: () => undefined,
@@ -91,60 +93,84 @@ function runner(): Runner & { inputs: CommandInput[] } {
 }
 
 describe("Contract", () => {
-  test("runs two commands: every operation but the logout, then the logout alone", async () => {
+  test("runs the shards, the multi-step phase and the logout as commands of their own", async () => {
     const fake = runner();
 
-    const runs = await contract(fake).run();
+    const runs = await contract(fake, 1).run();
 
-    expect(runs.map((run) => run.name)).toEqual(["all", "logout"]);
+    expect(runs.map((run) => run.name)).toEqual(["shard-0", "stateful", "logout"]);
     expect(fake.inputs.map((input) => input.operationIds)).toEqual([
+      ["listProjects", "ready", "getMySession"],
       ["listProjects", "ready", "getMySession"],
       ["endMySession"],
     ]);
   });
 
-  test("gives the main command both credentials and the logout command a session of its own", async () => {
+  test("deals every operation but the logout into exactly one shard", async () => {
     const fake = runner();
 
-    await contract(fake).run();
+    await contract(fake, 2).run();
 
-    expect(fake.inputs.map((input) => input.schemes)).toEqual([
-      {
-        oauth2: { kind: "bearer", value: "secret" },
-        sessionCookie: { kind: "cookie", value: "cookie-1" },
-      },
-      { sessionCookie: { kind: "cookie", value: "cookie-2" } },
+    const dealt = fake.inputs
+      .filter((input) => {
+        return input.name.startsWith("shard-");
+      })
+      .flatMap((input) => {
+        return input.operationIds;
+      });
+    expect([...dealt].sort()).toEqual(["getMySession", "listProjects", "ready"]);
+  });
+
+  test("gives every command a project of its own", async () => {
+    const fake = runner();
+
+    await contract(fake, 1).run();
+
+    const secrets = fake.inputs.map((input) => {
+      return Object.values(input.schemes).find((scheme) => {
+        return scheme.kind === "bearer";
+      })?.value;
+    });
+    expect(new Set(secrets).size).toBe(fake.inputs.length);
+  });
+
+  test("runs the shards through the per-operation phases and the multi-step run through its own", async () => {
+    const fake = runner();
+
+    await contract(fake, 1).run();
+
+    expect(fake.inputs.map((input) => input.phases)).toEqual([
+      ["examples", "coverage", "fuzzing"],
+      ["stateful"],
+      ["examples", "coverage", "fuzzing"],
     ]);
   });
 
   test("sends the CSRF token only with the cookie operations", async () => {
     const fake = runner();
 
-    await contract(fake).run();
+    await contract(fake, 1).run();
 
     expect(fake.inputs.map((input) => input.operationHeaders)).toEqual([
       { getMySession: { "X-Zitadel-CSRF": "csrf-1" } },
-      { endMySession: { "X-Zitadel-CSRF": "csrf-2" } },
+      { getMySession: { "X-Zitadel-CSRF": "csrf-2" } },
+      { endMySession: { "X-Zitadel-CSRF": "csrf-3" } },
     ]);
   });
 
-  test("runs the logout without the multi-step phase", async () => {
-    const fake = runner();
+  test("counts the shards and the logout, and not the multi-step run that repeats them", async () => {
+    const runs = await contract(runner(), 1).run();
 
-    await contract(fake).run();
-
-    expect(fake.inputs.map((input) => input.phases)).toEqual([
-      undefined,
-      ["examples", "coverage", "fuzzing"],
-    ]);
+    expect(runs.map((run) => run.counted)).toEqual([true, false, true]);
+    expect(runs[1]?.operations).toEqual(["Stateful tests"]);
   });
 
-  test("reports what each command found, with the multi-step test after the operations", async () => {
-    const [first] = await contract(runner()).run();
+  test("reports what a command found", async () => {
+    const [first] = await contract(runner(), 1).run();
 
     expect(first).toMatchObject({
-      name: "all",
-      operations: ["GET /projects", "GET /readyz", "GET /sessions/me", "Stateful tests"],
+      name: "shard-0",
+      operations: ["GET /projects", "GET /readyz", "GET /sessions/me"],
       exitCode: 1,
       expected: 3,
       complete: true,
@@ -154,10 +180,12 @@ describe("Contract", () => {
   });
 
   test("keeps each command's report and output", async () => {
-    await contract(runner()).run();
+    await contract(runner(), 1).run();
 
-    expect(await readFile(join(directory, "out", "all", "report.json"), "utf8")).toBe(reportJson);
-    expect(await readFile(join(directory, "out", "all", "output.log"), "utf8")).toBe("line");
+    expect(await readFile(join(directory, "out", "shard-0", "report.json"), "utf8")).toBe(
+      reportJson,
+    );
+    expect(await readFile(join(directory, "out", "shard-0", "output.log"), "utf8")).toBe("line");
   });
 
   test("keeps only the end of a long output for the failure message", async () => {
@@ -173,12 +201,12 @@ describe("Contract", () => {
       },
     };
 
-    const [first] = await contract(fake).run();
+    const [first] = await contract(fake, 1).run();
 
     expect(first?.log.split("\n")).toHaveLength(30);
   });
 
-  test("waits for both commands before it throws one's failure", async () => {
+  test("waits for every command before it throws one's failure", async () => {
     let finished = false;
     const fake: Runner = {
       run(input) {
@@ -199,7 +227,7 @@ describe("Contract", () => {
       },
     };
 
-    await expect(contract(fake).run()).rejects.toThrow("boom");
+    await expect(contract(fake, 1).run()).rejects.toThrow("boom");
     expect(finished).toBe(true);
   });
 });
