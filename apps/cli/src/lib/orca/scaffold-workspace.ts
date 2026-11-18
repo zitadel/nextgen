@@ -95,7 +95,7 @@ export class ScaffoldWorkspace {
    */
   async restoreInto(cwd: string): Promise<void> {
     for (const name of await this.replaced()) {
-      await fse.move(join(this.backup, name), join(cwd, name));
+      await fse.move(join(this.backup, name), join(cwd, name), { overwrite: true });
     }
   }
 
