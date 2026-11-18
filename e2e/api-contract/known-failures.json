@@ -1,18 +1,62 @@
 [
   {
-    "operation": "Stateful tests (public)",
+    "operation": "GET /oauth_settings/{oauth_settings_id}",
+    "check": "Server error"
+  },
+  {
+    "operation": "PATCH /teams/{team_id}",
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "GET /oauth_settings/{oauth_settings_id}",
-    "check": "Server error"
+    "operation": "PATCH /users/{user_id}",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /applications",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /auth_attempts",
+    "check": "API rejected schema-compliant request"
   },
   {
     "operation": "POST /auth_attempts/{attempt_id}/challenges",
     "check": "API rejected schema-compliant request"
   },
   {
+    "operation": "POST /branding",
+    "check": "API accepted schema-violating request"
+  },
+  {
+    "operation": "POST /deployments",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /grants/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /idps/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /invitations",
+    "check": "Server error"
+  },
+  {
     "operation": "POST /projects/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /projects/{project_id}/origins/remove",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /schemas",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /sessions/query",
     "check": "API rejected schema-compliant request"
   },
   {
@@ -24,27 +68,15 @@
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "Stateful tests (management)",
+    "operation": "POST /users/{user_id}/passkeys/registrations",
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "Stateful tests (management)",
-    "check": "Server error"
+    "operation": "PUT /users/{user_id}/password",
+    "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "PATCH /users/me",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /invitations/accept",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /invitations/lookup",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /invitations/reject",
+    "operation": "Stateful tests",
     "check": "Server error"
   }
 ]

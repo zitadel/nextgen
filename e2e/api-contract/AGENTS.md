@@ -2,29 +2,32 @@
 
 Checks the API against its own spec. Schemathesis generates requests from the
 OpenAPI document and fires them at a real instance of this working tree's
-server; Vitest reports one test per operation. Paths below are from the repo
+server; Vitest judges what it found. Paths below are from the repo
 root.
 
 ## How it runs
 
 - `turbo run api-contract --filter=@zitadel/e2e` builds the server, then runs
-  `api-contract/global-setup.ts`: it boots an instance with
-  `startLocalZitadel` (binary runtime, SQLite), fetches the spec the instance
-  serves at `/api/v1/openapi.json`, and runs the pinned Schemathesis image
-  through Testcontainers once per family. Docker is required.
-- The spec decides the families, from each operation's declared `security`
-  (`src/spec.ts`), and `src/credentials.ts` gives each its credentials:
-  `public` sends none, `management` the project secret, `session` a seeded
-  end user's cookie and CSRF token, `logout` a session of its own, because it
+  `src/api-contract.test.ts`. Its fixtures (`src/fixtures.ts`) are built before
+  the first test and torn down after the last, with no global setup: a real
+  instance of the server (`startLocalZitadel`, binary runtime, SQLite) whose
+  `/api/v1/openapi.json` is the spec under test, and one idle Schemathesis
+  container (the pinned image, through Testcontainers) with that spec mounted.
+  Docker is required.
+- `src/contract.ts` runs two commands in that one container,
+  at the same time: every operation but the logout, and the
+  logout alone. The spec decides which, from each operation's declared
+  `security` (`src/spec.ts`). The main command holds the project secret for the
+  bearer scheme and a seeded end user's cookie for the cookie scheme, and
+  Schemathesis applies the credential each operation's own security entry asks
+  for. The CSRF token rides only on the cookie operations
+  (`[operations.headers]`). The logout runs on a session of its own, because it
   ends the session.
-- `src/contract.test.ts` has one test per operation, named `METHOD /path`, plus
-  one per family for the multi-step phase (`Stateful tests (<family>)`). A
-  failing test names the check; the raw report and output are in
-  `api-contract/test-output/schemathesis/<family>/` (gitignored; the management
-  family keeps each operation in a folder named after its operation id, and its
-  multi-step run in `stateful/`),
-  and `st replay <id>` in the image replays a case.
-- The run takes about two minutes. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
+- The suite has one test for the run's completion, one for its accounting and
+  one for the baseline verdict, which lists every operation that differs. The
+  raw report and output are in `api-contract/test-output/schemathesis/<command>/`
+  (gitignored), and `st replay <id>` in the image replays a case.
+- The run takes about four minutes. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
 - The verdict is written to `api-contract/test-output/summary.md`, to the job summary on GitHub, and as error annotations on the check.
 
 ## The baseline
@@ -49,20 +52,14 @@ Never add a line to hide a failure you introduced. Fix it, or fix the spec.
 
 A baseline is only worth anything if a run repeats.
 
-- Every operation runs alone in a container, against a server and database of
-  its own (`src/instances.ts`), so what it finds depends on that operation and
-  the server only. Adding, removing or reordering other operations cannot change
-  it, and nothing is split by hand: the lane reads the operations from the spec.
-  Schemathesis draws the inputs of one run from a single seeded stream, so
-  grouping operations in a container changes what each of them receives. Keep
-  it that way: never put two operations in a container, and never share an instance.
-  Only the multi-step phase runs on all of a family's operations, because it
-  chains them.
-- `API_CONTRACT_SLOTS` (default the core count) is how many containers run at
-  once. It changes the time a run takes and nothing else.
-- `API_CONTRACT_WORKERS` (default 1) is the requests in flight inside one run, and
-  they do share that run's instance, so with more than 1 expect failures the
-  baseline does not list.
+- `API_CONTRACT_WORKERS` (default 1) is the requests in flight inside the main
+  command. Measured on CI with identical commits, one worker repeats exactly
+  (about 210s), and four are faster (about 125s) but share one server and so
+  find a different set of failures from run to run. Keep it at 1.
+- One command draws the inputs of all its operations from a single seeded
+  stream, so adding or removing an operation can change what the others
+  receive. A change to the spec can therefore change the baseline: regenerate
+  it from the new run and read the diff.
 - The Schemathesis release and the seed are pinned in `src/schemathesis.ts` (release) and `src/command.ts` (seed).
   Bumping the release adds checks, so regenerate the baseline in the same
   change and say so.
