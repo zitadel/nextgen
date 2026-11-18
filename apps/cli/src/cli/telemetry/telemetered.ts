@@ -314,8 +314,9 @@ export function Telemetered<
       const hash = createHash("sha256")
         .update(JSON.stringify([facts.cli_version, facts.node_version, facts.os, facts.arch]))
         .digest("hex");
-      if (profileDue(this.env, hash)) {
-        client.profile(facts, { $ip: 0 }, firstSeenProperties(this.meta));
+      const due = profileDue(this.env, hash, client.record);
+      if (due !== undefined) {
+        client.profile(facts, { $ip: 0 }, due.first ? firstSeenProperties(this.meta) : {});
       }
     }
 

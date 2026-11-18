@@ -8,7 +8,7 @@ import { type FlowReport, Telemetered } from "@/cli/telemetry/telemetered";
 import { ZitadelError } from "@/lib/errors";
 import { BaseCommand, type Facts } from "@/lib/oclif/base";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
-import { loadOrCreateIdentity } from "@/lib/telemetry/identity";
+import { loadOrCreateIdentity, type StoredIdentity } from "@/lib/telemetry/identity";
 import type { RunWatcher } from "@/lib/wizard";
 import { aConfigAt } from "@tests/helpers/suggestions";
 
@@ -28,6 +28,7 @@ class RecordingTelemetry {
   public readonly profiles: { set: Record<string, unknown>; once: Record<string, unknown> }[] = [];
   public enabled = true;
   public isFirstRun = false;
+  public record: StoredIdentity | undefined;
   public readonly distinctId = "did-test";
 
   public track(
@@ -65,9 +66,14 @@ class TestCommand extends Telemetered(BaseCommand) {
   /** Whether a person is at the terminal, answering what the run would. */
   public interactive = false;
   public watchdogs = 0;
+  /** Whether the install's record is one an earlier release created. */
+  public olderInstall = false;
 
   protected override createTelemetry(deps: TelemetryDeps): Telemetry {
     this.recorder.enabled = deps.flag !== false && !this.optOut;
+    this.recorder.record = this.olderInstall
+      ? { distinctId: "an-earlier-install" }
+      : loadOrCreateIdentity(deps.env).record;
     return this.recorder as unknown as Telemetry;
   }
 
@@ -306,6 +312,14 @@ describe("Telemetered profile", () => {
     expect(cmd.recorder.profiles).toHaveLength(1);
     expect(cmd.recorder.profiles[0]?.set).toMatchObject({ cli_version: "0.0.0-test" });
     expect(cmd.recorder.profiles[0]?.once).toEqual({ first_cli_version: "0.0.0-test" });
+  });
+
+  it("leaves the first version unwritten for an install that predates it", async () => {
+    const cmd = makeCommand();
+    cmd.olderInstall = true;
+    await cmd.open();
+
+    expect(cmd.recorder.profiles[0]?.once).toEqual({});
   });
 
   it("does not write it again on the next run while nothing changed", async () => {

@@ -4,7 +4,7 @@ import type { Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel
 
 import { resolveTelemetryToken, type TelemetryEndpoint } from "./config";
 import { resolveConsent } from "./consent";
-import { type Identity, loadOrCreateIdentity } from "./identity";
+import { type Identity, loadOrCreateIdentity, type StoredIdentity } from "./identity";
 import { MixpanelSink } from "./mixpanel-sink";
 import { type TelemetrySink, trace } from "./sink";
 import { compact } from "./util";
@@ -64,17 +64,21 @@ export type TelemetryDeps = {
 export class Telemetry {
   readonly distinctId: string;
   readonly isFirstRun: boolean;
+  /** The install's record as it was read, for the profile's due-check. */
+  readonly record: StoredIdentity | undefined;
   private readonly sinks: readonly TelemetrySink[];
   private readonly newId: () => string;
 
   private constructor(settings: {
     readonly distinctId: string;
     readonly isFirstRun: boolean;
+    readonly record?: StoredIdentity;
     readonly sinks: readonly TelemetrySink[];
     readonly newId: () => string;
   }) {
     this.distinctId = settings.distinctId;
     this.isFirstRun = settings.isFirstRun;
+    this.record = settings.record;
     this.sinks = settings.sinks;
     this.newId = settings.newId;
   }
@@ -139,6 +143,7 @@ export class Telemetry {
     return new Telemetry({
       distinctId: identity.distinctId,
       isFirstRun: identity.isFirstRun,
+      record: identity.record,
       sinks,
       newId,
     });

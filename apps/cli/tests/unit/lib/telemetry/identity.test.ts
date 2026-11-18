@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
@@ -96,34 +96,36 @@ describe("loadOrCreateIdentity", () => {
 describe("profileDue", () => {
   const DAY = 24 * 60 * 60 * 1000;
 
+  /** One run: it reads the install's record, then asks whether its profile is due. */
+  const run = (env: NodeJS.ProcessEnv, hash: string, now: number) => {
+    return profileDue(env, hash, loadOrCreateIdentity(env).record, now);
+  };
+
   it("is due the first time, and not again for the same facts within a day", ({ dir }) => {
     const env = { XDG_CONFIG_HOME: dir };
-    loadOrCreateIdentity(env);
 
-    expect(profileDue(env, "h1", 1000)).toBe(true);
-    expect(profileDue(env, "h1", 1000 + DAY - 1)).toBe(false);
+    expect(run(env, "h1", 1000)).toBeDefined();
+    expect(run(env, "h1", 1000 + DAY - 1)).toBeUndefined();
   });
 
   it("is due again when what the profile says changed", ({ dir }) => {
     const env = { XDG_CONFIG_HOME: dir };
-    loadOrCreateIdentity(env);
-    profileDue(env, "h1", 1000);
+    run(env, "h1", 1000);
 
-    expect(profileDue(env, "h2", 2000)).toBe(true);
+    expect(run(env, "h2", 2000)).toBeDefined();
   });
 
   it("is due again once a day has passed", ({ dir }) => {
     const env = { XDG_CONFIG_HOME: dir };
-    loadOrCreateIdentity(env);
-    profileDue(env, "h1", 1000);
+    run(env, "h1", 1000);
 
-    expect(profileDue(env, "h1", 1000 + DAY)).toBe(true);
+    expect(run(env, "h1", 1000 + DAY)).toBeDefined();
   });
 
   it("keeps the install's id when it remembers the profile", ({ dir }) => {
     const env = { XDG_CONFIG_HOME: dir };
     const { distinctId } = loadOrCreateIdentity(env);
-    profileDue(env, "h1", 1000);
+    run(env, "h1", 1000);
 
     expect(loadOrCreateIdentity(env).distinctId).toBe(distinctId);
   });
@@ -133,6 +135,39 @@ describe("profileDue", () => {
       throw new Error("no home directory");
     });
 
-    expect(profileDue({}, "h1", 1000)).toBe(false);
+    expect(profileDue({}, "h1", undefined, 1000)).toBeUndefined();
+  });
+
+  it("calls the first profile of an install this release created its first, and no later one", ({
+    dir,
+  }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+
+    expect(run(env, "h1", 1000)).toEqual({ first: true });
+    expect(run(env, "h2", 2000)).toEqual({ first: false });
+  });
+
+  it("does not call the first profile of an install that predates it its first", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+    const file = join(dir, "zitadel", "cli", "telemetry.json");
+    mkdirSync(join(dir, "zitadel", "cli"), { recursive: true });
+    writeFileSync(file, `${JSON.stringify({ distinctId: "an-earlier-install" })}\n`);
+
+    expect(run(env, "h1", 1000)).toEqual({ first: false });
+  });
+});
+
+describe("a failed write", () => {
+  it("takes the id another run stored in the meantime, and leaves no temporary file", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+    const config = join(dir, "zitadel", "cli");
+    mkdirSync(config, { recursive: true });
+    // A directory where the record belongs makes the rename fail, as a busy file does.
+    mkdirSync(join(config, "telemetry.json"));
+
+    const identity = loadOrCreateIdentity(env);
+
+    expect(identity.isFirstRun).toBe(false);
+    expect(readdirSync(config).filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
 });

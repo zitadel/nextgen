@@ -64,7 +64,7 @@ Some commands add what they did, as counts and fixed values:
 
 | Command | Adds |
 | --- | --- |
-| `setup` | The framework, renderer, package manager, preset and use case, the sign-in provider (its slug, `custom`, `none` or `multiple`), whether a minimum password length was set (never the value), whether it created the app, skipped the install or was given a port, how many files it wrote, and the last step it reached. |
+| `setup` | The framework, renderer, package manager, preset and use case, the sign-in provider (its slug, `custom`, `none` or `multiple`), whether a minimum password length was set (never the value), whether it created the app, skipped the install or was given a port, how many files it wrote, and the furthest stage it reached (`setup_stage`). |
 | `deploy` | How many resources the release pinned, and how many origins it went live on. |
 | `doctor` | How many checks ran, failed and warned, and the names of the checks that failed. |
 | `policy test` | Whether it tested the policy files or a release, and how many cases ran and failed, never a case, an input or a config. |
@@ -92,7 +92,7 @@ Nothing that identifies you, your machine or your project: no name, email addres
 
 The first time it sends anything, the CLI creates a random ID for the install and keeps it in `~/.config/zitadel/cli/telemetry.json`: under `$XDG_CONFIG_HOME` when that is set, and under `%APPDATA%` on Windows. The ID ties the runs of one install together in Mixpanel, and holds nothing about you or the machine. The events for Vercel leave it out, so while Mixpanel is paused it stays on your machine. Delete the file to start over with a new one. Where the file cannot be written, every run takes a new ID.
 
-On that first run, in an interactive terminal, the CLI says on stderr that it collects analytics, and how to opt out. With Mixpanel, it also records the install itself: the platform, the CLI and Node versions, the country, `host_agent`, how it was launched, and the version it began on. It writes that record again when something in it changes, such as an upgrade, and at most once a day, so the record shows when the install was last used.
+The first time the CLI runs in an interactive terminal, before it sends anything, it says on stderr that it collects analytics, and how to opt out. A first run that is not interactive, such as `--json` or a script, leaves that notice for the first run that is. With Mixpanel, it also records the install itself: the platform, the CLI and Node versions, the country, `host_agent`, how it was launched, and, for an install this release created, the version it began on. It writes that record again when something in it changes, such as an upgrade, and at most once a day, so the record shows when the install was last used.
 
 ## When it sends
 

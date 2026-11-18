@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -14,10 +14,14 @@ import { join } from "node:path";
 export type Identity = {
   readonly distinctId: string;
   readonly isFirstRun: boolean;
+  /** What the install's record said when it was read, so a run reads it once. */
+  readonly record?: StoredIdentity;
 };
 
-type StoredIdentity = {
+export type StoredIdentity = {
   distinctId: string;
+  /** Set when this install's record was created by a release that writes profiles, so its first version is known. */
+  began?: true;
   /** When the install's profile was last written, and a hash of what was written. */
   profile?: { at: number; hash: string };
 };
@@ -29,8 +33,13 @@ type StoredIdentity = {
  */
 function writeStored(file: string, stored: StoredIdentity): void {
   const temporary = `${file}.${process.pid}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
-  renameSync(temporary, file);
+  try {
+    writeFileSync(temporary, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
+    renameSync(temporary, file);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
 }
 
 /**
@@ -87,19 +96,37 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
   try {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
     if (typeof parsed.distinctId === "string" && parsed.distinctId.length > 0) {
-      return { distinctId: parsed.distinctId, isFirstRun: !existsSync(join(dir, NOTICE_FILE)) };
+      return {
+        distinctId: parsed.distinctId,
+        isFirstRun: !existsSync(join(dir, NOTICE_FILE)),
+        record: parsed,
+      };
     }
   } catch {
     /* fall through to mint a fresh id */
   }
 
-  const distinctId = randomUUID();
+  const record: StoredIdentity = { distinctId: randomUUID(), began: true };
   try {
     mkdirSync(dir, { recursive: true });
-    writeStored(file, { distinctId });
-    return { distinctId, isFirstRun: true };
+    writeStored(file, record);
+    return { distinctId: record.distinctId, isFirstRun: true, record };
   } catch {
-    return { distinctId, isFirstRun: false };
+    // Another run may have stored its id first: take that one, so the two are one install.
+    try {
+      const other = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
+      if (typeof other.distinctId === "string" && other.distinctId.length > 0) {
+        return {
+          distinctId: other.distinctId,
+          isFirstRun: !existsSync(join(dir, NOTICE_FILE)),
+          record: other,
+        };
+      }
+    } catch {
+      /* nothing stored: this run is on its own */
+    }
+
+    return { distinctId: record.distinctId, isFirstRun: false };
   }
 }
 
@@ -119,32 +146,33 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
  *
  * @param env - The environment the run reads.
  * @param hash - A hash of what the profile would say.
+ * @param record - The install's record as the run read it.
  * @param now - The time in milliseconds.
- * @returns Whether to write the profile now.
+ * @returns Nothing when no profile is due; else whether this is the install's first
+ *   profile, written by the release that created the install, so its version is the first one.
  */
 export function profileDue(
   env: NodeJS.ProcessEnv,
   hash: string,
+  record: StoredIdentity | undefined,
   now: number = Date.now(),
-): boolean {
+): { readonly first: boolean } | undefined {
   const dir = telemetryConfigDir(env);
-  if (dir === undefined) {
-    return false;
+  if (dir === undefined || record === undefined) {
+    return undefined;
   }
-  const file = join(dir, "telemetry.json");
+  const last = record.profile;
+  const due = last === undefined || last.hash !== hash || now - last.at >= PROFILE_EVERY_MS;
+  if (!due) {
+    return undefined;
+  }
   try {
-    const stored = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
-    const last = stored.profile;
-    const due = last === undefined || last.hash !== hash || now - last.at >= PROFILE_EVERY_MS;
-    if (!due) {
-      return false;
-    }
-    writeStored(file, { ...stored, profile: { at: now, hash } });
-
-    return true;
+    writeStored(join(dir, "telemetry.json"), { ...record, profile: { at: now, hash } });
   } catch {
-    return false;
+    return undefined;
   }
+
+  return { first: record.began === true && last === undefined };
 }
 
 /**
