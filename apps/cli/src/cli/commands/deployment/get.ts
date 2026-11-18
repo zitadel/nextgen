@@ -2,21 +2,23 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
-import { GetDeploymentByIdParams } from "@/lib/backend/schemas";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { GetDeploymentParams } from "@/lib/backend/schemas";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { variableCell } from "@/lib/variables";
+import { VariableView } from "@/lib/variable";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
  * refused before anything is asked or called, and says what one looks like.
  */
 const DEPLOYMENT_ID: Refused<string> = {
-  schema: z.string().trim().pipe(GetDeploymentByIdParams.shape.deployment_id),
+  schema: z.string().trim().pipe(GetDeploymentParams.shape.deployment_id),
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the deployments to find one.",
@@ -32,9 +34,10 @@ const DEPLOYMENT_ID: Refused<string> = {
  * release it made live, the origins it went to, when, and the variables it
  * froze.
  */
-export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
+export default class DeploymentGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "Read one deployment by id.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 5;
 
   static override examples = ["<%= config.bin %> deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"];
   static override args = {
@@ -64,7 +67,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
               await this.tabulate(
                 ["name", "value"],
                 variables.map((variable) => {
-                  return variableCell(variable);
+                  return VariableView.of(variable).cell();
                 }),
               )
             )

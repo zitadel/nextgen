@@ -1,4 +1,4 @@
-import { readPackageJson } from "@/lib/npm";
+import { PM } from "@/lib/pm";
 
 import { ManagedFilesCheck, resolveArtifacts } from "./managed-files";
 import { AbstractSanityCheck, type CheckContext } from "./types";
@@ -18,7 +18,7 @@ export class DependencyCheck extends AbstractSanityCheck {
   protected readonly summary = "package.json depends on the Zitadel SDK packages the app imports";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    const pkg = await readPackageJson(ctx.cwd);
+    const pkg = await PM.manifest(ctx.cwd);
     const names = new Set([
       ...Object.keys(pkg.dependencies ?? {}),
       ...Object.keys(pkg.devDependencies ?? {}),

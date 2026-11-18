@@ -158,7 +158,7 @@ export function isNonShippingFile(file) {
   }
 
   // End-to-end suites live beside the app they exercise and ship with none of it.
-  if (/^(?:e2e|apps\/[^/]*-e2e)\//.test(path) || /^apps\/demo-[^/]+\//.test(path)) {
+  if (/^(?:e2e|conformance|apps\/[^/]*-e2e)\//.test(path) || /^apps\/demo-[^/]+\//.test(path)) {
     return true;
   }
 
@@ -199,7 +199,7 @@ export function suggestType(files) {
       (path) =>
         isTestFile(path) ||
         path.includes("/testdata/") ||
-        /^(?:e2e|apps\/[^/]*-e2e)\//.test(path) ||
+        /^(?:e2e|conformance|apps\/[^/]*-e2e)\//.test(path) ||
         /^apps\/demo-[^/]+\//.test(path) ||
         path.startsWith("packages/api-mock/"),
     )

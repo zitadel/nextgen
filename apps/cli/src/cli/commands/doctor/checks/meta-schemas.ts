@@ -1,12 +1,6 @@
 import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import {
-  linkOnPath,
-  metaSchemaState,
-  type ProjectMetaSchema,
-  projectMetaSchemas,
-  writeMetaSchemas,
-} from "@/lib/meta-schemas";
+import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -31,7 +25,7 @@ type MetaSchemaDrift = {
  * They are CLI-owned generated output (ADR 042's amendment), never read by
  * `deploy` or the server, so a stale file only misleads the editor: that is
  * a warning, not a failure, and `--fix` rewrites them. A file there the CLI
- * does not ship is left alone. {@link metaSchemaState} decides what differs,
+ * does not ship is left alone. {@link MetaSchemas.state} decides what differs,
  * and when a symlink keeps a file from being written.
  *
  * A file that differs may as well come from a newer CLI. When the project
@@ -67,7 +61,8 @@ export class MetaSchemasCheck implements SanityCheck {
     }
     const newer =
       missing.length > 0 || outdated.length > 0
-        ? (await writeMetaSchemas(ctx.cwd, [...missing, ...outdated], { dryRun: true })).newerPin
+        ? (await MetaSchemas.from([...missing, ...outdated]).write(ctx.cwd, { dryRun: true }))
+            .newerPin
         : undefined;
     const parts = [
       missing.length > 0 ? `${missing.length} missing` : undefined,
@@ -108,8 +103,8 @@ export class MetaSchemasCheck implements SanityCheck {
 
   /**
    * Writes this CLI's version of every missing or outdated meta-schema through
-   * {@link writeMetaSchemas}, which leaves a linked or unreadable file alone.
-   * Writes nothing in a dry run, or when {@link writeMetaSchemas} refuses
+   * {@link MetaSchemas.write}, which leaves a linked or unreadable file alone.
+   * Writes nothing in a dry run, or when {@link MetaSchemas.write} refuses
    * because the project pins a newer `@zitadel/*` package than this CLI.
    *
    * @param ctx - The project and how to treat it.
@@ -118,7 +113,7 @@ export class MetaSchemasCheck implements SanityCheck {
    */
   async fix(ctx: CheckContext): Promise<void> {
     const { missing, outdated } = await drift(ctx);
-    await writeMetaSchemas(ctx.cwd, [...missing, ...outdated], { dryRun: ctx.dryRun });
+    await MetaSchemas.from([...missing, ...outdated]).write(ctx.cwd, { dryRun: ctx.dryRun });
   }
 }
 
@@ -134,11 +129,11 @@ async function drift(ctx: CheckContext): Promise<MetaSchemaDrift> {
     links: [],
     unreadable: [],
   };
-  for (const file of projectMetaSchemas(ctx.cliVersion)) {
+  for (const file of MetaSchemas.of(ctx.cliVersion).files) {
     try {
-      const state = await metaSchemaState(ctx.cwd, file);
+      const state = await MetaSchemas.state(ctx.cwd, file);
       if (state === "linked") {
-        const link = (await linkOnPath(ctx.cwd, file.path)) ?? file.path;
+        const link = (await MetaSchemas.linkOnPath(ctx.cwd, file.path)) ?? file.path;
         if (!result.links.includes(link)) {
           result.links.push(link);
         }

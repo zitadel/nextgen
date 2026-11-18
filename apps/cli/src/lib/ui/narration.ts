@@ -1,5 +1,4 @@
-import { installLogSink, type LogLevel } from "@/lib/log";
-
+import { log, type LogLevel } from "./log";
 import { GUIDE, MARK } from "./marks";
 import { writePlain } from "./plain";
 import { DrawnSpinner } from "./spinner";
@@ -62,7 +61,7 @@ export class Narration {
     }
     this.debug = options.debug ?? false;
     this.silent = options.silent ?? false;
-    this.release = installLogSink((level, text) => {
+    this.release = log.install((level, text) => {
       this.draw(level, text);
     });
   }

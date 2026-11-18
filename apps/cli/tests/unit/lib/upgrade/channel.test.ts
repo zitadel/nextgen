@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 
 import { Cache } from "@/lib/upgrade/cache";
 import { ReleaseChannel } from "@/lib/upgrade/channel";
-import { test } from "@tests/helpers/fixtures";
+import { test } from "@tests/fixtures";
 
 const REGISTRY = "https://registry.npmjs.org";
 const MIRROR = "https://mirror.example/npm";

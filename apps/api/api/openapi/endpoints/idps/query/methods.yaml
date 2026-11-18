@@ -1,6 +1,6 @@
 post:
   operationId: queryIdps
-  x-zitadel-cli: idps list
+  x-zitadel-cli: idp list
   summary: Query identity providers
   description: |
     Returns the identity providers of a project, external sign-ins such as

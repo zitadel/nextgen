@@ -59,7 +59,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 	return projectDetailResponse(project), nil
 }
 
-func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
+func (h *Handler) UpdateProject(ctx context.Context, req *api.PatchProjectRequest, params api.UpdateProjectParams) (api.UpdateProjectRes, error) {
 	projectID := string(params.ProjectID)
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
 		return nil, err
@@ -170,8 +170,8 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 	}, nil
 }
 
-// AddOrigin stores one origin pattern on the project.
-func (h *Handler) AddOrigin(ctx context.Context, req *api.ProjectOrigin, params api.AddOriginParams) (api.AddOriginRes, error) {
+// AddProjectOrigin stores one origin pattern on the project.
+func (h *Handler) AddProjectOrigin(ctx context.Context, req *api.ProjectOrigin, params api.AddProjectOriginParams) (api.AddProjectOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -188,16 +188,16 @@ func (h *Handler) AddOrigin(ctx context.Context, req *api.ProjectOrigin, params 
 	}, nil
 }
 
-// RemoveOrigin deletes one origin pattern. opDelete maps to the project.admin
+// RemoveProjectOrigin deletes one origin pattern. opDelete maps to the project.admin
 // relation, matching other delete-shaped management ops.
-func (h *Handler) RemoveOrigin(ctx context.Context, req *api.RemoveOriginReq, params api.RemoveOriginParams) (api.RemoveOriginRes, error) {
+func (h *Handler) RemoveProjectOrigin(ctx context.Context, req *api.RemoveProjectOriginReq, params api.RemoveProjectOriginParams) (api.RemoveProjectOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opDelete); err != nil {
 		return nil, err
 	}
 	if err := h.projectService.RemoveOrigin(ctx, string(params.ProjectID), req.Pattern); err != nil {
 		return nil, err
 	}
-	return &api.RemoveOriginNoContent{}, nil
+	return &api.RemoveProjectOriginNoContent{}, nil
 }
 
 // ------------------ Converters ---------------
@@ -324,7 +324,7 @@ func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) 
 }
 
 // projectResponse is the project body every item in queryProjects and
-// listMyProjects answers with. getProject and patchProject answer with
+// listMyProjects answers with. getProject and updateProject answer with
 // projectDetailResponse, which carries the same fields.
 func projectResponse(project *domain.Project) *api.ProjectResponse {
 	return &api.ProjectResponse{

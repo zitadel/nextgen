@@ -84,9 +84,9 @@ var submitFlowStepCodes = []string{
 }
 
 var getUserCodes = []string{
-	string(api.AuthUnauthorizedGetUserByIDErrorResponse),
-	string(api.InternalGetUserByIDErrorResponse),
-	string(api.ReqInvalidGetUserByIDErrorResponse),
-	string(api.UserNotFoundGetUserByIDErrorResponse),
-	string(api.UserPermissionDeniedGetUserByIDErrorResponse),
+	string(api.AuthUnauthorizedGetUserErrorResponse),
+	string(api.InternalGetUserErrorResponse),
+	string(api.ReqInvalidGetUserErrorResponse),
+	string(api.UserNotFoundGetUserErrorResponse),
+	string(api.UserPermissionDeniedGetUserErrorResponse),
 }

@@ -8,7 +8,7 @@ import {
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();

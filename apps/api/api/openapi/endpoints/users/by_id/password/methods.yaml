@@ -63,7 +63,7 @@ put:
     policy.
 
     The password policy is the one in the release that serves the caller's
-    `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
+    `Origin`, chosen as `createFlow` (`POST /flows`) chooses it. A frontend on a
     preview URL gets that preview's policy, and one on a primary origin the
     newest primary deployment's. A request with no `Origin`, or from the
     console when the project does not list the console's origin, gets the

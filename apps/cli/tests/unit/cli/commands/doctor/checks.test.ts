@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readdir, readFile, rm, stat, symlink } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { join } from "node:path";
 
-import { describe, expect, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 import {
   ClaimCheck,
@@ -19,18 +20,19 @@ import {
   SecretPermissionsCheck,
 } from "@/cli/commands/doctor/checks";
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
-import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
-import { createOrca } from "@/lib/orca";
+import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
+import { Orca, createOrca } from "@/lib/orca";
 import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
-import { MANAGED_MARKER } from "@/lib/paths";
-import { hashScaffoldFile } from "@/lib/scaffold-manifest";
 import { aCheckContext, CHECK_CLI_VERSION } from "@tests/helpers/check-context";
 import { aUserSchema } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
-import { write } from "@tests/helpers/git-repo";
+import { it } from "@tests/fixtures";
+import { git, ignoredByGit, isolateGit, write } from "@tests/helpers/git-repo";
+import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
 import { readJson } from "@tests/helpers/local-project";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { viteConfig, withFixedAddress, withoutBlankLines } from "@tests/helpers/vite-config";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 /**
  * The project the config and the secret name.
@@ -40,7 +42,7 @@ const PROJECT_ID = "proj-001";
 /**
  * The server the config names: the hosted cloud.
  */
-const CLOUD = "https://api.zitadel.cloud";
+const CLOUD = "https://preview.zitadel.com";
 
 /**
  * The issuer a Next project's `.env.local` names.
@@ -98,6 +100,11 @@ const LOGIN_LAYOUT = "app/login/layout.tsx";
 const ANGULAR_PROXY = "proxy.conf.cjs";
 
 /**
+ * A Vite app's config, into which setup merges the dev proxy.
+ */
+const VITE_CONFIG = "vite.config.ts";
+
+/**
  * A recorded hash no file on disk has, so the file reads as edited.
  */
 const EDITED_HASH = "0".repeat(64);
@@ -125,12 +132,12 @@ const TRAILING = "0.1.0-alpha.17";
 /**
  * A Next managed boundary file as setup wrote it.
  */
-const MANAGED_MIDDLEWARE = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
+const MANAGED_MIDDLEWARE = `${ManagedFile.MARKER}\nexport function middleware() {}\n`;
 
 /**
  * A Next managed boundary file the developer edited.
  */
-const EDITED_MIDDLEWARE = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+const EDITED_MIDDLEWARE = `${ManagedFile.MARKER}\nexport function middleware() { /* custom */ }\n`;
 
 /**
  * A Next 16 app's `package.json`, which has the SDK.
@@ -242,11 +249,11 @@ async function aNextProject(dir: string): Promise<void> {
     ".gitignore": [SECRET_FILE, ".env*", "!.env.example"].join("\n"),
     ".env.example": ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
     [SCHEMA_FILE]: JSON.stringify(aUserSchema()),
-    [LOGIN_PAGE]: `${MANAGED_MARKER}\nexport default function L() {}\n`,
-    [REGISTER_PAGE]: `${MANAGED_MARKER}\nexport default function R() {}\n`,
-    "app/profile/page.tsx": `${MANAGED_MARKER}\nexport default function P() {}\n`,
+    [LOGIN_PAGE]: `${ManagedFile.MARKER}\nexport default function L() {}\n`,
+    [REGISTER_PAGE]: `${ManagedFile.MARKER}\nexport default function R() {}\n`,
+    "app/profile/page.tsx": `${ManagedFile.MARKER}\nexport default function P() {}\n`,
     [MIDDLEWARE]: MANAGED_MIDDLEWARE,
-    "custom-elements.d.ts": `${MANAGED_MARKER}\nexport {};\n`,
+    "custom-elements.d.ts": `${ManagedFile.MARKER}\nexport {};\n`,
   });
   await writeSecret(dir, SECRET);
 }
@@ -316,9 +323,55 @@ async function anAngularProject(dir: string): Promise<void> {
       "];",
       "",
     ].join("\n"),
-    "src/app/app.ts": `${MANAGED_MARKER}\nexport class App {}\n`,
-    "src/app/app.html": `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`,
+    "src/app/app.ts": `${ManagedFile.MARKER}\nexport class App {}\n`,
+    "src/app/app.html": `<!-- ${ManagedFile.MARKER} -->\n<main></main>\n`,
     [ANGULAR_PROXY]: proxyConfTemplate(),
+  });
+  await writeSecret(dir, SECRET);
+}
+
+/**
+ * `ZITADEL_URL` in the env files setup writes, as it writes them: the server
+ * `zitadel.json` names.
+ */
+const SETUP_ENV_FILES = {
+  ".env.local": `ZITADEL_ISSUER=http://localhost:5173\nZITADEL_URL=${CLOUD}\n`,
+  ".env.development.local": `ZITADEL_URL=${CLOUD}\n`,
+};
+
+/**
+ * A server other than {@link CLOUD}.
+ */
+const OTHER_SERVER = "https://other.example";
+
+/**
+ * Fills `dir` with a React (Vite) managed project whose `vite.config.ts` is
+ * `config`, with `files` beside it, its env files as setup writes them unless
+ * `files` replaces one.
+ *
+ * @param dir - The directory to fill.
+ * @param config - The Vite config.
+ * @param files - Files written over the project's own, such as an env file.
+ */
+async function aReactProject(
+  dir: string,
+  config: string,
+  files: Readonly<Record<string, string>> = {},
+): Promise<void> {
+  await write(dir, {
+    "package.json": JSON.stringify({
+      name: "demo",
+      dependencies: { react: "^19", vite: "^8", "@zitadel/sdk-react": "latest" },
+    }),
+    "zitadel.json": JSON.stringify({
+      project: PROJECT_ID,
+      server: CLOUD,
+      framework: { id: "react" },
+    }),
+    ...SETUP_ENV_FILES,
+    [VITE_CONFIG]: config,
+    "src/App.tsx": `${ManagedFile.MARKER}\nexport default function App() {}\n`,
+    ...files,
   });
   await writeSecret(dir, SECRET);
 }
@@ -331,8 +384,8 @@ async function anAngularProject(dir: string): Promise<void> {
  * @param dir - The directory to fill.
  */
 async function anOlderNuxtProject(dir: string): Promise<void> {
-  const contents = `// ${MANAGED_MARKER}\n`;
-  const hash = hashScaffoldFile(contents);
+  const contents = `// ${ManagedFile.MARKER}\n`;
+  const hash = Orca.scaffoldHash(contents);
   const pages = ["app/pages/login.vue", "app/pages/register.vue", "app/pages/profile.vue"];
   await write(dir, {
     "package.json": JSON.stringify({
@@ -379,7 +432,7 @@ async function writeTheMetaSchemas(dir: string, cliVersion = CHECK_CLI_VERSION):
   await write(
     dir,
     Object.fromEntries(
-      projectMetaSchemas(cliVersion).map((file) => {
+      MetaSchemas.of(cliVersion).files.map((file) => {
         return [file.path, file.contents];
       }),
     ),
@@ -394,7 +447,7 @@ async function writeTheMetaSchemas(dir: string, cliVersion = CHECK_CLI_VERSION):
  * @throws When this CLI ships none there.
  */
 function thisCliMetaSchema(path: string): ProjectMetaSchema {
-  const file = projectMetaSchemas(CHECK_CLI_VERSION).find((meta) => {
+  const file = MetaSchemas.of(CHECK_CLI_VERSION).files.find((meta) => {
     return meta.path === path;
   });
   if (file === undefined) {
@@ -581,8 +634,27 @@ describe("SecretPermissionsCheck", () => {
   });
 });
 
+/** A SvelteKit `.gitignore` as an older setup left it: its `.env*` after the generator's `!.env.example`. */
+const AN_OLDER_SETUPS_GITIGNORE = asAnOlderSetupLeft(SVELTEKIT_GITIGNORE);
+
+/** An `.env.example` someone filled in: a value in it may be a secret. */
+const A_FILLED_IN_ENV_EXAMPLE = "ZITADEL_PROJECT_ID=\nZITADEL_PROJECT_SECRET=s3cr3t\n";
+
+/** Every file setup writes that holds a secret, and a customer's own env files. */
+const IGNORED_PATHS = [
+  SECRET_FILE,
+  ".env.local",
+  ".env.development.local",
+  ".env.test",
+  ".env.production",
+];
+
 describe("GitignoreCheck", () => {
-  it("fails when an entry is missing", async ({ dir }) => {
+  beforeEach(() => {
+    isolateGit();
+  });
+
+  it("fails when a file holding a secret is not ignored", async ({ dir }) => {
     await aNextProject(dir);
     await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
 
@@ -591,16 +663,56 @@ describe("GitignoreCheck", () => {
     expect(outcome.status).toBe("fail");
   });
 
-  describe("fix", () => {
-    it("appends the missing entries", async ({ dir }) => {
+  it("passes when the generator's own lines already ignore the env files", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, { ".gitignore": `.env\n.env.*\n!.env.example\n${SECRET_FILE}\n` });
+
+    const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  describe("with .env.example ignored, as an older setup left a SvelteKit app", () => {
+    it("warns rather than fails", async ({ dir }) => {
       await aNextProject(dir);
+      await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+      const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("warn");
+    });
+
+    it("offers doctor --fix", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+      const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+      expect(outcome.remedy).toContain("doctor --fix");
+    });
+
+    it("offers no repair while .env.example holds a value", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, {
+        ".gitignore": AN_OLDER_SETUPS_GITIGNORE,
+        ".env.example": A_FILLED_IN_ENV_EXAMPLE,
+      });
+
+      const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+      expect(outcome.remedy).toBeUndefined();
+    });
+  });
+
+  describe("fix", () => {
+    it("makes git ignore every missing secret", async ({ dir }) => {
+      await aNextProject(dir);
+      await git(dir, "init", "--quiet");
       await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
 
       await new GitignoreCheck().fix(aCheckContext(dir));
 
-      expect((await textOf(dir, ".gitignore")).split("\n")).toEqual(
-        expect.arrayContaining([".env*", "!.env.example"]),
-      );
+      expect(await ignoredByGit(dir, [...IGNORED_PATHS, ".env.example"])).toEqual(IGNORED_PATHS);
     });
 
     it("leaves the check passing", async ({ dir }) => {
@@ -628,6 +740,41 @@ describe("GitignoreCheck", () => {
       await new GitignoreCheck().fix(aCheckContext(dir, { dryRun: true }));
 
       expect((await new GitignoreCheck().run(aCheckContext(dir))).status).toBe("fail");
+    });
+
+    describe("with .env.example ignored, as an older setup left a SvelteKit app", () => {
+      it("makes git keep .env.example", async ({ dir }) => {
+        await aNextProject(dir);
+        await git(dir, "init", "--quiet");
+        await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+        await new GitignoreCheck().fix(aCheckContext(dir));
+
+        expect(await ignoredByGit(dir, [".env.example"])).toEqual([]);
+      });
+
+      it("un-ignores no file that holds a secret", async ({ dir }) => {
+        await aNextProject(dir);
+        await git(dir, "init", "--quiet");
+        await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+        await new GitignoreCheck().fix(aCheckContext(dir));
+
+        expect(await ignoredByGit(dir, IGNORED_PATHS)).toEqual(IGNORED_PATHS);
+      });
+
+      it("leaves .env.example ignored while it holds a value", async ({ dir }) => {
+        await aNextProject(dir);
+        await git(dir, "init", "--quiet");
+        await write(dir, {
+          ".gitignore": AN_OLDER_SETUPS_GITIGNORE,
+          ".env.example": A_FILLED_IN_ENV_EXAMPLE,
+        });
+
+        await new GitignoreCheck().fix(aCheckContext(dir));
+
+        expect(await ignoredByGit(dir, [".env.example"])).toEqual([".env.example"]);
+      });
     });
   });
 });
@@ -1355,7 +1502,7 @@ describe("ManagedFilesCheck", () => {
       await aNextProject(dir);
       await writeScaffold(dir, {
         files: {
-          [MIDDLEWARE]: { hash: hashScaffoldFile(MANAGED_MIDDLEWARE), class: "infrastructure" },
+          [MIDDLEWARE]: { hash: Orca.scaffoldHash(MANAGED_MIDDLEWARE), class: "infrastructure" },
         },
       });
       await rm(join(dir, "custom-elements.d.ts"));
@@ -1432,9 +1579,7 @@ describe("ManagedFilesCheck", () => {
       expect(outcome.status).toBe("warn");
     });
 
-    it("warns, rather than failing, when only the convenience dev script is missing", async ({
-      dir,
-    }) => {
+    it("passes an Angular app without a dev script, which only setup adds", async ({ dir }) => {
       await anAngularProject(dir);
       await write(dir, {
         "package.json": JSON.stringify({
@@ -1445,10 +1590,7 @@ describe("ManagedFilesCheck", () => {
 
       const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
 
-      expect(outcome).toMatchObject({
-        status: "warn",
-        message: expect.stringContaining("unapplied managed config edit(s): package.json"),
-      });
+      expect(outcome.status).toBe("pass");
     });
   });
 
@@ -1595,6 +1737,90 @@ describe("ManagedFilesCheck", () => {
     });
   });
 
+  describe("with a Vite project's dev proxy", () => {
+    it("passes a proxy that reads the server's address from ZITADEL_URL", async ({ dir }) => {
+      await aReactProject(dir, viteConfig(CLOUD));
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("warns, offering doctor --fix, on a proxy that fixes the server's address", async ({
+      dir,
+    }) => {
+      await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining(
+          "unapplied managed config edit(s): vite.config.ts (doctor --fix applies them)",
+        ),
+      });
+    });
+
+    it("warns, naming both addresses and the file, while .env.development.local names another server", async ({
+      dir,
+    }) => {
+      await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD), {
+        ".env.development.local": `ZITADEL_URL=${OTHER_SERVER}\n`,
+      });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining(
+          `fixes ${CLOUD}, but .env.development.local sets ZITADEL_URL to ${OTHER_SERVER}`,
+        ),
+      });
+    });
+
+    it("warns, naming the server zitadel.json names, while .env.development.local does not set one yet", async ({
+      dir,
+    }) => {
+      await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), OTHER_SERVER), {
+        ".env.development.local": "ZITADEL_PROJECT_ID=proj-001\n",
+      });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining(
+          `fixes ${OTHER_SERVER}, but zitadel.json names ${CLOUD}, which doctor --fix writes to .env.development.local as ZITADEL_URL`,
+        ),
+      });
+    });
+
+    it("warns, not fails, on a proxy whose bearer hook was changed by hand", async ({ dir }) => {
+      await aReactProject(
+        dir,
+        withFixedAddress(viteConfig(CLOUD), CLOUD).replace(
+          'proxyReq.setHeader("authorization", bearer);',
+          'proxyReq.setHeader("authorization", bearer);\n            console.debug("exchange");',
+        ),
+      );
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining("was changed since zitadel setup wrote it"),
+      });
+    });
+
+    it("says why a config it cannot read is unverifiable once", async ({ dir }) => {
+      await aReactProject(dir, "module.exports = () => ({});\n");
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.message.match(/vite\.config\.ts \(/g)).toHaveLength(1);
+    });
+  });
+
   describe("with Next's request boundary", () => {
     /**
      * Fills `dir` with a Next 16 app whose manifest records a pristine
@@ -1607,7 +1833,7 @@ describe("ManagedFilesCheck", () => {
       await write(dir, { "package.json": JSON.stringify(NEXT_16_PACKAGE) });
       await writeScaffold(dir, {
         files: {
-          [MIDDLEWARE]: { hash: hashScaffoldFile(MANAGED_MIDDLEWARE), class: "infrastructure" },
+          [MIDDLEWARE]: { hash: Orca.scaffoldHash(MANAGED_MIDDLEWARE), class: "infrastructure" },
         },
       });
     };
@@ -1669,7 +1895,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, PROXY)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, PROXY)).toContain(ManagedFile.MARKER);
       });
 
       it("drops middleware.ts from the manifest", async ({ dir }) => {
@@ -1710,7 +1936,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, LOGIN_PAGE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, LOGIN_PAGE)).toContain(ManagedFile.MARKER);
       });
 
       it("creates no proxy.ts, which Next refuses beside middleware.ts", async ({ dir }) => {
@@ -1759,7 +1985,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, PROXY)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, PROXY)).toContain(ManagedFile.MARKER);
       });
 
       it("drops middleware.ts from the manifest", async ({ dir }) => {
@@ -1824,7 +2050,7 @@ describe("ManagedFilesCheck", () => {
         await anUnresolvedConflict(dir);
         await new ManagedFilesCheck().fix(aCheckContext(dir));
         await rm(join(dir, MIDDLEWARE));
-        await write(dir, { [PROXY]: `${MANAGED_MARKER}\nexport function proxy() {}\n` });
+        await write(dir, { [PROXY]: `${ManagedFile.MARKER}\nexport function proxy() {}\n` });
       };
 
       it("creates no proxy.ts", async ({ dir }) => {
@@ -1879,12 +2105,12 @@ describe("ManagedFilesCheck", () => {
 
       await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-      expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+      expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
     });
 
     it("leaves an edited page untouched without a manifest", async ({ dir }) => {
       await aNextProject(dir);
-      const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "custom"; }\n`;
+      const editedLogin = `${ManagedFile.MARKER}\nexport default function L() { return "custom"; }\n`;
       await write(dir, { [LOGIN_PAGE]: editedLogin });
       await rm(join(dir, MIDDLEWARE));
 
@@ -1934,7 +2160,7 @@ describe("ManagedFilesCheck", () => {
 
       await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-      expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+      expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
     });
 
     describe("with missing infrastructure the manifest records", () => {
@@ -1957,7 +2183,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
       });
 
       it("refreshes its recorded hash", async ({ dir }) => {
@@ -1967,7 +2193,7 @@ describe("ManagedFilesCheck", () => {
 
         expect(await readJson(dir, STATE_FILE)).toHaveProperty(
           ["scaffold", "files", MIDDLEWARE, "hash"],
-          hashScaffoldFile(await textOf(dir, MIDDLEWARE)),
+          Orca.scaffoldHash(await textOf(dir, MIDDLEWARE)),
         );
       });
 
@@ -2017,7 +2243,7 @@ describe("ManagedFilesCheck", () => {
     });
 
     describe("with edited and adopted pages the manifest records", () => {
-      const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "edited"; }\n`;
+      const editedLogin = `${ManagedFile.MARKER}\nexport default function L() { return "edited"; }\n`;
       const adoptedRegister = "export default function Own() {}\n";
 
       /**
@@ -2055,7 +2281,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
       });
     });
 
@@ -2221,6 +2447,91 @@ describe("ManagedFilesCheck", () => {
       });
     });
 
+    describe("with a Vite proxy that fixes the server's address", () => {
+      it("moves the proxy onto ZITADEL_URL, keeping the address as its fallback", async ({
+        dir,
+      }) => {
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(withoutBlankLines(await textOf(dir, VITE_CONFIG))).toBe(
+          withoutBlankLines(viteConfig(CLOUD)),
+        );
+      });
+
+      it.for([".env.local", ".env.development.local"])(
+        "leaves the ZITADEL_URL in %s as it was",
+        async (file, { dir }) => {
+          await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
+
+          await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+          expect((await textOf(dir, file)).match(/^ZITADEL_URL=.*$/gm)).toEqual([
+            `ZITADEL_URL=${CLOUD}`,
+          ]);
+        },
+      );
+
+      it("moves a proxy whose env files set ZITADEL_URL empty, so the app keeps its address", async ({
+        dir,
+      }) => {
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD), {
+          ".env.development.local": "ZITADEL_URL=\n",
+        });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(withoutBlankLines(await textOf(dir, VITE_CONFIG))).toBe(
+          withoutBlankLines(viteConfig(CLOUD)),
+        );
+      });
+
+      it("leaves the check passing", async ({ dir }) => {
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+
+      it("changes nothing when run a second time", async ({ dir }) => {
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+        const once = await textOf(dir, VITE_CONFIG);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, VITE_CONFIG)).toBe(once);
+      });
+
+      it.for([
+        ["while .env.development.local names another server", CLOUD, OTHER_SERVER],
+        ["once its target was changed to another server", OTHER_SERVER, CLOUD],
+      ] as const)("leaves the proxy as it is %s", async ([, target, envServer], { dir }) => {
+        const config = withFixedAddress(viteConfig(CLOUD), target);
+        await aReactProject(dir, config, {
+          ".env.development.local": `ZITADEL_URL=${envServer}\n`,
+        });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, VITE_CONFIG)).toBe(config);
+      });
+
+      it("leaves a literal put back after the move as it is", async ({ dir }) => {
+        const pinned = withFixedAddress(viteConfig(CLOUD), CLOUD).replace(
+          "zitadel:proxy:v3",
+          "zitadel:proxy:v4",
+        );
+        await aReactProject(dir, pinned);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, VITE_CONFIG)).toBe(pinned);
+      });
+    });
+
     describe("with a fresh scaffold the manifest recorded", () => {
       /**
        * Fills `dir` with a project whose manifest records a fresh scaffold's
@@ -2241,7 +2552,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, HOME_PAGE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, HOME_PAGE)).toContain(ManagedFile.MARKER);
       });
 
       it("leaves the check passing", async ({ dir }) => {
@@ -2257,7 +2568,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, LOGIN_LAYOUT)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, LOGIN_LAYOUT)).toContain(ManagedFile.MARKER);
       });
 
       it("records the route layouts in the manifest", async ({ dir }) => {
@@ -2452,7 +2763,7 @@ describe("loadPatchContext", () => {
   it("reconstructs the patch context from on-disk project files", async ({ dir }) => {
     await aNextProject(dir);
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context).toMatchObject({
       framework: { id: "next" },
@@ -2479,7 +2790,7 @@ describe("loadPatchContext", () => {
     });
     await writeScaffold(dir, { files: {}, scaffolded_framework: true, dev_port: 3005 });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context).toMatchObject({
       preset: "passkey-first",
@@ -2489,6 +2800,28 @@ describe("loadPatchContext", () => {
     });
   });
 
+  it("plans with no server when zitadel.json records none, as it always has", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "zitadel.json": JSON.stringify({ project: PROJECT_ID, framework: { id: "next" } }),
+    });
+
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
+
+    expect(context.server).toBe("");
+  });
+
+  it.for([
+    ["1.2.0", "1.2.0"],
+    ["2.0.0-beta.3", "beta"],
+  ])("pins the SDK for CLI %s at %s", async ([cliVersion, expected], { dir }) => {
+    await aNextProject(dir);
+
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), cliVersion ?? "");
+
+    expect(context.sdkVersion).toBe(expected);
+  });
+
   it("takes the issuer from the project's files, never the shell's environment", async ({
     dir,
   }) => {
@@ -2496,7 +2829,7 @@ describe("loadPatchContext", () => {
     vi.stubEnv("ZITADEL_ENV", "production");
     vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.issuer).toBe(ISSUER);
   });
@@ -2506,7 +2839,7 @@ describe("loadPatchContext", () => {
     await rm(join(dir, ".env.local"));
     await writeScaffold(dir, { files: {}, dev_port: 3005 });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.issuer).toBe("http://localhost:3005");
   });
@@ -2523,7 +2856,7 @@ describe("loadPatchContext", () => {
     await aNextProject(dir);
     await writeScaffold(dir, scaffold);
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.posture).toBe(posture);
   });

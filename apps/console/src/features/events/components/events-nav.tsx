@@ -2,6 +2,7 @@ import { Link, useMatch, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftRight,
   Check,
+  ChevronRight,
   ChevronsUpDown,
   Logs,
   LogIn,
@@ -10,7 +11,10 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Combobox,
   ComboboxAnchor,
@@ -34,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -46,7 +51,6 @@ import {
   AUDIT_CATEGORIES,
   type AuditCategory,
   EVENT_TYPES,
-  FAILED_STATUS,
   FAILURE_TYPES,
   hasCustomRange,
   isNarrowed,
@@ -77,8 +81,8 @@ import {
  * The Events list of the sidebar (D30): what the shell shows in place of the
  * project's screens on `/events` and under an event's drawer, as Vercel's Logs
  * does. A picker chooses the list's view, and under it sit the filters chosen
- * from a list: the time, the category, the type, the status or how a sign-in
- * ended. Values that
+ * from a list, each a group that folds away as Vercel's are: the time, and
+ * the categories, the type, the statuses or how a sign-in ended. Values that
  * are pasted, the ids and the operation, go in the search above the table
  * (`EventSearchField`).
  *
@@ -157,11 +161,61 @@ export function EventViewPicker() {
 /** `Select` cannot hold an empty value, so "no choice" has a name of its own. */
 const ANY = "any";
 
+/** One value of a short list, as a row of its group. */
+interface CheckOption<T extends string> {
+  value: T;
+  label: string;
+  /** What the value means, in the row's last place, where Vercel draws a count. */
+  note?: string;
+  /** A dot in the tone the list's rows give the value: the colour of a failure. */
+  dot?: string;
+}
+
+/** The API's own values, capitalised. */
+const CATEGORY_OPTIONS: CheckOption<AuditCategory>[] = AUDIT_CATEGORIES.map((category) => ({
+  value: category,
+  label: category.charAt(0).toUpperCase() + category.slice(1),
+}));
+
+const NEUTRAL_DOT = "bg-muted-foreground/60";
+
+const OUTCOME_OPTIONS: CheckOption<SigninOutcome>[] = SIGNIN_OUTCOMES.map((outcome) => ({
+  value: outcome,
+  label: SIGNIN_OUTCOME_LABEL[outcome],
+  dot: outcome === "failed" ? "bg-destructive" : NEUTRAL_DOT,
+}));
+
+/** What a status class means, beside it in the list. */
+const STATUS_MEANING: Record<StatusClass, string> = {
+  "2xx": "Succeeded",
+  "3xx": "Redirected",
+  "4xx": "Refused",
+  "5xx": "Failed",
+};
+
+/** The dots of a request's status in the rows: the caller's mistake, the server's error. */
+const STATUS_DOT: Record<StatusClass, string> = {
+  "2xx": NEUTRAL_DOT,
+  "3xx": NEUTRAL_DOT,
+  "4xx": "bg-warning",
+  "5xx": "bg-destructive",
+};
+
+const STATUS_OPTIONS: CheckOption<StatusClass>[] = STATUS_CLASSES.map((status) => ({
+  value: status,
+  label: status,
+  note: STATUS_MEANING[status],
+  dot: STATUS_DOT[status],
+}));
+
 /**
- * The list's filters, under the view: the time range, and the category and
- * the type, or the requests' status, each chosen from the values there are.
+ * The list's filters, under the view, as Vercel's Logs draws its own: one
+ * group a filter, which folds away under its name. The time is a range chosen
+ * from a list. A filter of a few values (the categories, how a sign-in ended,
+ * a request's status classes) shows them all as checkboxes, several at once,
+ * each one range of an index; the types, some fifty, are found in a list.
  * A value that is pasted is the search's. The API has no count of the events
- * behind a value, so none is drawn.
+ * behind a value, so none is drawn where Vercel draws one.
  *
  * The icon rail has no room for a field: the group leaves with the labels,
  * and the screen's own button opens the sidebar to reach it.
@@ -177,9 +231,8 @@ export function EventFilters() {
       aria-label="Filters"
       className="pt-4 group-data-[collapsible=icon]:hidden"
     >
-      {/* The group's name, a step above its fields' labels: at one size the
-          heading read as the first of them. Clearing is the group's action,
-          so it sits on the heading. */}
+      {/* The group's name, a step above its filters' names. Clearing is the
+          group's action, so it sits on the heading. */}
       <div className="flex h-9 items-center justify-between pr-1 pl-2">
         <SidebarGroupLabel className="text-sidebar-foreground h-auto px-0 text-sm">
           Filters
@@ -196,74 +249,164 @@ export function EventFilters() {
           </Button>
         )}
       </div>
-      <SidebarGroupContent className="flex flex-col gap-4 px-2 pb-2">
-        <TimeFilter current={current} go={go} />
+      <SidebarGroupContent className="flex flex-col px-2 pb-2">
+        <FilterGroup label="Timeline" set={current.since || hasCustomRange(current) ? 1 : 0}>
+          {(labelId) => <TimeFilter current={current} go={go} labelId={labelId} />}
+        </FilterGroup>
 
         {/* The requests are one category themselves, and the sign-ins their
             own types. */}
         {current.view === "signins" && (
-          <Field label="Outcome">
+          <FilterGroup label="Outcome" set={current.outcome?.length ?? 0}>
             {(labelId) => (
-              <Select
-                value={current.outcome ?? ANY}
-                onValueChange={(outcome) =>
-                  go(withOutcome(current, outcome === ANY ? undefined : (outcome as SigninOutcome)))
-                }
-              >
-                <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any outcome</SelectItem>
-                  {SIGNIN_OUTCOMES.map((outcome) => (
-                    <SelectItem key={outcome} value={outcome}>
-                      {SIGNIN_OUTCOME_LABEL[outcome]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CheckList
+                labelId={labelId}
+                options={OUTCOME_OPTIONS}
+                chosen={current.outcome ?? []}
+                onChange={(outcomes) => go(withOutcome(current, outcomes))}
+              />
             )}
-          </Field>
+          </FilterGroup>
         )}
         {current.view !== "requests" && current.view !== "signins" && (
-          <Field label="Category">
+          <FilterGroup label="Category" set={current.category?.length ?? 0}>
             {(labelId) => (
-              <Select
-                value={current.category ?? ANY}
-                onValueChange={(category) =>
-                  go(
-                    withCategory(
-                      current,
-                      category === ANY ? undefined : (category as AuditCategory),
-                    ),
-                  )
-                }
-              >
-                <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any category</SelectItem>
-                  {AUDIT_CATEGORIES.map((category) => (
-                    // The API's own value, capitalised.
-                    <SelectItem key={category} value={category} className="capitalize">
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CheckList
+                labelId={labelId}
+                options={CATEGORY_OPTIONS}
+                chosen={current.category ?? []}
+                onChange={(categories) => go(withCategory(current, categories))}
+              />
             )}
-          </Field>
+          </FilterGroup>
         )}
 
-        {/* A request is one type: the requests narrow by status instead. */}
+        {/* A request is one type: the requests narrow by status instead.
+            Requests recorded before the server indexed the status are not
+            matched. */}
         {current.view === "requests" ? (
-          <StatusFilter current={current} go={go} />
+          <FilterGroup label="Status" set={current.status?.length ?? 0}>
+            {(labelId) => (
+              <CheckList
+                labelId={labelId}
+                options={STATUS_OPTIONS}
+                chosen={current.status ?? []}
+                onChange={(classes) => go(withStatus(current, classes))}
+              />
+            )}
+          </FilterGroup>
         ) : (
-          current.view !== "signins" && <TypeFilter current={current} go={go} />
+          current.view !== "signins" && (
+            <FilterGroup label="Type" set={current.type?.length ?? 0}>
+              {() => <TypeFilter current={current} go={go} />}
+            </FilterGroup>
+          )
         )}
       </SidebarGroupContent>
     </SidebarGroup>
+  );
+}
+
+/**
+ * One filter: its name, which folds its control away, over the control. Open
+ * until it is folded; folded over a value that is set, the name says how many
+ * are, so a filter never narrows the list unseen. The sidebar renders twice on
+ * a phone, so ids are per instance.
+ */
+function FilterGroup({
+  label,
+  set,
+  children,
+}: {
+  label: string;
+  /** How many values the filter holds. */
+  set: number;
+  children: (labelId: string) => ReactNode;
+}) {
+  const labelId = useId();
+  const [open, setOpen] = useState(true);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} role="group" aria-labelledby={labelId}>
+      <CollapsibleTrigger
+        // Folded over a value, the name says so: the parts would run together.
+        aria-label={!open && set > 0 ? `${label}, ${set} set` : undefined}
+        className={cn(
+          "text-sidebar-foreground hover:bg-sidebar-accent group/filter -mx-1 flex h-9 w-[calc(100%+--spacing(2))] items-center gap-2 rounded-md px-1 text-left text-sm font-medium outline-none",
+          "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        )}
+      >
+        <ChevronRight
+          aria-hidden
+          strokeWidth={1.5}
+          className="text-muted-foreground size-4 shrink-0 transition-transform group-data-[state=open]/filter:rotate-90 motion-reduce:transition-none"
+        />
+        <span id={labelId} className="flex-1">
+          {label}
+        </span>
+        {!open && set > 0 && (
+          <Badge variant="secondary" aria-hidden>
+            {set}
+          </Badge>
+        )}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-1 pb-3">{children(labelId)}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/**
+ * A filter of a few values, all of them in sight: a box a value, any number
+ * ticked, none meaning every one. As Vercel's Level and Status lists, less
+ * the count.
+ */
+function CheckList<T extends string>({
+  labelId,
+  options,
+  chosen,
+  onChange,
+}: {
+  labelId: string;
+  options: readonly CheckOption<T>[];
+  chosen: readonly T[];
+  onChange: (chosen: T[]) => void;
+}) {
+  const id = useId();
+  return (
+    <ul
+      aria-labelledby={labelId}
+      className="border-input bg-background dark:bg-input/30 divide-border divide-y rounded-md border"
+    >
+      {options.map((option) => {
+        const checked = chosen.includes(option.value);
+        return (
+          <li key={option.value}>
+            <label
+              htmlFor={`${id}-${option.value}`}
+              className="flex h-9 cursor-pointer items-center gap-2.5 px-2.5 text-sm"
+            >
+              <Checkbox
+                id={`${id}-${option.value}`}
+                checked={checked}
+                onCheckedChange={() =>
+                  onChange(
+                    checked
+                      ? chosen.filter((value) => value !== option.value)
+                      : [...chosen, option.value],
+                  )
+                }
+              />
+              {option.dot && (
+                <span aria-hidden className={cn("size-2 shrink-0 rounded-full", option.dot)} />
+              )}
+              <span className="text-foreground min-w-0 flex-1 truncate">{option.label}</span>
+              {option.note && (
+                <span className="text-muted-foreground shrink-0 text-xs">{option.note}</span>
+              )}
+            </label>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -278,44 +421,43 @@ const CUSTOM = "custom";
 function TimeFilter({
   current,
   go,
+  labelId,
 }: {
   current: EventsSearch;
   go: (search: EventsSearch) => void;
+  /** The group's name, which names the list. */
+  labelId: string;
 }) {
   const custom = hasCustomRange(current);
   const [editing, setEditing] = useState(false);
   const value = custom || editing ? CUSTOM : (current.since ?? ANY);
 
   return (
-    <>
-      <Field label="Timeline">
-        {(labelId) => (
-          <Select
-            value={value}
-            onValueChange={(choice) => {
-              if (choice === CUSTOM) {
-                setEditing(true);
-                return;
-              }
-              setEditing(false);
-              go(withTimeRange(current, choice === ANY ? undefined : (choice as TimeRange)));
-            }}
-          >
-            <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>Everything retained</SelectItem>
-              {TIME_RANGES.map((range) => (
-                <SelectItem key={range} value={range}>
-                  {TIME_RANGE_LABEL[range]}
-                </SelectItem>
-              ))}
-              <SelectItem value={CUSTOM}>Custom range</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-      </Field>
+    <div className="flex flex-col gap-3">
+      <Select
+        value={value}
+        onValueChange={(choice) => {
+          if (choice === CUSTOM) {
+            setEditing(true);
+            return;
+          }
+          setEditing(false);
+          go(withTimeRange(current, choice === ANY ? undefined : (choice as TimeRange)));
+        }}
+      >
+        <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Everything retained</SelectItem>
+          {TIME_RANGES.map((range) => (
+            <SelectItem key={range} value={range}>
+              {TIME_RANGE_LABEL[range]}
+            </SelectItem>
+          ))}
+          <SelectItem value={CUSTOM}>Custom range</SelectItem>
+        </SelectContent>
+      </Select>
       {(custom || editing) && (
         <CustomRange
           from={current.from}
@@ -326,7 +468,7 @@ function TimeFilter({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -515,170 +657,49 @@ function TypeFilter({
   };
 
   return (
-    <Field label="Type">
-      {() => (
-        <Combobox open={open} onOpenChange={setOpen}>
-          <ComboboxAnchor asChild>
-            <ComboboxTrigger
-              label="Event types"
-              open={open}
-              onOpen={() => setOpen(true)}
-              className={CONTROL}
-            >
-              {chosen.length === 0 ? (
-                <ComboboxPlaceholder>Any type</ComboboxPlaceholder>
-              ) : (
-                <ComboboxValue>
-                  {failuresOnly
-                    ? "Only failures"
-                    : chosen.length === 1
-                      ? chosen[0]
-                      : `${chosen.length} types`}
-                </ComboboxValue>
-              )}
-            </ComboboxTrigger>
-          </ComboboxAnchor>
-          <ComboboxContent
-            groups={TYPE_LIST}
-            selected={failuresOnly ? [FAILURES, ...chosen] : chosen}
-            searchPlaceholder="Find a type"
-            emptyLabel="No type matches."
-            label="Event types"
-            closeOnSelect={false}
-            onSelect={toggle}
-            onClose={() => setOpen(false)}
-            footer={
-              chosen.length > 0
-                ? { label: "Any type", onSelect: () => go(withTypes(current, [])) }
-                : undefined
-            }
-            className="w-64"
-          />
-        </Combobox>
-      )}
-    </Field>
-  );
-}
-
-/** What a status class means, beside it in the list. */
-const STATUS_MEANING: Record<StatusClass, string> = {
-  "2xx": "Succeeded",
-  "3xx": "Redirected",
-  "4xx": "Refused: the caller's mistake",
-  "5xx": "Failed: the server's error",
-};
-
-/** The list's first row, which is no class: it stands for the failed ones. */
-const FAILED = "preset:failed";
-
-/** As the type list: the shortcut heads the classes it ticks. */
-const STATUS_LIST: ComboboxGroup[] = [
-  {
-    ruled: true,
-    options: [
-      {
-        value: FAILED,
-        label: "Only failed requests",
-        description: FAILED_STATUS.join(", "),
-        chip: "destructive",
-      },
-    ],
-  },
-  {
-    options: STATUS_CLASSES.map((status) => ({
-      value: status,
-      label: status,
-      description: STATUS_MEANING[status],
-    })),
-  },
-];
-
-/**
- * The API requests narrowed by the class of their response status, several
- * at once: one range of the status index each, so any choice fills its pages.
- * **Only failed requests**, the list's first row, ticks 4xx and 5xx. Requests recorded before the
- * server indexed the status are not matched.
- */
-function StatusFilter({
-  current,
-  go,
-}: {
-  current: EventsSearch;
-  go: (search: EventsSearch) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const chosen = current.status ?? [];
-  const failedOnly =
-    chosen.length === FAILED_STATUS.length &&
-    FAILED_STATUS.every((status) => chosen.includes(status));
-  const toggle = (status: string) => {
-    if (status === FAILED) return go(withStatus(current, failedOnly ? [] : FAILED_STATUS));
-    const known = STATUS_CLASSES.find((candidate) => candidate === status);
-    if (!known) return;
-    go(
-      withStatus(
-        current,
-        chosen.includes(known) ? chosen.filter((other) => other !== known) : [...chosen, known],
-      ),
-    );
-  };
-
-  return (
-    <Field label="Status">
-      {() => (
-        <Combobox open={open} onOpenChange={setOpen}>
-          <ComboboxAnchor asChild>
-            <ComboboxTrigger
-              label="Status classes"
-              open={open}
-              onOpen={() => setOpen(true)}
-              className={CONTROL}
-            >
-              {chosen.length === 0 ? (
-                <ComboboxPlaceholder>Any status</ComboboxPlaceholder>
-              ) : (
-                <ComboboxValue>
-                  {failedOnly ? "Only failed requests" : chosen.join(", ")}
-                </ComboboxValue>
-              )}
-            </ComboboxTrigger>
-          </ComboboxAnchor>
-          <ComboboxContent
-            groups={STATUS_LIST}
-            selected={failedOnly ? [FAILED, ...chosen] : chosen}
-            searchPlaceholder="Find a status"
-            emptyLabel="No status matches."
-            label="Status classes"
-            closeOnSelect={false}
-            onSelect={toggle}
-            onClose={() => setOpen(false)}
-            footer={
-              chosen.length > 0
-                ? { label: "Any status", onSelect: () => go(withStatus(current, [])) }
-                : undefined
-            }
-            className="w-64"
-          />
-        </Combobox>
-      )}
-    </Field>
+    <Combobox open={open} onOpenChange={setOpen}>
+      <ComboboxAnchor asChild>
+        <ComboboxTrigger
+          label="Event types"
+          open={open}
+          onOpen={() => setOpen(true)}
+          className={CONTROL}
+        >
+          {chosen.length === 0 ? (
+            <ComboboxPlaceholder>Any type</ComboboxPlaceholder>
+          ) : (
+            <ComboboxValue>
+              {failuresOnly
+                ? "Only failures"
+                : chosen.length === 1
+                  ? chosen[0]
+                  : `${chosen.length} types`}
+            </ComboboxValue>
+          )}
+        </ComboboxTrigger>
+      </ComboboxAnchor>
+      <ComboboxContent
+        groups={TYPE_LIST}
+        selected={failuresOnly ? [FAILURES, ...chosen] : chosen}
+        searchPlaceholder="Find a type"
+        emptyLabel="No type matches."
+        label="Event types"
+        closeOnSelect={false}
+        onSelect={toggle}
+        onClose={() => setOpen(false)}
+        footer={
+          chosen.length > 0
+            ? { label: "Any type", onSelect: () => go(withTypes(current, [])) }
+            : undefined
+        }
+        className="w-64"
+      />
+    </Combobox>
   );
 }
 
 /** A filter's control: the sidebar's width, and its rows' 36px and 14px. */
 const CONTROL = "h-9 w-full text-sm md:text-sm";
 
-/** One filter: its name over its control. The sidebar renders twice on a phone, so ids are per instance. */
-function Field({ label, children }: { label: string; children: (labelId: string) => ReactNode }) {
-  const labelId = useId();
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span id={labelId} className={FIELD_LABEL}>
-        {label}
-      </span>
-      {children(labelId)}
-    </div>
-  );
-}
-
+/** A custom range's field names, under the group's. */
 const FIELD_LABEL = "text-xs leading-4 text-muted-foreground";

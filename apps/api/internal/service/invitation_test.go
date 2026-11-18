@@ -27,6 +27,13 @@ const (
 
 func newMockedInvitationService(t *testing.T, platformProjectID string) (*service.InvitationService, *servicemocks.MockAllStatements, *servicemocks.MockKeyService, *[]*domain.Event) {
 	t.Helper()
+	return newMockedInvitationServiceChecking(t, platformProjectID, inviterAdmin(true))
+}
+
+// newMockedInvitationServiceChecking builds the service with inviterIsAdmin as
+// its accept-time inviter check.
+func newMockedInvitationServiceChecking(t *testing.T, platformProjectID string, inviterIsAdmin service.InviterCheck) (*service.InvitationService, *servicemocks.MockAllStatements, *servicemocks.MockKeyService, *[]*domain.Event) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
@@ -46,7 +53,51 @@ func newMockedInvitationService(t *testing.T, platformProjectID string) (*servic
 		},
 	).AnyTimes()
 	keys := servicemocks.NewMockKeyService(ctrl)
-	return service.NewInvitationService(service.NewPool(pool), keys, invitationConsole, platformProjectID), statements, keys, events
+	db := service.NewPool(pool)
+	grants := service.NewGrantService(db, nil, platformProjectID)
+	refs := &grantRefStub{byID: map[string]domain.UserRef{
+		"user_admin": {UserID: "user_admin", Identifier: "ada@example.com", IdentifierProperty: "email", Display: "Ada Lovelace"},
+	}}
+	return service.NewInvitationService(db, keys, grants, refs, inviterIsAdmin, invitationConsole, platformProjectID), statements, keys, events
+}
+
+// newMockedInvitationServiceWithRefs also returns the ref resolver, which
+// finds a platform admin in the platform project and a local user only in
+// the invitation's project.
+func newMockedInvitationServiceWithRefs(t *testing.T) (*service.InvitationService, *servicemocks.MockAllStatements, *homedRefStub) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	refs := &homedRefStub{byProject: map[string]map[string]domain.UserRef{
+		grantPlatformProjID: {"user_admin": {UserID: "user_admin", Display: "Ada Lovelace"}},
+		invitationProjectID: {"user_local": {UserID: "user_local", Display: "Grace Hopper"}},
+	}}
+	db := service.NewPool(pool)
+	return service.NewInvitationService(db, nil, service.NewGrantService(db, nil, grantPlatformProjID), refs, inviterAdmin(true), invitationConsole, grantPlatformProjID), statements, refs
+}
+
+// homedRefStub resolves a user only in the project that homes them, and
+// records each batch it was asked for.
+type homedRefStub struct {
+	byProject map[string]map[string]domain.UserRef
+	calls     [][2]any
+}
+
+func (s *homedRefStub) ResolveUserRefs(_ context.Context, projectID string, userIDs []string) (map[string]domain.UserRef, error) {
+	s.calls = append(s.calls, [2]any{projectID, append([]string(nil), userIDs...)})
+	out := map[string]domain.UserRef{}
+	for _, id := range userIDs {
+		if ref, ok := s.byProject[projectID][id]; ok {
+			out[id] = ref
+		}
+	}
+	return out, nil
+}
+
+func (s *homedRefStub) ResolveRefsForUsers(context.Context, string, []*domain.User) (map[string]domain.UserRef, error) {
+	return nil, nil
 }
 
 // invitationEvent decodes one recorded event's payload into T.
@@ -391,7 +442,7 @@ func TestInvitationService_Cancel(t *testing.T) {
 			name: "deletes a pending invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
-				s.EXPECT().DeletePendingInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(nil)
+				s.EXPECT().DeleteCancellableInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(nil)
 			},
 		},
 		{
@@ -405,7 +456,7 @@ func TestInvitationService_Cancel(t *testing.T) {
 			name: "finished or expired invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
-				s.EXPECT().DeletePendingInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(database.NewNoRowFoundError(nil))
+				s.EXPECT().DeleteCancellableInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrInvitationNotPending(),
 		},
@@ -483,15 +534,60 @@ func TestInvitationService_List(t *testing.T) {
 			}, nil
 		})
 
-	status := domain.InvitationStatusPending
 	got, err := svc.List(t.Context(), service.ListInvitationsRequest{
 		ProjectID: invitationProjectID,
-		Status:    &status,
+		Statuses:  []domain.InvitationStatus{domain.InvitationStatusPending, domain.InvitationStatusRejected},
 		Limit:     5,
 		PageToken: "cursor_1",
 	})
 	require.NoError(t, err)
 	require.Len(t, got.Invitations, 2)
 	assert.Equal(t, "inv_2", got.Invitations[0].ID)
+	assert.Nil(t, got.Invitations[0].Inviter, "not expanded")
 	assert.Equal(t, "cursor_2", got.NextPageToken)
+}
+
+func TestInvitationService_ListExpandsInvitersInABatchPerHome(t *testing.T) {
+	t.Parallel()
+	svc, s, refs := newMockedInvitationServiceWithRefs(t)
+	s.EXPECT().ListInvitations(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Invitation]{
+		Items: []*domain.Invitation{
+			{ID: "inv_4", CreatedBy: new("user_admin")},
+			{ID: "inv_3", CreatedBy: new("user_local")},
+			{ID: "inv_2", CreatedBy: new("user_admin")},
+			{ID: "inv_1", CreatedBy: new("user_gone")},
+		},
+	}, nil)
+
+	got, err := svc.List(t.Context(), service.ListInvitationsRequest{ProjectID: invitationProjectID, ExpandInviter: true})
+	require.NoError(t, err)
+	assert.Equal(t, "Ada Lovelace", got.Invitations[0].Inviter.Display)
+	assert.Equal(t, "Grace Hopper", got.Invitations[1].Inviter.Display)
+	assert.Equal(t, "Ada Lovelace", got.Invitations[2].Inviter.Display)
+	assert.Equal(t, domain.UserRef{UserID: "user_gone"}, *got.Invitations[3].Inviter)
+	// Two batches for the page, whatever its size.
+	assert.Equal(t, [][2]any{
+		{grantPlatformProjID, []string{"user_admin", "user_local", "user_gone"}},
+		{invitationProjectID, []string{"user_local", "user_gone"}},
+	}, refs.calls)
+}
+
+func TestInvitationService_ListExpandsInviter(t *testing.T) {
+	svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+	s.EXPECT().ListInvitations(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Invitation]{
+		Items: []*domain.Invitation{
+			{ID: "inv_3", CreatedBy: new("user_admin")},
+			{ID: "inv_2", CreatedBy: new("user_gone")},
+			{ID: "inv_1"},
+		},
+	}, nil)
+
+	got, err := svc.List(t.Context(), service.ListInvitationsRequest{ProjectID: invitationProjectID, ExpandInviter: true})
+	require.NoError(t, err)
+	require.Len(t, got.Invitations, 3)
+	assert.Equal(t, "Ada Lovelace", got.Invitations[0].Inviter.Display)
+	// A creator who is gone degrades to their id.
+	assert.Equal(t, domain.UserRef{UserID: "user_gone"}, *got.Invitations[1].Inviter)
+	// A project secret names no inviter.
+	assert.Nil(t, got.Invitations[2].Inviter)
 }

@@ -7,6 +7,7 @@ import { Destructive, type DestructiveChange, Settled } from "@/lib/oclif/destru
 import type { CommandResult } from "@/lib/oclif/types";
 import { answering } from "@tests/helpers/keyboard";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 const GATE: Omit<DestructiveChange<string | undefined>, "apply"> = {
   verb: "remove",
@@ -30,7 +31,7 @@ type Invocation = {
 };
 
 /** A destructive command that records what its act was handed. */
-class Removing extends Destructive(BaseCommand) {
+class Removing extends Destructive(ServerCommand(BaseCommand)) {
   public static override readonly id: string = "variable:rm";
   // Drawn, so a question is clack's prompt, which is the one these tests answer.
   public static override wizard: boolean | undefined = true;
@@ -67,7 +68,7 @@ class Removing extends Destructive(BaseCommand) {
         force: this.invocation.force ?? false,
         "dry-run": this.invocation.dryRun ?? false,
       },
-      { resolveServer: false, source: "mock" },
+      { source: "mock" },
     );
     this.meta = { ...this.meta, nonInteractive: !(this.invocation.interactive ?? false) };
     return this.confirmed<string | undefined>({

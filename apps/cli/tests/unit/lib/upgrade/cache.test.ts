@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { Cache } from "@/lib/upgrade/cache";
-import { test as it } from "@tests/helpers/fixtures";
+import { test as it } from "@tests/fixtures";
 
 const ONE = Date.now();
 const TWO = ONE + 1;

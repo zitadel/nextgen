@@ -54,6 +54,16 @@ func ErrInvitationSelfAccept() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("self_accept"), "the inviter cannot accept their own invitation", nil, nil)
 }
 
+func ErrInvitationSelfReject() Error {
+	return newError(PrefixInvitation.ErrorCodePrefix("self_reject"), "the inviter cannot decline their own invitation", nil, nil)
+}
+
+// ErrInvitationInviterNotAdmin refuses an accept whose creator no longer
+// administers the project (ADR 086 §10).
+func ErrInvitationInviterNotAdmin() Error {
+	return newError(PrefixInvitation.ErrorCodePrefix("inviter_not_admin"), "the inviter no longer administers the project", nil, nil)
+}
+
 func ErrInvitationPendingLimit() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("pending_limit"), "the project has reached its pending invitation limit", nil, nil)
 }
@@ -102,8 +112,8 @@ type Invitation struct {
 	Type          InvitationType
 	ProjectMember *InvitationProjectMember
 	// EncryptedMetadata is the metadata JSON encrypted with the project's key,
-	// opaque to storage, so validate it before encrypting. Nil once accepted
-	// or declined.
+	// opaque to storage, so validate it before encrypting. Nil once
+	// accepted; a decline keeps it.
 	EncryptedMetadata *string
 	// Status is the stored status, never expired; StatusAt derives that.
 	Status        InvitationStatus
@@ -112,8 +122,10 @@ type Invitation struct {
 	CreatedAt     time.Time
 	ExpiresAt     time.Time
 	JourneyID     string
-	AcceptedBy    *string
-	AcceptedAt    *time.Time
+	// RespondedBy and RespondedAt say who accepted or declined and when;
+	// Status says which. Nil while pending or expired.
+	RespondedBy *string
+	RespondedAt *time.Time
 	// TokenHash is HashSecret of the link's token.
 	TokenHash string
 }

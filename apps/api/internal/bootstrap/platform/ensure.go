@@ -1,5 +1,5 @@
-// Package platform bootstraps deployment-level platform resources at server
-// startup. Today that is the single, flag-gated platform project (#605): when
+// Package platform bootstraps deployment-level platform resources when the
+// server seeds: at startup, or in its seed command. Today that is the single, flag-gated platform project (#605): when
 // explicitly enabled, the server idempotently ensures the well-known platform
 // project (domain.PlatformProjectID) exists, and deploys the configuration the
 // server ships to it (EnsureDeployed). Disabled (the default) is a no-op, so

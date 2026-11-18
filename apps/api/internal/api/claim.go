@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) InitClaim(ctx context.Context, params api.InitClaimParams) (api.InitClaimRes, error) {
+func (h *Handler) CreateProjectClaim(ctx context.Context, params api.CreateProjectClaimParams) (api.CreateProjectClaimRes, error) {
 	projectID := string(params.ProjectID)
 	// opWrite: init mints state and the contract scopes it to project.write.
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
@@ -41,7 +41,7 @@ func (h *Handler) InitClaim(ctx context.Context, params api.InitClaimParams) (ap
 	}, nil
 }
 
-func (h *Handler) GetClaimStatus(ctx context.Context, params api.GetClaimStatusParams) (api.GetClaimStatusRes, error) {
+func (h *Handler) GetProjectClaimStatus(ctx context.Context, params api.GetProjectClaimStatusParams) (api.GetProjectClaimStatusRes, error) {
 	projectID := string(params.ProjectID)
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (h *Handler) GetClaimStatus(ctx context.Context, params api.GetClaimStatusP
 	return &resp, nil
 }
 
-func (h *Handler) CompleteClaim(ctx context.Context, req *api.CompleteClaimRequest, params api.CompleteClaimParams) (api.CompleteClaimRes, error) {
+func (h *Handler) CompleteProjectClaim(ctx context.Context, req *api.CompleteClaimRequest, params api.CompleteProjectClaimParams) (api.CompleteProjectClaimRes, error) {
 	userID, err := h.verifyClaimSession(ctx)
 	if err != nil {
 		return nil, err
@@ -93,12 +93,12 @@ func (h *Handler) CompleteClaim(ctx context.Context, req *api.CompleteClaimReque
 	}, nil
 }
 
-// GetClaimWindow answers the claim page's countdown read. Unauthenticated by
+// GetProjectClaimWindow answers the claim page's countdown read. Unauthenticated by
 // contract (`security: []`): the page runs it before the developer signs in,
 // and the challenge from the claim URL is the capability. A challenge that
 // does not resolve answers 404 through claimErrorResponse, the same verdict a
 // wrong project id gets, so nothing about project existence leaks.
-func (h *Handler) GetClaimWindow(ctx context.Context, params api.GetClaimWindowParams) (api.GetClaimWindowRes, error) {
+func (h *Handler) GetProjectClaimWindow(ctx context.Context, params api.GetProjectClaimWindowParams) (api.GetProjectClaimWindowRes, error) {
 	res, err := h.claimService.Window(ctx, string(params.ProjectID), string(params.ChallengeID))
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (h *Handler) GetClaimWindow(ctx context.Context, params api.GetClaimWindowP
 // verifyClaimSession authenticates the human behind claim/complete (ADR 046 §2,
 // Claim C2). It returns the session's user id. Every rejection is pre-wrapped
 // as the public 401 verdict (auth.unauthorized) with the distinct sentinel kept
-// in the parent chain for logs and tests. Production caller: CompleteClaim
+// in the parent chain for logs and tests. Production caller: CompleteProjectClaim
 // (Claim E1, #611).
 func (h Handler) verifyClaimSession(ctx context.Context) (string, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)

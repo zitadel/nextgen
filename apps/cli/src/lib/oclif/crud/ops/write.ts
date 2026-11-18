@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
@@ -207,6 +207,10 @@ abstract class WriteOperation<
         document: documentSchemaOf(spec.schema, spec.root),
         fields,
         references: options.references,
+        retry: await this.rerun<{
+          file: Interfaces.OptionFlag<string | undefined>;
+          data: Interfaces.OptionFlag<string | undefined>;
+        }>({ with: { file: "<path>" }, without: ["data"] }),
       },
       flags,
     );
@@ -228,7 +232,7 @@ abstract class WriteOperation<
       });
     }
 
-    // Some writes answer without a body (`grants create` by identifier answers
+    // Some writes answer without a body (`grant create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
     const summary: Summary =
@@ -277,7 +281,7 @@ abstract class WriteOperation<
 }
 
 /** `<topic> create`. */
-export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
+export abstract class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
   static describe<Ctx>(definition: OperationDefinition<Ctx, CreateSpec<Ctx>>): OperationStatics {
     return describeWrite(definition, definition.options, "create");
   }
@@ -290,7 +294,7 @@ export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
 }
 
 /** `<topic> update <id>`. */
-export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
+export abstract class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
   static describe<Ctx>(definition: OperationDefinition<Ctx, UpdateSpec<Ctx>>): OperationStatics {
     return describeWrite(definition, definition.options, "update");
   }

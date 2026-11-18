@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
+import { it } from "@tests/fixtures";
 import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
 import { NextPatcher } from "@/lib/orca/patchers/rule/next";
 import { QwikPatcher } from "@/lib/orca/patchers/rule/qwik";
@@ -13,6 +13,7 @@ import { SolidPatcher } from "@/lib/orca/patchers/rule/solid";
 import { SveltePatcher } from "@/lib/orca/patchers/rule/svelte";
 import { VuePatcher } from "@/lib/orca/patchers/rule/vue";
 import type { PatchContext, Patcher } from "@/lib/orca/patchers/types";
+import { CliPackage } from "@/lib/upgrade";
 
 /**
  * The file-writer stops only on a file at exactly a path setup writes. These
@@ -20,16 +21,8 @@ import type { PatchContext, Patcher } from "@/lib/orca/patchers/types";
  * is written, so setup's dry-run patch reports them before it creates a
  * project.
  */
-const dirs: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
-
 /** A project directory holding `files`, keyed by their path from the root. */
-async function project(files: Record<string, string>): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-preflight-"));
-  dirs.push(cwd);
+async function project(cwd: string, files: Record<string, string>): Promise<string> {
   for (const [path, contents] of Object.entries(files)) {
     await mkdir(dirname(join(cwd, path)), { recursive: true });
     await writeFile(join(cwd, path), contents);
@@ -55,8 +48,10 @@ function ctxFor(id: string, appDir: string, versionMajor?: number): PatchContext
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
   };
 }
 
@@ -237,10 +232,10 @@ const SPA_CASES: Array<{
 ];
 
 describe("SPA patchers' root component", () => {
-  it.each(SPA_CASES.map((c) => [c.name, c] as const))(
+  it.for(SPA_CASES.map((c) => [c.name, c] as const))(
     "refuses %s, even with --force, and writes nothing",
-    async (_name, { patcher, ctx, root, existingApp, foreignRoot }) => {
-      const cwd = await project(existingApp);
+    async ([_name, { patcher, ctx, root, existingApp, foreignRoot }], { dir }) => {
+      const cwd = await project(dir, existingApp);
 
       await expect(patcher.patch(ctx, { cwd, dryRun: false, force: true })).rejects.toMatchObject({
         code: "E_CONFLICT",
@@ -251,10 +246,10 @@ describe("SPA patchers' root component", () => {
     },
   );
 
-  it.each(SPA_CASES.map((c) => [c.patcher.constructor.name, c] as const))(
+  it.for(SPA_CASES.map((c) => [c.patcher.constructor.name, c] as const))(
     "%s patches the entry of the template setup scaffolds",
-    async (_name, { patcher, ctx, root, template }) => {
-      const cwd = await project(template);
+    async ([_name, { patcher, ctx, root, template }], { dir }) => {
+      const cwd = await project(dir, template);
 
       const result = await patcher.patch(ctx, { cwd, dryRun: true, force: false });
 
@@ -270,8 +265,10 @@ describe("NextPatcher's request boundary", () => {
   };
   const MIDDLEWARE = "export function middleware() {}\n";
 
-  it("refuses a middleware.ts beside the proxy.ts Next 16 gets, even with --force", async () => {
-    const cwd = await project({ ...NEXT_APP, "middleware.ts": MIDDLEWARE });
+  it("refuses a middleware.ts beside the proxy.ts Next 16 gets, even with --force", async ({
+    dir,
+  }) => {
+    const cwd = await project(dir, { ...NEXT_APP, "middleware.ts": MIDDLEWARE });
 
     await expect(
       new NextPatcher().patch(ctxFor("next", "app", 16), { cwd, dryRun: false, force: true }),
@@ -284,16 +281,16 @@ describe("NextPatcher's request boundary", () => {
   });
 
   // `next dev` reads the boundary from the project root and from src/ alike.
-  it("refuses a boundary in src/ for an app at the project root", async () => {
-    const cwd = await project({ ...NEXT_APP, "src/middleware.js": MIDDLEWARE });
+  it("refuses a boundary in src/ for an app at the project root", async ({ dir }) => {
+    const cwd = await project(dir, { ...NEXT_APP, "src/middleware.js": MIDDLEWARE });
 
     await expect(
       new NextPatcher().patch(ctxFor("next", "app", 16), { cwd, dryRun: true, force: false }),
     ).rejects.toMatchObject({ details: { path: "src/middleware.js", writes: "proxy.ts" } });
   });
 
-  it("refuses a second middleware file under another extension", async () => {
-    const cwd = await project({ ...NEXT_APP, "middleware.js": MIDDLEWARE });
+  it("refuses a second middleware file under another extension", async ({ dir }) => {
+    const cwd = await project(dir, { ...NEXT_APP, "middleware.js": MIDDLEWARE });
 
     await expect(
       new NextPatcher().patch(ctxFor("next", "app", 15), { cwd, dryRun: true, force: false }),
@@ -303,8 +300,8 @@ describe("NextPatcher's request boundary", () => {
     });
   });
 
-  it("refuses a proxy.ts when it cannot tell the Next version", async () => {
-    const cwd = await project({ ...NEXT_APP, "src/proxy.ts": "export function proxy() {}\n" });
+  it("refuses a proxy.ts when it cannot tell the Next version", async ({ dir }) => {
+    const cwd = await project(dir, { ...NEXT_APP, "src/proxy.ts": "export function proxy() {}\n" });
 
     await expect(
       new NextPatcher().patch(ctxFor("next", "src/app"), { cwd, dryRun: true, force: false }),
@@ -318,8 +315,8 @@ describe("NextPatcher's request boundary", () => {
   });
 
   // Before Next 16, proxy.ts was no convention: it is just a file of the app's.
-  it("leaves a proxy.ts alone on Next 15", async () => {
-    const cwd = await project({ ...NEXT_APP, "proxy.ts": "export const target = 1;\n" });
+  it("leaves a proxy.ts alone on Next 15", async ({ dir }) => {
+    const cwd = await project(dir, { ...NEXT_APP, "proxy.ts": "export const target = 1;\n" });
 
     const result = await new NextPatcher().patch(ctxFor("next", "app", 15), {
       cwd,
@@ -331,8 +328,8 @@ describe("NextPatcher's request boundary", () => {
   });
 
   // At the path setup writes, the file-writer decides: --force replaces it.
-  it("leaves a boundary at the path setup writes to the file-writer", async () => {
-    const cwd = await project({ ...NEXT_APP, "proxy.ts": "export function proxy() {}\n" });
+  it("leaves a boundary at the path setup writes to the file-writer", async ({ dir }) => {
+    const cwd = await project(dir, { ...NEXT_APP, "proxy.ts": "export function proxy() {}\n" });
 
     const result = await new NextPatcher().patch(ctxFor("next", "app", 16), {
       cwd,

@@ -2,8 +2,11 @@ import type { Hook } from "@oclif/core";
 import { distance } from "fastest-levenshtein";
 
 import { EXIT_CODES, ZitadelError } from "@/lib/errors";
+import { SERVER_FLAG, ServerCommand } from "@/cli/commands/server-command";
 import { type Admitted, BaseCommand } from "@/lib/oclif/base";
+import { aliasedNouns } from "@/lib/oclif/plural-aliases";
 import type { JsonEnvelope } from "@/lib/oclif/types";
+import { regularPlural } from "@/lib/plural";
 import { commandOf, type SuggestedCommand } from "@/lib/suggestion";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 
@@ -19,17 +22,28 @@ export const UNKNOWN_COMMAND_EXIT_CODE = 127;
  * It names the command as far as it was wrong: the longest run of words that
  * is a topic, and the one word after it that is not a command there, which it
  * repeats as typed. The words after that one may be arguments, which a refusal
- * never repeats. It suggests the
- * help of the one visible command a word is a single edit from, never the
- * command itself, which would run without the flags typed, so a typo can never
- * turn into a different, possibly destructive, command.
+ * never repeats. A plural the commands of a noun answer to (`users`) is read
+ * as that noun when a word follows it, so the word is looked up among the
+ * noun's commands. It suggests the
+ * help of the one visible command a word is the plural of (`policies` for
+ * `policy`), or else is a single edit from, never the command itself, which
+ * would run without the flags typed, so a typo can never turn into a
+ * different, possibly destructive, command.
  */
-export class NotFound extends BaseCommand {
+export class NotFound extends ServerCommand(BaseCommand) {
   static override readonly id = "not-found";
   static override hidden = true;
   // Whatever was typed is its arguments.
   static override strict = false;
-  static override meta = { resolveServer: false };
+
+  /**
+   * It names no server of its own: what was typed is refused whatever the server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   /** Whether it refused the words as naming no command, which exits as a shell does. */
   private unknown = false;
@@ -69,7 +83,11 @@ export class NotFound extends BaseCommand {
     const blank = split.findIndex((word) => {
       return word.trim() === "";
     });
-    const words = blank === -1 ? split : split.slice(0, blank);
+    const read = blank === -1 ? split : split.slice(0, blank);
+    // `users frob` names no command of `user`: the plural runs that noun's
+    // commands, so what follows it is one of them or it is nothing.
+    const noun = aliasedNouns(this.config.commands).get(read[0] ?? "");
+    const words = noun === undefined || read.length < 2 ? read : [noun, ...read.slice(1)];
     // The next word of every visible command under `parent`.
     const under = (parent: readonly string[]): string[] => {
       return visible
@@ -85,6 +103,17 @@ export class NotFound extends BaseCommand {
         );
       });
       return close.length === 1 ? close[0] : undefined;
+    };
+
+    // The one candidate a word is the plural of. A command names its noun in
+    // the singular, and a plural is not always an edit away: `policies` is
+    // three from `policy`.
+    const singular = (word: string, candidates: readonly string[]): string | undefined => {
+      const plural = word.toLowerCase();
+      const singulars = [...new Set(candidates)].filter((candidate) => {
+        return regularPlural(candidate) === plural;
+      });
+      return singulars.length === 1 ? singulars[0] : undefined;
     };
 
     if (words[0] === undefined) {
@@ -122,7 +151,9 @@ export class NotFound extends BaseCommand {
     });
     const typed = words.slice(0, depth + 1);
     const parent = typed.slice(0, -1);
-    const meant = near(typed[depth] as string, under(parent));
+    const word = typed[depth] as string;
+    const candidates = under(parent);
+    const meant = singular(word, candidates) ?? near(word, candidates);
     const next: SuggestedCommand[] = [];
     if (meant !== undefined) {
       next.push(help([...parent, meant]));
@@ -166,8 +197,8 @@ export class NotFound extends BaseCommand {
 /**
  * Hands a name that is no command to {@link NotFound}. It never offers to run
  * another command, as oclif's own prompt did, taking the closest name for the
- * one typed and dropping its flags: `teams delete x --dry-run` became an offer
- * to run `grants delete`.
+ * one typed and dropping its flags: `team delete x --dry-run` became an offer
+ * to run `grant delete`.
  *
  * It hands over only the words that name the command and `--json` when it was
  * asked for, since the flags typed belong to a command that does not exist and
@@ -198,7 +229,8 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   // in every command, so only the base flags' letters are known. A flag every
   // command takes a value for takes the next word whatever it is, as oclif
   // would; any other leaves a word that is a flag itself, such as `--json`.
-  const base = Object.entries(BaseCommand.baseFlags);
+  // The flags every command takes: the base flags, and `--server`.
+  const base = Object.entries({ ...BaseCommand.baseFlags, server: SERVER_FLAG });
   const switches = new Map<string, boolean>([["json", true]]);
   for (const [name, flag] of [
     ...base,
@@ -225,9 +257,13 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
     }),
   );
   const lettered = (letter: string) => {
-    return Object.values(BaseCommand.baseFlags).find((flag) => {
-      return flag.char === letter;
-    });
+    return base
+      .map(([, flag]) => {
+        return flag;
+      })
+      .find((flag) => {
+        return flag.char === letter;
+      });
   };
   const words: string[] = [];
   // biome-ignore lint/plugin: scanner state the loop updates as it reads argv

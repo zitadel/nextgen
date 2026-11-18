@@ -41,7 +41,7 @@ function overviewReads(projectReads: string[]) {
       return HttpResponse.json({ ...project(id, "Acme"), origins: [], owning_team_id: null });
     }),
     http.get("http://localhost/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
-    http.get("http://localhost/api/v1/events", () => HttpResponse.json({ data: [] })),
+    http.get("http://localhost/api/v1/events", () => HttpResponse.json({ events: [] })),
   ];
 }
 
@@ -170,7 +170,7 @@ describe("landing routes", () => {
     server.use(http.get("*/api/v1/readyz", () => HttpResponse.text("ok")));
     await renderAt("/system");
 
-    const pill = await screen.findByRole("button", { name: "Switch project" });
+    const pill = await screen.findByRole("button", { name: /^Switch project/ });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
     expect(unpaged).toBe(1);
   });

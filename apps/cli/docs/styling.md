@@ -14,7 +14,7 @@ and [`SKILL.md`](../skills/zitadel-cli/SKILL.md).
 
 ## Color and marks
 
-Everything comes from [`src/lib/style.ts`](../src/lib/style.ts), which names what
+Everything comes from `style` ([`src/lib/ui/style.ts`](../src/lib/ui/style.ts)), which names what
 text is. A unit test fails on another `picocolors` import. Add a new kind of text
 there, not a new color at the call site.
 
@@ -32,7 +32,7 @@ there, not a new color at the call site.
 - Never rely on color alone. Output must read the same with `--no-color`, so a
   status always has its mark or a word such as `Warning:`.
 - Adding color must not change piped output: scripts read those words.
-- Narration is `log` (`src/lib/log.ts`): a wizard draws each level with its
+- Narration is `log` (`src/lib/ui/log.ts`): a wizard draws each level with its
   mark, and every other command says it as a plain line.
 - Color follows stdout's terminal. Write to stderr through `BaseCommand`, which
   takes the codes back out when only stderr is redirected.
@@ -59,7 +59,7 @@ there, not a new color at the call site.
 
 - Box only a moment that ends a run or needs attention, never a routine result.
 - Draw one with `drawBox` ([`src/lib/ui/layout.ts`](../src/lib/ui/layout.ts)),
-  its content through `wrapForBox` ([`src/lib/box.ts`](../src/lib/box.ts)), so
+  its content through `Ui.wrap` ([`src/lib/ui/box.ts`](../src/lib/ui/box.ts)), so
   the frame fits the terminal.
 - Green is for a run that succeeded, cyan (`notice`) for what to read or do.
 - Put nothing in a box that must be copied whole, such as a long URL: print it

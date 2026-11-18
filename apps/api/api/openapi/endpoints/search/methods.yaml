@@ -7,7 +7,7 @@ post:
     `query` is what the person typed and `types` names the kinds of result to
     look for; only those are searched. Each result is a reference: its `type`,
     its `id`, its `project_id`, a `title` and sometimes a `subtitle`. Read the
-    resource itself with the type's own operation, for example `GetUserByID`
+    resource itself with the type's own operation, for example `getUser`
     (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the
     result's project.
 

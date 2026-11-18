@@ -274,11 +274,21 @@ function ProjectSwitcher({
   // is the platform at its root and nothing at a root without it (D44).
   const marked = selected;
   const { label: rootLabel, Icon: RootIcon } = rootName(platform);
+  // What the pill shows, which its name must carry for those who say it.
+  const shown = root
+    ? rootLabel
+    : mine === undefined
+      ? undefined
+      : (label ?? (mine.projects.length === 0 ? NO_PROJECTS : NO_SELECTION));
 
   return (
     <Combobox open={open} onOpenChange={changeOpen}>
       <ComboboxAnchor asChild>
-        <button type="button" aria-label="Switch project" className={TRIGGER}>
+        <button
+          type="button"
+          aria-label={shown === undefined ? "Switch project" : `Switch project: ${shown}`}
+          className={TRIGGER}
+        >
           {root ? (
             <RootIcon size={16} className="shrink-0 text-foreground" aria-hidden />
           ) : selected ? (
@@ -291,9 +301,7 @@ function ProjectSwitcher({
           ) : mine === undefined ? (
             <Skeleton className="h-4 w-24" />
           ) : label === undefined ? (
-            <span className="min-w-0 truncate text-muted-foreground">
-              {mine.projects.length === 0 ? NO_PROJECTS : NO_SELECTION}
-            </span>
+            <span className="min-w-0 truncate text-muted-foreground">{shown}</span>
           ) : (
             <span className="min-w-0 truncate leading-5 text-foreground">{label}</span>
           )}

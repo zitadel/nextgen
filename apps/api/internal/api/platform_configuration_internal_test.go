@@ -60,26 +60,26 @@ func deniedCodes(resources map[string]resourceAccess) []string {
 	return codes
 }
 
-// CreateApplication is gated, and the contract's table has no row for it: it
+// PublishApplication is gated, and the contract's table has no row for it: it
 // still lists the operation as not implemented. This row holds it to the
 // platform project's admins until the table has one.
 var platformUnlistedWrites = []gateRow{
-	{op: "CreateApplication", relation: editor, target: onProject, denied: domain.ErrApplicationPermissionDenied().Code},
+	{op: "PublishApplication", relation: editor, target: onProject, denied: domain.ErrApplicationPermissionDenied().Code},
 }
 
 // The configuration writes that ask editor on a project, and so ask admin on
-// top of it on the reserved platform project. RemoveOrigin asks admin anywhere.
+// top of it on the reserved platform project. RemoveProjectOrigin asks admin anywhere.
 var platformAdminOnlyOperations = []string{
-	"CreateApplication",
-	"CreateBranding",
-	"CreateDeployment", "RollbackDeployment", "RemovePreview",
-	"CreateFlowDefinition",
-	"CreateIdp",
+	"PublishApplication",
+	"PublishBranding",
+	"CreateDeployment", "RollbackDeployment", "RemoveProjectPreview",
+	"PublishFlowDefinition",
+	"PublishIdp",
 	"PublishPolicy",
-	"AddOrigin",
+	"AddProjectOrigin",
 	"CreateRelease", "BuildRelease", "RevokeRelease",
-	"CreateSchema",
-	"UpdateVariables", "DeleteVariable",
+	"PublishSchema",
+	"SetVariables", "DeleteVariable",
 }
 
 // declaredResourceAccess reads the package for every resourceAccess it

@@ -3,10 +3,21 @@ import { join, resolve } from "node:path";
 import semver from "semver";
 
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
-import { type PackageJson, readPackageJson } from "@/lib/npm";
+import { PM, type PackageJson } from "@/lib/pm";
 import { ancestors } from "@/lib/paths";
 
-export { type PackageJson, readPackageJson } from "@/lib/npm";
+export type { PackageJson } from "@/lib/pm";
+
+/**
+ * Reads the `package.json` that sits directly in `dir`.
+ *
+ * @param dir - The project directory.
+ * @returns The parsed file.
+ * @throws When there is none, or it is not a JSON object.
+ */
+export async function readPackageJson(dir: string): Promise<PackageJson> {
+  return PM.manifest(dir);
+}
 
 /**
  * Reports whether `name` appears in either `dependencies` or `devDependencies`.

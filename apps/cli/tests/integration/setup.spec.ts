@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "@tests/helpers/local-server";
+import { SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aCommittedApp,
@@ -19,8 +19,6 @@ import {
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
-
-useLocalServers();
 
 /**
  * A full commit sha.
@@ -689,6 +687,29 @@ describe("setup", () => {
             expect(await app.trackedFiles()).not.toContain(name);
           },
         );
+
+        describe("over a .gitignore that excepts .env.example before it ignores env files", () => {
+          it("commits .env.example", async () => {
+            const app = await anApp();
+            await app.replaceGitignore(SVELTEKIT_GITIGNORE);
+
+            await app.setup();
+
+            expect(await app.trackedFiles()).toContain(".env.example");
+          });
+
+          it.each([".zitadel/secret", ".env.local", ".env.development.local"])(
+            "keeps git from committing %s later",
+            async (name) => {
+              const app = await anApp();
+              await app.replaceGitignore(SVELTEKIT_GITIGNORE);
+
+              await app.setup();
+
+              expect(await app.committableFiles()).not.toContain(name);
+            },
+          );
+        });
 
         it("commits the configuration it wrote, which the release is built from", async () => {
           const app = await anApp();

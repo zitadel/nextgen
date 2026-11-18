@@ -41,7 +41,7 @@ const server = setupServer();
 let mock: MockHandle = setupMockHandlers();
 
 beforeAll(() => {
-  // Any absolute URL works — the orval-generated handlers match `*/flow*`
+  // Any absolute URL works — the orval-generated handlers match `*/flows*`
   // with a wildcard prefix.
   configureZitadel({ proxyPath: "http://localhost", projectId: PROJECT_ID });
   server.listen({ onUnhandledRequest: "error" });
@@ -739,7 +739,7 @@ describe("setupMockHandlers — the provider round trip", () => {
 
   /**
    * Return through the callback with a code, follow its 303 the way the
-   * orchestrator does (`GET /flow/{id}` from `?flow=`), and answer that step.
+   * orchestrator does (`GET /flows/{flow_id}` from `?flow=`), and answer that step.
    */
   async function viaCallback(id: string, claims: { email: string }) {
     const res = await callback({ state: "s", code: "c", ...claims });
@@ -822,7 +822,7 @@ describe("setupMockHandlers — the provider round trip", () => {
   /** An sso submission straight over HTTP, so the test controls the headers. */
   async function submitSso(returnTarget: string, headers: Record<string, string> = {}) {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    return fetch(`http://localhost/flow/${start.id}/submit`, {
+    return fetch(`http://localhost/flows/${start.id}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
@@ -894,7 +894,7 @@ describe("setupMockHandlers — the provider round trip", () => {
   test("the submit handler takes no callback action", async () => {
     const { id, sessionToken } = await toProvider();
 
-    const refused = await fetch(`http://localhost/flow/${id}/submit`, {
+    const refused = await fetch(`http://localhost/flows/${id}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

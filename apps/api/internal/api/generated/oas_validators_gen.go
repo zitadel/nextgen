@@ -4499,22 +4499,6 @@ func (s ConfigurationBundleSchemasItem) Validate() error {
 	}
 }
 
-func (s *CreateApplicationCreated) Validate() error {
-	alias := (*CreateApplicationResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *CreateApplicationOK) Validate() error {
-	alias := (*CreateApplicationResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *CreateApplicationRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -4978,22 +4962,6 @@ func (s CreateGrantRequestRelation) Validate() error {
 	}
 }
 
-func (s *CreateIdpCreated) Validate() error {
-	alias := (*IdpResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *CreateIdpOK) Validate() error {
-	alias := (*IdpResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *CreateIdpRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -5191,6 +5159,24 @@ func (s *CreateInvitationProjectMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "journey_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
 			Error: err,
 		})
 	}
@@ -5454,6 +5440,24 @@ func (s *CreateInvitationTeamMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "journey_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
 			Error: err,
 		})
 	}
@@ -5754,20 +5758,6 @@ func (s *CreateReleaseRequest) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s CreateSchemaReq) Validate() error {
-	switch s.Type {
-	case UserSchemaCreateSchemaReq:
-		if err := s.UserSchema.Validate(); err != nil {
-			return err
-		}
-		return nil
-	case SchemaURLCreateSchemaReq:
-		return nil // no validation needed
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
 }
 
 func (s *CreateSessionRequest) Validate() error {
@@ -10871,6 +10861,15 @@ func (s InvitationCreatedTeamMemberPayloadType) Validate() error {
 	}
 }
 
+func (s InvitationExpand) Validate() error {
+	switch s {
+	case "inviter":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s InvitationID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
@@ -10923,6 +10922,24 @@ func (s *InvitationLookupProjectMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "created_by_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
 			Error: err,
 		})
 	}
@@ -11038,6 +11055,24 @@ func (s *InvitationLookupTeamMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "created_by_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
 			Error: err,
 		})
 	}
@@ -11234,6 +11269,24 @@ func (s *InvitationProjectMember) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "journey_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
 			Error: err,
 		})
 	}
@@ -11576,6 +11629,24 @@ func (s *InvitationTeamMember) Validate() error {
 		})
 	}
 	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Type.Validate(); err != nil {
 			return err
 		}
@@ -11807,10 +11878,25 @@ func (s Limit) Validate() error {
 	return nil
 }
 
-func (s ListBrandingResponse) Validate() error {
-	alias := ([]ListBrandingResponseItem)(s)
-	if alias == nil {
-		return errors.New("nil is invalid value")
+func (s *ListBrandingResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Branding == nil {
+			return errors.New("nil is invalid value")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "branding",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -11892,11 +11978,11 @@ func (s *ListEventsResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if s.Data == nil {
+		if s.Events == nil {
 			return errors.New("nil is invalid value")
 		}
 		var failures []validate.FieldError
-		for i, elem := range s.Data {
+		for i, elem := range s.Events {
 			if err := func() error {
 				if err := elem.Validate(); err != nil {
 					return err
@@ -11915,7 +12001,7 @@ func (s *ListEventsResponse) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "data",
+			Name:  "events",
 			Error: err,
 		})
 	}
@@ -15072,6 +15158,38 @@ func (s ProjectUpdatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *PublishApplicationCreated) Validate() error {
+	alias := (*CreateApplicationResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishApplicationOK) Validate() error {
+	alias := (*CreateApplicationResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishIdpCreated) Validate() error {
+	alias := (*IdpResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishIdpOK) Validate() error {
+	alias := (*IdpResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s PublishPolicyRequest) Validate() error {
 	switch s.Type {
 	case PasswordSetPolicyInputPublishPolicyRequest:
@@ -15084,6 +15202,20 @@ func (s PublishPolicyRequest) Validate() error {
 			return err
 		}
 		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s PublishSchemaReq) Validate() error {
+	switch s.Type {
+	case UserSchemaPublishSchemaReq:
+		if err := s.UserSchema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchemaURLPublishSchemaReq:
+		return nil // no validation needed
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}

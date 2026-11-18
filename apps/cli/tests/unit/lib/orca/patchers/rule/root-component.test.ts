@@ -1,8 +1,7 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import {
   angularEntry,
@@ -10,6 +9,7 @@ import {
   type RootMount,
   viteEntry,
 } from "@/lib/orca/patchers/rule/root-component";
+import { it } from "@tests/fixtures";
 
 /** A React root, as the React patcher writes and mounts it. */
 const REACT_ROOT: RootMount = {
@@ -20,16 +20,14 @@ const REACT_ROOT: RootMount = {
   mounts: "jsx",
 };
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
-
-/** A project directory holding `files`, keyed by their path from the root. */
-async function project(files: Record<string, string>): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-root-component-"));
-  dirs.push(cwd);
+/**
+ * Writes `files` into a directory.
+ *
+ * @param cwd - The directory to write them in.
+ * @param files - The files, keyed by their path from the root.
+ * @returns The directory.
+ */
+async function project(cwd: string, files: Record<string, string>): Promise<string> {
   for (const [path, contents] of Object.entries(files)) {
     await mkdir(dirname(join(cwd, path)), { recursive: true });
     await writeFile(join(cwd, path), contents);
@@ -53,8 +51,8 @@ createRoot(document.getElementById('root')).render(
 }
 
 describe("viteEntry", () => {
-  it("reads the module script index.html loads", async () => {
-    const cwd = await project({
+  it("reads the module script index.html loads", async ({ dir }) => {
+    const cwd = await project(dir, {
       "index.html":
         '<!doctype html>\n<html>\n  <body>\n    <div id="root"></div>\n' +
         '    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n',
@@ -63,8 +61,8 @@ describe("viteEntry", () => {
     expect(await viteEntry(cwd)).toBe("src/main.tsx");
   });
 
-  it("passes over commented-out, classic and remote scripts", async () => {
-    const cwd = await project({
+  it("passes over commented-out, classic and remote scripts", async ({ dir }) => {
+    const cwd = await project(dir, {
       "index.html":
         '<!-- <script type="module" src="/src/old.tsx"></script> -->\n' +
         '<script src="/legacy.js"></script>\n' +
@@ -75,14 +73,14 @@ describe("viteEntry", () => {
     expect(await viteEntry(cwd)).toBe("src/index.jsx");
   });
 
-  it("finds none without an index.html", async () => {
-    expect(await viteEntry(await project({}))).toBeUndefined();
+  it("finds none without an index.html", async ({ dir }) => {
+    expect(await viteEntry(await project(dir, {}))).toBeUndefined();
   });
 });
 
 describe("angularEntry", () => {
-  it("reads the application builder's browser entry", async () => {
-    const cwd = await project({
+  it("reads the application builder's browser entry", async ({ dir }) => {
+    const cwd = await project(dir, {
       "angular.json": JSON.stringify({
         projects: { demo: { architect: { build: { options: { browser: "src/boot.ts" } } } } },
       }),
@@ -91,8 +89,8 @@ describe("angularEntry", () => {
     expect(await angularEntry(cwd)).toBe("src/boot.ts");
   });
 
-  it("reads the browser builder's main entry of the default project", async () => {
-    const cwd = await project({
+  it("reads the browser builder's main entry of the default project", async ({ dir }) => {
+    const cwd = await project(dir, {
       "angular.json": JSON.stringify({
         defaultProject: "web",
         projects: {
@@ -105,25 +103,27 @@ describe("angularEntry", () => {
     expect(await angularEntry(cwd)).toBe("apps/web/main.ts");
   });
 
-  it("falls back to the Angular CLI's src/main.ts", async () => {
-    expect(await angularEntry(await project({}))).toBe("src/main.ts");
-    expect(await angularEntry(await project({ "angular.json": "{ not json" }))).toBe("src/main.ts");
+  it("falls back to the Angular CLI's src/main.ts", async ({ dir, other }) => {
+    expect(await angularEntry(await project(dir, {}))).toBe("src/main.ts");
+    expect(await angularEntry(await project(other, { "angular.json": "{ not json" }))).toBe(
+      "src/main.ts",
+    );
   });
 });
 
 describe("assertMountsRootComponent", () => {
-  it("passes an entry that mounts the root setup writes, before it exists", async () => {
+  it("passes an entry that mounts the root setup writes, before it exists", async ({ dir }) => {
     // create-vite's react-ts template once setup's scaffolder removed its demo App.tsx.
-    const cwd = await project({ "src/main.tsx": reactMain("./App.tsx") });
+    const cwd = await project(dir, { "src/main.tsx": reactMain("./App.tsx") });
 
     await expect(assertMountsRootComponent(cwd, "src/main.tsx", REACT_ROOT)).resolves.toBe(
       undefined,
     );
   });
 
-  it("refuses an entry that mounts a root component at another path", async () => {
+  it("refuses an entry that mounts a root component at another path", async ({ dir }) => {
     // create-vite's JavaScript react template.
-    const cwd = await project({
+    const cwd = await project(dir, {
       "src/main.jsx": reactMain("./App.jsx"),
       "src/App.jsx": "export default function App() { return <h1>Mine</h1> }\n",
     });
@@ -136,8 +136,8 @@ describe("assertMountsRootComponent", () => {
     });
   });
 
-  it("says --force can't fix it", async () => {
-    const cwd = await project({
+  it("says --force can't fix it", async ({ dir }) => {
+    const cwd = await project(dir, {
       "src/main.jsx": reactMain("./App.jsx"),
       "src/App.jsx": "export default function App() {}\n",
     });
@@ -149,8 +149,8 @@ describe("assertMountsRootComponent", () => {
 
   // Vite tries `.jsx` before `.tsx`, so the app keeps loading its own root
   // even once setup's sits beside it.
-  it("resolves a specifier without an extension the way Vite does", async () => {
-    const cwd = await project({
+  it("resolves a specifier without an extension the way Vite does", async ({ dir }) => {
+    const cwd = await project(dir, {
       "src/main.jsx": reactMain("./App"),
       "src/App.jsx": "export default function App() {}\n",
     });
@@ -160,12 +160,15 @@ describe("assertMountsRootComponent", () => {
     });
   });
 
-  it("resolves a root-relative specifier and the @/ alias from the project root", async () => {
-    const rootRelative = await project({
+  it("resolves a root-relative specifier and the @/ alias from the project root", async ({
+    dir,
+    other,
+  }) => {
+    const rootRelative = await project(dir, {
       "src/main.jsx": reactMain("/src/Root.jsx"),
       "src/Root.jsx": "export default function Root() {}\n",
     });
-    const aliased = await project({
+    const aliased = await project(other, {
       "src/main.jsx": reactMain("@/shell/Root"),
       "src/shell/Root.jsx": "export default function Root() {}\n",
     });
@@ -179,16 +182,16 @@ describe("assertMountsRootComponent", () => {
   });
 
   // A TypeScript entry may import `./App.js` and get `App.tsx`.
-  it("resolves a .js specifier to the TypeScript file it names", async () => {
-    const cwd = await project({ "src/main.tsx": reactMain("./App.js") });
+  it("resolves a .js specifier to the TypeScript file it names", async ({ dir }) => {
+    const cwd = await project(dir, { "src/main.tsx": reactMain("./App.js") });
 
     await expect(assertMountsRootComponent(cwd, "src/main.tsx", REACT_ROOT)).resolves.toBe(
       undefined,
     );
   });
 
-  it("names the root among the components a render call mounts side by side", async () => {
-    const cwd = await project({
+  it("names the root among the components a render call mounts side by side", async ({ dir }) => {
+    const cwd = await project(dir, {
       "src/main.jsx": `import { createRoot } from "react-dom/client";
 import { Toaster } from "./components/Toaster.jsx";
 import App from "./App.jsx";
@@ -205,8 +208,8 @@ createRoot(document.getElementById("root")).render(<><Toaster /><App /></>);
   });
 
   // Providers wrap the app; the component inside them is the root.
-  it("looks past providers of the app's own", async () => {
-    const cwd = await project({
+  it("looks past providers of the app's own", async ({ dir }) => {
+    const cwd = await project(dir, {
       "src/main.tsx": `import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "./theme";
 import App from "./App.tsx";
@@ -225,7 +228,7 @@ createRoot(document.getElementById("root")!).render(
     );
   });
 
-  it("lets setup go ahead where it cannot see the root", async () => {
+  it("lets setup go ahead where it cannot see the root", async ({ dir }) => {
     // A router from a package, a root defined in the entry itself, an alias it
     // does not know, an entry it cannot parse, and no entry at all.
     const cases = {
@@ -243,14 +246,19 @@ createRoot(el).render(<App />);
 `,
       "src/broken.jsx": "import App from './App.jsx'\ncreateRoot(el).render(<App",
     };
-    const cwd = await project({ ...cases, "src/App.jsx": "export default function App() {}\n" });
+    const cwd = await project(dir, {
+      ...cases,
+      "src/App.jsx": "export default function App() {}\n",
+    });
 
     for (const entry of [...Object.keys(cases), "src/missing.jsx", undefined]) {
       await expect(assertMountsRootComponent(cwd, entry, REACT_ROOT)).resolves.toBe(undefined);
     }
   });
 
-  it("reads a root passed as the mount call's first argument, and only that one", async () => {
+  it("reads a root passed as the mount call's first argument, and only that one", async ({
+    dir,
+  }) => {
     const angular: RootMount = {
       path: "src/app/app.ts",
       binding: { name: "App", named: true },
@@ -260,7 +268,7 @@ createRoot(el).render(<App />);
     };
     // Angular 17–19 generate app.component.ts; app.config.ts is the second
     // argument, not a root.
-    const cwd = await project({
+    const cwd = await project(dir, {
       "src/main.ts": `import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
@@ -278,7 +286,10 @@ bootstrapApplication(AppComponent, appConfig)
     });
   });
 
-  it("reads a root the entry constructs, when its file has the root's extension", async () => {
+  it("reads a root the entry constructs, when its file has the root's extension", async ({
+    dir,
+    other,
+  }) => {
     const svelte: RootMount = {
       path: "src/App.svelte",
       binding: { name: "App", named: false },
@@ -287,7 +298,7 @@ bootstrapApplication(AppComponent, appConfig)
       mounts: "argument",
       constructs: ".svelte",
     };
-    const constructed = await project({
+    const constructed = await project(dir, {
       "src/main.js": `import Shell from './Shell.svelte'
 import { Router } from './router'
 
@@ -298,7 +309,7 @@ export default app
       "src/Shell.svelte": "<h1>Mine</h1>\n",
       "src/router.js": "export class Router {}\n",
     });
-    const unrelated = await project({
+    const unrelated = await project(other, {
       "src/main.js": "import { Router } from './router'\nnew Router()\n",
       "src/router.js": "export class Router {}\n",
     });

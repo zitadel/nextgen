@@ -66,7 +66,7 @@ export async function completeProjectClaim(
   challengeId: string,
 ): Promise<ClaimOutcome> {
   try {
-    const result = await api.completeClaim(
+    const result = await api.completeProjectClaim(
       projectId,
       { challenge_id: challengeId },
       // Same-origin by design (Console ADR 0002), but say `include` like the
@@ -118,7 +118,7 @@ function alreadyClaimedDetails(body: unknown): { teamId?: string; dashboardUrl?:
 }
 
 /**
- * Splits the 403's two team codes (`completeClaim` declares them in its 403
+ * Splits the 403's two team codes (`completeProjectClaim` declares them in its 403
  * `oneOf`, beside `auth.csrf_invalid`, which the caller has already handled).
  * They differ in the only thing the developer cares about: whether signing in
  * again fixes it.
@@ -179,7 +179,7 @@ export async function fetchClaimWindow(
   challengeId: string,
 ): Promise<ClaimWindow | undefined> {
   try {
-    const result = await api.getClaimWindow(projectId, { challenge_id: challengeId });
+    const result = await api.getProjectClaimWindow(projectId, { challenge_id: challengeId });
     const expiresAt = new Date(result.expires_at);
     if (Number.isNaN(expiresAt.getTime())) return undefined;
     return { expiresAt, expired: result.expired };

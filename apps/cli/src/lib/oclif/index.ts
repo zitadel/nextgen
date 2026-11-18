@@ -11,7 +11,6 @@ export {
   PreviewCommand,
 } from "./environment-command";
 export { nonBlankArg, nonBlankString } from "./flags";
-export { type CommandGroup, CommandGroups } from "./groups";
 export type { Refusal } from "./refusal";
 export type {
   CommandResult,

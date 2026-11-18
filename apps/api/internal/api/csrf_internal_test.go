@@ -119,7 +119,7 @@ func TestCheckSessionCSRF(t *testing.T) {
 		{"write with the session's token passes", unsafe(CSRFToken(cookie)), api.CreateTeamOperation, nil},
 		// Deny by default: an operation that was never listed anywhere still
 		// needs the token once the cookie authenticates a write to it.
-		{"unlisted write without token is refused", unsafe(""), api.CreateBrandingOperation, domain.ErrAuthCSRFInvalid()},
+		{"unlisted write without token is refused", unsafe(""), api.PublishBrandingOperation, domain.ErrAuthCSRFInvalid()},
 		{"missing middleware state fails closed", context.Background(), api.GetMySessionOperation, domain.ErrInternal(nil)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

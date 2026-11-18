@@ -561,7 +561,7 @@ describe("a resumed flow that is already terminal", () => {
   it("still reaches onFlowComplete$, which attaches after the widget has fetched", async () => {
     const original = globalThis.fetch;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      if (!String(input).includes("/__nextgen/api/v1/flow/flow_done")) {
+      if (!String(input).includes("/__nextgen/api/v1/flows/flow_done")) {
         return original(input, init);
       }
       return Response.json({
