@@ -1,4 +1,4 @@
-import type { CreateApplicationBodyApplication } from "@zitadel/api/generated/model";
+import type { PublishApplicationBodyApplication } from "@zitadel/api/generated/model";
 
 /** The application presets, by name. */
 export const APPLICATION_PRESETS = ["web"] as const;
@@ -9,10 +9,10 @@ export const APPLICATION_PRESETS = ["web"] as const;
  * the caller to edit: it is not stored, and nothing remembers which preset made
  * a document. It leaves out `client_id` and the client secret because whoever
  * writes the document supplies them: through `POST /applications` the server
- * generates the id and issues the first secret, and in a release file the CLI
- * writes the id and the developer names the secret as a project variable. It
- * also leaves out `refresh_token`, `first_party` and a client `name`, which the
- * developer adds when wanted. The schema and the server validate the inputs.
+ * generates the id of a new client and issues its first secret. It also leaves
+ * out `refresh_token`, `first_party` and a client `name`, which the developer
+ * adds when wanted. It drops duplicate redirect URIs. The schema and the server
+ * validate the inputs.
  */
 export function webApplication({
   slug,
@@ -21,8 +21,8 @@ export function webApplication({
 }: {
   slug: string;
   name: string;
-  redirectUris: string[];
-}): CreateApplicationBodyApplication {
+  redirectUris: [string, ...string[]];
+}): PublishApplicationBodyApplication {
   return {
     slug,
     name,
@@ -31,7 +31,7 @@ export function webApplication({
         slug: "web",
         type: "confidential",
         grant_types: ["authorization_code"],
-        redirect_uris: [...redirectUris],
+        redirect_uris: [...new Set(redirectUris)],
       },
     ],
   };

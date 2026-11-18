@@ -7,7 +7,10 @@ import { webApplication } from "./application-presets.js";
 const validate = new Ajv2020({ strict: false }).compile(applicationMetaSchema);
 
 describe("web application preset", () => {
-  const redirectUris = ["https://shop.example.com/callback", "http://localhost:3000/callback"];
+  const redirectUris: [string, ...string[]] = [
+    "https://shop.example.com/callback",
+    "http://localhost:3000/callback",
+  ];
   const app = webApplication({ slug: "shop", name: "Shop", redirectUris });
 
   it("builds a document the application schema accepts", () => {
@@ -30,5 +33,16 @@ describe("web application preset", () => {
     expect(app.name).toBe("Shop");
     expect(app.clients[0]?.redirect_uris).toEqual(redirectUris);
     expect(app.clients[0]?.redirect_uris).not.toBe(redirectUris);
+  });
+
+  it("drops duplicate redirect URIs and keeps their order", () => {
+    const first = "https://shop.example.com/callback";
+    const second = "http://localhost:3000/callback";
+    const deduped = webApplication({
+      slug: "shop",
+      name: "Shop",
+      redirectUris: [first, second, first],
+    });
+    expect(deduped.clients[0]?.redirect_uris).toEqual([first, second]);
   });
 });
