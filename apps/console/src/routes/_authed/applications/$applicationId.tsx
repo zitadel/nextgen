@@ -22,9 +22,6 @@ import { formatDate, formatDateTime } from "@/lib/date";
  *
  * Read-only, and opened by its URL: the API has no applications list yet, so
  * the sidebar has no Applications entry to reach it from.
- *
- * The read needs `getApplication` to accept the console's session, as the
- * other detail reads do; until the API declares that, it answers 401 here.
  */
 export const Route = createFileRoute("/_authed/applications/$applicationId")({
   staticData: { scope: "project", resource: "application" },

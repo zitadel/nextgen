@@ -7235,6 +7235,9 @@
             "oauth2": [
               "application.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
