@@ -18,7 +18,7 @@ import { isCancellation, ZitadelError } from "@/lib/errors";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
-import { configIsDirty, headSha } from "./git";
+import { bundleIsDirty, headSha } from "./git";
 import {
   type Lockout,
   type PipelineMode,
@@ -27,7 +27,7 @@ import {
   type StepContext,
   type StepReport,
 } from "./pipeline";
-import { diffStep } from "./steps/diff";
+import { diffStep, referencedFiles } from "./steps/diff";
 import { lockoutStep } from "./steps/lockout";
 import { DEPLOYED_DEPENDENT_RULE, validateStep } from "./steps/validate";
 
@@ -313,7 +313,10 @@ export class Publisher {
     const outcome = await runSteps(steps, context);
     // Together: neither answer depends on the other and each spawns git, so
     // asking in turn would cost a whole process for nothing.
-    const [sha, dirty] = await Promise.all([headSha(request.cwd), configIsDirty(request.cwd)]);
+    const [sha, dirty] = await Promise.all([
+      headSha(request.cwd),
+      bundleIsDirty(request.cwd, referencedFiles(context)),
+    ]);
 
     return {
       bundle: Publisher.narrow(built.bundle),

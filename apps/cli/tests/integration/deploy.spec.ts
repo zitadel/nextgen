@@ -36,7 +36,7 @@ const NO_BASELINE = {
 };
 
 const UNCOMMITTED =
-  ".zitadel/ has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.";
+  "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.";
 
 const NO_EMAIL_LOCKOUT = expect.stringContaining(
   '1 of 1 existing user of "human-user" has no "email"',

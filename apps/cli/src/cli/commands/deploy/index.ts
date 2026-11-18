@@ -18,6 +18,7 @@ import {
   messageTooLong,
   Publisher,
 } from "@/lib/publish";
+import { configIsDirty } from "@/lib/publish/git";
 import {
   type NextOf,
   type Suggested,
@@ -270,13 +271,13 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       });
     }
 
-    // Record whether `.zitadel/` was dirty when this release was built, and
-    // warn: a release pins content, but its git provenance is only exact when
-    // the configuration was committed, so the reader knows the commit is
-    // approximate. A change elsewhere in the repository does not count.
+    // Record whether a file the release is built from was dirty when it was
+    // built, and warn: a release pins content, but its git provenance is only
+    // exact when those files were committed, so the reader knows the commit is
+    // approximate. A change to any other file in the repository does not count.
     if (prepared.gitDirty) {
       warnings.report(
-        ".zitadel/ has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
+        "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
       );
     }
 
@@ -323,7 +324,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
 
     // The release is live; if the tree was dirty, committing now keeps what was
     // deployed in git (the warning above says to commit before the next deploy).
-    const configUncommitted = prepared.gitDirty;
+    const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
 
     const title = `Deployed ${resources}`;
     const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;

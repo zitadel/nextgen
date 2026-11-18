@@ -1,5 +1,12 @@
 import { type DiffedFile, Repository } from "@/lib/git";
-import { CONFIG_DIRECTORIES, RELEASE_POLICY_GLOBS } from "@/lib/zitadel";
+import { posix } from "node:path";
+
+import {
+  CONFIG_DIRECTORIES,
+  POLICY_FILE_SUFFIX,
+  POLICY_TEST_SUFFIX,
+  RELEASE_POLICY_GLOBS,
+} from "@/lib/zitadel";
 
 /**
  * The directories a release is built from, the only paths a deploy diffs.
@@ -68,8 +75,8 @@ export async function headSubject(cwd: string): Promise<string | null> {
  *
  * @remarks
  * The commit's subject only describes the work when nothing is uncommitted. A
- * release's provenance does not use this: it asks {@link configIsDirty}, because
- * a change outside `.zitadel/` cannot change what a release pins.
+ * release's provenance does not use this: it asks {@link bundleIsDirty}, because
+ * a change to a file no release carries cannot change what a release pins.
  *
  * @param cwd - The project root.
  * @returns Whether anything is uncommitted; false when there is no repo.
@@ -89,9 +96,10 @@ export async function worktreeIsDirty(cwd: string): Promise<boolean> {
  * what a commit of the configuration would stage.
  *
  * @remarks
- * This is what a release records as its `git_dirty`: the commit is exact for
- * the bundle exactly when `.zitadel/` is committed. {@link worktreeIsDirty} is
- * wider, and says nothing about whether such a commit would have anything in it.
+ * {@link worktreeIsDirty} is wider, and says nothing about whether such a
+ * commit would have anything in it. What a release records as its `git_dirty`
+ * is {@link bundleIsDirty}, which looks only at the files the bundle is built
+ * from.
  *
  * @param cwd - The project root.
  * @returns Whether anything under `.zitadel/` is uncommitted; false when there
@@ -108,6 +116,62 @@ export async function configIsDirty(cwd: string): Promise<boolean> {
 
   return files.some((file) => {
     return file.path.startsWith(".zitadel/");
+  });
+}
+
+/**
+ * Whether a path is one a release is built from.
+ *
+ * @param path - The project-relative path, spelled with `/`.
+ * @param referenced - The files the bundle inlines from outside the configuration's directories.
+ * @returns Whether editing the file changes what a deploy publishes.
+ */
+function isCarriedByRelease(path: string, referenced: readonly string[]): boolean {
+  if (referenced.includes(path)) {
+    return true;
+  }
+  if (
+    CONFIG_PATHS.some((prefix) => {
+      return path.startsWith(prefix);
+    })
+  ) {
+    return true;
+  }
+
+  return (
+    posix.dirname(path) === CONFIG_DIRECTORIES.policies &&
+    path.endsWith(POLICY_FILE_SUFFIX) &&
+    !path.endsWith(POLICY_TEST_SUFFIX)
+  );
+}
+
+/**
+ * Whether a file a release is built from is uncommitted, untracked files
+ * included: what a release records as its `git_dirty`.
+ *
+ * @remarks
+ * The same files a deploy diffs ({@link CONFIG_PATHS}, the policy files and
+ * what the bundle inlines), so a file no release carries, such as
+ * `.zitadel/state.json` or an app file, cannot make the diff unreliable.
+ *
+ * @param cwd - The project root.
+ * @param referenced - The files the bundle inlines from outside the configuration's directories.
+ * @returns Whether any of them is uncommitted; false when there is no repo.
+ */
+export async function bundleIsDirty(
+  cwd: string,
+  referenced: readonly string[] = [],
+): Promise<boolean> {
+  const files = await Repository.answer(
+    cwd,
+    (repository) => {
+      return repository.uncommittedFiles();
+    },
+    [],
+  );
+
+  return files.some((file) => {
+    return isCarriedByRelease(file.path, referenced);
   });
 }
 

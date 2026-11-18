@@ -3,7 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { diffConfigAgainst, diffConfigFilesAgainst, worktreeIsDirty } from "@/lib/publish/git";
+import {
+  bundleIsDirty,
+  diffConfigAgainst,
+  diffConfigFilesAgainst,
+  worktreeIsDirty,
+} from "@/lib/publish/git";
 import { it } from "@tests/fixtures";
 import { commitAll, git, write } from "@tests/helpers/git-repo";
 
@@ -107,6 +112,99 @@ describe("worktreeIsDirty", () => {
 
   it("is false when there is no git repository", async ({ dir }) => {
     const dirty = await worktreeIsDirty(dir);
+
+    expect(dirty).toBe(false);
+  });
+});
+
+describe("bundleIsDirty", () => {
+  it("is false for a clean worktree", async ({ dir }) => {
+    await aCleanCommit(dir);
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(false);
+  });
+
+  it("is false for an uncommitted change outside .zitadel/", async ({ dir }) => {
+    await aCleanCommit(dir);
+    await write(dir, { "README.md": "# app\n\nedited\n" });
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(false);
+  });
+
+  it("is true for an uncommitted change to a file the bundle carries", async ({ dir }) => {
+    await aCleanCommit(dir);
+    await write(dir, { [MARKER]: '{ "edited": true }\n' });
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(true);
+  });
+
+  it("is true for an untracked file the bundle carries", async ({ dir }) => {
+    await aCleanCommit(dir);
+    await write(dir, { ".zitadel/schemas/new.json": "{}\n" });
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(true);
+  });
+
+  it("is true for an uncommitted policy file", async ({ dir }) => {
+    await aCleanCommit(dir);
+    await write(dir, { [POLICY]: "{}\n" });
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(true);
+  });
+
+  it("is false for an uncommitted policy test file", async ({ dir }) => {
+    await aCleanCommit(dir);
+    await write(dir, { [POLICY_TEST]: "{}\n" });
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(false);
+  });
+
+  it.for([".zitadel/state.json", ".zitadel/meta/schema.json", ".zitadel/secret"])(
+    "is false for an uncommitted %s, which no release carries",
+    async (path, { dir }) => {
+      await aCleanCommit(dir);
+      await write(dir, { [path]: "{}\n" });
+
+      const dirty = await bundleIsDirty(dir);
+
+      expect(dirty).toBe(false);
+    },
+  );
+
+  it("is true for an uncommitted file the bundle inlines from outside .zitadel/", async ({
+    dir,
+  }) => {
+    await aCleanCommit(dir);
+    await write(dir, { "public/login.liquid": "<p>edited</p>\n" });
+
+    const dirty = await bundleIsDirty(dir, ["public/login.liquid"]);
+
+    expect(dirty).toBe(true);
+  });
+
+  it("is false for that file when nothing inlines it", async ({ dir }) => {
+    await aCleanCommit(dir);
+    await write(dir, { "public/login.liquid": "<p>edited</p>\n" });
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(false);
+  });
+
+  it("is false when there is no git repository", async ({ dir }) => {
+    const dirty = await bundleIsDirty(dir);
 
     expect(dirty).toBe(false);
   });
