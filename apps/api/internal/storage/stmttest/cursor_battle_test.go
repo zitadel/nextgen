@@ -32,7 +32,6 @@ func sampleFlowDefinition(projectID, id, name string) *domain.FlowDefinition {
 		ID:            id,
 		Name:          name,
 		SchemaVersion: "1.0.0",
-		Status:        domain.FlowDefinitionStatusDraft,
 		UserSchema:    "https://example.com/schemas/human-user.json",
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "identifier",
@@ -886,7 +885,7 @@ func battleInvitations(t *testing.T, d dialect) {
 
 	t.Run("newest_first_helper", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Invitation], error) {
-			opts := invitation.ListOptions(projectID, new(domain.InvitationStatusPending), nil, now, 2)
+			opts := invitation.ListOptions(projectID, []domain.InvitationStatus{domain.InvitationStatusPending}, nil, now, 2)
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListInvitations(t.Context(), opts)
 		}, func(i *domain.Invitation) string { return i.ID })

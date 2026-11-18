@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/testdb"
+	"github.com/zitadel/nextgen/internal/storage/dialect/spanner/migration"
 )
 
 // testClient is a v2 spanner client connected to the migrated test database,
@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 func run(m *testing.M) (int, error) {
 	ctx := context.Background()
 
-	dsn, stop, err := testdb.SpannerDSN(ctx)
+	dsn, stop, err := migration.TestDSN(ctx)
 	if err != nil {
 		return 1, err
 	}

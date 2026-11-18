@@ -176,7 +176,6 @@ func PurposeStrings(def *domain.FlowDefinition) []string {
 // ToDomain converts scanned row columns plus definition JSON into the domain aggregate.
 func ToDomain(
 	projectID, id, name, schemaVersion string,
-	status domain.FlowDefinitionStatus,
 	createdAt, updatedAt time.Time,
 	rawDefinition []byte,
 ) (*domain.FlowDefinition, error) {
@@ -186,12 +185,11 @@ func ToDomain(
 			return nil, err
 		}
 	}
-	return contentToDomain(projectID, id, name, schemaVersion, status, createdAt, updatedAt, content)
+	return contentToDomain(projectID, id, name, schemaVersion, createdAt, updatedAt, content)
 }
 
 func contentToDomain(
 	projectID, id, name, schemaVersion string,
-	status domain.FlowDefinitionStatus,
 	createdAt, updatedAt time.Time,
 	content Content,
 ) (*domain.FlowDefinition, error) {
@@ -221,7 +219,6 @@ func contentToDomain(
 		ID:            id,
 		Name:          name,
 		SchemaVersion: schemaVersion,
-		Status:        status,
 		// Spanner returns UTC while pgx defaults to local; normalize to UTC.
 		CreatedAt:  createdAt.UTC(),
 		UpdatedAt:  updatedAt.UTC(),

@@ -8,7 +8,7 @@ The CLI is an agent-facing product surface. Canonical sources:
 [`apps/cli/AGENTS.md`](../../apps/cli/AGENTS.md) (package rules),
 [`apps/cli/skills/zitadel-cli/SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md)
 (the agent contract) and
-[`apps/cli/src/lib/local-server/AGENTS.md`](../../apps/cli/src/lib/local-server/AGENTS.md)
+[`apps/cli/src/lib/server/local/AGENTS.md`](../../apps/cli/src/lib/server/local/AGENTS.md)
 (the local runtime commands). Review heuristics on top of those:
 
 - The claim lifecycle is shipped

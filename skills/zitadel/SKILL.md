@@ -46,6 +46,9 @@ this router.
 - **Embed, theme, or drive the `<zitadel-login>` web component directly** → use
   **`zitadel-components`**.
 
+- **Test the app's sign-in, or pages behind it** → use the test kit
+  `@zitadel/testing`; **`zitadel-cli`**'s Testing section says when and how.
+
 ## The rule that spans all of them
 
 The CLI can **scaffold** a fresh app for every framework above and **integrate
@@ -75,7 +78,7 @@ The docs are organised into these sections:
 | Section       | What it covers                                                              |
 | ------------- | --------------------------------------------------------------------------- |
 | Get started   | The quickstart, an existing app, and driving the CLI as an agent            |
-| Guides        | Local runtime, `deploy`, social sign-in, login design and copy              |
+| Guides        | Local runtime, `deploy`, testing, social sign-in, login design and copy     |
 | Concepts      | Projects, teams, users, config as code, flows, schemas, sessions, databases |
 | SDKs          | One page per framework SDK, the SDK proxy, the API client, components       |
 | CLI reference | Every `zitadel` command with its flags and examples, by command group       |

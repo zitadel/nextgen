@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { assertDryRun, assertEndingIsWellFormed, assertOneText } from "@tests/helpers/project";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const run = (stdout: string, stderr = "") => ({ stdout, stderr });
 
@@ -47,7 +48,7 @@ describe("assertEndingIsWellFormed", () => {
 
   it("allows a lone spelled-out colour from a hostile payload, which is not the CLI's pair", () => {
     expect(() =>
-      assertEndingIsWellFormed(run("https://app.acme.com\\x1b[31m"), "origin add"),
+      assertEndingIsWellFormed(run(`${PRIMARY_ORIGIN}\\x1b[31m`), "origin add"),
     ).not.toThrow();
   });
 

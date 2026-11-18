@@ -93,7 +93,7 @@ func TestUserResponses_CarryDerivedIdentity(t *testing.T) {
 	})
 
 	t.Run("get by id carries the resolution", func(t *testing.T) {
-		res, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(displayUser.ID)})
+		res, err := client.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(displayUser.ID)})
 		require.NoError(t, err)
 		got, ok := res.(*api.User)
 		require.True(t, ok, helpers.MustMarshal(t, res))

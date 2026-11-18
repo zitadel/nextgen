@@ -2,8 +2,8 @@ title: InvitationMetadata
 description: |
   What the administrator entered at creation, so other administrators know who
   the link is for. It is only displayed, never matched. Null once the
-  invitation is accepted or declined. Cancel deletes the row with it; replace
-  moves it to the new invitation unless that sends its own.
+  invitation is accepted; a declined one keeps it. Cancel deletes the row with
+  it; replace moves it to the new invitation unless that sends its own.
 type: object
 required:
   - name

@@ -2,8 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 /**
  * The docs site's contract suite (tests/) against the local build:
- * `moon run docs:e2e`. Playwright starts `next start` on port 3003, or reuses
- * one (`moon run docs:start`).
+ * `turbo run e2e --filter=@zitadel/docs`. Playwright starts `next start` on
+ * port 3003, or reuses one (`turbo run start --filter=@zitadel/docs`).
  *
  * playwright.deployment.config.mts runs the same specs against a deployment
  * of the hosted cloud. The specs only ever use paths, so the same spec proves

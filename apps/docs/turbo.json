@@ -5,17 +5,19 @@
     // Turns the committed OpenAPI embed and its error YAML into .generated/,
     // which lib/openapi.ts and lib/error-reference.ts import, plus the CLI's
     // command reference (its reference test) and release notes (Changesets).
-    // Regenerate the embed (server:generate) before this when the OpenAPI
+    // Regenerate the embed (@zitadel/server#generate) before this when the OpenAPI
     // YAML changes.
     //
-    // Turbo hashes every NEXT_* variable into the tasks of a Next.js package,
-    // and on Vercel each deployment brings its own: NEXT_DEPLOYMENT_ID (see
-    // build), and Vercel's own variables under NEXT_PUBLIC_VERCEL_ (the
-    // deployment's URL, its commit), which the docs service's builds hash
-    // too: a preview missed both tasks with their inputs unchanged. Neither
-    // reads one, so both drop them all and hit the cache there.
+    // Turbo's Next.js inference hashes NEXT_PUBLIC_*, NEXT_DEPLOYMENT_ID and,
+    // when VERCEL_SKEW_PROTECTION_ENABLED is set, VERCEL_DEPLOYMENT_ID into
+    // every task of this package. The hosted cloud's project has Skew
+    // Protection on, so every deployment brings a new ID (see build). Vercel's
+    // NEXT_PUBLIC_VERCEL_* (its URL, its commit) change with it, and turbo
+    // drops those only where Vercel names their prefix in
+    // TURBO_CI_VENDOR_ENV_KEY. Neither task reads any of them, so both drop
+    // them all and hit the cache across deployments.
     "generate": {
-      "env": ["!NEXT_*"],
+      "env": ["!NEXT_*", "!VERCEL_DEPLOYMENT_ID"],
       "inputs": [
         "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
@@ -39,7 +41,7 @@
     // The live examples (components/examples) import the components, the
     // mock and the client the mock calls, each from its dist/.
     "typecheck": {
-      "env": ["!NEXT_*"],
+      "env": ["!NEXT_*", "!VERCEL_DEPLOYMENT_ID"],
       "dependsOn": [
         "generate",
         "@zitadel/api#generate",
@@ -52,10 +54,10 @@
     // app/global.css imports the design tokens' CSS variables, which the
     // repository commits, so that build needs no generation of them.
     //
-    // The build waits for typecheck, as in moon.yml: `next build` empties
-    // .next/types, where tsc reads the route types, so side by side
-    // typecheck failed with TS2304. A task-guard mutex would leave a gap: a
-    // cache hit restores .next without running the script.
+    // The build waits for typecheck: `next build` empties .next/types, where
+    // tsc reads the route types, so side by side typecheck failed with
+    // TS2304. A task-guard mutex would leave a gap: a cache hit restores
+    // .next without running the script.
     //
     // The hosted cloud's docs service builds through this task. A Next.js
     // build on Vercel bakes its deployment in: Skew Protection's ID into
@@ -71,7 +73,6 @@
       "dependsOn": [
         "typecheck",
         "generate",
-        "@zitadel/design-tokens#generate",
         "@zitadel/api#build",
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
@@ -81,7 +82,6 @@
     "dev": {
       "dependsOn": [
         "generate",
-        "@zitadel/design-tokens#generate",
         "@zitadel/api#build",
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
@@ -93,6 +93,7 @@
     // The site's contract suite (tests/, playwright.config.mts); Playwright
     // serves the build on port 3003.
     "e2e": {
+      "cache": false,
       "dependsOn": ["build"],
       "passThroughEnv": ["PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },

@@ -27,8 +27,10 @@ type PasskeyChallenge struct {
 	UserID  []byte    `json:"user_id,omitempty" msg:"u,omitempty"`
 	Expires time.Time `json:"expires" msg:"exp"`
 
-	Extensions map[string]any               `json:"extensions,omitempty" msg:"exts,omitempty"`
-	CredParams []PasskeyCredentialParameter `json:"credParams,omitempty" msg:"params,omitempty"`
+	// Extensions are the extension inputs sent to the client. The finish step
+	// verifies the client's outputs against their Session subset.
+	Extensions protocol.AuthenticationExtensions `json:"extensions,omitzero" msg:"exts,omitempty"`
+	CredParams []PasskeyCredentialParameter      `json:"credParams,omitempty" msg:"params,omitempty"`
 	// Mediation mirrors the WebAuthn CredentialMediationRequirement enum.
 	Mediation string `json:"mediation,omitempty" msg:"cmr,omitempty"`
 }
@@ -89,25 +91,28 @@ func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification string,
 	if err != nil {
 		return nil, err
 	}
-	var sessionData *webauthn.SessionData
+	var (
+		assertion   *protocol.CredentialAssertion
+		sessionData *webauthn.SessionData
+	)
 	opts := make([]webauthn.LoginOption, 0)
 	if verification != "" {
 		opts = append(opts, webauthn.WithUserVerification(protocol.UserVerificationRequirement(verification)))
 	}
-	// The discarded first return value is the *protocol.CredentialAssertion — the client-facing
-	// "publicKey" options for navigator.credentials.get(). We don't persist it: the API rebuilds
-	// the client payload from the typed PasskeyChallenge fields below, and only sessionData is
-	// needed server-side to verify the assertion. Caveat: the assertion's `timeout` lives only on
+	// The *protocol.CredentialAssertion is the client-facing "publicKey" options for
+	// navigator.credentials.get(). We persist only its extension inputs: the API rebuilds
+	// the client payload from the typed PasskeyChallenge fields below, and sessionData holds
+	// the rest of what is needed server-side to verify the assertion. Caveat: the assertion's `timeout` lives only on
 	// CredentialAssertion and is not mirrored on PasskeyChallenge, so it is not forwarded to the
 	// client. Add a Timeout field (here + in the API payload) if a server-chosen timeout is wanted.
 	if len(keys) == 0 {
-		_, sessionData, err = w.BeginDiscoverableLogin(opts...)
+		assertion, sessionData, err = w.BeginDiscoverableLogin(opts...)
 	} else {
 		user := &webAuthNUser{
 			userID: id,
 			creds:  PasskeysToCredentials(keys),
 		}
-		_, sessionData, err = w.BeginLogin(user, opts...)
+		assertion, sessionData, err = w.BeginLogin(user, opts...)
 	}
 	if err != nil {
 		return nil, err
@@ -121,7 +126,7 @@ func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification string,
 		RPOrigins:            origins,
 		UserID:               sessionData.UserID,
 		Expires:              sessionData.Expires,
-		Extensions:           map[string]any(sessionData.Extensions),
+		Extensions:           assertion.Response.Extensions,
 		CredParams:           credParamsFromProtocol(sessionData.CredParams),
 		Mediation:            string(sessionData.Mediation),
 	}, nil
@@ -185,7 +190,7 @@ func sessionDataFromChallenge(challenge *PasskeyChallenge) webauthn.SessionData 
 		AllowedCredentialIDs: challenge.AllowedCredentialIDs,
 		Expires:              challenge.Expires,
 		UserVerification:     protocol.UserVerificationRequirement(challenge.UserVerification),
-		Extensions:           protocol.AuthenticationExtensions(challenge.Extensions),
+		Extensions:           challenge.Extensions.Session(),
 		CredParams:           credParamsToProtocol(challenge.CredParams),
 		Mediation:            protocol.CredentialMediationRequirement(challenge.Mediation),
 	}
@@ -200,6 +205,10 @@ func webAuthNConfig(rpID string, origins ...url.URL) (*webauthn.WebAuthn, error)
 		RPID:          rpID,
 		RPDisplayName: rpID, // display name required for BeginRegistration; RPID is a valid default
 		RPOrigins:     rpOrigins,
+		// Accept client extension outputs nobody requested, as go-webauthn did
+		// before v0.18: some clients return them unprompted, and rejecting them
+		// would fail the user's sign-in.
+		ExtensionsUnsolicitedOutputPolicy: protocol.UnsolicitedOutputPolicyIgnore,
 	}
 	return webauthn.New(c)
 }
@@ -247,9 +256,12 @@ func VerifyPasskeyChallenge(challenge *PasskeyChallenge, response []byte, userID
 		discoveredUser = string(user.WebAuthnID())
 	}
 	return &PasskeyVerification{
-		CredentialID:   credential.ID,
-		SignCount:      credential.Authenticator.SignCount,
-		UserVerified:   credential.Flags.UserVerified,
+		CredentialID: credential.ID,
+		SignCount:    credential.Authenticator.SignCount,
+		// The ceremony's own UV flag: since go-webauthn v0.18,
+		// credential.Flags.UserVerified is the credential record's latched
+		// uvInitialized, not whether this assertion verified the user.
+		UserVerified:   parsedResponse.Response.AuthenticatorData.Flags.HasUserVerified(),
 		BackupEligible: credential.Flags.BackupEligible,
 		BackupState:    credential.Flags.BackupState,
 		UserID:         discoveredUser,
@@ -268,7 +280,9 @@ type PasskeyRegistrationChallenge struct {
 	ExcludeIDs  [][]byte // existing credential IDs excluded from this registration
 	Expires     time.Time
 	CredParams  []protocol.CredentialParameter
-	Extensions  protocol.AuthenticationExtensions
+	// Extensions are the extension inputs sent to the client; see
+	// [PasskeyChallenge.Extensions].
+	Extensions protocol.AuthenticationExtensions
 }
 
 // CreatePasskeyRegistrationChallenge calls webauthn.BeginRegistration and maps
@@ -284,7 +298,7 @@ func CreatePasskeyRegistrationChallenge(userID, username, displayName string, ex
 		displayName: displayName,
 		creds:       PasskeysToCredentials(existing),
 	}
-	_, sessionData, err := w.BeginRegistration(user)
+	creation, sessionData, err := w.BeginRegistration(user)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +316,7 @@ func CreatePasskeyRegistrationChallenge(userID, username, displayName string, ex
 		ExcludeIDs:  excludeIDs,
 		Expires:     sessionData.Expires,
 		CredParams:  sessionData.CredParams,
-		Extensions:  sessionData.Extensions,
+		Extensions:  creation.Response.Extensions,
 	}, nil
 }
 
@@ -396,7 +410,7 @@ func registrationSessionData(c *PasskeyRegistrationChallenge) webauthn.SessionDa
 		UserID:         []byte(c.UserID),
 		Expires:        c.Expires,
 		CredParams:     c.CredParams,
-		Extensions:     c.Extensions,
+		Extensions:     c.Extensions.Session(),
 	}
 }
 

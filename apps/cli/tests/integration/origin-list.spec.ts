@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { pressCtrlC } from "@tests/helpers/run-cli";
 import { anApp, aSetUpApp, SETUP_ORIGIN } from "@tests/helpers/project";
+import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -186,8 +187,8 @@ describe("origin list", () => {
 
       it("shows the patterns that were added", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
-        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
 
         const result = await app.run(["origin", "list", "--json"]);
 
@@ -200,8 +201,8 @@ describe("origin list", () => {
             title: "Found 3 origins",
             items: [
               SETUP_ORIGIN,
-              { pattern: "https://app.acme.com", kind: "primary" },
-              { pattern: "https://*-acme.vercel.app", kind: "preview" },
+              { pattern: PRIMARY_ORIGIN, kind: "primary" },
+              { pattern: PREVIEW_PATTERN, kind: "preview" },
             ],
             count: 3,
             next_page_token: null,
@@ -235,13 +236,13 @@ describe("origin list", () => {
     describe("--plain", () => {
       it("prints each origin as a tab-separated record", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
         const result = await app.run(["origin", "list", "--plain"]);
 
         expect(result).toPrintPlainRows(
           [SETUP_ORIGIN.pattern, SETUP_ORIGIN.kind],
-          ["https://app.acme.com", "primary"],
+          [PRIMARY_ORIGIN, "primary"],
         );
       });
 
@@ -259,13 +260,13 @@ describe("origin list", () => {
     describe("rendered for a terminal", () => {
       it("prints each origin as a record, as it does piped", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
         const result = await app.run(["origin", "list"]);
 
         expect(result).toPrintPlainRows(
           [SETUP_ORIGIN.pattern, SETUP_ORIGIN.kind],
-          ["https://app.acme.com", "primary"],
+          [PRIMARY_ORIGIN, "primary"],
         );
       });
 

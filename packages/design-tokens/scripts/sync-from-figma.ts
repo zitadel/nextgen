@@ -2,7 +2,7 @@
  * Pulls the published Variables of the Zitadel Design System library from
  * Figma's REST API and writes them to `src/generated/figma.tokens.json`.
  *
- *   moon run design-tokens:sync
+ *   turbo run sync --filter=@zitadel/design-tokens
  *
  * Requires `FIGMA_TOKEN` (a personal access token with read access to the
  * design system file). The file key, library name and pinned published
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
   await writeFile(OUT, `${JSON.stringify(tokensFile, null, 2)}\n`);
   console.log(`design-tokens sync: wrote ${OUT}`);
   console.warn(
-    "Remember to bump figma-tokens.lock with the new published version and `pulledAt`/`pulledBy`, then run `moon run design-tokens:generate` and commit the result. CI sync workflow does this automatically; if you ran sync manually, do it now.",
+    "Remember to bump figma-tokens.lock with the new published version and `pulledAt`/`pulledBy`, then run `turbo run generate --filter=@zitadel/design-tokens` and commit the result. CI sync workflow does this automatically; if you ran sync manually, do it now.",
   );
 }
 

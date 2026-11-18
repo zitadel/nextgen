@@ -42,7 +42,7 @@ export function aSchemaListing(
 }
 
 /**
- * An active login flow whose entry step offers SSO through `providers`, and
+ * A login flow whose entry step offers SSO through `providers`, and
  * routes each outcome of signing in that way.
  *
  * @param providers - The providers its entry step offers.
@@ -55,7 +55,6 @@ export function aFlowOffering(
 ): JsonObject {
   return {
     name: "sso-login",
-    status: "active",
     user_schema: userSchema,
     purposes: { login: "identifier" },
     steps: [

@@ -1,5 +1,5 @@
 /**
- * Tests for the comparison `workspace:check-go-work` runs before the check
+ * Tests for the comparison `//#check-go-work` runs before the check
  * itself (Vitest, no Go): which modules a module's own build and the
  * workspace's load at different versions.
  */

@@ -33,7 +33,6 @@ const POINTER = "../meta/flow-definition.json";
  * A flow that only registers, collecting a password on the way.
  */
 const REGISTER_ONLY = {
-  status: "active",
   purposes: { register: "register" },
   steps: [{ name: "register", fields: ["email", "x-auth-methods#password"] }],
 };
@@ -43,7 +42,6 @@ const REGISTER_ONLY = {
  * register side, which the login hands over to with a purpose flip.
  */
 const SIGNS_IN_AND_REGISTERS = {
-  status: "active",
   purposes: { login: "start", register: "register" },
   steps: [
     {
@@ -60,7 +58,6 @@ const SIGNS_IN_AND_REGISTERS = {
  * spells out a null action and purpose.
  */
 const NULL_ACTION_AND_PURPOSE = {
-  status: "active",
   purposes: { login: "identifier" },
   steps: [
     {
@@ -76,7 +73,6 @@ const NULL_ACTION_AND_PURPOSE = {
  * shares its name with a local password step.
  */
 const SWITCHING_TO_ANOTHER_FLOW = {
-  status: "active",
   purposes: { login: "identifier" },
   steps: [
     { name: "identifier", transitions: { other: { target: "password", action: "switch" } } },
@@ -89,7 +85,6 @@ const SWITCHING_TO_ANOTHER_FLOW = {
  * purpose, which switches the login to registration on its own.
  */
 const SWITCHING_TO_REGISTRATION = {
-  status: "active",
   purposes: { login: "identifier", register: "register" },
   steps: [
     {
@@ -105,7 +100,6 @@ const SWITCHING_TO_REGISTRATION = {
  * A flow whose login entry only enrols a passkey.
  */
 const ENROLS_PASSKEYS = {
-  status: "active",
   purposes: { login: "register" },
   steps: [{ name: "register", actions: [{ name: "enrol", kind: "passkey_register" }] }],
 };
@@ -118,7 +112,6 @@ const ENROLS_PASSKEYS = {
  */
 function offering(...providers: string[]): JsonObject {
   return {
-    status: "active",
     purposes: { login: "identifier" },
     steps: [{ name: "identifier", sso_providers: providers }],
   };
@@ -265,14 +258,6 @@ describe("Flow.findOfferedMethods", () => {
     const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual(["password"]);
-  });
-
-  it("ignores a flow that is not active", () => {
-    const flow = aFlow(aPasskeyFlow({ status: "draft" }));
-
-    const offered = flow.findOfferedMethods([]);
-
-    expect(offered).toEqual([]);
   });
 
   it("does not count a register-only flow that collects a password", () => {

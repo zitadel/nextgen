@@ -1,6 +1,8 @@
 import { execaSync } from "execa";
 import semver from "semver";
 
+import { frameworkCliVersion } from "./framework-clis";
+
 /**
  * How a framework CLI treats a Node outside its `engines.node`, which decides
  * what setup does about it:
@@ -133,13 +135,12 @@ export function nodeEnginesRange(
 
 /**
  * The `create-vite` release every Vite scaffolder (React, Vue, Solid, Svelte
- * and Qwik) runs, pinned exactly. 9.3.2 was published without its templates:
- * it fails to scaffold yet exits 0, so setup went on to report an empty
- * directory as an undetectable framework. Bump it by hand once a release
- * ships its templates again. The templates write `^` ranges, so a fresh app
- * still picks up framework and Vite patch releases.
+ * and Qwik) runs ({@link frameworkCliVersion}). 9.3.2 was published without
+ * its templates: it fails to scaffold yet exits 0, so setup went on to report
+ * an empty directory as an undetectable framework. The templates write `^`
+ * ranges, so a fresh app still picks up framework and Vite patch releases.
  */
-export const CREATE_VITE_VERSION = "9.3.1";
+export const CREATE_VITE_VERSION = frameworkCliVersion("create-vite");
 
 /**
  * What every scaffolder that runs `create-vite` declares. `create-vite` never

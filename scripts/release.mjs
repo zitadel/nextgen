@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,29 +10,30 @@ import {
   publishBlockersMessage,
   readLocalPackages,
 } from "./release-npm-preflight.mjs";
-import {
-  PUBLIC_PACKAGE_DIRS,
-  hostOnlyPackageDirs,
-  hostServerPlatformPackage,
-} from "./release-manifest.mjs";
+import { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 import { detectReleaseAutomation } from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
+  assertServerBinaries,
   buildContainerImage,
   buildServerBinaries,
+  collectServerBinaries,
   createArchives,
   gitInfo,
+  packageBinaryPath,
   packPublicPackages,
   prepareDockerContext,
   readServerRelease,
   releaseDir,
-  stageServerNpmBinaries,
   verifyLocalArtifacts,
   writeReleaseMetadata,
 } from "./release-artifacts.mjs";
-import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+
+// pack, snapshot and publish pack what the task graph built before them
+// (turbo's tasks, tools/release/package.json): every public package's dist and
+// each server platform package's binary (`binary` below).
 
 export async function main(args = forwardedArgs()) {
   const command = args[0];
@@ -40,6 +42,8 @@ export async function main(args = forwardedArgs()) {
   switch (command) {
     case "version":
       return await commandVersion();
+    case "binary":
+      return await commandBinary(options);
     case "snapshot":
       return await commandSnapshot(options);
     case "pack":
@@ -60,50 +64,47 @@ async function commandVersion() {
   console.log(`${release.name} ${release.version} (${release.tag})`);
 }
 
+/**
+ * The release binary of the server platform package this runs in
+ * (apps/server-<platform>, its build-binary task), into the bin/ its npm
+ * package ships.
+ */
+async function commandBinary(_options, cwd = process.cwd()) {
+  const here = await realpath(cwd);
+  let platformPackage;
+  for (const entry of SERVER_PLATFORM_PACKAGES) {
+    if ((await realpath(join(repoRoot, entry.packageDir))) === here) platformPackage = entry;
+  }
+  if (!platformPackage) {
+    throw new Error(`release binary runs in a server platform package, not in ${cwd}`);
+  }
+  const output = packageBinaryPath(repoRoot, platformPackage);
+  const release = await readServerRelease(repoRoot);
+  await buildServerBinaries({
+    repoRoot,
+    version: release.version,
+    gitInfo: await gitInfo({ repoRoot }),
+    platforms: [platformPackage],
+    output: () => output,
+  });
+}
+
 async function commandSnapshot(options) {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
-  // A host-only snapshot is for installing on this machine: one server
-  // platform, its npm package, no archives and no Docker context.
-  if (options.hostOnly && !options.skipContainer) {
-    throw new Error("a host-only snapshot has no Docker context: add --skip-container");
-  }
-  const host = options.hostOnly ? hostServerPlatformPackage() : undefined;
 
-  await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
-  await buildServerBinaries({
-    repoRoot,
-    outDir,
-    version: release.version,
-    gitInfo: info,
-    platforms: host ? [host] : undefined,
-  });
+  // The binaries are in their platform packages; the archives and the
+  // Docker context read them from the release directory.
+  await collectServerBinaries({ repoRoot, outDir, version: release.version });
   // Independent lanes over the built binaries, run side by side: each
-  // writes only its own output (the platform packages' bin/ and then npm/,
-  // archives/, docker-context/). Every lane settles before the first failure
-  // is rethrown, so a failing lane never leaves another's processes running.
+  // writes only its own output (npm/, archives/, docker-context/). Every
+  // lane settles before the first failure is rethrown, so a failing lane
+  // never leaves another's processes running.
   const lanes = await Promise.allSettled([
-    (async () => {
-      await stageServerNpmBinaries({
-        repoRoot,
-        outDir,
-        version: release.version,
-        platformPackages: host ? [host] : undefined,
-      });
-      await packPublicPackages({
-        repoRoot,
-        outDir,
-        version: release.version,
-        dirs: host ? hostOnlyPackageDirs(host) : undefined,
-      });
-    })(),
-    ...(host
-      ? []
-      : [
-          createArchives({ repoRoot, outDir, version: release.version }),
-          prepareDockerContext({ repoRoot, outDir, version: release.version }),
-        ]),
+    packPublicPackages({ repoRoot, outDir, version: release.version }),
+    createArchives({ repoRoot, outDir, version: release.version }),
+    prepareDockerContext({ repoRoot, outDir, version: release.version }),
   ]);
   const failedLane = lanes.find((lane) => lane.status === "rejected");
   if (failedLane) {
@@ -122,19 +123,19 @@ async function commandSnapshot(options) {
     });
   }
 
-  await verifyLocalArtifacts({ repoRoot, outDir, release, hostOnly: Boolean(host) });
+  await verifyLocalArtifacts({ repoRoot, outDir, release });
   console.log(`release snapshot ready: ${outDir}`);
 }
 
 async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
-  const info = await gitInfo({ repoRoot });
-  await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
-  await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
-  await packPublicPackages({ repoRoot, outDir, version: release.version });
-  console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
+  await assertServerBinaries({ repoRoot });
+  const tarballsDir = await packPublicPackages({ repoRoot, outDir, version: release.version });
+  // Exactly the public release packages, each installable: what CI checks of
+  // the full set (each journey checks only the tarballs it installs).
+  await run("node", ["e2e/journey/scripts/verify-tarballs.mjs", tarballsDir], { cwd: repoRoot });
+  console.log(`npm tarballs ready: ${tarballsDir}`);
 }
 
 async function commandPublish(options) {
@@ -219,9 +220,10 @@ async function assertPackagesPublishable() {
   }
 }
 
-// The publish preflight's npm check, on its own. ci.yml runs it on the version
-// PR and its merge group, so a version that release publish would refuse fails
-// before it lands on main, not after.
+// The publish preflight's npm check, on its own: @zitadel/release#check-npm,
+// which CI runs whenever a public package's manifest changes (the version PR
+// and its merge group among them), so a version that release publish would
+// refuse fails before it lands on main, not after.
 async function commandCheckNpm() {
   const release = await readServerRelease(repoRoot);
   await assertPackagesPublishable();
@@ -242,17 +244,17 @@ async function commandVerify() {
   console.log(`release artifacts verified for ${release.version}`);
 }
 
-// RELEASE_SKIP_CONTAINER=1 and RELEASE_HOST_ONLY=1 are --skip-container and
-// --host-only for CI's turbo job, which cannot pass them after `--`: turbo
-// puts those arguments into the cache key of every task in the run
+// RELEASE_SKIP_CONTAINER=1, RELEASE_DRY_RUN=1 and RECOVER_VERSION are
+// --skip-container, --dry-run and --recover-version for the workflows'
+// turbo runs, which cannot pass them after `--`: turbo puts those
+// arguments into the cache key of every task in the run
 // (vercel/turborepo#14770), so the whole release graph would be rebuilt
 // instead of restored.
 function parseOptions(args, env = process.env) {
   const parsed = {
-    dryRun: false,
+    dryRun: env.RELEASE_DRY_RUN === "1",
     skipContainer: env.RELEASE_SKIP_CONTAINER === "1",
-    hostOnly: env.RELEASE_HOST_ONLY === "1",
-    recoverVersion: "",
+    recoverVersion: env.RECOVER_VERSION ?? "",
     base: "",
   };
   for (let index = 0; index < args.length; index += 1) {
@@ -263,9 +265,6 @@ function parseOptions(args, env = process.env) {
         break;
       case "--skip-container":
         parsed.skipContainer = true;
-        break;
-      case "--host-only":
-        parsed.hostOnly = true;
         break;
       case "--recover-version":
         parsed.recoverVersion = args[++index] ?? "";
@@ -318,16 +317,16 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|check-npm|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|binary|pack|snapshot|publish|check-npm|verify> [options]
+
+Commands:
+  binary             Build the release binary of the server platform package
+                     this runs in (apps/server-<platform>) into its bin/.
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
   --skip-container   Build release files without building a local Docker image
                      (or set RELEASE_SKIP_CONTAINER=1).
-  --host-only        snapshot: build and pack only this machine's server
-                     platform, without archives or a Docker context;
-                     needs --skip-container
-                     (or set RELEASE_HOST_ONLY=1).
   --recover-version <v>
                      Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.

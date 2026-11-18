@@ -89,8 +89,6 @@ func TestExampleFlowDefinitions(t *testing.T) {
 
 			schemaURI := url.URL(req.GetSchemaURI().Value)
 			userSchemaRef := req.FlowDefinition.GetUserSchema()
-			status, err := domain.FlowDefinitionStatusString(string(req.FlowDefinition.GetStatus()))
-			require.NoError(t, err, "invalid status")
 
 			flowDef, err := domain.NewFlowDefinition(
 				"",
@@ -104,7 +102,6 @@ func TestExampleFlowDefinitions(t *testing.T) {
 					TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
 				},
 				steps,
-				status,
 			)
 			require.NoError(t, err, "domain NewFlowDefinition")
 

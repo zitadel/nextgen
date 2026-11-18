@@ -225,6 +225,16 @@ func (a *AuthAttempt) IsHandedOff() bool {
 	return a.HandoffToken != nil
 }
 
+// ResolvedUserID is the user the attempt has identified, from its verified
+// user factor; empty until an identifier resolved to one.
+func (a *AuthAttempt) ResolvedUserID() string {
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return ""
+	}
+	return userCheck.UserID
+}
+
 // FactorByClass returns a verified factor whose type competes in typ's class
 // (see [AuthCheckType.Class]), if one exists on the attempt.
 func (a *AuthAttempt) FactorByClass(typ AuthCheckType) (AuthFactor, bool) {

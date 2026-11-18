@@ -2,7 +2,8 @@ import type { Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
-import { newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
+import type { PackageCommand } from "@/lib/pm";
+import { Spelling } from "./spelling";
 
 import type { RELATIONS } from "./relations";
 
@@ -33,7 +34,10 @@ declare const suggestedCommand: unique symbol;
 
 /**
  * A rendered suggestion: the command line a person or an agent runs. Only the
- * renderer and {@link shellCommand} make one, so a raw string does not
+ * renderer makes one of this CLI; {@link shellCommand} and
+ * {@link suggestedCommandOf} make one of a program that is not it, and
+ * {@link shellSteps}, {@link pipedFrom}, {@link readingFrom} and
+ * {@link andTheRest} join or wrap ones already made. A raw string does not
  * typecheck where a suggestion is expected.
  */
 export type SuggestedCommand = string & { readonly [suggestedCommand]: true };
@@ -68,7 +72,18 @@ type Renderable = string | number | boolean | readonly (string | number)[];
  * A flag that parses to something a command line cannot carry (a duration, a
  * URL) is given as the text it is typed as.
  */
-type Given<Value> = [NonNullable<Value>] extends [Renderable] ? NonNullable<Value> : string;
+type Given<Value> =
+  | ([NonNullable<Value>] extends [Renderable] ? NonNullable<Value> : string)
+  // A value left for the reader to fill in: any value a switch is not.
+  | ([NonNullable<Value>] extends [boolean] ? never : FillIn);
+
+/**
+ * A value a suggestion leaves for the reader to fill in, such as `<client-id>`
+ * or {@link WHAT_CHANGED}: written in angle brackets, which the renderer
+ * quotes so a shell does not read it as a redirection. It stands in for any
+ * value but a switch's, which takes none.
+ */
+export type FillIn = `<${string}>`;
 
 /** Flags that say how a run answers, never what a suggestion should do. */
 type Answering = "color" | "debug" | "non-interactive" | "telemetry" | "verbose";
@@ -147,8 +162,11 @@ type FlagValues<Class> = {
     Values<Class>[Key & keyof Values<Class>]
   >;
 } & {
-  readonly [Key in RequiredKey<Class> as Named<Key>]: Given<
-    Values<Class>[Key & keyof Values<Class>]
+  // A required flag is given on: `false` for a required switch is the same as
+  // leaving it out, which the target refuses.
+  readonly [Key in RequiredKey<Class> as Named<Key>]: Exclude<
+    Given<Values<Class>[Key & keyof Values<Class>]>,
+    false
   >;
 } & {
   /**
@@ -158,10 +176,19 @@ type FlagValues<Class> = {
   readonly json?: boolean;
 };
 
+/**
+ * The flags a suggestion of the command class `Class` may carry, by the names
+ * code reads them: every flag it declares typed as it parses, its required
+ * flags given, its `exclusive` flags never both given, and its `dependsOn`
+ * flags given with what they depend on.
+ *
+ * @typeParam Class - A command class, or anything with the `flags` one
+ *   declares, as a mixin names the flags it relies on.
+ */
+export type FlagsOf<Class> = FlagValues<Class> & Exclusions<Class> & Dependencies<Class>;
+
 /** The flags a suggestion of `Id` may carry, by the names code reads them. */
-export type SuggestFlags<Id> = FlagValues<Target<Id>> &
-  Exclusions<Target<Id>> &
-  Dependencies<Target<Id>>;
+export type SuggestFlags<Id> = FlagsOf<Target<Id>>;
 
 type ArgValues<Class> = Class extends { args: infer Args }
   ? Args extends Interfaces.ArgInput
@@ -234,8 +261,18 @@ export type Checked<Id extends string> = Id extends SuggestionId
  */
 export type Next = { [Id in SuggestionId]: NextOf<Id> }[SuggestionId];
 
+/**
+ * The name of each flag the command class `Class` declares, as code reads it
+ * (`dryRun` for `--dry-run`), leaving out the flags that only say how a run
+ * answers.
+ *
+ * @typeParam Class - A command class, or anything with the `flags` one
+ *   declares.
+ */
+export type FlagNameOf<Class> = Named<FlagKey<Class>>;
+
 /** The flags of `Id` by the names code reads them, for a rerun's `without`. */
-export type SuggestFlagName<Id> = Named<FlagKey<Target<Id>>>;
+export type SuggestFlagName<Id> = FlagNameOf<Target<Id>>;
 
 /** A suggestion's input once its id is no longer known to the compiler. */
 export type LooseInput = Readonly<{
@@ -304,13 +341,13 @@ export type Again = <const Id extends SuggestionId>(
 ) => Promise<SuggestedCommand>;
 
 /**
- * A suggestion of a generated resource command (`users:get`, `release:list`)
+ * A suggestion of a generated resource command (`user:get`, `release:list`)
  * whose id is only known at run time, so the compiler cannot check it against a
  * command. The flags and arguments are checked when the run renders it instead:
  * the renderer throws on one the target does not declare, and on an id that is
  * no command.
  *
- * @param topic - The resource's topic, as oclif names it (`users`).
+ * @param topic - The resource's topic, as oclif names it (`user`).
  * @param verb - The operation on it, under the verb its command is named by.
  * @param input - The target's arguments and flags, by the names code reads them.
  * @returns The suggestion, for the run that reports it to render.
@@ -326,7 +363,7 @@ export function resourceSuggestion(
 /**
  * The help of a command whose id is only known at run time, such as the one a
  * refused command line named or a generated resource command
- * (`users:create`). The renderer checks the id, and throws on one that is no
+ * (`user:create`). The renderer checks the id, and throws on one that is no
  * command, as it does for {@link resourceSuggestion}.
  *
  * @param id - The command's id, as oclif names it (`variable:get`).
@@ -412,29 +449,112 @@ function canonical(value: unknown): string {
   });
 }
 
-/** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */
-export function shellCommand(command: string): SuggestedCommand {
-  return command as SuggestedCommand;
+/**
+ * The programs a shell suggestion may name: each one runs only itself, so a
+ * suggestion of one can never run this CLI. A package manager is not among
+ * them, since it can run a package (`pnpm dlx`); its commands are suggested
+ * through {@link suggestedCommandOf}, whose verbs cannot run one.
+ */
+const PROGRAMS = ["cd", "docker", "git", "rm"] as const;
+
+/** A program a shell suggestion may name ({@link PROGRAMS}). */
+type Program = (typeof PROGRAMS)[number];
+
+/**
+ * A command that is not the CLI (`docker pull …`, `git commit …`), suggested as
+ * its program and its words, joined with spaces. The program is one of
+ * {@link PROGRAMS}, so the CLI cannot be written here at all; suggest it as
+ * `{ id, args, flags }`. Each word is written as the shell should read it:
+ * quote a value that came from a person with `Cmd.quote`, and leave a glob
+ * bare. Run several one after another with {@link shellSteps}.
+ *
+ * @param program - The program.
+ * @param words - What follows it.
+ * @returns The command.
+ */
+export function shellCommand(program: Program, ...words: readonly string[]): SuggestedCommand {
+  return [program, ...words].join(" ") as SuggestedCommand;
 }
 
 /**
- * A suggestion wrapped in shell around it: a pipe that feeds it a secret
- * (`printf '%s' "$SECRET" | `) or the `< value.txt` redirection that must
- * follow the selector. The command itself stays the one the renderer made.
+ * A package manager's command as a suggestion, written as its own `display`
+ * shows it, so the suggestion and the hint that quotes the command read the
+ * same. Its verb, which the builder records, can only install, remove or run a
+ * project's own script, and `run` may not run this CLI's binary: that would run
+ * the CLI where nothing checks it.
+ *
+ * @param command - The package manager's command, as `lib/pm`
+ *   builds it.
+ * @returns The command.
+ * @throws {Error} When it runs this CLI.
  */
-export function inShell(
-  command: SuggestedCommand,
-  shell: { before?: string; after?: string },
+export function suggestedCommandOf(command: PackageCommand): SuggestedCommand {
+  if (command.verb === "run" && command.operands[0] === Spelling.BINARY) {
+    throw new Error(`${command.display} runs the CLI: suggest it as { id, args, flags }`);
+  }
+
+  return command.display as SuggestedCommand;
+}
+
+/**
+ * Commands run one after another, each only if the one before it worked:
+ * `cd app && npm uninstall x`.
+ *
+ * @param steps - The commands, each made by {@link shellCommand} or
+ *   {@link suggestedCommandOf}.
+ * @returns The line that runs them in turn.
+ */
+export function shellSteps(
+  ...steps: readonly [SuggestedCommand, SuggestedCommand, ...SuggestedCommand[]]
 ): SuggestedCommand {
-  return `${shell.before ?? ""}${command}${shell.after ?? ""}` as SuggestedCommand;
+  return steps.join(" && ") as SuggestedCommand;
+}
+
+/** The name of a shell variable a suggestion may read from: `CLIENT_SECRET`. */
+const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
+
+/**
+ * `command` fed a secret on stdin from the caller's own environment, so the
+ * secret never appears on the command line: `printf '%s' "$CLIENT_SECRET" | …`.
+ *
+ * @param variable - The shell variable that holds the secret.
+ * @param command - The command that reads it.
+ * @returns The command with the pipe in front of it.
+ * @throws {Error} When `variable` is no shell variable's name.
+ */
+export function pipedFrom(variable: string, command: SuggestedCommand): SuggestedCommand {
+  if (!VARIABLE.test(variable)) {
+    throw new Error(`${variable} is no shell variable's name`);
+  }
+
+  return `printf '%s' "$${variable}" | ${command}` as SuggestedCommand;
 }
 
 /**
- * The message a suggested `deploy` carries for the reader to fill in: a
- * non-interactive `deploy` with no message to fall back on refuses to run
- * without one.
+ * `command` reading its stdin from `file`: `… < value.txt`. It follows the
+ * whole command, the scope the renderer appended included.
+ *
+ * @param command - The command that reads it.
+ * @param file - The file, as a person would name it.
+ * @returns The command with the redirection after it.
  */
-export const WHAT_CHANGED = "<what changed>";
+export function readingFrom(command: SuggestedCommand, file: string): SuggestedCommand {
+  return `${command} < ${Cmd.quote(file)}` as SuggestedCommand;
+}
+
+/**
+ * `command` with ` ...` after it, for a retry that stands for the run again
+ * with everything else it was given: `setup --sso-client-id '<id>' ...`.
+ *
+ * @param command - The command.
+ * @returns The command, followed by the ellipsis.
+ */
+export function andTheRest(command: SuggestedCommand): SuggestedCommand {
+  return `${command} ...` as SuggestedCommand;
+}
+
+import { WHAT_CHANGED } from "./what-changed";
+export { WHAT_CHANGED };
 
 /**
  * What the renderer needs to know of a suggestion's target, read from the
@@ -645,7 +765,7 @@ export function suggestionWords(
       continue;
     }
     for (const word of wordsOf(value)) {
-      options.push(...optionArgs(`--${flag}`, word));
+      options.push(...Cmd.optionArgs(`--${flag}`, word));
     }
   }
   refuseBroken(id, input, target);
@@ -654,7 +774,7 @@ export function suggestionWords(
     if (value !== undefined && target.flags.has(spelled(name))) {
       // The scope is the run's as it was typed, so a server named with its
       // credentials loses them here, on every suggestion that carries it.
-      options.push(...optionArgs(`--${spelled(name)}`, withoutCredentials(value)));
+      options.push(...Cmd.optionArgs(`--${spelled(name)}`, withoutCredentials(value)));
     }
   }
   // A positional argument is read by where it stands, so one given after one
@@ -705,7 +825,7 @@ export function commandOf(words: readonly string[], cliVersion: string): Suggest
   const isNewest = NEWEST.has(words[0] ?? "");
 
   return (
-    isNewest ? newestCliCommand(line, cliVersion) : publicCliCommand(line, cliVersion)
+    isNewest ? Spelling.at(cliVersion).newestCommand(line) : Spelling.at(cliVersion).command(line)
   ) as SuggestedCommand;
 }
 
@@ -782,3 +902,6 @@ export function renderSuggestion(
 ): SuggestedCommand {
   return commandOf(suggestionWords(next.id, next, target, scope), cliVersion);
 }
+
+export { Guidance } from "./guidance";
+export { Spelling } from "./spelling";

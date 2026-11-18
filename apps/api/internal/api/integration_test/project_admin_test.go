@@ -168,7 +168,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	assert.Equal(t, ownGrant.ID, ownerRow.Sources[1].ProjectAdminGrantSource.GrantID)
 
 	// Revoking the explicit grant leaves the access inherited through the team.
-	delResp, err := owner.DeleteGrant(t.Context(), api.DeleteGrantParams{ID: ownGrant.ID, ProjectID: api.ProjectID(project.ID)})
+	delResp, err := owner.DeleteGrant(t.Context(), api.DeleteGrantParams{GrantID: ownGrant.ID, ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 	admins = queryAdmins(t, owner)

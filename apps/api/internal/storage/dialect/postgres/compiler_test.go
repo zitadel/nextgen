@@ -143,18 +143,6 @@ func TestCompileArrayContains(t *testing.T) {
 	assert.Equal(t, "login", args[0])
 }
 
-func TestCompileStatusEqualParamCast(t *testing.T) {
-	t.Parallel()
-
-	sql, args := compileFilterOnly(t,
-		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), "active"),
-		flowdefinition.Schema,
-	)
-	assert.Equal(t, "status = $1::zitadel_nextgen.flow_definition_states", sql)
-	require.Len(t, args, 1)
-	assert.Equal(t, "active", args[0])
-}
-
 func TestCompileFilterNil(t *testing.T) {
 	t.Parallel()
 

@@ -13,10 +13,12 @@ import {
   searchMeanings,
   type ValueFilter,
 } from "../model";
+import { EVENT_SHEET_WIDTH } from "./event-panel";
 
 /** What tells the two readings of one id apart. */
 const READING: Partial<Record<string, string>> = {
   actor: "what it did",
+  user: "what happened to its account",
   resource: "what happened to it",
 };
 
@@ -36,12 +38,26 @@ type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
  * search, so nothing here searches as you type.
  *
  * What the term means is listed under the field. One meaning applies on
- * Enter. An id that may be an actor or a resource lists both and waits for a
- * choice: guessing would show an empty list for the other reading. The empty
+ * Enter. An id that may be an actor or a resource, or a user's that may be
+ * the account or the actor, lists both and waits for a choice: guessing would
+ * show an empty list for the other reading. The empty
  * field offers **My activity**, the list narrowed to what the signed-in
  * person did, whose chip reads `actor: me`.
  */
-export function EventSearchField({ current, me }: { current: EventsSearch; me?: string }) {
+export function EventSearchField({
+  current,
+  me,
+  besideEvent = false,
+}: {
+  current: EventsSearch;
+  me?: string;
+  /**
+   * An event is open in its drawer. Where the drawer covers the list's right
+   * it covers the field's too, and the list under the field keeps to the part
+   * still in view rather than spreading over the drawer.
+   */
+  besideEvent?: boolean;
+}) {
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -153,7 +169,11 @@ export function EventSearchField({ current, me }: { current: EventsSearch; me?: 
           until an arrow key or a click goes into it. */}
       <PopoverContent
         align="start"
-        className="w-(--radix-popover-trigger-width) min-w-64 p-1"
+        // As wide as the field, up to where the drawer starts. Not shifted to
+        // fit: that would slide it left over the sidebar instead.
+        className="w-(--radix-popover-trigger-width) max-w-(--radix-popover-content-available-width) min-w-64 p-1"
+        collisionPadding={besideEvent ? { right: EVENT_SHEET_WIDTH } : undefined}
+        avoidCollisions={!besideEvent}
         onOpenAutoFocus={(event) => event.preventDefault()}
         // A click back into the field is not a click away from it.
         onInteractOutside={(event) => {
@@ -232,8 +252,8 @@ function Hint() {
     <p className="text-muted-foreground px-2 py-1.5 text-xs">
       Paste an ID, an event type or an operation, such as <Code>req_…</Code>,{" "}
       <Code>user.created</Code> or <Code>createUser</Code>, or name the filter: <Code>actor:</Code>,{" "}
-      <Code>resource:</Code>, <Code>resource_type:</Code>, <Code>app:</Code>, <Code>device:</Code>.
-      There is no text search.
+      <Code>user:</Code>, <Code>resource:</Code>, <Code>resource_type:</Code>, <Code>app:</Code>,{" "}
+      <Code>device:</Code>. There is no text search.
     </p>
   );
 }

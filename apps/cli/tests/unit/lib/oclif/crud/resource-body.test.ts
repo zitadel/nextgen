@@ -6,11 +6,15 @@ import { describeBody } from "@/lib/oclif/crud";
 import { documentSchemaOf } from "@/lib/oclif/crud/fields";
 import { resourceBody } from "@/lib/oclif/crud/resource-body";
 
+/** What a refusal suggests: the run again. */
+const RETRY = { id: "setup" } as const;
+
 const resolve = (flags: Record<string, unknown>) => {
   return resourceBody(
     {
-      topic: "teams",
+      topic: "team",
       verb: "create",
+      retry: RETRY,
       root: undefined,
       schema: CreateTeamBody,
       document: documentSchemaOf(CreateTeamBody, undefined),
@@ -41,7 +45,7 @@ describe("resourceBody", () => {
   it("words the refusal for what it lacks, naming the fields in the error's details", async () => {
     await expect(resolve({ data: "{}" })).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: "teams create is missing required field: --name",
+      message: "team create is missing required field: --name",
       hint: expect.stringContaining("Pass --name, or include it in --data / --file."),
       details: {
         missing: ["name"],
@@ -53,13 +57,13 @@ describe("resourceBody", () => {
     [
       "one",
       z.object({ name: z.string() }),
-      "teams create is missing required field: --name",
+      "team create is missing required field: --name",
       "Pass --name, or include it in --data / --file.",
     ],
     [
       "several",
       z.object({ name: z.string(), slug: z.string() }),
-      "teams create is missing required fields: --name, --slug",
+      "team create is missing required fields: --name, --slug",
       "Pass --name and --slug, or include them in --data / --file.",
     ],
   ])(
@@ -68,8 +72,9 @@ describe("resourceBody", () => {
       await expect(
         resourceBody(
           {
-            topic: "teams",
+            topic: "team",
             verb: "create",
+            retry: RETRY,
             root: undefined,
             schema,
             document: documentSchemaOf(schema, undefined),

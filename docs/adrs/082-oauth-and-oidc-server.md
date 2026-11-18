@@ -26,6 +26,18 @@
 > [ADR 068](068-project-is-the-data-boundary.md),
 > [ADR 070](070-cli-auth-method-toggles.md),
 > [ADR 078](078-abuse-prevention-in-layers.md)
+>
+> **Amendment (2026-11-11) — [D42](../design/decisions.md),
+> [Console ADR 0004 §1](../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project):**
+> an application on the reserved platform project signs people in to the
+> platform itself (the Console, the CLI, MCP clients acting on Zitadel), never
+> a customer's end users. Declaring one there in a release, or registering one
+> through the API, asks for the project's admin role, as its other
+> configuration does.
+>
+> **Amendment (2026-11-13), [identity model](../design/api/identity-model.md#one-call):**
+> the web preset fills the authorization code grant only, and refresh tokens
+> are opt-in (§3), as step 2 of the recommended sequence already says.
 
 ## TL;DR
 
@@ -215,14 +227,15 @@ Credentials become a resource of their own later, for rotation (§11).
 
 | Preset | Client type | Authenticates with | Grant types |
 |---|---|---|---|
-| Web | confidential | client secret or `private_key_jwt` | authorization code, refresh token |
+| Web | confidential | client secret or `private_key_jwt` | authorization code (refresh token opt-in) |
 | SPA or native | public | PKCE only | authorization code, refresh token |
 | Service | confidential | client secret or `private_key_jwt` | client credentials |
 
 A preset fills a client's fields when the CLI or the Console writes it, and
-is not stored. A client keeps its `type`, public or confidential, and its
-other fields, never the preset, so declared, registered and imported clients
-share one shape. Any confidential client can later be a principal
+is not stored. A web client that wants refresh tokens adds `refresh_token`
+to its `grant_types`. A client keeps its `type`, public or confidential,
+and its other fields, never the preset, so declared, registered and imported
+clients share one shape. Any confidential client can later be a principal
 ([identity model](../design/api/identity-model.md#principals)). A client has
 no `protocol` field: an OpenID Connect client is an OAuth client that asks
 for `openid`, as in RFC 7591 and OpenID Connect Dynamic Registration, so a

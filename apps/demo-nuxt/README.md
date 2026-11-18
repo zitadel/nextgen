@@ -4,12 +4,12 @@ A minimal Nuxt application demonstrating [Nextgen Auth](../../packages/sdk-nuxt)
 
 ## Running locally
 
-Use **Moon** from the repo root (`corepack pnpm install` first).
+Use **Turborepo** from the repo root (`corepack pnpm install` first).
 
 Build the SDK (and its transitive dependencies) once before the first run:
 
 ```bash
-moon run sdk-nuxt:build
+turbo run build --filter=@zitadel/sdk-nuxt
 ```
 
 ### 1. Configure environment
@@ -32,22 +32,25 @@ Or pass them inline when starting the dev server (step 2).
 Two terminals:
 
 ```bash
-# Terminal 1 — mock auth server on port 8080 (set PORT to override)
-moon run api-mock:start
+# Terminal 1 — mock auth server on port 8080
+turbo run start --filter=@zitadel/api-mock
 
 # Terminal 2 — Nuxt on port 3001
-moon run demo-nuxt:dev
+turbo run dev --filter=@zitadel/demo-nuxt
 
-# …or with inline env overrides:
+# …or with inline env overrides, through pnpm (turbo hides unlisted variables):
 # ZITADEL_URL=https://my-instance.zitadel.cloud NUXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
-#   moon run demo-nuxt:dev
+#   corepack pnpm --filter @zitadel/demo-nuxt dev
 ```
+
+The mock takes another port from `PORT` the same way:
+`PORT=8090 corepack pnpm --filter @zitadel/api-mock start`.
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
 
 ### Running against the Go server
 
-The full walkthrough (start the server with `moon run workspace:cli -- start`
+The full walkthrough (start the server with `pnpm run cli -- start`
 — SQLite by default, at `.zitadel/local/nextgen-data/zitadel.db` — create a project,
 configure the env, start the demo) is documented once in
 [`apps/demo-next/README.md`](../demo-next/README.md#running-against-the-go-server).
@@ -58,7 +61,7 @@ The nuxt differences:
 | port 3002 | port 3001 |
 | `apps/demo-next/.env.local` | `apps/demo-nuxt/.env` |
 | `NEXT_PUBLIC_ZITADEL_PROJECT_ID` | `NUXT_PUBLIC_ZITADEL_PROJECT_ID` |
-| `moon run demo-next:dev` | `moon run demo-nuxt:dev` |
+| `turbo run dev --filter=@zitadel/demo-next` | `turbo run dev --filter=@zitadel/demo-nuxt` |
 
 ---
 
@@ -67,14 +70,14 @@ Lit atoms, the paired React components, and the `<zitadel-login>` orchestrator
 (MSW in the browser via `msw-storybook-addon`):
 
 ```bash
-moon run storybook:dev
+turbo run dev --filter=@zitadel/storybook
 # → http://localhost:6006
 ```
 
 After changing the widget elements in `packages/components`, rebuild before refreshing:
 
 ```bash
-moon run components:build
+turbo run build --filter=@zitadel/components
 ```
 
 The demo imports the package from `dist/`, not source.

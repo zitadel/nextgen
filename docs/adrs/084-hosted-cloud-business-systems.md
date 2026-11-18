@@ -243,8 +243,10 @@ website's catch-all.
 - The add-on contract gains `signInApiBase`: where the sign-in widget (login,
   sign-up, claim) sends its calls. The cloud's add-on sets it to
   `/cloud/zitadel`, and starts BotID's client to protect the widget's two
-  flow writes, `POST /flow` and `POST /flow/{id}/submit`, beneath that base
-  and the API's prefix (`/cloud/zitadel/api/v1/flow`).
+  flow writes, `POST /flows` and `POST /flows/{flow_id}/submit`, beneath that base
+  and the API's prefix (`/cloud/zitadel/api/v1/flows`), and the same two at
+  `/flow`, where the server answers them until 1.0.0 (ADR 077 §4): a write
+  on either path gets the same check.
   Every other console call stays direct.
 - `cloud-functions` forwards the API's paths beneath `/cloud/zitadel/`
   (`/cloud/zitadel/api/v1/…`) to the server unchanged (cookies, `Origin`,
@@ -476,6 +478,6 @@ verification (§3).
   rather than keeping a cursor.
 - **BotID in Routing Middleware or a firewall rule.** Neither can read the
   verdict (§5).
-- **A `vercel.json` rewrite of `/flow` on an `Origin` match.** It would need
+- **A `vercel.json` rewrite of `/flows` on an `Origin` match.** It would need
   no console change, but no pattern tells this deployment's preview origins
   from a customer's relay on `vercel.app`.

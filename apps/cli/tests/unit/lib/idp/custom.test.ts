@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
-import Setup from "@/commands/setup";
+import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
+import Setup from "@/cli/commands/setup";
 import {
   checkGivenCustomFlags,
   customExample,

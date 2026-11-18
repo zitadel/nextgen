@@ -56,3 +56,45 @@ describe("toPrintPlainRow", () => {
     expect(printed("c\td\te")).not.toPrintPlainRow("c", "d");
   });
 });
+
+describe("toSuggestOnly", () => {
+  /**
+   * A finished run whose envelope suggests these commands, spelled out by the runner.
+   *
+   * @param commands - The commands the run suggested, without the runner.
+   * @returns The run as the matchers read it.
+   */
+  function suggesting(...commands: string[]) {
+    return printed(
+      JSON.stringify({
+        status: "error",
+        next_commands: commands.map((command) => {
+          return `npx @zitadel/cli@0.6.0 ${command}`;
+        }),
+      }),
+    );
+  }
+
+  it("matches exactly these suggestions, in this order, after the runner", () => {
+    expect(suggesting("deploy --cwd a", "preview rm u --cwd a")).toSuggestOnly(
+      "deploy --cwd a",
+      "preview rm u --cwd a",
+    );
+  });
+
+  it.each([
+    ["a missing suggestion", ["deploy --cwd a"], ["deploy --cwd a", "preview rm u"]],
+    ["an extra suggestion", ["deploy --cwd a", "preview rm u"], ["deploy --cwd a"]],
+    [
+      "a reordered suggestion",
+      ["deploy --cwd a", "preview rm u"],
+      ["preview rm u", "deploy --cwd a"],
+    ],
+  ])("does not match %s", (_, suggested, expected) => {
+    expect(suggesting(...suggested)).not.toSuggestOnly(...expected);
+  });
+
+  it("matches no suggestions when the envelope has none", () => {
+    expect(printed(JSON.stringify({ status: "error" }))).toSuggestOnly();
+  });
+});

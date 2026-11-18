@@ -7,7 +7,7 @@ import { flatLook } from "./flat-look";
 import { MockedLogin } from "./shared";
 
 export interface StyledLoginExampleProps {
-  /** `--zl-font-family-sans`, the login's typeface. */
+  /** `--zl-font-family-sans` and `--zl-font-family-heading`, the login's typeface. */
   fontFamily?: string;
   /** `--zl-primary`, the primary button. */
   primary?: string;
@@ -43,6 +43,7 @@ function stylesheet(
   return [
     `${selector} {`,
     `  --zl-font-family-sans: ${fontFamily};`,
+    `  --zl-font-family-heading: ${fontFamily};`,
     `  --zl-primary: ${primary};`,
     `  --zl-primary-foreground: ${primaryForeground};`,
     ...radii,

@@ -204,3 +204,7 @@ The verification pipeline is shared across SDKs and documented once in
 On top of it, the Nitro middleware refuses with a 400 any request that carries
 an `x-nextgen-auth-token` header: that header is an internal channel, so a
 client never sends it.
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

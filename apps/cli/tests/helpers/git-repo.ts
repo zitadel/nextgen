@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -8,6 +8,7 @@ import { vi } from "vitest";
 
 import { RepositoryError } from "@/lib/git/errors";
 import { Git, GitResult } from "@/lib/git/git";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 const exec = promisify(execFile);
 
@@ -20,13 +21,13 @@ const exec = promisify(execFile);
  * never what checks itself.
  */
 export class GitScratch {
-  private readonly dirs: string[] = [];
-
-  /** An empty directory, in no repository. */
+  /**
+   * An empty directory, in no repository. It is removed when the test ends.
+   *
+   * @returns The directory's path.
+   */
   async directory(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-git-test-"));
-    this.dirs.push(dir);
-    return dir;
+    return scratchDir("zitadel-git-test-");
   }
 
   /** A new repository with no commit. */
@@ -50,10 +51,6 @@ export class GitScratch {
     await writeFile(join(dir, "git"), `#!/bin/sh\nprintf '%s' '${stderr}' >&2\nexit ${exitCode}\n`);
     await chmod(join(dir, "git"), 0o755);
     return dir;
-  }
-
-  async cleanup(): Promise<void> {
-    await Promise.all(this.dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   }
 }
 
@@ -129,6 +126,35 @@ export async function trackedFiles(cwd: string): Promise<string[]> {
  */
 export async function commitSubjects(cwd: string): Promise<string[]> {
   return lines(await git(cwd, "log", "--format=%s"), "\n");
+}
+
+/**
+ * The paths git ignores in the repository at `cwd`, by `git check-ignore`,
+ * which reads every ignore source the way `git add` does. Paths need not exist.
+ *
+ * @param cwd - A directory in the repository.
+ * @param paths - The paths to ask about, relative to `cwd`.
+ * @returns Those of `paths` git ignores, in their order.
+ */
+export async function ignoredByGit(cwd: string, paths: readonly string[]): Promise<string[]> {
+  const answers = await Promise.all(
+    paths.map((path) => {
+      return exec("git", ["check-ignore", "--quiet", "--", path], { cwd }).then(
+        () => {
+          return true;
+        },
+        (error: { code?: unknown }) => {
+          if (error.code === 1) {
+            return false;
+          }
+          throw error;
+        },
+      );
+    }),
+  );
+  return paths.filter((_, index) => {
+    return answers[index];
+  });
 }
 
 function lines(stdout: string, separator: string): string[] {

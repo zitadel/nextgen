@@ -33,12 +33,12 @@ export function UserRowActions({
       <RowMenu name={name}>
         <DropdownMenuItem asChild>
           <Link to="/users/$userId" params={{ userId }}>
-            View details
+            View user
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
-          Delete
+          Delete user
         </DropdownMenuItem>
       </RowMenu>
       {/* Outside the menu, and opened by state rather than a trigger, so the

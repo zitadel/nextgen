@@ -1,13 +1,20 @@
+import type { Interfaces } from "@oclif/core";
+
 import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 
 import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
+import type { CommandClass } from "./command-class";
 
-/** A class that can be extended, abstract or not, whatever arguments it takes. */
-// biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
-type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
+/**
+ * The flag every destructive command declares, which the retry a refused
+ * confirmation suggests sets: the run again with `--force`. The mixin cannot
+ * see its host's flags, so it names the one it relies on here, and every
+ * confirmation refuses a host that does not declare it.
+ */
+type ConsentFlags = Readonly<{ force: Interfaces.BooleanFlag<boolean> }>;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {
@@ -69,6 +76,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       message,
       ...gate
     }: DestructiveChange<Ready>): Promise<CommandResult> {
+      this.relyOn<ConsentFlags>("force");
       if (this.dryRun) {
         return preview();
       }
@@ -114,7 +122,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
           ? gate
           : {
               ...gate,
-              retry: await this.rerun({
+              retry: await this.rerun<ConsentFlags>({
                 with: { force: true },
                 arguments: gate.arguments,
               }),

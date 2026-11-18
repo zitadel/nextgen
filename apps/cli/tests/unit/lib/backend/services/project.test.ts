@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ProjectService } from "@/lib/backend/services/project";
 import { fakeClient } from "@tests/helpers/fake-client";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 describe("ProjectService.get", () => {
   it("reads the project it was asked for", async () => {
@@ -18,13 +19,13 @@ describe("ProjectService.get", () => {
       fakeClient({
         getProject: async () => ({
           id: "proj_1",
-          origins: [{ pattern: "https://app.acme.com", kind: "primary" }],
+          origins: [{ pattern: PRIMARY_ORIGIN, kind: "primary" }],
         }),
       }),
     );
 
     await expect(projectService.get("proj_1")).resolves.toMatchObject({
-      origins: [{ pattern: "https://app.acme.com" }],
+      origins: [{ pattern: PRIMARY_ORIGIN }],
     });
   });
 });

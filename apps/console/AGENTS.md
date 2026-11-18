@@ -65,15 +65,26 @@ between files are the sign the component is missing.
   `requireProjectScope` in loaders, `useRequiredProjectScope` in components.
 - Never scope a management call with `getConsoleProjectId()`: that is the
   project the console signs into, not the one being managed.
-- The sidebar lists a project's screens, with or without a selection: without
-  one, a screen asks for a project first (Projects with `?next=`, D22).
-- Projects (the home) and `/settings` are above every project: Projects lists
-  the account's screens (`nav.view: "account"`, D27) around the project's
-  (D34); `/settings` its own pages (`nav.view: "settings"`, D29).
+- A project's sidebar lists its screens; opened without a selection, a screen
+  asks for a project first (Projects with `?next=`, D31).
+- The root's sidebar lists Projects, the platform project's screens and
+  Settings (`useAccountListItems`, D42). `/settings` lists the platform
+  project's Settings pages and the add-on's (`useSettingsListItems`, D29); the
+  person's profile is `/account`, opened from the account menu.
+- The reserved platform project is the root, never a project to choose (D42):
+  read its id only from `getPlatformProjectId()`, and send `exclude_platform`
+  with every `listMyProjects`.
+- Its screens are the project screens with it selected: never add a route or
+  a copy of a screen for the root. A row that opens one sets `project` to it.
+- The chrome treats that selection as the root (`usePlatformSelected`): never
+  show the platform project's name, or list or remember it as a project.
+- The bar names where the person is (D44): on a root screen the root alone
+  (`Platform`, or `All projects` without platform access); in a project, the
+  root then the project.
 - A project's Settings opens its own list too (`nav.view: "project-settings"`,
   D40); add a project setting as a page there, never as a tab.
-- Going up to Projects or Settings never drops the selected project (D36):
-  never link with `project: undefined`.
+- Root screens (`isRootPath`) hold the root, never a project (D44): link up
+  with `useRootSearch`; the `_authed` guard enforces it for any URL.
 - `/` is the project's Overview (D35): only reads a screen already makes, and no
   figures, since the API has no counts.
 - Screens outside every project (billing, operators) go in one of those lists,
@@ -108,7 +119,7 @@ between files are the sign the component is missing.
 
 ## Code layout
 
-Layers import downward only; `console:lint` fails an upward import
+Layers import downward only; the console's `lint` fails an upward import
 ([ADR 0007](docs/adrs/0007-console-code-layout.md)): `routes/` → `app-shell/` →
 `features/` → `components/`, `hooks/`, `lib/`, `api/`, `auth/`, `runtime/`.
 
@@ -127,22 +138,22 @@ Layers import downward only; `console:lint` fails an upward import
 ## Local loop
 
 ```sh
-moon run console:dev-real   # real seeded instance + dev server (the default)
-moon run console:dev-claim  # the same for the claim page
-moon run console:dev        # dev server only, http://localhost:5174
-moon run console:typecheck console:test console:build
+turbo run dev:real --filter=@zitadel/console    # real seeded instance + dev server (the default)
+turbo run dev:claim --filter=@zitadel/console   # the same for the claim page
+turbo run dev --filter=@zitadel/console         # dev server only, http://localhost:5174
+turbo run typecheck test build --filter=@zitadel/console
 ```
 
 - Develop against real data: `@zitadel/api-mock` has no user store, so a list
   read from it is fiction. When each backend applies is in the Local
   development section of [`README.md`](README.md).
-- The claim page needs `dev-claim`: `claim/complete` accepts only a
-  platform-project session, so on `dev-real` every claim fails with "This
-  account can't claim the project". `dev-claim` pins the console to
+- The claim page needs `dev:claim`: `claim/complete` accepts only a
+  platform-project session, so on `dev:real` every claim fails with "This
+  account can't claim the project". `dev:claim` pins the console to
   `proj_platform`, so list screens read empty and you register on the claim
   page instead of using the seeded users.
 - Both tasks build the CLI they boot the server through. A direct
-  `pnpm run dev:real` does not: run `moon run cli:build` first, or the server
+  `pnpm run dev:real` does not: run `turbo run build --filter=@zitadel/cli` first, or the server
   starts unmigrated and dies with `no such table: projects`.
 - Run `pnpm install` after a rebase: a stale `node_modules` fails the built CLI
   on a missing transitive dependency.

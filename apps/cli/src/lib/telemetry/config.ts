@@ -1,3 +1,4 @@
+import { SERVER } from "@/constants";
 import { ciFlag } from "./dimensions/ci-flag";
 
 /**
@@ -18,7 +19,7 @@ import { ciFlag } from "./dimensions/ci-flag";
  */
 
 /** The hosted cloud's address, where released CLIs send their events. */
-export const CLOUD_HOST = "preview.zitadel.com";
+export const CLOUD_HOST = new URL(SERVER).host;
 
 /**
  * Where Mixpanel events go, by data-residency region. EU events go through the

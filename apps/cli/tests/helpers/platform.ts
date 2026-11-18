@@ -1,4 +1,5 @@
 import {
+  acceptInvitation,
   completeClaimChallenge,
   resetPlatformStore,
   setupPlatformHandlers,
@@ -13,6 +14,7 @@ import { z } from "zod";
 
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
 const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
@@ -119,6 +121,9 @@ export interface PlatformMock {
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
 
+  /** Makes the project's live previews unreadable while everything else answers. */
+  cannotListPreviews(): void;
+
   /**
    * Refuses every read of a variable, as a credential without `variable.read`
    * does, while a deployment and the project still answer. A command that reads
@@ -183,6 +188,14 @@ export interface PlatformMock {
   revokesAHostileReleaseId(): string;
 
   /**
+   * Answers a release revoke with `409 rel.in_use` naming a primary origin that
+   * holds a terminal escape sequence.
+   *
+   * @returns The origin it will name.
+   */
+  refusesRevokeNamingAHostileOrigin(): string;
+
+  /**
    * Answers a user query with a page cursor holding a terminal escape
    * sequence, which the footer and the next-page command both name.
    *
@@ -205,6 +218,29 @@ export interface PlatformMock {
    * deploy lands between a deploy's inspection and its write.
    */
   racesTheNextDeploy(): void;
+
+  /**
+   * Answers every invitation create with one fixed invitation whose id and link
+   * hold a terminal escape sequence, as a compromised server would.
+   *
+   * @returns The link it will answer with.
+   */
+  mintsAHostileInvitation(): string;
+
+  /**
+   * Answers every invitation read and list with one invitation whose name holds
+   * a terminal escape sequence, as an administrator could have typed it.
+   *
+   * @returns The name it will answer with.
+   */
+  servesAHostileInvitation(): string;
+
+  /**
+   * Accepts the invitation, as the person it was for redeeming its link would.
+   *
+   * @param invitationId - The invitation to accept.
+   */
+  acceptsInvitation(invitationId: string): void;
 
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
@@ -229,6 +265,25 @@ export interface PlatformMock {
 
   /** Takes the npm registry out of reach, as an offline machine has it. */
   npmRegistryIsDown(): void;
+}
+
+/** A pending viewer invitation as the API answers one, for a handler that answers a fixed one. */
+function hostileInvitation(id: string, metadata: { name: string } | null): Record<string, unknown> {
+  return {
+    id,
+    project_id: "proj_1",
+    type: "project_member",
+    project_member: { relation: "viewer" },
+    metadata,
+    status: "pending",
+    created_by: null,
+    created_by_type: "service",
+    created_at: "2026-01-01T00:00:00Z",
+    expires_at: "2026-01-04T00:00:00Z",
+    journey_id: "journey_1",
+    responded_by: null,
+    responded_at: null,
+  };
 }
 
 const NPM_DIST_TAGS = "https://registry.npmjs.org/-/package/:name/dist-tags";
@@ -452,7 +507,7 @@ export function usePlatformMock(): PlatformMock {
     },
 
     servesAHostileOrigin() {
-      const origin = "https://app.acme.com\u001b[2Jwiped";
+      const origin = `${PRIMARY_ORIGIN}\u001b[2Jwiped`;
       const deployment = (id: string) => {
         return {
           id,
@@ -519,6 +574,23 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return id;
+    },
+
+    refusesRevokeNamingAHostileOrigin() {
+      const origin = "https://evil\u001b[2Jwiped.example.com";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1", kind: "primary" }] },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      return origin;
     },
 
     pagesWithAHostileCursor() {
@@ -625,12 +697,51 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
+    cannotListPreviews() {
+      server.use(
+        http.get("*/projects/:projectId/previews", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
+        ),
+      );
+    },
+
     cannotReadConnections() {
       server.use(
         http.get("*/idps/:id", () =>
           HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
         ),
       );
+    },
+
+    mintsAHostileInvitation() {
+      const link = "https://console.example.com/invitations/accept#token=\u001b[2Jwiped";
+      server.use(
+        http.post("*/invitations", () => {
+          return HttpResponse.json(
+            { ...hostileInvitation("inv-\u001b[2Jwiped", null), link },
+            { status: 201 },
+          );
+        }),
+      );
+      return link;
+    },
+
+    servesAHostileInvitation() {
+      const name = "Ada\u001b[2Jwiped";
+      const invitation = hostileInvitation("inv_hostile", { name });
+      server.use(
+        http.get("*/invitations", () => {
+          return HttpResponse.json({ invitations: [invitation], next_page_token: null });
+        }),
+        http.get("*/invitations/:id", () => {
+          return HttpResponse.json(invitation);
+        }),
+      );
+      return name;
+    },
+
+    acceptsInvitation(invitationId) {
+      acceptInvitation(invitationId);
     },
 
     recovers() {

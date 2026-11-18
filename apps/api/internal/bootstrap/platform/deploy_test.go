@@ -41,6 +41,45 @@ func TestDeployedByNewerBuild(t *testing.T) {
 	}
 }
 
+// What a server that does not seed reports when it starts: only what keeps
+// the console from signing anyone in.
+func TestDrift(t *testing.T) {
+	const origin = "https://console.example"
+	primary := func(origins ...string) *domain.Deployment {
+		deployment := &domain.Deployment{OriginKind: domain.DeploymentOriginKindPrimary}
+		for _, origin := range origins {
+			deployment.Targets = append(deployment.Targets, domain.DeploymentTarget{Origin: origin})
+		}
+		return deployment
+	}
+	preview := &domain.Deployment{OriginKind: domain.DeploymentOriginKindPreview, Targets: []domain.DeploymentTarget{{Origin: origin}}}
+	listed := []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}}
+
+	for _, tt := range []struct {
+		name    string
+		origins []domain.Origin
+		live    []*domain.Deployment
+		want    string
+	}{
+		{"what a seeding left", listed, []*domain.Deployment{primary(origin)}, ""},
+		{"a preview beside it", listed, []*domain.Deployment{preview, primary(origin)}, ""},
+		{"nothing is deployed", listed, nil, "nothing is deployed to " + origin},
+		{"only a preview is deployed", listed, []*domain.Deployment{preview}, "nothing is deployed to " + origin},
+		{"another public base was seeded", listed, []*domain.Deployment{primary("https://other.example")}, "nothing is deployed to " + origin},
+		{"the origin was removed after the seeding", nil, []*domain.Deployment{primary(origin)}, "is not one of its primary origins"},
+		{"the origin is only a preview's", []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPreview}}, []*domain.Deployment{primary(origin)}, "is not one of its primary origins"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := drift(tt.origins, tt.live, origin)
+			if tt.want == "" {
+				assert.Empty(t, got)
+				return
+			}
+			assert.Contains(t, got, tt.want)
+		})
+	}
+}
+
 func TestPlatformBundleIsTheServersDefaults(t *testing.T) {
 	const builtinBase = "https://example.com/api/schemas"
 

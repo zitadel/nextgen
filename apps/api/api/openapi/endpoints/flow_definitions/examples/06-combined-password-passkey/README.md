@@ -125,5 +125,5 @@ flowchart TD
   (`packages/config/defaults/default-login.json`) is similar but with
   `complete: show`, no profile fields, and no navigation CTAs.
 - For a redirect-terminal flow to actually navigate, the caller must supply
-  `redirect_uri` on `POST /flow`. Without it, the terminal step still
+  `redirect_uri` on `POST /flows`. Without it, the terminal step still
   classifies as `redirect`, but the frontend has nowhere to send the user.

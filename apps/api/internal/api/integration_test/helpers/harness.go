@@ -28,6 +28,7 @@ type Harness struct {
 
 	httpClient       dependency[*http.Client]
 	testServer       dependency[*httptest.Server]
+	specValidator    dependency[*SpecValidator]
 	hasherFactory    dependency[*crypto.HasherFactory]
 	passwordPolicy   dependency[*service.PasswordPolicy]
 	userCreatePolicy dependency[*service.UserCreatePolicy]
@@ -60,6 +61,8 @@ type Harness struct {
 	keyService            dependency[service.KeyService]
 	variableService       dependency[service.VariableService]
 	tokenService          dependency[service.TokenService]
+	grantService          dependency[*service.GrantService]
+	invitationService     dependency[*service.InvitationService]
 
 	schemaStore     dependency[domain.JSONSchemaStore]
 	schemaResolver  dependency[*domain.JSONSchemaResolver]
