@@ -167,6 +167,39 @@ describe("brandingAssetWarnings", () => {
     expect(hits).toHaveBeenCalledTimes(1);
   });
 
+  it.for(["light", "dark"])(
+    "warns when the %s theme's logo 404s, naming the field",
+    async (theme, { server }) => {
+      server.use(
+        http.head(LOGO, () => {
+          return new HttpResponse(null, { status: 404 });
+        }),
+      );
+
+      const warnings = await brandingAssetWarnings([{ theme: { [theme]: { logo_url: LOGO } } }]);
+
+      expect(warnings).toEqual([
+        expect.stringMatching(new RegExp(`^theme\\.${theme}\\.logo_url ${LOGO}.*HTTP 404`)),
+      ]);
+    },
+  );
+
+  it("stays quiet when both per-theme logos serve an image", async ({ server }) => {
+    server.use(http.head(LOGO, anImage));
+
+    const warnings = await brandingAssetWarnings([
+      { theme: { light: { logo_url: LOGO }, dark: { logo_url: LOGO } } },
+    ]);
+
+    expect(warnings).toEqual([]);
+  });
+
+  it("ignores a theme that holds no logo", async () => {
+    const warnings = await brandingAssetWarnings([{ theme: { light: { accent: "#fff" } } }]);
+
+    expect(warnings).toEqual([]);
+  });
+
   it("ignores a descriptor without asset URLs", async () => {
     const warnings = await brandingAssetWarnings([
       { layout: "split", liquid_template: { $file: "./login.liquid" } },
