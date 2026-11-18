@@ -14,6 +14,7 @@ import { Baseline, BaselineUpdate } from "./baseline";
 import { Contract, type CommandRun } from "./contract";
 import { Credentials } from "./credentials";
 import { Schemathesis } from "./schemathesis";
+import { OperationSources, type SourceLocation } from "./sources";
 import { OpenApiSpec } from "./spec";
 import { ContractSummary } from "./summary";
 
@@ -38,28 +39,37 @@ export interface Instance {
   specText: string;
   /** Makes a project of its own on the instance, with the credentials it answers to. */
   project: () => Promise<Credentials>;
+  /** Where an operation (`METHOD /path`) is defined in the spec's source. */
+  locate: (operation: string) => SourceLocation | undefined;
 }
 
 /** How many shards the operations are dealt into: `API_CONTRACT_SHARDS`, else four. */
 const SHARDS = Math.max(1, Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || 4);
 
 /**
- * Puts the verdict where a person looks first: a file beside the raw reports,
- * the job summary and error annotations when run by GitHub Actions.
+ * Puts the verdict where a person looks first: the run's summary page, error
+ * annotations on the check (each pointing at the operation's definition in the
+ * spec's source), a file beside the raw reports, and the log, in plain text,
+ * folded away when nothing broke.
  */
-async function publish(summary: ContractSummary): Promise<void> {
+async function publish(summary: ContractSummary, instance: Instance): Promise<void> {
   const page = summary.markdown();
   const directory = join(packageRoot, "test-output");
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, "summary.md"), page);
-  console.info(`\n${page}`);
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    await appendFile(process.env.GITHUB_STEP_SUMMARY, `${page}\n`);
-  }
   if (process.env.GITHUB_ACTIONS) {
-    for (const line of summary.annotations()) {
+    const verdict = summary.problems().length === 0;
+    console.info(verdict ? "::group::API contract: passed" : "::group::API contract: broken");
+    console.info(summary.text());
+    console.info("::endgroup::");
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      await appendFile(process.env.GITHUB_STEP_SUMMARY, `${page}\n`);
+    }
+    for (const line of summary.annotations(instance.locate)) {
       console.info(line);
     }
+  } else {
+    console.info(`\n${summary.text()}\n`);
   }
 }
 
@@ -126,7 +136,20 @@ export const test = base.extend<{
           });
           return new Credentials(connected, spec, baseUrl);
         };
-        await use({ zitadel, baseUrl, spec, specText, project });
+        const sources = new OperationSources(
+          join(workspaceRoot, "apps", "api", "api", "openapi"),
+          workspaceRoot,
+        );
+        const ids = new Map(
+          spec.operations().map((operation) => {
+            return [operation.name, operation.id];
+          }),
+        );
+        const locate = (operation: string): SourceLocation | undefined => {
+          const id = ids.get(operation);
+          return id === undefined ? undefined : sources.find(id);
+        };
+        await use({ zitadel, baseUrl, spec, specText, project, locate });
       } finally {
         await zitadel.stop();
       }
@@ -162,7 +185,7 @@ export const test = base.extend<{
       if (process.env.API_CONTRACT_UPDATE_BASELINE === "1") {
         new BaselineUpdate(runs).apply(baseline);
       }
-      await publish(new ContractSummary(runs, baseline));
+      await publish(new ContractSummary(runs, baseline), instance);
       await use(runs);
     },
     { scope: "file" },
