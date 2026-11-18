@@ -38,11 +38,6 @@ export class ConfirmFramework extends WizardStep<"frameworkConfirm", Fact<"answe
   readonly key = "frameworkConfirm";
 
   /**
-   * The name reports of the onboarding flow call this step by.
-   */
-  override readonly milestone = "framework_selection";
-
-  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

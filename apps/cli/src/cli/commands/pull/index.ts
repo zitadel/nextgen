@@ -23,6 +23,7 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * A release id, as the platform mints it.
@@ -202,7 +203,7 @@ type PullOutcome =
  * resource by handle, so files are written by handle and the next `deploy`
  * rebuilds the same release.
  */
-export default class Pull extends ServerCommand(EnvironmentCommand) {
+export default class Pull extends Telemetered(ServerCommand(EnvironmentCommand)) {
   static override description =
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
   static override group = CommandGroups.releases;

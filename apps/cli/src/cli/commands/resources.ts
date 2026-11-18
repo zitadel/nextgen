@@ -1,4 +1,3 @@
-import { crudAction, type Observation } from "@/cli/telemetry/observation";
 import type { Interfaces } from "@oclif/core";
 import { isVariableReference } from "@zitadel/config/idp";
 
@@ -85,6 +84,7 @@ import {
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
 const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
@@ -377,7 +377,6 @@ const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
  */
 export const RESOURCES = {
   user: resource({
-    observation: { follow: crudAction() } satisfies Observation,
     group: CommandGroups.usersAndAccess,
     groupOrder: 1,
     singular: "user",
@@ -476,7 +475,6 @@ export const RESOURCES = {
   }),
 
   team: resource({
-    observation: { follow: crudAction() } satisfies Observation,
     group: CommandGroups.usersAndAccess,
     groupOrder: 2,
     singular: "team",
@@ -691,16 +689,6 @@ export const RESOURCES = {
   }),
 
   grant: resource({
-    observation: {
-      follow: crudAction((announcement) => {
-        if (announcement.channel === "write" && announcement.event.verb === "create") {
-          const level = announcement.event.body.relation;
-
-          return { access_level: typeof level === "string" ? level : undefined };
-        }
-        return undefined;
-      }),
-    } satisfies Observation,
     group: CommandGroups.usersAndAccess,
     groupOrder: 3,
     singular: "grant",
@@ -753,7 +741,12 @@ export const RESOURCES = {
       },
       // A grant names exactly one of `user` and `team`, which the required
       // fields alone cannot say, so the example names the principal itself.
-      { example: "--relation viewer --user-identifier alice@acme.com" },
+      {
+        example: "--relation viewer --user-identifier alice@acme.com",
+        facts: (body) => {
+          return { access_level: typeof body.relation === "string" ? body.relation : undefined };
+        },
+      },
     ),
     delete: {
       call: ({ client, projectId }, id, consent) => {
@@ -1129,7 +1122,10 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(
       };
     },
   },
-  ServerCommand,
+  // Every generated command connects to a server and reports on its own run.
+  (Base) => {
+    return Telemetered(ServerCommand(Base)) as unknown as typeof Base;
+  },
 );
 
 /**

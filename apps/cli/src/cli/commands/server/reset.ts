@@ -7,6 +7,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { type Fact, section } from "@/lib/ui";
 import { BaseCommand } from "@/lib/oclif";
 import { CommandGroups } from "@/cli/commands/groups";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * What a reset reports about the server it removes: a process, a container, or
@@ -21,9 +22,9 @@ type ResetTarget =
  * A folder with no server is not refused: there is nothing to reset, and the
  * result says so.
  */
-export default class Reset extends Destructive(
+export default class Reset extends Telemetered(Destructive(
   LocalServerCommand(ServerCommand(BaseCommand), "exact"),
-) {
+)) {
   static override group = CommandGroups.localServer;
   static override description = "Delete the local Zitadel server runtime and data.";
   static override groupOrder = 6;

@@ -309,41 +309,29 @@ paused.
 - Consent is opt-out (`--no-telemetry`, `DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`)
   and resolved once in `resolveConsent` (`src/lib/telemetry/consent.ts`).
   Never send around it.
-- `Recorder` (`src/cli/telemetry/recorder.ts`) is the only place a client is built
-  and an event is sent; `src/lib` and the commands never send.
-- Libraries and `BaseCommand` only announce facts on `node:diagnostics_channel`
-  (`zitadel:command`, `:wizard`, `:prompt`, `:publish`, `:write`), in their own
-  words and with no analytics vocabulary; the `init` hook (`src/cli/hooks/recorder.ts`)
-  installs the one subscriber.
-- Keep no table that maps command ids, step keys or properties to events. A command
-  declares its own `static observation` (`src/cli/telemetry/observation.ts`): `action(…)`
-  for an action event, `flow(…)` for a wizard, `together(…)` for both, `headline` for the
-  one fact its Vercel copy keeps.
-- A wizard step names itself for reports with `milestone`, and says what it settled with
-  `facts()`; a step that settles nothing declares neither.
-- A generated resource opts in with `observation` on its descriptor in `resources.ts`.
-- A command that must never be counted overrides `observed()` to answer no.
-- Telemetry never writes to stdout and never fails a command. The first-run
-  notice goes to stderr, in interactive mode only.
-- Mixpanel is paused: `src/lib/telemetry/config.ts` bakes in no token, so only
-  `ZITADEL_TELEMETRY_TOKEN` sends to it. Bake one back in only for a project in
-  the region its endpoint names; tokens are write-only, published on purpose.
-- Without settings a run is production traffic; `ZITADEL_TELEMETRY_ENV=development`
-  (`scripts/run-cli.mjs` sets it) is not, and CI sets `DO_NOT_TRACK=1`.
-- Mixpanel events for the EU region go through the cloud's
-  `/telemetry/mixpanel/*` rewrite in `vercel.json` (`config.test.ts`).
-- `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
-  (`Runtime.userAgent()` in `src/lib/runtime`) and obey the same opt-out.
-- The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)
-  tells users what is sent and how to opt out: change it with any of the above.
+- `Telemetered` (`src/cli/telemetry/telemetered.ts`) is the only place a client is built
+  and an event is sent. A command that extends it reports on its own run; one that does
+  not sends nothing. Put it outermost: `extends Telemetered(Destructive(ServerCommand(…)))`.
+- `BaseCommand` and `src/lib` hold no telemetry. The base command offers one neutral hook,
+  `describe()`, for what a command knows about its run; a layer or a command overrides it
+  and keeps `super.describe()`.
+- Keep no table that maps command ids, step keys or properties to events: a command
+  says what it knows in its own `describe()` and `annotate()` calls.
+- A wizard command passes `this.watchWizard({ flow, step })` as the wizard's `watch`;
+  `step` is one function in the command that names a step for the event catalog and
+  returns the choice the step settled.
+- A command's Vercel copy keeps one fact of its own: `static override readonly headline`.
+- A generated resource says what it knows from the body it sends with `facts` on its
+  `create` or `update`, in `resources.ts`.
 
 ### Adding a dimension
 
 `cli_command_started`, `cli_command_completed` and `cli_command_failed` are sent by
-the recorder for every command, from what `BaseCommand` announces. Add a dimension rather than an event:
+`Telemetered` for every command that extends it. Add a dimension rather than an event:
 
-1. Note it with `this.annotate({ … })`. It reaches the events fired after it, so not
-   `started`. Never fetch data just to note it.
+1. Note it with `this.annotate({ … })` as the run learns it, or return it from `describe()`
+   once the run is over. It reaches the events fired after it, so not `started`. Never
+   fetch data just to note it.
 2. Name it `snake_case`; a boolean starts with `is_`, `has_`, `dry_` or
    `non_`. Leave out empty values; `compact()` drops them.
 3. List it under its command in the

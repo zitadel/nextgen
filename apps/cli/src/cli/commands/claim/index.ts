@@ -19,7 +19,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
 import { ServerCommand } from "@/cli/commands/server-command";
-import type { Observation } from "@/cli/telemetry/observation";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -149,11 +149,11 @@ const CHALLENGE_ID: Refused<string> = {
  * `--no-wait` returns the link as the result, and `--challenge-id` resumes
  * waiting on it in a second run.
  */
-export default class Claim extends ServerCommand(EnvironmentCommand) {
+export default class Claim extends Telemetered(ServerCommand(EnvironmentCommand)) {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
-  static override readonly observation: Observation = { headline: "claim_outcome" };
+  static override readonly headline = "claim_outcome";
   static override groupOrder = 2;
 
   static override examples = [

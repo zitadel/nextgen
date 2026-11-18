@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 
@@ -32,7 +31,6 @@ import {
   type Suggested,
   type SuggestedCommand,
 } from "@/lib/suggestion";
-import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { Runtime } from "@/lib/runtime";
 import { Skills } from "@/lib/skills";
 import type { Presentation, Summary } from "@/lib/ui";
@@ -40,7 +38,6 @@ import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
-import { announceCommand, type Notes } from "./events";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
 import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
@@ -90,9 +87,15 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
   SERVER,
   NO_COLOR,
   FORCE_COLOR,
-  DO_NOT_TRACK,
-  ZITADEL_TELEMETRY,
 ];
+
+/**
+ * What a command knows about its run, by name: enums, booleans, counts or lists
+ * of enums, never a value the developer typed.
+ */
+export type Facts = Readonly<
+  Record<string, string | number | boolean | readonly string[] | null | undefined>
+>;
 
 /** How a command resolves the context it runs in; see {@link BaseCommand.meta}. */
 export type MetaOptions = {
@@ -189,11 +192,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
       description:
         "Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.",
     }),
-    telemetry: Flags.boolean({
-      default: true,
-      allowNo: true,
-      description: "Send anonymous usage analytics. Disable with --no-telemetry.",
-    }),
   };
 
   /** How the run's context is resolved; see {@link toMeta}. */
@@ -276,13 +274,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return this.meta.cliVersion;
   }
 
-  /**
-   * What the command has noted about its run (framework, counts, `step`, …) via
-   * {@link annotate}, announced with the run's outcome. Replaced immutably,
-   * never mutated in place.
-   */
-  private notes: Notes = Object.freeze({});
-
   private reading: ReturnType<BaseCommand["parse"]> | undefined;
 
   /**
@@ -307,19 +298,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
   private settled = false;
 
-  /** Ties one run's announcements together; minted at instance construction. */
-  private readonly invocationId = randomUUID();
-
-  /** Whether the run has been announced as opened. */
-  private opened = false;
-
-  /**
-   * Wall-clock start used to derive `duration_ms`. Captured at instance
-   * construction (before flag parsing and server resolution) so the duration
-   * covers the full invocation, even when the run is opened late from
-   * {@link catch} after an early failure.
-   */
-  private readonly startedAt = Date.now();
 
   /**
    * The one lifecycle every command shares: parse the flags, resolve the
@@ -342,8 +320,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
    *
    * This runs before the run has a context, so it may only read what is
    * already here — a file, a flag. It is too early to ask a server: the user
-   * agent is installed by `init` and telemetry opens with the context, so a
-   * request from here would go out unidentified and a failure would be
+   * agent is installed by `init` and the run's context is settled afterwards,
+   * so a request from here would go out unidentified and a failure would be
    * reported with no command behind it.
    */
   protected async sourceOf(
@@ -582,30 +560,20 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * Note facts about this run, merged immutably into what is announced with its
-   * outcome: a new frozen bag replaces the previous one, so no shared object is
-   * ever mutated. `step` advances by noting it again at each milestone.
+   * What this command knows about its run, as facts, for whoever reports on
+   * it. A command or a layer between adds its own and keeps what the layers
+   * below it say.
    *
-   * @param patch - The facts to add or replace.
+   * @returns The facts, by name: enums, booleans, counts or lists of enums.
    */
-  protected annotate(patch: Notes): void {
-    this.notes = Object.freeze({ ...this.notes, ...patch });
+  protected describe(): Facts {
+    return {};
   }
 
   /**
-   * What this command says about how its run is followed: which facts it
-   * reports and which of its own events matter. Left to the command, read by
-   * whoever follows the run, and unknown to the base command.
+   * The failure this run ended with, once it has, as it is shown and exits.
    */
-  static readonly observation?: unknown;
-
-  /**
-   * Whether anyone may follow this run. A command that must never be counted
-   * answers no.
-   */
-  protected observed(): boolean {
-    return true;
-  }
+  protected failed: ZitadelError | undefined;
 
   /**
    * Builds {@link GlobalOptions} from parsed flags and stores the result on
@@ -683,7 +651,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? await new Skills(process.env, !this.meta.nonInteractive).eligible()
         : false;
     this.settled = true;
-    this.open(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
   }
 
@@ -775,50 +742,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * Announce the run as opened, once, reading everything from the current
-   * {@link meta}. Also called from {@link catch} so a failure thrown before
-   * {@link toMeta} finished (server resolution, flag parsing) is still
-   * announced.
-   *
-   * @param reporting - What the developer chose on the command line, when they chose.
-   */
-  private open(reporting: boolean | undefined): void {
-    if (this.opened) {
-      return;
-    }
-    this.opened = true;
-    announceCommand({
-      phase: "opened",
-      meta: this.meta,
-      invocationId: this.invocationId,
-      startedAt: this.startedAt,
-      notes: this.notes,
-      observed: this.observed(),
-      observation: this.command.observation,
-      reporting,
-      interactive: this.isInteractive(),
-    });
-  }
-
-  /**
-   * Whether this invocation is an interactive session, derived from argv +
-   * `jsonEnabled()` + TTY rather than `meta.nonInteractive`, so it is correct
-   * even on the early-failure path where {@link catch} opens the run against a
-   * fallback meta that has not yet computed `nonInteractive` from the flags.
-   */
-  private isInteractive(): boolean {
-    if (this.nonInteractive || this.jsonEnabled()) {
-      return false;
-    }
-    const argv = process.argv;
-    if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
-      return false;
-    }
-
-    return isTerminal();
-  }
-
-  /**
    * Final step of every command: in human mode it prints the rendered result,
    * then the result's next steps, then its footer (oclif suppresses
    * {@link Command.log} under `--json`); it returns the envelope so oclif's
@@ -826,14 +749,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
-    announceCommand({
-      phase: "completed",
-      meta: this.meta,
-      invocationId: this.invocationId,
-      startedAt: this.startedAt,
-      notes: this.notes,
-      status: result.status,
-    });
     const next =
       normalized.status === "ok" && normalized.nextShown !== undefined
         ? ""
@@ -1113,10 +1028,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * Renders any thrown error as the failure envelope and exits with its code.
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
-   * envelope's `command` field accurate. If that early failure left telemetry
-   * unopened, {@link open} runs here so the failure is still announced;
-   * the flag isn't parsed yet on that path, so `--no-telemetry` is honoured from
-   * argv.
+   * envelope's `command` field accurate. The failure the run ends with is kept in
+   * {@link failed}.
    */
   protected override async catch(error: unknown): Promise<never> {
     const known = this.settled ? this.meta : await this.metaFromArgv(this.meta);
@@ -1137,16 +1050,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       help,
     );
     this.meta = meta;
-    this.open(process.argv.includes("--no-telemetry") ? false : undefined);
-    announceCommand({
-      phase: "failed",
-      meta,
-      invocationId: this.invocationId,
-      startedAt: this.startedAt,
-      notes: this.notes,
-      code: zitadelError.code,
-      exitCode: zitadelError.exitCode,
-    });
+    this.failed = zitadelError;
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), warnings.take()));
     } else if (zitadelError.code === "E_CANCELLED") {
@@ -1169,25 +1073,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * oclif runs this after `run`/`catch` on every path. We flush pending
-   * telemetry so a short-lived CLI process does not exit before the lifecycle
-   * event is sent. The await is bounded by the flush budget, so a hung or
-   * firewalled network adds at most ~1s.
-   *
-   * `mixpanel@0.18` always uses keep-alive agents (hardcoded; not configurable)
-   * and exposes no request timeout or handle, so a completed *or* hung request
-   * leaves a socket that keeps Node's event loop open past the await. The
-   * failure path force-exits via oclif's `exit()`, but the success path would
-   * otherwise hang, so we arm an unref'd watchdog: it cannot keep the loop alive
-   * on a clean exit, but if a telemetry socket is still holding it open after
-   * the grace, it force-exits with the resolved code.
+   * oclif runs this after `run`/`catch` on every path, so whatever a run left
+   * open is closed here.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
     this.ui.releaseNarration();
-    const settle: Promise<unknown>[] = [];
-    announceCommand({ phase: "closing", invocationId: this.invocationId, settle });
-    await Promise.allSettled(settle);
     await super.finally(error);
   }
 

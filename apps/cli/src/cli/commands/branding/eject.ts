@@ -35,6 +35,7 @@ import {
 } from "@/lib/zitadel";
 import { Project } from "@/lib/project";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The shipped designs, as a list for a hint to offer. */
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
@@ -113,7 +114,7 @@ function isRetiredDesign(value: string): boolean {
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends Promptable(ServerCommand(BaseCommand)) {
+export default class BrandingEject extends Telemetered(Promptable(ServerCommand(BaseCommand))) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override group = CommandGroups.signIn;

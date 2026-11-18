@@ -8,6 +8,7 @@ import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -38,7 +39,7 @@ const LIMIT = {
  * fetches one page and reports `next_page_token`; `--all` drains them,
  * `--limit` / `--page-token` walk them a page at a time.
  */
-export default class PreviewList extends Tabulatable(ServerCommand(PreviewCommand)) {
+export default class PreviewList extends Telemetered(Tabulatable(ServerCommand(PreviewCommand))) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.releases;
   static override groupOrder = 2;

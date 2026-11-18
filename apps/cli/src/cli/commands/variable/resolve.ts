@@ -12,6 +12,7 @@ import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { VariableView } from "@/lib/variable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The deployment `variable resolve` reads. The schema is the API spec's own, so
@@ -57,7 +58,7 @@ const COLUMNS = ["name", "value"] as const;
  * deploy, and a preview origin is only ever served by a pull-request build,
  * never by `deploy`.
  */
-export default class VariableResolve extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class VariableResolve extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
   static override description = "Show the variables a deployment froze, the live one by default.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

@@ -1,5 +1,3 @@
-import { channel } from "node:diagnostics_channel";
-
 import { intro, log, note, outro } from "@clack/prompts";
 import pc from "picocolors";
 
@@ -18,15 +16,6 @@ import type { Confirmer, Questions } from "./questions";
 import { DrawnSpinner, QuietSpinner, type Spinner } from "./spinner";
 import type { Summary } from "./summary";
 import { Where } from "./where";
-
-/**
- * The channel a prompt is announced on, just before it is drawn, and only
- * then: a question a flag, a pipe or a default answers draws nothing and
- * announces nothing.
- */
-export const PROMPT_CHANNEL = "zitadel:prompt";
-
-const prompts = channel(PROMPT_CHANNEL);
 
 /**
  * The chain: one command's output from its first line to its last (the package
@@ -235,6 +224,18 @@ export class Chain implements Drawing, Narratable {
     outro(pc.red(CANCELLED));
   }
 
+  private promptListener: (() => void) | undefined;
+
+  /**
+   * Be told each time a prompt is about to be drawn, and only then: a question
+   * a flag, a pipe or a default answers draws nothing and tells no one.
+   *
+   * @param listener - Called before the prompt is drawn.
+   */
+  listenToPrompts(listener: () => void): void {
+    this.promptListener = listener;
+  }
+
   /**
    * The questions, asked the way this command presents itself. A wizard's
    * are drawn in its chain: each one opens the chain before its prompt and
@@ -248,8 +249,10 @@ export class Chain implements Drawing, Narratable {
     audience: Pick<Audience, "interactive" | "force"> = this.audience,
   ): Questions & Confirmer {
     const shown = (): void => {
-      if (prompts.hasSubscribers) {
-        prompts.publish({});
+      try {
+        this.promptListener?.();
+      } catch {
+        // Whoever listens never changes what the person sees.
       }
     };
     const session = {

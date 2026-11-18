@@ -11,7 +11,7 @@ import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { ServerCommand } from "@/cli/commands/server-command";
-import { action, type Observation } from "@/cli/telemetry/observation";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The release `--release` deploys. The schema is the API spec's own, so a
@@ -57,12 +57,9 @@ const MESSAGE = {
  * `zitadel deployment create` — deploy an existing release to the project's
  * origins.
  */
-export default class DeploymentCreate extends ServerCommand(EnvironmentCommand) {
+export default class DeploymentCreate extends Telemetered(ServerCommand(EnvironmentCommand)) {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.releases;
-  static override readonly observation: Observation = {
-    follow: action({ action: "redeploy", resource_type: "deployment" }),
-  };
   static override groupOrder = 5;
 
   static override examples = [

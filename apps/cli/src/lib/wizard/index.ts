@@ -11,9 +11,4 @@
  * be lifted out unchanged.
  */
 export { EndStep, WizardStep } from "./step";
-export {
-  WIZARD_CHANNEL,
-  Wizard,
-  WizardDefinitionError,
-  type WizardEvent,
-} from "./wizard";
+export { type RunWatcher, Wizard, WizardDefinitionError } from "./wizard";

@@ -181,13 +181,6 @@ export class NotFound extends ServerCommand(BaseCommand) {
     const refused = this.unknown && code === EXIT_CODES.E_VALIDATION;
     return super.exit(refused ? UNKNOWN_COMMAND_EXIT_CODE : code);
   }
-
-  /**
-   * A command nobody typed is never counted.
-   */
-  protected override observed(): boolean {
-    return false;
-  }
 }
 
 /**

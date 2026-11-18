@@ -4,6 +4,7 @@ import { prose } from "@/lib/oclif/rendering";
 import { Skills } from "@/lib/skills";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel skills add` — give the project's coding agents the Zitadel skills.
@@ -13,7 +14,7 @@ import { ServerCommand } from "@/cli/commands/server-command";
  * Adding them is this command's whole job, so it asks nothing; running it
  * again replaces them, which is how they follow a CLI update.
  */
-export default class SkillsAdd extends ServerCommand(BaseCommand) {
+export default class SkillsAdd extends Telemetered(ServerCommand(BaseCommand)) {
   static override description =
     "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.";
   static override group = CommandGroups.gettingStarted;

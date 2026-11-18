@@ -1,4 +1,4 @@
-import { providerOf, selectionName } from "@zitadel/config/idp";
+import { providerOf } from "@zitadel/config/idp";
 
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { WizardStep } from "@/lib/wizard";
@@ -26,17 +26,6 @@ export class SelectConnection extends WizardStep<
    * The step's name, which a wizard refuses to hold twice.
    */
   readonly key = "selection";
-
-  /**
-   * What the step settled, for reports of the provider setup flow: the kind of
-   * provider, never its name.
-   *
-   * @param known - What is known once the step finished.
-   * @returns The kind of provider, as facts.
-   */
-  override facts({ selection }: Fact<"selection">): Readonly<Record<string, unknown>> {
-    return { provider_type: selectionName(selection) };
-  }
 
   /**
    * What the command gives the step.

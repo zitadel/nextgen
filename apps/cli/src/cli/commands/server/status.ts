@@ -24,6 +24,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { TestKit } from "@/lib/test-kit";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -32,7 +33,7 @@ import { ServerCommand } from "@/cli/commands/server-command";
  * local server, or orphaned config should be visible without making `status`
  * itself fail.
  */
-export default class Status extends ServerCommand(EnvironmentCommand) {
+export default class Status extends Telemetered(ServerCommand(EnvironmentCommand)) {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 3;

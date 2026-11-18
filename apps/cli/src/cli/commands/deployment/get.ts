@@ -12,6 +12,7 @@ import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
@@ -34,7 +35,7 @@ const DEPLOYMENT_ID: Refused<string> = {
  * release it made live, the origins it went to, when, and the variables it
  * froze.
  */
-export default class DeploymentGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class DeploymentGet extends Telemetered(Tabulatable(ServerCommand(EnvironmentCommand))) {
   static override description = "Read one deployment by id.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;

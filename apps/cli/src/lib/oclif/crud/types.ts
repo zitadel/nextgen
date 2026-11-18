@@ -214,6 +214,11 @@ export type WriteShape = Readonly<{
    * `team`, which no generated example can know.
    */
   example?: string;
+  /**
+   * What the write knows about its run from the body it sends: enums and
+   * counts only, never a value the developer typed.
+   */
+  facts?(body: Json): Readonly<Record<string, string | number | boolean | undefined>>;
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
   /**
@@ -254,11 +259,6 @@ export type ResourceDescriptor<Ctx> = Readonly<{
   group?: string;
   /** Position of the resource's row within its group on the root help, lowest first. */
   groupOrder?: number;
-  /**
-   * What the resource's commands say about how their runs are followed, as
-   * the resource declared it. Opaque here: it is read by whoever follows a run.
-   */
-  observation?: unknown;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
   /**

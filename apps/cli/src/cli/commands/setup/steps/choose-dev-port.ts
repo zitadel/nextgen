@@ -38,20 +38,6 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
   readonly key = "devPort";
 
   /**
-   * The name reports of the onboarding flow call this step by.
-   */
-  override readonly milestone = "dev_port_selection";
-
-  /**
-   * The step settles a choice no report may carry: the port is never sent.
-   *
-   * @returns No facts.
-   */
-  override facts(): Readonly<Record<string, unknown>> {
-    return {};
-  }
-
-  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

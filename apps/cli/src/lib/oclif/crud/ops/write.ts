@@ -1,7 +1,6 @@
-import { channel } from "node:diagnostics_channel";
-
 import { Flags, type Interfaces } from "@oclif/core";
 
+import type { Facts } from "@/lib/oclif/base";
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
   type BodyField,
@@ -190,6 +189,23 @@ abstract class WriteOperation<
 > extends ResourceCommand<Ctx, Spec, WriteInput> {
   protected abstract verb: "create" | "update";
 
+  /**
+   * The body this run sent, once it has.
+   */
+  private written: Json | undefined;
+
+  /**
+   * What the write knows about its run from the body it sent.
+   *
+   * @returns The facts the resource's write declares, with the layers below.
+   */
+  protected override describe(): Facts {
+    return {
+      ...super.describe(),
+      ...(this.written === undefined ? {} : this.definition.spec.facts?.(this.written)),
+    };
+  }
+
   protected override async operate({ args, flags }: WriteInput): Promise<CommandResult> {
     const { topic, spec, resource, options } = this.definition;
     const fields = fieldsOf(spec, options);
@@ -236,9 +252,7 @@ abstract class WriteOperation<
 
     // Some writes answer without a body (`grant create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
-    if (writes.hasSubscribers) {
-      writes.publish({ topic: this.definition.topic, verb: this.verb, body });
-    }
+    this.written = body;
     const result = await this.send(await this.context(), body, id);
     const summary: Summary =
       result === undefined
@@ -284,23 +298,6 @@ abstract class WriteOperation<
     return Promise.resolve(undefined);
   }
 }
-
-/**
- * The channel a create or update is announced on, just before it is sent, with
- * the body it sends.
- */
-export const WRITE_CHANNEL = "zitadel:write";
-
-/**
- * What a write announces on {@link WRITE_CHANNEL}.
- */
-export type WriteEvent = Readonly<{
-  topic: string;
-  verb: "create" | "update";
-  body: Json;
-}>;
-
-const writes = channel(WRITE_CHANNEL);
 
 /** `<topic> create`. */
 export abstract class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {

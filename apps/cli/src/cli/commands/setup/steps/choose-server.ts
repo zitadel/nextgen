@@ -59,21 +59,6 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
   readonly key = "server";
 
   /**
-   * The name reports of the onboarding flow call this step by.
-   */
-  override readonly milestone = "server_selection";
-
-  /**
-   * What the step settled, for reports of the onboarding flow.
-   *
-   * @param known - What is known once the step finished.
-   * @returns The choice, as facts.
-   */
-  override facts({ answers }: Fact<"answers">): Readonly<Record<string, unknown>> {
-    return { server_type: ZitadelRuntime.fromUrl(answers.server).kind === "local" ? "local" : "remote" };
-  }
-
-  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

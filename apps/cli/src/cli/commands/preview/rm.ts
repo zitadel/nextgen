@@ -9,6 +9,7 @@ import { deletedData } from "@/lib/oclif/envelope";
 import { filled, type Refused, taken } from "@/lib/oclif/flags";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing
@@ -31,7 +32,7 @@ const URL = {
  * history. Idempotent on the server, but destructive from the caller's point
  * of view.
  */
-export default class PreviewRm extends Destructive(ServerCommand(PreviewCommand)) {
+export default class PreviewRm extends Telemetered(Destructive(ServerCommand(PreviewCommand))) {
   static override description = "Remove a live preview from the project.";
   static override group = CommandGroups.releases;
   static override groupOrder = 2;

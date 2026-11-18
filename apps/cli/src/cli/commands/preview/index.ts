@@ -22,6 +22,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Ttl, TtlError } from "@/lib/ttl";
 import { warnings } from "@/lib/ui";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 const CREDENTIAL_REQUIRED_REFUSAL = {
   message: "{credential} is not set",
@@ -232,7 +233,7 @@ export async function refusePrimaryOrigins(
  * prints is the release digest as `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build
  * to pin.
  */
-export default class Preview extends ServerCommand(PreviewCommand) {
+export default class Preview extends Telemetered(ServerCommand(PreviewCommand)) {
   static override description =
     "Deploy a release from .zitadel/ to a pull-request build's preview URLs.";
   static override group = CommandGroups.releases;

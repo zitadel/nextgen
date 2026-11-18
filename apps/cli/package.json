@@ -39,7 +39,6 @@
     "helpClass": "./dist/cli/help",
     "hooks": {
       "command_not_found": "./dist/hooks/command-not-found",
-      "init": "./dist/hooks/recorder",
       "finally": "./dist/hooks/version-notice"
     },
     "additionalHelpFlags": [

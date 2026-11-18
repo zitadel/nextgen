@@ -31,7 +31,6 @@ import {
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
 import { CommandGroups } from "@/cli/commands/groups";
-import { flow, type Observation } from "@/cli/telemetry/observation";
 import {
   type Admitted,
   BaseCommand,
@@ -56,6 +55,7 @@ import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/
 import {
   DEFAULT_RENDERER,
   type Fact,
+  onboardingStep,
   PORT,
 } from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
@@ -87,6 +87,7 @@ import { ShowResult } from "./steps/show-result";
 import { WriteConfiguration } from "./steps/write-configuration";
 import { WriteManifest } from "./steps/write-manifest";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * How `--design`, which setup no longer takes, is refused.
@@ -192,7 +193,7 @@ const RENDERER_FLAG_DESCRIPTION =
  * `--design` is hidden so scripts and agents passing it get a targeted error
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
-export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
+export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCommand))) {
   /**
    * What `--help` says the command does.
    */
@@ -203,10 +204,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
    * The group the command index lists it under.
    */
   static override group = CommandGroups.gettingStarted;
-  static override readonly observation: Observation = {
-    headline: "framework",
-    follow: flow({ flow: "onboarding", otherwise: "application_setup" }),
-  };
+  static override readonly headline = "framework";
 
   /**
    * Where it sits in its group.
@@ -662,6 +660,11 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
         .run(
           { flags },
           {
+            watch: this.watchWizard({
+              flow: "onboarding",
+              otherwise: "application_setup",
+              step: onboardingStep,
+            }),
             onUndoError: (key, error) => {
               warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

@@ -28,20 +28,6 @@ export abstract class WizardStep<Key extends string, Out extends object, Needs e
   abstract readonly key: Key;
 
   /**
-   * The name reports of the run call this step by, when it has one.
-   */
-  readonly milestone?: string;
-
-  /**
-   * What the step settled, as facts for reports of the run, given everything
-   * known once it finished. A step that settles nothing leaves it out.
-   *
-   * @param known - What is known, with what the step added.
-   * @returns The facts, by name.
-   */
-  facts?(known: Needs & Out): Readonly<Record<string, unknown>>;
-
-  /**
    * Do the step's work.
    *
    * @param needs - What earlier steps settled.
@@ -78,11 +64,6 @@ export abstract class EndStep<Key extends string, Result, Needs extends object> 
    * The step's name, which a wizard refuses to hold twice.
    */
   abstract readonly key: Key;
-
-  /**
-   * The name reports of the run call this step by, when it has one.
-   */
-  readonly milestone?: string;
 
   /**
    * Whether this step ends the wizard, given what is known.

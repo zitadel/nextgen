@@ -6,6 +6,7 @@ import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 import { type Fact, section } from "@/lib/ui";
 import { BaseCommand } from "@/lib/oclif";
 import { CommandGroups } from "@/cli/commands/groups";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel stop`: stops this folder's server and keeps its data, or, with
@@ -13,7 +14,7 @@ import { CommandGroups } from "@/cli/commands/groups";
  * started it. Stopping a folder with no server is not an error: there is
  * nothing to stop, and the result says so.
  */
-export default class Stop extends LocalServerCommand(ServerCommand(BaseCommand), "exact") {
+export default class Stop extends Telemetered(LocalServerCommand(ServerCommand(BaseCommand), "exact")) {
   static override group = CommandGroups.localServer;
   static override description = "Stop the local Zitadel server.";
   static override groupOrder = 2;
