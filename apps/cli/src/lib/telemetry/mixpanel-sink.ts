@@ -20,6 +20,8 @@ export type MixpanelSettings = {
 
 /** Sends events and profiles to the Mixpanel project a token names. */
 export class MixpanelSink implements TelemetrySink {
+  readonly destination = "mixpanel" as const;
+
   private readonly client: MixpanelClient;
   private readonly distinctId: string;
   private readonly debug: boolean;

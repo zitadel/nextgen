@@ -9,6 +9,9 @@ import type { Modifiers, Properties } from "mixpanel";
  * the ones still in the air on its way out.
  */
 export interface TelemetrySink {
+  /** Which destination this is, so an event can name where it goes. */
+  readonly destination: "mixpanel" | "vercel";
+
   /** Sends one event. */
   track(event: string, payload: Properties): void;
 

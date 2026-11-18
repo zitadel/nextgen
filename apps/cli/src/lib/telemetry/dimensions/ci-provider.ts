@@ -1,41 +1,30 @@
+import ci from "ci-info";
+
 import type { Property } from "@/lib/telemetry/property";
 
-import { envEnabled } from "./env-flag";
-
-/** Coarse CI provider name, or `undefined` when not running in CI. */
+/**
+ * The CI service the process runs in, as a lowercase name with underscores
+ * (`github_actions`, `gitlab_ci`), `unknown` for CI `ci-info` has no name for,
+ * and `undefined` when not running in CI.
+ */
 class CiProvider implements Property<NodeJS.ProcessEnv, string | undefined> {
-  /** Provider-marker env var → reported name, in match order. */
-  private static readonly providers = [
-    ["GITHUB_ACTIONS", "github_actions"],
-    ["GITLAB_CI", "gitlab_ci"],
-    ["CIRCLECI", "circleci"],
-    ["BUILDKITE", "buildkite"],
-    ["JENKINS_URL", "jenkins"],
-  ] as const satisfies ReadonlyArray<readonly [string, string]>;
-
-  public value(env: NodeJS.ProcessEnv): string | undefined {
-    const named = CiProvider.providers.find(([marker]) => {
-      return envEnabled(env[marker]);
-    });
-    if (named) {
-      return named[1];
+  public value(_env: NodeJS.ProcessEnv): string | undefined {
+    if (!ci.isCI) {
+      return undefined;
     }
-    return envEnabled(env.CI) ? "unknown" : undefined;
+
+    return ci.name?.toLowerCase().replaceAll(/[^a-z0-9]+/g, "_").replaceAll(/^_|_$/g, "") ?? "unknown";
   }
 }
 
 export const ciProvider = new CiProvider();
 
 /**
- * Whether this runs in a CI build: the providers {@link ciProvider} recognises
- * (`CI`, or a provider's own marker such as Jenkins' `JENKINS_URL`), plus the
- * builds that set neither: Cloudflare Pages, Azure Pipelines and AWS CodeBuild.
+ * Whether this runs in a CI build, as `ci-info` reads it.
+ *
+ * @param _env - Unused: `ci-info` reads the process's own environment.
+ * @returns Whether the process runs in CI.
  */
-export function runsInCi(env: NodeJS.ProcessEnv): boolean {
-  return (
-    ciProvider.value(env) !== undefined ||
-    env.CF_PAGES === "1" ||
-    envEnabled(env.TF_BUILD) ||
-    envEnabled(env.CODEBUILD_BUILD_ID)
-  );
+export function runsInCi(_env: NodeJS.ProcessEnv): boolean {
+  return ci.isCI;
 }

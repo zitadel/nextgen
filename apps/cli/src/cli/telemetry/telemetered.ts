@@ -316,6 +316,8 @@ export function Telemetered<
           this.reportInvocationId,
           facts,
         ),
+        // The hosted intake's copy is for the three lifecycle events only.
+        name.startsWith("cli_command_") ? undefined : ["mixpanel"],
       );
     }
 

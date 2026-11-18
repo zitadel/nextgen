@@ -2,6 +2,7 @@ import type { RuntimeKind } from "@/lib/server";
 import { detectAgent } from "agent-cli-detector";
 
 import type { Properties } from "@/lib/telemetry";
+import { installedFromPackage, resolveChannel } from "@/lib/telemetry/config";
 import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
 import { ciProvider } from "@/lib/telemetry/dimensions/ci-provider";
 import { country } from "@/lib/telemetry/dimensions/country";
@@ -118,6 +119,8 @@ export function commandEventProperties(
   return {
     ...extra,
     surface: "cli",
+    environment: resolveChannel(env),
+    install_source: installedFromPackage() ? "package" : "source",
     ...eventDeviceProperties(meta),
     ip: 0,
     invocation_id: invocationId,

@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { SERVER } from "@/constants";
 import { ciFlag } from "./dimensions/ci-flag";
 
@@ -65,7 +67,35 @@ export function resolveChannel(env: NodeJS.ProcessEnv): "development" | "product
   if (ciFlag.value(env)) {
     return "development";
   }
+  // Nor a run of the CLI's own development mode, nor one from a checkout of its
+  // source instead of the installed package.
+  if (isDevelopmentFlag(env.ZITADEL_CLI_DEV) || !installedFromPackage()) {
+    return "development";
+  }
   return "production";
+}
+
+/**
+ * Whether a development switch is on: anything but unset, empty, `0` or `false`.
+ *
+ * @param value - The switch's value.
+ * @returns Whether it is on.
+ */
+function isDevelopmentFlag(value: string | undefined): boolean {
+  const flag = value?.trim().toLowerCase();
+
+  return flag !== undefined && flag !== "" && flag !== "0" && flag !== "false";
+}
+
+/**
+ * Whether this code runs from an installed package, whether through `npx`, a
+ * global install or a project's `node_modules`, as opposed to a checkout of the
+ * source. An installed package always sits under a `node_modules` directory.
+ *
+ * @returns Whether the running code lives under `node_modules`.
+ */
+export function installedFromPackage(): boolean {
+  return fileURLToPath(import.meta.url).split(/[\\/]/).includes("node_modules");
 }
 
 /**

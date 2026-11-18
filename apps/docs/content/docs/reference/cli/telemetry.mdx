@@ -51,7 +51,8 @@ The CLI can also send its events to [Mixpanel](https://mixpanel.com), in its EU 
 | `os`, `$os`, `arch` | The platform, such as `darwin`, `Mac OS X` and `arm64`. |
 | `mp_country_code` | The country of your timezone, for the timezones the CLI knows; none for others. |
 | `is_tty`, `non_interactive`, `dry_run`, `force` | Whether it ran in a terminal, without prompts, as a dry run, and with `--force`. |
-| `is_ci`, `ci_provider` | Whether it ran in CI, and which: `github_actions`, `gitlab_ci`, `circleci`, `buildkite`, `jenkins` or `unknown`. |
+| `is_ci`, `ci_provider` | Whether it ran in CI, and which, by name, such as `github_actions`, or `unknown`. |
+| `environment`, `install_source` | Whether the run counts as customer traffic (`production`, or `development` for CI, development mode and runs from a source checkout), and whether the CLI ran from an installed package or from source. |
 | `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
 | `is_agent`, `agent_name` | Whether the CLI ran inside a coding agent, and which one it recognised, such as `claude-code`. It says where the CLI ran, never who typed the command. |
 | `invocation_channel` | The package manager that started it: `npm`, `pnpm`, `yarn`, `bun` or `unknown`. |

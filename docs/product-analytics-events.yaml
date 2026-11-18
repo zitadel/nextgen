@@ -302,8 +302,23 @@ properties:
     description: Whether the CLI ran in CI.
   ci_provider:
     type: string
-    values: [github_actions, gitlab_ci, circleci, buildkite, jenkins, unknown]
-    description: Which CI it ran in; absent outside CI.
+    description: >-
+      Which CI service it ran in, as a lowercase name with underscores from
+      `ci-info`'s list (`github_actions`, `gitlab_ci`, `circleci`), or `unknown`;
+      absent outside CI.
+  environment:
+    type: string
+    values: [production, development]
+    description: >-
+      Whether the run counts as customer traffic. A run in CI, in the CLI's
+      development mode (`ZITADEL_CLI_DEV`) or from a checkout of its source is
+      `development`, unless `ZITADEL_TELEMETRY_ENV` says otherwise.
+  install_source:
+    type: string
+    values: [package, source]
+    description: >-
+      Whether the CLI ran from an installed package (`npx`, a global or a
+      project install) or from a checkout of its source.
   is_agent:
     type: boolean
     description: >-
@@ -477,6 +492,8 @@ components:
       - force
       - is_ci
       - ci_provider
+      - environment
+      - install_source
       - host_agent
       - is_agent
       - agent_name

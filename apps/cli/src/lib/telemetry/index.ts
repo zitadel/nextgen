@@ -144,15 +144,28 @@ export class Telemetry {
     });
   }
 
-  /** Send an event with the given properties; `distinct_id`/`$insert_id` are stamped here. */
-  track(event: string, properties: TelemetryProperties): void {
+  /**
+   * Send an event with the given properties; `distinct_id`/`$insert_id` are
+   * stamped here.
+   *
+   * @param event - The event's name.
+   * @param properties - The event's properties.
+   * @param only - The destinations the event goes to; every one when left out.
+   */
+  track(
+    event: string,
+    properties: TelemetryProperties,
+    only?: readonly TelemetrySink["destination"][],
+  ): void {
     const payload = compact({
       ...properties,
       distinct_id: this.distinctId,
       $insert_id: this.newId(),
     });
     for (const sink of this.sinks) {
-      sink.track(event, payload);
+      if (only === undefined || only.includes(sink.destination)) {
+        sink.track(event, payload);
+      }
     }
   }
 
