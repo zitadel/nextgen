@@ -2,9 +2,10 @@ import { rm } from "node:fs/promises";
 
 import { HttpResponse, http } from "msw";
 import type { SetupServer } from "msw/node";
-import { afterEach, describe, expect } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import InvitationCancel from "@/cli/commands/invitation/cancel";
+import { BaseCommand } from "@/lib/oclif/base";
 import { it } from "@tests/fixtures";
 import { parseArg } from "@tests/helpers/inputs";
 import { answering } from "@tests/helpers/keyboard";
@@ -204,6 +205,126 @@ describe("invitation cancel, run by a person with an id", () => {
       expect(cancelled).toEqual([]);
     },
   );
+});
+
+/** Watches the product events the command sends. */
+function trackedEvents() {
+  return vi.spyOn(
+    BaseCommand.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
+    "trackEvent",
+  );
+}
+
+describe("invitation cancel's invitation_cancelled event", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is sent once a pending invitation is cancelled, with its role and journey", async ({
+    server,
+  }) => {
+    serving(server, pending("inv_1", "John Doe"));
+    const cwd = await anApp();
+    const sent = trackedEvents();
+
+    await runCommand(InvitationCancel, "invitation:cancel", [
+      "inv_1",
+      "--force",
+      "--json",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(cancelled).toEqual(["inv_1"]);
+    expect(sent).toHaveBeenCalledExactlyOnceWith("invitation_cancelled", {
+      role: "project_viewer",
+      invitation_journey_id: "journey_inv_1",
+    });
+  });
+
+  it("is not sent for a declined invitation, whose journey already ended", async ({ server }) => {
+    serving(server, { ...pending("inv_1", "John Doe"), status: "rejected" });
+    const cwd = await anApp();
+    const sent = trackedEvents();
+
+    await runCommand(InvitationCancel, "invitation:cancel", [
+      "inv_1",
+      "--force",
+      "--json",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(cancelled).toEqual(["inv_1"]);
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("is not sent when the cancel fails", async ({ server }) => {
+    serving(server, pending("inv_1", "John Doe"), 500);
+    const cwd = await anApp();
+    const sent = trackedEvents();
+
+    await rejectionOf(() => {
+      return runCommand(InvitationCancel, "invitation:cancel", [
+        "inv_1",
+        "--force",
+        "--json",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
+    });
+
+    expect(cancelled).toEqual(["inv_1"]);
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("is not sent on a dry run", async ({ server }) => {
+    serving(server, pending("inv_1", "John Doe"));
+    const cwd = await anApp();
+    const sent = trackedEvents();
+
+    await runCommand(InvitationCancel, "invitation:cancel", [
+      "inv_1",
+      "--dry-run",
+      "--json",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(cancelled).toEqual([]);
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("is not sent when the person says no", async ({ server }) => {
+    serving(server, pending("inv_1", "John Doe"));
+    const cwd = await anApp();
+    const sent = trackedEvents();
+    const talk = answering(false);
+
+    await rejectionOf(() => {
+      return asTerminal(() => {
+        return runCommand(InvitationCancel, "invitation:cancel", [
+          "inv_1",
+          "--cwd",
+          cwd,
+          "--server",
+          SERVER,
+        ]);
+      });
+    });
+
+    expect(talk.asked()).toHaveLength(1);
+    expect(cancelled).toEqual([]);
+    expect(sent).not.toHaveBeenCalled();
+  });
 });
 
 describe("invitation cancel, with nobody to ask", () => {

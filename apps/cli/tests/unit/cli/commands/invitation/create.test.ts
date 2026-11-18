@@ -2,9 +2,10 @@ import { rm } from "node:fs/promises";
 
 import { HttpResponse, http } from "msw";
 import type { SetupServer } from "msw/node";
-import { afterEach, describe, expect } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import InvitationCreate from "@/cli/commands/invitation/create";
+import { BaseCommand } from "@/lib/oclif/base";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { answering } from "@tests/helpers/keyboard";
@@ -237,5 +238,104 @@ describe("invitation create --dry-run", () => {
     ]);
 
     expect(parseJson(result.stdout)).toMatchObject({ code: "E_VALIDATION" });
+  });
+});
+
+/** Watches the product events the command sends. */
+function trackedEvents() {
+  return vi.spyOn(
+    BaseCommand.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
+    "trackEvent",
+  );
+}
+
+/** Runs a create that asks nothing, with `extra` flags. */
+function create(cwd: string, ...extra: string[]): Promise<unknown> {
+  return runCommand(InvitationCreate, "invitation:create", [
+    "--relation",
+    "viewer",
+    ...extra,
+    "--json",
+    "--cwd",
+    cwd,
+    "--server",
+    SERVER,
+  ]);
+}
+
+describe("invitation create's invitation_created event", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is sent once the API creates the invitation, with its role and journey", async ({
+    server,
+  }) => {
+    answeringReads(server, "pending");
+    const cwd = await anApp(dirs);
+    const sent = trackedEvents();
+
+    await create(cwd);
+
+    expect(sent).toHaveBeenCalledExactlyOnceWith("invitation_created", {
+      role: "project_viewer",
+      invitation_journey_id: "journey_1",
+    });
+  });
+
+  it("is sent once for a replacement too", async ({ server }) => {
+    answeringReads(server, "pending");
+    const cwd = await anApp(dirs);
+    const sent = trackedEvents();
+
+    await create(cwd, "--replaces", INVITATION);
+
+    expect(posted).toHaveLength(1);
+    expect(sent).toHaveBeenCalledExactlyOnceWith("invitation_created", {
+      role: "project_viewer",
+      invitation_journey_id: "journey_1",
+    });
+  });
+
+  it("is not sent when the create fails", async ({ server }) => {
+    answeringReads(server, "pending");
+    server.use(
+      http.post(`${SERVER}/api/v1/invitations`, () => {
+        return HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 });
+      }),
+    );
+    const cwd = await anApp(dirs);
+    const sent = trackedEvents();
+
+    await rejectionOf(() => {
+      return create(cwd);
+    });
+
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("is not sent on a dry run", async ({ server }) => {
+    answeringReads(server, "pending");
+    const cwd = await anApp(dirs);
+    const sent = trackedEvents();
+
+    await create(cwd, "--dry-run");
+
+    expect(posted).toEqual([]);
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("is not sent when the person says no", async ({ server }) => {
+    answeringReads(server, "pending");
+    const cwd = await anApp(dirs);
+    const sent = trackedEvents();
+    const talk = answering("John Doe", "editor", false);
+
+    await asTerminal(() => {
+      return runCommand(InvitationCreate, "invitation:create", ["--cwd", cwd, "--server", SERVER]);
+    });
+
+    expect(talk.asked()).toHaveLength(3);
+    expect(sent).not.toHaveBeenCalled();
   });
 });

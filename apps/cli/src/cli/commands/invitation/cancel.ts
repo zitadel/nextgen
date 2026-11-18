@@ -1,6 +1,6 @@
 import { Args, Flags } from "@oclif/core";
 
-import { type Invitation, InvitationService, invitationRole } from "@/lib/backend";
+import { type Invitation, InvitationService, invitationGrant, invitationRole } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
@@ -25,6 +25,9 @@ const INVITATION_ID: Refused<string> = {
     },
   },
 };
+
+/** The product event a cancel sends once the API confirms it (ADR 086, amended). */
+const INVITATION_CANCELLED = "invitation_cancelled";
 
 /**
  * How a bare cancel is refused when it cannot pick: a dry run must not read the
@@ -120,6 +123,13 @@ export default class InvitationCancel extends Destructive(ServerCommand(Environm
         apply: async (consent, { client, projectId, invitation }) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
           await unlocked.cancel(invitation.id);
+          // A declined journey already ended with invitation_rejected.
+          if (invitation.status === "pending") {
+            this.trackEvent(INVITATION_CANCELLED, {
+              role: invitationGrant(invitation),
+              invitation_journey_id: invitation.journey_id,
+            });
+          }
           const id = escapeControlCharacters(invitation.id);
           const title =
             invitation.status === "pending"
