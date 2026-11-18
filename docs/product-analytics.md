@@ -132,3 +132,5 @@ Each tracking ticket specifies:
 Add a ticket's events to the catalog as `planned`, and mark them `emitted` in the change that sends them.
 
 Verify that tracked actions appear in Mixpanel once, with the expected names and properties.
+
+The metrics a product manager reads, and how to build each one in Mixpanel, are in [product-analytics-metrics.md](product-analytics-metrics.md).
