@@ -39,46 +39,36 @@ afterEach(() => {
 });
 
 describe("Credentials", () => {
-  test("sends nothing to the public operations", async () => {
-    await expect(credentials().forFamily("public")).resolves.toEqual({ headers: {}, schemes: {} });
+  test("gives the project secret for the bearer scheme", () => {
+    expect(credentials().bearer()).toEqual({ oauth2: { kind: "bearer", value: "secret" } });
   });
 
-  test("gives the management operations the project secret for the bearer scheme", async () => {
-    await expect(credentials().forFamily("management")).resolves.toEqual({
-      headers: {},
-      schemes: { oauth2: { kind: "bearer", value: "secret" } },
+  test("gives a session the cookie for the cookie scheme and its CSRF token", async () => {
+    csrf();
+
+    await expect(credentials().session()).resolves.toEqual({
+      scheme: { sessionCookie: { kind: "cookie", value: "cookie-value" } },
+      csrfToken: "token",
     });
   });
-
-  test.each(["session", "logout"] as const)(
-    "gives the %s operations the session cookie for the cookie scheme and its CSRF token",
-    async (family) => {
-      csrf();
-
-      await expect(credentials().forFamily(family)).resolves.toEqual({
-        headers: { "X-Zitadel-CSRF": "token" },
-        schemes: { sessionCookie: { kind: "cookie", value: "cookie-value" } },
-      });
-    },
-  );
 
   test("asks for the CSRF token with the session cookie", async () => {
     csrf();
 
-    await credentials().forFamily("session");
+    await credentials().session();
 
     expect(fetch).toHaveBeenCalledWith("http://x/api/v1/sessions/me/csrf", {
       headers: { Cookie: "__Host-zitadel_session=cookie-value" },
     });
   });
 
-  test("mints a session of its own for each session family", async () => {
+  test("mints a session of its own on every call", async () => {
     csrf();
     const connected = zitadel();
     const subject = credentials(connected);
 
-    await subject.forFamily("session");
-    await subject.forFamily("logout");
+    await subject.session();
+    await subject.session();
 
     expect(connected.seedSession).toHaveBeenCalledTimes(2);
   });
@@ -86,6 +76,6 @@ describe("Credentials", () => {
   test("fails when the server will not issue a CSRF token", async () => {
     csrf(401);
 
-    await expect(credentials().forFamily("session")).rejects.toThrow("answered 401");
+    await expect(credentials().session()).rejects.toThrow("answered 401");
   });
 });

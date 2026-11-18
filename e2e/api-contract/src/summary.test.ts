@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 
 import type { Baseline } from "./baseline";
-import type { FamilyRun } from "./lane";
+import type { CommandRun } from "./contract";
 import { ContractSummary } from "./summary";
 
-function run(failures: FamilyRun["failures"]): FamilyRun {
+function run(failures: CommandRun["failures"]): CommandRun {
   return {
-    family: "management",
-    operations: ["GET /teams", "Stateful tests (management)"],
+    name: "all",
+    operations: ["GET /teams", "Stateful tests"],
     expected: 1,
     accounting: { selected: 1, tested: 1, skipped: 0, errored: 0, unmatched: [] },
     exitCode: 1,
@@ -39,7 +39,7 @@ describe("ContractSummary", () => {
       baseline,
     );
     const page = summary.markdown();
-    expect(page).toContain("`GET /teams` (management)");
+    expect(page).toContain("`GET /teams` (all)");
     expect(page).toContain('New failure: "Server error"');
     expect(page).toContain("turbo run api-contract --filter=@zitadel/e2e");
   });
@@ -54,10 +54,10 @@ describe("ContractSummary", () => {
     ]);
   });
 
-  test("tells how long each family took, and copes with no families", () => {
+  test("tells how long each command took, and copes with no commands", () => {
     const page = new ContractSummary([run([])], baseline).markdown();
-    expect(page).toContain("| management | 1 | 1s |");
-    expect(page).toContain("| slowest (the families run at the same time) | | 1s |");
+    expect(page).toContain("| all | 1 | 1s |");
+    expect(page).toContain("| slowest (the commands run at the same time) | | 1s |");
     expect(new ContractSummary([], baseline).timing()).toContain("| | 0s |");
   });
 

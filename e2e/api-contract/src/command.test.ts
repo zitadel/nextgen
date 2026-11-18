@@ -1,13 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  EXIT_MARKER,
-  HOOKS_PATH,
-  MAX_EXAMPLES,
-  WORKERS,
-  SchemathesisCommand,
-  SEED,
-} from "./command";
+import { HOOKS_PATH, MAX_EXAMPLES, WORKERS, SchemathesisCommand, SEED } from "./command";
 
 /** The hooks the lane loads into every run (it keeps a made-up page token out of the requests), and no bytecode written beside them. */
 const HOOKS_ENVIRONMENT = { SCHEMATHESIS_HOOKS: HOOKS_PATH, PYTHONDONTWRITEBYTECODE: "1" };
@@ -20,8 +13,8 @@ const CHECKS_TABLE =
 function command(overrides: Partial<ConstructorParameters<typeof SchemathesisCommand>[0]> = {}) {
   return new SchemathesisCommand({
     checks: ["not_a_server_error", "ignored_auth"],
+    name: "all",
     url: "http://host.docker.internal:1/api/v1",
-    headers: {},
     schemes: {},
     operationIds: [],
     ...overrides,
@@ -30,64 +23,77 @@ function command(overrides: Partial<ConstructorParameters<typeof SchemathesisCom
 
 describe("SchemathesisCommand", () => {
   test("runs with a fixed seed and example count", () => {
-    const shell = command().toShell();
+    const args = command().toArgs();
 
-    expect(shell).toContain(`--seed ${String(SEED)}`);
-    expect(shell).toContain(`--max-examples ${String(MAX_EXAMPLES)}`);
-    expect(shell).toContain(`--workers ${String(WORKERS)}`);
+    expect(args).toContain(String(SEED));
+    expect(args.slice(args.indexOf("--max-examples"))[1]).toBe(String(MAX_EXAMPLES));
+    expect(args.slice(args.indexOf("--workers"))[1]).toBe(String(WORKERS));
   });
 
   test("selects the checks in the config, never with a flag that would override an exemption", () => {
-    expect(command().toShell()).not.toContain("--checks");
+    expect(command().toArgs()).not.toContain("--checks");
     expect(command().config()).toBe(CHECKS_TABLE);
   });
 
-  test("keeps header values out of the command line", () => {
-    const secret = command({ headers: { Authorization: "Bearer s3cret" } });
+  test("keeps a command's files in a folder of its own", () => {
+    const logout = command({ name: "logout" });
 
-    expect(secret.toShell()).not.toContain("s3cret");
-    expect(secret.toShell()).toContain('-H "$HEADER_0"');
-    expect(secret.environment()).toEqual({
-      ...HOOKS_ENVIRONMENT,
-      HEADER_0: "Authorization: Bearer s3cret",
-    });
-  });
-
-  test("numbers several headers in order", () => {
-    const several = command({ headers: { A: "1", B: "2" } });
-
-    expect(several.toShell()).toContain('-H "$HEADER_0" -H "$HEADER_1"');
-    expect(several.environment()).toEqual({
-      ...HOOKS_ENVIRONMENT,
-      HEADER_0: "A: 1",
-      HEADER_1: "B: 2",
-    });
-  });
-
-  test("adds no header flag and no environment when there are no headers", () => {
-    expect(command().toShell()).not.toContain("-H ");
-    expect(command().environment()).toEqual(HOOKS_ENVIRONMENT);
-  });
-
-  test("limits the run to the operations it is given", () => {
-    const shell = command({ operationIds: ["getMyUser", "listThings"] }).toShell();
-
-    expect(shell).toContain(
-      "--include-operation-id 'getMyUser' --include-operation-id 'listThings'",
+    expect(logout.reportPath).toBe("/work/logout/report.json");
+    expect(logout.toArgs()).toEqual(
+      expect.arrayContaining([
+        "--config-file",
+        "/work/logout/schemathesis.toml",
+        "--report-json-path",
+        "/work/logout/report.json",
+      ]),
     );
   });
 
-  test("quotes an operation id that holds a quote", () => {
-    expect(command({ operationIds: ["it's"] }).toShell()).toContain(`'it'\\''s'`);
+  describe("operation headers", () => {
+    const operationHeaders = { getMySession: { "X-Zitadel-CSRF": "t0ken" } };
+
+    test("go in a table for their operation only, reading the value from the environment", () => {
+      expect(command({ operationHeaders }).config()).toBe(
+        `${CHECKS_TABLE}\n` +
+          '[[operations]]\ninclude-operation-id = "getMySession"\n\n' +
+          '[operations.headers]\n"X-Zitadel-CSRF" = "${HEADER_0}"\n',
+      );
+    });
+
+    test("keep their values out of the command line and the config", () => {
+      const subject = command({ operationHeaders });
+
+      expect(subject.toArgs().join(" ")).not.toContain("t0ken");
+      expect(subject.config()).not.toContain("t0ken");
+      expect(subject.environment()).toEqual({ ...HOOKS_ENVIRONMENT, HEADER_0: "t0ken" });
+    });
+
+    test("add no table and no environment when there are none", () => {
+      expect(command().config()).toBe(CHECKS_TABLE);
+      expect(command().environment()).toEqual(HOOKS_ENVIRONMENT);
+    });
   });
 
-  test("loads the hooks file the run copies into its work folder", () => {
+  test("limits the run to the operations it is given", () => {
+    const args = command({ operationIds: ["getMyUser", "listThings"] }).toArgs();
+
+    expect(args).toEqual(
+      expect.arrayContaining([
+        "--include-operation-id",
+        "getMyUser",
+        "--include-operation-id",
+        "listThings",
+      ]),
+    );
+  });
+
+  test("passes an operation id that holds a quote as it is, since no shell reads it", () => {
+    expect(command({ operationIds: ["it's"] }).toArgs()).toContain("it's");
+  });
+
+  test("loads the hooks file the container's start copies into its work folder", () => {
     expect(HOOKS_PATH).toBe("/work/hooks.py");
     expect(command().environment().SCHEMATHESIS_HOOKS).toBe(HOOKS_PATH);
-  });
-
-  test("prints the exit status on a line of its own and exits zero", () => {
-    expect(command().toShell()).toContain(`printf '\\n%s %s\\n' "${EXIT_MARKER}" "$rc"; exit 0`);
   });
 
   describe("check exemptions", () => {
@@ -126,10 +132,10 @@ describe("SchemathesisCommand", () => {
     });
 
     test("keep their values out of the command line and the config", () => {
-      const shell = command({ schemes }).toShell();
+      const args = command({ schemes }).toArgs().join(" ");
 
-      expect(shell).not.toContain("s3cret");
-      expect(shell).not.toContain("c00kie");
+      expect(args).not.toContain("s3cret");
+      expect(args).not.toContain("c00kie");
       expect(command({ schemes }).config()).not.toContain("s3cret");
       expect(command({ schemes }).environment()).toEqual({
         ...HOOKS_ENVIRONMENT,
@@ -139,9 +145,12 @@ describe("SchemathesisCommand", () => {
     });
 
     test("point Schemathesis at the config file", () => {
-      expect(command().toShell()).toMatch(
-        /^schemathesis --config-file \/work\/schemathesis.toml run/,
-      );
+      expect(command().toArgs().slice(0, 4)).toEqual([
+        "schemathesis",
+        "--config-file",
+        "/work/all/schemathesis.toml",
+        "run",
+      ]);
     });
 
     test("let a refusing operation answer 400, and no other", () => {

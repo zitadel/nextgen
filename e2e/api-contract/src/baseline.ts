@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
-import type { FamilyRun } from "./lane";
+import type { CommandRun } from "./contract";
 import type { Failure } from "./report";
 
 export interface KnownFailure {
@@ -92,9 +92,9 @@ export class Baseline {
  * and writing it would silently drop them from the ratchet.
  */
 export class BaselineUpdate {
-  private readonly runs: FamilyRun[];
+  private readonly runs: CommandRun[];
 
-  constructor(runs: FamilyRun[]) {
+  constructor(runs: CommandRun[]) {
     this.runs = runs;
   }
 
@@ -103,7 +103,7 @@ export class BaselineUpdate {
    * tested every operation it was asked to: the same accounting the suite
    * asserts, so a baseline is never written from a run the suite would reject.
    */
-  private static trusted(run: FamilyRun): boolean {
+  private static trusted(run: CommandRun): boolean {
     const { selected, tested, skipped, errored, unmatched } = run.accounting;
     return (
       run.complete &&
@@ -122,11 +122,11 @@ export class BaselineUpdate {
       return !BaselineUpdate.trusted(run);
     });
     if (untrusted.length > 0) {
-      const families = untrusted.map((run) => {
-        return run.family;
+      const names = untrusted.map((run) => {
+        return run.name;
       });
       throw new Error(
-        `refusing to rewrite the baseline from an unfinished run: ${families.join(", ")}`,
+        `refusing to rewrite the baseline from an unfinished run: ${names.join(", ")}`,
       );
     }
     baseline.write(
