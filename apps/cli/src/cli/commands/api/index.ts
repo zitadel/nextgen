@@ -203,24 +203,6 @@ export function refuseUnforced(
   }
 }
 
-/**
- * The refusal of a call the server did not authenticate. It names the server
- * that was called and the credential that was sent, because the usual cause is
- * a secret that belongs to another server's project.
- *
- * @param server - The server the call went to.
- * @param error - The 401 the server answered.
- * @returns The error to throw.
- */
-export function unauthorizedAt(server: string, error: UnauthorizedError): ZitadelError {
-  return new ZitadelError("E_AUTH", error.message, {
-    hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
-    details: {
-      server,
-    },
-  });
-}
-
 /** A shell word, single-quoted. */
 function quote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
@@ -434,7 +416,15 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
       ? operationService.callAll(request)
       : operationService.call(request)
     ).catch((error: unknown) => {
-      throw error instanceof UnauthorizedError ? unauthorizedAt(server, error) : error;
+      if (error instanceof UnauthorizedError) {
+        throw new ZitadelError("E_AUTH", error.message, {
+          hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
+          details: {
+            server,
+          },
+        });
+      }
+      throw error;
     });
 
     const answer = this.answered(operation.id, response);

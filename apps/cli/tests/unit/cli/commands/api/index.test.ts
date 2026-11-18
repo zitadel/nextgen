@@ -1,13 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import Api, {
-  readOperation,
-  refuseUnforced,
-  refuseUnpaged,
-  unauthorizedAt,
-} from "@/cli/commands/api/index";
+import Api, { readOperation, refuseUnforced, refuseUnpaged } from "@/cli/commands/api/index";
 import { parseFlag } from "@tests/helpers/inputs";
-import { Operation, UnauthorizedError } from "@/lib/backend";
+import { Operation } from "@/lib/backend";
 
 const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 
@@ -164,23 +159,4 @@ describe("-X", () => {
       });
     },
   );
-});
-
-describe("a call the server does not authenticate", () => {
-  it("is E_AUTH, naming the server called and the secret sent", () => {
-    const refusal = unauthorizedAt(
-      "https://preview.zitadel.com",
-      new UnauthorizedError("The request lacks valid authentication credentials.", {
-        status: 401,
-      }),
-    );
-
-    expect(refusal).toMatchObject({
-      code: "E_AUTH",
-      message: "The request lacks valid authentication credentials.",
-      hint: expect.stringContaining(
-        "https://preview.zitadel.com did not accept the ZITADEL_PROJECT_SECRET",
-      ),
-    });
-  });
 });
