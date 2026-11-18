@@ -1,8 +1,10 @@
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { describeRegistry } from "@/lib/oclif/crud";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 import { RESOURCES } from "./resources";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The columns `resources` renders, in order. */
 const COLUMNS = ["topic", "verbs", "filters"] as const;
@@ -16,11 +18,12 @@ const COLUMNS = ["topic", "verbs", "filters"] as const;
  * of them from the registry at once, and `--json` makes it machine-readable.
  * The command talks to no server: it describes the CLI, not the project.
  */
-export default class ResourcesList extends Tabulatable(BaseCommand) {
+export default class ResourcesList extends Tabulatable(ServerCommand(BaseCommand)) {
   static override id = "resources";
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";
-  static override group = CommandGroups.diagnostics;
+  static override group = CommandGroups.apiAndEvents;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> resources",
@@ -31,9 +34,14 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
     plain: plainFlag,
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ flags }: Admitted<typeof ResourcesList>): Promise<JsonEnvelope> {
     const items = describeRegistry(RESOURCES);

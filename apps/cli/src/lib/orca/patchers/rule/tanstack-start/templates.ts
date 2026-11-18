@@ -1,4 +1,4 @@
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
@@ -25,7 +25,7 @@ import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
  * session work runs) rather than silently dropping CSRF protection.
  */
 export function startTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
 
@@ -48,7 +48,7 @@ export const startInstance = createStart(() => ({
 
 /** `src/routes/index.tsx` — the landing chooser linking to login/register/profile. */
 export function indexRouteTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
@@ -106,7 +106,7 @@ function authRoute(purpose: "login" | "register", ctx: PatchContext): string {
 // fall back to the neutral wording.`
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createFileRoute } from "@tanstack/react-router";
 import { ${reactImports} } from "@zitadel/sdk-tanstack-start/react";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";${localesComment}
@@ -148,7 +148,7 @@ export function registerRouteTemplate(ctx: PatchContext): string {
  * does not carry it).
  */
 export function profileRouteTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";

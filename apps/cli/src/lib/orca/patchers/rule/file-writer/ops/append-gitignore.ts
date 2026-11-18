@@ -1,9 +1,9 @@
-import { entriesToAppend } from "@/lib/gitignore";
 import {
   type Change,
   Operation,
   type Source,
 } from "@/lib/orca/patchers/rule/file-writer/operation";
+import { Project } from "@/lib/project";
 
 /**
  * Appends the entries `.gitignore` needs for each rule's path to be ignored
@@ -22,7 +22,7 @@ export class AppendGitignoreOp extends Operation<"append-gitignore"> {
    * @returns `.gitignore` with the missing entries added, or as it is when every rule holds.
    */
   protected change(source: Source): Change {
-    const missing = entriesToAppend(source.text, this.op.rules);
+    const missing = Project.gitignore(this.op.rules).entriesToAppend(source.text);
 
     if (missing.length === 0) {
       return this.file(source, source.text);

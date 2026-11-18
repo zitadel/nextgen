@@ -19,9 +19,8 @@ const asWritten = (file: string): string => relative(SRC, file).split(sep).join(
  * pinned so that it only ever shrinks.
  */
 const STILL_DRAWING_THEMSELVES = [
-  "cli/commands/logs/index.ts: writes to process.stdout",
+  "cli/commands/server/logs.ts: writes to process.stdout",
   "cli/hooks/version-notice.ts: writes to process.stderr",
-  "lib/input.ts: imports @clack/prompts",
   "lib/oclif/base.ts: writes to process.stderr",
   "lib/telemetry/sink.ts: writes to process.stderr",
 ].sort();
@@ -54,7 +53,7 @@ describe("which shape a command draws", () => {
 
 describe("the UI package", () => {
   it("hands out the ways to draw, and nothing it draws with", async () => {
-    expect(Object.keys(ui).sort()).toEqual(["Ui", "section"]);
+    expect(Object.keys(ui).sort()).toEqual(["Ui", "log", "section", "style", "warnings"]);
   });
 
   // The package is the only place the CLI draws. Everything else returns what
@@ -90,6 +89,7 @@ describe("the UI package", () => {
       "lib/ui/chain.ts",
       "lib/ui/plain.ts",
       "lib/ui/progress.ts",
+      "lib/ui/prompter.ts",
       "lib/ui/spinner.ts",
     ]);
   });
@@ -113,7 +113,7 @@ describe("saying what a command is doing", () => {
 });
 
 describe("asking a person", () => {
-  // Every question is a clack prompt asked through `lib/input.ts`. A module
+  // Every question is a clack prompt asked through `lib/ui/asker.ts`. A module
   // that opens a line reader of its own would ask in a second way, with its
   // own look, its own echo and its own idea of Ctrl-C.
   it("is done with clack alone, so no module reads a line from the terminal itself", async () => {
@@ -152,7 +152,7 @@ describe("the boundary scan", () => {
     ["consola's string helpers", 'import { box, stripAnsi } from "consola/utils";'],
     ["another package", 'import { log } from "@clack/core";'],
     ["a child process's own streams", "child.stdout?.pipe(target);"],
-    ["prose that quotes a forbidden call", "// never consola.warn; use reportWarning"],
+    ["prose that quotes a forbidden call", "// never consola.warn; use warnings.report"],
     ["a block comment that shows one", "/** `process.stdout.write` is the UI's alone. */"],
   ])("leaves %s alone", (_form, source) => {
     expect(drawsDirectly(source)).toEqual([]);

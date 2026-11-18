@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 import { ReadIssuer } from "@/cli/commands/auth-method/sso/enable/steps/read-issuer";
 import { ZitadelError } from "@/lib/errors";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { makeProject, setUpProject } from "@tests/helpers/local-project";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 

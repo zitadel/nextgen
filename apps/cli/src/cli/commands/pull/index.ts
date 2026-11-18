@@ -5,13 +5,14 @@ import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
 import { GetDeploymentParams, GetReleaseParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PublishedConfiguration } from "@/lib/publish";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import {
   type Change,
   DiskStore,
@@ -21,6 +22,7 @@ import {
   type Schemas,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * A release id, as the platform mints it.
@@ -200,11 +202,11 @@ type PullOutcome =
  * resource by handle, so files are written by handle and the next `deploy`
  * rebuilds the same release.
  */
-export default class Pull extends EnvironmentCommand {
+export default class Pull extends ServerCommand(EnvironmentCommand) {
   static override description =
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
-  static override group = CommandGroups.configuration;
-  static override groupOrder = 2;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> pull",
@@ -469,7 +471,7 @@ export function fileList(paths: readonly string[], dryRun: boolean): string[] {
  * caller sees it too.
  */
 function reportSkipped(resource: PinnedResource): void {
-  reportWarning(
+  warnings.report(
     `The release pins ${resource.kind} "${resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
   );
 }

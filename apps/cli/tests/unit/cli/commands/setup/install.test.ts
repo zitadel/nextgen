@@ -1,20 +1,18 @@
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import type { SetupFlags } from "@/cli/commands/setup";
+import { LocalRuntime } from "@/lib/server";
 import { InstallDependencies } from "@/cli/commands/setup/steps/install-dependencies";
-import type { BoxAction } from "@/lib/box";
+import { Ui, log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
-import { installLogSink } from "@/lib/log";
 import { createOrca } from "@/lib/orca";
-import type { PackageCommand, runPackageCommand } from "@/lib/package-manager";
+import type { PackageCommand, Runner } from "@/lib/pm";
 import type { Suggest } from "@/lib/suggestion";
-import { Ui } from "@/lib/ui";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
-import { recordLog, type Said } from "@tests/helpers/log";
+import { recordLog, type Said } from "@tests/fixtures/log";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-import { takeReportedWarnings } from "@/lib/warnings";
 
 /**
  * The selector the follow-up commands carry, pinning the project setup created.
@@ -72,7 +70,7 @@ async function aProject(dir: string, packageJson: Record<string, unknown> = {}):
  * @returns The runner, recording each call.
  */
 function aRunner() {
-  return vi.fn<typeof runPackageCommand>(async () => {
+  return vi.fn<Runner>(async () => {
     return undefined;
   });
 }
@@ -83,20 +81,20 @@ function aRunner() {
  * @returns The runner, recording each call.
  */
 function aFailingRunner() {
-  return vi.fn<typeof runPackageCommand>(async () => {
+  return vi.fn<Runner>(async () => {
     throw Object.assign(new Error("boom"), { code: 1 });
   });
 }
 
 /**
  * A package-command runner whose install succeeds and whose next command exits
- * with code 1, its captured output on the error as `runPackageCommand` puts it.
+ * with code 1, its captured output on the error as `PackageCommand.run` puts it.
  *
  * @param output - What the failed command printed.
  * @returns The runner, recording each call.
  */
 function aRunnerFailingAfterInstall(output = "") {
-  return vi.fn<typeof runPackageCommand>(async (command) => {
+  return vi.fn<Runner>(async (command) => {
     if (command.verb === "run") {
       throw Object.assign(new Error(`${command.display} failed with exit 1`), { output });
     }
@@ -111,7 +109,7 @@ function aRunnerFailingAfterInstall(output = "") {
  * @returns The runner.
  */
 function aRunnerInterruptedAfterInstall(controller: AbortController) {
-  return vi.fn<typeof runPackageCommand>(async (command) => {
+  return vi.fn<Runner>(async (command) => {
     if (command.verb === "run") {
       controller.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
       throw new Error(`${command.display} failed with signal SIGINT`);
@@ -148,7 +146,7 @@ type InstallInput = Readonly<{
   framework: string;
   skipInstall: boolean;
   signal: AbortSignal;
-  run?: typeof runPackageCommand;
+  run?: Runner;
 }>;
 
 /**
@@ -196,7 +194,7 @@ async function installWith(input: InstallInput) {
       ...(input.cwdFlag === undefined ? {} : { cwd: input.cwdFlag }),
       skipInstall: input.skipInstall,
     } as SetupFlags,
-    orca: createOrca(),
+    orca: createOrca(LocalRuntime.DIR),
     app: { framework: input.framework, devPort: 3000 },
     patched: {
       dryRun: input.dryRun,
@@ -228,7 +226,7 @@ function stepsOf(said: ReadonlyArray<Said>): string[] {
 }
 
 beforeEach(({ onTestFinished }) => {
-  onTestFinished(installLogSink(() => {}));
+  onTestFinished(log.install(() => {}));
 });
 
 /**
@@ -624,52 +622,50 @@ describe("InstallDependencies", () => {
       await aProject(dir);
 
       const result = await installWith(aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }));
-      takeReportedWarnings();
+      warnings.take();
 
       expect(result.install).toMatchObject({ status: "completed" });
     });
 
     it("warns, naming the script to rerun, when it fails", async ({ dir }) => {
       await aProject(dir);
-      takeReportedWarnings();
+      warnings.take();
 
       await installWith(aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }));
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(warnings.take()).toEqual([
         "npm run generate-routes failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: npm run generate-routes failed with exit 1",
       ]);
     });
 
     it("names the directory in the script to rerun with --cwd", async ({ dir }) => {
       await aProject(dir);
-      takeReportedWarnings();
+      warnings.take();
 
       await installWith(
         aNewAppInput(dir, { cwdFlag: CWD_FLAG, run: aRunnerFailingAfterInstall() }),
       );
 
-      expect(takeReportedWarnings()[0]).toMatch(/^npm --prefix shop run generate-routes failed/);
+      expect(warnings.take()[0]).toMatch(/^npm --prefix shop run generate-routes failed/);
     });
 
     it("quotes the last lines of its output when it fails", async ({ dir }) => {
       await aProject(dir);
-      takeReportedWarnings();
+      warnings.take();
       const output = Array.from({ length: 30 }, (_, line) => {
         return `line ${String(line + 1)}`;
       }).join("\n");
 
       await installWith(aNewAppInput(dir, { run: aRunnerFailingAfterInstall(`${output}\n`) }));
 
-      expect(takeReportedWarnings()[0]?.split("\n").slice(1)).toEqual(
-        output.split("\n").slice(-20),
-      );
+      expect(warnings.take()[0]?.split("\n").slice(1)).toEqual(output.split("\n").slice(-20));
     });
 
     // Setup awaits this before its commit and deploy, so the rejection is
     // what keeps a Ctrl-C from committing.
     it("stops setup with the cancellation when Ctrl-C stops it", async ({ dir }) => {
       await aProject(dir);
-      takeReportedWarnings();
+      warnings.take();
       const controller = new AbortController();
 
       const error = await rejectionOf(() => {
@@ -682,7 +678,7 @@ describe("InstallDependencies", () => {
       });
 
       expect(error).toMatchObject({ code: "E_CANCELLED" });
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(warnings.take()).toEqual([]);
     });
   });
 

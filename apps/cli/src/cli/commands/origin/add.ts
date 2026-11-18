@@ -1,16 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { OriginService } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankArg,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { relatedFlags } from "@/lib/suggestion/relations";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -26,9 +22,10 @@ const ORIGIN_KINDS = ["primary", "preview"] as const;
  * had, which is why this is a deliberate command and never a side effect of a
  * deploy.
  */
-export default class OriginAdd extends EnvironmentCommand {
+export default class OriginAdd extends ServerCommand(EnvironmentCommand) {
   static override description = "Add an origin pattern to the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> origin add https://app.acme.com --kind primary",

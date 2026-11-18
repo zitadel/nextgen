@@ -27,7 +27,7 @@ const maxBuildAttempts = 3
 // project: the configuration this server ships (the platform user schema, the
 // default login flows, the recommended password policy and the default sign-up
 // policy) is built into one release and deployed to consoleOrigin, the project's one primary origin. It
-// runs on every start, so an upgrade's defaults go live. A start that changes
+// runs on every seeding, so an upgrade's defaults go live. A seeding that changes
 // nothing deploys nothing, and a server built before the one that made the live
 // deployment leaves it alone.
 func EnsureDeployed(
@@ -104,21 +104,27 @@ func buildRelease(ctx context.Context, releases service.ReleaseService, bundle s
 // on an old deployment's own URL, must not take the console back. A build with
 // no date, such as a development one, always deploys.
 func deployedByNewerBuild(live []*domain.Deployment, builtAt time.Time) bool {
-	for _, deployment := range live {
-		if deployment.OriginKind != domain.DeploymentOriginKindPrimary {
-			continue
-		}
-		if deployment.Metadata.Message == nil || builtAt.IsZero() {
-			return false
-		}
-		stamp, ok := strings.CutPrefix(*deployment.Metadata.Message, platformDeployPrefix)
-		if !ok {
-			return false
-		}
-		deployedBy, err := time.Parse(time.RFC3339, stamp)
-		return err == nil && deployedBy.After(builtAt)
+	primary := primaryDeployment(live)
+	if primary == nil || primary.Metadata.Message == nil || builtAt.IsZero() {
+		return false
 	}
-	return false
+	stamp, ok := strings.CutPrefix(*primary.Metadata.Message, platformDeployPrefix)
+	if !ok {
+		return false
+	}
+	deployedBy, err := time.Parse(time.RFC3339, stamp)
+	return err == nil && deployedBy.After(builtAt)
+}
+
+// primaryDeployment is the newest primary deployment among live, what the
+// console is served; nil when there is none.
+func primaryDeployment(live []*domain.Deployment) *domain.Deployment {
+	for _, deployment := range live {
+		if deployment.OriginKind == domain.DeploymentOriginKindPrimary {
+			return deployment
+		}
+	}
+	return nil
 }
 
 // ownPrimaryOrigin makes consoleOrigin the platform project's one primary

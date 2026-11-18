@@ -19,7 +19,7 @@ A deployment puts a release live on a target: `primary`, meaning every primary o
 
 A deployment freezes the project's [variables](/docs/concepts/repo-config#variables) for its target. Deployments form a history that is never edited; `zitadel deployment list` shows it, newest first.
 
-Each origin is served the release of the newest deployment to it. A sign-in stays on the release it started with, even if a newer deployment lands meanwhile.
+Each origin is served the release of the newest deployment to it. A request with no origin, such as the CLI's or your backend's, and the console get the newest primary deployment's release; with no primary deployment yet, they are refused (`rel.no_default`). A sign-in stays on the release it started with, even if a newer deployment lands meanwhile.
 
 ## Rollback
 

@@ -32,7 +32,18 @@ export type PatchContext = PatchView &
     project: Omit<CreatedProject, "name">;
     issuer: string;
     server: string;
+    /**
+     * The server `zitadel.json` names when `server` is not a URL: the default one,
+     * which the command that builds the context knows.
+     */
+    defaultServer: string;
     cliVersion: string;
+    /**
+     * The version a scaffold writes for the `@zitadel/*` packages it adds: the CLI's own exact
+     * version on the release train, else its dist-tag. Derived from `cliVersion` where each context
+     * is built.
+     */
+    sdkVersion: string;
     scaffoldedFramework?: boolean;
     /**
      * Sign-in preset the scaffold starts from (`SETUP_PRESETS` in

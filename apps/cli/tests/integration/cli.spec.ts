@@ -11,7 +11,7 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 
@@ -39,12 +39,12 @@ async function typescriptFiles(dir: string): Promise<string[]> {
   return files;
 }
 
-/** Every command id the source suggests through `publicCliCommand` or copy. */
+/** Every command id the source suggests through `Spelling#command` or copy. */
 async function suggestedCommandIds(): Promise<Set<string>> {
   const commands = new Set<string>();
   for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
     const source = await readFile(file, "utf8");
-    for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
+    for (const match of source.matchAll(/Spelling\.at\([^)]*\)\.command\(\s*(["`])([^"`$]*)/g)) {
       const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }

@@ -19,7 +19,7 @@ function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
     force: false,
     command: "setup",
     cliVersion: "0.1.0-alpha.11",
-    source: "https://api.zitadel.cloud",
+    source: "https://preview.zitadel.com",
     verbose: false,
     debug: false,
     env: {},
@@ -32,6 +32,7 @@ describe("commandEventProperties", () => {
   it("emits allow-listed dimensions and never the raw source/cwd", () => {
     const props = commandEventProperties(
       meta({ source: "https://auth.internal.acme.com/x" }),
+      "self_hosted",
       "sess-1",
     );
     const serialized = JSON.stringify(props);
@@ -47,7 +48,10 @@ describe("commandEventProperties", () => {
   });
 
   it("merges per-command extras", () => {
-    const props = commandEventProperties(meta(), "sess-1", { framework: "react", step: "x" });
+    const props = commandEventProperties(meta(), "self_hosted", "sess-1", {
+      framework: "react",
+      step: "x",
+    });
     expect(props.framework).toBe("react");
     expect(props.step).toBe("x");
   });
@@ -55,7 +59,7 @@ describe("commandEventProperties", () => {
 
 describe("vercelEventKeys", () => {
   function vercelCopy(event: string, command: string, extra: Properties) {
-    const props = commandEventProperties(meta({ command }), "sess-1", extra);
+    const props = commandEventProperties(meta({ command }), "self_hosted", "sess-1", extra);
     return JSON.parse(
       vercelEventBody(
         event,
@@ -124,6 +128,6 @@ describe("deviceProfileProperties", () => {
     expect("mp_country_code" in props).toBe(false);
     const serialized = JSON.stringify(props);
     expect(serialized).not.toContain("/work/app");
-    expect(serialized).not.toContain("zitadel.cloud");
+    expect(serialized).not.toContain("zitadel.com");
   });
 });

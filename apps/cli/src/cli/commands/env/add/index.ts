@@ -1,3 +1,4 @@
+import { SERVER } from "@/constants";
 import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Args, Flags } from "@oclif/core";
@@ -5,30 +6,20 @@ import type { Parsed } from "@zitadel/config/idp";
 import { z } from "zod";
 
 import { createZitadelClient, ProjectService } from "@/lib/backend";
-import { deployInitialRelease, type InitialDeployment, isEnvironmentName } from "@/lib/environment";
+import { Environment, type InitialDeployment } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
-import { writeManagedEnvFile } from "@/lib/fs-safe";
-import { isObject } from "@/lib/json";
-import { log } from "@/lib/log";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { log, warnings } from "@/lib/ui";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { type Refused, reads, taken } from "@/lib/oclif/flags";
-import { Promptable } from "@/lib/oclif/promptable";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
-import { readZitadelConfig } from "@/lib/project";
-import { environmentFileName } from "@/lib/secret-paths";
-import { DEFAULT_SERVER, parseServer, resolveServer } from "@/lib/server";
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { userAgent } from "@/lib/user-agent";
-import { reportWarning } from "@/lib/warnings";
+import { Runtime } from "@/lib/runtime";
+import { Project } from "@/lib/project";
+import { ChoosingServerCommand } from "@/cli/commands/server-command";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL = {
@@ -46,7 +37,7 @@ async function environmentFile(
   name: string,
   force: boolean,
 ): Promise<{ file: string; path: string }> {
-  const file = environmentFileName(name);
+  const file = Project.envFileName(name);
   const path = join(cwd, file);
   const exists = await stat(path).then(
     () => {
@@ -84,7 +75,7 @@ const APP_URL_REFUSAL = {
 
 /** The environment name the argument holds: one that can name a `.env.<name>.local` file. */
 const ENVIRONMENT_NAME = {
-  schema: z.string().trim().refine(isEnvironmentName),
+  schema: z.string().trim().refine(Environment.isName),
   refusal: {
     message: '"{value}" is not a usable environment name',
     hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
@@ -134,13 +125,14 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends Promptable(BaseCommand) {
+export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = [
-    "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
-    "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
+    `<%= config.bin %> env add production --server ${SERVER} --app-url https://app.acme.com`,
+    `<%= config.bin %> env add staging --server ${SERVER} --project proj_01K9AA9M3K7E2QX8VB4T`,
   ];
   static override args = {
     name: Args.custom<string>({
@@ -164,43 +156,24 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     force: Flags.boolean({ description: "Overwrite an existing .env.<name>.local." }),
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
-
   protected async execute({ args, flags }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
     const { cwd, env, nonInteractive, dryRun } = this.meta;
     const environment = await environmentFile(cwd, args.name, flags.force);
-    // `--server` resolves to an origin as it does everywhere; one that was not
-    // given is left to the prompt below.
-    const givenServer = this.meta.serverFlag
-      ? (
-          await resolveServer({
-            cwd,
-            serverFlag: this.meta.serverFlag,
-          })
-        ).value
-      : undefined;
-
-    const config = await readZitadelConfig(cwd);
-    const frameworkId = isObject(config.framework) ? config.framework.id : undefined;
+    // `--server` resolves to an origin as it does everywhere, before anything else
+    // is read; one that was not given is asked for below.
+    const givenServer = await this.givenServer();
+    const config = await Project.at(cwd).config();
+    const frameworkId = config.frameworkId;
     const publicVariable =
       typeof frameworkId === "string"
         ? PUBLIC_PROJECT_ID_VARIABLE[frameworkId as keyof typeof PUBLIC_PROJECT_ID_VARIABLE]
         : undefined;
 
+    // The rerun keeps every choice this run made, so binding a project
+    // (`--project`) stays a bind rather than creating a new project.
     const server =
       givenServer ??
-      (await this.ask.text({
-        name: "server",
-        message: "What is the URL of your Zitadel server?",
-        flag: "--server",
-        initialValue: DEFAULT_SERVER,
-        parse: parseServer,
-        // The rerun keeps every choice this run made, so binding a project
-        // (`--project`) stays a bind rather than creating a new project.
-        retry: await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),
-      }));
+      (await this.askServer(await this.again("env:add", { with: { server: SERVER } })));
 
     const appUrl =
       flags.appUrl ??
@@ -253,7 +226,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       flags.project === undefined
         ? await new ProjectService(
             createZitadelClient({
-              userAgent: userAgent(),
+              userAgent: Runtime.current().userAgent(),
               baseUrl: server,
               signal: this.signal,
             }),
@@ -292,7 +265,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       ...(issuer === undefined ? {} : { ZITADEL_ISSUER: issuer }),
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
-    await writeManagedEnvFile(environment.path, values);
+    await Project.envFile(environment.path).write(values);
     log.done(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
@@ -579,9 +552,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
   }): Promise<InitialDeployment | undefined> {
     log.start("Deploying .zitadel/ to the new environment");
     try {
-      const deployment = await deployInitialRelease({
+      const deployment = await Environment.deployInitialRelease({
         client: createZitadelClient({
-          userAgent: userAgent(),
+          userAgent: Runtime.current().userAgent(),
           baseUrl: opts.server,
           token: opts.projectSecret,
           signal: this.signal,
@@ -595,14 +568,13 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         narrate: (notices) => {
           this.narrate(notices);
         },
-        suggest: opts.suggest,
       });
       log.done(
         `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;
     } catch (error) {
-      reportWarning(
+      warnings.report(
         `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })} to publish it.`,
       );
       return undefined;

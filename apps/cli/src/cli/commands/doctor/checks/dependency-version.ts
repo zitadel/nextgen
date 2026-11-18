@@ -1,6 +1,6 @@
 import semver from "semver";
 
-import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
+import { PM } from "@/lib/pm";
 import { suggestedCommandOf } from "@/lib/suggestion";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
@@ -83,8 +83,7 @@ export class DependencyVersionCheck implements SanityCheck {
         // a bare `npm install` would switch managers on a pnpm/yarn/bun project
         // and write a caret range — exactly the float this check ignores.
         remedy: suggestedCommandOf(
-          addExactCommandFor(
-            await detectPackageManager(ctx.cwd),
+          (await PM.detect(ctx.cwd)).addExact(
             mismatched.map((dependency) => {
               return `${dependency.name}@${ctx.cliVersion}`;
             }),

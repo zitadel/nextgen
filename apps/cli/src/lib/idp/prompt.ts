@@ -6,10 +6,9 @@ import {
   parseClientId,
   parseClientSecret,
   providerOf,
-  selectionName,
 } from "@zitadel/config/idp";
 
-import { type FillIn, pipedFrom, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
+import type { FillIn, SuggestedCommand } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
 
 import type { GivenCredentials } from "./credentials";
@@ -19,7 +18,7 @@ import { askConnectionEndpoints } from "./endpoints";
  * What a suggested retry names where the client id is still to be given: the
  * one value there that is not a client id, so it is the reader's to replace.
  */
-const CLIENT_ID_PLACEHOLDER = "<client-id>";
+export const CLIENT_ID_PLACEHOLDER: FillIn = "<client-id>";
 
 /**
  * What {@link CredentialPrompt} asks about, and how.
@@ -52,10 +51,17 @@ export type PromptRun = {
   readonly developmentBuild: boolean;
 
   /**
-   * Renders a suggested retry for the run, scope included, so it targets the
-   * same project.
+   * The running command again with the client id given, for an agent to run
+   * once a missing credential is to hand: the command decides it, so it keeps
+   * everything the run was given. `undefined` where there is no such retry.
+   *
+   * @param clientId - The client id, or a placeholder for it.
+   * @param piped - Whether the command reads the secret from `$CLIENT_SECRET` on stdin.
    */
-  readonly suggest: Suggest;
+  readonly retry: (
+    clientId: ClientId | FillIn,
+    piped: boolean,
+  ) => Promise<SuggestedCommand | undefined>;
 };
 
 /**
@@ -124,7 +130,7 @@ export class CredentialPrompt {
       flag: "--client-id",
       parse: parseClientId,
       given: givenClientId,
-      retry: this.retryFor(CLIENT_ID_PLACEHOLDER, false),
+      retry: await this.run.retry(CLIENT_ID_PLACEHOLDER, false),
     });
     const secretVariable = this.run.secretVariable;
     const secret = await this.run.ask.secret({
@@ -132,7 +138,7 @@ export class CredentialPrompt {
       message: `What is the client secret of your ${provider.displayName} OAuth app? It will be stored on the project as ${secretVariable}.`,
       parse: parseClientSecret,
       stdin: true,
-      retry: this.retryFor(clientId, true),
+      retry: await this.run.retry(clientId, true),
     });
 
     return {
@@ -158,29 +164,5 @@ export class CredentialPrompt {
       developmentBuild: this.run.developmentBuild,
       ask: this.run.ask,
     });
-  }
-
-  /**
-   * What an agent can run once a missing credential is to hand. Only for a
-   * catalog provider: a custom connection needs its settings repeated too.
-   *
-   * @param clientId - The client id, or a placeholder for it.
-   * @param piped - Whether the command reads the secret from `$CLIENT_SECRET` on stdin.
-   * @returns The command, or `undefined` for a custom provider.
-   */
-  private retryFor(clientId: ClientId | FillIn, piped: boolean): SuggestedCommand | undefined {
-    const selection = this.run.selection;
-    if (selection.kind !== "catalog") {
-      return undefined;
-    }
-    const command = this.run.suggest({
-      id: "auth-method:sso:enable",
-      flags: {
-        provider: selectionName(selection),
-        clientId,
-      },
-    });
-
-    return piped ? pipedFrom("CLIENT_SECRET", command) : command;
   }
 }

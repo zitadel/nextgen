@@ -2,14 +2,14 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, run, runCapture } from "./dev-process.mjs";
+import { forwardedArgs, isOneShotServerCommand, run, runCapture } from "./dev-process.mjs";
 import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = withServerMigrateArgs(forwardedArgs());
 
 try {
-  if (!isHelp(args) && args[0] !== "migrate" && args[0] !== "completion") {
+  if (!isHelp(args) && !isOneShotServerCommand(args)) {
     await run("turbo", ["run", "@zitadel/console#build"], { cwd: repoRoot });
   }
   // The module compiles in apps/api, but the server runs from the repository
@@ -57,7 +57,7 @@ function withServerMigrateArgs(args) {
   if (isHelp(args) || args.includes("--migrate")) {
     return args;
   }
-  if (args[0] === "migrate" || args[0] === "completion") {
+  if (isOneShotServerCommand(args)) {
     return args;
   }
   return [...args, "--migrate"];

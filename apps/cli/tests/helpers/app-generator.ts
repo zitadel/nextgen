@@ -1,6 +1,7 @@
-import { chmod, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /**
  * Stands in for `create-next-app`: writes a minimal Next.js App Router app into
@@ -49,10 +50,12 @@ process.stdout.write(">=20.9.0\\n");
 /**
  * A `PATH` on which setup creates a new Next.js app without downloading
  * anything: `npx` and `npm` are stand-ins that write the app and answer the
- * Node lookup.
+ * Node lookup. The stand-ins' directory is removed when the test ends.
+ *
+ * @returns The `PATH` value to run setup with.
  */
 export async function aFakeAppGeneratorPath(): Promise<string> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-generator-"));
+  const binDir = await scratchDir("zitadel-fake-generator-");
   for (const [name, script] of [
     ["npx", NPX],
     ["npm", NPM],
