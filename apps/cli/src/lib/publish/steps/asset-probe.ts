@@ -10,25 +10,31 @@ import { isJsonObject, type JsonObject, type JsonValue } from "@/lib/zitadel";
 
 /**
  * Branding descriptor fields whose value is a URL the login page fetches as
- * an image, each as the path to it. All are optional and all fail the same
+ * an image, each as its dotted path. All are optional and all fail the same
  * invisible way when the URL is well-formed but dead.
  *
  * @remarks
  * The top-level `logo_url` is the fallback; `theme.light.logo_url` and
- * `theme.dark.logo_url` are what each theme renders.
+ * `theme.dark.logo_url` are what each theme renders. `typography.font_url` is a
+ * stylesheet, not an image, so this probe does not check it.
  */
 const ASSET_FIELDS = [
-  ["logo_url"],
-  ["hero_url"],
-  ["theme", "light", "logo_url"],
-  ["theme", "dark", "logo_url"],
+  "logo_url",
+  "hero_url",
+  "theme.light.logo_url",
+  "theme.dark.logo_url",
 ] as const;
+
+/**
+ * One branding descriptor field that names an image.
+ */
+type AssetField = (typeof ASSET_FIELDS)[number];
 
 /**
  * One asset URL a descriptor sets, and the field that sets it.
  */
 type AssetUrl = {
-  readonly field: string;
+  readonly field: AssetField;
   readonly url: string;
 };
 
@@ -509,8 +515,8 @@ function describeVerdict(asset: AssetUrl, verdict: AssetProbeVerdict): string | 
  *   with its URL.
  */
 function assetUrlsOf(body: JsonObject): readonly AssetUrl[] {
-  return ASSET_FIELDS.flatMap((path) => {
-    const value = path.reduce<JsonValue | undefined>((node, key) => {
+  return ASSET_FIELDS.flatMap((field) => {
+    const value = field.split(".").reduce<JsonValue | undefined>((node, key) => {
       if (!isJsonObject(node)) {
         return undefined;
       }
@@ -519,7 +525,7 @@ function assetUrlsOf(body: JsonObject): readonly AssetUrl[] {
     if (typeof value !== "string" || value === "") {
       return [];
     }
-    return [{ field: path.join("."), url: value }];
+    return [{ field, url: value }];
   });
 }
 
