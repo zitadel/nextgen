@@ -64,6 +64,7 @@ export class Schemathesis {
     const container = await new GenericContainer(SCHEMATHESIS_IMAGE)
       .withEntrypoint(["sleep", String(IDLE_SECONDS)])
       .withBindMounts([{ source: workDir, target: "/work", mode: "rw" }])
+      .withResourcesQuota({ cpu: 4 })
       .withExtraHosts([{ host: HOST_ALIAS, ipAddress: "host-gateway" }])
       .start();
     return new Schemathesis(container, workDir);
