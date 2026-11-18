@@ -150,9 +150,12 @@ export class ContractSummary {
       }
       for (const detail of problem.details) {
         lines.push(
-          ...this.detailLines(detail).map((line) => {
-            return line === "" ? "" : `    ${line}`;
-          }),
+          ...this.detailLines(detail)
+            .join("\n")
+            .split("\n")
+            .map((line) => {
+              return line === "" ? "" : `    ${line}`;
+            }),
         );
       }
       lines.push("");

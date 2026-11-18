@@ -77,6 +77,7 @@ describe("ContractSummary", () => {
     expect(text).toContain("API contract: broken. 1 of 1 operations do not match the spec.");
     expect(text).toContain('  New failure: "Server error" (3 requests).');
     expect(text).toContain("    curl -X GET http://x/api/v1/teams");
+    expect(text).toContain('    {"code":"internal"}');
     expect(text).not.toMatch(/^#|```/m);
   });
 

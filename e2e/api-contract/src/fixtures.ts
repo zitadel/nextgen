@@ -58,10 +58,13 @@ async function publish(summary: ContractSummary, instance: Instance): Promise<vo
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, "summary.md"), page);
   if (process.env.GITHUB_ACTIONS) {
-    const verdict = summary.problems().length === 0;
-    console.info(verdict ? "::group::API contract: passed" : "::group::API contract: broken");
-    console.info(summary.text());
-    console.info("::endgroup::");
+    // A broken run says so in the failing test's message, so the log carries
+    // the text once; a passing run folds it away.
+    if (summary.problems().length === 0) {
+      console.info("::group::API contract: passed");
+      console.info(summary.text());
+      console.info("::endgroup::");
+    }
     if (process.env.GITHUB_STEP_SUMMARY) {
       await appendFile(process.env.GITHUB_STEP_SUMMARY, `${page}\n`);
     }
