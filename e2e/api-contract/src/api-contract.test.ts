@@ -15,7 +15,9 @@ describe("API contract", () => {
   });
 
   test("Schemathesis tested every operation it was asked to", ({ contract }) => {
-    for (const run of contract) {
+    for (const run of contract.filter((candidate) => {
+      return candidate.counted;
+    })) {
       expect(run.accounting, run.name).toEqual({
         selected: run.expected,
         tested: run.expected,

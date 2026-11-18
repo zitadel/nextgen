@@ -2,7 +2,12 @@ import { appendFile, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { startLocalZitadel, type ConnectedZitadel } from "@zitadel/testing";
+import {
+  bootstrapProject,
+  connectZitadel,
+  startLocalZitadel,
+  type ConnectedZitadel,
+} from "@zitadel/testing";
 import { test as base } from "vitest";
 
 import { Baseline, BaselineUpdate } from "./baseline";
@@ -31,7 +36,12 @@ export interface Instance {
   baseUrl: string;
   spec: OpenApiSpec;
   specText: string;
+  /** Makes a project of its own on the instance, with the credentials it answers to. */
+  project: () => Promise<Credentials>;
 }
+
+/** How many shards the operations are dealt into: `API_CONTRACT_SHARDS`, else four. */
+const SHARDS = Math.max(1, Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || 4);
 
 /**
  * Puts the verdict where a person looks first: a file beside the raw reports,
@@ -105,7 +115,18 @@ export const test = base.extend<{
             `the served spec's servers URL is ${String(spec.prefix)}, not ${API_PREFIX}`,
           );
         }
-        await use({ zitadel, baseUrl, spec, specText });
+        const project = async (): Promise<Credentials> => {
+          const bootstrapped = await bootstrapProject({ baseUrl: root });
+          const connected = connectZitadel({
+            baseUrl: root,
+            projectId: bootstrapped.projectId,
+            projectSecret: bootstrapped.projectSecret,
+            schemaId: bootstrapped.schemaId,
+            previewSecret: bootstrapped.previewSecret,
+          });
+          return new Credentials(connected, spec, baseUrl);
+        };
+        await use({ zitadel, baseUrl, spec, specText, project });
       } finally {
         await zitadel.stop();
       }
@@ -130,7 +151,8 @@ export const test = base.extend<{
       const runs = await new Contract({
         spec: instance.spec,
         baseUrl: instance.baseUrl,
-        credentials: new Credentials(instance.zitadel, instance.spec, instance.baseUrl),
+        project: instance.project,
+        shards: SHARDS,
         runner: schemathesis,
         artifactsDir: join(packageRoot, "test-output", "schemathesis"),
         log: (message) => {

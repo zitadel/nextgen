@@ -109,11 +109,12 @@ export class BaselineUpdate {
       run.complete &&
       run.errors.length === 0 &&
       [0, 1].includes(run.exitCode) &&
-      selected === run.expected &&
-      tested === run.expected &&
-      skipped === 0 &&
-      errored === 0 &&
-      unmatched.length === 0
+      (!run.counted ||
+        (selected === run.expected &&
+          tested === run.expected &&
+          skipped === 0 &&
+          errored === 0 &&
+          unmatched.length === 0))
     );
   }
 

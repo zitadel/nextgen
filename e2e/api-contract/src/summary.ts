@@ -59,7 +59,7 @@ export class ContractSummary {
   markdown(): string {
     const problems = this.problems();
     const tested = this.runs.reduce((sum, run) => {
-      return sum + run.accounting.tested;
+      return sum + (run.counted ? run.accounting.tested : 0);
     }, 0);
     const timing = this.timing();
     if (problems.length === 0) {
