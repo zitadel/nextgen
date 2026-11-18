@@ -52,7 +52,7 @@ describe("loadOrCreateIdentity", () => {
     expect(second.isFirstRun).toBe(true);
     expect(second.distinctId).toBe(first.distinctId);
 
-    markNoticed(env);
+    expect(markNoticed(env)).toBe(true);
     expect(loadOrCreateIdentity(env).isFirstRun).toBe(false);
 
     const stored = JSON.parse(
@@ -154,6 +154,21 @@ describe("profileDue", () => {
     writeFileSync(file, `${JSON.stringify({ distinctId: "an-earlier-install" })}\n`);
 
     expect(run(env, "h1", 1000)).toEqual({ first: false });
+  });
+});
+
+describe("markNoticed", () => {
+  it("lets only the first of two runs show the notice", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+
+    expect([markNoticed(env), markNoticed(env)]).toEqual([true, false]);
+  });
+
+  it("lets a run that cannot record it show it anyway", ({ dir }) => {
+    const fileAsParent = join(dir, "afile");
+    writeFileSync(fileAsParent, "x");
+
+    expect(markNoticed({ XDG_CONFIG_HOME: fileAsParent })).toBe(true);
   });
 });
 

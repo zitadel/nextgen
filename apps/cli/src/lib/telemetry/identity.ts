@@ -179,21 +179,27 @@ export function profileDue(
 }
 
 /**
- * Remembers that the first-run notice was shown, so no later run shows it again.
- * Best-effort: an install that cannot write its record shows it once per run
+ * Claims the first-run notice for this run: the marker is created exclusively and
+ * before the notice is printed, so of two concurrent first runs only one shows it,
+ * and a run that dies after printing never shows it twice.
+ *
+ * Fail-open: an install that cannot write the marker shows the notice on every run
  * instead of never.
  *
  * @param env - The environment the run reads.
+ * @returns Whether this run is the one to show the notice.
  */
-export function markNoticed(env: NodeJS.ProcessEnv): void {
+export function markNoticed(env: NodeJS.ProcessEnv): boolean {
   const dir = telemetryConfigDir(env);
   if (dir === undefined) {
-    return;
+    return true;
   }
   try {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, NOTICE_FILE), "", { mode: 0o600 });
-  } catch {
-    /* the notice may show again */
+    writeFileSync(join(dir, NOTICE_FILE), "", { mode: 0o600, flag: "wx" });
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "EEXIST";
   }
+
+  return true;
 }

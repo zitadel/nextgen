@@ -294,9 +294,8 @@ export function Telemetered<
       }
       // The notice comes before the first send, and until a run that can show
       // it has, every run is the first.
-      if (client.isFirstRun && this.reportInteractive()) {
+      if (client.isFirstRun && this.reportInteractive() && markNoticed(this.env)) {
         this.logToStderr(FIRST_RUN_NOTICE);
-        markNoticed(this.env);
       }
       this.reportTrack(CLI_COMMAND_STARTED, { ...this.reportNotes });
       this.reportProfile(client);
