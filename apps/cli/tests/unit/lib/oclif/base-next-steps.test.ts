@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import { asStepsShown } from "@/lib/oclif/next-steps";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
-import { publicCliCommand } from "@/lib/public-cli";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 import { json, prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { aSuggest } from "@tests/helpers/suggestions";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
+import { Spelling } from "@/lib/suggestion";
 
 /** A command that records what `emit` prints, per stream, instead of writing it. */
 class NextStepsCommand extends BaseCommand {
@@ -32,19 +32,19 @@ class NextStepsCommand extends BaseCommand {
   }
 
   public async finish(result: CommandResult): Promise<JsonEnvelope> {
-    await this.toMeta({ telemetry: false }, { resolveServer: false, source: "mock" });
+    await this.toMeta({ telemetry: false }, { source: "mock" });
     return this.emit(result);
   }
 }
 
 function makeCommand(): NextStepsCommand {
-  takeReportedWarnings();
+  warnings.take();
   return new NextStepsCommand([], { version: "0.0.0-test" } as unknown as Config);
 }
 
 const DEPLOY: SuggestedCommand = aSuggest({}, "0.0.0-test")({ id: "deploy" });
 /** {@link DEPLOY} as the reader runs it. */
-const PUBLIC_DEPLOY = publicCliCommand("deploy", "0.0.0-test");
+const PUBLIC_DEPLOY = Spelling.at("0.0.0-test").command("deploy");
 
 describe("BaseCommand next steps", () => {
   describe("in the envelope", () => {

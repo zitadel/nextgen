@@ -1,9 +1,12 @@
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
+import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
+
 import { brandingAssetWarnings, resolvePublicAddresses } from "@/lib/publish/steps/asset-probe";
-import { useUserAgent } from "@/lib/user-agent";
-import { it } from "@tests/helpers/fixtures";
+import { Runtime } from "@/lib/runtime";
+import { isJsonObject, type JsonValue } from "@/lib/zitadel";
+import { it } from "@tests/fixtures";
 
 /**
  * The resolver the probe asks, answered by each test.
@@ -39,6 +42,39 @@ function anImage(): Response {
   return HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } });
 }
 
+/**
+ * The dotted path to every image URL a branding schema node declares, following
+ * its `$ref`s into `defs`. `font_url` names a stylesheet, so it is not one.
+ *
+ * @param node - A schema node.
+ * @param defs - The schema's `$defs`.
+ * @param trail - The keys down to the node.
+ * @returns The dotted paths.
+ */
+function imageUrlPaths(
+  node: JsonValue | undefined,
+  defs: JsonValue | undefined,
+  trail: readonly string[],
+): readonly string[] {
+  if (!isJsonObject(node) || !isJsonObject(defs)) {
+    return [];
+  }
+  const ref = node.$ref;
+  if (typeof ref === "string") {
+    return imageUrlPaths(defs[ref.replace("#/$defs/", "")], defs, trail);
+  }
+  const properties = node.properties;
+  if (!isJsonObject(properties)) {
+    return [];
+  }
+  return Object.entries(properties).flatMap(([key, child]) => {
+    if (key.endsWith("_url") && key !== "font_url") {
+      return [[...trail, key].join(".")];
+    }
+    return imageUrlPaths(child, defs, [...trail, key]);
+  });
+}
+
 beforeEach(() => {
   lookup.mockReset();
   lookup.mockResolvedValue([PUBLIC_ADDRESS]);
@@ -54,7 +90,7 @@ describe("brandingAssetWarnings", () => {
   });
 
   it("identifies the CLI to asset hosts", async ({ server }) => {
-    useUserAgent("zitadel-cli/1.0.0");
+    Runtime.current().useUserAgent("zitadel-cli/1.0.0");
     const agents: (string | null)[] = [];
     server.use(
       http.head(LOGO, ({ request }) => {
@@ -165,6 +201,95 @@ describe("brandingAssetWarnings", () => {
     await brandingAssetWarnings([{ logo_url: shared, hero_url: shared }]);
 
     expect(hits).toHaveBeenCalledTimes(1);
+  });
+
+  it.for(["light", "dark"])(
+    "warns when the %s theme's logo 404s, naming the field",
+    async (theme, { server }) => {
+      server.use(
+        http.head(LOGO, () => {
+          return new HttpResponse(null, { status: 404 });
+        }),
+      );
+
+      const warnings = await brandingAssetWarnings([{ theme: { [theme]: { logo_url: LOGO } } }]);
+
+      expect(warnings).toEqual([
+        expect.stringContaining(`theme.${theme}.logo_url ${LOGO} returned HTTP 404`),
+      ]);
+    },
+  );
+
+  it("probes every image URL the branding schema declares", async ({ server }) => {
+    server.use(
+      http.head(LOGO, () => {
+        return new HttpResponse(null, { status: 404 });
+      }),
+    );
+    const schema: JsonValue = JSON.parse(
+      JSON.stringify(
+        metaSchemaFiles().find((file) => {
+          return file.name === "branding.json";
+        })?.body,
+      ),
+    );
+    const paths = imageUrlPaths(schema, isJsonObject(schema) ? schema.$defs : undefined, []);
+
+    const warnings = await Promise.all(
+      paths.map((path) => {
+        const body: JsonValue = path.split(".").reduceRight<JsonValue>((value, key) => {
+          return { [key]: value };
+        }, LOGO);
+        return brandingAssetWarnings([isJsonObject(body) ? body : {}]);
+      }),
+    );
+
+    expect(warnings.flat()).toEqual(
+      paths.map((path) => {
+        return expect.stringContaining(`${path} ${LOGO}`);
+      }),
+    );
+  });
+
+  it("probes a URL the top-level logo and a theme logo share once", async ({ server }) => {
+    const hits = vi.fn();
+    server.use(
+      http.head(LOGO, () => {
+        hits();
+        return new HttpResponse(null, { status: 500 });
+      }),
+    );
+
+    await brandingAssetWarnings([{ logo_url: LOGO, theme: { dark: { logo_url: LOGO } } }]);
+
+    expect(hits).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a theme that is null", { theme: null }],
+    ["a theme that is not an object", { theme: "dark" }],
+    ["a theme side that is null", { theme: { light: null } }],
+    ["a theme logo that is empty", { theme: { dark: { logo_url: "" } } }],
+  ])("ignores %s", async (_situation, body) => {
+    const warnings = await brandingAssetWarnings([body]);
+
+    expect(warnings).toEqual([]);
+  });
+
+  it("stays quiet when both per-theme logos serve an image", async ({ server }) => {
+    server.use(http.head(LOGO, anImage));
+
+    const warnings = await brandingAssetWarnings([
+      { theme: { light: { logo_url: LOGO }, dark: { logo_url: LOGO } } },
+    ]);
+
+    expect(warnings).toEqual([]);
+  });
+
+  it("ignores a theme that holds no logo", async () => {
+    const warnings = await brandingAssetWarnings([{ theme: { light: { accent: "#fff" } } }]);
+
+    expect(warnings).toEqual([]);
   });
 
   it("ignores a descriptor without asset URLs", async () => {

@@ -1,12 +1,12 @@
-import type { ListEvents200DataItem, ListEventsParams } from "@zitadel/api/generated/model";
+import type { ListEvents200EventsItem, ListEventsParams } from "@zitadel/api/generated/model";
 
 /**
- * One event, as `GET /events` and `GET /events/{id}` return it: an
+ * One event, as `GET /events` and `GET /events/{event_id}` return it: an
  * append-only record of something that happened in a project, a sign-in
  * step, a change to a record or an API request. The API, the CLI and
  * the console's Events screen all call them events.
  */
-export type ProjectEvent = ListEvents200DataItem;
+export type ProjectEvent = ListEvents200EventsItem;
 
 /** What Events' audit view, and Overview's card of it, say of a project with none. */
 export const NO_AUDIT_EVENTS = "This project has no audit events.";
@@ -93,12 +93,16 @@ export const VIEW_LABEL: Record<EventView, string> = {
   all: "All",
 };
 
-/** What each view holds, under its name in the view picker. */
+/**
+ * What each view holds, under its name in the view picker. Each stands on its
+ * own: "both" stopped saying which two once the sign-ins had a view between
+ * the audit events and the requests.
+ */
 export const VIEW_DESCRIPTION: Record<EventView, string> = {
   audit: "Sign-ins and changes to the project",
   signins: "One row per sign-in, and how it ended",
   requests: "One per call to the API",
-  all: "Both, in the order they happened",
+  all: "Audit events and API requests",
 };
 
 /**
@@ -638,13 +642,13 @@ export function eventFilterValues(event: ProjectEvent): { filter: ValueFilter; v
  */
 export type EventsSearch = {
   view: EventView;
-  category?: AuditCategory;
+  category?: AuditCategory[];
   since?: TimeRange;
   from?: string;
   to?: string;
   type?: string[];
   status?: StatusClass[];
-  outcome?: SigninOutcome;
+  outcome?: SigninOutcome[];
 } & Partial<Record<IdFilterKey, string>>;
 
 /**
@@ -676,8 +680,8 @@ function byRequest(search: EventsSearch): boolean {
  *   category beside it. That also keeps types on their own one range of
  *   their index each, which always fills its pages.
  * - The requests are one category themselves, so they take no other.
- * - The sign-ins are their own types, so they take no category; an outcome
- *   narrows them alone.
+ * - The sign-ins are their own types, so they take no category; outcomes
+ *   narrow them alone.
  * - A range with fixed ends replaces one counted back from now.
  *
  * Everything else combines: the ids with each other, with types, with any
@@ -692,6 +696,17 @@ export function servedSearch(search: EventsSearch): EventsSearch {
   if (time.view === "requests") return { ...time, category: undefined, outcome: undefined };
   if (time.view === "signins") return { ...time, category: undefined };
   return time.outcome ? { ...time, outcome: undefined } : time;
+}
+
+/**
+ * The values of a fixed list a URL names, once each, in the list's order; any
+ * other value is dropped. One value (`?category=auth`, as links made before a
+ * filter took several still read) or several.
+ */
+function chosenOf<T extends string>(known: readonly T[], value: unknown): T[] | undefined {
+  const values = Array.isArray(value) ? value : [value];
+  const chosen = known.filter((candidate) => values.includes(candidate));
+  return chosen.length > 0 ? chosen : undefined;
 }
 
 /** An RFC 3339 moment, normalised; anything unparseable is no bound at all. */
@@ -718,13 +733,6 @@ function eventTypes(value: unknown): string[] | undefined {
   return types.length > 0 ? [...new Set(types)] : undefined;
 }
 
-/** The status classes a URL names, once each, in their order; any other value is dropped. */
-function statusClasses(value: unknown): StatusClass[] | undefined {
-  const values = Array.isArray(value) ? value : [value];
-  const classes = STATUS_CLASSES.filter((known) => values.includes(known));
-  return classes.length > 0 ? classes : undefined;
-}
-
 /**
  * The filters a URL may carry. Anything else is dropped rather than sent: an
  * unknown view is the default one, a range whose start is not before its end
@@ -741,13 +749,13 @@ export function parseEventsSearch(search: Record<string, unknown>): EventsSearch
   // left out would keep the URL's value.
   const parsed: EventsSearch = {
     view: EVENT_VIEWS.find((known) => known === search.view) ?? "audit",
-    category: AUDIT_CATEGORIES.find((known) => known === search.category),
+    category: chosenOf(AUDIT_CATEGORIES, search.category),
     since: TIME_RANGES.find((known) => known === search.since),
     from,
     to,
     type: eventTypes(search.type),
-    status: statusClasses(search.status),
-    outcome: SIGNIN_OUTCOMES.find((known) => known === search.outcome),
+    status: chosenOf(STATUS_CLASSES, search.status),
+    outcome: chosenOf(SIGNIN_OUTCOMES, search.outcome),
   };
   for (const { key } of VALUE_FILTERS) {
     if (key === "type") continue;
@@ -765,10 +773,10 @@ export function hasCustomRange(search: EventsSearch): boolean {
 /** How many filters narrow the view beyond the view itself; the time is one, however set. */
 export function filterCount(search: EventsSearch): number {
   return (
-    Number(Boolean(search.category)) +
+    Number(Boolean(search.category?.length)) +
     Number(Boolean(search.since) || hasCustomRange(search)) +
     Number(Boolean(search.status?.length)) +
-    Number(Boolean(search.outcome)) +
+    Number(Boolean(search.outcome?.length)) +
     VALUE_FILTERS.filter(({ key }) => (key === "type" ? search.type?.length : search[key])).length
   );
 }
@@ -776,6 +784,26 @@ export function filterCount(search: EventsSearch): number {
 /** Whether anything narrows the view beyond the view itself. */
 export function isNarrowed(search: EventsSearch): boolean {
   return filterCount(search) > 0;
+}
+
+/**
+ * What an empty list adds under a filter the server has had only since a
+ * later version: the user's, and a request's operation and status class.
+ * Events it recorded before it had one are not matched by it (root ADR 048,
+ * "No backfill"), yet an event of that age still offers the filter from its
+ * drawer, and the list it leads to is empty. `undefined` under none of these
+ * filters. Those events leave the list as retention removes them.
+ */
+export function olderUnmatched(search: EventsSearch): string | undefined {
+  const names = [
+    search.user ? "user" : undefined,
+    search.operation ? "operation" : undefined,
+    search.status?.length ? "status" : undefined,
+  ].filter((name) => name !== undefined);
+  const last = names.pop();
+  if (!last) return undefined;
+  const filters = names.length > 0 ? `${names.join(", ")} and ${last} filters` : `${last} filter`;
+  return `Events recorded before the server had the ${filters} are not matched.`;
 }
 
 /** Whether the list is narrowed to exactly this value already, so setting it would narrow no further. */
@@ -818,8 +846,8 @@ export function eventsQuery(
       ? undefined
       : served.view === "requests"
         ? ["request"]
-        : served.category
-          ? [served.category]
+        : served.category?.length
+          ? served.category
           : served.view === "audit"
             ? [...AUDIT_VIEW_CATEGORIES]
             : undefined;
@@ -827,7 +855,9 @@ export function eventsQuery(
     category,
     event_type:
       served.view === "signins"
-        ? [...(served.outcome ? OUTCOME_TYPES[served.outcome] : SIGNIN_OUTCOME_TYPES)]
+        ? served.outcome?.length
+          ? served.outcome.flatMap((outcome) => OUTCOME_TYPES[outcome])
+          : [...SIGNIN_OUTCOME_TYPES]
         : served.type,
     actor_id: served.actor,
     user_id: served.user,
@@ -860,19 +890,20 @@ export function withView(current: EventsSearch, view: EventView): EventsSearch {
   });
 }
 
-/** The sign-ins narrowed to one way of ending, or to none. */
+/** The sign-ins narrowed to these ways of ending, or to none: each its types' ranges of the type index. */
 export function withOutcome(
   current: EventsSearch,
-  outcome: SigninOutcome | undefined,
+  outcomes: readonly SigninOutcome[],
 ): EventsSearch {
-  return servedSearch({ ...current, outcome });
+  return servedSearch({ ...current, outcome: chosenOf(SIGNIN_OUTCOMES, [...outcomes]) });
 }
 
-/** The list narrowed to one category, or to none. A category takes no type beside it. */
+/** The list narrowed to these categories, or to none. A category takes no type beside it. */
 export function withCategory(
   current: EventsSearch,
-  category: AuditCategory | undefined,
+  categories: readonly AuditCategory[],
 ): EventsSearch {
+  const category = chosenOf(AUDIT_CATEGORIES, [...categories]);
   return servedSearch({ ...current, category, type: category ? undefined : current.type });
 }
 
@@ -911,10 +942,7 @@ export function withTypes(current: EventsSearch, types: readonly string[]): Even
  */
 export function withStatus(current: EventsSearch, classes: readonly StatusClass[]): EventsSearch {
   if (classes.length === 0) return { ...current, status: undefined };
-  return servedSearch({
-    ...current,
-    status: STATUS_CLASSES.filter((known) => classes.includes(known)),
-  });
+  return servedSearch({ ...current, status: chosenOf(STATUS_CLASSES, [...classes]) });
 }
 
 /**
@@ -1004,7 +1032,8 @@ const PREFIXES: Record<string, ValueFilterKey> = {
  * - Any other id may be who did something or what it was done to, so it
  *   means both an actor and a resource, and the person says which.
  *
- * A term with a space in it, or none, means nothing.
+ * A term with a space in it, or none, means nothing, and so does a filter's
+ * prefix whose value is still to come (`actor:`): it is no id of its own.
  */
 export function searchMeanings(term: string): SearchMeaning[] {
   const value = term.trim();
@@ -1017,6 +1046,7 @@ export function searchMeanings(term: string): SearchMeaning[] {
   const named = NAMED.exec(value);
   const key = named?.[1] ? PREFIXES[named[1]] : undefined;
   if (named?.[2] && key) return [{ kind: "filter", filter: FILTER_BY_KEY[key], value: named[2] }];
+  if (value.endsWith(":") && PREFIXES[value.slice(0, -1)]) return [];
   if (value.startsWith("evt_")) return [{ kind: "event", id: value }];
   if (value.startsWith("req_") || TRACE_ID.test(value)) return [filter("request")];
   if (value.startsWith("sess_")) return [filter("session")];

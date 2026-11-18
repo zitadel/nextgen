@@ -242,8 +242,9 @@ Rotation is driven entirely by configuration; there is no API call or CLI comman
    `use_for_encryption` unset (or absent).
 2. **Restart** the server. From that moment new project KEKs are wrapped with the new key, and old ones still unwrap
    with the retained predecessor.
-3. **Re-wrap runs automatically.** After the HTTP listener starts, the server runs `keyService.MigrateToLatestMasterKey`
-   in the background: it pages through every row in `encryption_keys` (100 at a time, ordered by ID), and for each row
+3. **Re-wrap runs automatically.** After the HTTP listener starts, a server with more than one master key configured
+   runs `keyService.MigrateToLatestMasterKey` in the background (with one key there is nothing to re-wrap, and a
+   start does not look): it pages through every row in `encryption_keys` (100 at a time, ordered by ID), and for each row
    whose `kid` points at a configured master key that is *not* the current encryption key, it unwraps with the old key,
    re-wraps with the new one, and updates the row. Rows already wrapped by the current key, and rows wrapped by a
    project KEK rather than a master key, are skipped.

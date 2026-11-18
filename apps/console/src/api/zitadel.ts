@@ -13,7 +13,7 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  *   #1300): the session cookie rides along, as in production.
  * - **Production** — the built console is embedded in the Go binary, which
  *   serves the API under `/api/v1` (`buildHTTPMux`, ADR 077). Requests go
- *   to `/api/v1/flow`, `/api/v1/sessions/me`, … on the same origin, carrying
+ *   to `/api/v1/flows`, `/api/v1/sessions/me`, … on the same origin, carrying
  *   the session cookie and (on public-plane calls) the
  *   runtime-discovered publishable key.
  *

@@ -11,7 +11,7 @@ import {
   renderDoctorReport,
   withCategories,
 } from "@/cli/commands/doctor/report";
-import { addExactCommandFor } from "@/lib/package-manager";
+import { PM } from "@/lib/pm";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { aSuggest } from "@tests/helpers/suggestions";
 
@@ -309,7 +309,7 @@ describe("renderDoctorReport", () => {
           name: "dependency-version",
           status: "warn",
           message: "pins differ",
-          remedy: suggestedCommandOf(addExactCommandFor("npm", [SDK_PIN])),
+          remedy: suggestedCommandOf(PM.named("npm").addExact([SDK_PIN])),
         },
       ]);
 

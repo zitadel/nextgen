@@ -5130,7 +5130,7 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 }
 
 // The case a client cannot cover for itself: the widget keeps collected
-// values in memory only, while GET /flow/{id} re-renders from flow state.
+// values in memory only, while GET /flows/{flow_id} re-renders from flow state.
 func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -6302,7 +6302,7 @@ func TestFlowStateMachine_Render_TerminalStepSkipsResolution(t *testing.T) {
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
 	assert.Equal(t, "done", result.Step.Name)
-	// Marked complete, so GET /flow/{id} can answer 410 for a finished flow.
+	// Marked complete, so GET /flows/{flow_id} can answer 410 for a finished flow.
 	assert.NotNil(t, result.Step.Complete)
 }
 

@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { runCommand } from "@tests/helpers/run-cli";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { Config, Errors } from "@oclif/core";
 
@@ -14,10 +14,10 @@ import { ZitadelError } from "@/lib/errors";
 
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
-import { recordLog } from "@tests/helpers/log";
+import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import {
   defaultSchema,
   makeProject,
@@ -26,7 +26,7 @@ import {
   writeJson,
 } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asOneLine, asTerminal, useTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -186,15 +186,8 @@ function printed(talk: Person): string {
   ].join("\n");
 }
 
-useTerminal();
-
-beforeEach(() => {
-  vi.spyOn(process.stdout, "write").mockImplementation(() => {
-    return true;
-  });
-  vi.spyOn(process.stderr, "write").mockImplementation(() => {
-    return true;
-  });
+it.beforeEach(({ terminal }) => {
+  terminal.tty(true);
   vi.spyOn(console, "log").mockImplementation(() => {
     return undefined;
   });
@@ -504,6 +497,7 @@ describe("AuthMethodCommand", () => {
               cwd,
             ],
             expect.anything(),
+            expect.anything(),
           ],
         },
       });
@@ -544,6 +538,7 @@ describe("AuthMethodCommand", () => {
               "--cwd",
               cwd,
             ],
+            expect.anything(),
             expect.anything(),
           ],
         },

@@ -1,7 +1,9 @@
-import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { Environment, type EnvironmentKey } from "@/lib/environment";
+import { CommandGroups } from "@/cli/commands/groups";
+import { EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
@@ -21,10 +23,11 @@ const REDACTED = "••••••••";
  * and which source supplied each value. It never prints a secret in full, so
  * the output is safe to paste into a bug report.
  */
-export default class Env extends Tabulatable(EnvironmentCommand) {
+export default class Env extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description =
     "Show which server and project resolve, and where each value came from.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> env",
@@ -35,7 +38,7 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
   protected async execute(): Promise<JsonEnvelope> {
     const { name, values, consulted } = this.environment;
 
-    const resolved = ENVIRONMENT_KEYS.flatMap((key) => {
+    const resolved = Environment.KEYS.flatMap((key) => {
       const entry = values[key];
       if (!entry) {
         return [];

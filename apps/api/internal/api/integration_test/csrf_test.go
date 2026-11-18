@@ -144,16 +144,20 @@ func TestSessionCSRF(t *testing.T) {
 		})
 	}
 
-	// Invitation lookup is a read (ADR 086 CSRF-on-writes): same-origin may
-	// omit the token and reaches the stub; cross-site is still refused.
+	// Invitation lookup is a read (ADR 086 §7): same-origin may omit the token
+	// and reaches the lookup; cross-site is still refused. Only platform users
+	// redeem, so it signs one in.
 	t.Run("invitation lookup needs no token but must be same-origin", func(t *testing.T) {
 		t.Parallel()
-		status, body := raw(t, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
+		userID, _ := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+		cleanupPlatformUserAndTeam(t, userID)
+		platformCookie := platformSessionCookie(t, userID)
+		status, body := cookieRequest(t, platformCookie, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
 			"Sec-Fetch-Site": "same-origin",
 		})
-		assert.Equal(t, http.StatusNotImplemented, status, body)
+		assert.Equal(t, http.StatusNotFound, status, body)
 
-		status, body = raw(t, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
+		status, body = cookieRequest(t, platformCookie, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
 			"Sec-Fetch-Site": "cross-site",
 			"Origin":         "https://evil.example",
 		})
@@ -198,16 +202,16 @@ func TestSessionCSRF(t *testing.T) {
 
 		patch := &api.PatchMyUserRequest{}
 		require.NoError(t, patch.UnmarshalJSON([]byte(`{"attributes":{"nickname":"Myself"}}`)))
-		me, err := session.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
+		me, err := session.UpdateMyUser(t.Context(), patch, api.UpdateMyUserParams{})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchMyUserForbidden{}, me, helpers.MustMarshal(t, me))
-		assert.Equal(t, api.ErrorCode("auth.csrf_invalid"), me.(*api.PatchMyUserForbidden).Code)
+		require.IsType(t, &api.UpdateMyUserForbidden{}, me, helpers.MustMarshal(t, me))
+		assert.Equal(t, api.ErrorCode("auth.csrf_invalid"), me.(*api.UpdateMyUserForbidden).Code)
 
-		claim, err := session.CompleteClaim(t.Context(), &api.CompleteClaimRequest{ChallengeID: "ch_any"},
-			api.CompleteClaimParams{ProjectID: api.ProjectID(home.ID)})
+		claim, err := session.CompleteProjectClaim(t.Context(), &api.CompleteClaimRequest{ChallengeID: "ch_any"},
+			api.CompleteProjectClaimParams{ProjectID: api.ProjectID(home.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.CompleteClaimForbidden{}, claim, helpers.MustMarshal(t, claim))
-		assert.True(t, claim.(*api.CompleteClaimForbidden).IsAuthCsrfInvalid(), helpers.MustMarshal(t, claim))
+		require.IsType(t, &api.CompleteProjectClaimForbidden{}, claim, helpers.MustMarshal(t, claim))
+		assert.True(t, claim.(*api.CompleteProjectClaimForbidden).IsAuthCsrfInvalid(), helpers.MustMarshal(t, claim))
 	})
 
 	t.Run("a project secret needs no token", func(t *testing.T) {

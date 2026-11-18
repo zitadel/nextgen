@@ -2,20 +2,16 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { DeploymentService, type Variable } from "@/lib/backend";
-import { GetDeploymentVariablesParams } from "@/lib/backend/schemas";
+import { ListDeploymentVariablesParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { WHAT_CHANGED } from "@/lib/suggestion";
-import { variableCell } from "@/lib/variables";
+import { VariableView } from "@/lib/variable";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The deployment `variable resolve` reads. The schema is the API spec's own, so
@@ -23,7 +19,7 @@ import { variableCell } from "@/lib/variables";
  * one looks like.
  */
 const DEPLOYMENT_ID: Refused<string> = {
-  schema: z.string().trim().pipe(GetDeploymentVariablesParams.shape.deployment_id),
+  schema: z.string().trim().pipe(ListDeploymentVariablesParams.shape.deployment_id),
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the deployments to find one, or omit it to read the live deployment.",
@@ -61,9 +57,10 @@ const COLUMNS = ["name", "value"] as const;
  * deploy, and a preview origin is only ever served by a pull-request build,
  * never by `deploy`.
  */
-export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
+export default class VariableResolve extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "Show the variables a deployment froze, the live one by default.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable resolve",
@@ -182,7 +179,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     });
 
     const rows = items.map((item) => {
-      return variableCell(item);
+      return VariableView.of(item).cell();
     });
     const columns = COLUMNS;
     const empty = `${deploymentId} froze no variables${where}`;

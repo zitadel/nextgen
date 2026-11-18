@@ -13,6 +13,7 @@ import {
   searchMeanings,
   type ValueFilter,
 } from "../model";
+import { EVENT_SHEET_WIDTH } from "./event-panel";
 
 /** What tells the two readings of one id apart. */
 const READING: Partial<Record<string, string>> = {
@@ -43,7 +44,20 @@ type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
  * field offers **My activity**, the list narrowed to what the signed-in
  * person did, whose chip reads `actor: me`.
  */
-export function EventSearchField({ current, me }: { current: EventsSearch; me?: string }) {
+export function EventSearchField({
+  current,
+  me,
+  besideEvent = false,
+}: {
+  current: EventsSearch;
+  me?: string;
+  /**
+   * An event is open in its drawer. Where the drawer covers the list's right
+   * it covers the field's too, and the list under the field keeps to the part
+   * still in view rather than spreading over the drawer.
+   */
+  besideEvent?: boolean;
+}) {
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -155,7 +169,11 @@ export function EventSearchField({ current, me }: { current: EventsSearch; me?: 
           until an arrow key or a click goes into it. */}
       <PopoverContent
         align="start"
-        className="w-(--radix-popover-trigger-width) min-w-64 p-1"
+        // As wide as the field, up to where the drawer starts. Not shifted to
+        // fit: that would slide it left over the sidebar instead.
+        className="w-(--radix-popover-trigger-width) max-w-(--radix-popover-content-available-width) min-w-64 p-1"
+        collisionPadding={besideEvent ? { right: EVENT_SHEET_WIDTH } : undefined}
+        avoidCollisions={!besideEvent}
         onOpenAutoFocus={(event) => event.preventDefault()}
         // A click back into the field is not a click away from it.
         onInteractOutside={(event) => {

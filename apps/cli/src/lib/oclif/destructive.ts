@@ -6,6 +6,7 @@ import { CANCELLED } from "@/lib/errors";
 import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
+import type { CommandClass } from "./command-class";
 
 /**
  * The flag every destructive command declares, which the retry a refused
@@ -14,10 +15,6 @@ import type { CommandResult } from "./types";
  * confirmation refuses a host that does not declare it.
  */
 type ConsentFlags = Readonly<{ force: Interfaces.BooleanFlag<boolean> }>;
-
-/** A class that can be extended, abstract or not, whatever arguments it takes. */
-// biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
-type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {

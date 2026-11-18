@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -12,18 +11,14 @@ import { HttpResponse, http, passthrough } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { it, type Serve } from "@tests/fixtures";
 
-import {
-  localRuntimePaths,
-  writeRuntimeMetadata,
-  type RuntimeMetadata,
-} from "@/lib/local-server/runtime";
+import { LocalRuntime, type RuntimeMetadata } from "@/lib/server";
 import Claim from "@/cli/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
 import { answering } from "@tests/helpers/keyboard";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
@@ -34,8 +29,8 @@ import { aBinaryRecord } from "@tests/helpers/runtime-record";
  * `claim/complete` route is cookie-authenticated and Express-only, so it is
  * not reachable through msw handlers.
  */
-const SERVER = "https://api.zitadel.cloud";
-const { server, dirs: tempDirs } = usePlatformServer();
+const SERVER = "https://preview.zitadel.com";
+const { server } = usePlatformServer();
 type Project = { id: string; project_secret: string };
 
 /**
@@ -64,13 +59,15 @@ async function createProjectOnMock(): Promise<Project> {
   return project;
 }
 
-async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
-  cwd: string;
-  project: Project;
-}> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-  tempDirs.push(cwd);
-
+/**
+ * Makes a directory a project of the mock's: creates the project there and writes the secret a
+ * `setup` would have.
+ *
+ * @param cwd - The directory.
+ * @param overrides - Fields of the secret to set, or to replace.
+ * @returns The project the mock made.
+ */
+async function makeProject(cwd: string, overrides: Record<string, unknown> = {}): Promise<Project> {
   const project = await createProjectOnMock();
 
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
@@ -83,7 +80,7 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
     created_at: "2026-01-01T00:00:00.000Z",
     ...overrides,
   });
-  return { cwd, project };
+  return project;
 }
 
 async function writeSecret(cwd: string, secret: Record<string, unknown>): Promise<void> {
@@ -122,10 +119,10 @@ async function onChallengeMinted(act: (challengeId: string) => void): Promise<vo
 }
 
 describe("claim", () => {
-  it.each(["challenge", "ch_", "not-a-challenge"])(
+  it.for(["challenge", "ch_", "not-a-challenge"])(
     "refuses --challenge-id %j, which is not one the contract mints",
-    async (given) => {
-      const { cwd } = await makeProject();
+    async (given, { dir: cwd }) => {
+      await makeProject(cwd);
 
       const res = await claim(cwd, ["--challenge-id", given]);
 
@@ -141,8 +138,8 @@ describe("claim", () => {
     },
   );
 
-  it("attaches the project to a team and records it in .zitadel/secret", async () => {
-    const { cwd, project } = await makeProject();
+  it("attaches the project to a team and records it in .zitadel/secret", async ({ dir: cwd }) => {
+    const project = await makeProject(cwd);
 
     const [res] = await Promise.all([
       claim(cwd),
@@ -182,8 +179,8 @@ describe("claim", () => {
     expect(secret.preview_secret).toBe("sk_preview_test");
   });
 
-  it("prints the link and the permanence outcome, without team wording", async () => {
-    const { cwd, project } = await makeProject();
+  it("prints the link and the permanence outcome, without team wording", async ({ dir: cwd }) => {
+    const project = await makeProject(cwd);
 
     // No `--json`: the envelope silences the narration, and the point here is the
     // human-facing narration — the link on its own line, then the success
@@ -205,9 +202,9 @@ describe("claim", () => {
     expect(output).not.toContain("attached to team");
   });
 
-  it("skips without a network call when the secret already records a team", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-    tempDirs.push(cwd);
+  it("skips without a network call when the secret already records a team", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeSecret(cwd, {
       project_id: "proj-local",
@@ -232,8 +229,10 @@ describe("claim", () => {
     expect(snapshotPlatformStore().claimChallengeIds).toEqual([]);
   });
 
-  it("reports the owning team when the platform says it is already claimed", async () => {
-    const { cwd, project } = await makeProject();
+  it("reports the owning team when the platform says it is already claimed", async ({
+    dir: cwd,
+  }) => {
+    const project = await makeProject(cwd);
     await Promise.all([
       claim(cwd),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
@@ -258,8 +257,8 @@ describe("claim", () => {
     expect(json.data.dashboard_url).toContain(String(claimed.team_id));
   });
 
-  it("fails with actionable guidance when the link expires", async () => {
-    const { cwd } = await makeProject();
+  it("fails with actionable guidance when the link expires", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const [res] = await Promise.all([
       claim(cwd),
@@ -284,8 +283,8 @@ describe("claim", () => {
     expect(secret.team_id).toBeUndefined();
   });
 
-  it("explains a closed claim window without suggesting a retry", async () => {
-    const { cwd, project } = await makeProject();
+  it("explains a closed claim window without suggesting a retry", async ({ dir: cwd }) => {
+    const project = await makeProject(cwd);
     expireClaimWindow(project.id);
 
     const res = await claim(cwd);
@@ -313,8 +312,10 @@ describe("claim", () => {
   // A challenge minted in the window's last minutes outlives it: the poll
   // must then surface the same non-retryable refusal as init, not the
   // "start a new link" advice a fresh challenge cannot honor.
-  it("maps a window that closes mid-poll to the non-retryable explanation", async () => {
-    const { cwd, project } = await makeProject();
+  it("maps a window that closes mid-poll to the non-retryable explanation", async ({
+    dir: cwd,
+  }) => {
+    const project = await makeProject(cwd);
 
     const [res] = await Promise.all([
       claim(cwd),
@@ -339,8 +340,8 @@ describe("claim", () => {
     expect(secret.team_id).toBeUndefined();
   });
 
-  it("keeps waiting after the platform rate-limits a status check", async () => {
-    const { cwd, project } = await makeProject();
+  it("keeps waiting after the platform rate-limits a status check", async ({ dir: cwd }) => {
+    const project = await makeProject(cwd);
     const rateLimited = vi.fn(() => new HttpResponse(null, { status: 429 }));
     server.use(http.get("*/projects/:project_id/claim/status", rateLimited, { once: true }));
 
@@ -354,8 +355,8 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toMatch(/^team-/);
   });
 
-  it("stops waiting at --timeout and leaves the secret untouched", async () => {
-    const { cwd } = await makeProject();
+  it("stops waiting at --timeout and leaves the secret untouched", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await claim(cwd, ["--timeout", "2"]);
 
@@ -367,8 +368,8 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
-  it("never asks for the status of a link that has already expired", async () => {
-    const { cwd } = await makeProject();
+  it("never asks for the status of a link that has already expired", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const statusChecks = vi.fn(() =>
       HttpResponse.json({
         status: "completed",
@@ -399,9 +400,9 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
-  it("stops at once when interrupted while it waits to ask again", async () => {
+  it("stops at once when interrupted while it waits to ask again", async ({ dir: cwd }) => {
     vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
-    const { cwd } = await makeProject();
+    await makeProject(cwd);
     const statusChecks = vi.fn(() => new HttpResponse(null, { status: 429 }));
     server.use(http.get("*/projects/:project_id/claim/status", statusChecks));
 
@@ -416,10 +417,13 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
-  it("waits longer between each status check that is answered with 429, up to five seconds", async () => {
+  it("waits longer between each status check that is answered with 429, up to five seconds", async ({
+    dir: cwd,
+    clock,
+  }) => {
+    clock.only("setTimeout", "clearTimeout", "Date");
     vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
-    const { cwd } = await makeProject();
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    await makeProject(cwd);
     const askedAt: number[] = [];
     server.use(
       http.get("*/projects/:project_id/claim/status", () => {
@@ -433,8 +437,8 @@ describe("claim", () => {
       await new Promise<void>((resolve) => {
         setImmediate(resolve);
       });
-      if (vi.getTimerCount() > 0) {
-        await vi.advanceTimersToNextTimerAsync();
+      if (clock.pending() > 0) {
+        await clock.next();
       }
     }
     vi.useRealTimers();
@@ -447,8 +451,8 @@ describe("claim", () => {
     expect(gaps).toEqual([1000, 1500, 2250, 3375, 5000, 5000]);
   });
 
-  it("mutates neither the platform nor the secret under --dry-run", async () => {
-    const { cwd } = await makeProject();
+  it("mutates neither the platform nor the secret under --dry-run", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await claim(cwd, ["--dry-run"]);
 
@@ -468,8 +472,10 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
-  it("claims the project the resolved environment names, not the fallback secret", async () => {
-    const { cwd, project: fallback } = await makeProject();
+  it("claims the project the resolved environment names, not the fallback secret", async ({
+    dir: cwd,
+  }) => {
+    const fallback = await makeProject(cwd);
     const envProject = await createProjectOnMock();
     await writeFile(
       join(cwd, ".env.production.local"),
@@ -499,9 +505,7 @@ describe("claim", () => {
     expect(secret.claimed_at).toBeUndefined();
   });
 
-  it("asks for a missing project id on a terminal and keeps the answer", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-    tempDirs.push(cwd);
+  it("asks for a missing project id on a terminal and keeps the answer", async ({ dir: cwd }) => {
     const envProject = await createProjectOnMock();
     await writeFile(
       join(cwd, ".env.production.local"),
@@ -530,9 +534,7 @@ describe("claim", () => {
     );
   });
 
-  it("claims from an env file with no local secret present", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-    tempDirs.push(cwd);
+  it("claims from an env file with no local secret present", async ({ dir: cwd }) => {
     const envProject = await createProjectOnMock();
     const file = join(cwd, "prod.env");
     await writeFile(
@@ -570,8 +572,10 @@ describe("claim", () => {
       };
     };
 
-    it("returns the link and the command that waits for it, without waiting", async () => {
-      const { cwd, project } = await makeProject();
+    it("returns the link and the command that waits for it, without waiting", async ({
+      dir: cwd,
+    }) => {
+      const project = await makeProject(cwd);
 
       const res = await claim(cwd, ["--no-wait"]);
 
@@ -587,14 +591,14 @@ describe("claim", () => {
       // The resume keeps this run's server and directory, or it would wait on
       // the default project instead.
       expect(json.data.next_commands).toEqual([
-        expect.stringMatching(
-          new RegExp(`claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `),
+        expect.stringContaining(
+          `claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `,
         ),
       ]);
     });
 
-    it("claims nothing and leaves the secret untouched", async () => {
-      const { cwd } = await makeProject();
+    it("claims nothing and leaves the secret untouched", async ({ dir: cwd }) => {
+      await makeProject(cwd);
 
       await claim(cwd, ["--no-wait"]);
 
@@ -604,8 +608,8 @@ describe("claim", () => {
       expect(secret.claimed_at).toBeUndefined();
     });
 
-    it("prints the link and the resume command for a person", async () => {
-      const { cwd } = await makeProject();
+    it("prints the link and the resume command for a person", async ({ dir: cwd }) => {
+      await makeProject(cwd);
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", SERVER, "--no-wait"]);
 
@@ -615,8 +619,8 @@ describe("claim", () => {
       expect(res.stdout).toContain("claim --challenge-id ch_");
     });
 
-    it("refuses --timeout, which a run that does not wait cannot honour", async () => {
-      const { cwd } = await makeProject();
+    it("refuses --timeout, which a run that does not wait cannot honour", async ({ dir: cwd }) => {
+      await makeProject(cwd);
 
       const res = await claim(cwd, ["--no-wait", "--timeout", "5"]);
 
@@ -624,8 +628,10 @@ describe("claim", () => {
       expect(snapshotPlatformStore().claimChallengeIds).toEqual([]);
     });
 
-    it("previews a link under --dry-run and suggests the same mode for real", async () => {
-      const { cwd } = await makeProject();
+    it("previews a link under --dry-run and suggests the same mode for real", async ({
+      dir: cwd,
+    }) => {
+      await makeProject(cwd);
 
       const res = await claim(cwd, ["--no-wait", "--dry-run"]);
 
@@ -645,8 +651,8 @@ describe("claim", () => {
       return (parseJson(res.stdout) as { data: { challenge_id: string } }).data.challenge_id;
     }
 
-    it("waits on a handed-out link and records the claim", async () => {
-      const { cwd, project } = await makeProject();
+    it("waits on a handed-out link and records the claim", async ({ dir: cwd }) => {
+      const project = await makeProject(cwd);
       const challengeId = await handOutLink(cwd);
       completeClaimChallenge(challengeId, project.id);
 
@@ -664,8 +670,8 @@ describe("claim", () => {
       expect(secret.claimed_at).toBe(json.data.claimed_at);
     });
 
-    it("mints no second link", async () => {
-      const { cwd, project } = await makeProject();
+    it("mints no second link", async ({ dir: cwd }) => {
+      const project = await makeProject(cwd);
       const challengeId = await handOutLink(cwd);
       completeClaimChallenge(challengeId, project.id);
 
@@ -674,8 +680,10 @@ describe("claim", () => {
       expect(snapshotPlatformStore().claimChallengeIds).toEqual([challengeId]);
     });
 
-    it("suggests a new link that does not wait when the handed-out one expires", async () => {
-      const { cwd } = await makeProject();
+    it("suggests a new link that does not wait when the handed-out one expires", async ({
+      dir: cwd,
+    }) => {
+      await makeProject(cwd);
       const challengeId = await handOutLink(cwd);
       expireClaimChallenge(challengeId);
 
@@ -687,8 +695,10 @@ describe("claim", () => {
       expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
     });
 
-    it("reports a link the platform never minted for this project as not found", async () => {
-      const { cwd } = await makeProject();
+    it("reports a link the platform never minted for this project as not found", async ({
+      dir: cwd,
+    }) => {
+      await makeProject(cwd);
 
       const res = await claim(cwd, ["--challenge-id", "ch_neverminted"]);
 
@@ -703,10 +713,7 @@ describe("claim", () => {
       expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
     });
 
-    it("refuses an id that is not a challenge id before connecting", async () => {
-      const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-      tempDirs.push(cwd);
-
+    it("refuses an id that is not a challenge id before connecting", async ({ dir: cwd }) => {
       // No project is set up here, so reaching the server would fail on the
       // missing project id instead: the refusal has to come first.
       const res = await claim(cwd, ["--challenge-id", "ch_x;whoami"]);
@@ -726,9 +733,9 @@ describe("claim", () => {
       server.use(http.all(/^http:\/\/localhost:\d+\//, () => passthrough()));
     });
 
-    it("points at `zitadel start` when no local runtime is reachable", async () => {
-      const { cwd } = await makeProject();
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+    it("points at `zitadel start` when no local runtime is reachable", async ({ dir: cwd }) => {
+      await makeProject(cwd);
+      await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:9"));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--json", "--server", "local"]);
 
@@ -738,10 +745,10 @@ describe("claim", () => {
       expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
     });
 
-    it("claims against the resolved local server", async ({ serve }) => {
-      const { cwd } = await makeProject();
+    it("claims against the resolved local server", async ({ serve, dir: cwd }) => {
+      await makeProject(cwd);
       const serverUrl = await startClaimServer(serve);
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest([
         "claim",
@@ -763,13 +770,13 @@ describe("claim", () => {
 
     // No `--json` in the next two: the warning is narration, and the
     // envelope silences it.
-    it("warns when a local server advertises a remote claim page", async ({ serve }) => {
-      const { cwd } = await makeProject();
+    it("warns when a local server advertises a remote claim page", async ({ serve, dir: cwd }) => {
+      await makeProject(cwd);
       const serverUrl = await startClaimServer(
         serve,
-        "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_localstub",
+        "https://preview.zitadel.com/ui/console/claim?challenge_id=ch_localstub",
       );
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
 
@@ -777,13 +784,13 @@ describe("claim", () => {
       expect(`${res.stdout}${res.stderr}`).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
     });
 
-    it("spells out an escape sequence in the claim link it prints", async ({ serve }) => {
-      const { cwd } = await makeProject();
+    it("spells out an escape sequence in the claim link it prints", async ({ serve, dir: cwd }) => {
+      await makeProject(cwd);
       const serverUrl = await startClaimServer(
         serve,
         "http://localhost/claim/ch_localstub\u001b[2Jwiped",
       );
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
 
@@ -792,10 +799,13 @@ describe("claim", () => {
       expect(`${res.stdout}${res.stderr}`).not.toContain("\u001b");
     });
 
-    it("does not warn when the claim page is on the local server itself", async ({ serve }) => {
-      const { cwd } = await makeProject();
+    it("does not warn when the claim page is on the local server itself", async ({
+      serve,
+      dir: cwd,
+    }) => {
+      await makeProject(cwd);
       const serverUrl = await startClaimServer(serve);
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+      await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
 
@@ -852,9 +862,9 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return aBinaryRecord({
     pid: process.pid,
     command: process.execPath,
-    log_path: localRuntimePaths(cwd).logFile,
+    log_path: LocalRuntime.paths(cwd).logFile,
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
-    data_dir: localRuntimePaths(cwd).dataDir,
+    data_dir: LocalRuntime.paths(cwd).dataDir,
   });
 }

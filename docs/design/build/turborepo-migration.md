@@ -433,10 +433,10 @@ Two workable setups; the prototype's draft uses the first.
 | | Vercel Remote Cache (OIDC) | Depot's turbo cache |
 |---|---|---|
 | Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), no `TURBO_API` (turbo's default, `https://vercel.com/api`, is the cache; `https://vercel.com` is the dashboard, which answers 405), a runner that does not point turbo at a cache of its own (Depot's do, unless the organization turns off "Allow Actions jobs to automatically connect to Depot Cache": ci-turbo's Depot runs restored from Depot's cache with `TURBO_API` set in the workflow), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
-| Shared with | the cloud deployments (same team cache, apart by key: turbo hashes `VERCEL_TARGET_ENV` into every task on Vercel, so a build CI did is no hit there) | CI only |
+| Shared with | the cloud deployments (same team cache, apart by key: the root `turbo.json` hashes `VERCEL` into every task, so a build CI did is no hit there) | CI only |
 | Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue, pushes to main (which run the gate alone), the nightly run and runs by hand, as moon's runs write Depot's cache; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue, pushes to main (which run the gate alone), the nightly run and runs by hand, as moon's runs write Depot's cache; on Vercel, every build reads and writes as Vercel's cache policies allow: a preview reads main's entries and its own branch's, and writes only its own (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
@@ -461,13 +461,21 @@ sets them up:
 
 - **Vercel builds** use the cache as Vercel sets it up (decision 3): every
   build, production and preview, reads and writes it with a token Vercel
-  gives the build, and keeps no local cache. Turbo puts `VERCEL_TARGET_ENV`
-  into every task's hash, so production builds restore only entries written
-  under production's keys, previews only previews'. That separation is by
-  key, not by permission: a branch's preview build runs the branch's code
-  with a token that can write any entry, production's keys included, so
-  anyone who can push a branch could plant one. Forks cannot: their pull
-  requests get no build, and so no token, until a team member approves one
+  gives the build, and keeps no local cache. Vercel's
+  [cache policies](https://vercel.com/docs/monorepos/remote-caching#how-cache-policies-isolate-artifacts)
+  sort the artifacts by where a build came from: a verified push to `main`
+  reads and writes the repository's shared namespace; a build of another
+  branch reads that namespace and its own branch's, and writes only its
+  own; a redeploy reads and writes nothing. So production is apart from the
+  previews by permission, not by key: a branch's preview runs the branch's
+  code, but what it uploads stays in that branch's namespace, which
+  production never reads. The logs agree: of 101 preview builds on
+  2026-11-13, none restored an entry another branch had stored, 271 times
+  with the key there. Production and previews therefore compute the same
+  keys (the root `turbo.json` drops turbo's default `VERCEL_TARGET_ENV`
+  hash), and a branch's first preview restores from main's build every
+  package it does not change. Forks get no build, and so no token, until a
+  team member approves one
   (the project's Git fork protection). A planted entry is removed by
   clearing the team's cache (owners only). The cloud's launcher, which runs
   with production's secrets, stays `cache: false` in every environment
@@ -482,8 +490,8 @@ sets them up:
   pull request's later pushes restore what its earlier ones built, and the
   merge queue writes the results of the commit that lands on main. A
   read-only flag (`remote:r`) is the pull request's own choice, so it only
-  ever kept honest branches out. Without `VERCEL_TARGET_ENV`, CI's entries
-  are apart from the Vercel builds'. A poisoned artifact could still make a
+  ever kept honest branches out. CI's keys lack `VERCEL`, which Vercel's
+  builds hash, so CI's entries are apart from theirs. A poisoned artifact could still make a
   pull-request or merge-queue run pass for code that fails; the signatures
   below close that.
 - **Later, to let only main's results reach production:** turbo's
@@ -612,9 +620,11 @@ the release graph.
    only.
 3. **Vercel builds use the remote cache as Vercel sets it up** (2026-10-13,
    replacing "production never restores from the cache"). Every build,
-   production and preview, reads and writes the team's remote cache, and
-   turbo's default `VERCEL_TARGET_ENV` hash keeps production's entries
-   apart from the previews'. Writing takes the team's token, which forks do
+   production and preview, reads and writes the team's remote cache.
+   Vercel's cache policies keep a branch's entries away from production,
+   so production and previews share keys and a preview restores main's
+   entries (2026-11-13, replacing "turbo's default `VERCEL_TARGET_ENV` hash
+   keeps production's entries apart from the previews'"). Writing takes the team's token, which forks do
    not get (see "Who may write to the cache"). The cloud's builds set no
    cache policy of their own.
 4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,

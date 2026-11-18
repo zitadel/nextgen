@@ -4,24 +4,27 @@ import { join } from "node:path";
 import { execa } from "execa";
 
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
-import { hasZitadelConfig } from "@/lib/project";
-import { CLI_PACKAGE_NAME, newestCliCommand } from "@/lib/public-cli";
-import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
-import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
-import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
+import { Skills } from "@/lib/skills";
+import { style } from "@/lib/ui";
+import { Spelling, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { releaseChannel } from "@/lib/upgrade/config";
 import { UPDATE_CHECK_VARIABLE, ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 import {
+  CliPackage,
   InstallError,
   PackageInstaller,
   ReleaseLookupError,
-  type UpgradeResult,
+  ReleaseNotes,
   Upgrader,
+  type BreakingChange,
+  type UpgradeResult,
 } from "@/lib/upgrade";
+import { Project } from "@/lib/project";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * How long the new release's `doctor --fix` may run before it counts as failed.
@@ -43,11 +46,11 @@ type Refresh = "done" | "issues" | "failed" | "planned" | "skipped";
  * choice the user made, as `doctor`'s `dependency-version` check also holds, so
  * it is reported and left alone.
  */
-export default class Upgrade extends BaseCommand {
+export default class Upgrade extends ServerCommand(BaseCommand) {
   static override description =
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
-  static override group = CommandGroups.diagnostics;
-  static override groupOrder = 2;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",
@@ -55,12 +58,13 @@ export default class Upgrade extends BaseCommand {
   ];
 
   /**
-   * Everything this command does is about npm and the project, so there is no
-   * server to ask.
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
    */
-  static override meta = {
-    resolveServer: false,
-  };
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   /**
    * Upgrades the project in four steps, in an order that lets a person stop:
@@ -107,19 +111,20 @@ export default class Upgrade extends BaseCommand {
       });
     });
 
+    const notes = new ReleaseNotes();
     const breaking: readonly BreakingChange[] = plan.upToDate
       ? []
-      : await breakingChanges(plan.oldest, plan.target);
+      : await notes.breakingBetween(plan.oldest, plan.target);
     if (!plan.upToDate) {
       const banner: string[] = [];
       if (breaking.length > 0) {
-        banner.push(strong("Breaking changes on the way:"));
+        banner.push(style.strong("Breaking changes on the way:"));
       }
       for (const { version, note } of breaking) {
-        const said = `${strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
-        banner.push(`  ${mark.warn} ${said}`);
+        const said = `${style.strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
+        banner.push(`  ${style.mark.warn} ${said}`);
       }
-      banner.push(`Release notes: ${url(RELEASE_NOTES_URL)}`, "");
+      banner.push(`Release notes: ${style.url(notes.url)}`, "");
       this.log(banner.join("\n"));
     }
 
@@ -135,25 +140,25 @@ export default class Upgrade extends BaseCommand {
 
     const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
 
-    const done = this.dryRun ? arrow : mark.pass;
+    const done = this.dryRun ? style.arrow : style.mark.pass;
     const rows: string[] = [];
     for (const pkg of plan.packages) {
       const said = escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`);
       rows.push(`  ${done} ${said}`);
     }
     if (this.dryRun && result.installCommand !== undefined) {
-      rows.push(`  Would run ${command(result.installCommand)}`);
+      rows.push(`  Would run ${style.command(result.installCommand)}`);
     }
     if (refresh === "done") {
       rows.push(`  ${done} Refreshed generated files with doctor --fix`);
     } else if (refresh === "issues") {
-      rows.push(`  ${mark.warn} Refreshed generated files; doctor still reports issues`);
+      rows.push(`  ${style.mark.warn} Refreshed generated files; doctor still reports issues`);
     } else if (refresh === "failed") {
-      rows.push(`  ${mark.warn} Could not refresh generated files`);
+      rows.push(`  ${style.mark.warn} Could not refresh generated files`);
     }
     for (const { name, specifier } of plan.leftAlone) {
       const said = `- ${name} left at "${specifier}", not an exact version`;
-      rows.push(`  ${dim(escapeControlCharacters(said))}`);
+      rows.push(`  ${style.dim(escapeControlCharacters(said))}`);
     }
 
     const upgrade = this.dryRun
@@ -173,14 +178,14 @@ export default class Upgrade extends BaseCommand {
     if (refresh === "issues") {
       commands.push(atTarget({ id: "doctor" }));
     }
-    if (result.installed && existsSync(join(this.cwd, SHARED_SKILLS_DIR))) {
+    if (result.installed && existsSync(join(this.cwd, Skills.SHARED_DIR))) {
       commands.push(atTarget({ id: "skills:add" }));
     }
 
     const actions: string[] = [];
     if (plan.cliBehind) {
-      const newest = newestCliCommand("<command>", this.cliVersion);
-      const global = `npm install --global ${CLI_PACKAGE_NAME}@${plan.target}`;
+      const newest = Spelling.at(this.cliVersion).newestCommand("<command>");
+      const global = `npm install --global ${CliPackage.NAME}@${plan.target}`;
       actions.push(
         `This CLI is still ${this.cliVersion}. Run the newest with ${newest}, or if you installed it globally, update it with ${global}.`,
       );
@@ -202,7 +207,7 @@ export default class Upgrade extends BaseCommand {
         };
       }),
       breaking_changes: breaking,
-      release_notes_url: RELEASE_NOTES_URL,
+      release_notes_url: notes.url,
       refresh,
     });
     if (result.installCommand !== undefined) {
@@ -220,7 +225,7 @@ export default class Upgrade extends BaseCommand {
     return this.emit({
       status: "ok",
       data,
-      pretty: painted([strong(title), ...rows].join("\n")),
+      pretty: painted([style.strong(title), ...rows].join("\n")),
       summary: {
         title,
         sections: [],
@@ -254,7 +259,7 @@ export default class Upgrade extends BaseCommand {
     result: UpgradeResult,
     noTelemetry: boolean,
   ): Promise<Refresh> {
-    if (result.installCommand === undefined || !(await hasZitadelConfig(this.cwd))) {
+    if (result.installCommand === undefined || !(await Project.at(this.cwd).hasConfig())) {
       return "skipped";
     }
     if (this.dryRun) {
@@ -263,7 +268,7 @@ export default class Upgrade extends BaseCommand {
 
     const args = [
       "--yes",
-      `${CLI_PACKAGE_NAME}@${version}`,
+      `${CliPackage.NAME}@${version}`,
       "doctor",
       "--fix",
       "--non-interactive",

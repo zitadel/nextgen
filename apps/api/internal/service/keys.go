@@ -298,6 +298,15 @@ func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) (err error) {
 	ctx, end := startSpan(ctx, "KeyService.MigrateToLatestMasterKey")
 	defer end(&err)
 
+	// Only a rotation has anything to move: a key wrapped by a master key that
+	// is not configured cannot be unwrapped, so with one master key a scan
+	// over every project's keys could re-wrap none of them.
+	if !s.masterKeys.Rotating() {
+		return nil
+	}
+	logger := getLoggingContext(ctx, "key")
+	logger.Info("migrate keys to latest master key")
+
 	opts := &database.ListOptions[domain.EncryptionKeyField]{
 		Pagination: database.Page[domain.EncryptionKeyField]{
 			Limit: 100,
@@ -361,5 +370,6 @@ func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) (err error) {
 	if len(errs) > 0 {
 		return errors.Join(errs...)
 	}
+	logger.Debug("master key migration done")
 	return nil
 }

@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { CircleUser, Copy, type LucideIcon, Plus, Search } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ProjectMark } from "@/components/project-mark";
@@ -89,7 +89,6 @@ export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
         variant="outline"
         tooltip="Search"
         onClick={onOpen}
-        aria-label="Search"
         aria-keyshortcuts="Meta+K Control+K"
         // A field, not a row: the card's fill and muted text, which hovering
         // keeps, where a row would take the accent.
@@ -97,7 +96,8 @@ export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
       >
         <Search aria-hidden />
         <span className="truncate">Search…</span>
-        <Kbd className="ml-auto group-data-[collapsible=icon]:hidden">
+        {/* The shortcut reaches assistive tech through `aria-keyshortcuts`, so the key cap is hidden and the name is the label. */}
+        <Kbd aria-hidden className="ml-auto group-data-[collapsible=icon]:hidden">
           {IS_MAC ? "⌘K" : "Ctrl K"}
         </Kbd>
       </SidebarMenuButton>
@@ -790,16 +790,15 @@ const PROJECT_RESULTS = 8;
 /** How many rows the typed list holds, as Vercel's holds a handful. */
 const MAX_RESULTS = 8;
 
-function Kbd({ children, className }: { children: ReactNode; className?: string }) {
+function Kbd({ className, ...props }: ComponentProps<"kbd">) {
   return (
     <kbd
+      {...props}
       className={cn(
         "rounded-sm border border-border px-1.5 font-mono text-[11px] leading-4 text-muted-foreground",
         className,
       )}
-    >
-      {children}
-    </kbd>
+    />
   );
 }
 

@@ -1,13 +1,14 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, describe, expect, vi } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { Chain } from "@/lib/ui/chain";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { GUIDE, MARK } from "@/lib/ui/marks";
-import { atScreen as it } from "@tests/helpers/fixtures";
+import { it } from "@tests/unit/lib/ui/at-terminal";
 import { answering, type Person, type Terminal } from "@tests/helpers/keyboard";
-import { asTerminal } from "@tests/helpers/terminal";
+import type { TimeControls } from "@tests/fixtures/clock";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
 const normally = () => new Chain({ interactive: true, force: false }, "plain");
@@ -17,19 +18,18 @@ const scripted = () => new Chain({ interactive: false, force: false });
 const FRAME = 100;
 
 afterEach(() => {
-  vi.useRealTimers();
   DrawnSpinner.active.clear();
 });
 
-const printed = (screen: Terminal) => stripAnsi(screen.plain());
+const printed = (terminal: Terminal) => stripAnsi(terminal.plain());
 
 describe("Chain", () => {
-  it("draws nothing at all when nobody is watching", ({ screen }) => {
+  it("draws nothing at all when nobody is watching", ({ terminal }) => {
     const chain = scripted();
     chain.describe("Listing origins");
     chain.finish({ title: "Found 1 origin", sections: [] });
 
-    expect(printed(screen)).toBe("");
+    expect(printed(terminal)).toBe("");
   });
 
   // The gutter is the only part of a narrated line that needs a terminal, so
@@ -37,10 +37,10 @@ describe("Chain", () => {
   // through `consola` instead, a warning arrived as its ` WARN ` badge and a
   // step as a glyph of consola's choosing, which is the chain's marks in name
   // only.
-  it("writes a wizard's narration, with the mark it would have drawn", ({ screen }) => {
+  it("writes a wizard's narration, with the mark it would have drawn", ({ terminal }) => {
     scripted().narrate("i", "the flow was edited by hand");
 
-    expect(printed(screen)).toBe("i  the flow was edited by hand\n");
+    expect(printed(terminal)).toBe("i  the flow was edited by hand\n");
   });
 
   it.for([
@@ -48,27 +48,27 @@ describe("Chain", () => {
     ["a failure", MARK.failed],
   ] as const)(
     "writes %s to stderr, where a normal command puts it",
-    ([_kind, mark], { screen }) => {
+    ([_kind, mark], { terminal }) => {
       scripted().narrate(mark, "the flow was edited by hand");
 
-      expect(printed(screen)).toBe("");
-      expect(stripAnsi(screen.errors())).toContain("the flow was edited by hand");
+      expect(printed(terminal)).toBe("");
+      expect(stripAnsi(terminal.errors())).toContain("the flow was edited by hand");
     },
   );
 
   // `│` is what a line that carries no mark of its own is given, and off a
   // terminal a lone gutter is a stray glyph: the line is indented to the same
   // column instead, so the marks above and below it still line up.
-  it("writes a line that carries no mark as an indent, not as a gutter", ({ screen }) => {
+  it("writes a line that carries no mark as an indent, not as a gutter", ({ terminal }) => {
     scripted().narrate(GUIDE, "and this is why");
 
-    expect(printed(screen)).toBe("   and this is why\n");
+    expect(printed(terminal)).toBe("   and this is why\n");
   });
 
-  it("writes a blank line as a gap, with no mark", ({ screen }) => {
+  it("writes a blank line as a gap, with no mark", ({ terminal }) => {
     scripted().narrate("i", "");
 
-    expect(printed(screen)).toBe("\n");
+    expect(printed(terminal)).toBe("\n");
   });
 
   // Narration used to reach clack whenever the chain was not plain-and-watched,
@@ -77,57 +77,59 @@ describe("Chain", () => {
   it.for([
     ["a wizard", () => new Chain({ interactive: false, force: false })],
     ["a normal command", () => new Chain({ interactive: false, force: false }, "plain")],
-  ] as const)("draws no gutter for %s nobody is watching", ([_shape, make], { screen }) => {
+  ] as const)("draws no gutter for %s nobody is watching", ([_shape, make], { terminal }) => {
     make().narrate("i", "something happened");
 
-    expect(printed(screen)).not.toContain("│");
+    expect(printed(terminal)).not.toContain("│");
   });
 
-  it("opens on the first thing drawn, not when it is named", ({ screen }) => {
+  it("opens on the first thing drawn, not when it is named", ({ terminal }) => {
     const chain = watching();
     chain.describe("Listing origins");
 
-    expect(printed(screen)).toBe("");
+    expect(printed(terminal)).toBe("");
 
     chain.narrate("i", "first line");
 
-    expect(printed(screen)).toContain("┌  Listing origins");
+    expect(printed(terminal)).toContain("┌  Listing origins");
   });
 
-  it("closes once, however many times it is asked to", ({ screen }) => {
+  it("closes once, however many times it is asked to", ({ terminal }) => {
     const chain = watching();
     chain.describe("Removing an origin");
     chain.narrate("i", "asked something");
     chain.finish({ title: "Found 1 origin", sections: [] });
     chain.finish({ title: "Found 2 origins", sections: [] });
 
-    expect(printed(screen).split("└").length - 1).toBe(1);
-    expect(printed(screen)).toContain("└  Found 1 origin");
+    expect(printed(terminal).split("└").length - 1).toBe(1);
+    expect(printed(terminal)).toContain("└  Found 1 origin");
   });
 
-  it("prints a listing as it is, with no frame around it", ({ screen }) => {
+  it("prints a listing as it is, with no frame around it", ({ terminal }) => {
     const chain = watching();
     chain.describe("Listing origins");
     chain.finish({ title: "Found 1 origin", sections: [], lines: ["pattern  kind"] });
 
-    expect(printed(screen)).toContain("pattern  kind");
-    expect(printed(screen)).not.toContain("╭");
+    expect(printed(terminal)).toContain("pattern  kind");
+    expect(printed(terminal)).not.toContain("╭");
   });
 
-  it("names where it ran in the footer's words for a normal command", ({ screen }) => {
+  it("names where it ran in the footer's words for a normal command", ({ terminal }) => {
     const chain = normally();
     chain.describe("Removing an origin");
-    chain.ranAgainst("proj-1", "api.zitadel.cloud");
+    chain.ranAgainst("proj-1", "preview.zitadel.com");
     chain.finish({ title: "Removed the origin", sections: [] });
 
-    expect(printed(screen)).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
-    expect(printed(screen)).not.toContain("╭");
+    expect(printed(terminal)).toContain(
+      "Removed the origin · project proj-1 on preview.zitadel.com",
+    );
+    expect(printed(terminal)).not.toContain("╭");
   });
 
-  it("says where it ran as the last line of a summary it does have", ({ screen }) => {
+  it("says where it ran as the last line of a summary it does have", ({ terminal }) => {
     const chain = watching();
     chain.describe("Deploying the configuration");
-    chain.ranAgainst("proj-1", "api.zitadel.cloud");
+    chain.ranAgainst("proj-1", "preview.zitadel.com");
     chain.finish({
       title: "Deployed it",
       sections: [],
@@ -136,32 +138,32 @@ describe("Chain", () => {
       boxed: true,
     });
 
-    const box = printed(screen);
+    const box = printed(terminal);
     expect(box).toContain("╭");
     expect(box.indexOf("a detail")).toBeLessThan(box.indexOf("Using project proj-1"));
   });
 
-  it("wraps a note so a box never outgrows the width everything obeys", ({ screen }) => {
+  it("wraps a note so a box never outgrows the width everything obeys", ({ terminal }) => {
     const chain = watching();
     chain.describe("Enabling single sign-on");
     chain.note("Register an app", ["x ".repeat(120).trim()]);
 
     const widest = Math.max(
-      ...printed(screen)
+      ...printed(terminal)
         .split("\n")
         .filter((line) => line.includes("x x"))
         .map((line) => {
           return line.replace(/^│ {2}/, "").replace(/\s*│$/, "").length;
         }),
     );
-    expect(printed(screen).split("Register an app").length - 1).toBe(1);
+    expect(printed(terminal).split("Register an app").length - 1).toBe(1);
     expect(widest).toBeLessThanOrEqual(72);
   });
 
   // The base command renders a failure as an error block through `finish`, so
   // closing the chain on the failure itself would make that call return early
   // and the run would end showing nothing but its closing line.
-  it("leaves a failure for the error block to close", ({ screen }) => {
+  it("leaves a failure for the error block to close", ({ terminal }) => {
     const chain = watching();
     chain.describe("Removing an origin");
     chain.narrate("i", "asked");
@@ -169,22 +171,24 @@ describe("Chain", () => {
     chain.abort(new Error("boom"));
     chain.finish({ title: "Could not remove the origin", sections: [] });
 
-    expect(printed(screen).split("└").length - 1).toBe(1);
-    expect(printed(screen)).toContain("└  Could not remove the origin");
+    expect(printed(terminal).split("└").length - 1).toBe(1);
+    expect(printed(terminal)).toContain("└  Could not remove the origin");
   });
 
-  it("stays quiet when the person cancelled, because the prompt already said so", ({ screen }) => {
+  it("stays quiet when the person cancelled, because the prompt already said so", ({
+    terminal,
+  }) => {
     const chain = watching();
     chain.describe("Removing an origin");
     chain.narrate("i", "asked");
 
     chain.abort(new PromptCancelled());
 
-    expect(printed(screen)).not.toContain("└");
+    expect(printed(terminal)).not.toContain("└");
   });
 
   it("closes the chain for a cancellation that was not a prompt's, whatever it says", ({
-    screen,
+    terminal,
   }) => {
     const chain = watching();
     chain.describe("Removing an origin");
@@ -192,32 +196,32 @@ describe("Chain", () => {
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
-    expect(printed(screen)).toContain("└");
+    expect(printed(terminal)).toContain("└");
   });
 
   // Ctrl-C in the middle of the work closes nothing by itself, so without
   // this the run ends on a bare `┌` and the shell prompt lands in the gutter.
-  it("closes the chain when the person interrupted the work", ({ screen }) => {
+  it("closes the chain when the person interrupted the work", ({ terminal }) => {
     const chain = watching();
     chain.describe("Listing variables");
     chain.narrate("!", "a warning");
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-    expect(printed(screen)).toMatch(/└ +Cancelled/);
+    expect(printed(terminal)).toMatch(/└ +Cancelled/);
   });
 
-  it("closes nothing when the interrupt arrived before anything was drawn", ({ screen }) => {
+  it("closes nothing when the interrupt arrived before anything was drawn", ({ terminal }) => {
     const chain = watching();
     chain.describe("Listing variables");
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-    expect(printed(screen)).not.toContain("└");
+    expect(printed(terminal)).not.toContain("└");
   });
 
   it("closes on the one cancellation sentence, which claims nothing about what changed", ({
-    screen,
+    terminal,
   }) => {
     const chain = watching();
     chain.describe("Listing variables");
@@ -225,17 +229,17 @@ describe("Chain", () => {
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-    expect(printed(screen).split("└").at(-1)?.trim()).toBe("Cancelled");
+    expect(printed(terminal).split("└").at(-1)?.trim()).toBe("Cancelled");
   });
 
-  it("leaves a bridged line that already fits on one line", ({ screen }) => {
+  it("leaves a bridged line that already fits on one line", ({ terminal }) => {
     const chain = watching();
     chain.describe("Listing variables");
 
     chain.narrate("!", "a short warning");
 
     expect(
-      printed(screen)
+      printed(terminal)
         .split("\n")
         .filter((line) => line.includes("a short warning")),
     ).toHaveLength(1);
@@ -252,25 +256,27 @@ describe("a normal command's chain, which is no chain at all", () => {
   };
   const removed = { title: "Removed B from the project", sections: [] };
 
-  it("opens nothing, whatever the command said on the way", ({ screen }) => {
+  it("opens nothing, whatever the command said on the way", ({ terminal }) => {
     const chain = normally();
     removing(chain);
     chain.say("the project is in development");
     chain.finish(removed);
 
-    expect(printed(screen)).not.toContain("┌");
-    expect(printed(screen)).not.toContain("└");
+    expect(printed(terminal)).not.toContain("┌");
+    expect(printed(terminal)).not.toContain("└");
   });
 
-  it("ends on its answer and one footer line", ({ screen }) => {
+  it("ends on its answer and one footer line", ({ terminal }) => {
     const chain = normally();
     removing(chain);
     chain.finish(removed);
 
-    expect(printed(screen)).toBe("Removed B from the project · project proj-1 on localhost:8111\n");
+    expect(printed(terminal)).toBe(
+      "Removed B from the project · project proj-1 on localhost:8111\n",
+    );
   });
 
-  it("never frames a summary that asked for a box", ({ screen }) => {
+  it("never frames a summary that asked for a box", ({ terminal }) => {
     const chain = normally();
     removing(chain);
     chain.finish({
@@ -279,73 +285,79 @@ describe("a normal command's chain, which is no chain at all", () => {
       next: [{ text: "Deploy it:", command: "zitadel deploy" }],
     });
 
-    expect(printed(screen)).not.toContain("╭");
+    expect(printed(terminal)).not.toContain("╭");
   });
 
-  it("says a failure with no chain to close", ({ screen }) => {
+  it("says a failure with no chain to close", ({ terminal }) => {
     const chain = normally();
     removing(chain);
     chain.finish({ title: "Error: No such variable (E_NOT_FOUND)", sections: [], failed: true });
 
-    expect(printed(screen)).not.toContain("└");
-    expect(printed(screen)).toContain("Error: No such variable (E_NOT_FOUND)");
+    expect(printed(terminal)).not.toContain("└");
+    expect(printed(terminal)).toContain("Error: No such variable (E_NOT_FOUND)");
   });
 
-  it("keeps a spinner out of the gutter it does not have", ({ screen }) => {
+  it("keeps a spinner out of the gutter it does not have", ({ terminal }) => {
     normally().spinner("Fetching users");
 
-    expect(printed(screen)).not.toContain("┌");
-    expect(printed(screen)).not.toContain("│");
+    expect(printed(terminal)).not.toContain("┌");
+    expect(printed(terminal)).not.toContain("│");
   });
 
   /**
    * Everything drawn, in order, with the frames of a spinner running under
    * `label` where they fell, which is how a person sees it clear and come back.
    */
-  const aSpinnerRunning = (chain: Chain, label: string) => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  const aSpinnerRunning = (clock: TimeControls, chain: Chain, label: string) => {
+    clock.only("setInterval", "clearInterval");
     const running = chain.spinner(label);
-    vi.advanceTimersByTime(FRAME);
+    clock.advance(FRAME);
     return running;
   };
 
   it("clears a running spinner before it narrates a line and draws it again after", ({
-    screen,
+    clock,
+    terminal,
   }) => {
     const chain = watching();
-    const running = aSpinnerRunning(chain, "Deploying");
+    const running = aSpinnerRunning(clock, chain, "Deploying");
 
     chain.narrate("i", "halfway there");
-    vi.advanceTimersByTime(FRAME);
+    clock.advance(FRAME);
 
-    const shown = printed(screen);
+    const shown = printed(terminal);
     expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("halfway there"));
     expect(shown.lastIndexOf("Deploying")).toBeGreaterThan(shown.indexOf("halfway there"));
     running.clear();
   });
 
-  it("clears a running spinner before it draws a note and draws it again after", ({ screen }) => {
+  it("clears a running spinner before it draws a note and draws it again after", ({
+    clock,
+    terminal,
+  }) => {
     const chain = watching();
-    const running = aSpinnerRunning(chain, "Deploying");
+    const running = aSpinnerRunning(clock, chain, "Deploying");
 
     chain.note("Register an app", ["open the console"]);
-    vi.advanceTimersByTime(FRAME);
+    clock.advance(FRAME);
 
-    const shown = printed(screen);
+    const shown = printed(terminal);
     expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("Register an app"));
     expect(shown.lastIndexOf("Deploying")).toBeGreaterThan(shown.indexOf("Register an app"));
     running.clear();
   });
 
-  it("clears a running spinner before a question is drawn and draws it again after the answer", async () => {
+  it("clears a running spinner before a question is drawn and draws it again after the answer", async ({
+    clock,
+  }) => {
     const person = answering(true);
     const chain = watching();
-    const running = aSpinnerRunning(chain, "Deploying");
+    const running = aSpinnerRunning(clock, chain, "Deploying");
 
     await asTerminal(() => {
       return chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
     });
-    vi.advanceTimersByTime(FRAME);
+    clock.advance(FRAME);
 
     const shown = printed(person);
     expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("Deploy it now?"));
@@ -353,22 +365,22 @@ describe("a normal command's chain, which is no chain at all", () => {
     running.clear();
   });
 
-  it.each([
+  it.for([
     ["plain", normally],
     ["wizard", watching],
   ] as const)(
     "draws a running spinner again when the question is walked away from in a %s chain",
-    async (_shape, make) => {
+    async ([_shape, make], { clock }) => {
       const person = answering(undefined);
       const chain = make();
-      const running = aSpinnerRunning(chain, "Deploying");
+      const running = aSpinnerRunning(clock, chain, "Deploying");
 
       await expect(
         asTerminal(() => {
           return chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
         }),
       ).rejects.toMatchObject({ code: "E_CANCELLED" });
-      vi.advanceTimersByTime(FRAME);
+      clock.advance(FRAME);
 
       const shown = printed(person);
       expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("Deploy it now?"));
@@ -388,29 +400,29 @@ describe("a normal command's chain, which is no chain at all", () => {
 
   // `task` and `begin` got the gutter that `spinner` was taught to keep out
   // of, so a normal command that reported a step drew a `│` above its answer.
-  it("keeps a step out of the gutter it does not have", async ({ screen }) => {
+  it("keeps a step out of the gutter it does not have", async ({ terminal }) => {
     await normally().task("Fetching variables", async () => undefined);
 
-    expect(printed(screen)).not.toContain("┌");
-    expect(printed(screen)).not.toContain("│");
+    expect(printed(terminal)).not.toContain("┌");
+    expect(printed(terminal)).not.toContain("│");
   });
 
-  it("keeps a hand-ended step out of it too", ({ screen }) => {
+  it("keeps a hand-ended step out of it too", ({ terminal }) => {
     normally().begin("Fetching variables").done();
 
-    expect(printed(screen)).not.toContain("│");
+    expect(printed(terminal)).not.toContain("│");
   });
 
   // Ctrl-C at a plain prompt left the line it was typing on, with nothing but
   // the terminal's own `^C`, so the shell prompt continued that line. The same
   // sentence a wizard closes on says the run stopped.
-  it("says the one cancellation sentence where there is no chain to close", ({ screen }) => {
+  it("says the one cancellation sentence where there is no chain to close", ({ terminal }) => {
     const chain = normally();
     removing(chain);
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
-    expect(printed(screen)).toBe("\nCancelled\n");
+    expect(printed(terminal)).toBe("\nCancelled\n");
   });
 
   // `--force` is a flag about whether to ask. The only difference it may make
@@ -510,10 +522,10 @@ describe("a normal command's chain, which is no chain at all", () => {
       );
     });
 
-    it("writes nothing of its own: the caller decides where it goes", ({ screen }) => {
+    it("writes nothing of its own: the caller decides where it goes", ({ terminal }) => {
       scripted().written(summary);
 
-      expect(printed(screen)).toBe("");
+      expect(printed(terminal)).toBe("");
     });
   });
 });

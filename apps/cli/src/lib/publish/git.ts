@@ -25,7 +25,7 @@ const CONFIG_PATHS = [
 const CONFIG_GLOBS = [RELEASE_POLICY_GLOBS.included];
 
 /**
- * Policy test files sit beside the policies, but `policies test` runs them and
+ * Policy test files sit beside the policies, but `policy test` runs them and
  * no release carries them.
  */
 const EXCLUDED = [RELEASE_POLICY_GLOBS.excluded];

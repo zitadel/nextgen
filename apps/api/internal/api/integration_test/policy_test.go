@@ -349,7 +349,7 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 
 	t.Run("registration", func(t *testing.T) {
 		schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-		defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 			ProjectID:      api.ProjectID(project.ID),
 			FlowDefinition: passwordRegisterFlowDefinition(schemaURL),
 		})
@@ -383,7 +383,7 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 				"email":                   jx.Raw(`"policy-register@example.com"`),
 				"x-auth-methods#password": jx.Raw(`"short-pass"`),
 			}),
-		}, api.SubmitFlowStepParams{ID: flowHeaders.Response.ID, Zflow: mustExtractZflow(t, flowHeaders.SetCookie)})
+		}, api.SubmitFlowStepParams{FlowID: flowHeaders.Response.ID, Zflow: mustExtractZflow(t, flowHeaders.SetCookie)})
 		require.NoError(t, err)
 		require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, submitResp, helpers.MustMarshal(t, submitResp))
 		badStep := badRequestStep(t, submitResp)
@@ -420,7 +420,7 @@ func TestPasswordPolicyFollowsTheRelease(t *testing.T) {
 		t.Helper()
 		body, err := json.Marshal(map[string]string{"project_id": project.ID, "purpose": "register"})
 		require.NoError(t, err)
-		resp, raw := postFlow(t, "/flow", body, origin, nil)
+		resp, raw := postFlow(t, "/flows", body, origin, nil)
 		require.Equal(t, http.StatusCreated, resp.StatusCode, string(raw))
 		var opened api.FlowResponse
 		require.NoError(t, opened.UnmarshalJSON(raw), string(raw))

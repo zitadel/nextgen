@@ -1,6 +1,6 @@
 import type { Command } from "@oclif/core";
 
-import { bindOperation, type OperationClass } from "./ops/command";
+import { bindOperation, type OperationClass, type ServerMixin } from "./ops/command";
 import { DeleteOperation } from "./ops/delete";
 import { ListOperation } from "./ops/list";
 import { GetOperation } from "./ops/read";
@@ -43,7 +43,7 @@ export type {
   OperationInput,
   OperationStatics,
 } from "./ops/command";
-export { bindOperation, definitionOf, ResourceCommand } from "./ops/command";
+export { bindOperation, definitionOf, ResourceCommand, type ServerMixin } from "./ops/command";
 export type { FieldPaths } from "./paths";
 export { allows, fieldPaths, observedPaths, suggestable } from "./paths";
 export { parseFilter, parseSort } from "./query";
@@ -55,13 +55,14 @@ export { CreateOperation, DeleteOperation, GetOperation, ListOperation, UpdateOp
 
 /**
  * Builds the command classes for every registry entry, keyed by oclif command
- * id (`users:list`), ready to spread into an explicit command table. oclif's
+ * id (`user:list`), ready to spread into an explicit command table. oclif's
  * help, manifest, autocomplete, and README generation read them exactly as
  * they read hand-written classes.
  */
 export const buildResourceCommands = <Ctx>(
   registry: ResourceRegistry<Ctx>,
   options: ResourceCommandOptions<Ctx>,
+  takesServer: ServerMixin,
 ): Readonly<Record<ResourceCommandId, typeof Command>> => {
   return Object.fromEntries(
     Object.entries(registry).flatMap(([topic, resource]) => {
@@ -72,7 +73,12 @@ export const buildResourceCommands = <Ctx>(
       ): readonly (readonly [ResourceCommandId, typeof Command])[] => {
         return spec === undefined
           ? []
-          : [[`${topic}:${verb}`, bindOperation(operation, { topic, resource, spec, options })]];
+          : [
+              [
+                `${topic}:${verb}`,
+                bindOperation(operation, { topic, resource, spec, options }, takesServer),
+              ],
+            ];
       };
       return [
         ...bind("list", ListOperation, resource.list),

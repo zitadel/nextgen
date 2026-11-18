@@ -1,13 +1,15 @@
 import { Flags } from "@oclif/core";
 
 import { VariableRemoval, VariableService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import { variableNameArg } from "./name";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -15,9 +17,10 @@ import { variableNameArg } from "./name";
  * `--preview` removes the preview value and leaves the primary one standing;
  * without it the variable is removed for both kinds.
  */
-export default class VariableRm extends Destructive(EnvironmentCommand) {
+export default class VariableRm extends Destructive(ServerCommand(EnvironmentCommand)) {
   static override description = "Remove one variable from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID",

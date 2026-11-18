@@ -1,14 +1,10 @@
 import { Args } from "@oclif/core";
 
 import { Operation } from "@/lib/backend";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
@@ -36,10 +32,11 @@ function entryOf(operation: Operation) {
  * offline. `--json` carries each one's parameters, body and paging, which is
  * what an agent needs to build the call.
  */
-export default class ApiLs extends Tabulatable(BaseCommand) {
+export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
   static override description =
     "List the operations of the Zitadel API that the api command calls.";
-  static override group = CommandGroups.diagnostics;
+  static override group = CommandGroups.apiAndEvents;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> api ls",
@@ -59,9 +56,14 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     plain: plainFlag,
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<JsonEnvelope> {
     const items = Operation.all({
