@@ -134,6 +134,21 @@ export function Telemetered<
     }
 
     /**
+     * Sends a product event the catalog lists for the CLI, with the header and
+     * context every CLI event carries, to every destination the catalog names.
+     * Only for an event an ADR names; a command's own facts are dimensions
+     * ({@link annotate}, `describe()`).
+     *
+     * @param event - The event's name in the catalog.
+     * @param properties - The event's properties.
+     */
+    protected trackEvent(event: string, properties: Facts): void {
+      this.reportGuard(() => {
+        this.reportTrack(event, properties);
+      });
+    }
+
+    /**
      * Telemetry factory seam. Production returns the real {@link Telemetry.create};
      * tests override it to inject a recording client.
      *

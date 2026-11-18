@@ -93,6 +93,10 @@ class TestCommand extends Telemetered(BaseCommand) {
     this.watchdogs += 1;
   }
 
+  public send(event: string, properties: Facts): void {
+    this.trackEvent(event, properties);
+  }
+
   public async wrapUp(): Promise<void> {
     await this.finally(undefined);
   }
@@ -311,6 +315,39 @@ describe("Telemetered end of run", () => {
     await cmd.wrapUp();
 
     expect(cmd.watchdogs).toBe(0);
+  });
+});
+
+describe("Telemetered product events", () => {
+  it("sends a product event with its properties and the command's context", async () => {
+    const cmd = makeCommand();
+    await cmd.open();
+    cmd.send("invitation_created", { role: "project_viewer", invitation_journey_id: "journey_1" });
+
+    expect(names(cmd)).toEqual(["cli_command_started", "invitation_created"]);
+    expect(cmd.recorder.sent[1]?.properties).toMatchObject({
+      role: "project_viewer",
+      invitation_journey_id: "journey_1",
+      command: "telemetry-test",
+      invocation_id: cmd.recorder.sent[0]?.properties.invocation_id,
+    });
+  });
+
+  it("sends a product event to every destination", async () => {
+    const cmd = makeCommand();
+    await cmd.open();
+    cmd.send("invitation_created", { role: "project_viewer" });
+
+    expect(cmd.recorder.sent[1]?.only).toBeUndefined();
+  });
+
+  it("sends no product event when telemetry is opted out", async () => {
+    const cmd = makeCommand();
+    cmd.optOut = true;
+    await cmd.open();
+    cmd.send("invitation_created", { role: "project_viewer" });
+
+    expect(names(cmd)).toEqual([]);
   });
 });
 

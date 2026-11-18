@@ -186,10 +186,14 @@ nothing; `data.skills` and `data.directories` say what it added where.
   - `--replaces <invitation_id>` makes a new link for a lost, expired or
     declined one, keeping its name unless `--name` gives another; an accepted
     one fails with `E_VALIDATION`.
-  - `invitation list [--status …] [--type …]` and `invitation get
-    <invitation_id>` read them. `invitation cancel <invitation_id>` stops a
-    pending link or removes a declined one and needs `--force` when
-    non-interactive; its `--dry-run` needs the id.
+  - `invitation list` leaves accepted invitations out, as the console does;
+    repeat `--status` to pick statuses (`--status accepted` lists them).
+    `invitation get <invitation_id>` reads one; `responded_by` and
+    `responded_at` say who accepted or declined it, and when.
+  - `invitation cancel <invitation_id>` stops a pending link, or removes a
+    declined invitation, and needs `--force` when non-interactive; its
+    `--dry-run` needs the id. An accepted or expired one fails with
+    `E_VALIDATION`.
   - A project nobody has claimed refuses invitations until it is claimed
     (`zitadel claim`). Existing members are read with `grant list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
@@ -395,6 +399,12 @@ Each invocation prints one JSON object:
   when no identifier step comes before it. A step reached through a
   `user_already_exists` collision, such as `sso-conflict`, is exempt: the
   collision names the user.
+- `deploy`, `deploy --dry-run` and `preview` probe the branding image URLs
+  (`logo_url`, `hero_url`, `theme.light.logo_url`, `theme.dark.logo_url`) and
+  add one `warnings` line per field whose public `https` URL is unreachable,
+  not a 2xx or not an image, naming the field. It never fails the command; set
+  `ZITADEL_SKIP_ASSET_PROBE` to skip it, or `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to
+  change the per-URL budget.
 - `deploy` and `deploy --dry-run` read the project's users and refuse when the
   config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
