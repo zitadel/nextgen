@@ -76,16 +76,11 @@ packages/sdk-*/
 packages/client-sdk-contract/
 packages/server-sdk-contract/
 conformance/
-patches/
 ```
 
 These exceptions cover code and contracts that are intended to be imported,
 generated from, embedded into, or otherwise used by downstream applications
 without imposing AGPL-3.0-only obligations on those applications.
-
-`patches/` holds pnpm patches to third-party packages. Each one quotes the
-source of an MIT-licensed dependency, so the path is MIT as well; a patch to a
-package under another license needs its own line here.
 
 For `apps/api/api/`, OpenAPI `info.license` metadata describes the exposed
 API contract/specification license. It does not describe or override the
