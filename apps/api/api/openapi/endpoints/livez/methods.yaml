@@ -1,5 +1,6 @@
 get:
   operationId: getLive
+  # demo: the server answers this operation with a 500 on purpose
   tags:
     - System
   summary: Check the server's liveness

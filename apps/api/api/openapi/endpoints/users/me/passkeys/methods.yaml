@@ -1,5 +1,6 @@
 get:
   operationId: listMyPasskeys
+  # demo: the server answers this operation with a 500 on purpose
   summary: List my passkeys
   description: |
     Lists the signed-in user's own passkeys, newest first, paginated with a
