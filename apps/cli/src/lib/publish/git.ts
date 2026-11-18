@@ -67,9 +67,9 @@ export async function headSubject(cwd: string): Promise<string | null> {
  * not only under `.zitadel/`.
  *
  * @remarks
- * A release records the provenance of the whole commit it was built from, so a
- * change outside `.zitadel/` (a code change that the config depends on, say)
- * makes that provenance just as inexact.
+ * The commit's subject only describes the work when nothing is uncommitted. A
+ * release's provenance does not use this: it asks {@link configIsDirty}, because
+ * a change outside `.zitadel/` cannot change what a release pins.
  *
  * @param cwd - The project root.
  * @returns Whether anything is uncommitted; false when there is no repo.
@@ -89,8 +89,9 @@ export async function worktreeIsDirty(cwd: string): Promise<boolean> {
  * what a commit of the configuration would stage.
  *
  * @remarks
- * {@link worktreeIsDirty} is wider, and says nothing about whether such a
- * commit would have anything in it.
+ * This is what a release records as its `git_dirty`: the commit is exact for
+ * the bundle exactly when `.zitadel/` is committed. {@link worktreeIsDirty} is
+ * wider, and says nothing about whether such a commit would have anything in it.
  *
  * @param cwd - The project root.
  * @returns Whether anything under `.zitadel/` is uncommitted; false when there
