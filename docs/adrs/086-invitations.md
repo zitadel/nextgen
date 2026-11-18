@@ -465,7 +465,7 @@ the 72-hour acceptance rate as an invitation nobody opened, the same error
   <invitation_id>` reads the invitation before it asks to confirm. The
   question names who the invitation is for and its role, and the event takes
   its role and journey from that read. A cancel with no id picks from the
-  pending list, which it has already read.
+  pending and declined invitations, which it has already read.
 - Cancelling a declined invitation sends none: its journey already ended
   with `invitation_rejected`.
 - The 72-hour acceptance rate leaves out cancelled journeys.
