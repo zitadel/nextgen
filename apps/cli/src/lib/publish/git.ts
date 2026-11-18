@@ -92,34 +92,6 @@ export async function worktreeIsDirty(cwd: string): Promise<boolean> {
 }
 
 /**
- * Whether anything under `.zitadel/` is uncommitted, untracked files included:
- * what a commit of the configuration would stage.
- *
- * @remarks
- * {@link worktreeIsDirty} is wider, and says nothing about whether such a
- * commit would have anything in it. What a release records as its `git_dirty`
- * is {@link bundleIsDirty}, which looks only at the files the bundle is built
- * from.
- *
- * @param cwd - The project root.
- * @returns Whether anything under `.zitadel/` is uncommitted; false when there
- *   is no repo.
- */
-export async function configIsDirty(cwd: string): Promise<boolean> {
-  const files = await Repository.answer(
-    cwd,
-    (repository) => {
-      return repository.uncommittedFiles();
-    },
-    [],
-  );
-
-  return files.some((file) => {
-    return file.path.startsWith(".zitadel/");
-  });
-}
-
-/**
  * Whether a path is one a release is built from.
  *
  * @param path - The project-relative path, spelled with `/`.

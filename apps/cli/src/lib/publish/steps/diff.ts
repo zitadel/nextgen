@@ -40,19 +40,6 @@ export type ConfigDiff = {
 };
 
 /**
- * The project-relative files the bundle inlines from outside `.zitadel/`, which
- * a deploy diffs and a dirty tree is judged by.
- *
- * @param ctx - The step context holding the configuration and its store.
- * @returns The paths, spelled with `/`.
- */
-export function referencedFiles(ctx: Pick<StepContext, "config" | "store">): readonly string[] {
-  return ctx.config.branding.all.flatMap((branding) => {
-    return branding.listReferencedPaths(ctx.store);
-  });
-}
-
-/**
  * Show what `.zitadel/` changed since the release the target serves now.
  *
  * It reads the live release's `git_sha` from its metadata and runs
@@ -111,7 +98,7 @@ export const diffStep: Step = {
     // a diff against the newest says nothing about the others.
     const learned = learnedFrom(touched, releases.size);
 
-    const referenced = referencedFiles(ctx);
+    const referenced = ctx.referenced;
     if (ctx.json) {
       const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
       if (files === null) {

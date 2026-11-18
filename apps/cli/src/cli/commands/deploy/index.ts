@@ -18,7 +18,6 @@ import {
   messageTooLong,
   Publisher,
 } from "@/lib/publish";
-import { configIsDirty } from "@/lib/publish/git";
 import {
   type NextOf,
   type Suggested,
@@ -324,7 +323,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
 
     // The release is live; if the tree was dirty, committing now keeps what was
     // deployed in git (the warning above says to commit before the next deploy).
-    const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
+    const configUncommitted = prepared.gitDirty;
 
     const title = `Deployed ${resources}`;
     const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;

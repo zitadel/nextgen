@@ -27,7 +27,7 @@ import {
   type StepContext,
   type StepReport,
 } from "./pipeline";
-import { diffStep, referencedFiles } from "./steps/diff";
+import { diffStep } from "./steps/diff";
 import { lockoutStep } from "./steps/lockout";
 import { DEPLOYED_DEPENDENT_RULE, validateStep } from "./steps/validate";
 
@@ -281,6 +281,9 @@ export class Publisher {
     const known = await this.loadKnowingDeployed(store);
     const config = known.config;
     const built = config.bundle(store);
+    const referenced = config.branding.all.flatMap((branding) => {
+      return branding.listReferencedPaths(store);
+    });
     const context: StepContext = {
       cwd: request.cwd,
       deployments: this.deployments,
@@ -295,6 +298,7 @@ export class Publisher {
       config,
       deployedUnknown: known.deployedUnknown,
       store,
+      referenced,
       bundle: built.bundle,
       // The steps hand on what they learned, so a later one can stand on what
       // an earlier one found rather than reading it again.
@@ -315,7 +319,7 @@ export class Publisher {
     // asking in turn would cost a whole process for nothing.
     const [sha, dirty] = await Promise.all([
       headSha(request.cwd),
-      bundleIsDirty(request.cwd, referencedFiles(context)),
+      bundleIsDirty(request.cwd, referenced),
     ]);
 
     return {
