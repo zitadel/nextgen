@@ -8,7 +8,7 @@ import { type FlowReport, Telemetered } from "@/cli/telemetry/telemetered";
 import { ZitadelError } from "@/lib/errors";
 import { BaseCommand, type Facts } from "@/lib/oclif/base";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
-import { loadOrCreateIdentity, type StoredIdentity } from "@/lib/telemetry/identity";
+import { loadOrCreateIdentity, markNoticed, type StoredIdentity } from "@/lib/telemetry/identity";
 import type { RunWatcher } from "@/lib/wizard";
 import { aConfigAt } from "@tests/helpers/suggestions";
 
@@ -251,6 +251,16 @@ describe("Telemetered first-run notice", () => {
     await cmd.open();
 
     expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: config.dir }).isFirstRun).toBe(false);
+  });
+
+  it("does not show it to a run that lost the claim to a concurrent first run", async () => {
+    markNoticed({ XDG_CONFIG_HOME: config.dir });
+    const cmd = makeCommand();
+    cmd.recorder.isFirstRun = true;
+    cmd.interactive = true;
+    await cmd.open();
+
+    expect(cmd.recorder.order).not.toContain("notice");
   });
 
   it("leaves it for a later run when the first run could not show it", async () => {
