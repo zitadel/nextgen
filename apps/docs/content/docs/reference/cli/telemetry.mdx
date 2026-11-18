@@ -41,7 +41,7 @@ Run a command with `--debug` to see each event on stderr before it is sent.
 
 ### What Mixpanel would get
 
-The CLI can also send its events to [Mixpanel](https://mixpanel.com), in its EU region, through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`). A run in CI, in development mode or from a source checkout goes to a separate development project, so it never reaches customer data. `cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
+The CLI can also send its events to [Mixpanel](https://mixpanel.com), in the US region for production and the EU region for development, where EU events go through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`). A run in CI, in development mode or from a source checkout goes to a separate development project, so it never reaches customer data. `cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
 
 | Property | What it holds |
 | --- | --- |

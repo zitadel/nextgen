@@ -338,6 +338,6 @@ Anonymous product analytics: a copy of each event to Vercel Web Analytics
    telemetry page; `tests/unit/lib/telemetry/catalog.test.ts` fails when the
    code and the catalog disagree.
 4. Check that it arrives in Mixpanel's Live View, with `ZITADEL_TELEMETRY_TOKEN`
-   naming a project of your own, or rely on the development project a development run sends to. The region defaults to
+   naming a project of your own, or rely on the development project a development run sends to. Each baked-in project carries its own region; a token of your own defaults to
    `eu`; set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are
    silently dropped.

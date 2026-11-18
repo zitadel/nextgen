@@ -7,11 +7,11 @@ import { ciFlag } from "./dimensions/ci-flag";
  * Resolves the Mixpanel ingestion token and endpoint for a CLI invocation, and
  * the channel that decides whether a run is production traffic.
  *
- * Both Mixpanel projects are in the EU region, which is the default endpoint,
- * so each one's token is baked in: a production run sends to the production
- * project, and a development run (CI, the CLI's own development mode, a source
- * checkout) to the development project, so test traffic never reaches customer
- * data. `ZITADEL_TELEMETRY_TOKEN` overrides both. Lifecycle events also go to
+ * Each Mixpanel project's token is baked in with the region it lives in: a
+ * production run sends to the production project (US), and a development run
+ * (CI, the CLI's own development mode, a source checkout) to the development
+ * project (EU), so test traffic never reaches customer data.
+ * `ZITADEL_TELEMETRY_TOKEN` overrides both. Lifecycle events also go to
  * Vercel Web Analytics (`vercel.ts`), from production runs only.
  *
  * A Mixpanel token is a *write-only* project token: it can ingest events but
@@ -102,43 +102,62 @@ export function installedFromPackage(): boolean {
 }
 
 /**
- * The production Mixpanel project's token, in its EU region. It is write-only
- * and published on purpose, like the one in Next.js. Left unset until the
- * production project's token is added, so a production run sends to Mixpanel
- * only with `ZITADEL_TELEMETRY_TOKEN`.
+ * A Mixpanel project a run sends to: its write-only ingestion token, published
+ * on purpose like the one in Next.js, and the data-residency region the project
+ * lives in. A token only works against the region of its own project, so the
+ * two are kept together.
  */
-const PRODUCTION_TOKEN: string | undefined = undefined;
+type Project = Readonly<{ token: string; region: TelemetryRegion }>;
 
 /**
- * The development Mixpanel project's token, in its EU region; write-only and
- * published on purpose, like {@link PRODUCTION_TOKEN}.
+ * The production project, which lives in the US region.
  */
-const DEVELOPMENT_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
+const PRODUCTION: Project = { token: "f56fd7315ccd614fba8eecb2a8966152", region: "us" };
 
 /**
- * Resolve the Mixpanel ingestion token, or `undefined` for no Mixpanel events.
- * A `ZITADEL_TELEMETRY_TOKEN` override wins; without one, a production run uses
- * the production project's token and any other run the development project's.
+ * The development project, which lives in the EU region.
+ */
+const DEVELOPMENT: Project = { token: "0fb432b08a9797b87b0eebcbee11706e", region: "eu" };
+
+/**
+ * The project a run sends to: a `ZITADEL_TELEMETRY_TOKEN` override, which is
+ * taken to live in the EU region unless `ZITADEL_TELEMETRY_REGION` says
+ * otherwise; else the production project for a production run and the
+ * development project for any other.
  *
  * @param env - The environment the run reads.
- * @returns The token, if the run has one.
+ * @returns The project to send to.
  */
-export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefined {
+function resolveProject(env: NodeJS.ProcessEnv): Project {
   const override = env.ZITADEL_TELEMETRY_TOKEN?.trim();
   if (override) {
-    return override;
+    return { token: override, region: "eu" };
   }
 
-  return resolveChannel(env) === "production" ? PRODUCTION_TOKEN : DEVELOPMENT_TOKEN;
+  return resolveChannel(env) === "production" ? PRODUCTION : DEVELOPMENT;
 }
 
 /**
- * Resolve where Mixpanel events go from `ZITADEL_TELEMETRY_REGION`. Defaults to
- * the EU region. Set `ZITADEL_TELEMETRY_REGION=us` for a US-hosted project —
- * events sent to the wrong region are silently dropped, so verify the first
- * event lands in Live View.
+ * Resolve the Mixpanel ingestion token.
+ *
+ * @param env - The environment the run reads.
+ * @returns The token of the project the run sends to.
+ */
+export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefined {
+  return resolveProject(env).token;
+}
+
+/**
+ * Resolve where Mixpanel events go: the region of the project the run sends to,
+ * or the one `ZITADEL_TELEMETRY_REGION` names. Events sent to the wrong region
+ * are silently dropped, so verify the first event lands in Live View.
+ *
+ * @param env - The environment the run reads.
+ * @returns The endpoint of the region.
  */
 export function resolveTelemetryEndpoint(env: NodeJS.ProcessEnv): TelemetryEndpoint {
-  const region = (env.ZITADEL_TELEMETRY_REGION ?? "eu").trim().toLowerCase();
-  return region === "us" ? ENDPOINTS.us : ENDPOINTS.eu;
+  const named = env.ZITADEL_TELEMETRY_REGION?.trim().toLowerCase();
+  const region = named === "us" || named === "eu" ? named : resolveProject(env).region;
+
+  return ENDPOINTS[region];
 }
