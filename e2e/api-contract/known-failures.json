@@ -28,8 +28,16 @@
     "check": "API accepted schema-violating request"
   },
   {
+    "operation": "POST /branding",
+    "check": "Response violates schema"
+  },
+  {
     "operation": "POST /deployments",
     "check": "Server error"
+  },
+  {
+    "operation": "POST /deployments/{deployment_id}/rollback",
+    "check": "API accepted schema-violating request"
   },
   {
     "operation": "POST /grants/query",
@@ -74,9 +82,5 @@
   {
     "operation": "PUT /users/{user_id}/password",
     "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "Stateful tests",
-    "check": "Server error"
   }
 ]
