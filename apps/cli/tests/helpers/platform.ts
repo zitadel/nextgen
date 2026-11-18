@@ -745,6 +745,9 @@ export function usePlatformMock(): PlatformMock {
         http.get("*/invitations/:id", () => {
           return HttpResponse.json(invitation);
         }),
+        http.delete("*/invitations/:id", () => {
+          return new HttpResponse(null, { status: 204 });
+        }),
       );
       return name;
     },
