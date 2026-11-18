@@ -46,7 +46,7 @@ export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCo
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
     const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
-    this.recordTelemetry({
+    this.annotate({
       is_secret: variable.secret,
     });
 

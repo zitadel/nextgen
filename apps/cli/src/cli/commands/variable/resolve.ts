@@ -174,7 +174,7 @@ export default class VariableResolve extends Tabulatable(ServerCommand(Environme
     where: string,
     carried: { origins?: string[] },
   ): Promise<JsonEnvelope> {
-    this.recordTelemetry({
+    this.annotate({
       variable_count: items.length,
     });
 

@@ -1,10 +1,5 @@
 import type { LocalMachine } from "@/lib/server";
-import {
-  type IdpProvider,
-  type ProviderName,
-  type ProviderSelection,
-  selectionName,
-} from "@zitadel/config/idp";
+import type { IdpProvider, ProviderName, ProviderSelection } from "@zitadel/config/idp";
 
 import type { FollowUps, SchemaTarget } from "@/cli/commands/auth-method/command";
 import type AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
@@ -19,7 +14,6 @@ import type {
 } from "@/lib/idp";
 import { log } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/lib/oclif";
-import type { FlowStep } from "@/lib/oclif/flow-telemetry";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Again, Suggest, SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -473,15 +467,3 @@ export function drawMapping(change: DocumentChange<Connection>): void {
       .join("\n"),
   );
 }
-
-/**
- * How the provider setup flow learns what it reports: the kind of provider,
- * once the run has settled it. It reports no step of its own.
- */
-export const PROVIDER_SETUP_STEPS: Readonly<Record<string, FlowStep<Partial<EnableFacts>>>> = {
-  selection: {
-    choice: ({ selection }) => {
-      return { provider_type: selection === undefined ? undefined : selectionName(selection) };
-    },
-  },
-};

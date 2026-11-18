@@ -28,6 +28,7 @@ export default defineConfig({
     index: "src/index.ts",
     "cli/help": "src/cli/help.ts",
     "hooks/command-not-found": "src/cli/hooks/command-not-found.ts",
+    "hooks/recorder": "src/cli/hooks/recorder.ts",
     "hooks/version-notice": "src/cli/hooks/version-notice.ts",
   },
   outDir: "dist",

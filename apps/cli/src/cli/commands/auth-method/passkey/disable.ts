@@ -3,6 +3,7 @@ import { Flags } from "@oclif/core";
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, JsonEnvelope } from "@/lib/oclif";
+import { action, type Observation } from "@/cli/telemetry/observation";
 
 /**
  * `zitadel auth-method passkey disable` — disable passkey sign-in for a user schema.
@@ -10,6 +11,14 @@ import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
   static override description = "Disable passkey sign-in for a user schema.";
   static override group = CommandGroups.signIn;
+  static override readonly observation: Observation = {
+    follow: action({
+      action: "disable",
+      resource_type: "authentication_method",
+      method: "passkey",
+      entry_point: "standalone",
+    }),
+  };
   static override groupOrder = 1;
 
   static override examples = [

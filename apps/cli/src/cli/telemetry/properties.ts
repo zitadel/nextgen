@@ -1,4 +1,6 @@
 import type { RuntimeKind } from "@/lib/server";
+import { detectAgent } from "agent-cli-detector";
+
 import type { Properties } from "@/lib/telemetry";
 import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
 import { ciProvider } from "@/lib/telemetry/dimensions/ci-provider";
@@ -6,7 +8,7 @@ import { country } from "@/lib/telemetry/dimensions/country";
 import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
 import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
 import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
-import type { GlobalOptions } from "./types";
+import type { GlobalOptions } from "@/lib/oclif/types";
 
 /**
  * CLI-specific telemetry glue: the only place that turns a {@link GlobalOptions}
@@ -18,92 +20,16 @@ export const CLI_COMMAND_STARTED = "cli_command_started";
 export const CLI_COMMAND_COMPLETED = "cli_command_completed";
 export const CLI_COMMAND_FAILED = "cli_command_failed";
 
-export const ACTION_COMPLETED = "action_completed";
-export const ACTION_FAILED = "action_failed";
-
 /**
- * What a command's success or failure reports as an action event, by command
- * id. A command not listed reports none.
- */
-export const COMMAND_ACTIONS: ReadonlyMap<string, Properties> = new Map<string, Properties>([
-  ["user:create", { action: "create", resource_type: "user" }],
-  ["user:update", { action: "update", resource_type: "user" }],
-  ["user:delete", { action: "delete", resource_type: "user" }],
-  ["team:create", { action: "create", resource_type: "team" }],
-  ["team:update", { action: "update", resource_type: "team" }],
-  ["team:deactivate", { action: "deactivate", resource_type: "team" }],
-  ["grant:create", { action: "create", resource_type: "grant" }],
-  ["grant:delete", { action: "delete", resource_type: "grant" }],
-  ...(["password", "passkey", "sso"] as const).flatMap((method) => {
-    return (["enable", "disable"] as const).map((action): [string, Properties] => {
-      return [
-        `auth-method:${method}:${action}`,
-        { action, resource_type: "authentication_method", method, entry_point: "standalone" },
-      ];
-    });
-  }),
-  ["deploy", { action: "deploy", resource_type: "deployment" }],
-  ["deployment:create", { action: "redeploy", resource_type: "deployment" }],
-  ["deployment:rollback", { action: "rollback", resource_type: "deployment" }],
-]);
-
-/**
- * The dimensions a command records that an action event carries too.
- */
-const ACTION_DIMENSIONS = [
-  "access_level",
-  "test_mode",
-  "test_result",
-  "changed_configuration_types",
-  "stage",
-] as const;
-
-/**
- * The properties of the action event a command's outcome reports, or
- * `undefined` when the command reports none.
- *
- * @param command - The command id.
- * @param recorded - What the command recorded as it ran.
- * @param outcome - What the outcome adds: its duration, and its error code when it failed.
- * @returns The event's own properties, before the run's common ones.
- */
-export function actionProperties(
-  command: string,
-  recorded: Properties,
-  outcome: Properties,
-): Properties | undefined {
-  const action = COMMAND_ACTIONS.get(command);
-  if (action === undefined) {
-    return undefined;
-  }
-  const dimensions = Object.fromEntries(
-    ACTION_DIMENSIONS.map((name) => {
-      return [name, recorded[name]];
-    }),
-  );
-  return { ...dimensions, ...action, ...outcome };
-}
-
-/**
- * The one dimension of its own a command's Vercel Web Analytics copy keeps, by
- * command id; the rest go to Mixpanel only.
- */
-export const VERCEL_COMMAND_DIMENSIONS: ReadonlyMap<string, string> = new Map([
-  ["setup", "framework"],
-  ["claim", "claim_outcome"],
-  ["doctor", "failed_checks"],
-  ["api", "operation"],
-  ["start", "runtime"],
-]);
-
-/**
- * The properties the Vercel Web Analytics copy of `command`'s lifecycle events
+ * The properties the Vercel Web Analytics copy of a command's lifecycle events
  * keeps, in priority order, the header first: the intake takes 8. The
- * command's own dimension ranks after `host_agent`, so on a failed run, where
+ * command's own headline ranks after `host_agent`, so on a failed run, where
  * `reason` fills the eighth place, it takes `non_interactive`'s.
+ *
+ * @param dimension - The one fact of its own the command keeps, if it has one.
+ * @returns The property names the copy keeps.
  */
-export function vercelEventKeys(command: string): readonly string[] {
-  const dimension = VERCEL_COMMAND_DIMENSIONS.get(command);
+export function vercelEventKeys(dimension?: string): readonly string[] {
   return [
     "surface",
     "cli_version",
@@ -201,10 +127,28 @@ export function commandEventProperties(
     is_ci: ciFlag.value(env),
     ci_provider: ciProvider.value(env),
     host_agent: hostAgent.value(env),
+    ...agentProperties(env),
     invocation_channel: invocationChannel.value(env),
     dry_run: meta.dryRun,
     force: meta.force,
     server_kind: serverKind,
+  };
+}
+
+/**
+ * Whether the run is inside a coding agent, and which, as the detector names
+ * it from a fixed list. A run it recognises nothing in says nothing about who
+ * ran it, so only a detected agent is named.
+ *
+ * @param env - The environment the command ran in.
+ * @returns `is_agent` and, for a detected agent, `agent_name`.
+ */
+function agentProperties(env: NodeJS.ProcessEnv): Properties {
+  const found = detectAgent({ env });
+
+  return {
+    is_agent: found.detected,
+    agent_name: found.detected ? found.agent?.id : undefined,
   };
 }
 

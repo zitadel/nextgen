@@ -44,7 +44,7 @@ export default class VariableList extends Tabulatable(ServerCommand(EnvironmentC
 
     if (flags.preview) {
       const items = await variableService.previews();
-      this.recordTelemetry({
+      this.annotate({
         variable_count: items.length,
       });
       const rows = items.map((item) => {
@@ -69,7 +69,7 @@ export default class VariableList extends Tabulatable(ServerCommand(EnvironmentC
     }
 
     const items = await variableService.inventory();
-    this.recordTelemetry({
+    this.annotate({
       variable_count: items.length,
     });
     const rows = items.map((item) => {

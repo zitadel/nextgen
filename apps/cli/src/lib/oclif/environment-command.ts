@@ -120,7 +120,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const { environment } = this;
     // Recorded before anything is required, so a run stopped for a missing
     // value still says which credential it was after.
-    this.recordTelemetry({ credential, has_env_file: environment.envFile !== undefined });
+    this.annotate({ credential, has_env_file: environment.envFile !== undefined });
     // On a terminal a missing value is prompted for and persisted to
     // `.env.<name>.local`; non-interactively each still throws, naming
     // the sources consulted, so a scripted run stays deterministic.

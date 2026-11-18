@@ -259,7 +259,7 @@ The server evaluates every case, so the command needs a connection to it. By def
       return !testCase.passed;
     }).length;
     const source = flags.release === undefined ? "files" : "release";
-    this.recordTelemetry({
+    this.annotate({
       policy_source: source,
       case_count: cases.length,
       failed_count: failed,

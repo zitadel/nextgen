@@ -39,6 +39,7 @@
     "helpClass": "./dist/cli/help",
     "hooks": {
       "command_not_found": "./dist/hooks/command-not-found",
+      "init": "./dist/hooks/recorder",
       "finally": "./dist/hooks/version-notice"
     },
     "additionalHelpFlags": [
@@ -154,6 +155,7 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
+    "agent-cli-detector": "^0.1.7",
     "ajv": "catalog:",
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",

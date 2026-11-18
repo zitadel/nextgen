@@ -182,7 +182,7 @@ export default class VariableSet extends Tabulatable(
         });
 
     const written = await variableService.set(args.name, value, write);
-    this.recordTelemetry({
+    this.annotate({
       is_secret: write.secret,
     });
 

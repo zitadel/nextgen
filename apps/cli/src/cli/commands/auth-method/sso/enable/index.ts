@@ -12,13 +12,9 @@ import {
   RESERVED_SLUGS,
 } from "@zitadel/config/idp";
 
+import { action, flow, type Observation, together } from "@/cli/telemetry/observation";
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
-import {
-  type EnableFacts,
-  type Fact,
-  PROVIDER_SETUP_STEPS,
-} from "@/cli/commands/auth-method/sso/enable/shared";
-import { FlowTelemetry } from "@/lib/oclif/flow-telemetry";
+import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
@@ -70,6 +66,17 @@ const PROVIDER_IS_NAMED_REFUSAL = {
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.signIn;
+  static override readonly observation: Observation = {
+    follow: together(
+      action({
+        action: "enable",
+        resource_type: "authentication_method",
+        method: "sso",
+        entry_point: "standalone",
+      }),
+      flow({ flow: "oidc_provider_setup", with: { entry_point: "standalone" } }),
+    ),
+  };
   static override groupOrder = 1;
 
   static override examples = [
@@ -149,19 +156,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
-
-    const setup = new FlowTelemetry<Partial<EnableFacts>>({
-      flow: "oidc_provider_setup",
-      steps: PROVIDER_SETUP_STEPS,
-      completesAt: "write",
-      preview: () => {
-        return this.dryRun;
-      },
-      send: (event, properties) => {
-        this.trackEvent(event, properties);
-      },
-    });
-    setup.begin({ entry_point: "standalone" });
 
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
@@ -255,7 +249,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .run(
           { flags },
           {
-            watch: setup.watcher,
             onUndoError: (key, error) => {
               warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

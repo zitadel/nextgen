@@ -82,6 +82,25 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
   readonly key = "socialSignIn";
 
   /**
+   * The name reports of the onboarding flow call this step by.
+   */
+  override readonly milestone = "provider_selection";
+
+  /**
+   * What the step settled, for reports of the onboarding flow.
+   *
+   * @param known - What is known once the step finished.
+   * @returns The choice, as facts.
+   */
+  override facts({ answers }: Fact<"answers">): Readonly<Record<string, unknown>> {
+    return {
+      provider_types: answers.sso.map((draft) => {
+        return selectionName(draft.selection);
+      }),
+    };
+  }
+
+  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

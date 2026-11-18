@@ -31,6 +31,21 @@ export class ChooseSignIn extends WizardStep<"signInPreset", Fact<"answers">, Ne
   readonly key = "signInPreset";
 
   /**
+   * The name reports of the onboarding flow call this step by.
+   */
+  override readonly milestone = "preset_selection";
+
+  /**
+   * What the step settled, for reports of the onboarding flow.
+   *
+   * @param known - What is known once the step finished.
+   * @returns The choice, as facts.
+   */
+  override facts({ answers }: Fact<"answers">): Readonly<Record<string, unknown>> {
+    return { preset: answers.preset };
+  }
+
+  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

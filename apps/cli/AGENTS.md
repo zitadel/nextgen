@@ -296,8 +296,8 @@ Anonymous product analytics: a copy of each event to Vercel Web Analytics
 paused.
 
 - Add no other analytics tool or SDK, browser SDK included.
-- The Vercel copy sends only `VERCEL_EVENT_KEYS` (`src/lib/oclif/command-telemetry.ts`),
-  the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
+- The Vercel copy sends only the keys `vercelEventKeys` (`src/cli/telemetry/properties.ts`)
+  returns, the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
 - Development runs (`resolveChannel`, CI included) send no Vercel copy unless
   `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
@@ -309,8 +309,20 @@ paused.
 - Consent is opt-out (`--no-telemetry`, `DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`)
   and resolved once in `resolveConsent` (`src/lib/telemetry/consent.ts`).
   Never send around it.
-- `BaseCommand` (`src/lib/oclif/base.ts`) is the only place a client is
-  built; CLI-specific properties live in `src/lib/oclif/command-telemetry.ts`.
+- `Recorder` (`src/cli/telemetry/recorder.ts`) is the only place a client is built
+  and an event is sent; `src/lib` and the commands never send.
+- Libraries and `BaseCommand` only announce facts on `node:diagnostics_channel`
+  (`zitadel:command`, `:wizard`, `:prompt`, `:publish`, `:write`), in their own
+  words and with no analytics vocabulary; the `init` hook (`src/cli/hooks/recorder.ts`)
+  installs the one subscriber.
+- Keep no table that maps command ids, step keys or properties to events. A command
+  declares its own `static observation` (`src/cli/telemetry/observation.ts`): `action(…)`
+  for an action event, `flow(…)` for a wizard, `together(…)` for both, `headline` for the
+  one fact its Vercel copy keeps.
+- A wizard step names itself for reports with `milestone`, and says what it settled with
+  `facts()`; a step that settles nothing declares neither.
+- A generated resource opts in with `observation` on its descriptor in `resources.ts`.
+- A command that must never be counted overrides `observed()` to answer no.
 - Telemetry never writes to stdout and never fails a command. The first-run
   notice goes to stderr, in interactive mode only.
 - Mixpanel is paused: `src/lib/telemetry/config.ts` bakes in no token, so only
@@ -327,11 +339,11 @@ paused.
 
 ### Adding a dimension
 
-`cli_command_started`, `cli_command_completed` and `cli_command_failed` fire
-from `BaseCommand` for every command. Add a dimension rather than an event:
+`cli_command_started`, `cli_command_completed` and `cli_command_failed` are sent by
+the recorder for every command, from what `BaseCommand` announces. Add a dimension rather than an event:
 
-1. Record it with `this.recordTelemetry({ … })`. It reaches the events fired
-   after it, so not `started`. Never fetch data just to record it.
+1. Note it with `this.annotate({ … })`. It reaches the events fired after it, so not
+   `started`. Never fetch data just to note it.
 2. Name it `snake_case`; a boolean starts with `is_`, `has_`, `dry_` or
    `non_`. Leave out empty values; `compact()` drops them.
 3. List it under its command in the

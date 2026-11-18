@@ -144,7 +144,7 @@ export default class InvitationCreate extends Promptable(ServerCommand(Environme
       name,
       replaces: flags.replaces,
     });
-    this.recordTelemetry({
+    this.annotate({
       role: `project_${invitationRole(invitation)}`,
       is_replace: flags.replaces !== undefined,
     });

@@ -1,6 +1,7 @@
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, JsonEnvelope } from "@/lib/oclif";
+import { action, type Observation } from "@/cli/telemetry/observation";
 
 /**
  * `zitadel auth-method password enable` — enable password sign-in for a user schema.
@@ -8,6 +9,14 @@ import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 export default class AuthMethodPasswordEnable extends AuthMethodCommand {
   static override description = "Enable password sign-in for a user schema.";
   static override group = CommandGroups.signIn;
+  static override readonly observation: Observation = {
+    follow: action({
+      action: "enable",
+      resource_type: "authentication_method",
+      method: "password",
+      entry_point: "standalone",
+    }),
+  };
   static override groupOrder = 1;
 
   static override examples = [

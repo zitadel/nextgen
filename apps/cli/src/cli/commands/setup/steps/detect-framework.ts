@@ -49,6 +49,21 @@ export class DetectFramework extends WizardStep<
   readonly key = "detect";
 
   /**
+   * The name reports of the onboarding flow call this step by.
+   */
+  override readonly milestone = "framework_selection";
+
+  /**
+   * What the step settled, for reports of the onboarding flow.
+   *
+   * @param known - What is known once the step finished.
+   * @returns The choice, as facts.
+   */
+  override facts({ found }: Fact<"found">): Readonly<Record<string, unknown>> {
+    return { framework: found.app.framework };
+  }
+
+  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

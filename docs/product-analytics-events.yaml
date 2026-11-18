@@ -304,6 +304,16 @@ properties:
     type: string
     values: [github_actions, gitlab_ci, circleci, buildkite, jenkins, unknown]
     description: Which CI it ran in; absent outside CI.
+  is_agent:
+    type: boolean
+    description: >-
+      Whether the CLI ran inside a coding agent, as the detector reads it from
+      the environment. It says where the CLI ran, never who typed the command.
+  agent_name:
+    type: string
+    description: >-
+      The coding agent the detector recognised, by the id it gives from its own
+      fixed list, such as `claude-code`; absent when none was recognised.
   host_agent:
     type: string
     values: [claude_code, cursor, vscode, unknown]
@@ -468,6 +478,8 @@ components:
       - is_ci
       - ci_provider
       - host_agent
+      - is_agent
+      - agent_name
       - invocation_channel
       - invocation_id
       - distinct_id
@@ -566,7 +578,7 @@ components:
         - files_written_count
         - package_manager
       branding:eject: [design]
-      deploy: [resources, origin_count, stage, changed_configuration_types]
+      deploy: [resources, origin_count]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
       policy:test: [policy_source, case_count, failed_count]
       start: [runtime]

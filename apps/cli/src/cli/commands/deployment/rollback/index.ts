@@ -20,6 +20,7 @@ import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { action, type Observation } from "@/cli/telemetry/observation";
 
 const NOTHING_DEPLOYED_REFUSAL = {
   message: "There is no deployment to roll back",
@@ -86,6 +87,9 @@ export default class DeploymentRollback extends Tabulatable(
 ) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.releases;
+  static override readonly observation: Observation = {
+    follow: action({ action: "rollback", resource_type: "deployment" }),
+  };
   static override groupOrder = 5;
 
   static override examples = [

@@ -31,6 +31,7 @@ import {
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
 import { CommandGroups } from "@/cli/commands/groups";
+import { flow, type Observation } from "@/cli/telemetry/observation";
 import {
   type Admitted,
   BaseCommand,
@@ -39,7 +40,6 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { FlowTelemetry } from "@/lib/oclif/flow-telemetry";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { accepts, parses, reads } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -56,11 +56,7 @@ import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/
 import {
   DEFAULT_RENDERER,
   type Fact,
-  ONBOARDING_CHECKS,
-  ONBOARDING_PROMPTS,
-  ONBOARDING_STEPS,
   PORT,
-  type SetupFacts,
 } from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
 import { CheckPatch } from "./steps/check-patch";
@@ -207,6 +203,10 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
    * The group the command index lists it under.
    */
   static override group = CommandGroups.gettingStarted;
+  static override readonly observation: Observation = {
+    headline: "framework",
+    follow: flow({ flow: "onboarding", otherwise: "application_setup" }),
+  };
 
   /**
    * Where it sits in its group.
@@ -409,23 +409,6 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
       ui: this.ui,
     };
 
-    const onboarding = new FlowTelemetry<Partial<SetupFacts>>({
-      flow: "onboarding",
-      steps: ONBOARDING_STEPS,
-      failures: ONBOARDING_CHECKS,
-      viewed: ONBOARDING_PROMPTS,
-      completesAt: "result",
-      otherwise: "application_setup",
-      preview: () => {
-        return this.dryRun;
-      },
-      send: (event, properties) => {
-        this.trackEvent(event, properties);
-      },
-    });
-    onboarding.begin();
-    this.ui.onPrompt(onboarding.prompted);
-
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("setup")
         .step(
@@ -484,7 +467,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             ui: this.ui,
           }),
           ({ flags, found, scaffoldedFramework }) => {
-            this.recordTelemetry({
+            this.annotate({
               framework: found.app.framework,
               renderer: flags.renderer ?? DEFAULT_RENDERER,
               scaffolded_skeleton: scaffoldedFramework,
@@ -514,7 +497,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             suggest: this.suggest,
           }),
           ({ answers }) => {
-            this.recordTelemetry({
+            this.annotate({
               preset: answers.preset,
               use_case: answers.useCase,
               sso:
@@ -559,7 +542,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             ui: this.ui,
           }),
           () => {
-            this.recordTelemetry({ step: "project_created" });
+            this.annotate({ step: "project_created" });
           },
         )
         .step(
@@ -587,12 +570,12 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             dryRun: this.dryRun,
           }),
           ({ allFilesWritten, scaffolded }) => {
-            this.recordTelemetry({
+            this.annotate({
               step: "files_patched",
               files_written_count: allFilesWritten.length,
             });
             if (!this.dryRun) {
-              this.recordTelemetry({
+              this.annotate({
                 password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
               });
             }
@@ -623,7 +606,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             ui: this.ui,
           }),
           ({ installOutcome }) => {
-            this.recordTelemetry({
+            this.annotate({
               step: "dependencies_installed",
               package_manager: installOutcome.install.package_manager,
             });
@@ -679,7 +662,6 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
         .run(
           { flags },
           {
-            watch: onboarding.watcher,
             onUndoError: (key, error) => {
               warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

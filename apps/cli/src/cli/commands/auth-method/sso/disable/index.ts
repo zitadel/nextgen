@@ -8,6 +8,7 @@ import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
+import { action, type Observation } from "@/cli/telemetry/observation";
 
 /**
  * What a run that names no provider is refused for. The provider is always
@@ -33,6 +34,14 @@ const NAME_PROVIDER_REFUSAL = {
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
   static override group = CommandGroups.signIn;
+  static override readonly observation: Observation = {
+    follow: action({
+      action: "disable",
+      resource_type: "authentication_method",
+      method: "sso",
+      entry_point: "standalone",
+    }),
+  };
   static override groupOrder = 1;
 
   static override examples = [

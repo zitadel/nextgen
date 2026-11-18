@@ -1,3 +1,5 @@
+import { channel } from "node:diagnostics_channel";
+
 import type { EndStep, WizardStep } from "./step";
 
 /**
@@ -12,41 +14,58 @@ type Undo = () => Promise<void>;
 type Observer<Known extends object> = (known: Known) => void;
 
 /**
- * Told how a run goes, step by step, for a caller that records it without the
- * steps knowing. Each call comes from the engine, never from a step, and a
- * step that ends the wizard is not reported as a finished step.
+ * The channel a wizard announces how its run goes on, for anything that wants
+ * to follow a run without the steps knowing. Nothing is built when nobody is
+ * listening.
  */
-export type RunWatcher = {
-  /**
-   * A step is about to run.
-   *
-   * @param key - The step's name.
-   */
-  readonly started?: (key: string) => void;
-  /**
-   * A step finished, with everything known so far.
-   *
-   * @param key - The step's name.
-   * @param known - What is known, with what the step added.
-   */
-  readonly finished?: (key: string, known: object) => void;
-  /**
-   * A step failed, before the steps that ran are taken back.
-   *
-   * @param key - The step's name.
-   * @param error - What the step threw.
-   */
-  readonly failed?: (key: string, error: unknown) => void;
-};
+export const WIZARD_CHANNEL = "zitadel:wizard";
+
+/**
+ * What a wizard announces on {@link WIZARD_CHANNEL}, once per step and phase. A
+ * step that ends the wizard is never announced as finished.
+ */
+export type WizardEvent =
+  | {
+      readonly wizard: string;
+      readonly phase: "started";
+      readonly step: string;
+      readonly milestone: string | undefined;
+    }
+  | {
+      readonly wizard: string;
+      readonly phase: "finished";
+      readonly step: string;
+      readonly milestone: string | undefined;
+      readonly facts: Readonly<Record<string, unknown>> | undefined;
+    }
+  | {
+      readonly wizard: string;
+      readonly phase: "failed";
+      readonly step: string;
+      readonly milestone: string | undefined;
+      readonly error: unknown;
+    }
+  | { readonly wizard: string; readonly phase: "completed" }
+  | { readonly wizard: string; readonly phase: "ended"; readonly step: string };
+
+const events = channel(WIZARD_CHANNEL);
+
+/**
+ * Announce one event, building it only when somebody listens.
+ *
+ * @param event - Builds the event.
+ */
+function announce(event: () => WizardEvent): void {
+  if (events.hasSubscribers) {
+    events.publish(event());
+  }
+}
 
 /**
  * How one run behaves.
  */
 type RunOptions = {
-  /**
-   * Told how the run goes; see {@link RunWatcher}.
-   */
-  readonly watch?: RunWatcher;
+
   /**
    * Told when a step's undo itself failed. The run goes on undoing the steps
    * before it, and the error that started the undo is still the one thrown.
@@ -211,7 +230,9 @@ export class Wizard<Initial extends object, State extends object, Result> {
         return before;
       }
       const attempt = async (): Promise<Progress<State & Out, Result>> => {
-        options.watch?.started?.(step.key);
+        announce(() => {
+          return { wizard: this.name, phase: "started", step: step.key, milestone: step.milestone };
+        });
         const out = await reader.run(before.state);
         const undo = async (): Promise<void> => {
           try {
@@ -232,12 +253,28 @@ export class Wizard<Initial extends object, State extends object, Result> {
         };
       };
       const finished = await attempt().catch(async (error: unknown) => {
-        options.watch?.failed?.(step.key, error);
+        announce(() => {
+          return {
+            wizard: this.name,
+            phase: "failed",
+            step: step.key,
+            milestone: step.milestone,
+            error,
+          };
+        });
         await before.undo();
         throw error;
       });
       if (finished.kind === "continue") {
-        options.watch?.finished?.(step.key, finished.state);
+        announce(() => {
+          return {
+            wizard: this.name,
+            phase: "finished",
+            step: step.key,
+            milestone: step.milestone,
+            facts: step.facts?.(finished.state as never),
+          };
+        });
         try {
           observe?.(finished.state);
         } catch (error) {
@@ -275,6 +312,9 @@ export class Wizard<Initial extends object, State extends object, Result> {
           return before;
         }
         const result = await reader.run(before.state);
+        announce(() => {
+          return { wizard: this.name, phase: "ended", step: step.key };
+        });
 
         return {
           kind: "end",
@@ -283,7 +323,15 @@ export class Wizard<Initial extends object, State extends object, Result> {
         };
       };
       return attempt().catch(async (error: unknown) => {
-        options.watch?.failed?.(step.key, error);
+        announce(() => {
+          return {
+            wizard: this.name,
+            phase: "failed",
+            step: step.key,
+            milestone: step.milestone,
+            error,
+          };
+        });
         await before.undo();
         throw error;
       });
@@ -330,7 +378,12 @@ export class Wizard<Initial extends object, State extends object, Result> {
         return progress.result;
       }
       try {
-        return answer(progress.state);
+        const answered = answer(progress.state);
+        announce(() => {
+          return { wizard: this.name, phase: "completed" };
+        });
+
+        return answered;
       } catch (error) {
         await progress.undo();
         throw error;

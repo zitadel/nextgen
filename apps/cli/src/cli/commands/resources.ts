@@ -1,3 +1,4 @@
+import { crudAction, type Observation } from "@/cli/telemetry/observation";
 import type { Interfaces } from "@oclif/core";
 import { isVariableReference } from "@zitadel/config/idp";
 
@@ -376,6 +377,7 @@ const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
  */
 export const RESOURCES = {
   user: resource({
+    observation: { follow: crudAction() } satisfies Observation,
     group: CommandGroups.usersAndAccess,
     groupOrder: 1,
     singular: "user",
@@ -474,6 +476,7 @@ export const RESOURCES = {
   }),
 
   team: resource({
+    observation: { follow: crudAction() } satisfies Observation,
     group: CommandGroups.usersAndAccess,
     groupOrder: 2,
     singular: "team",
@@ -688,6 +691,16 @@ export const RESOURCES = {
   }),
 
   grant: resource({
+    observation: {
+      follow: crudAction((announcement) => {
+        if (announcement.channel === "write" && announcement.event.verb === "create") {
+          const level = announcement.event.body.relation;
+
+          return { access_level: typeof level === "string" ? level : undefined };
+        }
+        return undefined;
+      }),
+    } satisfies Observation,
     group: CommandGroups.usersAndAccess,
     groupOrder: 3,
     singular: "grant",
@@ -740,12 +753,7 @@ export const RESOURCES = {
       },
       // A grant names exactly one of `user` and `team`, which the required
       // fields alone cannot say, so the example names the principal itself.
-      {
-        example: "--relation viewer --user-identifier alice@acme.com",
-        record: (body) => {
-          return { access_level: typeof body.relation === "string" ? body.relation : undefined };
-        },
-      },
+      { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
       call: ({ client, projectId }, id, consent) => {

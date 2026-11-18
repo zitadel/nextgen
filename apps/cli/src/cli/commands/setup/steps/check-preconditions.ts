@@ -89,6 +89,11 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   readonly key = "preconditions";
 
   /**
+   * The name reports of the onboarding flow call this step by.
+   */
+  override readonly milestone = "initial_checks";
+
+  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

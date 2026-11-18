@@ -19,6 +19,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
 import { ServerCommand } from "@/cli/commands/server-command";
+import type { Observation } from "@/cli/telemetry/observation";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -152,6 +153,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
+  static override readonly observation: Observation = { headline: "claim_outcome" };
   static override groupOrder = 2;
 
   static override examples = [
@@ -241,7 +243,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         : flags.challengeId === undefined
           ? "Open a browser to claim this project"
           : "Wait for the link to be used to claim this project";
-      this.recordTelemetry({ claim_outcome: "dry_run" });
+      this.annotate({ claim_outcome: "dry_run" });
 
       const would =
         localRecord && !flags.noWait
@@ -293,7 +295,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
           });
         }
         case "window-expired": {
-          this.recordTelemetry({ claim_outcome: "window_expired" });
+          this.annotate({ claim_outcome: "window_expired" });
           throw refusalError(WINDOW_CLOSED_REFUSAL, {});
         }
         case "started": {
@@ -377,7 +379,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
     log.done("Project claimed");
 
-    this.recordTelemetry({
+    this.annotate({
       claim_outcome: "completed",
       browser_opened: opened,
     });
@@ -432,30 +434,30 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         }
 
         const progress = await claimService.status(challengeId).catch((error: unknown) => {
-          this.recordTelemetry({ poll_count: attempt });
+          this.annotate({ poll_count: attempt });
           throw new AbortError(error instanceof Error ? error : new Error(String(error)));
         });
         switch (progress.outcome) {
           case "completed": {
-            this.recordTelemetry({ poll_count: attempt });
+            this.annotate({ poll_count: attempt });
             return progress.claim;
           }
           case "window-expired": {
-            this.recordTelemetry({
+            this.annotate({
               claim_outcome: "window_expired",
               poll_count: attempt,
             });
             throw new AbortError(refusalError(WINDOW_CLOSED_REFUSAL, {}));
           }
           case "expired": {
-            this.recordTelemetry({
+            this.annotate({
               claim_outcome: "expired",
               poll_count: attempt,
             });
             throw new AbortError(refusalError(LINK_EXPIRED_REFUSAL, {}, { claim: startOver }));
           }
           case "not-found": {
-            this.recordTelemetry({
+            this.annotate({
               claim_outcome: "not_found",
               poll_count: attempt,
             });
@@ -489,7 +491,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
       if (!(error instanceof NotFinished)) {
         throw error;
       }
-      this.recordTelemetry({
+      this.annotate({
         claim_outcome: "timeout",
         poll_count: error.attempt,
       });
@@ -506,7 +508,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
     projectId: string,
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): JsonEnvelope {
-    this.recordTelemetry({ claim_outcome: "link_issued" });
+    this.annotate({ claim_outcome: "link_issued" });
     const wait = this.suggest({ id: "claim", flags: { challengeId: challenge.challenge_id } });
 
     const title = "Open the link in a browser to make your project permanent";
@@ -548,7 +550,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
     claimed_at?: string;
     dashboard_url?: string;
   }): JsonEnvelope {
-    this.recordTelemetry({ claim_outcome: "already_claimed" });
+    this.annotate({ claim_outcome: "already_claimed" });
     const title = "This project already belongs to a team";
     // The platform's own link to the project when it gave one, else the server's
     // console, so a project claimed earlier still says where to manage it.

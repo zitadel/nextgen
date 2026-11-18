@@ -6,6 +6,7 @@ import { Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
 import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
+import { action, type Observation } from "@/cli/telemetry/observation";
 import { type Admitted, type Connection, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
@@ -168,6 +169,19 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
   static override group = CommandGroups.releases;
+  static override readonly observation: Observation = {
+    follow: action({ action: "deploy", resource_type: "deployment" }, (announcement) => {
+      if (announcement.channel === "publish") {
+        return announcement.event.phase === "entered"
+          ? { stage: announcement.event.stage }
+          : { changed_configuration_types: announcement.event.changed };
+      }
+      if (announcement.channel === "command" && announcement.event.phase === "completed") {
+        return { stage: undefined };
+      }
+      return undefined;
+    }),
+  };
   static override groupOrder = 1;
 
   static override examples = [
@@ -214,7 +228,6 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
     if (!this.dryRun) {
       await this.requirePrimaryOrigin(publisher, projectId, environment);
     }
-    this.recordTelemetry({ stage: "validation" });
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -239,7 +252,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       });
     }
     const { resourceCount } = prepared;
-    this.recordTelemetry({ resources: resourceCount });
+    this.annotate({ resources: resourceCount });
     // The deploy again as it was typed (message and `--force` included), so a retry
     // or the real run after a dry run asks for the same thing.
     const again = async (): Promise<SuggestedCommand> => {
@@ -281,15 +294,10 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       );
     }
 
-    const { release, publication } = await publisher.deploy(
-      {
-        prepared,
-        message,
-      },
-      (stage) => {
-        this.recordTelemetry({ stage });
-      },
-    );
+    const { release, publication } = await publisher.deploy({
+      prepared,
+      message,
+    });
     switch (publication.outcome) {
       case "revoked": {
         throw new ZitadelError(
@@ -323,13 +331,9 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       }
     }
     const { deployment } = publication;
-    this.recordTelemetry({
-      stage: undefined,
-      changed_configuration_types: prepared.changedConfiguration,
-    });
 
     const servedOrigins = deployment.origins;
-    this.recordTelemetry({ origin_count: servedOrigins.length });
+    this.annotate({ origin_count: servedOrigins.length });
 
     // The release is live; if the tree was dirty, committing now keeps what was
     // deployed in git (the warning above says to commit before the next deploy).

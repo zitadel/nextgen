@@ -53,6 +53,7 @@ The CLI can also send its events to [Mixpanel](https://mixpanel.com), in its EU 
 | `is_tty`, `non_interactive`, `dry_run`, `force` | Whether it ran in a terminal, without prompts, as a dry run, and with `--force`. |
 | `is_ci`, `ci_provider` | Whether it ran in CI, and which: `github_actions`, `gitlab_ci`, `circleci`, `buildkite`, `jenkins` or `unknown`. |
 | `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
+| `is_agent`, `agent_name` | Whether the CLI ran inside a coding agent, and which one it recognised, such as `claude-code`. It says where the CLI ran, never who typed the command. |
 | `invocation_channel` | The package manager that started it: `npm`, `pnpm`, `yarn`, `bun` or `unknown`. |
 | `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted` or `unknown`, never its URL. |
 | `invocation_id` | A random ID that ties one run's events together. |

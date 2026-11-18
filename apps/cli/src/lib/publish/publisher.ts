@@ -1,3 +1,5 @@
+import { channel } from "node:diagnostics_channel";
+
 import {
   type Deployment,
   DeploymentService,
@@ -29,6 +31,34 @@ import {
   type StepReport,
 } from "./pipeline";
 import { diffStep } from "./steps/diff";
+
+/**
+ * The channel a publish announces how it goes on, for anything that wants to
+ * follow it. Nothing is built when nobody is listening.
+ */
+export const PUBLISH_CHANNEL = "zitadel:publish";
+
+/**
+ * What a publish announces on {@link PUBLISH_CHANNEL}: the kinds of
+ * configuration its diff found changed, once it is prepared (unset when the
+ * diff could not tell), and each stage a deploy enters.
+ */
+export type PublishEvent =
+  | { readonly phase: "prepared"; readonly changed: readonly ConfigurationType[] | undefined }
+  | { readonly phase: "entered"; readonly stage: "validation" | "release_creation" | "deployment" };
+
+const events = channel(PUBLISH_CHANNEL);
+
+/**
+ * Announce one event, if anybody listens.
+ *
+ * @param event - The event.
+ */
+function announce(event: PublishEvent): void {
+  if (events.hasSubscribers) {
+    events.publish(event);
+  }
+}
 import { lockoutStep } from "./steps/lockout";
 import { DEPLOYED_DEPENDENT_RULE, validateStep } from "./steps/validate";
 
@@ -105,12 +135,6 @@ export type PreparedRelease = {
    * command must not deploy without consent.
    */
   readonly lockouts: readonly Lockout[];
-
-  /**
-   * The kinds of configuration that differ from what is live, when the diff
-   * could tell.
-   */
-  readonly changedConfiguration: readonly ConfigurationType[] | undefined;
   readonly gitSha: string | undefined;
   readonly gitDirty: boolean;
 };
@@ -283,6 +307,7 @@ export class Publisher {
    * @throws {@link ZitadelError} `E_VALIDATION` naming each file a step refuses.
    */
   async prepare(request: PrepareRequest): Promise<PreparedRelease> {
+    announce({ phase: "entered", stage: "validation" });
     const store = new DiskStore(request.cwd);
     // Each file's shape is the validate step's to check, with its own messages.
     const known = await this.loadKnowingDeployed(store);
@@ -322,6 +347,8 @@ export class Publisher {
     // asking in turn would cost a whole process for nothing.
     const [sha, dirty] = await Promise.all([headSha(request.cwd), worktreeIsDirty(request.cwd)]);
 
+    announce({ phase: "prepared", changed: outcome.learned.changedConfiguration });
+
     return {
       bundle: Publisher.narrow(built.bundle),
       resourceCount: built.resourceCount,
@@ -329,7 +356,6 @@ export class Publisher {
       warnings: outcome.warnings,
       notices: outcome.notices,
       lockouts: outcome.lockouts,
-      changedConfiguration: outcome.learned.changedConfiguration,
       gitSha: sha ?? undefined,
       gitDirty: dirty,
     };
@@ -356,16 +382,12 @@ export class Publisher {
    * a deploy that raced in.
    *
    * @param request - The prepared bundle, the message and the origins it lands on.
-   * @param onStage - Told which stage the deploy is entering, so a failure can say where it was.
    * @returns The release, and whether the deploy landed, lost a race, or met a revoked release.
    */
-  async deploy(
-    request: DeployRequest,
-    onStage?: (stage: "release_creation" | "deployment") => void,
-  ): Promise<DeployOutcome> {
-    onStage?.("release_creation");
+  async deploy(request: DeployRequest): Promise<DeployOutcome> {
+    announce({ phase: "entered", stage: "release_creation" });
     const release = await this.createRelease(request);
-    onStage?.("deployment");
+    announce({ phase: "entered", stage: "deployment" });
     const publication = await this.deployments.deployToPrimary({
       releaseId: release.id,
       message: request.message,

@@ -1,3 +1,5 @@
+import { channel } from "node:diagnostics_channel";
+
 import { Flags, type Interfaces } from "@oclif/core";
 
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
@@ -234,6 +236,9 @@ abstract class WriteOperation<
 
     // Some writes answer without a body (`grant create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
+    if (writes.hasSubscribers) {
+      writes.publish({ topic: this.definition.topic, verb: this.verb, body });
+    }
     const result = await this.send(await this.context(), body, id);
     const summary: Summary =
       result === undefined
@@ -280,6 +285,23 @@ abstract class WriteOperation<
   }
 }
 
+/**
+ * The channel a create or update is announced on, just before it is sent, with
+ * the body it sends.
+ */
+export const WRITE_CHANNEL = "zitadel:write";
+
+/**
+ * What a write announces on {@link WRITE_CHANNEL}.
+ */
+export type WriteEvent = Readonly<{
+  topic: string;
+  verb: "create" | "update";
+  body: Json;
+}>;
+
+const writes = channel(WRITE_CHANNEL);
+
 /** `<topic> create`. */
 export abstract class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
   static describe<Ctx>(definition: OperationDefinition<Ctx, CreateSpec<Ctx>>): OperationStatics {
@@ -289,7 +311,6 @@ export abstract class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpe
   protected readonly verb = "create";
 
   protected send(ctx: Ctx, body: Json): Promise<WriteResult> {
-    this.recordTelemetry(this.definition.spec.record?.(body) ?? {});
     return this.definition.spec.call(ctx, body);
   }
 }

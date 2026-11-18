@@ -29,6 +29,11 @@ export class ReportAlreadySetUp extends EndStep<"alreadySetUp", CommandResult, N
   readonly key = "alreadySetUp";
 
   /**
+   * The name reports of the onboarding flow call this step by.
+   */
+  override readonly milestone = "initial_checks";
+
+  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

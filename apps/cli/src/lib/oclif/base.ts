@@ -32,7 +32,6 @@ import {
   type Suggested,
   type SuggestedCommand,
 } from "@/lib/suggestion";
-import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { Runtime } from "@/lib/runtime";
 import { Skills } from "@/lib/skills";
@@ -41,18 +40,7 @@ import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
-import {
-  ACTION_COMPLETED,
-  ACTION_FAILED,
-  actionProperties,
-  CLI_COMMAND_COMPLETED,
-  CLI_COMMAND_FAILED,
-  CLI_COMMAND_STARTED,
-  commandEventProperties,
-  deviceProfileProperties,
-  FIRST_RUN_NOTICE,
-  vercelEventKeys,
-} from "./command-telemetry";
+import { announceCommand, type Notes } from "./events";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
 import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
@@ -289,20 +277,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * Anonymous usage analytics for this invocation, created once in
-   * {@link toMeta}. Subclasses add command-specific dimensions (framework,
-   * counts, `step`, …) via {@link recordTelemetry}; the base class
-   * fires the lifecycle events and flushes in {@link finally}.
+   * What the command has noted about its run (framework, counts, `step`, …) via
+   * {@link annotate}, announced with the run's outcome. Replaced immutably,
+   * never mutated in place.
    */
-  protected telemetry?: Telemetry;
-
-  /**
-   * Per-command dimensions merged onto each lifecycle event emitted *after* they
-   * are recorded — typically `completed`/`failed`, since `started` fires from
-   * {@link openTelemetry} before a command body runs. Updated immutably via
-   * {@link recordTelemetry} — never mutated in place.
-   */
-  protected telemetryProps: Readonly<Properties> = Object.freeze({});
+  private notes: Notes = Object.freeze({});
 
   private reading: ReturnType<BaseCommand["parse"]> | undefined;
 
@@ -328,16 +307,19 @@ export abstract class BaseCommand extends Interruptible(Command) {
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
   private settled = false;
 
-  /** Correlates the started/completed pair; minted at instance construction. */
-  private readonly telemetryInvocationId = randomUUID();
+  /** Ties one run's announcements together; minted at instance construction. */
+  private readonly invocationId = randomUUID();
+
+  /** Whether the run has been announced as opened. */
+  private opened = false;
 
   /**
    * Wall-clock start used to derive `duration_ms`. Captured at instance
    * construction (before flag parsing and server resolution) so the duration
-   * covers the full invocation, even when telemetry is opened late from
+   * covers the full invocation, even when the run is opened late from
    * {@link catch} after an early failure.
    */
-  private readonly telemetryStartedAt = Date.now();
+  private readonly startedAt = Date.now();
 
   /**
    * The one lifecycle every command shares: parse the flags, resolve the
@@ -600,34 +582,29 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * Merge command-specific dimensions into {@link telemetryProps} immutably: a
-   * new frozen bag replaces the previous one, so no shared object is ever
-   * mutated. `step` advances by re-recording it at each milestone.
+   * Note facts about this run, merged immutably into what is announced with its
+   * outcome: a new frozen bag replaces the previous one, so no shared object is
+   * ever mutated. `step` advances by noting it again at each milestone.
+   *
+   * @param patch - The facts to add or replace.
    */
-  protected recordTelemetry(patch: Properties): void {
-    this.telemetryProps = Object.freeze({ ...this.telemetryProps, ...patch });
+  protected annotate(patch: Notes): void {
+    this.notes = Object.freeze({ ...this.notes, ...patch });
   }
 
   /**
-   * Sends an event of the event catalog with the run's common properties, if
-   * the developer has not opted out. For the events a flow or an action
-   * reports; the three lifecycle events are sent by the base command itself.
-   *
-   * @param event - The event's name.
-   * @param properties - The event's own properties.
+   * What this command says about how its run is followed: which facts it
+   * reports and which of its own events matter. Left to the command, read by
+   * whoever follows the run, and unknown to the base command.
    */
-  protected trackEvent(event: string, properties: Properties): void {
-    if (this.telemetry?.enabled) {
-      this.telemetry.track(
-        event,
-        commandEventProperties(
-          this.meta,
-          ZitadelRuntime.fromUrl(this.meta.source).kind,
-          this.telemetryInvocationId,
-          properties,
-        ),
-      );
-    }
+  static readonly observation?: unknown;
+
+  /**
+   * Whether anyone may follow this run. A command that must never be counted
+   * answers no.
+   */
+  protected observed(): boolean {
+    return true;
   }
 
   /**
@@ -706,7 +683,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? await new Skills(process.env, !this.meta.nonInteractive).eligible()
         : false;
     this.settled = true;
-    this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
+    this.open(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
   }
 
@@ -798,65 +775,36 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * Create telemetry once per invocation and open the lifecycle (started event +
-   * anonymous profile + first-run notice), reading every dimension from the
-   * current {@link meta}. Guarded so a command that resolves meta more than once
-   * does not double-count. Also called from {@link catch} so a failure thrown
-   * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
-   * records the run. Returns early for an inert (opted-out / test-runner /
-   * nowhere to send) instance so a disabled run never builds the property bags —
-   * no timezone→country resolution or URL parsing for users who opted out. The
-   * anonymous device profile is install-level and stable, so it is written only
-   * on first run rather than paying a `people.set` request on every command.
+   * Announce the run as opened, once, reading everything from the current
+   * {@link meta}. Also called from {@link catch} so a failure thrown before
+   * {@link toMeta} finished (server resolution, flag parsing) is still
+   * announced.
+   *
+   * @param reporting - What the developer chose on the command line, when they chose.
    */
-  /**
-   * Telemetry factory seam. Production returns the real {@link Telemetry.create};
-   * tests override it to inject a recording client and assert the lifecycle
-   * ordering and opt-out behaviour that the central Vitest consent guard would
-   * otherwise make untestable.
-   */
-  protected createTelemetry(deps: TelemetryDeps): Telemetry {
-    return Telemetry.create(deps);
-  }
-
-  private openTelemetry(flag: boolean | undefined): void {
-    if (this.telemetry) {
+  private open(reporting: boolean | undefined): void {
+    if (this.opened) {
       return;
     }
-    this.telemetry = this.createTelemetry({
-      env: process.env,
-      flag,
-      debug: this.meta.debug,
-      vercelKeys: vercelEventKeys(this.meta.command),
+    this.opened = true;
+    announceCommand({
+      phase: "opened",
+      meta: this.meta,
+      invocationId: this.invocationId,
+      startedAt: this.startedAt,
+      notes: this.notes,
+      observed: this.observed(),
+      observation: this.command.observation,
+      reporting,
+      interactive: this.isInteractive(),
     });
-    if (!this.telemetry.enabled) {
-      return;
-    }
-    this.telemetry.track(
-      CLI_COMMAND_STARTED,
-      commandEventProperties(
-        this.meta,
-        ZitadelRuntime.fromUrl(this.meta.source).kind,
-        this.telemetryInvocationId,
-        this.telemetryProps,
-      ),
-    );
-    if (this.telemetry.isFirstRun) {
-      this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
-        $ip: 0,
-      });
-      if (this.isInteractive()) {
-        process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
-      }
-    }
   }
 
   /**
-   * Whether this invocation is an interactive human session, used to gate the
-   * one-time first-run notice. Derived from argv + `jsonEnabled()` + TTY rather
-   * than `meta.nonInteractive`, so it is correct even on the early-failure path
-   * where {@link catch} opens telemetry against a fallback meta that has not yet
-   * computed `nonInteractive` from the flags.
+   * Whether this invocation is an interactive session, derived from argv +
+   * `jsonEnabled()` + TTY rather than `meta.nonInteractive`, so it is correct
+   * even on the early-failure path where {@link catch} opens the run against a
+   * fallback meta that has not yet computed `nonInteractive` from the flags.
    */
   private isInteractive(): boolean {
     if (this.nonInteractive || this.jsonEnabled()) {
@@ -878,29 +826,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
-    if (this.telemetry?.enabled) {
-      this.telemetry.track(
-        CLI_COMMAND_COMPLETED,
-        commandEventProperties(
-          this.meta,
-          ZitadelRuntime.fromUrl(this.meta.source).kind,
-          this.telemetryInvocationId,
-          {
-            ...this.telemetryProps,
-            status: result.status,
-            duration_ms: Date.now() - this.telemetryStartedAt,
-          },
-        ),
-      );
-      if (result.status === "ok" && !this.meta.dryRun) {
-        const action = actionProperties(this.meta.command, this.telemetryProps, {
-          duration_ms: Date.now() - this.telemetryStartedAt,
-        });
-        if (action !== undefined) {
-          this.trackEvent(ACTION_COMPLETED, action);
-        }
-      }
-    }
+    announceCommand({
+      phase: "completed",
+      meta: this.meta,
+      invocationId: this.invocationId,
+      startedAt: this.startedAt,
+      notes: this.notes,
+      status: result.status,
+    });
     const next =
       normalized.status === "ok" && normalized.nextShown !== undefined
         ? ""
@@ -1181,7 +1114,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
    * envelope's `command` field accurate. If that early failure left telemetry
-   * unopened, {@link openTelemetry} runs here so the failure is still recorded;
+   * unopened, {@link open} runs here so the failure is still announced;
    * the flag isn't parsed yet on that path, so `--no-telemetry` is honoured from
    * argv.
    */
@@ -1204,41 +1137,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
       help,
     );
     this.meta = meta;
-    this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
-    if (this.telemetry?.enabled) {
-      this.telemetry.track(
-        CLI_COMMAND_FAILED,
-        commandEventProperties(
-          meta,
-          ZitadelRuntime.fromUrl(meta.source).kind,
-          this.telemetryInvocationId,
-          {
-            ...this.telemetryProps,
-            status: "error",
-            reason: zitadelError.code,
-            exit_code: zitadelError.exitCode,
-            duration_ms: Date.now() - this.telemetryStartedAt,
-          },
-        ),
-      );
-      const action = meta.dryRun
-        ? undefined
-        : actionProperties(meta.command, this.telemetryProps, {
-            reason: zitadelError.code,
-            duration_ms: Date.now() - this.telemetryStartedAt,
-          });
-      if (action !== undefined) {
-        this.telemetry.track(
-          ACTION_FAILED,
-          commandEventProperties(
-            meta,
-            ZitadelRuntime.fromUrl(meta.source).kind,
-            this.telemetryInvocationId,
-            action,
-          ),
-        );
-      }
-    }
+    this.open(process.argv.includes("--no-telemetry") ? false : undefined);
+    announceCommand({
+      phase: "failed",
+      meta,
+      invocationId: this.invocationId,
+      startedAt: this.startedAt,
+      notes: this.notes,
+      code: zitadelError.code,
+      exitCode: zitadelError.exitCode,
+    });
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), warnings.take()));
     } else if (zitadelError.code === "E_CANCELLED") {
@@ -1277,10 +1185,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
     this.ui.releaseNarration();
-    await this.telemetry?.shutdown(1000);
-    if (this.telemetry?.enabled) {
-      setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
-    }
+    const settle: Promise<unknown>[] = [];
+    announceCommand({ phase: "closing", invocationId: this.invocationId, settle });
+    await Promise.allSettled(settle);
     await super.finally(error);
   }
 

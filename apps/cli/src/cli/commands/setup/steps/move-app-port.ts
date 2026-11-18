@@ -68,6 +68,11 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
   readonly key = "moveDevPort";
 
   /**
+   * The name reports of the onboarding flow call this step by.
+   */
+  override readonly milestone = "initial_checks";
+
+  /**
    * What the command gives the step.
    */
   private readonly deps: Deps;

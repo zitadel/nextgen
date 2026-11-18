@@ -8,7 +8,9 @@ export {
   type PreparedRelease,
   type PrepareRequest,
   type PreviewRequest,
+  PUBLISH_CHANNEL,
   Publisher,
+  type PublishEvent,
   type PublishOutcome,
   type ReleaseRequest,
 } from "./publisher";
