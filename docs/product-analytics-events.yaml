@@ -333,7 +333,8 @@ properties:
     type: string
     description: >-
       The CLI version an install began on, written to its profile once and never
-      changed, so a cohort can ask who installed which version.
+      changed, so a cohort can ask who installed which version. Only an install
+      that began on a release that writes it has one; an earlier install does not.
   invocation_channel:
     type: string
     values: [npm, pnpm, yarn, bun, unknown]
@@ -613,7 +614,8 @@ components:
         An install's first run, then whenever what the profile says changes (a new
         CLI or Node version) and at most once a day, so its "Updated
         at" shows the install's last day of use. `first_cli_version` is written
-        only the first time.
+        only for an install that began on a release that writes it, and only the
+        first time; an earlier install never has it.
       destinations: [mixpanel]
       properties: [$os, $country_code, os, arch, node_version, cli_version, $name, host_agent, is_agent, invocation_channel, install_source, first_cli_version]
 

@@ -91,43 +91,46 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
   if (dir === undefined) {
     return { distinctId: randomUUID(), isFirstRun: false };
   }
-  const file = join(dir, "telemetry.json");
-
-  try {
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
-    if (typeof parsed.distinctId === "string" && parsed.distinctId.length > 0) {
-      return {
-        distinctId: parsed.distinctId,
-        isFirstRun: !existsSync(join(dir, NOTICE_FILE)),
-        record: parsed,
-      };
-    }
-  } catch {
-    /* fall through to mint a fresh id */
+  const stored = readStored(dir);
+  if (stored !== undefined) {
+    return stored;
   }
 
   const record: StoredIdentity = { distinctId: randomUUID(), began: true };
   try {
     mkdirSync(dir, { recursive: true });
-    writeStored(file, record);
+    writeStored(join(dir, "telemetry.json"), record);
     return { distinctId: record.distinctId, isFirstRun: true, record };
   } catch {
     // Another run may have stored its id first: take that one, so the two are one install.
-    try {
-      const other = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
-      if (typeof other.distinctId === "string" && other.distinctId.length > 0) {
-        return {
-          distinctId: other.distinctId,
-          isFirstRun: !existsSync(join(dir, NOTICE_FILE)),
-          record: other,
-        };
-      }
-    } catch {
-      /* nothing stored: this run is on its own */
-    }
-
-    return { distinctId: record.distinctId, isFirstRun: false };
+    return readStored(dir) ?? { distinctId: record.distinctId, isFirstRun: false };
   }
+}
+
+/**
+ * The install's identity as its record says, if there is a usable one. An install
+ * whose record predates the notice marker (it has no `began`) already saw the
+ * notice on an earlier release, so only an install this release began is first-run
+ * until the notice has been shown.
+ *
+ * @param dir - The directory the install's state lives in.
+ * @returns The identity, or nothing when there is no record or it is unusable.
+ */
+function readStored(dir: string): Identity | undefined {
+  try {
+    const record = JSON.parse(readFileSync(join(dir, "telemetry.json"), "utf8")) as StoredIdentity;
+    if (typeof record.distinctId === "string" && record.distinctId.length > 0) {
+      return {
+        distinctId: record.distinctId,
+        isFirstRun: record.began === true && !existsSync(join(dir, NOTICE_FILE)),
+        record,
+      };
+    }
+  } catch {
+    /* no usable record */
+  }
+
+  return undefined;
 }
 
 /**

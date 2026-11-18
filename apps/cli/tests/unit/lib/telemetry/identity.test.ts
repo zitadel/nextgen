@@ -157,8 +157,18 @@ describe("profileDue", () => {
   });
 });
 
+describe("an install that predates the notice marker", () => {
+  it("has already seen the notice, so it is not first-run", ({ dir }) => {
+    const config = join(dir, "zitadel", "cli");
+    mkdirSync(config, { recursive: true });
+    writeFileSync(join(config, "telemetry.json"), `${JSON.stringify({ distinctId: "earlier" })}\n`);
+
+    expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: dir }).isFirstRun).toBe(false);
+  });
+});
+
 describe("a failed write", () => {
-  it("takes the id another run stored in the meantime, and leaves no temporary file", ({ dir }) => {
+  it("leaves no temporary file, and is its own install when nothing else is stored", ({ dir }) => {
     const env = { XDG_CONFIG_HOME: dir };
     const config = join(dir, "zitadel", "cli");
     mkdirSync(config, { recursive: true });
