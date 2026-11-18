@@ -5,7 +5,6 @@ import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
-import { Server } from "@/lib/server";
 
 /**
  * A project's `zitadel.json`: the committed record of how setup configured it.
@@ -103,7 +102,8 @@ export class ProjectConfig {
   }
 
   /**
-   * The top-level `server` origin, or the default server when the key is absent.
+   * The top-level `server` origin, or `undefined` when the key is absent, in which
+   * case the project is on the default server and the command says which that is.
    *
    * This is the server the project actually lives on, which is not always the
    * one a command is talking to: `doctor` pins its own source to the local
@@ -111,9 +111,12 @@ export class ProjectConfig {
    * about the project itself, rather than about this invocation, reads it from
    * here.
    *
-   * @returns The server's origin.
+   * @returns The server's origin, if the file names one.
    */
-  get server(): string {
-    return typeof this.data.server === "string" ? this.data.server : Server.DEFAULT;
+  get server(): string | undefined {
+    if (typeof this.data.server === "string") {
+      return this.data.server;
+    }
+    return undefined;
   }
 }

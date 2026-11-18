@@ -1,4 +1,5 @@
 import { Claim } from "@/lib/claim";
+import { ZitadelRuntime } from "@/lib/server";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 import { Project } from "@/lib/project";
@@ -32,7 +33,9 @@ export class ClaimCheck implements SanityCheck {
           // From `zitadel.json`, not the command's own source: `doctor` pins its
           // source to the local runtime URL, so asking it where the project lives
           // would report every project as local.
-          server: (await Project.at(ctx.cwd).config()).server,
+          cloud: ZitadelRuntime.fromUrl(
+            (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
+          ).isCloud(),
         });
       })
       .catch(() => {

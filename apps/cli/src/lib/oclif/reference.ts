@@ -117,14 +117,33 @@ export function cliReference(
       );
     });
 
-  const flagOrder = Object.keys(BaseCommand.baseFlags);
+  // The global flags are `BaseCommand`'s, and those a variable stands in for
+  // (`--server`, which `ServerCommand` adds), each taken by every command as one
+  // and the same flag, in the order the commands list them.
+  const named = new Set([
+    ...Object.keys(BaseCommand.baseFlags),
+    ...FLAG_VARIABLES.map((variable) => {
+      return variable.flag;
+    }),
+  ]);
+  const globals: Interfaces.FlagInput = Object.fromEntries(
+    Object.entries(entries[0]?.command.baseFlags ?? {}).filter(([name, flag]) => {
+      return (
+        named.has(name) &&
+        entries.every(({ command }) => {
+          return command.baseFlags?.[name] === flag;
+        })
+      );
+    }),
+  );
+  const flagOrder = Object.keys(globals);
 
   return {
     bin,
     groups: [...groups],
     globalFlags: [
       JSON_FLAG,
-      ...flagReferences(BaseCommand.baseFlags, (text) => {
+      ...flagReferences(globals, (text) => {
         return text;
       }),
     ],
@@ -133,7 +152,7 @@ export function cliReference(
     }),
     exitCodes: { ...EXIT_CODES },
     commands: entries.map(({ id, command, group }) => {
-      return commandReference(id.replaceAll(":", " "), command, group, bin);
+      return commandReference(id.replaceAll(":", " "), command, group, bin, globals);
     }),
   };
 }
@@ -151,6 +170,7 @@ function commandReference(
   command: ReferencedCommand,
   group: string,
   bin: string,
+  globals: Interfaces.FlagInput,
 ): CommandReference {
   // The global flags are listed once, for every command, so each must take
   // all of them.
@@ -168,7 +188,7 @@ function commandReference(
   // `--schema` of every `auth-method` command.
   const own: Interfaces.FlagInput = command.flags ?? {};
   const family = Object.entries(base).filter(([name]) => {
-    return !(name in own) && !(name in BaseCommand.baseFlags);
+    return !(name in own) && !(name in globals);
   });
   const render = (text: string) => {
     return renderTemplates(text, id, bin);

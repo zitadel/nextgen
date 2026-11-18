@@ -83,6 +83,7 @@ import {
 } from "@/lib/oclif/crud";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
 const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
@@ -1101,23 +1102,27 @@ export const RESOURCES = {
  * connect like every command that talks to a project (see
  * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
  */
-export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
-  operations: OPERATIONS,
-  // A `${{ NAME }}` reference to a project variable (ADR 062) names a
-  // credential without revealing it, and is the only form a connection's
-  // `client_secret` takes, so it may stand on a command line.
-  references: {
-    matches: isVariableReference,
-    example: "'${{ NAME }}'",
+export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(
+  RESOURCES,
+  {
+    operations: OPERATIONS,
+    // A `${{ NAME }}` reference to a project variable (ADR 062) names a
+    // credential without revealing it, and is the only form a connection's
+    // `client_secret` takes, so it may stand on a command line.
+    references: {
+      matches: isVariableReference,
+      example: "'${{ NAME }}'",
+    },
+    connect: async (open) => {
+      const { client, projectId } = await open();
+      return {
+        client,
+        projectId,
+      };
+    },
   },
-  connect: async (open) => {
-    const { client, projectId } = await open();
-    return {
-      client,
-      projectId,
-    };
-  },
-});
+  ServerCommand,
+);
 
 /**
  * A generated resource command as a suggestion is checked against it. Its

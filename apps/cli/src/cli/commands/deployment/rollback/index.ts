@@ -19,6 +19,7 @@ import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 const NOTHING_DEPLOYED_REFUSAL = {
   message: "There is no deployment to roll back",
@@ -80,7 +81,9 @@ const MESSAGE = {
  * one. It reports the revisions that release pins, and that users keep theirs:
  * configuration rolls back, user data does not.
  */
-export default class DeploymentRollback extends Tabulatable(Destructive(EnvironmentCommand)) {
+export default class DeploymentRollback extends Tabulatable(
+  Destructive(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;

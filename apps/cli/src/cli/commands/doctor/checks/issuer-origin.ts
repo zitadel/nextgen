@@ -1,4 +1,5 @@
 import { configuredIssuer } from "@/cli/commands/doctor/patch-context";
+import { ZitadelRuntime } from "@/lib/server";
 import {
   createZitadelClient,
   DeploymentService,
@@ -129,7 +130,7 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     .then(async (secret) => {
       return {
         secret,
-        server: (await Project.at(cwd).config()).server,
+        server: (await Project.at(cwd).config()).server ?? ZitadelRuntime.DEFAULT,
       };
     })
     .catch(() => {

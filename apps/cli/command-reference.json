@@ -2957,10 +2957,10 @@
       ],
       "examples": [
         {
-          "command": "env add production --server https://api.zitadel.cloud --app-url https://app.acme.com"
+          "command": "env add production --server https://preview.zitadel.com --app-url https://app.acme.com"
         },
         {
-          "command": "env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T"
+          "command": "env add staging --server https://preview.zitadel.com --project proj_01K9AA9M3K7E2QX8VB4T"
         }
       ]
     },

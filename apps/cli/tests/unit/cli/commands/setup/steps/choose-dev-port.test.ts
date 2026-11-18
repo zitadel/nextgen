@@ -4,20 +4,13 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/server/local/server", async (importOriginal) => {
-  return {
-    ...(await importOriginal<object>()),
-    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
-  };
-});
-
 import { isCancel, text } from "@clack/prompts";
 
 import { ChooseDevPort } from "@/cli/commands/setup/steps/choose-dev-port";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { Ui } from "@/lib/ui";
-import { LocalServer } from "@/lib/server/local/server";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { aPromptDeps } from "@tests/helpers/setup";
 
@@ -85,23 +78,28 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
+const machine = new FakeMachine();
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
-  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
 describe("ChooseDevPort", () => {
   describe("when the detected port is free", () => {
-    it("checks the detected port", async () => {
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+    it("asks about the detected port only when something holds it", async () => {
+      vi.mocked(text).mockResolvedValueOnce("3001");
 
-      expect(LocalServer.isPortFree).toHaveBeenCalledWith(3000);
+      await new ChooseDevPort(aPromptDeps(undefined, new FakeMachine({ taken: [3000] }))).ask(
+        setupAnswers({ devPort: 3000 }),
+        CONTEXT,
+      );
+
+      expect(text).toHaveBeenCalledTimes(1);
     });
 
     it("keeps the detected port", async () => {
-      const answers = await new ChooseDevPort(aPromptDeps()).ask(
+      const answers = await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
         setupAnswers({ devPort: 3000 }),
         CONTEXT,
       );
@@ -110,40 +108,41 @@ describe("ChooseDevPort", () => {
     });
 
     it("does not ask", async () => {
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+      await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ devPort: 3000 }),
+        CONTEXT,
+      );
 
       expect(text).not.toHaveBeenCalled();
     });
   });
 
   describe("when the detected port is taken", () => {
-    beforeEach(() => {
-      vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
-      vi.mocked(LocalServer.nextFreePort).mockImplementation((port) => {
-        return Promise.resolve(port + 1);
-      });
+    const machine = new FakeMachine({
+      taken: [3000, 5173],
+      nextFree: (port) => {
+        return port + 1;
+      },
     });
 
     it("parses the entered text into a number", async () => {
       vi.mocked(text).mockResolvedValueOnce("4000");
 
-      const answers = await new ChooseDevPort(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+        setupAnswers(),
+        CONTEXT,
+      );
 
       expect(answers.devPort).toBe(4000);
-    });
-
-    it("looks for the next free port after it", async () => {
-      vi.mocked(text).mockResolvedValueOnce("5174");
-
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
-
-      expect(LocalServer.nextFreePort).toHaveBeenCalledWith(5173);
     });
 
     it("says the port is in use and suggests the next free one", async () => {
       vi.mocked(text).mockResolvedValueOnce("5174");
 
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ devPort: 5173 }),
+        CONTEXT,
+      );
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
         message: "Port 5173 is in use. Which port should your app run on?",
@@ -152,34 +151,46 @@ describe("ChooseDevPort", () => {
     });
 
     it("suggests the taken port when the next ones are taken too", async () => {
-      vi.mocked(LocalServer.nextFreePort).mockResolvedValue(undefined);
       vi.mocked(text).mockResolvedValueOnce("5173");
 
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await new ChooseDevPort(
+        aPromptDeps(
+          undefined,
+          new FakeMachine({
+            taken: Array.from({ length: 21 }, (_, index) => {
+              return 5173 + index;
+            }),
+          }),
+        ),
+      ).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ initialValue: "5173" });
     });
   });
 
   describe("with --dev-port", () => {
-    it("keeps the flagged port", async () => {
-      vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
+    const machine = new FakeMachine({ taken: [5000] });
 
-      const answers = await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5000 }), {
-        ...CONTEXT,
-        devPortFromFlag: true,
-      });
+    it("keeps the flagged port", async () => {
+      const answers = await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ devPort: 5000 }),
+        {
+          ...CONTEXT,
+          devPortFromFlag: true,
+        },
+      );
 
       expect(answers.devPort).toBe(5000);
     });
 
     it("does not ask", async () => {
-      vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
-
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5000 }), {
-        ...CONTEXT,
-        devPortFromFlag: true,
-      });
+      await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ devPort: 5000 }),
+        {
+          ...CONTEXT,
+          devPortFromFlag: true,
+        },
+      );
 
       expect(text).not.toHaveBeenCalled();
     });

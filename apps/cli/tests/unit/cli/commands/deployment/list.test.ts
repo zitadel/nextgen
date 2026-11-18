@@ -366,7 +366,7 @@ describe("deployment list", () => {
 });
 
 describe("deployment list at a terminal", () => {
-  const SERVER = "https://api.zitadel.cloud";
+  const SERVER = "https://preview.zitadel.com";
 
   const deployment = (id: string) => ({
     id,

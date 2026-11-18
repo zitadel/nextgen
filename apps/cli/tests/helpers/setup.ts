@@ -1,3 +1,5 @@
+import type { LocalMachine } from "@/lib/server";
+import { FakeMachine } from "@tests/helpers/local-machine";
 import type { SetupServices } from "@/cli/commands/setup/shared";
 import { Ui } from "@/lib/ui";
 import { write } from "@tests/helpers/git-repo";
@@ -52,15 +54,17 @@ export function suggestedCommands(stdout: string): string[] {
  */
 export function aPromptDeps(
   cwd = "/tmp/app",
+  machine: LocalMachine = new FakeMachine(),
 ): Pick<
   SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  "ask" | "cwd" | "dryRun" | "machine" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
 > {
   const audience = { interactive: true, force: false };
   return {
     ask: Ui.asker(audience),
     cwd,
     dryRun: false,
+    machine,
     nonInteractive: false,
     serverFlag: undefined,
     suggest: aSuggest({}, "1.2.3"),

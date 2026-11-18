@@ -30,6 +30,7 @@ import {
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { Project } from "@/lib/project";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -163,7 +164,7 @@ function commitConfig(deployed: string, message: string | undefined): SuggestedC
  * (primary origins are never named one by one). `--dry-run` stops after the
  * diff, writing nothing to the server.
  */
-export default class Deploy extends Destructive(EnvironmentCommand) {
+export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand)) {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
   static override group = CommandGroups.releases;

@@ -1,3 +1,4 @@
+import type { RuntimeKind } from "@/lib/server";
 import type { Properties } from "@/lib/telemetry";
 import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
 import { ciProvider } from "@/lib/telemetry/dimensions/ci-provider";
@@ -5,7 +6,6 @@ import { country } from "@/lib/telemetry/dimensions/country";
 import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
 import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
 import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
-import { Server } from "@/lib/server";
 import type { GlobalOptions } from "./types";
 
 /**
@@ -178,10 +178,13 @@ function profileDeviceProperties(meta: GlobalOptions): Properties {
  * enums, booleans, counts, and versions cross the boundary — never URLs,
  * project ids, file paths, emails, or secrets. `extra` is spread first so the
  * canonical base dimensions always win; callers order their own extras so
- * reserved lifecycle fields win over command props.
+ * reserved lifecycle fields win over command props. `serverKind` is what kind
+ * of server the run talked to (cloud, self-hosted, local), as the command's base
+ * works it out from its address.
  */
 export function commandEventProperties(
   meta: GlobalOptions,
+  serverKind: RuntimeKind,
   invocationId: string,
   extra: Properties = {},
 ): Properties {
@@ -201,7 +204,7 @@ export function commandEventProperties(
     invocation_channel: invocationChannel.value(env),
     dry_run: meta.dryRun,
     force: meta.force,
-    server_kind: Server.at(meta.source).kind,
+    server_kind: serverKind,
   };
 }
 

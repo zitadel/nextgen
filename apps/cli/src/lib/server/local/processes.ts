@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 
-import { execa } from "execa";
+import { type Run, systemRun } from "./ports";
 
 import { errorMessage } from "@/lib/errors";
 import { isFile } from "@/lib/fs";
@@ -13,7 +13,7 @@ export type ManagedRuntimeProcess = Readonly<{
   ppid?: number;
 }>;
 
-export type ManagedRuntimeDiscovery = Readonly<{
+type ManagedRuntimeDiscovery = Readonly<{
   error?: string;
   processes: ReadonlyArray<ManagedRuntimeProcess>;
   supported: boolean;
@@ -38,21 +38,35 @@ export interface LocalServers {
 
 /** The real answer: the machine's processes, read with `ps`. */
 export class PsLocalServers implements LocalServers {
+  private readonly run: Run;
+
+  /**
+   * @param run - How `ps` is run; this machine's own by default.
+   */
+  constructor(run: Run = systemRun) {
+    this.run = run;
+  }
+
   current(): Promise<ManagedRuntimeDiscovery> {
-    return discoverManagedRuntimeProcesses();
+    return discoverManagedRuntimeProcesses({ run: this.run });
   }
 }
 
 export async function discoverManagedRuntimeProcesses(opts?: {
   readonly timeoutMs?: number;
+  readonly run?: Run;
 }): Promise<ManagedRuntimeDiscovery> {
+  const run = opts?.run ?? systemRun;
   if (process.platform === "win32") {
     return { supported: false, processes: [], error: "process sweep is not available on Windows" };
   }
 
   // `ww`: without it `ps` cuts each command at `COLUMNS`, and a long install path loses the
   // `bin/nextgen` that marks a server before the full command is ever read.
-  const listed = await runPs(["axww", "-o", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
+  const listed = await run("ps", ["axww", "-o", "pid=,ppid=,command="], {
+    timeout: opts?.timeoutMs ?? 1000,
+  })
+    .then(({ stdout }) => stdout)
     .then(parsePsRows)
     .then(
       (rows) => {
@@ -73,8 +87,8 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     candidates.map(async (row) => {
       return {
         ...row,
-        command: await hydrateCommand("eww", row.pid, row.command, opts?.timeoutMs ?? 1000),
-        shown: await hydrateCommand("ww", row.pid, row.command, opts?.timeoutMs ?? 1000),
+        command: await hydrateCommand(run, "eww", row.pid, row.command, opts?.timeoutMs ?? 1000),
+        shown: await hydrateCommand(run, "ww", row.pid, row.command, opts?.timeoutMs ?? 1000),
       };
     }),
   );
@@ -86,23 +100,22 @@ export async function discoverManagedRuntimeProcesses(opts?: {
   return { supported: true, processes: uniqueByPid(processes) };
 }
 
-async function runPs(args: string[], timeoutMs: number): Promise<string> {
-  return (await execa("ps", args, { timeout: timeoutMs })).stdout;
-}
-
 /**
  * The full command of `pid`: `eww` adds the environment it ran with, which only
  * tells a managed runtime apart and is never reported; `ww` gives its arguments.
  */
 async function hydrateCommand(
+  run: Run,
   flags: "eww" | "ww",
   pid: number,
   fallback: string,
   timeoutMs: number,
 ): Promise<string> {
   try {
-    const hydrated = await runPs([flags, "-p", String(pid), "-o", "command="], timeoutMs);
-    return hydrated.trim() || fallback;
+    const { stdout } = await run("ps", [flags, "-p", String(pid), "-o", "command="], {
+      timeout: timeoutMs,
+    });
+    return stdout.trim() || fallback;
   } catch {
     return fallback;
   }
@@ -141,13 +154,17 @@ async function toManagedRuntimeProcess(
   if (!wrapper && !isCliLocalDataDir(dataDir)) {
     return undefined;
   }
-  return {
+  const base = {
     pid: row.pid,
     ppid: row.ppid,
     command: stripEnvironmentNoise(row.shown ?? row.command),
-    kind: wrapper ? "server-wrapper" : "server-binary",
-    ...(dataDir ? { data_dir: dataDir } : {}),
   };
+  const withDataDir = (dataDir && { data_dir: dataDir }) || {};
+  if (wrapper) {
+    return { ...base, kind: "server-wrapper", ...withDataDir };
+  } else {
+    return { ...base, kind: "server-binary", ...withDataDir };
+  }
 }
 
 function isRuntimeCandidate(command: string): boolean {
@@ -208,7 +225,9 @@ async function isServerWrapper(command: string): Promise<boolean> {
       !OPTIONS_WITH_A_VALUE.has(given[index - 1] ?? "")
     );
   });
-  const rest = first < 0 ? [] : given.slice(first);
+  const rest = given.filter((_word, index) => {
+    return first >= 0 && index >= first;
+  });
   const script = rest.findIndex((word) => {
     return basename(word) === WRAPPER_SCRIPT;
   });

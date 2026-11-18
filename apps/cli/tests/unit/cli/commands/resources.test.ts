@@ -43,7 +43,7 @@ import {
   resource,
   update,
 } from "@/cli/commands/resources";
-import { COMMANDS } from "@/index";
+import { COMMANDS, WORKFLOW_COMMANDS } from "@/index";
 import { idArg } from "@/lib/oclif/crud/shared";
 import { parseArg } from "@tests/helpers/inputs";
 import { tabulate } from "@tests/helpers/tabulate";
@@ -57,7 +57,7 @@ import {
 } from "@/lib/oclif/crud";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = "https://preview.zitadel.com";
 const OPERATIONS = ["equals", "greater_than"] as const;
 
 /**
@@ -974,6 +974,128 @@ describe("--file -", () => {
     expect(json.message).toBe("--file - reads the body from a pipe, but nothing is piped in");
     expect(json.hint).toContain("--data");
   });
+});
+
+/** A value typed to a write that must never come back out. */
+const CANARY = "s3cr3t-canary-7f3a";
+
+/** What an id may look like, tried in turn until the resource's own check takes one. */
+const SAMPLE_IDS = (topic: string): string[] => [
+  `${topic}_1`,
+  `${topic.slice(0, 3)}_1`,
+  "01JTESTAAAAAAAAAAAAAAAAAAA",
+  "given_1",
+];
+
+/** An id the resource accepts, so a write reaches its body instead of refusing the id. */
+const idFor = (topic: string, resource: ResourceDescriptor<Platform>): string => {
+  const schema = resource.idSchema as
+    | { safeParse: (value: unknown) => { success: boolean } }
+    | undefined;
+  const found = SAMPLE_IDS(topic).find((candidate) => {
+    return schema === undefined || schema.safeParse(candidate).success;
+  });
+  if (found === undefined) {
+    throw new Error(`no sample id for ${topic}: add one to SAMPLE_IDS`);
+  }
+
+  return found;
+};
+
+/** Every generated write: the topic, the verb, and the arguments it cannot run without. */
+const WRITES = entries().flatMap(([topic, resource]) => {
+  return (["create", "update"] as const).flatMap((verb) => {
+    const command = COMMANDS[`${topic}:${verb}`];
+    if (command === undefined || Object.hasOwn(WORKFLOW_COMMANDS, `${topic}:${verb}`)) {
+      return [];
+    }
+    const required = Object.values(command.args ?? {}).filter((arg) => {
+      return arg.required === true;
+    });
+    return [
+      {
+        topic,
+        verb,
+        given: required.map(() => {
+          return idFor(topic, resource);
+        }),
+      },
+    ];
+  });
+});
+
+describe("--file - on every write, at a terminal", () => {
+  it("covers every generated create and update", () => {
+    const generated = Object.keys(COMMANDS).filter((id) => {
+      return (
+        /:(create|update)$/.test(id) &&
+        !Object.hasOwn(WORKFLOW_COMMANDS, id) &&
+        entries().some(([topic]) => id === `${topic}:create` || id === `${topic}:update`)
+      );
+    });
+
+    expect(WRITES.map(({ topic, verb }) => `${topic}:${verb}`).sort()).toEqual(generated.sort());
+  });
+
+  it.for(WRITES)(
+    "$topic $verb refuses, and suggests the run again with a path",
+    async ({ topic, verb, given }, { dir: cwd, terminal: _terminal }) => {
+      await makeProject(cwd);
+
+      const res = await run(cwd, [topic, verb, ...given, "--file", "-"]);
+
+      expect(res.exitCode).toBe(3);
+      expect(parseJson(res.stdout)).toMatchObject({
+        next_commands: [
+          expect.stringContaining([topic, verb, ...given, "--file '<path>'"].join(" ")),
+        ],
+      });
+    },
+  );
+});
+
+/** Every repeatable `key=value` flag of a generated write, with the write it belongs to. */
+const RECORD_FLAGS = WRITES.flatMap(({ topic, verb, given }) => {
+  const flags = COMMANDS[`${topic}:${verb}`]?.flags ?? {};
+  return Object.entries(flags)
+    .filter(([name, flag]) => {
+      return (
+        name !== "set" &&
+        flag.type === "option" &&
+        flag.multiple === true &&
+        /key:?=value/.test(flag.description ?? "")
+      );
+    })
+    .map(([name]) => {
+      return { topic, verb, given, flag: name };
+    });
+});
+
+describe("a secret typed twice to a repeatable flag of a write", () => {
+  it("is found on the writes that take one", () => {
+    expect(RECORD_FLAGS.length).toBeGreaterThan(0);
+  });
+
+  it.for(RECORD_FLAGS)(
+    "$topic $verb --$flag never prints the first, whichever the last is",
+    async ({ topic, verb, given, flag }, { dir: cwd, terminal: _terminal }) => {
+      await makeProject(cwd);
+
+      const res = await run(cwd, [
+        topic,
+        verb,
+        ...given,
+        "--file",
+        "-",
+        `--${flag}`,
+        `password=${CANARY}`,
+        `--${flag}`,
+        "password:=null",
+      ]);
+
+      expect(res.stdout + res.stderr).not.toContain(CANARY);
+    },
+  );
 });
 
 describe("piped output", () => {

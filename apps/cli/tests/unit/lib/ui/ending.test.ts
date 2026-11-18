@@ -9,7 +9,7 @@ import { Where } from "@/lib/ui/where";
 
 const plain = (text: string | undefined): string => stripAnsi(text ?? "");
 const nowhere = new Where();
-const somewhere = new Where("proj-1", "api.zitadel.cloud");
+const somewhere = new Where("proj-1", "preview.zitadel.com");
 const ending = (summary: Partial<Summary>, where = nowhere): Ending =>
   new Ending({ title: "Done", sections: [], ...summary }, where);
 
@@ -324,7 +324,7 @@ describe("which shape an ending takes", () => {
       normally({ title: "Error: Nope (E_NOT_FOUND)", failed: true }, somewhere).renderStandalone(),
     );
 
-    expect(shown).toContain("project proj-1 on api.zitadel.cloud");
+    expect(shown).toContain("project proj-1 on preview.zitadel.com");
   });
 });
 

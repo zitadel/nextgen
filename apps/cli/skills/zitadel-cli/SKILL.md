@@ -120,7 +120,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   current directory, not from `--cwd` (`--cwd app --env-file app/.env.ci`):
   Node reads `--env-file` itself before the CLI starts and exits 9 with
   `node: <path>: not found`, and no envelope, when the file is not there.
-- **Server and project.** A command that talks to a project reads
+- **Server and project.** `--server` is a flag of each command that takes a server,
+  not a global one. A command that talks to a project reads
   `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
   first source that has it: `--server` (the URL only), `--env-file <path>`, the
   process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,
@@ -353,9 +354,9 @@ Each invocation prints one JSON object:
   flag the run was given except those that only say how it answers
   (`--json`, `--non-interactive`, `--no-color`, `--verbose`, `--debug`,
   `--no-telemetry`); add `--non-interactive --json` when you run one.
-- A command named in a `hint`, a `warning` or a `next_actions` line is written
-  the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
-  unquoted — so prose and follow-up never name the same command two ways.
+- Run a command that takes the environment flags only from `next_commands` (or
+  `details.suggested_args`): a `hint`, a `warning` or a `next_actions` line never
+  spells one out, because prose cannot carry `--env`, `--env-file` or `--server`.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
@@ -1017,7 +1018,8 @@ step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
-could be enabled instead. A non-interactive dry run refuses it the same way, and its
+could be enabled instead, then `sso enable --provider '<name>'` (replace
+`<name>`). A non-interactive dry run refuses it the same way, and its
 `--force` re-run keeps `--dry-run`; with `--force` it previews the change and
 warns that no way to sign in would be left. A method that is enabled but not
 offered by any flow is reported in `warnings` (and in `data.not_offered`

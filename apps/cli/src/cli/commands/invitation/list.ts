@@ -13,6 +13,7 @@ import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { ListInvitationsQueryParams } from "@/lib/backend/schemas";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
@@ -45,7 +46,7 @@ const LIMIT = {
  * with their status and expiry. `--status` and `--type` narrow the page; like
  * every list verb it fetches one page and reports `next_page_token`.
  */
-export default class InvitationList extends Tabulatable(EnvironmentCommand) {
+export default class InvitationList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "List the project's invitations, newest first.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 6;

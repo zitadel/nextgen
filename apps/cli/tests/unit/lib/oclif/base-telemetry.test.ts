@@ -54,7 +54,7 @@ class TestCommand extends BaseCommand {
   }
 
   public async open(): Promise<void> {
-    await this.toMeta({}, { resolveServer: false, source: "mock" });
+    await this.toMeta({}, { source: "mock" });
   }
   public complete(): void {
     this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
