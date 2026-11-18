@@ -220,7 +220,10 @@ properties:
     description: How a CLI command ended.
   reason:
     type: string
-    description: A predefined error code such as `E_NETWORK`, never a raw message.
+    description: >-
+      A predefined error code such as `E_NETWORK`, never a raw message. #2200
+      calls the property `error_code`; the CLI keeps the name its failed events
+      already carry, so a report across components reads both.
   exit_code:
     type: number
     description: The CLI process's exit code.

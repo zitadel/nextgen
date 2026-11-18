@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -18,8 +18,6 @@ export type Identity = {
 
 type StoredIdentity = {
   distinctId: string;
-  /** Set once the first-run notice has been shown on this install. */
-  noticed?: true;
   /** When the install's profile was last written, and a hash of what was written. */
   profile?: { at: number; hash: string };
 };
@@ -34,6 +32,13 @@ function writeStored(file: string, stored: StoredIdentity): void {
   writeFileSync(temporary, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
   renameSync(temporary, file);
 }
+
+/**
+ * The file whose existence says the first-run notice was shown. It is a file of
+ * its own, not a field of the install's record, so two runs that each rewrite
+ * the record never lose it.
+ */
+const NOTICE_FILE = "notice-shown";
 
 /** How long a written profile stands before it is written again: a day. */
 const PROFILE_EVERY_MS = 24 * 60 * 60 * 1000;
@@ -82,7 +87,7 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
   try {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
     if (typeof parsed.distinctId === "string" && parsed.distinctId.length > 0) {
-      return { distinctId: parsed.distinctId, isFirstRun: parsed.noticed !== true };
+      return { distinctId: parsed.distinctId, isFirstRun: !existsSync(join(dir, NOTICE_FILE)) };
     }
   } catch {
     /* fall through to mint a fresh id */
@@ -154,10 +159,9 @@ export function markNoticed(env: NodeJS.ProcessEnv): void {
   if (dir === undefined) {
     return;
   }
-  const file = join(dir, "telemetry.json");
   try {
-    const stored = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
-    writeStored(file, { ...stored, noticed: true });
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, NOTICE_FILE), "", { mode: 0o600 });
   } catch {
     /* the notice may show again */
   }

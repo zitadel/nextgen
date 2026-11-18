@@ -1124,7 +1124,7 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(
   },
   // Every generated command connects to a server and reports on its own run.
   (Base) => {
-    return Telemetered(ServerCommand(Base)) as unknown as typeof Base;
+    return Telemetered(ServerCommand(Base));
   },
 );
 
