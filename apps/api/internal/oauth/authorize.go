@@ -41,7 +41,7 @@ const (
 	// §4.1.2.1). The library has no constructor for it.
 	temporarilyUnavailable = "temporarily_unavailable"
 	// requestURINotSupported refuses a request object passed by reference
-	// (RFC 9101 §6.3). The library has no constructor for it.
+	// (RFC 9101 §7). The library has no constructor for it.
 	requestURINotSupported = "request_uri_not_supported"
 	// maxBindingCookies bounds the binding cookies one browser holds. Every
 	// accepted request sets one, any site can send a browser here, and the
@@ -173,20 +173,23 @@ func keepError(ctx context.Context, err error) {
 }
 
 // logError writes the line an error an endpoint answers gets (ADR 030): err
-// when an opServer method returned one, or else the library's own refusal,
-// read from the status and body it answered with. The library logs both too,
-// but without the request id.
-func logError(ctx context.Context, err error, status int, body []byte) {
+// when an opServer method returned one, or else answered, the library's own
+// refusal with an error status. The library logs both too, but without the
+// request id. A refusal of its own that the library redirects to the client
+// gets no line here: only the library logs it.
+func logError(ctx context.Context, err error, status int, answered *oidc.Error) {
+	// The library answers an endpoint this server does not serve with
+	// server_error and a 404, so for its answers the status decides.
+	fault := status >= http.StatusInternalServerError
 	if err == nil {
 		if status == 0 {
 			return
 		}
-		refusal := new(oidc.Error)
-		// A body that is not the library's JSON leaves the line without a description.
-		_ = json.Unmarshal(body, refusal)
-		err = refusal
+		err = answered
+	} else if oauthErr, ok := errors.AsType[*oidc.Error](err); !ok || oauthErr.ErrorType == oidc.ServerError || oauthErr.ErrorType == temporarilyUnavailable {
+		fault = true
 	}
-	if oauthErr, ok := errors.AsType[*oidc.Error](err); !ok || oauthErr.ErrorType == oidc.ServerError || oauthErr.ErrorType == temporarilyUnavailable {
+	if fault {
 		errlog.LogFault(ctx, err)
 		return
 	}
@@ -318,23 +321,25 @@ func withoutLoggedState(next http.Handler) http.Handler {
 
 // withErrorPages answers a browser navigation's error with the error page
 // instead of the library's JSON (ADR 076). A program keeps the JSON. The
-// Accept header decides, and Vary says so to caches. Either way the error is
-// logged once.
+// Accept header decides, and Vary says so to caches. Either way logError
+// logs the error.
 func withErrorPages(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Accept")
 		var answered error
 		ew := &errorWriter{ResponseWriter: w, page: errorpage.Wants(r)}
 		next.ServeHTTP(ew, r.WithContext(context.WithValue(r.Context(), answeredErrorKey{}, &answered)))
-		logError(r.Context(), answered, ew.status, ew.body.Bytes())
+		refusal := new(oidc.Error)
+		// A body that is not the library's JSON leaves the line and the page without a description.
+		_ = json.Unmarshal(ew.body.Bytes(), refusal)
+		logError(r.Context(), answered, ew.status, refusal)
 		if ew.page && ew.status != 0 {
-			body := ew.body.Bytes()
 			// The token and revocation endpoints quote the request in their
 			// descriptions, so their pages get no sentence.
 			if !strings.HasSuffix(r.URL.Path, AuthorizePath) {
-				body = nil
+				refusal.Description = ""
 			}
-			errorpage.Write(w, r, errorPageFor(ew.status, body))
+			errorpage.Write(w, r, errorPageFor(ew.status, refusal.Description))
 		}
 	})
 }
@@ -359,12 +364,12 @@ func (w *errorWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// errorPageFor builds the error page for status (ADR 076 §4). body is the
-// JSON the library answered with, or nil for a page without a sentence. For
-// a 4xx the page shows its error_description. In oidc v3.52.0 the
+// errorPageFor builds the error page for status (ADR 076 §4). For a 4xx the
+// page shows description, the error_description the library answered with,
+// or no sentence when it is empty. In oidc v3.52.0 the
 // authorization endpoint's descriptions are fixed texts, and the template
 // escapes them.
-func errorPageFor(status int, body []byte) errorpage.Page {
+func errorPageFor(status int, description string) errorpage.Page {
 	switch {
 	case status == http.StatusNotFound:
 		return errorpage.NotFound(nil)
@@ -375,12 +380,7 @@ func errorPageFor(status int, body []byte) errorpage.Page {
 			Description: "The server could not complete this request. Try again in a moment.",
 		}
 	default:
-		var refusal struct {
-			Description string `json:"error_description"`
-		}
-		// A body that is not the library's JSON leaves the page without a sentence.
-		_ = json.Unmarshal(body, &refusal)
-		return errorpage.Page{Status: status, Title: "Request failed", Description: refusal.Description}
+		return errorpage.Page{Status: status, Title: "Request failed", Description: description}
 	}
 }
 

@@ -95,6 +95,7 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name          string
+		method        string
 		set           map[string]string
 		wantChallenge string
 		wantState     string
@@ -108,6 +109,10 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 		// Another cookie and a loopback binding cookie do not count.
 		{name: "at_cookie_limit", cookies: "session=1; _zauth_authreq_x=n; " + bindingCookieNames(10), wantExpired: []string{"__Host-_zauth_authreq_00"}},
 		{name: "over_cookie_limit", cookies: bindingCookieNames(12), wantExpired: []string{"__Host-_zauth_authreq_00", "__Host-_zauth_authreq_01", "__Host-_zauth_authreq_02"}},
+		// A browser sends no Lax cookie with another site's form POST, so the
+		// limit expires nothing there, however many the browser holds.
+		// TODO(#2795): close this gap.
+		{name: "cross_site_post", method: http.MethodPost},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -116,7 +121,7 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 			mux := newMux(t, Config{Settings: deployed, Clients: shop, AuthRequests: store})
 			headers := map[string]string{"X-Forwarded-Proto": "https", "Accept": "text/html", "Cookie": tt.cookies}
 
-			rec := send(t, mux, http.MethodGet, authorizePath+authorizeQuery(tt.set), "app.example.com", headers)
+			rec := send(t, mux, cmp.Or(tt.method, http.MethodGet), authorizePath+authorizeQuery(tt.set), "app.example.com", headers)
 
 			require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 			assert.Equal(t, "https://app.example.com/login?auth_request=authreq_1", rec.Header().Get("Location"))
@@ -325,10 +330,12 @@ func TestErrorPageSentenceOnlyOnAuthorize(t *testing.T) {
 func TestAuthorizeLogs(t *testing.T) {
 	// Not parallel: the library logs through the default logger.
 	tests := []struct {
-		name      string
-		clients   ClientResolver
-		headers   map[string]string
-		set       map[string]string
+		name    string
+		clients ClientResolver
+		headers map[string]string
+		set     map[string]string
+		// path replaces the authorization request.
+		path      string
 		wantLevel string
 		// wantCause is in the api error line, wantLine anywhere in the log.
 		wantCause string
@@ -341,6 +348,8 @@ func TestAuthorizeLogs(t *testing.T) {
 		{name: "unregistered_redirect_uri_from_a_program", headers: https, set: map[string]string{"redirect_uri": "https://evil.example/callback"}, wantLevel: "INFO"},
 		{name: "clients_fail", clients: failing{errors.New("boom")}, wantLevel: "ERROR", wantCause: "boom"},
 		{name: "clients_unavailable", clients: failing{domain.ErrUnavailable()}, wantLevel: "ERROR"},
+		// The library answers an endpoint that is not built with server_error and a 404.
+		{name: "endpoint_not_built", path: "/oauth/proj_123" + JWKSPath, wantLevel: "INFO"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -354,9 +363,12 @@ func TestAuthorizeLogs(t *testing.T) {
 			if tt.headers == nil {
 				tt.headers = browser
 			}
+			if tt.path == "" {
+				tt.path = authorizePath + authorizeQuery(tt.set)
+			}
 			mux := newMux(t, Config{Settings: deployed, Clients: tt.clients, AuthRequests: &authRequests{}})
 
-			send(t, mux, http.MethodGet, authorizePath+authorizeQuery(tt.set), "app.example.com", tt.headers)
+			send(t, mux, http.MethodGet, tt.path, "app.example.com", tt.headers)
 
 			var apiErrors []string
 			for line := range strings.Lines(logs.String()) {
