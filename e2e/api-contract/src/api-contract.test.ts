@@ -43,10 +43,11 @@ describe("API contract", () => {
   });
 
   test("no operation breaks the API contract beyond known-failures.json", ({ contract }) => {
-    const problems = new ContractSummary(contract, baseline).problems().map((problem) => {
-      return `${problem.operation}: ${problem.findings.join(" ")}`;
-    });
-    expect(problems).toEqual([]);
+    const summary = new ContractSummary(contract, baseline);
+    // The message is the verdict itself, so the log shows it as written and not as a diff of arrays.
+    if (summary.problems().length > 0) {
+      throw new Error(`\n${summary.text()}`);
+    }
   });
 
   test("known-failures.json names only operations the spec has", ({ contract }) => {

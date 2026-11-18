@@ -80,6 +80,7 @@ describe("BaselineUpdate", () => {
     stopReason: "finished",
     errors: [],
     failures: [{ operation: "GET /z", check: "Server error", count: 4 }],
+    details: {},
     seconds: 1,
   };
 

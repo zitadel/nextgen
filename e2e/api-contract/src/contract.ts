@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { CHECKS, exemptionsFor, refusalsFor } from "./checks";
 import type { CommandInput } from "./command";
 import { CSRF_HEADER, type SessionCredential } from "./credentials";
+import { FailureDetails, type FailureDetail } from "./details";
 import { compare } from "./order";
 import { Shards } from "./shards";
 import type { Accounting, Failure } from "./report";
@@ -32,6 +33,8 @@ export interface CommandRun {
   stopReason: string;
   errors: string[];
   failures: Failure[];
+  /** The failing requests Schemathesis printed, by operation name. */
+  details: Record<string, FailureDetail[]>;
   /** How long the command took, in seconds. */
   seconds: number;
 }
@@ -193,6 +196,7 @@ export class Contract {
       complete: run.report.complete,
       stopReason: run.report.stopReason,
       errors: run.report.errors,
+      details: FailureDetails.parse(run.log),
       seconds,
       failures: run.report.failures().sort((a, b) => {
         return compare(a.operation, b.operation) || compare(a.check, b.check);
