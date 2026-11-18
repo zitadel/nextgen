@@ -37,7 +37,7 @@ func (h Handler) Handle(ctx context.Context, record slog.Record) error {
 	if keys, _ := ctx.Value(withoutAttrsKey{}).([]string); len(keys) > 0 {
 		kept := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
 		record.Attrs(func(attr slog.Attr) bool {
-			if attr, ok := withoutAttrs(attr, keys); ok {
+			if attr, ok, _ := withoutAttrs(attr, keys); ok {
 				kept.AddAttrs(attr)
 			}
 			return true
@@ -66,21 +66,28 @@ func (h Handler) WithGroup(name string) slog.Handler {
 
 var _ slog.Handler = (*Handler)(nil)
 
-// withoutAttrs returns attr without the attributes named keys inside it, or
-// false when attr itself is one of them.
-func withoutAttrs(attr slog.Attr, keys []string) (slog.Attr, bool) {
+// withoutAttrs returns attr without the attributes named keys inside it.
+// keep is false when attr itself is one of them. An attr with nothing to drop
+// is returned as it came, since a handler may need the value behind a group:
+// the GCP handler reads the stack from the error.
+func withoutAttrs(attr slog.Attr, keys []string) (_ slog.Attr, keep, changed bool) {
 	if slices.Contains(keys, attr.Key) {
-		return attr, false
+		return attr, false, true
 	}
 	value := attr.Value.Resolve()
 	if value.Kind() != slog.KindGroup {
-		return attr, true
+		return attr, true, false
 	}
 	var kept []slog.Attr
 	for _, member := range value.Group() {
-		if member, ok := withoutAttrs(member, keys); ok {
+		member, keep, memberChanged := withoutAttrs(member, keys)
+		changed = changed || memberChanged
+		if keep {
 			kept = append(kept, member)
 		}
 	}
-	return slog.Attr{Key: attr.Key, Value: slog.GroupValue(kept...)}, true
+	if !changed {
+		return attr, true, false
+	}
+	return slog.Attr{Key: attr.Key, Value: slog.GroupValue(kept...)}, true, true
 }
