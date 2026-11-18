@@ -31,7 +31,16 @@ root.
   raw report and output are in `api-contract/test-output/schemathesis/<command>/` (`shard-N`, `stateful`, `logout`)
   (gitignored), and `st replay <id>` in the image replays a case.
 - The run takes about a minute and a half on CI. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
-- The verdict is written to `api-contract/test-output/summary.md`, to the job summary on GitHub, and as error annotations on the check.
+- The verdict names each broken operation and shows the response and the `curl`
+  request that broke it, with credentials and tokens left out (`src/details.ts`
+  reads them from Schemathesis's printed output) and the `st replay` id. It is
+  written as Markdown to `api-contract/test-output/summary.md` and the job
+  summary on GitHub, as plain text to the log (folded away when nothing broke),
+  and as one error annotation per operation on the check, which points at the
+  operation's definition in the spec's source (`src/sources.ts`) so it shows on
+  that line when the pull request changes the file. Vitest's console capture is
+  off for this lane (`disableConsoleIntercept`), so the log is not interleaved
+  with `stdout | ...` headers.
 
 ## The baseline
 

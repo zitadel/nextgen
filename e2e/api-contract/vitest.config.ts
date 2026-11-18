@@ -17,6 +17,9 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/e2e-api-contract",
     environment: "node",
+    // The run prints a verdict meant to be read in a log; Vitest would put a
+    // "stdout | file > test" line above every line of it.
+    disableConsoleIntercept: true,
     include: ["src/api-contract.test.ts"],
     // The first test to ask for a fixture waits for it: booting the instance,
     // starting the container and the whole Schemathesis run happen there.
