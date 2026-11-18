@@ -2,23 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppWindow } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import {
-  DETAIL_BODY,
-  DETAIL_STACK,
-  DETAIL_VALUE,
-  DetailHeader,
-  DetailRow,
-  DetailRows,
-  DetailSection,
-} from "@/components/detail-page";
+import { DETAIL_BODY, DetailHeader, DetailSection } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { ApplicationClients } from "@/features/applications/components/application-clients";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
-import { formatDate, formatDateTime } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 
 /**
- * Application detail: what the application is, then its OAuth clients, each
- * opening to its settings and document.
+ * Application detail: its OAuth clients, each opening to its settings and
+ * document.
+ *
+ * The design's Overview card holds the application's source and issuer URL;
+ * the API returns neither yet, so the card is left out until it does.
  *
  * Read-only, and opened by its URL: the API has no applications list yet, so
  * the sidebar has no Applications entry to reach it from.
@@ -35,14 +30,14 @@ export const Route = createFileRoute("/_authed/applications/$applicationId")({
 
 function ApplicationDetail() {
   const application = Route.useLoaderData();
-  const { name, clients } = application.definition;
+  const { clients } = application.definition;
 
   return (
     <Page>
       <DetailHeader
         icon={AppWindow}
         // The slug: what flows and other documents call the application, and
-        // fixed for its life. Its name is a value of the card below.
+        // fixed for its life.
         title={application.slug}
         meta={[
           { label: "Application ID", value: application.id, copyable: true },
@@ -50,19 +45,7 @@ function ApplicationDetail() {
         ]}
       />
 
-      <div className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
-        <DetailSection title="Overview">
-          <DetailRows>
-            <DetailRow label="Name">
-              <span className={DETAIL_VALUE}>{name}</span>
-            </DetailRow>
-            {/* When the newest revision was written. */}
-            <DetailRow label="Last modified">
-              <span className={DETAIL_VALUE}>{formatDateTime(application.updated_at)}</span>
-            </DetailRow>
-          </DetailRows>
-        </DetailSection>
-
+      <div className={DETAIL_BODY}>
         <DetailSection title="Configuration">
           <ApplicationClients clients={clients} />
         </DetailSection>

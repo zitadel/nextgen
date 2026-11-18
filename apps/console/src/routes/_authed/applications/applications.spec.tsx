@@ -58,7 +58,7 @@ async function renderAt(path: string) {
 }
 
 describe("application detail", () => {
-  it("shows the header, the overview and a row per client", async () => {
+  it("shows the header and a row per client", async () => {
     server.use(http.get(APPLICATION_URL, () => HttpResponse.json(application())));
     await renderAt("/applications/app_1");
 
@@ -66,8 +66,7 @@ describe("application detail", () => {
     expect(screen.getByRole("button", { name: "Copy Application ID" })).toBeInTheDocument();
 
     const cards = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(cards).toEqual(["Overview", "Configuration"]);
-    expect(screen.getByText("Shop")).toBeInTheDocument();
+    expect(cards).toEqual(["Configuration"]);
 
     expect(screen.getByRole("heading", { level: 3, name: "Clients" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "web" })).toBeInTheDocument();
@@ -80,6 +79,9 @@ describe("application detail", () => {
 
     const web = await screen.findByRole("region", { name: "web" });
     expect(within(web).getByText("client_web_2d7f0a91")).toBeInTheDocument();
+    // A client's settings are the dense rows: 8px either side of each rule.
+    const rows = within(web).getByText("Client ID").closest(".\\@container\\/detail-rows");
+    expect(rows).toHaveClass("gap-2");
     expect(within(web).getByText("Confidential")).toBeInTheDocument();
     expect(within(web).getByText("Yes")).toBeInTheDocument();
     expect(within(web).getByText("Authorization code")).toBeInTheDocument();

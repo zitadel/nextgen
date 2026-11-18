@@ -45,7 +45,7 @@ export function ApplicationClients({ clients }: { clients: ApplicationClient[] }
 function ClientRows({ client }: { client: ApplicationClient }) {
   const redirectUris = client.redirect_uris ?? [];
   return (
-    <DetailRows container>
+    <DetailRows container dense>
       {/* Left out when the client has another name: the row's title is its slug. */}
       {client.name && (
         <DetailRow label="Name">

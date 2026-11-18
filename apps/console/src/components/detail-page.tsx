@@ -234,29 +234,34 @@ const ROW_RULE = "-mt-px";
  * a rule, 16px between each, and no rule after the last. `as="ul"` makes it a
  * list: each row is wrapped in its `li`, the rule above it inside that item.
  * `container` lays its rows out on the list's own width, for rows nested
- * inside another row's value (a policy's settings in a release).
+ * inside another row's value (a policy's settings in a release). `dense` puts
+ * 8px either side of the rule instead, for a client's settings in an
+ * application.
  */
 export function DetailRows({
   as = "div",
   container = false,
+  dense = false,
   children,
 }: {
   as?: "div" | "ul";
   container?: boolean;
+  dense?: boolean;
   children: ReactNode;
 }) {
   const rows = Children.toArray(children);
   const Tag = as;
+  const gap = dense ? "gap-2" : "gap-4";
   return (
     <RowsOnContainer.Provider value={container}>
-      <Tag className={cn("flex flex-col gap-4", container && "@container/detail-rows")}>
+      <Tag className={cn("flex flex-col", gap, container && "@container/detail-rows")}>
         {rows.map((row, index) => {
           // `Children.toArray` has keyed every element row.
           const key = isValidElement(row) && row.key !== null ? row.key : index;
-          // In a list the rule opens the row's own item, 16px above it, so the
+          // In a list the rule opens the row's own item, above it, so the
           // list holds nothing but its items.
           return as === "ul" ? (
-            <li key={key} className="flex flex-col gap-4">
+            <li key={key} className={cn("flex flex-col", gap)}>
               {index > 0 && <Separator className={ROW_RULE} />}
               {row}
             </li>
