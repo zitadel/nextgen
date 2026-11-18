@@ -620,7 +620,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         event,
-        commandEventProperties(this.meta, this.telemetryInvocationId, properties),
+        commandEventProperties(
+          this.meta,
+          ZitadelRuntime.fromUrl(this.meta.source).kind,
+          this.telemetryInvocationId,
+          properties,
+        ),
       );
     }
   }
@@ -1225,7 +1230,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
       if (action !== undefined) {
         this.telemetry.track(
           ACTION_FAILED,
-          commandEventProperties(meta, this.telemetryInvocationId, action),
+          commandEventProperties(
+            meta,
+            ZitadelRuntime.fromUrl(meta.source).kind,
+            this.telemetryInvocationId,
+            action,
+          ),
         );
       }
     }

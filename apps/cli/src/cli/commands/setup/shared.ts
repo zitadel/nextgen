@@ -49,7 +49,7 @@ import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
 import type { FlowStep } from "@/lib/oclif/flow-telemetry";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { LocalRuntime, type LocalMachine, type ResolvedServer, Server } from "@/lib/server";
+import { LocalRuntime, type LocalMachine, type ResolvedServer, ZitadelRuntime } from "@/lib/server";
 
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
@@ -1658,7 +1658,10 @@ export const ONBOARDING_STEPS: Readonly<Record<string, FlowStep<Partial<SetupFac
     step: "server_selection",
     choice: ({ answers }) => {
       return {
-        server_type: answers !== undefined && Server.at(answers.server).kind === "local" ? "local" : "remote",
+        server_type:
+          answers !== undefined && ZitadelRuntime.fromUrl(answers.server).kind === "local"
+            ? "local"
+            : "remote",
       };
     },
   },
