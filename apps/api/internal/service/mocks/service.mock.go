@@ -18395,41 +18395,41 @@ func (c *MockApplicationServiceClientCall) DoAndReturn(f func(context.Context, s
 	return c
 }
 
-// CreateOrRevise mocks base method.
+// CreateOrReviseRegistered mocks base method.
 func (m *MockApplicationService) CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte) (*service.CreateApplicationOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateOrRevise", ctx, projectID, document)
+	ret := m.ctrl.Call(m, "CreateOrReviseRegistered", ctx, projectID, document)
 	ret0, _ := ret[0].(*service.CreateApplicationOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CreateOrRevise indicates an expected call of CreateOrRevise.
-func (mr *MockApplicationServiceMockRecorder) CreateOrRevise(ctx, projectID, document any) *MockApplicationServiceCreateOrReviseCall {
+// CreateOrReviseRegistered indicates an expected call of CreateOrReviseRegistered.
+func (mr *MockApplicationServiceMockRecorder) CreateOrReviseRegistered(ctx, projectID, document any) *MockApplicationServiceCreateOrReviseRegisteredCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrRevise", reflect.TypeOf((*MockApplicationService)(nil).CreateOrReviseRegistered), ctx, projectID, document)
-	return &MockApplicationServiceCreateOrReviseCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrReviseRegistered", reflect.TypeOf((*MockApplicationService)(nil).CreateOrReviseRegistered), ctx, projectID, document)
+	return &MockApplicationServiceCreateOrReviseRegisteredCall{Call: call}
 }
 
-// MockApplicationServiceCreateOrReviseCall wrap *gomock.Call
-type MockApplicationServiceCreateOrReviseCall struct {
+// MockApplicationServiceCreateOrReviseRegisteredCall wrap *gomock.Call
+type MockApplicationServiceCreateOrReviseRegisteredCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockApplicationServiceCreateOrReviseCall) Return(arg0 *service.CreateApplicationOutput, arg1 error) *MockApplicationServiceCreateOrReviseCall {
+func (c *MockApplicationServiceCreateOrReviseRegisteredCall) Return(arg0 *service.CreateApplicationOutput, arg1 error) *MockApplicationServiceCreateOrReviseRegisteredCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockApplicationServiceCreateOrReviseCall) Do(f func(context.Context, string, []byte) (*service.CreateApplicationOutput, error)) *MockApplicationServiceCreateOrReviseCall {
+func (c *MockApplicationServiceCreateOrReviseRegisteredCall) Do(f func(context.Context, string, []byte) (*service.CreateApplicationOutput, error)) *MockApplicationServiceCreateOrReviseRegisteredCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockApplicationServiceCreateOrReviseCall) DoAndReturn(f func(context.Context, string, []byte) (*service.CreateApplicationOutput, error)) *MockApplicationServiceCreateOrReviseCall {
+func (c *MockApplicationServiceCreateOrReviseRegisteredCall) DoAndReturn(f func(context.Context, string, []byte) (*service.CreateApplicationOutput, error)) *MockApplicationServiceCreateOrReviseRegisteredCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

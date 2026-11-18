@@ -68,9 +68,9 @@ type Handler interface {
 	//
 	// Building writes revisions, so besides `release.write` it needs the write scope of every kind the
 	// bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
-	// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
-	// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
-	// scope. An empty kind needs no scope.
+	// `idp.write`, `application.write`, `policy.write` and `oauth_settings.write`, as the per-kind create
+	// endpoints do. A missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a
+	// token with that scope. An empty kind needs no scope.
 	//
 	// Building a release does not deploy it. A release is not tied to an origin, and the same release can
 	// later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
@@ -579,6 +579,17 @@ type Handler interface {
 	//
 	// GET /applications/{application_id}
 	GetApplication(ctx context.Context, params GetApplicationParams) (GetApplicationRes, error)
+	// GetApplicationRevisionById implements getApplicationRevisionById operation.
+	//
+	// Returns one revision of an application that authenticates its users via Zitadel, by its
+	// `revision_id`, the value a release pins. A declared application is served at the revision its
+	// deployment's release pins, so this is how to read what a release serves. It never returns a client
+	// secret.
+	//
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /applications/revisions/{revision_id}
+	GetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (GetApplicationRevisionByIdRes, error)
 	// GetAuthAttempt implements getAuthAttempt operation.
 	//
 	// Returns the current state of an authentication attempt, one sign-in round.
@@ -1256,6 +1267,10 @@ type Handler interface {
 	// a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
 	// rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
 	// details identify the setting.
+	//
+	// An application a release declares has one writer, the release: a slug one holds is refused with
+	// `app.declared`. Edit its file under `.zitadel/applications/` and deploy instead. A client here
+	// leaves `secret` out, which only a release sets; one that sets it is refused with `app.invalid`.
 	//
 	// If the document is refused, no change is stored and an existing application keeps its current
 	// revision.

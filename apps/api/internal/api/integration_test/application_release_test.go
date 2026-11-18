@@ -36,7 +36,7 @@ func TestDeclaredApplication(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("the application reads back as declared, its client_id as written", func(t *testing.T) {
-		resp, err := f.client.GetApplicationById(t.Context(), api.GetApplicationByIdParams{ProjectID: api.ProjectID(f.project), ID: stored.ApplicationID})
+		resp, err := f.client.GetApplication(t.Context(), api.GetApplicationParams{ProjectID: api.ProjectID(f.project), ApplicationID: stored.ApplicationID})
 		require.NoError(t, err)
 		require.IsType(t, &api.ApplicationResponse{}, resp, helpers.MustMarshal(t, resp))
 		app := resp.(*api.ApplicationResponse)
@@ -67,11 +67,11 @@ func TestDeclaredApplication(t *testing.T) {
 	})
 
 	t.Run("the API may not revise a declared application", func(t *testing.T) {
-		resp, err := f.client.CreateApplication(t.Context(), &api.CreateApplicationRequest{Application: shopApplication(webClient("web", ""))},
-			api.CreateApplicationParams{ProjectID: api.ProjectID(f.project)})
+		resp, err := f.client.PublishApplication(t.Context(), &api.CreateApplicationRequest{Application: shopApplication(webClient("web", ""))},
+			api.PublishApplicationParams{ProjectID: api.ProjectID(f.project)})
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateApplicationConflict{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode(domain.ErrApplicationDeclared().Code), resp.(*api.CreateApplicationConflict).Code)
+		require.IsType(t, &api.PublishApplicationConflict{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrApplicationDeclared().Code), resp.(*api.PublishApplicationConflict).Code)
 	})
 
 	t.Run("a deploy is refused while the secret's variable has no value", func(t *testing.T) {
@@ -225,11 +225,11 @@ func TestDeclaredApplicationRefusals(t *testing.T) {
 	t.Parallel()
 	f := newDeploymentFixture(t)
 
-	registered, err := f.client.CreateApplication(t.Context(), &api.CreateApplicationRequest{
+	registered, err := f.client.PublishApplication(t.Context(), &api.CreateApplicationRequest{
 		Application: api.Application{Slug: "crm", Name: "CRM", Clients: []api.ApplicationClient{webClient("web", "crm-web")}},
-	}, api.CreateApplicationParams{ProjectID: api.ProjectID(f.project)})
+	}, api.PublishApplicationParams{ProjectID: api.ProjectID(f.project)})
 	require.NoError(t, err)
-	require.IsType(t, &api.CreateApplicationCreated{}, registered, helpers.MustMarshal(t, registered))
+	require.IsType(t, &api.PublishApplicationCreated{}, registered, helpers.MustMarshal(t, registered))
 
 	type refusal struct {
 		index   int

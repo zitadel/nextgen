@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/secrets"
 )
 
 func webClient(redirectURIs ...string) domain.ApplicationClientDocument {
@@ -191,7 +193,7 @@ func TestValidateDeclaredApplication(t *testing.T) {
 	}
 }
 
-func TestApplicationClientsToCreate(t *testing.T) {
+func TestReviseRegisteredApplication(t *testing.T) {
 	t.Parallel()
 
 	current := domain.ApplicationDocument{Clients: []domain.ApplicationClientDocument{
@@ -207,7 +209,7 @@ func TestApplicationClientsToCreate(t *testing.T) {
 		wantDetails any
 	}{
 		{
-			name:     "on create every client is new",
+			name:     "every client of an application without clients is new",
 			document: []domain.ApplicationClientDocument{{Slug: "web"}, {Slug: "api", ClientID: new("289374592837459283@shop")}},
 			want:     []string{"web", "api"},
 		},
@@ -227,14 +229,14 @@ func TestApplicationClientsToCreate(t *testing.T) {
 			current:     current,
 			document:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("other")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
+			wantDetails: map[string][]string{"fields": {"/clients/other"}},
 		},
 		{
 			name:        "an omitted client",
 			current:     current,
 			document:    []domain.ApplicationClientDocument{{Slug: "api"}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/web"}},
+			wantDetails: map[string][]string{"fields": {"/clients/client_01KWH3B"}},
 		},
 		{
 			name: "every omitted client and changed client_id",
@@ -245,7 +247,7 @@ func TestApplicationClientsToCreate(t *testing.T) {
 			}},
 			document:    []domain.ApplicationClientDocument{{Slug: "cli", ClientID: new("other")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/web", "/clients/api", "/clients/0/client_id"}},
+			wantDetails: map[string][]string{"fields": {"/clients/other", "/clients/client_01KWH3B", "/clients/client_01KWH3C"}},
 		},
 		{
 			name:     "every new client with a reserved prefix",
@@ -261,9 +263,16 @@ func TestApplicationClientsToCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := domain.ApplicationClientsToCreate(tt.current, domain.ApplicationDocument{Clients: tt.document})
+			current, err := json.Marshal(tt.current)
+			require.NoError(t, err)
+			old := &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop", Document: current}
+			_, added, _, err := domain.ReviseRegisteredApplication(old, domain.ApplicationDocument{Clients: tt.document}, []byte("{}"), secrets.NewRandomSecretGenerator())
 			if tt.wantErr == nil {
 				require.NoError(t, err)
+				var got []string
+				for _, client := range added {
+					got = append(got, client.Slug)
+				}
 				assert.Equal(t, tt.want, got)
 				return
 			}
@@ -313,7 +322,7 @@ func TestReviseDeclaredApplication(t *testing.T) {
 			old:         declared,
 			document:    []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api-2")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
+			wantDetails: map[string][]string{"fields": {"/clients/shop-api-2"}},
 		},
 		{
 			name:     "a new client with a reserved prefix",
@@ -335,7 +344,7 @@ func TestReviseDeclaredApplication(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			revised, got, err := domain.ReviseDeclaredApplication(tt.old, stored, domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.document}, []byte("{}"))
+			revised, got, err := tt.old.ReviseDeclaredApplication(stored, domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.document}, []byte("{}"))
 			if tt.wantErr == nil {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)

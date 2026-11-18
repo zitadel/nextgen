@@ -212,12 +212,12 @@ type GetApplicationParams struct {
 
 // GetApplicationRevisionByIdParams is parameters of getApplicationRevisionById operation.
 type GetApplicationRevisionByIdParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The revision ID: the `revision_id` that `createApplication` (`POST /applications`)
-	// or `getApplicationById` returns, or that a release pins.
+	// The revision ID: the `revision_id` that `createApplication` (`POST /applications`) or
+	// `getApplicationById` returns, or that a release pins.
 	RevisionID string
 }
 

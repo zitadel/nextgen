@@ -33,6 +33,7 @@ const (
 	EvaluatePolicyOperation                  OperationName = "EvaluatePolicy"
 	ExchangeHandoffOperation                 OperationName = "ExchangeHandoff"
 	GetApplicationOperation                  OperationName = "GetApplication"
+	GetApplicationRevisionByIdOperation      OperationName = "GetApplicationRevisionById"
 	GetAuthAttemptOperation                  OperationName = "GetAuthAttempt"
 	GetBrandingOperation                     OperationName = "GetBranding"
 	GetDeploymentOperation                   OperationName = "GetDeployment"

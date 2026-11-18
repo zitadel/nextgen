@@ -89,9 +89,9 @@ type Invoker interface {
 	//
 	// Building writes revisions, so besides `release.write` it needs the write scope of every kind the
 	// bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
-	// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
-	// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
-	// scope. An empty kind needs no scope.
+	// `idp.write`, `application.write`, `policy.write` and `oauth_settings.write`, as the per-kind create
+	// endpoints do. A missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a
+	// token with that scope. An empty kind needs no scope.
 	//
 	// Building a release does not deploy it. A release is not tied to an origin, and the same release can
 	// later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
@@ -600,6 +600,17 @@ type Invoker interface {
 	//
 	// GET /applications/{application_id}
 	GetApplication(ctx context.Context, params GetApplicationParams) (GetApplicationRes, error)
+	// GetApplicationRevisionById invokes getApplicationRevisionById operation.
+	//
+	// Returns one revision of an application that authenticates its users via Zitadel, by its
+	// `revision_id`, the value a release pins. A declared application is served at the revision its
+	// deployment's release pins, so this is how to read what a release serves. It never returns a client
+	// secret.
+	//
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /applications/revisions/{revision_id}
+	GetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (GetApplicationRevisionByIdRes, error)
 	// GetAuthAttempt invokes getAuthAttempt operation.
 	//
 	// Returns the current state of an authentication attempt, one sign-in round.
@@ -1277,6 +1288,10 @@ type Invoker interface {
 	// a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
 	// rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
 	// details identify the setting.
+	//
+	// An application a release declares has one writer, the release: a slug one holds is refused with
+	// `app.declared`. Edit its file under `.zitadel/applications/` and deploy instead. A client here
+	// leaves `secret` out, which only a release sets; one that sets it is refused with `app.invalid`.
 	//
 	// If the document is refused, no change is stored and an existing application keeps its current
 	// revision.
@@ -2184,9 +2199,9 @@ func (c *Client) sendAddProjectOrigin(ctx context.Context, request *ProjectOrigi
 //
 // Building writes revisions, so besides `release.write` it needs the write scope of every kind the
 // bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
-// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
-// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
-// scope. An empty kind needs no scope.
+// `idp.write`, `application.write`, `policy.write` and `oauth_settings.write`, as the per-kind create
+// endpoints do. A missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a
+// token with that scope. An empty kind needs no scope.
 //
 // Building a release does not deploy it. A release is not tied to an origin, and the same release can
 // later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
@@ -6222,6 +6237,175 @@ func (c *Client) sendGetApplication(ctx context.Context, params GetApplicationPa
 
 	stage = "DecodeResponse"
 	result, err := decodeGetApplicationResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetApplicationRevisionById invokes getApplicationRevisionById operation.
+//
+// Returns one revision of an application that authenticates its users via Zitadel, by its
+// `revision_id`, the value a release pins. A declared application is served at the revision its
+// deployment's release pins, so this is how to read what a release serves. It never returns a client
+// secret.
+//
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /applications/revisions/{revision_id}
+func (c *Client) GetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (GetApplicationRevisionByIdRes, error) {
+	res, err := c.sendGetApplicationRevisionById(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetApplicationRevisionById(ctx context.Context, params GetApplicationRevisionByIdParams) (res GetApplicationRevisionByIdRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getApplicationRevisionById"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/applications/revisions/{revision_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetApplicationRevisionByIdOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/applications/revisions/"
+	{
+		// Encode "revision_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "revision_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.RevisionID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetApplicationRevisionByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetApplicationRevisionByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetApplicationRevisionByIdResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -15694,6 +15878,10 @@ func (c *Client) sendLookupInvitation(ctx context.Context, request *InvitationTo
 // a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
 // rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
 // details identify the setting.
+//
+// An application a release declares has one writer, the release: a slug one holds is refused with
+// `app.declared`. Edit its file under `.zitadel/applications/` and deploy instead. A client here
+// leaves `secret` out, which only a release sets; one that sets it is refused with `app.invalid`.
 //
 // If the document is refused, no change is stored and an existing application keeps its current
 // revision.

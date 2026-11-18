@@ -78,7 +78,7 @@ func NewApplicationService(v2Pool *DB, schemas BuiltinSchemaProvider, generator 
 // returned once in the output. An application a release declares has the
 // release as its one writer, so its slug is refused.
 func (s *applicationService) CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte) (_ *CreateApplicationOutput, err error) {
-	ctx, end := startSpan(ctx, "ApplicationService.CreateOrRevise")
+	ctx, end := startSpan(ctx, "ApplicationService.CreateOrReviseRegistered")
 	defer end(&err)
 
 	next, err := s.validate(document, false)
@@ -206,6 +206,9 @@ func (s *applicationService) reviseRegistered(ctx context.Context, projectID str
 		}
 
 		revisedApp, addedClients, plainSecrets, err = domain.ReviseRegisteredApplication(oldApp, newDoc, newDocBs, s.secrets)
+		if err != nil {
+			return err
+		}
 		oldDoc, err := domain.ParseApplicationDocument(oldApp.Document)
 		if err != nil {
 			return err

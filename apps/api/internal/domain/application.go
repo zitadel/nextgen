@@ -139,6 +139,9 @@ func NewRegisteredApplication(projectID string, doc ApplicationDocument, docbs [
 	if err := ValidateRegisteredApplication(doc); err != nil {
 		return nil, nil, nil, err
 	}
+	if err := validateNoReservedClientIDs(doc, doc.Clients); err != nil {
+		return nil, nil, nil, err
+	}
 
 	clients = make([]*ApplicationClient, len(doc.Clients))
 	plainSecrets = make([]string, len(doc.Clients))
@@ -187,7 +190,7 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 	}
 	removed := removedClients(oldDoc.Clients, newDoc.Clients)
 	modifiedClientIDs := modifiedClientIDs(oldDoc.Clients, newDoc.Clients)
-	if len(removed) > 0 || len(modifiedClientIDs) == 0 {
+	if len(removed) > 0 || len(modifiedClientIDs) > 0 {
 		return nil, nil, nil, ErrApplicationFieldImmutable(append(modifiedClientIDs, removed...))
 	}
 
@@ -196,6 +199,9 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 			return !slices.ContainsFunc(oldDoc.Clients, func(c ApplicationClientDocument) bool { return oc.Slug == c.Slug })
 		}).
 		ToSlice()
+	if err := validateNoReservedClientIDs(newDoc, toAdd); err != nil {
+		return nil, nil, nil, err
+	}
 
 	clientsToAdd = make([]*ApplicationClient, len(toAdd))
 	plainSecrets = make([]string, len(toAdd))
@@ -222,6 +228,9 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 
 func NewDeclaredApplication(projectID string, doc ApplicationDocument, docBs []byte) (app *Application, clients []*ApplicationClient, err error) {
 	if err := ValidateDeclaredApplication(doc); err != nil {
+		return nil, nil, err
+	}
+	if err := validateNoReservedClientIDs(doc, doc.Clients); err != nil {
 		return nil, nil, err
 	}
 
@@ -259,6 +268,9 @@ func (app *Application) ReviseDeclaredApplication(stored []*ApplicationClient, n
 	}
 
 	toAdd, _ := slice_util.DiffFunc(oldClients, newDoc.Clients, func(a ApplicationClientDocument, b ApplicationClientDocument) bool { return a.Slug == b.Slug })
+	if err := validateNoReservedClientIDs(newDoc, toAdd); err != nil {
+		return nil, nil, err
+	}
 	clientsToAdd = make([]*ApplicationClient, len(toAdd))
 	for i, client := range toAdd {
 		clientsToAdd[i] = &ApplicationClient{ProjectID: app.ProjectID, Slug: client.Slug, ClientID: gu.Value(client.ClientID)}
@@ -275,9 +287,6 @@ func (app *Application) ReviseDeclaredApplication(stored []*ApplicationClient, n
 
 	return revisedApp, clientsToAdd, nil
 }
-
-// The codes are literal: the ID prefix is "app", the error resource is
-// "application".
 
 // ErrApplicationFieldImmutable rejects a revision that changes a client's
 // client_id or omits a stored client. details lists the location of each: the
@@ -399,9 +408,6 @@ func validateApplicationDocument(doc ApplicationDocument) map[string]string {
 			if seenIDs[*client.ClientID] {
 				failures[at+"/client_id"] = "another client of the application has this client_id"
 			}
-			if HasReservedClientIDPRefix(*client.ClientID) {
-				failures[at+"/client_id"] = "a supplied client_id may not start with " + strings.Join(reservedClientIDPrefixes, " or ")
-			}
 			seenIDs[*client.ClientID] = true
 		}
 		if slices.Contains(client.GrantTypes, grantTypeRefreshToken) && !slices.ContainsFunc(client.GrantTypes, isRefreshTokenIssuingGrant) {
@@ -441,6 +447,22 @@ func modifiedClientIDs(newClients, oldClients []ApplicationClientDocument) []App
 			return ok && !sameString(oldClient.ClientID, client.ClientID)
 		}).
 		ToSlice()
+}
+
+func validateNoReservedClientIDs(doc ApplicationDocument, added []ApplicationClientDocument) error {
+	failures := map[string]string{}
+	for i, client := range doc.Clients {
+		if client.ClientID == nil || !HasReservedClientIDPRefix(*client.ClientID) {
+			continue
+		}
+		if slices.ContainsFunc(added, func(c ApplicationClientDocument) bool { return c.Slug == client.Slug }) {
+			failures[fmt.Sprintf("/clients/%d/client_id", i)] = "a supplied client_id may not start with " + strings.Join(reservedClientIDPrefixes, " or ")
+		}
+	}
+	if len(failures) > 0 {
+		return ErrApplicationInvalid(failures, nil)
+	}
+	return nil
 }
 
 func HasReservedClientIDPRefix(clientID string) bool {

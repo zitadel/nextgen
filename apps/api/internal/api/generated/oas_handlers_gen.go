@@ -488,9 +488,9 @@ func (s *Server) handleAddProjectOriginRequest(args [1]string, argsEscaped bool,
 //
 // Building writes revisions, so besides `release.write` it needs the write scope of every kind the
 // bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
-// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
-// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
-// scope. An empty kind needs no scope.
+// `idp.write`, `application.write`, `policy.write` and `oauth_settings.write`, as the per-kind create
+// endpoints do. A missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a
+// token with that scope. An empty kind needs no scope.
 //
 // Building a release does not deploy it. A release is not tied to an origin, and the same release can
 // later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
@@ -5836,6 +5836,220 @@ func (s *Server) handleGetApplicationRequest(args [1]string, argsEscaped bool, w
 	}
 
 	if err := encodeGetApplicationResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleGetApplicationRevisionByIdRequest handles getApplicationRevisionById operation.
+//
+// Returns one revision of an application that authenticates its users via Zitadel, by its
+// `revision_id`, the value a release pins. A declared application is served at the revision its
+// deployment's release pins, so this is how to read what a release serves. It never returns a client
+// secret.
+//
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /applications/revisions/{revision_id}
+func (s *Server) handleGetApplicationRevisionByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getApplicationRevisionById"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/applications/revisions/{revision_id}"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetApplicationRevisionByIdOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetApplicationRevisionByIdOperation,
+			ID:   "getApplicationRevisionById",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, GetApplicationRevisionByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, GetApplicationRevisionByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeGetApplicationRevisionByIdParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetApplicationRevisionByIdRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetApplicationRevisionByIdOperation,
+			OperationSummary: "Get a revision of an application",
+			OperationID:      "getApplicationRevisionById",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "revision_id",
+					In:   "path",
+				}: params.RevisionID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetApplicationRevisionByIdParams
+			Response = GetApplicationRevisionByIdRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetApplicationRevisionByIdParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetApplicationRevisionById(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetApplicationRevisionById(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetApplicationRevisionByIdResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -16679,6 +16893,10 @@ func (s *Server) handleLookupInvitationRequest(args [0]string, argsEscaped bool,
 // a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
 // rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
 // details identify the setting.
+//
+// An application a release declares has one writer, the release: a slug one holds is refused with
+// `app.declared`. Edit its file under `.zitadel/applications/` and deploy instead. A client here
+// leaves `secret` out, which only a release sets; one that sets it is refused with `app.invalid`.
 //
 // If the document is refused, no change is stored and an existing application keeps its current
 // revision.

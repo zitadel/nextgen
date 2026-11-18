@@ -52,12 +52,12 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		assert.True(t, got.Created)
 		assert.Equal(t, "app_1", got.Application.ID)
 		assert.Equal(t, []service.ApplicationClientSecret{
-			{Slug: "web", ClientID: "client_1", Secret: "sk_client_1"},
-			{Slug: "admin", ClientID: "shop-admin", Secret: "sk_client_2"},
+			{Slug: "web", ClientID: "client_1", Secret: "sk_csec_1"},
+			{Slug: "admin", ClientID: "shop-admin", Secret: "sk_csec_2"},
 		}, got.Secrets)
 		assert.Equal(t, []*domain.ApplicationClientSecret{
-			{ProjectID: appProjectID, ApplicationClientID: "client_1", SecretHash: domain.HashSecret("sk_client_1")},
-			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_client_2")},
+			{ProjectID: appProjectID, ApplicationClientID: "client_1", SecretHash: domain.HashSecret("sk_csec_1")},
+			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_csec_2")},
 		}, *secrets, "each client stores the hash of the secret it was returned")
 
 		require.Len(t, *f.events, 1)
@@ -91,9 +91,9 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
 		require.NoError(t, err)
 		assert.False(t, got.Created)
-		assert.Equal(t, []service.ApplicationClientSecret{{Slug: "admin", ClientID: "shop-admin", Secret: "sk_client_1"}}, got.Secrets)
+		assert.Equal(t, []service.ApplicationClientSecret{{Slug: "admin", ClientID: "shop-admin", Secret: "sk_csec_1"}}, got.Secrets)
 		assert.Equal(t, []*domain.ApplicationClientSecret{
-			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_client_1")},
+			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_csec_1")},
 		}, *secrets)
 
 		require.Len(t, *f.events, 1)
