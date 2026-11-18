@@ -1,11 +1,9 @@
 import { chmod, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { GenericContainer, Wait } from "testcontainers";
+import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
-import { EXIT_MARKER, SchemathesisCommand, type SchemeCredential } from "./command";
-import type { Exemption } from "./checks";
-import { Completion } from "./completion";
+import { SchemathesisCommand, type CommandInput } from "./command";
 import { SchemathesisReport } from "./report";
 
 /**
@@ -21,38 +19,8 @@ export const SCHEMATHESIS_IMAGE = "schemathesis/schemathesis:4.31.0";
  */
 const HOST_ALIAS = "host.docker.internal";
 
-/** How long one run may take before the lane gives up on it. */
-const RUN_TIMEOUT_MS = 15 * 60_000;
-
-/**
- * How long the output stream may trail the wait strategy. Testcontainers
- * reads the container's logs twice, once to see the marker and once for our
- * consumer, and the second can deliver the line a moment later.
- */
-const OUTPUT_LAG_MS = 60_000;
-
-export interface SchemathesisInput {
-  /** A scratch folder for this run; the spec is written into it and the report read from it. */
-  workDir: string;
-  /** The OpenAPI document, as the server serves it. */
-  spec: string;
-  /** The API's base URL as the host sees it, including the path prefix. */
-  baseUrl: string;
-  /** Headers every request carries. */
-  headers: Record<string, string>;
-  /** Credentials by security scheme name. */
-  schemes: Record<string, SchemeCredential>;
-  /** The `operationId`s to test. */
-  operationIds: readonly string[];
-  /** The checks to apply, by name. */
-  checks: readonly string[];
-  /** The phases to run; all of them when absent. */
-  phases?: readonly string[];
-  /** The operations that may answer a valid-looking request with a 400. */
-  refusals?: readonly string[];
-  /** The checks to switch off for an operation. */
-  exemptions?: readonly Exemption[];
-}
+/** How long the idle container stays up if a run never stops it. */
+const IDLE_SECONDS = 4 * 60 * 60;
 
 export interface SchemathesisRun {
   /** Schemathesis's exit status: 0 when every check passed, 1 when one failed. */
@@ -64,111 +32,85 @@ export interface SchemathesisRun {
   report: SchemathesisReport;
 }
 
-/** Runs the pinned Schemathesis image once against a server on the host, through Testcontainers. */
+/**
+ * One Schemathesis container, started idle with the spec and hooks mounted.
+ * Each `run` is a command executed inside it, so any number of runs share the
+ * one container and may overlap.
+ */
 export class Schemathesis {
-  async run(input: SchemathesisInput): Promise<SchemathesisRun> {
-    await mkdir(input.workDir, { recursive: true });
-    // The image runs as an unprivileged user whose id is not the host user's, so
-    // on Linux it can only write its report into a folder everyone can write to.
-    await chmod(input.workDir, 0o777);
-    // Written as the JSON it parses to, so only a document that is valid JSON
-    // reaches the file, whatever the server answered.
-    await writeFile(join(input.workDir, "openapi.json"), JSON.stringify(JSON.parse(input.spec)));
-    await copyFile(join(import.meta.dirname, "..", "hooks.py"), join(input.workDir, "hooks.py"));
+  private readonly container: StartedTestContainer;
+  private readonly workDir: string;
 
-    const url = new URL(input.baseUrl);
-    url.hostname = HOST_ALIAS;
-    const command = new SchemathesisCommand({
-      url: url.toString().replace(/\/$/, ""),
-      headers: input.headers,
-      schemes: input.schemes,
-      operationIds: input.operationIds,
-      checks: input.checks,
-      phases: input.phases,
-      refusals: input.refusals,
-      exemptions: input.exemptions,
-    });
-    await writeFile(join(input.workDir, "schemathesis.toml"), command.config());
-
-    const completion = new Completion();
-    const container = await this.start(input.workDir, command, completion);
-    const deadline = new Deadline(OUTPUT_LAG_MS, () => {
-      return `Schemathesis finished but its status never reached the output stream. Its output:\n${completion.log}`;
-    });
-    try {
-      const exitCode = await Promise.race([completion.exitCode, deadline.expired]);
-      const reportText = await this.readReport(input.workDir, exitCode, completion.log);
-      return {
-        exitCode,
-        log: completion.log,
-        reportText,
-        report: SchemathesisReport.parse(reportText),
-      };
-    } finally {
-      deadline.cancel();
-      await container.stop();
-    }
+  private constructor(container: StartedTestContainer, workDir: string) {
+    this.container = container;
+    this.workDir = workDir;
   }
 
   /**
-   * Starts the container, which is ready when it has printed the exit marker
-   * and so also when the run is over. A container that exits at once would
-   * otherwise be started and gone before its output was read. The wait is
-   * bounded by the startup timeout, and its failure carries what was printed.
+   * Starts the container.
+   *
+   * @param workDir - a scratch folder the container mounts; the spec and hooks are put in it and each run's report is read from it.
+   * @param spec - the OpenAPI document, as the server serves it.
    */
-  private async start(workDir: string, command: SchemathesisCommand, completion: Completion) {
-    try {
-      return await new GenericContainer(SCHEMATHESIS_IMAGE)
-        .withEntrypoint(["sh", "-c"])
-        .withCommand([command.toShell()])
-        .withEnvironment(command.environment())
-        .withBindMounts([{ source: workDir, target: "/work", mode: "rw" }])
-        .withExtraHosts([{ host: HOST_ALIAS, ipAddress: "host-gateway" }])
-        .withLogConsumer((stream) => {
-          stream.on("data", (chunk: Buffer | string) => {
-            completion.push(chunk);
-          });
-        })
-        .withWaitStrategy(Wait.forLogMessage(new RegExp(`^${EXIT_MARKER} \\d+\\s*$`, "m")))
-        .withStartupTimeout(RUN_TIMEOUT_MS)
-        .start();
-    } catch (error) {
-      throw new Error(`Schemathesis did not finish. Its output:\n${completion.log}`, {
-        cause: error,
-      });
-    }
+  static async start(workDir: string, spec: string): Promise<Schemathesis> {
+    await mkdir(workDir, { recursive: true });
+    // The image runs as an unprivileged user whose id is not the host user's, so
+    // on Linux it can only write into a folder everyone can write to.
+    await chmod(workDir, 0o777);
+    // Written as the JSON it parses to, so only a document that is valid JSON
+    // reaches the file, whatever the server answered.
+    await writeFile(join(workDir, "openapi.json"), JSON.stringify(JSON.parse(spec)));
+    await copyFile(join(import.meta.dirname, "..", "hooks.py"), join(workDir, "hooks.py"));
+    const container = await new GenericContainer(SCHEMATHESIS_IMAGE)
+      .withEntrypoint(["sleep", String(IDLE_SECONDS)])
+      .withBindMounts([{ source: workDir, target: "/work", mode: "rw" }])
+      .withExtraHosts([{ host: HOST_ALIAS, ipAddress: "host-gateway" }])
+      .start();
+    return new Schemathesis(container, workDir);
   }
 
-  private async readReport(workDir: string, exitCode: number, log: string): Promise<string> {
+  /** The API's base URL as the container reaches it. */
+  static fromContainer(baseUrl: string): string {
+    const url = new URL(baseUrl);
+    url.hostname = HOST_ALIAS;
+    return url.toString().replace(/\/$/, "");
+  }
+
+  /**
+   * Runs one command in the container and reads the report it wrote.
+   *
+   * @param input - the command; its `url` is the address the host sees, which is rewritten for the container.
+   */
+  async run(input: CommandInput): Promise<SchemathesisRun> {
+    const command = new SchemathesisCommand({
+      ...input,
+      url: Schemathesis.fromContainer(input.url),
+    });
+    const directory = join(this.workDir, input.name);
+    await mkdir(directory, { recursive: true });
+    await chmod(directory, 0o777);
+    await writeFile(join(directory, "schemathesis.toml"), command.config());
+    const result = await this.container.exec(command.toArgs(), { env: command.environment() });
+    const reportText = await this.readReport(directory, result.exitCode, result.output);
+    return {
+      exitCode: result.exitCode,
+      log: result.output,
+      reportText,
+      report: SchemathesisReport.parse(reportText),
+    };
+  }
+
+  async stop(): Promise<void> {
+    await this.container.stop();
+  }
+
+  private async readReport(directory: string, exitCode: number, log: string): Promise<string> {
     try {
-      return await readFile(join(workDir, "report.json"), "utf8");
+      return await readFile(join(directory, "report.json"), "utf8");
     } catch {
       throw new Error(
         `Schemathesis wrote no report (exit ${String(exitCode)}). Its output:\n${log}`,
       );
     }
-  }
-}
-
-/**
- * A limit on a wait. Its timer is deliberately left referenced: while the lane
- * waits for the output stream to deliver the marker, nothing else keeps the
- * process alive, and Node would otherwise exit silently with the run
- * unfinished. It is cleared the moment the wait ends.
- */
-class Deadline {
-  readonly expired: Promise<never>;
-  private timer: NodeJS.Timeout | undefined;
-
-  constructor(milliseconds: number, message: () => string) {
-    this.expired = new Promise<never>((_, reject) => {
-      this.timer = setTimeout(() => {
-        reject(new Error(message()));
-      }, milliseconds);
-    });
-  }
-
-  cancel(): void {
-    clearTimeout(this.timer);
   }
 }

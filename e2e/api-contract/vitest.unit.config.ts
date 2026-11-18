@@ -15,7 +15,7 @@ export default defineConfig({
     name: "@zitadel/e2e-api-contract-unit",
     environment: "node",
     include: ["src/**/*.test.ts"],
-    exclude: ["src/contract.test.ts"],
+    exclude: ["src/api-contract.test.ts"],
     coverage: { ...baseTest.coverage, include: ["src/**/*.ts"] },
   },
 });

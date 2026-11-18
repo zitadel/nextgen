@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { Baseline, BaselineUpdate } from "./baseline";
-import type { FamilyRun } from "./lane";
+import type { CommandRun } from "./contract";
 
 let directory: string;
 let path: string;
@@ -68,8 +68,8 @@ describe("Baseline", () => {
 });
 
 describe("BaselineUpdate", () => {
-  const complete: FamilyRun = {
-    family: "public",
+  const complete: CommandRun = {
+    name: "all",
     operations: ["GET /z"],
     expected: 1,
     accounting: { selected: 1, tested: 1, skipped: 0, errored: 0, unmatched: [] },
@@ -108,14 +108,14 @@ describe("BaselineUpdate", () => {
       "matched no operation of a filter",
       { accounting: { ...complete.accounting, unmatched: ["x"] } },
     ],
-  ] as [string, Partial<FamilyRun>][])(
+  ] as [string, Partial<CommandRun>][])(
     "refuses a run that %s, and leaves the file alone",
     async (_, change) => {
       const before = await readFile(path, "utf8");
 
       expect(() => {
         new BaselineUpdate([{ ...complete, ...change }]).apply(new Baseline(path));
-      }).toThrow("refusing to rewrite the baseline from an unfinished run: public");
+      }).toThrow("refusing to rewrite the baseline from an unfinished run: all");
       expect(await readFile(path, "utf8")).toBe(before);
     },
   );

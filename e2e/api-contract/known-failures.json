@@ -4,23 +4,67 @@
     "check": "Server error"
   },
   {
+    "operation": "PATCH /teams/{team_id}",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "PATCH /users/{user_id}",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /applications",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /auth_attempts",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /branding",
+    "check": "API accepted schema-violating request"
+  },
+  {
+    "operation": "POST /deployments",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /grants/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /idps/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /invitations",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /projects/{project_id}/origins/remove",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /schemas",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /sessions/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
     "operation": "POST /users/query",
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "Stateful tests (management)",
+    "operation": "POST /users/{user_id}/passkeys/registrations",
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /invitations/accept",
-    "check": "Server error"
+    "operation": "PUT /users/{user_id}/password",
+    "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /invitations/lookup",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /invitations/reject",
+    "operation": "Stateful tests",
     "check": "Server error"
   }
 ]

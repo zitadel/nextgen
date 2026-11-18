@@ -16,7 +16,6 @@
     "playwright.shared.ts",
     "api-contract/vitest.config.ts",
     "api-contract/vitest.unit.config.ts",
-    "api-contract/global-setup.ts",
     "api-contract/src/**/*.ts",
     "cli/playwright*.config.mts",
     "cli/global-setup.ts",

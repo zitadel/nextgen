@@ -1,9 +1,9 @@
 import type { Baseline } from "./baseline";
-import type { FamilyRun } from "./lane";
+import type { CommandRun } from "./contract";
 
 /** One operation the API breaks its contract on, in the words a person needs to act on it. */
 export interface Problem {
-  family: string;
+  command: string;
   operation: string;
   /** What is wrong, one entry per check: a new failure, or a listed one that stopped. */
   findings: string[];
@@ -16,14 +16,14 @@ export interface Problem {
  * annotations on the check, so nobody has to open the raw log to find it.
  */
 export class ContractSummary {
-  private readonly runs: FamilyRun[];
+  private readonly runs: CommandRun[];
   private readonly baseline: Baseline;
 
   /**
-   * @param runs - what each family's Schemathesis run found.
+   * @param runs - what each Schemathesis command found.
    * @param baseline - the failures the API is known to have today.
    */
-  constructor(runs: FamilyRun[], baseline: Baseline) {
+  constructor(runs: CommandRun[], baseline: Baseline) {
     this.runs = runs;
     this.baseline = baseline;
   }
@@ -31,7 +31,7 @@ export class ContractSummary {
   /**
    * Each operation whose failures differ from the baseline.
    *
-   * @returns the problems, in the order the families ran.
+   * @returns the problems, in the order the commands ran.
    */
   problems(): Problem[] {
     const found: Problem[] = [];
@@ -44,7 +44,7 @@ export class ContractSummary {
           }),
         );
         if (findings.length > 0) {
-          found.push({ family: run.family, operation, findings });
+          found.push({ command: run.name, operation, findings });
         }
       }
     }
@@ -72,7 +72,7 @@ export class ContractSummary {
       "",
     ];
     for (const problem of problems) {
-      lines.push(`### \`${problem.operation}\` (${problem.family})`, "");
+      lines.push(`### \`${problem.operation}\` (${problem.command})`, "");
       for (const finding of problem.findings) {
         lines.push(`- ${finding}`);
       }
@@ -81,7 +81,7 @@ export class ContractSummary {
     lines.push(
       "### What to do",
       "",
-      "- The request that broke each check is in the `diagnostics` artifact of this run, under `e2e/api-contract/test-output/schemathesis/<family>/` (`report.json`, `output.log`); a family that was split into slices keeps them in `<family>/shard-N/` and its multi-step run in `<family>/stateful/`.",
+      "- The request that broke each check is in the `diagnostics` artifact of this run, under `e2e/api-contract/test-output/schemathesis/<command>/` (`report.json`, `output.log`).",
       "- Reproduce it on your machine: `turbo run api-contract --filter=@zitadel/e2e`.",
       "- A new failure means the server or the spec is wrong: fix one of them. Do not add the failure to `known-failures.json`.",
       "- A listed failure that stopped happening: delete its line from `e2e/api-contract/known-failures.json`.",
@@ -92,13 +92,13 @@ export class ContractSummary {
   }
 
   /**
-   * How long each family took, which is where a slow run spends its time.
+   * How long each command took, which is where a slow run spends its time.
    *
    * @returns a Markdown table.
    */
   timing(): string {
     const rows = this.runs.map((run) => {
-      return `| ${run.family} | ${String(run.accounting.tested)} | ${String(run.seconds)}s |`;
+      return `| ${run.name} | ${String(run.accounting.tested)} | ${String(run.seconds)}s |`;
     });
     const total = this.runs.reduce((sum, run) => {
       return sum + run.seconds;
@@ -112,11 +112,11 @@ export class ContractSummary {
     return [
       "### Time",
       "",
-      "| Family | Operations | Took |",
+      "| Command | Operations | Took |",
       "| --- | --- | --- |",
       ...rows,
       `| sum of all | | ${String(Math.round(total * 10) / 10)}s |`,
-      `| slowest (the families run at the same time) | | ${String(slowest)}s |`,
+      `| slowest (the commands run at the same time) | | ${String(slowest)}s |`,
       "",
     ].join("\n");
   }

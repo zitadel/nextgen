@@ -1,0 +1,148 @@
+import { appendFile, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { startLocalZitadel, type ConnectedZitadel } from "@zitadel/testing";
+import { test as base } from "vitest";
+
+import { Baseline, BaselineUpdate } from "./baseline";
+import { Contract, type CommandRun } from "./contract";
+import { Credentials } from "./credentials";
+import { Schemathesis } from "./schemathesis";
+import { OpenApiSpec } from "./spec";
+import { ContractSummary } from "./summary";
+
+const packageRoot = join(import.meta.dirname, "..");
+const workspaceRoot = join(packageRoot, "..", "..");
+
+/**
+ * Where the resource API lives on a deployment's host (ADR 077). The served
+ * spec states it as its `servers` URL; the fixture asserts the two agree, as the
+ * Go side does for its own copy of this constant.
+ */
+export const API_PREFIX = "/api/v1";
+
+export const baseline = new Baseline(join(packageRoot, "known-failures.json"));
+
+/** One booted instance of this working tree's server, and the spec it serves. */
+export interface Instance {
+  zitadel: ConnectedZitadel;
+  /** The resource API's base URL, including the path prefix. */
+  baseUrl: string;
+  spec: OpenApiSpec;
+  specText: string;
+}
+
+/**
+ * Puts the verdict where a person looks first: a file beside the raw reports,
+ * the job summary and error annotations when run by GitHub Actions.
+ */
+async function publish(summary: ContractSummary): Promise<void> {
+  const page = summary.markdown();
+  const directory = join(packageRoot, "test-output");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "summary.md"), page);
+  console.info(`\n${page}`);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, `${page}\n`);
+  }
+  if (process.env.GITHUB_ACTIONS) {
+    for (const line of summary.annotations()) {
+      console.info(line);
+    }
+  }
+}
+
+/**
+ * The suite's fixtures, each built before the first test of the file that asks
+ * for it and torn down after the last:
+ *
+ * - `workDir`: a scratch folder the Schemathesis container mounts.
+ * - `instance`: a real server of this working tree, booted once, and the spec
+ *   it serves. Testing the spec the binary serves, and not the YAML beside it,
+ *   is the point: it is the contract a customer's client reads, and it cannot
+ *   drift from the server under test.
+ * - `schemathesis`: the one Schemathesis container, started idle with that
+ *   spec; each command is run inside it.
+ * - `contract`: what Schemathesis found, published as the run's summary.
+ */
+export const test = base.extend<{
+  workDir: string;
+  instance: Instance;
+  schemathesis: Schemathesis;
+  contract: CommandRun[];
+}>({
+  workDir: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest reads the fixtures a function needs from its destructured first argument, so it must be a pattern even when empty.
+    async ({}, use) => {
+      const directory = await mkdtemp(join(tmpdir(), "api-contract-"));
+      // Schemathesis's container user must be able to reach the folders below it.
+      await chmod(directory, 0o755);
+      await use(directory);
+      await rm(directory, { recursive: true, force: true });
+    },
+    { scope: "file" },
+  ],
+
+  instance: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest reads the fixtures a function needs from its destructured first argument, so it must be a pattern even when empty.
+    async ({}, use) => {
+      const zitadel = await startLocalZitadel({
+        serverBinary:
+          process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
+      });
+      try {
+        const root = zitadel.handle.baseUrl.replace(/\/$/, "");
+        const baseUrl = `${root}${API_PREFIX}`;
+        const response = await fetch(`${baseUrl}/openapi.json`);
+        if (!response.ok) {
+          throw new Error(`GET ${baseUrl}/openapi.json answered ${String(response.status)}`);
+        }
+        const specText = await response.text();
+        const spec = OpenApiSpec.parse(specText);
+        if (spec.prefix !== API_PREFIX) {
+          throw new Error(
+            `the served spec's servers URL is ${String(spec.prefix)}, not ${API_PREFIX}`,
+          );
+        }
+        await use({ zitadel, baseUrl, spec, specText });
+      } finally {
+        await zitadel.stop();
+      }
+    },
+    { scope: "file" },
+  ],
+
+  schemathesis: [
+    async ({ workDir, instance }, use) => {
+      const container = await Schemathesis.start(workDir, instance.specText);
+      try {
+        await use(container);
+      } finally {
+        await container.stop();
+      }
+    },
+    { scope: "file" },
+  ],
+
+  contract: [
+    async ({ instance, schemathesis }, use) => {
+      const runs = await new Contract({
+        spec: instance.spec,
+        baseUrl: instance.baseUrl,
+        credentials: new Credentials(instance.zitadel, instance.spec, instance.baseUrl),
+        runner: schemathesis,
+        artifactsDir: join(packageRoot, "test-output", "schemathesis"),
+        log: (message) => {
+          console.info(`[api-contract] ${message}`);
+        },
+      }).run();
+      if (process.env.API_CONTRACT_UPDATE_BASELINE === "1") {
+        new BaselineUpdate(runs).apply(baseline);
+      }
+      await publish(new ContractSummary(runs, baseline));
+      await use(runs);
+    },
+    { scope: "file" },
+  ],
+});

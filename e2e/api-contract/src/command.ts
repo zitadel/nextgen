@@ -11,11 +11,9 @@ export const SEED = 24184733292255574161660497485948756999n;
 export const MAX_EXAMPLES = 25;
 
 /**
- * How many requests Schemathesis sends at once within one run. It stays at 1:
- * with more, which requests overlap changes from run to run, and so does what
- * fails. The lane gets its speed from running containers side by side instead
- * (see `Lane`), which repeats exactly. `API_CONTRACT_WORKERS` overrides it to
- * measure that.
+ * How many requests Schemathesis sends at once within one run: its threads
+ * share the one server, so this is where the lane's speed comes from.
+ * `API_CONTRACT_WORKERS` overrides it.
  */
 export const WORKERS = Number(process.env.API_CONTRACT_WORKERS ?? 1);
 
@@ -27,14 +25,8 @@ export const WORKERS = Number(process.env.API_CONTRACT_WORKERS ?? 1);
  */
 export const REQUEST_TIMEOUT_SECONDS = 60;
 
-/** Where the container finds the hooks, which `Schemathesis.run` copies there. */
+/** Where the container finds the hooks, which the container's start copies there. */
 export const HOOKS_PATH = "/work/hooks.py";
-
-/** Where the container finds the auth config. */
-export const CONFIG_PATH = "/work/schemathesis.toml";
-
-/** Where the sentinel line puts Schemathesis's own exit status. */
-export const EXIT_MARKER = "schemathesis-exit:";
 
 /** A credential for one of the spec's security schemes, which Schemathesis reads by scheme name. */
 export interface SchemeCredential {
@@ -43,12 +35,19 @@ export interface SchemeCredential {
 }
 
 export interface CommandInput {
+  /** The folder under `/work` this command keeps its config and report in. */
+  name: string;
   /** The checks to apply, by name. */
   checks: readonly string[];
   /** The API's base URL as the container reaches it, including the path prefix. */
   url: string;
-  /** Headers every request carries. Their values are read from the environment, never the command line. */
-  headers: Record<string, string>;
+  /**
+   * Headers an operation's requests carry, by `operationId`. A header meant for
+   * one kind of operation (the CSRF token of the cookie operations) must not
+   * ride on the others. Values are read from the environment, never the
+   * command line.
+   */
+  operationHeaders?: Record<string, Record<string, string>>;
   /**
    * Credentials by security scheme name. Schemathesis applies them where the
    * spec says (a bearer header, a cookie) and, because it knows which
@@ -77,13 +76,13 @@ export interface CommandInput {
 const ACCEPTED_STATUSES = ["2xx", "3xx", "401", "403", "404", "409", "429", "5xx"] as const;
 
 /**
- * The shell line a container runs, and the environment it reads. Header values
- * (a bearer token, a session cookie) travel in the environment so they never
- * land in the process list or in Testcontainers' logs of the command.
+ * The Schemathesis command a container runs, and the files and environment it
+ * reads. Credentials (a bearer token, a session cookie) travel in the
+ * environment and the config reads them from there, so they never land in the
+ * process list or in Testcontainers' logs of the command.
  *
  * Schemathesis exits non-zero when it finds a failure, which is a result here
- * and not a failure to start. The shell therefore prints that status on a line
- * of its own and exits zero; the run is over when that line appears.
+ * and not a failure to start: the caller reads the exit status.
  */
 export class SchemathesisCommand {
   private readonly input: CommandInput;
@@ -92,7 +91,22 @@ export class SchemathesisCommand {
     this.input = input;
   }
 
-  /** The environment holding every header line and scheme credential. */
+  /** The folder the command works in, inside the container. */
+  get directory(): string {
+    return `/work/${this.input.name}`;
+  }
+
+  /** Where the command writes its report, inside the container. */
+  get reportPath(): string {
+    return `${this.directory}/report.json`;
+  }
+
+  /** The config file the command reads, inside the container. */
+  get configPath(): string {
+    return `${this.directory}/schemathesis.toml`;
+  }
+
+  /** The environment holding every header value and scheme credential. */
   environment(): Record<string, string> {
     // Python would otherwise write hooks.pyc into the mounted work directory as
     // root, and the run could not delete it afterwards.
@@ -100,8 +114,8 @@ export class SchemathesisCommand {
       SCHEMATHESIS_HOOKS: HOOKS_PATH,
       PYTHONDONTWRITEBYTECODE: "1",
     };
-    Object.entries(this.input.headers).forEach(([name, value], index) => {
-      environment[`HEADER_${String(index)}`] = `${name}: ${value}`;
+    this.headerEntries().forEach((entry, index) => {
+      environment[`HEADER_${String(index)}`] = entry.value;
     });
     Object.values(this.input.schemes).forEach((credential, index) => {
       environment[`SCHEME_${String(index)}`] = credential.value;
@@ -109,10 +123,19 @@ export class SchemathesisCommand {
     return environment;
   }
 
+  /** Every per-operation header, in the order the environment numbers them. */
+  private headerEntries(): { operationId: string; name: string; value: string }[] {
+    return Object.entries(this.input.operationHeaders ?? {}).flatMap(([operationId, headers]) => {
+      return Object.entries(headers).map(([name, value]) => {
+        return { operationId, name, value };
+      });
+    });
+  }
+
   /**
    * The `schemathesis.toml`: the checks to run, the scheme credentials, the
-   * check exemptions of the operations under test, and the refusing operations
-   * that may answer 400.
+   * headers of single operations, the check exemptions of the operations under
+   * test, and the refusing operations that may answer 400.
    */
   config(): string {
     const entries = Object.entries(this.input.schemes);
@@ -122,6 +145,12 @@ export class SchemathesisCommand {
       const key = credential.kind === "bearer" ? "bearer" : "api_key";
       tables.push(
         `[auth.openapi.${JSON.stringify(name)}]\n${key} = "\${SCHEME_${String(index)}}"\n`,
+      );
+    });
+    this.headerEntries().forEach((entry, index) => {
+      tables.push(
+        `[[operations]]\ninclude-operation-id = ${JSON.stringify(entry.operationId)}\n\n` +
+          `[operations.headers]\n${JSON.stringify(entry.name)} = "\${HEADER_${String(index)}}"\n`,
       );
     });
     (this.input.exemptions ?? []).forEach((exemption) => {
@@ -154,33 +183,33 @@ export class SchemathesisCommand {
     return ["[checks]\nenabled = false\n", ...enabled].join("\n");
   }
 
-  /** Single-quotes a value for the shell. */
-  private static quote(value: string): string {
-    return `'${value.replaceAll("'", `'\\''`)}'`;
-  }
-
-  toShell(): string {
-    const headers = Object.keys(this.input.headers).map((_, index) => {
-      return `-H "$HEADER_${String(index)}"`;
-    });
-    const operations = this.input.operationIds.map((id) => {
-      return `--include-operation-id ${SchemathesisCommand.quote(id)}`;
-    });
+  /** The command and its arguments, which the container runs without a shell, so nothing needs quoting. */
+  toArgs(): string[] {
     return [
-      `schemathesis --config-file ${CONFIG_PATH} run /work/openapi.json`,
-      `--url ${SchemathesisCommand.quote(this.input.url)}`,
-      ...headers,
-      ...operations,
-      `--request-timeout ${String(REQUEST_TIMEOUT_SECONDS)}`,
-      `--seed ${String(SEED)}`,
-      `--max-examples ${String(MAX_EXAMPLES)}`,
-      `--workers ${String(WORKERS)}`,
-      ...(this.input.phases ? [`--phases ${this.input.phases.join(",")}`] : []),
-      "--report json --report-json-path /work/report.json",
+      "schemathesis",
+      "--config-file",
+      this.configPath,
+      "run",
+      "/work/openapi.json",
+      "--url",
+      this.input.url,
+      ...this.input.operationIds.flatMap((id) => {
+        return ["--include-operation-id", id];
+      }),
+      "--request-timeout",
+      String(REQUEST_TIMEOUT_SECONDS),
+      "--seed",
+      String(SEED),
+      "--max-examples",
+      String(MAX_EXAMPLES),
+      "--workers",
+      String(WORKERS),
+      ...(this.input.phases ? ["--phases", this.input.phases.join(",")] : []),
+      "--report",
+      "json",
+      "--report-json-path",
+      this.reportPath,
       "--no-color",
-      // The leading newline puts the marker on a line of its own even when
-      // Schemathesis's output did not end with one.
-      `; rc=$?; printf '\\n%s %s\\n' "${EXIT_MARKER}" "$rc"; exit 0`,
-    ].join(" ");
+    ];
   }
 }
