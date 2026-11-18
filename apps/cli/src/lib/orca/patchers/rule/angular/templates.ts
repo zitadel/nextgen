@@ -1,9 +1,8 @@
 import { posix } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
-import type { GitignoreRule } from "@/lib/gitignore";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import type { WiringVerdict } from "@/lib/orca/patchers/rule/file-writer/types";
 import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
@@ -23,6 +22,7 @@ import {
   SESSION_COOKIE_MARKER_V1,
 } from "@/lib/orca/patchers/rule/session-cookie";
 import { lfText, withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
+import type { GitignoreRule } from "@/lib/project";
 
 /** The managed launcher the app's serve, build and test scripts run through. */
 export const LAUNCHER_PATH = "zitadel-ng.cjs";
@@ -89,7 +89,7 @@ export function appComponentTemplate(ctx: PatchContext): string {
   // [locales] binding in app.html) to fall back to the neutral wording.
   protected readonly locales = businessLocales;`
     : "";
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { Component, OnInit } from "@angular/core";
 import {${importNames}} from "@zitadel/sdk-angular";
 // ${LAUNCHER_PATH} writes this module from ZITADEL_PROJECT_ID: npm run dev, build and test run it.
@@ -133,7 +133,7 @@ export class App implements OnInit {
  * file-system-race scan (CodeQL's `js/file-system-race`) reports in the app.
  */
 export function launcherTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 // Writes the project id into ${PROJECT_ID_MODULE_PATH}, which .gitignore
 // excludes, then runs the Angular CLI with the arguments it was given. The id
 // comes from the environment, else from .env.local, which zitadel setup writes.
@@ -262,7 +262,7 @@ export function devScriptEdit(source: string | undefined): string {
  */
 export function appTemplateHtml(ctx: PatchContext): string {
   const localesBinding = ctx.useCase === "business" ? `\n      [locales]="locales"` : "";
-  return `<!-- ${MANAGED_MARKER} -->
+  return `<!-- ${ManagedFile.MARKER} -->
 @if (path.startsWith('/profile')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-session
@@ -310,7 +310,7 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * ADR 083).
  */
 export function proxyConfTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 const { readFileSync, existsSync } = require("node:fs");
 
 function loadEnvLocal() {
@@ -470,11 +470,11 @@ export function proxyConfEdit(): (source: string | undefined) => string {
       return proxyConfTemplate();
     }
     return withLfLineEnds(source, (text) => {
-      if (text.includes(MANAGED_MARKER) && text.includes(LEGACY_UNCONDITIONAL_BEARER)) {
+      if (text.includes(ManagedFile.MARKER) && text.includes(LEGACY_UNCONDITIONAL_BEARER)) {
         return forwardAppOrigin(text.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
       }
       assertNoUnreviewedProjectSecretProxy(text, "proxy.conf.cjs");
-      return text.includes(MANAGED_MARKER) ? forwardAppOrigin(text) : text;
+      return text.includes(ManagedFile.MARKER) ? forwardAppOrigin(text) : text;
     });
   };
 }
@@ -482,7 +482,7 @@ export function proxyConfEdit(): (source: string | undefined) => string {
 /** Whether `text` (LF line ends) is the managed proxy as an earlier CLI wrote it, without the session-cookie hooks. */
 function hasBearerOnlyHooks(text: string): boolean {
   return (
-    text.includes(MANAGED_MARKER) &&
+    text.includes(ManagedFile.MARKER) &&
     bearerIn(text) !== undefined &&
     text.includes(BEARER_ONLY_HOOKS)
   );
@@ -491,7 +491,7 @@ function hasBearerOnlyHooks(text: string): boolean {
 /** Whether `text` (LF line ends) is the managed proxy with the session-cookie hooks the CLI wrote before ADR 083. */
 function hasV1Hooks(text: string): boolean {
   return (
-    text.includes(MANAGED_MARKER) &&
+    text.includes(ManagedFile.MARKER) &&
     text.includes(SESSION_COOKIE_FUNCTIONS_V1) &&
     text.includes(SESSION_COOKIE_HOOKS_V1)
   );
@@ -555,7 +555,7 @@ export function proxyConfSessionCookieVerdict(source: string): WiringVerdict {
     return "detached";
   }
   return {
-    unknown: text.includes(MANAGED_MARKER)
+    unknown: text.includes(ManagedFile.MARKER)
       ? "it was changed since zitadel setup wrote it, so the session-cookie hooks (ADR 073) must be added by hand"
       : "it is not the proxy zitadel setup writes, so the session-cookie hooks (ADR 073) must be added by hand",
   };
@@ -578,7 +578,7 @@ export function proxyConfApiPrefixEdit(): (source: string | undefined) => string
       return proxyConfTemplate();
     }
     return withLfLineEnds(source, (text) => {
-      return text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
+      return text.includes(ManagedFile.MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
         ? text.replace(V2_EXCHANGE_ONLY_BEARER, EXCHANGE_ONLY_BEARER)
         : text;
     });
@@ -598,14 +598,14 @@ export function proxyConfApiPrefixVerdict(source: string): WiringVerdict {
   if (text.includes(EXCHANGE_ONLY_BEARER)) {
     return "applied";
   }
-  if (text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)) {
+  if (text.includes(ManagedFile.MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)) {
     return "detached";
   }
   if (!text.includes("ZITADEL_PROJECT_SECRET") || text.includes(PREFIXED_EXCHANGE_PATH)) {
     return "applied";
   }
   return {
-    unknown: text.includes(MANAGED_MARKER)
+    unknown: text.includes(ManagedFile.MARKER)
       ? `it was changed since zitadel setup wrote it, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`
       : `it is not the proxy zitadel setup writes, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
   };

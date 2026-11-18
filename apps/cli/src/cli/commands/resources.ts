@@ -81,8 +81,9 @@ import {
   type WriteResult,
   type WriteShape,
 } from "@/lib/oclif/crud";
-import { CommandGroups } from "@/lib/oclif/groups";
+import { CommandGroups } from "@/cli/commands/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
 const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
@@ -375,7 +376,7 @@ const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
  */
 export const RESOURCES = {
   user: resource({
-    group: CommandGroups.usersAndTeams,
+    group: CommandGroups.usersAndAccess,
     groupOrder: 1,
     singular: "user",
     idSchema: GetUserParams.shape.user_id,
@@ -473,7 +474,7 @@ export const RESOURCES = {
   }),
 
   team: resource({
-    group: CommandGroups.usersAndTeams,
+    group: CommandGroups.usersAndAccess,
     groupOrder: 2,
     singular: "team",
     idField: "id",
@@ -527,7 +528,8 @@ export const RESOURCES = {
   }),
 
   session: resource({
-    group: CommandGroups.authentication,
+    group: CommandGroups.usersAndAccess,
+    groupOrder: 4,
     singular: "session",
     idSchema: GetSessionParams.shape.session_id,
     idField: "session_id",
@@ -579,7 +581,8 @@ export const RESOURCES = {
   }),
 
   event: resource({
-    group: CommandGroups.diagnostics,
+    group: CommandGroups.apiAndEvents,
+    groupOrder: 1,
     singular: "event",
     idField: "id",
     columns: ["id", "event_type", "category", "actor_id", "occurred_at"],
@@ -685,7 +688,7 @@ export const RESOURCES = {
   }),
 
   grant: resource({
-    group: CommandGroups.usersAndTeams,
+    group: CommandGroups.usersAndAccess,
     groupOrder: 3,
     singular: "grant",
     idField: "id",
@@ -751,7 +754,8 @@ export const RESOURCES = {
   // The revision routes are not modelled here — the CLI has no grammar for a
   // sub-resource listing yet, so `idp revisions` is deliberately absent.
   idp: resource({
-    group: CommandGroups.authentication,
+    group: CommandGroups.signIn,
+    groupOrder: 2,
     singular: "identity provider connection",
     plural: "identity provider connections",
     idField: "id",
@@ -804,7 +808,8 @@ export const RESOURCES = {
   }),
 
   project: resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.projectSettings,
+    groupOrder: 1,
     singular: "project",
     idField: "id",
     columns: ["id", "name", "created_at"],
@@ -842,7 +847,8 @@ export const RESOURCES = {
   // would be a second writer over the same state; reading what the server
   // currently holds is how you check that a deploy landed.
   schema: resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.signIn,
+    groupOrder: 3,
     singular: "schema",
     idField: "id",
     // Addressed by object type as well as by revision id, so the argument is
@@ -895,7 +901,8 @@ export const RESOURCES = {
   }),
 
   release: resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.releases,
+    groupOrder: 4,
     singular: "release",
     plural: "releases",
     idSchema: GetReleaseParams.shape.release_id,
@@ -934,7 +941,8 @@ export const RESOURCES = {
   }),
 
   "flow-definition": resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.signIn,
+    groupOrder: 5,
     singular: "flow definition",
     plural: "flow definitions",
     idField: "id",
@@ -986,7 +994,8 @@ export const RESOURCES = {
   }),
 
   branding: resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.signIn,
+    groupOrder: 4,
     singular: "branding revision",
     plural: "branding revisions",
     idField: "id",
@@ -1021,7 +1030,8 @@ export const RESOURCES = {
   // policy per operation, and the list shows each at its newest revision.
   // The revision routes are not modelled, for the reason `idp` gives.
   policy: resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.signIn,
+    groupOrder: 6,
     singular: "policy",
     idField: "id",
     // Addressed by operation as well as by id: the operation is what the
@@ -1087,23 +1097,27 @@ export const RESOURCES = {
  * connect like every command that talks to a project (see
  * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
  */
-export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
-  operations: OPERATIONS,
-  // A `${{ NAME }}` reference to a project variable (ADR 062) names a
-  // credential without revealing it, and is the only form a connection's
-  // `client_secret` takes, so it may stand on a command line.
-  references: {
-    matches: isVariableReference,
-    example: "'${{ NAME }}'",
+export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(
+  RESOURCES,
+  {
+    operations: OPERATIONS,
+    // A `${{ NAME }}` reference to a project variable (ADR 062) names a
+    // credential without revealing it, and is the only form a connection's
+    // `client_secret` takes, so it may stand on a command line.
+    references: {
+      matches: isVariableReference,
+      example: "'${{ NAME }}'",
+    },
+    connect: async (open) => {
+      const { client, projectId } = await open();
+      return {
+        client,
+        projectId,
+      };
+    },
   },
-  connect: async (open) => {
-    const { client, projectId } = await open();
-    return {
-      client,
-      projectId,
-    };
-  },
-});
+  ServerCommand,
+);
 
 /**
  * A generated resource command as a suggestion is checked against it. Its

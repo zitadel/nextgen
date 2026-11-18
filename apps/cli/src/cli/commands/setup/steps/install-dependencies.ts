@@ -1,18 +1,8 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import type { BoxAction } from "@/lib/box";
+import { log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
-import { type DependencyInstall, installDependencies } from "@/lib/install";
-import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
-import {
-  detectPackageManager,
-  devCommandFor,
-  inDirectory,
-  installCommandFor,
-  runPackageCommand,
-  runScriptCommandFor,
-} from "@/lib/package-manager";
-import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
-import { reportWarning } from "@/lib/warnings";
+import { type DependencyInstall, type InstallContext, PM, type Runner } from "@/lib/pm";
+import { Guidance, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -33,7 +23,7 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun" | "env" | "isJson" | "signal" |
     /**
      * Runs a package manager's command, when something other than the real one should.
      */
-    run?: typeof runPackageCommand;
+    run?: Runner;
   }>;
 
 /**
@@ -130,22 +120,20 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
     const afterInstallScript = scaffoldedFramework
       ? orca.scaffolderFor(app.framework).afterInstallScript
       : undefined;
-    const packageManager = await detectPackageManager(this.deps.cwd);
-    const devCommand = devCommandFor(packageManager);
+    const packageManager = await PM.detect(this.deps.cwd);
+    const devCommand = packageManager.dev();
     const shownInstall = suggestedCommandOf(
-      inDirectory(installCommandFor(packageManager), flags.cwd, this.deps.cwd),
+      packageManager.install().inDirectory(flags.cwd, this.deps.cwd),
     );
-    const shownDev = suggestedCommandOf(inDirectory(devCommand, flags.cwd, this.deps.cwd));
-    const { install } = await installDependencies({
+    const shownDev = suggestedCommandOf(devCommand.inDirectory(flags.cwd, this.deps.cwd));
+    const context: InstallContext = {
       cwd: this.deps.cwd,
-      needed: scaffoldedFramework || patched.depsAdded.length > 0,
-      dryRun: this.deps.dryRun,
-      skipInstall: Boolean(flags.skipInstall),
       env: this.deps.env,
       json: this.deps.isJson,
       task: (label, work, done) => {
         return this.deps.ui.task(label, work, done);
       },
+      log,
       failed: (error, installCommand) => {
         return new ZitadelError(
           "E_VALIDATION",
@@ -171,18 +159,25 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         );
       },
       ...(this.deps.run === undefined ? {} : { run: this.deps.run }),
-    });
+    };
+    const { install } = await packageManager.installDependencies(
+      {
+        needed: scaffoldedFramework || patched.depsAdded.length > 0,
+        dryRun: this.deps.dryRun,
+        skipInstall: Boolean(flags.skipInstall),
+      },
+      context,
+    );
     if (install.status === "completed" && afterInstallScript !== undefined) {
-      const command = runScriptCommandFor(packageManager, afterInstallScript);
+      const command = packageManager.script(afterInstallScript);
       try {
         await this.deps.ui.task(
           `Running ${command.display}`,
           async () => {
-            await (this.deps.run ?? runPackageCommand)(command, {
-              cwd: this.deps.cwd,
-              env: this.deps.env,
-              captureOutput: true,
-            });
+            const options = { cwd: this.deps.cwd, env: this.deps.env, captureOutput: true };
+            await (this.deps.run === undefined
+              ? command.run(options)
+              : this.deps.run(command, options));
           },
           () => {
             return `Ran ${command.display}`;
@@ -196,8 +191,8 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
           typeof error === "object" && error !== null && "output" in error
             ? error.output
             : undefined;
-        reportWarning(
-          `${suggestedCommandOf(inDirectory(command, flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${
+        warnings.report(
+          `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${
             typeof output === "string" && output.trim() !== ""
               ? `\n${output.trimEnd().split("\n").slice(-QUOTED_OUTPUT_LINES).join("\n")}`
               : ""
@@ -228,7 +223,7 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
             text: `Start your project (then open ${issuer}/register):`,
             command: shownDev,
           },
-          { text: verifyLoginAction() },
+          { text: Guidance.verifyLogin() },
           {
             text: "The dev server keeps its terminal busy. Open a second terminal in this directory for further commands.",
           },
@@ -241,8 +236,8 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         nextActions: [
           ...(includeInstallCommand ? [`Install dependencies: ${shownInstall}`] : []),
           `Start your project: ${shownDev} (then open ${issuer}/register)`,
-          verifyLoginAction(),
-          ...customizeAndPublishActions(this.deps.suggest),
+          Guidance.verifyLogin(),
+          ...new Guidance(this.deps.suggest).customizeAndPublish(),
         ],
         nextCommands: includeInstallCommand
           ? [shownInstall, shownDev, planCommand, statusCommand]

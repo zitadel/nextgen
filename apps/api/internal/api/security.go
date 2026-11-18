@@ -174,6 +174,9 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.ListMyPasskeysOperation:        true,
 	api.ListMyIdentityLinksOperation:   true,
 	api.GetMyPasswordStateOperation:    true,
+	api.LookupInvitationOperation:      true,
+	api.AcceptInvitationOperation:      true,
+	api.RejectInvitationOperation:      true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -198,6 +201,9 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetProjectOperation:          true,
 	api.UpdateProjectOperation:       true,
 	api.ListProjectAdminsOperation:   true,
+	api.LookupInvitationOperation:    true,
+	api.AcceptInvitationOperation:    true,
+	api.RejectInvitationOperation:    true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,

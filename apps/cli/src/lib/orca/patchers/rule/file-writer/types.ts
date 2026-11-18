@@ -1,5 +1,5 @@
-import type { GitignoreRule } from "@/lib/gitignore";
 import type { PatchedFile } from "@/lib/orca/patchers/types";
+import type { GitignoreRule } from "@/lib/project";
 
 /**
  * A single filesystem mutation in a rule-based patcher's plan. Rule patchers

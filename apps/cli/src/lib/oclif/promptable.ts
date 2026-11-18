@@ -1,10 +1,10 @@
 import type { Questions } from "@/lib/ui";
 
 import type { BaseCommand } from "./base";
+import type { CommandClass } from "./command-class";
 
-/** A class that can be extended, abstract or not, whatever arguments it takes. */
-// biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
-type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
+/** Marks the classes {@link Promptable} made, so applying it again returns the same one. */
+const PROMPTABLE = Symbol("promptable");
 
 /**
  * Marks a command that can ask a person a question, and gives it the one way
@@ -20,7 +20,7 @@ type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
  * There is one method per kind of question — `text`, `secret`, `select`,
  * `multiselect`, `yesNo` — so a command states only the question and the
  * answer's type follows from it. See {@link Questions} for what each one
- * returns, and `lib/input.ts` for the order the answer is looked for in and
+ * returns, and `lib/ui/asker.ts` for the order the answer is looked for in and
  * what is thrown when there is none. It cannot ask a destructive `confirm`: a
  * destructive command extends `Destructive` instead.
  */
@@ -37,5 +37,11 @@ export function Promptable<TBase extends CommandClass<BaseCommand>>(Base: TBase)
       return this.ui.questions();
     }
   }
+  // Applied twice (a `Destructive` command is already `Promptable`, and so is a
+  // command that chooses its server), it is the same class once.
+  if (Reflect.has(Base.prototype, PROMPTABLE)) {
+    return Base as unknown as typeof PromptableCommand;
+  }
+  Object.defineProperty(PromptableCommand.prototype, PROMPTABLE, { value: true });
   return PromptableCommand;
 }

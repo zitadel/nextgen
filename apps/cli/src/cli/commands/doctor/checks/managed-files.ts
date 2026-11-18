@@ -4,17 +4,12 @@ import { join } from "node:path";
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
 import { readIfReadable } from "@/lib/fs";
 import type { ConfigWiringStatus, EjectActions } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
-import { readRendererId, readZitadelConfig } from "@/lib/project";
-import {
-  hashScaffoldFile,
-  readScaffoldManifest,
-  writeScaffoldManifest,
-} from "@/lib/scaffold-manifest";
 import { updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { Project } from "@/lib/project";
+import { Orca } from "@/lib/orca";
 
 /**
  * Per-file classification reported in the check's `details`:
@@ -54,7 +49,7 @@ export class ManagedFilesCheck implements SanityCheck {
   readonly name = "managed-files";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const manifest = await readScaffoldManifest(ctx.cwd);
+    const manifest = await Orca.readManifest(ctx.cwd);
     const evaluated = manifest
       ? await evaluateManifest(ctx.cwd, manifest)
       : await evaluateTemplates(ctx);
@@ -203,7 +198,7 @@ export class ManagedFilesCheck implements SanityCheck {
    * the user's and are not recorded.
    */
   async fix(ctx: CheckContext): Promise<void> {
-    const manifest = await readScaffoldManifest(ctx.cwd);
+    const manifest = await Orca.readManifest(ctx.cwd);
     const missingBefore = manifest ? await missingManifestPaths(ctx.cwd, manifest) : [];
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     const patcher = ctx.orca.patcherFor(patchCtx.framework.id);
@@ -282,7 +277,7 @@ export class ManagedFilesCheck implements SanityCheck {
         contents !== undefined && missingBefore.includes(path)
           ? {
               ...entry,
-              hash: hashScaffoldFile(contents),
+              hash: Orca.scaffoldHash(contents),
             }
           : entry;
     }
@@ -291,9 +286,9 @@ export class ManagedFilesCheck implements SanityCheck {
         continue;
       }
       const contents = await readIfReadable(join(ctx.cwd, path));
-      if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
+      if (contents !== undefined && Orca.isManaged(contents)) {
         files[path] = {
-          hash: hashScaffoldFile(contents),
+          hash: Orca.scaffoldHash(contents),
           class: actions.fileClasses?.[path] ?? "presentation",
         };
       }
@@ -334,8 +329,8 @@ async function detectBoundaryConflicts(
       const entry = manifest?.files[retired];
       const pristine =
         entry !== undefined &&
-        contents.includes(MANAGED_MARKER) &&
-        hashScaffoldFile(contents) === entry.hash;
+        Orca.isManaged(contents) &&
+        Orca.scaffoldHash(contents) === entry.hash;
       conflicts.push({
         current,
         retired,
@@ -394,7 +389,7 @@ async function materializeManifest(
         continue;
       }
       const contents = await readIfReadable(join(ctx.cwd, path));
-      if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
+      if (contents !== undefined && Orca.isManaged(contents)) {
         marked.push(path);
       }
     }
@@ -408,7 +403,7 @@ async function materializeManifest(
     ) {
       return;
     }
-    await writeScaffoldManifest({
+    await Orca.writeManifest({
       cwd: ctx.cwd,
       actions,
       written: marked,
@@ -482,12 +477,10 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
     return undefined;
   }
   try {
-    const config = await readZitadelConfig(ctx.cwd).catch(() => {
-      return {} as Record<string, unknown>;
-    });
+    const config = await Project.at(ctx.cwd).configOrEmpty();
     return ctx.orca.patcherFor(framework.id).artifacts({
       framework,
-      rendererId: readRendererId(config),
+      rendererId: config.rendererId,
     });
   } catch {
     return undefined;
@@ -498,13 +491,13 @@ function stateFor(contents: string | undefined, hash: string | undefined): Scaff
   if (contents === undefined) {
     return "missing";
   }
-  if (!contents.includes(MANAGED_MARKER)) {
+  if (!Orca.isManaged(contents)) {
     return "adopted";
   }
   if (hash === undefined) {
     return "managed";
   }
-  return hashScaffoldFile(contents) === hash ? "pristine" : "edited";
+  return Orca.scaffoldHash(contents) === hash ? "pristine" : "edited";
 }
 
 async function missingManifestPaths(cwd: string, manifest: ScaffoldManifest): Promise<string[]> {

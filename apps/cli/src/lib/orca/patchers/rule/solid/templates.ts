@@ -1,4 +1,4 @@
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
@@ -32,7 +32,7 @@ export function appTemplate(ctx: PatchContext): string {
 // fall back to the neutral wording.`
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { onMount } from "solid-js";
 import { ${importNames} } from "@zitadel/sdk-solid";${localesComment}
 

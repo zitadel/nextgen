@@ -12,16 +12,16 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import { isErrno, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import { pathExists } from "@/lib/fs";
-import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { MetaSchemas } from "@/lib/meta-schemas";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { filled, reads } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { hasZitadelConfig } from "@/lib/project";
-import { normalizePublicCliProse } from "@/lib/public-cli";
-import { WHAT_CHANGED } from "@/lib/suggestion";
+import { Spelling, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   Branding,
@@ -33,6 +33,8 @@ import {
   RETIRED_BRANDING_DESIGNS,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { Project } from "@/lib/project";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The shipped designs, as a list for a hint to offer. */
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
@@ -111,10 +113,11 @@ function isRetiredDesign(value: string): boolean {
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends Promptable(BaseCommand) {
+export default class BrandingEject extends Promptable(ServerCommand(BaseCommand)) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 4;
 
   static override flags = {
     force: Flags.boolean({
@@ -131,15 +134,20 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     }),
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
     if (flags.design !== undefined && !isBrandingDesign(flags.design)) {
       throw refusalError(RETIRED_DESIGN_REFUSAL, { design: flags.design });
     }
-    if (!(await hasZitadelConfig(this.cwd))) {
+    if (!(await Project.at(this.cwd).hasConfig())) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
     // The checks above refused one that is not a design, so a value that got
@@ -209,24 +217,25 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     // Never overwrite a hand-edited README.
     await write(
       join(CONFIG_DIRECTORIES.branding, "README.md"),
-      normalizePublicCliProse(brandingReadmeContent(), this.cliVersion),
+      Spelling.at(this.cliVersion).normalizeProse(brandingReadmeContent()),
       false,
     ).catch(swallowConflict);
     // The descriptor's `$schema` must resolve to the dialect it was written
     // in, so the CLI-owned meta-schema is written when missing or outdated,
     // as `doctor --fix` does; one that cannot be read, or sits behind a
     // symlink, is doctor's to report.
-    const brandingMeta = projectMetaSchemas(this.cliVersion).filter((file) => {
+    const brandingMeta = MetaSchemas.of(this.cliVersion).only((file) => {
       return file.path === `${META_SCHEMA_DIR}/branding.json`;
     });
-    const metaWrites = await writeMetaSchemas(this.cwd, brandingMeta, { dryRun: this.dryRun });
+    const metaWrites = await brandingMeta.write(this.cwd, { dryRun: this.dryRun });
     for (const artifact of metaWrites.written) {
       if (artifact.kind === "file") {
         filesWritten.push(artifact.path);
       }
     }
 
-    const unchanged = change.changedPaths.length + 1 + brandingMeta.length - filesWritten.length;
+    const unchanged =
+      change.changedPaths.length + 1 + brandingMeta.files.length - filesWritten.length;
     if (this.dryRun) {
       const wouldTitle = `Would eject the ${design} design into ${CONFIG_DIRECTORIES.branding}/ (dry run)`;
 

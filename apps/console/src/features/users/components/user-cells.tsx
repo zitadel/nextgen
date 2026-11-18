@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Braces, Info } from "lucide-react";
+import { Braces } from "lucide-react";
 
 import { AttributeFields } from "./attribute-fields";
 import { DocumentViewer } from "@/components/document-viewer";
@@ -30,29 +30,11 @@ import { cn } from "@/lib/utils";
 export const USER_CLAMP = "max-w-70";
 
 /**
- * The identifier's property (`email`, `username`) beside it: a label, so
- * smaller and quieter than the value it names (`InlineCode` alone is the
- * 12/16 prose size).
- */
-function IdentifierChip({ property }: { property?: string }) {
-  if (!property) return null;
-  return (
-    <InlineCode className="text-muted-foreground shrink-0 px-1 py-0 text-[10px] leading-3.5">
-      {property}
-    </InlineCode>
-  );
-}
-
-/**
  * The User cell of a user table: the server-resolved identity (display →
  * identifier → id, ADR 058 §3a) as the link to the user, and the designated
  * identifier (x-identifier) beneath a display name. Schema-driven columns
  * cannot promise a meaningful leading value; this cell always can, so a
  * mixed-schema list still reads the identifier down one column.
- *
- * The identifier carries its property as a chip (`email`, `username`), once,
- * beside whichever line shows it: a list that mixes schemas signs people in
- * with different properties, and a tooltip hid that (D23).
  *
  * `sticky` pins it to the card's left edge while the other columns scroll
  * under it (the Users list); the header cell over it takes
@@ -85,24 +67,19 @@ export function UserIdentityCell({
         sticky && [RESOURCE_STICKY_START, RESOURCE_STICKY_BODY],
       )}
     >
-      <span className="flex min-w-0 items-center gap-1.5">
-        {card ? (
-          <HoverCard openDelay={400} closeDelay={100}>
-            <HoverCardTrigger asChild>{link}</HoverCardTrigger>
-            <HoverCardContent align="start" className="w-80 overflow-hidden p-3">
-              <UserIdentityCard user={user} context={card} />
-            </HoverCardContent>
-          </HoverCard>
-        ) : (
-          link
-        )}
-        {/* No display name: the identifier is the link text itself. */}
-        {!user.secondary && <IdentifierChip property={user.identifierProperty} />}
-      </span>
+      {card ? (
+        <HoverCard openDelay={400} closeDelay={100}>
+          <HoverCardTrigger asChild>{link}</HoverCardTrigger>
+          <HoverCardContent align="start" className="w-80 overflow-hidden p-3">
+            <UserIdentityCard user={user} context={card} />
+          </HoverCardContent>
+        </HoverCard>
+      ) : (
+        link
+      )}
       {user.secondary && (
-        <span className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1.5 text-xs">
-          <IdentifierChip property={user.identifierProperty} />
-          <span className="truncate">{user.secondary}</span>
+        <span className="text-muted-foreground mt-0.5 block min-w-0 truncate text-xs">
+          {user.secondary}
         </span>
       )}
     </TableCell>
@@ -151,14 +128,11 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
           )}
         </p>
       </div>
-      <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 py-2.5 leading-4.5">
+      <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 pt-2.5 leading-4.5">
         <dt className="text-muted-foreground">Signs in with</dt>
-        <dd className="flex min-w-0 items-center gap-1.5">
+        <dd className="min-w-0 truncate">
           {user.identifier ? (
-            <>
-              <IdentifierChip property={user.identifierProperty} />
-              <span className="truncate">{user.identifier}</span>
-            </>
+            user.identifier
           ) : (
             <span className="text-muted-foreground">No identifier</span>
           )}
@@ -198,18 +172,6 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
           </>
         )}
       </dl>
-      {/* Guidance, not data: a band of its own, edge to edge under the card's
-          12px inset, so it does not read as another row of the list. A shade
-          below the popover: `muted` is the popover's own colour in dark mode,
-          and the full canvas too deep against it. */}
-      <p className="text-muted-foreground border-border bg-background dark:bg-background/40 -mx-3 -mb-3 flex gap-2 border-t px-3 py-2.5 text-[11px] leading-4">
-        <Info aria-hidden strokeWidth={1.5} className="mt-px size-3.5 shrink-0" />
-        <span>
-          The schema decides what a user signs in with (
-          <code className="whitespace-nowrap">x-identifier</code>) and what the console calls them (
-          <code className="whitespace-nowrap">x-display</code>).
-        </span>
-      </p>
     </div>
   );
 }
@@ -275,7 +237,7 @@ export function UserAttributesCell({
           </PopoverTrigger>
           {/* Focus lands on the popover itself, not on its first tab: an
               auto-focused tab would open with its focus ring drawn. Tab still
-              walks on to View details, the tabs and Copy. */}
+              walks on to View user, the tabs and Copy. */}
           <PopoverContent
             align="start"
             aria-label={`Attributes of ${user.name}`}
@@ -297,7 +259,7 @@ export function UserAttributesCell({
                 params={{ userId: user.id }}
                 className="shrink-0 text-sm underline-offset-2 hover:underline"
               >
-                View details
+                View user
               </Link>
             </div>
             <DocumentViewer

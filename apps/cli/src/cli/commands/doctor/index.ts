@@ -3,42 +3,17 @@ import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/cli/commands/local-server/started";
+import { LocalRuntime, StartedServer, ZitadelRuntime } from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
-import { claimAction, claimCommand, claimWindowClosedAction } from "@/lib/claim-state";
+import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
-import { isRefusal } from "@/lib/consent";
-import { resolveEnvironment } from "@/lib/environment";
+import { Consent } from "@/lib/consent";
+import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { serverLogAction } from "@/lib/journey-guidance";
-import {
-  dockerRuntimeGuidance,
-  dockerUnavailableMessage,
-} from "@/lib/local-server/docker-guidance";
-import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
-import {
-  assertLocalStateWritable,
-  checkLocalServerHealth,
-  DEFAULT_LOCAL_SERVER_PORT,
-  defaultLocalServerImageForCliVersion,
-  findUpward,
-  LOCAL_RUNTIME_FILE,
-  localServerUrl,
-  RUNTIME_BACKENDS,
-  type RuntimeBackend,
-  type RuntimeMetadata,
-  readNearestRuntimeMetadata,
-  resolveRuntimeBackend,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
-import { log } from "@/lib/log";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { log, warnings as invocationWarnings } from "@/lib/ui";
+import { CommandGroups } from "@/cli/commands/groups";
+import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
+import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -51,26 +26,26 @@ import {
   stepsOf,
 } from "@/lib/oclif/next-steps";
 import { createOrca } from "@/lib/orca";
-import { listenersForPort } from "@/lib/prober/ports";
 import {
-  hasZitadelConfig,
-  hasZitadelSecret,
-  readProjectServer,
-  readZitadelConfig,
-  readZitadelSecret,
-} from "@/lib/project";
-import { isLoopbackUrl } from "@/lib/server";
-import {
-  type Suggest,
-  type SuggestedCommand,
+  Guidance,
   shellCommand,
+  type Suggest,
   type SuggestWords,
+  type SuggestedCommand,
 } from "@/lib/suggestion";
-import { userAgent } from "@/lib/user-agent";
-import { reportWarning } from "@/lib/warnings";
+import { Runtime } from "@/lib/runtime";
 
-import { type CheckContext, type CheckOutcome, checkCliVersion, SANITY_CHECKS } from "./checks";
+import {
+  AbstractSanityCheck,
+  type CheckContext,
+  type CheckOutcome,
+  checkCliVersion,
+  SANITY_CHECKS,
+} from "./checks";
+import { LocalRuntimeChecks } from "./checks/local-runtime";
 import { doctorReport, renderDoctorReport, withCategories } from "./report";
+import { Project } from "@/lib/project";
+import { BaseCommand } from "@/lib/oclif";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -136,10 +111,10 @@ type Checking = Readonly<{
 /**
  * `zitadel doctor` — verify local runtime and project state.
  */
-export default class Doctor extends Destructive(BaseCommand) {
+export default class Doctor extends Destructive(LocalServerCommand(ServerCommand(BaseCommand))) {
   static override description = "Verify local runtime and project state.";
-  static override group = CommandGroups.diagnostics;
-  static override groupOrder = 1;
+  static override group = CommandGroups.gettingStarted;
+  static override groupOrder = 3;
 
   static override flags = relatedFlags(
     {
@@ -157,7 +132,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       }),
       runtime: Flags.option({
         description: "Local runtime backend.",
-        options: RUNTIME_BACKENDS,
+        options: LocalRuntime.BACKENDS,
       })(),
       // Doctor's local-runtime checks are about the machine, but with `--env` /
       // `--env-file` it also verifies the environment a command would connect to:
@@ -167,23 +142,29 @@ export default class Doctor extends Destructive(BaseCommand) {
     { force: { dependsOn: ["fix"] } },
   );
 
-  static override meta = {
-    resolveServer: false,
-  };
-
   /**
    * What doctor is about, worked out once: the port it checks and the hosted
    * server of a project that runs no local one. It is resolved before the
    * context is built, so the run's first event names the same server as its
    * last, and `execute` reads what was found rather than asking again.
    */
-  private readonly started = startedServer(readNearestRuntimeMetadata);
+  private readonly started = new StartedServer(LocalRuntime.readNearest);
 
   private readonly checking = new Map<string, Promise<Checking>>();
 
   protected override async sourceOf(flags: Asked, cwd: string): Promise<string> {
     const { port, hostedServer } = await this.checks(flags, cwd);
-    return hostedServer ?? localServerUrl(port);
+    return hostedServer ?? LocalRuntime.urlOf(port);
+  }
+
+  /**
+   * Before the flags are parsed this command names no server: the one it is
+   * about is read from the folder, by `sourceOf`, once they are.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
   }
 
   protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
@@ -192,19 +173,17 @@ export default class Doctor extends Destructive(BaseCommand) {
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =
       nearest !== undefined && nearest.dir !== this.cwd ? nearest.dir : undefined;
-    const runtimeBackend = resolveRuntimeBackend({
+    const runtimeBackend = LocalRuntime.resolveBackend({
       runtime: flags.runtime,
       image: flags.image,
       envImage: this.env.ZITADEL_LOCAL_IMAGE,
       existingRuntime,
     });
     const image =
-      flags.image ??
-      this.env.ZITADEL_LOCAL_IMAGE ??
-      defaultLocalServerImageForCliVersion(this.cliVersion);
+      flags.image ?? this.env.ZITADEL_LOCAL_IMAGE ?? LocalRuntime.imageFor(this.cliVersion);
     const runtimeChecks =
       hostedServer === undefined
-        ? await runLocalRuntimeChecks(
+        ? await new LocalRuntimeChecks(
             nearest?.dir ?? this.cwd,
             existingRuntime,
             runtimeBackend,
@@ -213,12 +192,12 @@ export default class Doctor extends Destructive(BaseCommand) {
             this.localServers(),
             this.suggest,
             parentRuntimeDir,
-          )
+          ).run()
         : [];
-    const hasConfig = await hasZitadelConfig(this.cwd);
+    const hasConfig = await Project.at(this.cwd).hasConfig();
     const ctx: CheckContext = {
       cwd: this.cwd,
-      orca: createOrca(),
+      orca: createOrca(LocalRuntime.DIR),
       cliVersion: this.cliVersion,
       suggest: this.suggest,
       dryRun: this.dryRun,
@@ -249,8 +228,8 @@ export default class Doctor extends Destructive(BaseCommand) {
           if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
             throw error;
           }
-          if (isRefusal(error) && error instanceof ZitadelError) {
-            reportWarning(`${error.message}. ${error.hint ?? ""}`.trim());
+          if (Consent.isRefusal(error) && error instanceof ZitadelError) {
+            invocationWarnings.report(`${error.message}. ${error.hint ?? ""}`.trim());
             continue;
           }
           log.debug(`doctor --fix: ${check.name} repair failed`, error);
@@ -297,15 +276,23 @@ export default class Doctor extends Destructive(BaseCommand) {
     // A `zitadel.json` that does not parse is the config check's to report,
     // not a reason for doctor itself to fail before it reports anything.
     const projectServer = hasConfig
-      ? await readZitadelConfig(this.cwd).then(readProjectServer, () => {
-          return flags.server;
-        })
+      ? await Project.at(this.cwd)
+          .config()
+          .then(
+            (config) => {
+              return config.server ?? ZitadelRuntime.DEFAULT;
+            },
+            () => {
+              return flags.server;
+            },
+          )
       : flags.server;
     // A bare claim resolves as this shell does, so it is offered unpinned only
     // when that resolution lands on the very project the check read.
     const bareResolves =
       projectId !== undefined &&
-      (await resolveEnvironment({
+      (await Environment.resolve({
+        servers: ZitadelRuntime,
         cwd: this.cwd,
         env: this.env,
       }).then(
@@ -354,7 +341,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       })?.status === "pass";
     const nextActions = [
       ...(warningAdvice?.nextActions ?? []),
-      ...(serving ? [serverLogAction(this.suggest)] : []),
+      ...(serving ? [new Guidance(this.suggest).serverLog()] : []),
     ];
     this.recordTelemetry({
       runtime: runtimeBackend,
@@ -502,7 +489,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       });
       return {
         cwd,
-        port: flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
+        port: flags.port ?? hint?.runtime.port ?? LocalRuntime.DEFAULT_PORT,
         hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
       };
     })();
@@ -526,15 +513,25 @@ export default class Doctor extends Destructive(BaseCommand) {
       return undefined;
     }
     if (
-      (await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined ||
-      !(await hasZitadelConfig(cwd))
+      (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE)) !== undefined ||
+      !(await Project.at(cwd).hasConfig())
     ) {
       return undefined;
     }
-    const server = await readZitadelConfig(cwd).then(readProjectServer, () => {
+    const server = await Project.at(cwd)
+      .config()
+      .then(
+        (config) => {
+          return config.server ?? ZitadelRuntime.DEFAULT;
+        },
+        () => {
+          return undefined;
+        },
+      );
+    if (server === undefined || ZitadelRuntime.fromUrl(server).isLoopback()) {
       return undefined;
-    });
-    return server === undefined || isLoopbackUrl(server) ? undefined : server;
+    }
+    return server;
   }
 }
 
@@ -586,10 +583,9 @@ export function failureAdvice(
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = dockerRuntimeGuidance(again.rerun);
     return {
-      hint: advice.hint,
-      nextCommands: [advice.check, again.rerun],
+      hint: "Docker is required only for the managed local runtime (`zitadel start` and `--server local`). Start Docker, then retry; or target a remote server with `--server <url>`.",
+      nextCommands: [shellCommand("docker", "version"), again.rerun],
     };
   }
 
@@ -608,7 +604,10 @@ export function failureAdvice(
   }
 
   if (failedNames.has("port")) {
-    const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
+    const fallbackPort =
+      [LocalRuntime.DEFAULT_PORT, port + 1].find((candidate) => {
+        return candidate !== port;
+      }) ?? port + 1;
     const stopCommand = suggest({ id: "stop", flags: { all: true } });
     const retryCommand = again.rerun;
     const alternatePortCommand = suggest({ id: "doctor", flags: { port: fallbackPort } });
@@ -736,9 +735,11 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = dockerRuntimeGuidance(again.rerun);
-    nextActions.push(...advice.nextActions);
-    nextCommands.push(advice.check, again.rerun);
+    nextActions.push(
+      "Start Docker Desktop, Docker Engine, or a Docker-compatible runtime such as Colima.",
+      "If you are not using the managed local runtime, run setup with --server <url> instead.",
+    );
+    nextCommands.push(shellCommand("docker", "version"), again.rerun);
   }
 
   const claimWarning = warnings.find((check) => {
@@ -759,9 +760,12 @@ export function advisoryForWarnings(
       fix(
         "claim",
         claimWindowClosed(claimWarning)
-          ? claimWindowClosedAction(local)
-          : claimAction(local, undefined),
-        claimCommand(local),
+          ? Claim.windowClosedNudge(
+              local({ id: "claim" }),
+              local({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } }),
+            )
+          : Claim.nudge(local({ id: "claim" }), undefined),
+        local({ id: "claim" }),
       );
     }
   }
@@ -861,7 +865,8 @@ async function runEnvironmentChecks(input: {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  const resolved = await resolveEnvironment({
+  const resolved = await Environment.resolve({
+    servers: ZitadelRuntime,
     cwd: input.cwd,
     env: input.env,
     envName: input.envName,
@@ -887,256 +892,38 @@ async function runEnvironmentChecks(input: {
   const { environment } = resolved;
   const name = environment.name.value;
   return [
-    await check(`environment`, `Resolved ${name} environment connects`, async () => {
-      const server = environment.values.ZITADEL_URL?.value;
-      const projectId = environment.values.ZITADEL_PROJECT_ID?.value;
-      const token = environment.values.ZITADEL_PROJECT_SECRET?.value;
-      if (server === undefined || projectId === undefined) {
-        throw new Error(
-          `ZITADEL_URL and ZITADEL_PROJECT_ID must resolve for the ${name} environment`,
-        );
-      }
-      if (token === undefined) {
-        throw new Error(
-          `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
-        );
-      }
-      const project = await createZitadelClient({
-        userAgent: userAgent(),
-        baseUrl: server,
-        token,
-        signal: input.signal,
-      }).getProject(projectId);
-      if (project.id !== projectId) {
-        throw new Error(`${server} returned project ${project.id}, not the resolved ${projectId}`);
-      }
-      return `${server} is reachable and project ${projectId} matches`;
-    }),
-  ];
-}
-
-/**
- * The local runtime checks, against the server in `runtimeDir` (the directory
- * holding its `.zitadel/local` state, or the current directory when no server
- * was started yet).
- */
-async function runLocalRuntimeChecks(
-  runtimeDir: string,
-  runtime: RuntimeMetadata | undefined,
-  runtimeBackend: RuntimeBackend,
-  image: string,
-  port: number,
-  servers: LocalServers,
-  suggest: Suggest,
-  inheritedFrom?: string,
-): Promise<CheckOutcome[]> {
-  const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
-  if (runtimeBackend === "binary") {
-    return [
-      await check("server-binary", "Server npm package is available", async () => {
-        const version = LocalServer.assertBinaryAvailable();
-        return `@zitadel/server ${version} is available`;
-      }),
-      await check(
-        "state-dir",
-        "Local state directory is writable",
-        async () => {
-          const probe = await assertLocalStateWritable(runtimeDir);
-          return probe.checkedPath === probe.targetPath
-            ? `${probe.targetPath} is writable`
-            : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
-        },
-        "warn",
-      ),
-      await check("port", `Port ${String(port)} is available`, () => {
-        return checkPortAvailability(runtime, port);
-      }),
-      await checkRuntime(runtime, runtimeBackend, inheritedFrom),
-      managedRuntimeCheck,
-    ];
-  }
-
-  const docker = await check(
-    "docker-cli",
-    "Docker is reachable",
-    async () => {
-      const result = await LocalServer.dockerReachable().catch((error: unknown) => {
-        throw new Error(dockerUnavailableMessage(error), { cause: error });
-      });
-      if (result.status !== 0) {
-        throw new Error(dockerUnavailableMessage(result.stderr || "docker version failed"));
-      }
-      return `Docker engine ${result.stdout.trim() || "available"}`;
-    },
-    "warn",
-  );
-
-  const imageCheck =
-    docker.status === "pass"
-      ? await check(
-          "image",
-          `Image ${image} is available`,
-          async () => {
-            try {
-              const source = await LocalServer.imageAvailable(image);
-              return source === "local"
-                ? `Image ${image} is available locally`
-                : `Image ${image} is available from the registry`;
-            } catch (error) {
-              throw new Error(imageUnavailableMessage(image, error, suggest), { cause: error });
-            }
-          },
-          "warn",
-        )
-      : ({
-          name: "image",
-          status: "warn",
-          message: "Skipped image check because Docker is not reachable.",
-        } satisfies CheckOutcome);
-
-  return [
-    docker,
-    imageCheck,
-    await check(
-      "state-dir",
-      "Local state directory is writable",
+    await AbstractSanityCheck.attempt(
+      `environment`,
+      `Resolved ${name} environment connects`,
       async () => {
-        const probe = await assertLocalStateWritable(runtimeDir);
-        return probe.checkedPath === probe.targetPath
-          ? `${probe.targetPath} is writable`
-          : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
+        const server = environment.values.ZITADEL_URL?.value;
+        const projectId = environment.values.ZITADEL_PROJECT_ID?.value;
+        const token = environment.values.ZITADEL_PROJECT_SECRET?.value;
+        if (server === undefined || projectId === undefined) {
+          throw new Error(
+            `ZITADEL_URL and ZITADEL_PROJECT_ID must resolve for the ${name} environment`,
+          );
+        }
+        if (token === undefined) {
+          throw new Error(
+            `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
+          );
+        }
+        const project = await createZitadelClient({
+          userAgent: Runtime.current().userAgent(),
+          baseUrl: server,
+          token,
+          signal: input.signal,
+        }).getProject(projectId);
+        if (project.id !== projectId) {
+          throw new Error(
+            `${server} returned project ${project.id}, not the resolved ${projectId}`,
+          );
+        }
+        return `${server} is reachable and project ${projectId} matches`;
       },
-      "warn",
     ),
-    await check("port", `Port ${String(port)} is available`, () => {
-      return checkPortAvailability(runtime, port);
-    }),
-    await checkRuntime(runtime, runtimeBackend, inheritedFrom),
-    managedRuntimeCheck,
   ];
-}
-
-async function checkPortAvailability(
-  runtime: RuntimeMetadata | undefined,
-  port: number,
-): Promise<string> {
-  if (runtime?.port === port && (await checkLocalServerHealth(runtime.server_url))) {
-    return `${runtime.server_url} is already healthy`;
-  }
-  const listeners = await listenersForPort(port);
-  if (listeners.length > 0) {
-    throw new PortInUseCheckError(port, localServerUrl(port), listeners);
-  }
-  return `Port ${String(port)} is available`;
-}
-
-class PortInUseCheckError extends Error {
-  readonly port: number;
-  readonly serverUrl: string;
-  readonly listeners: Awaited<ReturnType<typeof listenersForPort>>;
-
-  constructor(
-    port: number,
-    serverUrl: string,
-    listeners: Awaited<ReturnType<typeof listenersForPort>>,
-  ) {
-    super(`Port ${String(port)} is already in use by ${formatListeners(listeners)}`);
-    this.port = port;
-    this.serverUrl = serverUrl;
-    this.listeners = listeners;
-  }
-}
-
-async function checkManagedRuntimeProcesses(
-  runtime: RuntimeMetadata | undefined,
-  servers: LocalServers,
-): Promise<CheckOutcome> {
-  const discovery = await servers.current();
-  if (!discovery.supported) {
-    return {
-      name: "managed-runtime-processes",
-      status: "warn",
-      message: "Could not look for other local Zitadel servers on this machine.",
-      details: {
-        supported: false,
-        error: discovery.error,
-      },
-    };
-  }
-  const processes = additionalManagedRuntimeProcesses(discovery.processes, runtime);
-  if (processes.length === 0) {
-    return {
-      name: "managed-runtime-processes",
-      status: "pass",
-      message: "No other local Zitadel server is running on this machine.",
-      details: {
-        supported: true,
-        scope: "host",
-        processes: [],
-      },
-    };
-  }
-  return {
-    name: "managed-runtime-processes",
-    status: "warn",
-    message:
-      new Intl.PluralRules("en").select(processes.length) === "one"
-        ? "1 other local Zitadel server is running on this machine."
-        : `${String(processes.length)} other local Zitadel servers are running on this machine.`,
-    details: {
-      supported: true,
-      scope: "host",
-      processes,
-    },
-  };
-}
-
-function additionalManagedRuntimeProcesses(
-  processes: ReadonlyArray<ManagedRuntimeProcess>,
-  runtime: RuntimeMetadata | undefined,
-): ReadonlyArray<ManagedRuntimeProcess> {
-  if (runtime?.backend !== "binary") {
-    return processes;
-  }
-  return processes.filter((processInfo) => {
-    return processInfo.pid !== runtime.pid && processInfo.ppid !== runtime.pid;
-  });
-}
-
-async function checkRuntime(
-  runtime: { backend: RuntimeBackend; server_url: string } | undefined,
-  runtimeBackend: RuntimeBackend,
-  inheritedFrom?: string,
-): Promise<CheckOutcome> {
-  return check("runtime", "Existing local runtime is healthy", async () => {
-    if (!runtime) {
-      return "No existing runtime metadata";
-    }
-    if (runtime.backend !== runtimeBackend) {
-      throw new Error(
-        `Existing local runtime uses ${runtime.backend}; run start --runtime ${runtimeBackend} to switch backends.`,
-      );
-    }
-    if (!(await checkLocalServerHealth(runtime.server_url))) {
-      throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
-    }
-    return inheritedFrom === undefined
-      ? `${runtime.server_url} is healthy`
-      : `${runtime.server_url} is healthy (server started in the parent folder ${inheritedFrom})`;
-  });
-}
-
-function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>): string {
-  return listeners
-    .map((listener) => {
-      return [
-        listener.command ?? "unknown",
-        listener.pid ? `pid ${String(listener.pid)}` : undefined,
-      ]
-        .filter(Boolean)
-        .join(" ");
-    })
-    .join(", ");
 }
 
 /**
@@ -1189,56 +976,19 @@ function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
   );
 }
 
-async function check(
-  name: string,
-  fallback: string,
-  run: () => Promise<string>,
-  failureStatus: "warn" | "fail" = "fail",
-): Promise<CheckOutcome> {
-  try {
-    return {
-      name,
-      status: "pass",
-      message: await run(),
-    };
-  } catch (error) {
-    if (error instanceof PortInUseCheckError) {
-      return {
-        name,
-        status: failureStatus,
-        message: error.message,
-        details: {
-          port: error.port,
-          server_url: error.serverUrl,
-          listeners: error.listeners,
-        },
-      };
-    }
-    return {
-      name,
-      status: failureStatus,
-      message: error instanceof Error ? error.message : fallback,
-    };
-  }
-}
-
-function imageUnavailableMessage(image: string, error: unknown, suggest: Suggest): string {
-  const detail = errorMessage(error);
-  const suffix = detail.trim() ? ` (${detail.trim()})` : "";
-  return `Image ${image} is not available to Docker${suffix}; ${suggest({ id: "start" })} may need a pull or a different image.`;
-}
-
 /** The project `.zitadel/secret` records, or nothing when it cannot be read. */
 async function secretProjectId(cwd: string): Promise<string | undefined> {
-  return (await hasZitadelSecret(cwd))
-    ? readZitadelSecret(cwd).then(
-        (secret) => {
-          return secret.project_id;
-        },
-        () => {
-          return undefined;
-        },
-      )
+  return (await Project.at(cwd).hasSecret())
+    ? Project.at(cwd)
+        .secret()
+        .then(
+          (secret) => {
+            return secret.data.project_id;
+          },
+          () => {
+            return undefined;
+          },
+        )
     : undefined;
 }
 
@@ -1255,7 +1005,8 @@ async function namesProject(
   // process environment is left out, so only the file answers. The file must
   // carry the credential too: for one it lacks, a pinned claim would take
   // whatever secret the shell exports and send it along for this project.
-  return resolveEnvironment({
+  return Environment.resolve({
+    servers: ZitadelRuntime,
     cwd: dirname(path),
     env: {},
     envFile: path,

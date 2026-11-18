@@ -9,7 +9,7 @@ import { ZitadelError } from "@/lib/errors";
 import { ZitadelConfig } from "@/lib/zitadel";
 import { aCheckContext } from "@tests/helpers/check-context";
 import { anOidcConnection, aUserSchema } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -41,7 +41,7 @@ async function aProject(dir: string): Promise<void> {
   await write(dir, {
     "zitadel.json": JSON.stringify({
       project: "proj-001",
-      server: "https://api.zitadel.cloud",
+      server: "https://preview.zitadel.com",
       framework: { id: "next" },
     }),
     ".zitadel/secret": JSON.stringify({

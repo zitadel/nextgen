@@ -199,12 +199,12 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
 			service.NewClaimService(db, ConsoleOrigin+"/ui/console", platform.ID),
-			service.NewGrantService(db, service.StatementsUserRefResolver{Pool: db}, platform.ID),
+			h.EnsureGrantService(t),
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
 		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).
-			WithInvitationService(service.NewInvitationService(db, h.EnsureKeyService(t), ConsoleOrigin+"/ui/console", platform.ID))
+			WithInvitationService(h.EnsureInvitationService(t))
 	}
 	return h.handler.value
 }

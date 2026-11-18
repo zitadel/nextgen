@@ -1,7 +1,7 @@
 import { describe, expect, it as plain } from "vitest";
 
 import { Dependencies, Dependency } from "@/lib/upgrade/dependencies";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 

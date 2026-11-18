@@ -8,29 +8,27 @@ import type { SetupServices } from "@/cli/commands/setup/shared";
 import { MoveAppPort } from "@/cli/commands/setup/steps/move-app-port";
 import { ZitadelError } from "@/lib/errors";
 import { callbackUriFor } from "@/lib/idp";
-import { installLogSink } from "@/lib/log";
-import { readZitadelSecret } from "@/lib/project";
-import { Ui } from "@/lib/ui";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { Ui, log, warnings } from "@/lib/ui";
 import { forced } from "@tests/helpers/check-context";
 import { aGoogleConnection } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import { aNextApp } from "@tests/helpers/setup";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { Project } from "@/lib/project";
 
 usePlatformServer();
 
 beforeEach(({ onTestFinished }) => {
-  onTestFinished(installLogSink(() => {}));
+  onTestFinished(log.install(() => {}));
 });
 
 /**
  * The cloud platform the mock answers for.
  */
-const CLOUD = "https://api.zitadel.cloud";
+const CLOUD = "https://preview.zitadel.com";
 
 /**
  * The origin the app moves to.
@@ -97,7 +95,7 @@ async function movingTo3101(
  * @returns The names of the providers.
  */
 function reregistered(): string[] {
-  return takeReportedWarnings().flatMap((warning) => {
+  return warnings.take().flatMap((warning) => {
     return ["acme", "google"].filter((slug) => {
       return (
         warning ===
@@ -115,7 +113,7 @@ describe("MoveAppPort", () => {
       await writeFile(join(dir, ".zitadel/idps/google.json"), "{}\n");
       await writeFile(join(dir, ".zitadel/idps/acme.json"), "{ not json");
 
-      takeReportedWarnings();
+      warnings.take();
 
       await movingTo3101(dir);
 
@@ -130,7 +128,7 @@ describe("MoveAppPort", () => {
       await writeFile(join(dir, ".zitadel/idps/google.json"), JSON.stringify(aGoogleConnection()));
       await writeFile(join(dir, ".zitadel/idps/acme.json"), "{ not json");
 
-      takeReportedWarnings();
+      warnings.take();
 
       await movingTo3101(dir);
 
@@ -159,7 +157,7 @@ describe("MoveAppPort", () => {
       await writeFile(join(dir, ".zitadel/idps/google.json"), JSON.stringify(aGoogleConnection()));
       await mkdir(join(dir, ".zitadel/schemas/unreadable.json"), { recursive: true });
 
-      takeReportedWarnings();
+      warnings.take();
 
       await movingTo3101(dir);
 
@@ -170,7 +168,7 @@ describe("MoveAppPort", () => {
   describe("when it asks to remove the previous origin", () => {
     it("names the project and the server it removes it from", async ({ dir }) => {
       await setUpApp(dir);
-      const { project_id } = await readZitadelSecret(dir);
+      const { project_id } = (await Project.at(dir).secret()).data;
       const asked: string[] = [];
 
       await movingTo3101(dir, {
@@ -182,7 +180,7 @@ describe("MoveAppPort", () => {
       });
 
       expect(asked).toEqual([
-        `Remove http://localhost:3000, the app's previous origin, from project ${project_id} on api.zitadel.cloud, now that http://localhost:3101 replaces it?`,
+        `Remove http://localhost:3000, the app's previous origin, from project ${project_id} on preview.zitadel.com, now that http://localhost:3101 replaces it?`,
       ]);
     });
   });
@@ -211,7 +209,7 @@ describe("MoveAppPort", () => {
     it("says so before it asks for consent", async ({ dir }) => {
       await setUpApp(dir);
       const events: string[] = [];
-      const restore = installLogSink((_level, text) => {
+      const restore = log.install((_level, text) => {
         events.push(text);
       });
 

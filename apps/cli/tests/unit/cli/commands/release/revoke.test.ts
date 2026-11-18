@@ -11,10 +11,10 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
-import { asTerminal as asPerson } from "@tests/helpers/terminal";
+import { asTerminal as asPerson } from "@tests/fixtures/terminal";
 import { parseJson, runCliForTest, runCommand } from "@tests/helpers/run-cli";
 
-const { dirs } = usePlatformServer();
+usePlatformServer();
 
 const RELEASE = "rel_01KX3RG8A7F0N9WD3P2E4YM5C1";
 
@@ -59,7 +59,6 @@ describe("release revoke asked on a terminal", () => {
       id: "proj_test",
       secret: "ps",
     });
-    dirs.push(cwd);
     const talk = answering(false);
     await asPerson(() =>
       runCommand(ReleaseRevoke, "release:revoke", [RELEASE, "--cwd", cwd, "--server", serverUrl]),
@@ -92,10 +91,7 @@ describe("release revoke refused for a release an origin serves", () => {
    * @returns The project's directory, its release and which deployment serves it where.
    */
   async function aServedRelease(served: { primary: boolean; preview: boolean }) {
-    const project = await aReleaseServedOn("zitadel-release-revoke-served-", served);
-    dirs.push(project.cwd);
-
-    return project;
+    return aReleaseServedOn("zitadel-release-revoke-served-", served);
   }
 
   /**
@@ -148,7 +144,6 @@ describe("release revoke refused for a release an origin serves", () => {
       { primary: true, preview: false },
       { primaries: ["https://b.acme.com", "https://c.acme.com", "https://d.acme.com"] },
     );
-    dirs.push(project.cwd);
 
     const result = await runCliForTest(revokeArgumentsOf(project));
 
@@ -174,7 +169,6 @@ describe("release revoke refused for a release an origin serves", () => {
         ],
       },
     );
-    dirs.push(project.cwd);
 
     const result = await runCliForTest(revokeArgumentsOf(project));
 

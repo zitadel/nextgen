@@ -6165,6 +6165,11 @@ type ListDeploymentsParams struct {
 	// Narrows the list to the deployments that targeted this origin, given exactly as the deployment
 	// records it. An origin no deployment targeted answers an empty list, not an error.
 	Origin OptOrigin `json:",omitempty,omitzero"`
+	// Narrows the list to the deployments of this release: the `id` that `createRelease`
+	// (`POST /releases`) returns or `listReleases` (`GET /releases`) lists. A release with nothing to
+	// list, one never deployed, one no longer served with `live=true`, or one of another project, answers
+	// an empty list, not an error.
+	ReleaseID OptReleaseID `json:",omitempty,omitzero"`
 	// Lists what each target serves now instead of the history. Defaults to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
 	// Related objects to embed on each returned deployment.
@@ -6192,6 +6197,15 @@ func unpackListDeploymentsParams(packed middleware.Parameters) (params ListDeplo
 		}
 		if v, ok := packed[key]; ok {
 			params.Origin = v.(OptOrigin)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "release_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ReleaseID = v.(OptReleaseID)
 		}
 	}
 	{
@@ -6345,6 +6359,69 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "origin",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: release_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "release_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotReleaseIDVal ReleaseID
+				if err := func() error {
+					var paramsDotReleaseIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotReleaseIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotReleaseIDVal = ReleaseID(paramsDotReleaseIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ReleaseID.SetTo(paramsDotReleaseIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ReleaseID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "release_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -8593,10 +8670,12 @@ type ListInvitationsParams struct {
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// Only invitations with this status.
-	Status OptInvitationStatus `json:",omitempty,omitzero"`
+	// Only invitations with this status. Repeat the parameter to match any of several statuses.
+	Status []InvitationStatus `json:",omitempty"`
 	// Only invitations of this type.
 	Type OptListInvitationsType `json:",omitempty,omitzero"`
+	// Related objects to embed on each returned invitation.
+	Expand []InvitationExpand `json:",omitempty"`
 }
 
 func unpackListInvitationsParams(packed middleware.Parameters) (params ListInvitationsParams) {
@@ -8631,7 +8710,7 @@ func unpackListInvitationsParams(packed middleware.Parameters) (params ListInvit
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.Status = v.(OptInvitationStatus)
+			params.Status = v.([]InvitationStatus)
 		}
 	}
 	{
@@ -8641,6 +8720,15 @@ func unpackListInvitationsParams(packed middleware.Parameters) (params ListInvit
 		}
 		if v, ok := packed[key]; ok {
 			params.Type = v.(OptListInvitationsType)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "expand",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Expand = v.([]InvitationExpand)
 		}
 	}
 	return params
@@ -8825,38 +8913,62 @@ func decodeListInvitationsParams(args [0]string, argsEscaped bool, r *http.Reque
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotStatusVal InvitationStatus
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotStatusVal = InvitationStatus(c)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.Status.SetTo(paramsDotStatusVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.Status.Get(); ok {
+				params.Status = nil
+				return d.DecodeArray(func(d uri.Decoder) error {
+					var paramsDotStatusVal InvitationStatus
 					if err := func() error {
-						if err := value.Validate(); err != nil {
+						val, err := d.DecodeValue()
+						if err != nil {
 							return err
 						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotStatusVal = InvitationStatus(c)
 						return nil
 					}(); err != nil {
 						return err
 					}
+					params.Status = append(params.Status, paramsDotStatusVal)
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if params.Status == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    0,
+					MaxLengthSet: false,
+				}).ValidateLength(len(params.Status)); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				if err := validate.UniqueItems(params.Status); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				var failures []validate.FieldError
+				for i, elem := range params.Status {
+					if err := func() error {
+						if err := elem.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						failures = append(failures, validate.FieldError{
+							Name:  fmt.Sprintf("[%d]", i),
+							Error: err,
+						})
+					}
+				}
+				if len(failures) > 0 {
+					return &validate.Error{Fields: failures}
 				}
 				return nil
 			}(); err != nil {
@@ -8923,6 +9035,86 @@ func decodeListInvitationsParams(args [0]string, argsEscaped bool, r *http.Reque
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "type",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: expand.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.Expand = nil
+				return d.DecodeArray(func(d uri.Decoder) error {
+					var paramsDotExpandVal InvitationExpand
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotExpandVal = InvitationExpand(c)
+						return nil
+					}(); err != nil {
+						return err
+					}
+					params.Expand = append(params.Expand, paramsDotExpandVal)
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if params.Expand == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    0,
+					MaxLengthSet: false,
+				}).ValidateLength(len(params.Expand)); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				if err := validate.UniqueItems(params.Expand); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				var failures []validate.FieldError
+				for i, elem := range params.Expand {
+					if err := func() error {
+						if err := elem.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						failures = append(failures, validate.FieldError{
+							Name:  fmt.Sprintf("[%d]", i),
+							Error: err,
+						})
+					}
+				}
+				if len(failures) > 0 {
+					return &validate.Error{Fields: failures}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "expand",
 			In:   "query",
 			Err:  err,
 		}

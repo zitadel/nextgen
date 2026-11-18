@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   anApp,
@@ -12,7 +11,6 @@ import {
 import { cliVersion, expectedPublicCliCommand, parseJson } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 /**
  * What the envelope says of Docker, which only a local server run in it asks.
@@ -342,7 +340,7 @@ describe("status", () => {
         await app.writeConfig({
           $schema: "./.zitadel/meta/project.json",
           project: "orphan",
-          server: "https://api.zitadel.cloud",
+          server: "https://preview.zitadel.com",
         });
 
         const result = await app.status();
@@ -417,7 +415,7 @@ describe("status", () => {
           source: "",
           code: "E_VALIDATION",
           message: 'Invalid server "nope"',
-          hint: "Use local, or a URL like https://acme.zitadel.cloud.",
+          hint: "Use local, or an http(s) URL.",
         });
       });
     });

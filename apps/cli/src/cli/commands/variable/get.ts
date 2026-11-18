@@ -1,13 +1,15 @@
 import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { variableCell } from "@/lib/variables";
+import { VariableView } from "@/lib/variable";
 
 import { variableNameArg } from "./name";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -17,9 +19,10 @@ import { variableNameArg } from "./name";
  * `--preview` it reads the primary value; with it, the preview value. A name with
  * no value of the kind asked for is a miss.
  */
-export default class VariableGet extends Tabulatable(EnvironmentCommand) {
+export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "Get one variable from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID",
@@ -60,7 +63,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
       });
     }
 
-    const cell = variableCell(variable);
+    const cell = VariableView.of(variable).cell();
 
     return this.emit({
       status: "ok",

@@ -35,6 +35,7 @@ import { signHandoffToken } from "./crypto.js";
 import { PASSWORD_FIELD } from "./fixtures/login.js";
 import { setupMockHandlers } from "./handlers.js";
 import {
+  acceptInvitation,
   expireClaimChallenge,
   expireClaimWindow,
   snapshotPlatformStore,
@@ -2586,14 +2587,17 @@ describe("api-mock releases and deployments", () => {
       id: string;
     };
 
-    const deployed = (await (
-      await createDeployment(project.id, project.secret, {
-        release_id: release.id,
-        targets: ["https://x-acme.vercel.app"],
-      })
-    ).json()) as { targets: { expires_at: string | null }[] };
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://x-acme.vercel.app"],
+    });
 
-    expect(deployed.targets[0]?.expires_at).not.toBeNull();
+    const listed = (await (await fetch(`${API}/projects/${project.id}/previews`)).json()) as {
+      previews: { expires_at: string }[];
+    };
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 
   test("a rollback keeps the origins it froze when one is no longer primary", async () => {
@@ -2726,14 +2730,16 @@ describe("api-mock releases and deployments", () => {
       targets: [url],
     });
     expect(deployed.status).toBe(201);
-    const body = (await deployed.json()) as { targets: { origin: string; expires_at: string }[] };
-    expect(body.targets[0]?.origin).toBe(url);
-    expect(new Date(body.targets[0]?.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+    const body = (await deployed.json()) as { targets: { origin: string }[] };
+    expect(body.targets).toEqual([{ origin: url }]);
 
     const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
-      previews: { origin: string }[];
+      previews: { origin: string; expires_at: string }[];
     };
     expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 
   test("refuses a deployment that mixes preview URLs with primary origins", async () => {
@@ -2855,15 +2861,12 @@ describe("api-mock releases and deployments", () => {
       ttl: "PT168H",
     });
     expect(again.status).toBe(201);
-    const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
     const expiresAgain = (
       (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
         previews: { expires_at: string }[];
       }
     ).previews[0]?.expires_at as string;
     expect(new Date(expiresAgain).getTime()).toBeGreaterThan(new Date(expiresFirst).getTime());
-    // The renewal reports the expiry the preview now runs on.
-    expect(renewedBody.targets[0]?.expires_at).toBe(expiresAgain);
   });
 
   test("pages the previews list with limit and next_page_token", async () => {
@@ -2918,10 +2921,10 @@ describe("api-mock releases and deployments", () => {
         targets: [url],
         ttl: "PT168H",
       })
-    ).json()) as { id: string; deployed_at: string; targets: { expires_at: string }[] };
+    ).json()) as { id: string };
     const historyBefore = (await (
       await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
-    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
 
     const removed = await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
       method: "POST",
@@ -2945,10 +2948,9 @@ describe("api-mock releases and deployments", () => {
     // ends the preview, it does not rewrite history.
     const historyAfter = (await (
       await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
-    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
     expect(historyAfter.deployed_at).toBe(historyBefore.deployed_at);
     expect(historyAfter.targets).toEqual(historyBefore.targets);
-    expect(historyAfter.targets[0]?.expires_at).toBe(deployed.targets[0]?.expires_at);
   });
 
   test("refuses to revoke a release an origin still serves, then allows it", async () => {
@@ -3327,6 +3329,45 @@ describe("api-mock releases and deployments", () => {
           [replacement.deployment.id, replacement.release.id, [PRIMARY_URL]],
           [preview.id, release.id, [PREVIEW_URL]],
         ]);
+      });
+    });
+
+    describe("the deployments of one release", () => {
+      /**
+       * The ids of the deployments a list narrowed to one release answers.
+       *
+       * @param projectId - The project.
+       * @param releaseId - The release to narrow the list to.
+       * @param live - List the live view instead of the history.
+       * @returns The deployment ids, newest first.
+       */
+      async function ofRelease(projectId: string, releaseId: string, live = false) {
+        const view = live ? "&live=true" : "";
+        const response = await fetch(
+          `${BASE}/deployments?project_id=${projectId}&release_id=${releaseId}${view}`,
+        );
+        const listed = (await response.json()) as { deployments: { id: string }[] };
+
+        return listed.deployments.map((deployment) => {
+          return deployment.id;
+        });
+      }
+
+      test("lists every deployment of the release in the history, superseded ones included", async () => {
+        const { project, release, primary, preview } = await aReleaseServedTwice("release-history");
+        const replacement = await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id)).toEqual([preview.id, primary.id]);
+        expect(await ofRelease(project.id, replacement.release.id)).toEqual([
+          replacement.deployment.id,
+        ]);
+      });
+
+      test("lists only the live deployments that serve the release in the live view", async () => {
+        const { project, release, preview } = await aReleaseServedTwice("release-live");
+        await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id, true)).toEqual([preview.id]);
       });
     });
 
@@ -3810,6 +3851,154 @@ describe("api-mock error paths — each refusal a handler names", () => {
       await expectRefusal(await call("GET", "/sessions/me/csrf"), 401, "auth.unauthorized");
       await expectRefusal(await call("DELETE", "/sessions/me"), 401, "auth.unauthorized");
     });
+  });
+});
+
+describe("api-mock invitations", () => {
+  async function newProject(name: string): Promise<string> {
+    const res = await fetch(`${API}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  type Created = { id: string; journey_id: string; link?: string; metadata?: unknown };
+
+  const invite = (projectId: string, body: Record<string, unknown> = {}) =>
+    fetch(`${API}/invitations?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "project_member",
+        project_member: { relation: "viewer" },
+        ...body,
+      }),
+    });
+
+  async function invited(projectId: string, body: Record<string, unknown> = {}): Promise<Created> {
+    const res = await invite(projectId, body);
+    expect(res.status).toBe(201);
+    return (await res.json()) as Created;
+  }
+
+  async function code(res: Response): Promise<{ status: number; code: string }> {
+    return { status: res.status, code: ((await res.json()) as { code: string }).code };
+  }
+
+  test("creates a pending invitation with its one-shot link", async () => {
+    const projectId = await newProject("invitations-create");
+
+    const created = await invited(projectId, { metadata: { name: "Ada" } });
+
+    expect(created).toMatchObject({
+      id: expect.stringMatching(/^inv_/),
+      status: "pending",
+      link: expect.stringMatching(/\/invitations\/accept#token=\S+$/),
+      metadata: { name: "Ada" },
+    });
+  });
+
+  test("never returns the link on a read", async () => {
+    const projectId = await newProject("invitations-read");
+    const created = await invited(projectId);
+
+    const one = (await (
+      await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
+    const listed = (await (await fetch(`${API}/invitations?project_id=${projectId}`)).json()) as {
+      invitations: Record<string, unknown>[];
+    };
+
+    expect([one, ...listed.invitations].some((invitation) => "link" in invitation)).toBe(false);
+  });
+
+  test("lists newest first, filtered and paged", async () => {
+    const projectId = await newProject("invitations-list");
+    const first = await invited(projectId);
+    const second = await invited(projectId);
+    acceptInvitation(first.id);
+
+    const page = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&limit=1`)
+    ).json()) as { invitations: { id: string }[]; next_page_token?: string | null };
+    const pending = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&status=pending`)
+    ).json()) as { invitations: { id: string }[] };
+    const teams = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&type=team_member`)
+    ).json()) as { invitations: unknown[] };
+
+    expect({
+      page: page.invitations.map((invitation) => invitation.id),
+      next: page.next_page_token,
+      pending: pending.invitations.map((invitation) => invitation.id),
+      teams: teams.invitations,
+    }).toEqual({ page: [second.id], next: "1", pending: [second.id], teams: [] });
+  });
+
+  test("a replace keeps the journey and name and deletes the original", async () => {
+    const projectId = await newProject("invitations-replace");
+    const original = await invited(projectId, { metadata: { name: "Ada" } });
+
+    const replacement = await invited(projectId, { replaces_invitation_id: original.id });
+
+    expect({
+      journey: replacement.journey_id,
+      metadata: replacement.metadata,
+      original: (await fetch(`${API}/invitations/${original.id}?project_id=${projectId}`)).status,
+    }).toEqual({ journey: original.journey_id, metadata: { name: "Ada" }, original: 404 });
+  });
+
+  test("cancels a pending invitation", async () => {
+    const projectId = await newProject("invitations-cancel");
+    const created = await invited(projectId);
+
+    const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(204);
+  });
+
+  test("refuses a team invitation as not implemented", async () => {
+    const projectId = await newProject("invitations-team");
+
+    const res = await fetch(`${API}/invitations?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "team_member",
+        team_member: { team_id: "team_1", role: "member" },
+      }),
+    });
+
+    expect(await code(res)).toEqual({ status: 501, code: "not_implemented" });
+  });
+
+  test("answers inv.not_found for an invitation the project does not hold", async () => {
+    const projectId = await newProject("invitations-missing");
+
+    const res = await fetch(`${API}/invitations/inv_missing?project_id=${projectId}`);
+
+    expect(await code(res)).toEqual({ status: 404, code: "inv.not_found" });
+  });
+
+  test("refuses to replace or cancel an accepted invitation", async () => {
+    const projectId = await newProject("invitations-accepted");
+    const created = await invited(projectId);
+    acceptInvitation(created.id);
+
+    const replaced = await invite(projectId, { replaces_invitation_id: created.id });
+    const cancelled = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect([await code(replaced), await code(cancelled)]).toEqual([
+      { status: 404, code: "inv.not_found" },
+      { status: 404, code: "inv.not_found" },
+    ]);
   });
 });
 

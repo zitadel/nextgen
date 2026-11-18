@@ -1,16 +1,16 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Command } from "@oclif/core";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { z } from "zod";
 
-import { answering, atTerminal } from "@tests/helpers/keyboard";
+import { it } from "@tests/fixtures";
+import { answering } from "@tests/helpers/keyboard";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { printing } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 import { EXIT_CODES } from "@/lib/errors";
 import { BaseCommand } from "@/lib/oclif";
 import {
@@ -31,6 +31,7 @@ import {
   UpdateOperation,
   type UpdateSpec,
 } from "@/lib/oclif/crud";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The generated command each operation stands in for. A run suggests commands
@@ -59,9 +60,12 @@ function inCli<Bound extends typeof Command>(command: Bound, id: string): Bound 
 }
 
 /** {@link bindOperationOnly}, named as the command it stands in for. */
-const bindOperation: typeof bindOperationOnly = (operation, definition) => {
+const bindOperation = <Ctx, Spec>(
+  operation: OperationClass<Ctx, Spec>,
+  definition: OperationDefinition<Ctx, Spec>,
+) => {
   return inCli(
-    bindOperationOnly(operation, definition),
+    bindOperationOnly(operation, definition, ServerCommand),
     STAND_IN.get(operation) ?? "team:deactivate",
   );
 };
@@ -280,7 +284,7 @@ describe("operation statics", () => {
 describe("bindOperation", () => {
   it("produces a BaseCommand subclass carrying the definition and statics", () => {
     const Bound = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
-    expect(Object.getPrototypeOf(Bound)).toBe(GetOperation);
+    expect(Bound.prototype).toBeInstanceOf(GetOperation);
     expect(Bound.prototype).toBeInstanceOf(BaseCommand);
     expect(Bound.description).toBe("Get one team by id.");
     expect(Object.keys(Bound.flags)).toEqual(["fields", "extra"]);
@@ -707,10 +711,6 @@ describe("output a script reads", () => {
 });
 
 describe("list paging", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("asks for the page --page-token names first", async () => {
     const sent: unknown[] = [];
     const command = bindOperation(
@@ -730,9 +730,7 @@ describe("list paging", () => {
     expect(sent).toEqual([expect.objectContaining({ page_token: "p2" })]);
   });
 
-  it("reports each page of a drain once it has it", async () => {
-    vi.useFakeTimers();
-    const screen = atTerminal();
+  it("reports each page of a drain once it has it", async ({ clock, terminal }) => {
     const seen: string[] = [];
     const command = bindOperation(
       ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
@@ -740,9 +738,9 @@ describe("list paging", () => {
         ...list,
         body: z.object({}).passthrough(),
         call: async (_ctx, body) => {
-          vi.advanceTimersByTime(FRAME);
+          clock.advance(FRAME);
           const token = (body as { page_token?: string }).page_token;
-          seen.push(`${token ?? "first"} asked after ${screen.plain().includes("page 1")}`);
+          seen.push(`${token ?? "first"} asked after ${terminal.plain().includes("page 1")}`);
           if (token === undefined) {
             return { teams: [], next_page_token: "p2" };
           }
@@ -754,18 +752,19 @@ describe("list paging", () => {
     await asTerminal(() => printed(command, ["--all", "--plain"]));
 
     expect(seen).toEqual(["first asked after false", "p2 asked after true", "p3 asked after true"]);
-    expect(screen.plain()).toContain("Fetching teams — page 2");
+    expect(terminal.plain()).toContain("Fetching teams — page 2");
   });
 
-  it("names the descriptor's plural in the drain's spinner, not the topic", async () => {
-    vi.useFakeTimers();
-    const screen = atTerminal();
+  it("names the descriptor's plural in the drain's spinner, not the topic", async ({
+    clock,
+    terminal,
+  }) => {
     const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, {
       ...definition({
         ...list,
         body: z.object({}).passthrough(),
         call: async (_ctx, body) => {
-          vi.advanceTimersByTime(FRAME);
+          clock.advance(FRAME);
           const token = (body as { page_token?: string }).page_token;
           return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
         },
@@ -776,7 +775,7 @@ describe("list paging", () => {
 
     await asTerminal(() => printed(command, ["--all", "--plain"]));
 
-    expect(screen.plain()).toContain("Fetching identity providers — page 1");
+    expect(terminal.plain()).toContain("Fetching identity providers — page 1");
   });
 
   it.each([
@@ -870,25 +869,22 @@ describe("assembling a body", () => {
     expect(sent).toEqual([{ connection: { slug: "acme" } }]);
   });
 
-  it("lets --set path:=null replace an object a file gave, and the schema decide on it", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-crud-"));
+  it("lets --set path:=null replace an object a file gave, and the schema decide on it", async ({
+    dir,
+  }) => {
     const file = join(dir, "connection.json");
     await writeFile(
       file,
       JSON.stringify({ slug: "acme", oidc: { issuer: "https://x", scopes: ["openid"] } }),
     );
-    try {
-      await creating().run(["--file", file, "--json"]);
-      expect(sent).toHaveLength(1);
-      // `oidc` may be left out but not be null, so the same file with
-      // `oidc:=null` over it fails validation, and nothing more is sent.
-      await expect(
-        creating().run(["--file", file, "--set", "oidc:=null", "--json"]),
-      ).rejects.toThrowError(expect.objectContaining({ oclif: { exit: EXIT_CODES.E_VALIDATION } }));
-      expect(sent).toHaveLength(1);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    await creating().run(["--file", file, "--json"]);
+    expect(sent).toHaveLength(1);
+    // `oidc` may be left out but not be null, so the same file with
+    // `oidc:=null` over it fails validation, and nothing more is sent.
+    await expect(
+      creating().run(["--file", file, "--set", "oidc:=null", "--json"]),
+    ).rejects.toThrowError(expect.objectContaining({ oclif: { exit: EXIT_CODES.E_VALIDATION } }));
+    expect(sent).toHaveLength(1);
   });
 
   it("lays each source over the last: the document, the field flags, then --set in order", async () => {
@@ -962,6 +958,7 @@ describe("delete confirmation", () => {
         bindOperationOnly(
           DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
           definition<DeleteSpec<Ctx>>({ verb, call }),
+          ServerCommand,
         ),
         DELETING[verb],
       ),

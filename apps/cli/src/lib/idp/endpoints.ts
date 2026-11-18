@@ -35,7 +35,7 @@ export type EndpointsQuestion = {
  * before this the connection document had to be hand-edited afterwards and
  * re-applied. Someone who installed the CLI is configuring the real vendor and
  * must never meet the question — so it is gated on `developmentBuild`
- * (`isDevelopmentBuild()`, the explicit `ZITADEL_CLI_DEV` opt-in). A published
+ * (`Runtime.current().isDevelopment()`, the explicit `ZITADEL_CLI_DEV` opt-in). A published
  * CLI never sets it, so the question stays out of its `--help` and prompts.
  *
  * The catalog's own issuer is dropped when written, so an ordinary run

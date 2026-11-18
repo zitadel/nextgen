@@ -1,6 +1,5 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { LocalServer } from "@/lib/local-server/server";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -11,7 +10,7 @@ type Needs = Fact<"flags" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<SetupServices, "dryRun" | "nonInteractive" | "suggest">;
+type Deps = Pick<SetupServices, "dryRun" | "machine" | "nonInteractive" | "suggest">;
 
 /**
  * Closes the questions: says so when a run that asked nothing still pins the dev
@@ -53,10 +52,10 @@ export class SettleAnswers extends WizardStep<"settle", object, Needs> {
     if (
       (this.deps.nonInteractive || this.deps.dryRun) &&
       flags.devPort === undefined &&
-      !(await LocalServer.isPortFree(answers.devPort))
+      !(await this.deps.machine.isPortFree(answers.devPort))
     ) {
-      const free = await LocalServer.nextFreePort(answers.devPort);
-      reportWarning(
+      const free = await this.deps.machine.nextFreePort(answers.devPort);
+      warnings.report(
         free === undefined
           ? `Port ${answers.devPort} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
           : `Port ${answers.devPort} is already in use. If that is not this app's dev server, run setup with a free port: ${this.deps.suggest(

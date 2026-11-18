@@ -83,8 +83,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   whose flag only the user may agree to (next rule).
 - **Ask the user before `--force` on anything destructive.** A command that
   deletes, revokes or rolls back (`user delete`, `variable rm`, `origin rm`,
-  `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
-  person first. Non-interactive and without `--force`, it fails with
+  `invitation cancel`, `deployment rollback`, `reset`, `eject`, a destructive
+  `api` call) asks a person first. Non-interactive and without `--force`, it fails with
   `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
   same command with `--force`, except for `api`, whose body may hold a secret
   or come from a pipe: rerun that call yourself, with its `-F` fields or
@@ -120,7 +120,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   current directory, not from `--cwd` (`--cwd app --env-file app/.env.ci`):
   Node reads `--env-file` itself before the CLI starts and exits 9 with
   `node: <path>: not found`, and no envelope, when the file is not there.
-- **Server and project.** A command that talks to a project reads
+- **Server and project.** `--server` is a flag of each command that takes a server,
+  not a global one. A command that talks to a project reads
   `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
   first source that has it: `--server` (the URL only), `--env-file <path>`, the
   process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,
@@ -176,6 +177,21 @@ nothing; `data.skills` and `data.directories` say what it added where.
   non-interactive, pass `--force` too, or `warnings` says the repair waited.
   The repair deploys the newest primary release to it when there is one;
   otherwise `warnings` says to `deploy`.
+- **Invitations.** `zitadel invitation create --relation viewer|editor|admin`
+  makes a link that grants that role on the project to whoever opens it and
+  signs in; `--name` labels who it is for and is never matched. Non-interactive,
+  `create` asks nothing and needs `--relation`.
+  - `data.link` is in the create result only and never again: hand it to the
+    user, never put it in a file or a commit. It expires in 72 hours.
+  - `--replaces <invitation_id>` makes a new link for a lost, expired or
+    declined one, keeping its name unless `--name` gives another; an accepted
+    one fails with `E_VALIDATION`.
+  - `invitation list [--status …] [--type …]` and `invitation get
+    <invitation_id>` read them. `invitation cancel <invitation_id>` stops a
+    pending link or removes a declined one and needs `--force` when
+    non-interactive; its `--dry-run` needs the id.
+  - A project nobody has claimed refuses invitations until it is claimed
+    (`zitadel claim`). Existing members are read with `grant list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -267,8 +283,8 @@ npx @zitadel/cli@latest api ls --json        # every API operation, its paramete
 ```
 
 `--help` groups the commands by what you are doing: getting started, local
-development, users and teams, authentication, configuration and releases, and
-diagnostics and utilities. A family such as `user` is one row, and
+server, users and access, sign-in, project settings, releases, API and events,
+and the CLI itself. A family such as `user` is one row, and
 `zitadel user --help` lists its verbs. Read the groups from `--help` rather than
 from memory, since they change as the CLI gains commands.
 
@@ -338,9 +354,9 @@ Each invocation prints one JSON object:
   flag the run was given except those that only say how it answers
   (`--json`, `--non-interactive`, `--no-color`, `--verbose`, `--debug`,
   `--no-telemetry`); add `--non-interactive --json` when you run one.
-- A command named in a `hint`, a `warning` or a `next_actions` line is written
-  the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
-  unquoted — so prose and follow-up never name the same command two ways.
+- Run a command that takes the environment flags only from `next_commands` (or
+  `details.suggested_args`): a `hint`, a `warning` or a `next_actions` line never
+  spells one out, because prose cannot carry `--env`, `--env-file` or `--server`.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
@@ -394,7 +410,11 @@ Each invocation prints one JSON object:
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
-  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  line to pin). Each `data.previews[]` entry is `{ url, expires_at }`, where
+  `expires_at` is the live preview's expiry read after the deploy; a later
+  deploy to the URL renews it (`preview list` reads it again). Every preview
+  expires, so `expires_at: null` means that read failed: the run still answers
+  `ok` with a warning, and the preview and `data.release_env` stand. It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
   outside a preview or development build it is a no-op — even with an explicit
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
@@ -423,6 +443,13 @@ Each invocation prints one JSON object:
   and also stop serving when they expire. Revoke again once none serves it.
   Without origins the CLI can read, the conflict is the plain one: no `hint`, no
   `next_commands`, and `details` holds the server's `status`, `url` and `body`.
+- `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
+  live expiry of a live preview deployment's preview (the earliest, when it still
+  serves several), empty for any other deployment, such as a primary one, a replaced
+  one, or one whose preview is gone. It is also empty when the live view or the
+  previews could not be read, and a warning says so. `--json` items are the API's records,
+  unchanged and without `expires`: read a preview's expiry as JSON with
+  `preview list --json`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.
@@ -794,6 +821,8 @@ release this CLI ships; one an earlier release started is restarted, and its
 data stays. `setup --server local` refuses a binary-runtime server another
 release started with `E_CONFLICT` before it creates anything: that server's API
 is its own release's. Its `next_commands` run `start`, then `setup` again.
+Setup's interactive server question lists such a server as unavailable, and
+asks again when its URL is typed as a custom one.
 
 In an existing app, `--framework` has to name the framework setup detects
 there; another one stops setup with `E_CONFLICT` instead of offering
@@ -989,7 +1018,8 @@ step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
-could be enabled instead. A non-interactive dry run refuses it the same way, and its
+could be enabled instead, then `sso enable --provider '<name>'` (replace
+`<name>`). A non-interactive dry run refuses it the same way, and its
 `--force` re-run keeps `--dry-run`; with `--force` it previews the change and
 warns that no way to sign in would be left. A method that is enabled but not
 offered by any flow is reported in `warnings` (and in `data.not_offered`
@@ -1029,8 +1059,9 @@ error: a file that does not parse or fails its contract, a flow the server's
 flow rules refuse, a connection that disagrees with a schema or flow, and a
 variable the environment lacks (`environment/missing-variable`, one issue per
 file that references it). The hint says to fix the files and re-run, and for a
-literal `client_secret` (`connection/literal-secret`) to publish it with
-`variable set NAME --secret` and reference it as `"${{ NAME }}"`. Warnings in
+literal `client_secret` (`connection/literal-secret`) to publish it and
+reference it as `"${{ NAME }}"`; the runnable `variable set NAME --secret`
+is in `next_commands`, not in the hint. Warnings in
 `warnings` start with the file's path. The server still applies its own
 release rules when the build is submitted, such as handles being unique, so a
 passing dry run does not promise the release is accepted.
@@ -1145,8 +1176,14 @@ waits for the person to finish, returns `data.dashboard_url`, and records the
 owning team in `.zitadel/secret`. When the link expires, or `--challenge-id`
 names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
 new `--no-wait` link. A project that already has a team is `skipped` with
-`reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
-and no `next_commands`, since a new link cannot reopen it.
+`reason: "already-claimed"` and carries `data.console_url`, the link to the
+project's console; one past its 14 days fails with `E_VALIDATION` and no
+`next_commands`, since a new link cannot reopen it.
+
+To get a person to the console of a project on a hosted or self-hosted server,
+run `console --no-open --json`: with no local server started in the directory it
+returns `data.console_url` instead of a local sign-in link, and the person signs
+in there themselves.
 
 ## Reference files
 

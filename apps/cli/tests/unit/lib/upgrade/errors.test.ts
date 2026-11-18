@@ -1,15 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { PackageCommand } from "@/lib/package-manager";
+import { PM } from "@/lib/pm";
 import { InstallError, ReleaseLookupError } from "@/lib/upgrade/errors";
 
-const INSTALL: PackageCommand = {
-  command: "npm",
-  verb: "add",
-  operands: ["@zitadel/api@2.0.0"],
-  args: ["install", "--save-exact", "@zitadel/api@2.0.0"],
-  display: "npm install --save-exact @zitadel/api@2.0.0",
-};
+const INSTALL = PM.named("npm").addExact(["@zitadel/api@2.0.0"]);
 
 describe("ReleaseLookupError", () => {
   it("is named, and says only that no release was found", () => {

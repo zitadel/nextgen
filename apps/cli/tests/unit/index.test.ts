@@ -8,7 +8,7 @@ import { z } from "zod";
 import { COMMANDS, NO_PLURAL } from "@/index";
 import { aliasedCommands, pluralAliasOf } from "@/lib/oclif/plural-aliases";
 import { COLLECTION_PLURALS } from "@tests/helpers/collections";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
@@ -176,5 +176,26 @@ describe("COMMANDS", () => {
         }),
       ).toEqual([]);
     });
+  });
+});
+
+describe("the flags each command takes", () => {
+  /** What a command accepts besides its arguments: its own flags and the ones its bases add. */
+  const effective = (command: (typeof COMMANDS)[string]): string[] => {
+    return Object.keys({ ...command.baseFlags, ...command.flags }).sort();
+  };
+
+  it("are pinned for every command", () => {
+    expect(
+      Object.fromEntries(
+        Object.entries(COMMANDS)
+          .sort(([left], [right]) => {
+            return left.localeCompare(right);
+          })
+          .map(([id, command]) => {
+            return [id, effective(command)];
+          }),
+      ),
+    ).toMatchSnapshot();
   });
 });

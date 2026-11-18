@@ -21,20 +21,27 @@ func TestCommandHelpListsMigrate(t *testing.T) {
 	cmd.SetArgs([]string{"--help"})
 	require.NoError(t, cmd.Execute())
 
-	var migrateCmd, serverCmd bool
+	var migrateCmd, seedCmd, serverCmd bool
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
 		case "migrate":
 			migrateCmd = true
 			assert.Equal(t, "Apply database migrations and exit", c.Short)
+		case "seed":
+			seedCmd = true
+			assert.Equal(t, "Seed the database and exit", c.Short)
+			require.NotNil(t, c.Flags().Lookup("user-file"), "expected --user-file on seed")
 		case "server":
 			serverCmd = true
 			require.NotNil(t, c.Flags().Lookup("migrate"), "expected --migrate on server")
+			require.NotNil(t, c.Flags().Lookup("seed"), "expected --seed on server")
 		}
 	}
 	assert.True(t, migrateCmd, "expected a command named migrate")
+	assert.True(t, seedCmd, "expected a command named seed")
 	assert.True(t, serverCmd, "expected a command named server")
 	require.NotNil(t, cmd.Flags().Lookup("migrate"), "expected --migrate on root")
+	require.NotNil(t, cmd.Flags().Lookup("seed"), "expected --seed on root")
 }
 
 func TestMigrateCommandAppliesSchemaIdempotently(t *testing.T) {
