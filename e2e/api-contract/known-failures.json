@@ -12,10 +12,6 @@
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /auth_attempts/{attempt_id}/challenges",
-    "check": "API rejected schema-compliant request"
-  },
-  {
     "operation": "POST /branding",
     "check": "API accepted schema-violating request"
   },
@@ -26,14 +22,6 @@
   {
     "operation": "POST /invitations",
     "check": "Server error"
-  },
-  {
-    "operation": "POST /projects/query",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /teams/query",
-    "check": "API rejected schema-compliant request"
   },
   {
     "operation": "POST /users/query",
