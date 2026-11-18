@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type FlowReport, Telemetered } from "@/cli/telemetry/telemetered";
 import { ZitadelError } from "@/lib/errors";
 import { BaseCommand, type Facts } from "@/lib/oclif/base";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
+import { loadOrCreateIdentity } from "@/lib/telemetry/identity";
 import type { RunWatcher } from "@/lib/wizard";
 import { aConfigAt } from "@tests/helpers/suggestions";
 
@@ -17,6 +22,7 @@ type Sent = {
 /** Minimal recording stand-in for the generic Telemetry client. */
 class RecordingTelemetry {
   public readonly sent: Sent[] = [];
+  public readonly profiles: { set: Record<string, unknown>; once: Record<string, unknown> }[] = [];
   public enabled = true;
   public readonly isFirstRun = false;
   public readonly distinctId = "did-test";
@@ -29,8 +35,12 @@ class RecordingTelemetry {
     this.sent.push({ event, properties, only });
   }
 
-  public profile(): void {
-    /* no profile in this harness */
+  public profile(
+    set: Record<string, unknown>,
+    _modifiers: unknown,
+    once: Record<string, unknown>,
+  ): void {
+    this.profiles.push({ set, once });
   }
 
   public async shutdown(): Promise<void> {
@@ -107,6 +117,21 @@ const FLOW: FlowReport = {
   },
 };
 
+/** Where the install's id and profile record live, so a test never touches the real one. */
+const config = { dir: "" };
+
+beforeEach(() => {
+  config.dir = mkdtempSync(join(tmpdir(), "zitadel-telemetered-"));
+  vi.stubEnv("XDG_CONFIG_HOME", config.dir);
+  // The real client mints the install's id before the mixin asks about its profile.
+  loadOrCreateIdentity({ XDG_CONFIG_HOME: config.dir });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  rmSync(config.dir, { recursive: true, force: true });
+});
+
 function makeCommand(): TestCommand {
   return new TestCommand([], aConfigAt("0.0.0-test"));
 }
@@ -165,6 +190,33 @@ describe("Telemetered lifecycle", () => {
     cmd.complete();
 
     expect(cmd.recorder.sent.map(({ only }) => only)).toEqual([undefined, undefined]);
+  });
+});
+
+describe("Telemetered profile", () => {
+  it("writes the install's profile on the first run, with its first version written once", async () => {
+    const cmd = makeCommand();
+    await cmd.open();
+
+    expect(cmd.recorder.profiles).toHaveLength(1);
+    expect(cmd.recorder.profiles[0]?.set).toMatchObject({ cli_version: "0.0.0-test" });
+    expect(cmd.recorder.profiles[0]?.once).toEqual({ first_cli_version: "0.0.0-test" });
+  });
+
+  it("does not write it again on the next run while nothing changed", async () => {
+    await makeCommand().open();
+    const next = makeCommand();
+    await next.open();
+
+    expect(next.recorder.profiles).toHaveLength(0);
+  });
+
+  it("writes nothing for a run that is opted out", async () => {
+    const cmd = makeCommand();
+    cmd.optOut = true;
+    await cmd.open();
+
+    expect(cmd.recorder.profiles).toHaveLength(0);
   });
 });
 

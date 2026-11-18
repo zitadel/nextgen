@@ -1,4 +1,4 @@
-import type { RuntimeKind } from "@/lib/server";
+import { type RuntimeKind, ZitadelRuntime } from "@/lib/server";
 import type { Properties } from "@/lib/telemetry";
 import { installedFromPackage, resolveChannel } from "@/lib/telemetry/config";
 import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
@@ -109,7 +109,7 @@ function profileDeviceProperties(meta: GlobalOptions): Properties {
  */
 export function commandEventProperties(
   meta: GlobalOptions,
-  serverKind: RuntimeKind,
+  serverKind: RuntimeKind | "none",
   invocationId: string,
   extra: Properties = {},
 ): Properties {
@@ -160,5 +160,30 @@ export function deviceProfileProperties(meta: GlobalOptions, distinctId: string)
     ...profileDeviceProperties(meta),
     $name: `${label} · ${distinctId.slice(0, 8)}`,
     host_agent: agent,
+    is_agent: isAgent(agent),
+    invocation_channel: invocationChannel.value(meta.env),
+    install_source: installedFromPackage() ? "package" : "source",
   };
+}
+
+/**
+ * What an install's profile says only once, the first time it is written: the
+ * version it began on, which lets a cohort ask who installed which version.
+ *
+ * @param meta - What the run is about.
+ * @returns The facts to write where the profile does not have them yet.
+ */
+export function firstSeenProperties(meta: GlobalOptions): Properties {
+  return { first_cli_version: meta.cliVersion };
+}
+
+/**
+ * The kind of server a run is about, or `none` for a command that talks to no
+ * server and so has no address.
+ *
+ * @param source - The run's server address, empty when it names none.
+ * @returns The kind.
+ */
+export function serverKindOf(source: string): RuntimeKind | "none" {
+  return source === "" ? "none" : ZitadelRuntime.fromUrl(source).kind;
 }

@@ -15,8 +15,11 @@ export interface TelemetrySink {
   /** Sends one event. */
   track(event: string, payload: Properties): void;
 
-  /** Writes the user's profile, where the destination has one. */
-  profile(payload: Properties, modifiers: Modifiers): void;
+  /**
+   * Writes the user's profile, where the destination has one: `payload` always,
+   * and `once` only where the profile does not have it yet.
+   */
+  profile(payload: Properties, modifiers: Modifiers, once?: Properties): void;
 
   /** Resolves when every send so far is over, or after `timeoutMs`, whichever comes first. */
   flush(timeoutMs: number): Promise<void>;

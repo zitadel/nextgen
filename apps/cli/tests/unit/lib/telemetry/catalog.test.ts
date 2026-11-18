@@ -11,6 +11,7 @@ import {
   CLI_COMMAND_STARTED,
   commandEventProperties,
   deviceProfileProperties,
+  firstSeenProperties,
   vercelEventKeys,
 } from "@/cli/telemetry/properties";
 import type { GlobalOptions } from "@/lib/oclif/types";
@@ -431,7 +432,10 @@ describe("CLI telemetry against the catalog", () => {
 
   it("sends exactly the properties the catalog lists on the install profile", async () => {
     const { profile } = cliOf(await loadCatalog());
-    const sent = Object.keys(deviceProfileProperties(meta(), "09233195-cd34-468c"));
+    const sent = [
+      ...Object.keys(deviceProfileProperties(meta(), "09233195-cd34-468c")),
+      ...Object.keys(firstSeenProperties(meta())),
+    ];
     expect(new Set(profile?.properties)).toEqual(new Set(sent));
   });
 });

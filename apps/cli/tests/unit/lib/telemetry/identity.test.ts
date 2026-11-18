@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { loadOrCreateIdentity, telemetryConfigDir } from "@/lib/telemetry/identity";
+import { loadOrCreateIdentity, profileDue, telemetryConfigDir } from "@/lib/telemetry/identity";
 import { it } from "@tests/fixtures";
 
 const { homedir } = vi.hoisted(() => {
@@ -82,5 +82,49 @@ describe("loadOrCreateIdentity", () => {
     const identity = loadOrCreateIdentity({ XDG_CONFIG_HOME: fileAsParent });
     expect(identity.isFirstRun).toBe(false);
     expect(identity.distinctId).toMatch(/[0-9a-f-]{36}/);
+  });
+});
+
+describe("profileDue", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it("is due the first time, and not again for the same facts within a day", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+    loadOrCreateIdentity(env);
+
+    expect(profileDue(env, "h1", 1000)).toBe(true);
+    expect(profileDue(env, "h1", 1000 + DAY - 1)).toBe(false);
+  });
+
+  it("is due again when what the profile says changed", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+    loadOrCreateIdentity(env);
+    profileDue(env, "h1", 1000);
+
+    expect(profileDue(env, "h2", 2000)).toBe(true);
+  });
+
+  it("is due again once a day has passed", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+    loadOrCreateIdentity(env);
+    profileDue(env, "h1", 1000);
+
+    expect(profileDue(env, "h1", 1000 + DAY)).toBe(true);
+  });
+
+  it("keeps the install's id when it remembers the profile", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
+    const { distinctId } = loadOrCreateIdentity(env);
+    profileDue(env, "h1", 1000);
+
+    expect(loadOrCreateIdentity(env).distinctId).toBe(distinctId);
+  });
+
+  it("is never due for an install that cannot remember what it wrote", () => {
+    homedir.mockImplementation(() => {
+      throw new Error("no home directory");
+    });
+
+    expect(profileDue({}, "h1", 1000)).toBe(false);
   });
 });

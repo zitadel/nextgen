@@ -169,11 +169,19 @@ export class Telemetry {
     }
   }
 
-  /** Write a user profile where the destination has one. `modifiers` carries `$ip` etc. */
-  profile(properties: TelemetryProperties, modifiers: Modifiers = {}): void {
+  /**
+   * Write a user profile where the destination has one. `modifiers` carries
+   * `$ip` etc.; `once` is written only where the profile does not have it yet.
+   */
+  profile(
+    properties: TelemetryProperties,
+    modifiers: Modifiers = {},
+    once: TelemetryProperties = {},
+  ): void {
     const payload = compact(properties);
+    const first = compact(once);
     for (const sink of this.sinks) {
-      sink.profile(payload, modifiers);
+      sink.profile(payload, modifiers, first);
     }
   }
 

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { Flags } from "@oclif/core";
 
@@ -7,9 +7,9 @@ import type { BaseCommand, Facts, MetaOptions } from "@/lib/oclif/base";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif";
 import type { GlobalOptions } from "@/lib/oclif/types";
-import { ZitadelRuntime } from "@/lib/server";
 import { Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
+import { profileDue } from "@/lib/telemetry/identity";
 import type { RunWatcher } from "@/lib/wizard";
 
 import {
@@ -19,6 +19,8 @@ import {
   commandEventProperties,
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
+  firstSeenProperties,
+  serverKindOf,
   vercelEventKeys,
 } from "./properties";
 
@@ -277,11 +279,22 @@ export function Telemetered<
         return;
       }
       this.reportTrack(CLI_COMMAND_STARTED, { ...this.reportNotes });
-      if (client.isFirstRun) {
-        client.profile(deviceProfileProperties(this.meta, client.distinctId), { $ip: 0 });
-        if (this.reportInteractive()) {
-          this.logToStderr(FIRST_RUN_NOTICE);
-        }
+      this.reportProfile(client);
+      if (client.isFirstRun && this.reportInteractive()) {
+        this.logToStderr(FIRST_RUN_NOTICE);
+      }
+    }
+
+    /**
+     * Writes the install's profile when it is due: the first time, when what it
+     * says changed (an upgrade, another Node), and at most once a day, which
+     * keeps its "last seen" within a day of the install's last run.
+     */
+    private reportProfile(client: Telemetry): void {
+      const facts = deviceProfileProperties(this.meta, client.distinctId);
+      const hash = createHash("sha256").update(JSON.stringify(facts)).digest("hex");
+      if (profileDue(process.env, hash)) {
+        client.profile(facts, { $ip: 0 }, firstSeenProperties(this.meta));
       }
     }
 
@@ -314,7 +327,7 @@ export function Telemetered<
         name,
         commandEventProperties(
           this.meta,
-          ZitadelRuntime.fromUrl(this.meta.source).kind,
+          serverKindOf(this.meta.source),
           this.reportInvocationId,
           facts,
         ),

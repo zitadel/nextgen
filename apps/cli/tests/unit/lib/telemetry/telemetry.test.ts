@@ -8,7 +8,7 @@ type Tracked = { event: string; properties: Properties };
 
 function fakeClient(
   sink: Tracked[],
-  opts: { throwOnTrack?: boolean; peopleSink?: Properties[] } = {},
+  opts: { throwOnTrack?: boolean; peopleSink?: Properties[]; onceSink?: Properties[] } = {},
 ): MixpanelClient {
   return {
     track(event: string, properties: Properties, callback?: Callback): void {
@@ -30,10 +30,11 @@ function fakeClient(
       },
       set_once(
         _distinctId: string,
-        _properties: Properties,
+        properties: Properties,
         _modifiers?: Modifiers,
         callback?: Callback,
       ): void {
+        opts.onceSink?.push(properties);
         callback?.(undefined);
       },
     },
@@ -94,6 +95,20 @@ describe("Telemetry (generic core)", () => {
 
     expect(peopleSink).toHaveLength(1);
     expect(peopleSink[0]?.$name).toBe("darwin · did-1234");
+  });
+
+  it("writes what is given as `once` only where the profile does not have it yet, and nothing when none is given", () => {
+    const sink: Tracked[] = [];
+    const peopleSink: Properties[] = [];
+    const onceSink: Properties[] = [];
+    const t = Telemetry.create(
+      deps(sink, { initClient: () => fakeClient(sink, { peopleSink, onceSink }) }),
+    );
+    t.profile({ cli_version: "1" }, { $ip: 0 }, { first_cli_version: "1" });
+    t.profile({ cli_version: "2" }, { $ip: 0 });
+
+    expect(onceSink).toEqual([{ first_cli_version: "1" }]);
+    expect(peopleSink).toHaveLength(2);
   });
 
   it("exposes the first-run flag from identity", () => {

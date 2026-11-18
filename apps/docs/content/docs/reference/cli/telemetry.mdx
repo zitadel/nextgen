@@ -18,7 +18,7 @@ Each event keeps at most eight properties:
 | --- | --- |
 | `surface` | The Zitadel component that sent it: always `cli`. |
 | `cli_version` | The version of the CLI. |
-| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted` or `unknown`, never its URL. |
+| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted`, `none` for a command that talks to no server, or `unknown`, never its URL. |
 | `command` | The command, such as `variables:set`. |
 | `status` | How the command ended: `ok`, `skipped` or `error`. |
 | `reason` | A failed command's error code, such as `E_NETWORK`. |
@@ -56,7 +56,7 @@ The CLI can also send its events to [Mixpanel](https://mixpanel.com), in the US 
 | `host_agent` | The coding agent it ran inside, such as `claude_code`, `cursor` or `codex`, `vscode` for an editor's terminal, or `unknown`. |
 | `is_agent` | Whether the CLI ran inside a coding agent (`host_agent` says which). It says where the CLI ran, never who typed the command. |
 | `invocation_channel` | The package manager that started it: `npm`, `pnpm`, `yarn`, `bun` or `unknown`. |
-| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted` or `unknown`, never its URL. |
+| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted`, `none` for a command that talks to no server, or `unknown`, never its URL. |
 | `invocation_id` | A random ID that ties one run's events together. |
 | `distinct_id` | The [install ID](#the-install-id). |
 
@@ -92,7 +92,7 @@ Nothing that identifies you, your machine or your project: no name, email addres
 
 The first time it sends anything, the CLI creates a random ID for the install and keeps it in `~/.config/zitadel/cli/telemetry.json`: under `$XDG_CONFIG_HOME` when that is set, and under `%APPDATA%` on Windows. The ID ties the runs of one install together in Mixpanel, and holds nothing about you or the machine. The events for Vercel leave it out, so while Mixpanel is paused it stays on your machine. Delete the file to start over with a new one. Where the file cannot be written, every run takes a new ID.
 
-On that first run, in an interactive terminal, the CLI says on stderr that it collects analytics, and how to opt out. With Mixpanel, it also records the install itself, with the platform, versions, country and `host_agent` its events carry.
+On that first run, in an interactive terminal, the CLI says on stderr that it collects analytics, and how to opt out. With Mixpanel, it also records the install itself: the platform, the CLI and Node versions, the country, `host_agent`, how it was launched, and the version it began on. It writes that record again when something in it changes, such as an upgrade, and at most once a day, so the record shows when the install was last used.
 
 ## When it sends
 

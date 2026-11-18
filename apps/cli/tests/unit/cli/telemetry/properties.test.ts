@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   commandEventProperties,
   deviceProfileProperties,
+  firstSeenProperties,
+  serverKindOf,
   vercelEventKeys,
 } from "@/cli/telemetry/properties";
 import type { GlobalOptions } from "@/lib/oclif/types";
@@ -154,5 +156,32 @@ describe("the run's environment", () => {
       is_agent: true,
     });
     expect(outside.is_agent).toBe(false);
+  });
+});
+
+describe("serverKindOf", () => {
+  it("is none for a command that names no server, and the kind of any other", () => {
+    expect(serverKindOf("")).toBe("none");
+    expect(serverKindOf("http://localhost:8080")).toBe("local");
+    expect(serverKindOf("not a url")).toBe("unknown");
+  });
+});
+
+describe("the install's profile", () => {
+  it("carries how the CLI was launched and whether it ran in an agent, beside its versions", () => {
+    const props = deviceProfileProperties(meta({ env: { CLAUDECODE: "1" } }), "09233195-cd34");
+
+    expect(props).toMatchObject({
+      cli_version: "0.1.0-alpha.11",
+      host_agent: "claude_code",
+      is_agent: true,
+    });
+    expect(Object.keys(props)).toEqual(
+      expect.arrayContaining(["node_version", "invocation_channel", "install_source"]),
+    );
+  });
+
+  it("names the version an install began on, to be written once", () => {
+    expect(firstSeenProperties(meta())).toEqual({ first_cli_version: "0.1.0-alpha.11" });
   });
 });

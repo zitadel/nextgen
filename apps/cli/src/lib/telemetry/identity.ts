@@ -14,7 +14,14 @@ export type Identity = {
   readonly isFirstRun: boolean;
 };
 
-type StoredIdentity = { distinctId: string };
+type StoredIdentity = {
+  distinctId: string;
+  /** When the install's profile was last written, and a hash of what was written. */
+  profile?: { at: number; hash: string };
+};
+
+/** How long a written profile stands before it is written again: a day. */
+const PROFILE_EVERY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Resolve the directory the CLI persists cross-invocation state in, honoring
@@ -75,5 +82,49 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
     return { distinctId, isFirstRun: true };
   } catch {
     return { distinctId, isFirstRun: false };
+  }
+}
+
+/**
+ * Whether the install's profile is due to be written now, and if so remember
+ * that it was: when it has never been written, when what it would say differs
+ * from what it last said, or when a day has passed since it was last written.
+ * That keeps the profile's version facts current within a day of an upgrade,
+ * and its "last seen" within a day of the install's last run, for at most one
+ * request per install per day.
+ *
+ * Fail-closed: an install that cannot remember what it wrote (no config
+ * directory, a read-only home) never writes a profile, so it cannot add a new
+ * profile on every run.
+ *
+ * @param env - The environment the run reads.
+ * @param hash - A hash of what the profile would say.
+ * @param now - The time in milliseconds.
+ * @returns Whether to write the profile now.
+ */
+export function profileDue(
+  env: NodeJS.ProcessEnv,
+  hash: string,
+  now: number = Date.now(),
+): boolean {
+  const dir = telemetryConfigDir(env);
+  if (dir === undefined) {
+    return false;
+  }
+  const file = join(dir, "telemetry.json");
+  try {
+    const stored = JSON.parse(readFileSync(file, "utf8")) as StoredIdentity;
+    const last = stored.profile;
+    const due = last === undefined || last.hash !== hash || now - last.at >= PROFILE_EVERY_MS;
+    if (!due) {
+      return false;
+    }
+    writeFileSync(file, `${JSON.stringify({ ...stored, profile: { at: now, hash } })}\n`, {
+      mode: 0o600,
+    });
+
+    return true;
+  } catch {
+    return false;
   }
 }
