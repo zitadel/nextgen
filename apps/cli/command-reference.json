@@ -4117,6 +4117,9 @@
           "command": "api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
         },
         {
+          "command": "api updateUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W -F attributes.age=1"
+        },
+        {
           "command": "api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json"
         },
         {

@@ -230,7 +230,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   any operation of the API with the server, project and project secret every
   project command resolves (`--server`, `--env`, `--env-file`, the `.env`
   files, `.zitadel/secret`). One that needs the secret fails with
-  `E_VALIDATION` when no `ZITADEL_URL` resolves; one that needs none runs
+  `E_VALIDATION` when no `ZITADEL_URL` resolves, and with `E_AUTH` when that
+  server does not accept the secret, the hint naming the server and the variable
+  (a secret belongs to the project on one server); one that needs none runs
   against the cloud where nothing names a server. One
   that deletes, revokes or rolls back asks first and needs `--force` when
   non-interactive, as the command that covers it does. An update is not
