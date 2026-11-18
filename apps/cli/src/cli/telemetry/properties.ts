@@ -1,6 +1,4 @@
 import type { RuntimeKind } from "@/lib/server";
-import { detectAgent } from "agent-cli-detector";
-
 import type { Properties } from "@/lib/telemetry";
 import { installedFromPackage, resolveChannel } from "@/lib/telemetry/config";
 import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
@@ -130,7 +128,7 @@ export function commandEventProperties(
     is_ci: ciFlag.value(env),
     ci_provider: ciProvider.value(env),
     host_agent: hostAgent.value(env),
-    ...agentProperties(env),
+    is_agent: isAgent(hostAgent.value(env)),
     invocation_channel: invocationChannel.value(env),
     dry_run: meta.dryRun,
     force: meta.force,
@@ -139,20 +137,14 @@ export function commandEventProperties(
 }
 
 /**
- * Whether the run is inside a coding agent, and which, as the detector names
- * it from a fixed list. A run it recognises nothing in says nothing about who
- * ran it, so only a detected agent is named.
+ * Whether a host is a coding agent: any the detector recognised, not an editor's
+ * terminal or an unknown one. It says where the CLI ran, never who typed.
  *
- * @param env - The environment the command ran in.
- * @returns `is_agent` and, for a detected agent, `agent_name`.
+ * @param host - The `host_agent` value.
+ * @returns Whether it is a coding agent.
  */
-function agentProperties(env: NodeJS.ProcessEnv): Properties {
-  const found = detectAgent({ env });
-
-  return {
-    is_agent: found.detected,
-    agent_name: found.detected ? found.agent?.id : undefined,
-  };
+function isAgent(host: string): boolean {
+  return host !== "vscode" && host !== "unknown";
 }
 
 /**

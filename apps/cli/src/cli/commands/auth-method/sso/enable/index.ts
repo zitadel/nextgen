@@ -13,7 +13,7 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
-import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
+import { AuthMethodCommand, providerKind } from "@/cli/commands/auth-method/command";
 import type { EnableFacts, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
@@ -145,7 +145,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
-    this.annotate({ provider_type: this.providerKind(flags.provider) });
+    this.annotate({ provider_type: providerKind(flags.provider) });
 
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")

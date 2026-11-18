@@ -22,7 +22,7 @@ Each event keeps at most eight properties:
 | `command` | The command, such as `variables:set`. |
 | `status` | How the command ended: `ok`, `skipped` or `error`. |
 | `reason` | A failed command's error code, such as `E_NETWORK`. |
-| `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
+| `host_agent` | The coding agent it ran inside, such as `claude_code`, `cursor` or `codex`, `vscode` for an editor's terminal, or `unknown`. |
 | `non_interactive` | Whether it ran without prompts. |
 
 A few commands add one property of their own. When a failed command's event already holds eight, it takes the place of `non_interactive`.
@@ -41,7 +41,7 @@ Run a command with `--debug` to see each event on stderr before it is sent.
 
 ### What Mixpanel would get
 
-The CLI can also send its events to [Mixpanel](https://mixpanel.com), in the US region for production and the EU region for development, where EU events go through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`). A run in CI, in development mode or from a source checkout goes to a separate development project, so it never reaches customer data. `cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
+The CLI can also send its events to [Mixpanel](https://mixpanel.com), in the US region for production and the EU region for development, where EU events go through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`). A run in development mode or from a source checkout goes to a separate development project, so it never reaches customer data, and a run in CI sends nothing. `cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
 
 | Property | What it holds |
 | --- | --- |
@@ -51,10 +51,10 @@ The CLI can also send its events to [Mixpanel](https://mixpanel.com), in the US 
 | `os`, `$os`, `arch` | The platform, such as `darwin`, `Mac OS X` and `arm64`. |
 | `mp_country_code` | The country of your timezone, for the timezones the CLI knows; none for others. |
 | `is_tty`, `non_interactive`, `dry_run`, `force` | Whether it ran in a terminal, without prompts, as a dry run, and with `--force`. |
-| `is_ci`, `ci_provider` | Whether it ran in CI, and which, by name, such as `github_actions`, or `unknown`. |
+| `is_ci`, `ci_provider` | Whether it ran in CI, and which: `github_actions`, `gitlab_ci`, `circleci`, `buildkite`, `jenkins` or `unknown`. |
 | `environment`, `install_source` | Whether the run counts as customer traffic (`production`, or `development` for CI, development mode and runs from a source checkout), and whether the CLI ran from an installed package or from source. |
-| `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
-| `is_agent`, `agent_name` | Whether the CLI ran inside a coding agent, and which one it recognised, such as `claude-code`. It says where the CLI ran, never who typed the command. |
+| `host_agent` | The coding agent it ran inside, such as `claude_code`, `cursor` or `codex`, `vscode` for an editor's terminal, or `unknown`. |
+| `is_agent` | Whether the CLI ran inside a coding agent (`host_agent` says which). It says where the CLI ran, never who typed the command. |
 | `invocation_channel` | The package manager that started it: `npm`, `pnpm`, `yarn`, `bun` or `unknown`. |
 | `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted` or `unknown`, never its URL. |
 | `invocation_id` | A random ID that ties one run's events together. |

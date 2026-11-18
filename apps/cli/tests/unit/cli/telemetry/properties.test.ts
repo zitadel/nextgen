@@ -2,12 +2,10 @@ import type { Properties } from "mixpanel";
 import { describe, expect, it } from "vitest";
 
 import {
-  actionProperties,
-  COMMAND_ACTIONS,
   commandEventProperties,
   deviceProfileProperties,
   vercelEventKeys,
-} from "@/lib/oclif/command-telemetry";
+} from "@/cli/telemetry/properties";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { VERCEL_ENDPOINT, vercelEventBody } from "@/lib/telemetry/vercel";
 
@@ -60,13 +58,13 @@ describe("commandEventProperties", () => {
 });
 
 describe("vercelEventKeys", () => {
-  function vercelCopy(event: string, command: string, extra: Properties) {
+  function vercelCopy(event: string, command: string, extra: Properties, headline?: string) {
     const props = commandEventProperties(meta({ command }), "self_hosted", "sess-1", extra);
     return JSON.parse(
       vercelEventBody(
         event,
         props,
-        { endpoint: VERCEL_ENDPOINT, keys: vercelEventKeys(command) },
+        { endpoint: VERCEL_ENDPOINT, keys: vercelEventKeys(headline) },
         0,
       ),
     ).ed as Record<string, unknown>;
@@ -79,7 +77,7 @@ describe("vercelEventKeys", () => {
       exit_code: 1,
       duration_ms: 12,
     });
-    expect(Object.keys(copy)).toEqual([...vercelEventKeys("variable:list")]);
+    expect(Object.keys(copy)).toEqual([...vercelEventKeys()]);
     expect(copy).toMatchObject({
       surface: "cli",
       command: "variable:list",
@@ -91,22 +89,23 @@ describe("vercelEventKeys", () => {
   });
 
   it("keeps a completed command's own dimension beside whether it ran without prompts", () => {
-    const copy = vercelCopy("cli_command_completed", "setup", {
-      framework: "nextjs",
-      renderer: "react",
-      status: "ok",
-    });
+    const copy = vercelCopy(
+      "cli_command_completed",
+      "setup",
+      { framework: "nextjs", renderer: "react", status: "ok" },
+      "framework",
+    );
     expect(copy).toMatchObject({ framework: "nextjs", non_interactive: true });
     expect(copy).not.toHaveProperty("renderer");
   });
 
   it("puts a failed command's own dimension in place of whether it ran without prompts", () => {
-    const copy = vercelCopy("cli_command_failed", "doctor", {
-      checks_failed: 1,
-      failed_checks: "port",
-      status: "error",
-      reason: "E_PORT_IN_USE",
-    });
+    const copy = vercelCopy(
+      "cli_command_failed",
+      "doctor",
+      { checks_failed: 1, failed_checks: "port", status: "error", reason: "E_PORT_IN_USE" },
+      "failed_checks",
+    );
     expect(copy).toMatchObject({ failed_checks: "port", reason: "E_PORT_IN_USE" });
     expect(copy).not.toHaveProperty("non_interactive");
     expect(copy).not.toHaveProperty("checks_failed");
@@ -134,40 +133,26 @@ describe("deviceProfileProperties", () => {
   });
 });
 
-describe("actionProperties", () => {
-  it("names the action and resource of a command that reports one, with the dimensions it recorded", () => {
-    expect(
-      actionProperties(
-        "grant:create",
-        { access_level: "project_admin", resources: 3 },
-        { duration_ms: 12 },
-      ),
-    ).toEqual({
-      access_level: "project_admin",
-      test_mode: undefined,
-      test_result: undefined,
-      changed_configuration_types: undefined,
-      stage: undefined,
-      action: "create",
-      resource_type: "grant",
-      duration_ms: 12,
-    });
+describe("the run's environment", () => {
+  it("says whether the run counts as customer traffic and where the CLI ran from", () => {
+    const props = commandEventProperties(
+      meta({ env: { ZITADEL_TELEMETRY_ENV: "production" } }),
+      "cloud",
+      "sess-1",
+    );
+
+    expect(props.environment).toBe("production");
+    expect(["package", "source"]).toContain(props.install_source);
   });
 
-  it("reports nothing for a command that has no action", () => {
-    expect(actionProperties("doctor", {}, {})).toBeUndefined();
-  });
+  it("says a run inside a coding agent is one, and any other run is not", () => {
+    const inside = commandEventProperties(meta({ env: { CLAUDECODE: "1" } }), "cloud", "sess-1");
+    const outside = commandEventProperties(meta({ env: {} }), "cloud", "sess-1");
 
-  it.each([
-    ["auth-method:sso:enable", "enable", "sso"],
-    ["auth-method:passkey:disable", "disable", "passkey"],
-    ["auth-method:password:enable", "enable", "password"],
-  ])("reports %s as %s of the %s method, on its own", (command, action, method) => {
-    expect(COMMAND_ACTIONS.get(command)).toEqual({
-      action,
-      resource_type: "authentication_method",
-      method,
-      entry_point: "standalone",
+    expect({ host: inside.host_agent, is_agent: inside.is_agent }).toEqual({
+      host: "claude_code",
+      is_agent: true,
     });
+    expect(outside.is_agent).toBe(false);
   });
 });

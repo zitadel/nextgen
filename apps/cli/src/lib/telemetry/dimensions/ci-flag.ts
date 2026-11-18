@@ -1,15 +1,11 @@
-import ci from "ci-info";
-
 import type { Property } from "@/lib/telemetry/property";
 
-/**
- * Whether the process is running inside an automated CI environment, as
- * `ci-info` reads it from the process's own environment when it loads: about
- * fifty CI services, and the generic `CI` variable.
- */
+import { envEnabled } from "./env-flag";
+
+/** Whether the process is running inside an automated CI environment. */
 class CiFlag implements Property<NodeJS.ProcessEnv, boolean> {
-  public value(_env: NodeJS.ProcessEnv): boolean {
-    return ci.isCI;
+  public value(env: NodeJS.ProcessEnv): boolean {
+    return envEnabled(env.CI) || envEnabled(env.GITHUB_ACTIONS) || envEnabled(env.GITLAB_CI);
   }
 }
 

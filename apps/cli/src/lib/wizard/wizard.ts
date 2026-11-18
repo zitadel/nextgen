@@ -50,6 +50,21 @@ export type RunWatcher = Readonly<{
 }>;
 
 /**
+ * Tells a watcher something, and goes on whatever it does with it: a watcher
+ * never changes the run, so one that throws cannot skip an undo or replace the
+ * error that stopped the run.
+ *
+ * @param tell - Calls the watcher.
+ */
+function told(tell: () => void): void {
+  try {
+    tell();
+  } catch {
+    // Following a run never changes it.
+  }
+}
+
+/**
  * How one run behaves.
  */
 type RunOptions = {
@@ -222,7 +237,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
         return before;
       }
       const attempt = async (): Promise<Progress<State & Out, Result>> => {
-        options.watch?.started?.(step.key);
+        told(() => options.watch?.started?.(step.key));
         const out = await reader.run(before.state);
         const undo = async (): Promise<void> => {
           try {
@@ -243,12 +258,12 @@ export class Wizard<Initial extends object, State extends object, Result> {
         };
       };
       const finished = await attempt().catch(async (error: unknown) => {
-        options.watch?.failed?.(step.key, error);
+        told(() => options.watch?.failed?.(step.key, error));
         await before.undo();
         throw error;
       });
       if (finished.kind === "continue") {
-        options.watch?.finished?.(step.key, finished.state);
+        told(() => options.watch?.finished?.(step.key, finished.state));
         try {
           observe?.(finished.state);
         } catch (error) {
@@ -286,7 +301,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
           return before;
         }
         const result = await reader.run(before.state);
-        options.watch?.ended?.(step.key);
+        told(() => options.watch?.ended?.(step.key));
 
         return {
           kind: "end",
@@ -295,7 +310,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
         };
       };
       return attempt().catch(async (error: unknown) => {
-        options.watch?.failed?.(step.key, error);
+        told(() => options.watch?.failed?.(step.key, error));
         await before.undo();
         throw error;
       });
@@ -343,7 +358,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
       }
       try {
         const answered = answer(progress.state);
-        options.watch?.completed?.();
+        told(() => options.watch?.completed?.());
 
         return answered;
       } catch (error) {

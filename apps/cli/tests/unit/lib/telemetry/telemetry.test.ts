@@ -125,7 +125,7 @@ describe("Telemetry (generic core)", () => {
     const loadIdentity = vi.fn(() => identity);
     const t = Telemetry.create(
       deps(sink, {
-        env: {},
+        env: { CI: "true" },
         loadIdentity,
       }),
     );

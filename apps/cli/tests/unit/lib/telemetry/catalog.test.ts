@@ -11,9 +11,8 @@ import {
   CLI_COMMAND_STARTED,
   commandEventProperties,
   deviceProfileProperties,
-  VERCEL_COMMAND_DIMENSIONS,
   vercelEventKeys,
-} from "@/lib/oclif/command-telemetry";
+} from "@/cli/telemetry/properties";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { VERCEL_MAX_PROPERTIES } from "@/lib/telemetry/vercel";
 import { keysOf } from "@tests/helpers/declarations";
@@ -31,7 +30,7 @@ const catalogPath = join(
 );
 const srcDir = join(import.meta.dirname, "../../../../src");
 const commandsDir = join(srcDir, "cli", "commands");
-const baseCommand = join(srcDir, "lib/oclif/base.ts");
+const telemetered = join(srcDir, "cli/telemetry/telemetered.ts");
 
 type PropertyDef = {
   type: string;
@@ -137,15 +136,15 @@ function commandId(file: string): string {
   return segments.join(":");
 }
 
-/** The dimensions each command passes to `recordTelemetry`, by command id. */
+/** The dimensions each command passes to `annotate`, by command id. */
 async function recordedDimensions(): Promise<Map<string, Set<string>>> {
   const files = (await readdir(commandsDir, { recursive: true })).filter((file) =>
     file.endsWith(".ts"),
   );
   const recorded = new Map<string, Set<string>>();
   for (const file of files) {
-    const keys = (await callsIn(join(commandsDir, file), calls("recordTelemetry"))).flatMap(
-      (call) => keysOf(call.arguments[0]),
+    const keys = (await callsIn(join(commandsDir, file), calls("annotate"))).flatMap((call) =>
+      keysOf(call.arguments[0]),
     );
     if (keys.length > 0) {
       const id = commandId(file);
@@ -155,29 +154,45 @@ async function recordedDimensions(): Promise<Map<string, Set<string>>> {
   return recorded;
 }
 
-/** Each lifecycle event, by the constant `BaseCommand` tracks it with. */
+/**
+ * The one fact each command keeps in its Vercel copy, by command id: the
+ * `static override readonly headline` the command declares.
+ */
+async function headlines(): Promise<Map<string, string>> {
+  const files = (await readdir(commandsDir, { recursive: true })).filter((file) =>
+    file.endsWith(".ts"),
+  );
+  const found = new Map<string, string>();
+  for (const file of files) {
+    const headline = (await readFile(join(commandsDir, file), "utf8")).match(
+      /static override readonly headline = "(\w+)"/,
+    );
+    if (headline?.[1] !== undefined) {
+      found.set(commandId(file), headline[1]);
+    }
+  }
+  return found;
+}
+
+/** Each lifecycle event, by the constant `Telemetered` tracks it with. */
 const LIFECYCLE_EVENTS = [
   ["CLI_COMMAND_STARTED", CLI_COMMAND_STARTED],
   ["CLI_COMMAND_COMPLETED", CLI_COMMAND_COMPLETED],
   ["CLI_COMMAND_FAILED", CLI_COMMAND_FAILED],
 ] as const;
 
-/** The properties `BaseCommand` adds to `commandEventProperties` where it tracks `constant`. */
+/** The properties `Telemetered` adds to `commandEventProperties` where it tracks `constant`. */
 async function lifecycleExtras(constant: string): Promise<string[]> {
   const tracks = await callsIn(
-    baseCommand,
+    telemetered,
     (call) =>
-      calls("track")(call) &&
+      calls("reportTrack")(call) &&
       call.arguments[0] !== undefined &&
       ts.isIdentifier(call.arguments[0]) &&
       call.arguments[0].text === constant,
   );
   return tracks.flatMap((track) => {
-    const bag = track.arguments[1];
-    if (bag && ts.isCallExpression(bag)) {
-      return keysOf(bag.arguments[3]);
-    }
-    return [];
+    return keysOf(track.arguments[1]);
   });
 }
 
@@ -363,13 +378,14 @@ describe("CLI telemetry against the catalog", () => {
     for (const [, event] of LIFECYCLE_EVENTS) {
       expect(events[event]?.destinations, event).toContain("vercel");
     }
-    expect(Object.fromEntries(VERCEL_COMMAND_DIMENSIONS)).toEqual(vercel?.dimensions ?? {});
-    for (const command of [...VERCEL_COMMAND_DIMENSIONS.keys(), "variable:list"]) {
-      const dimension = VERCEL_COMMAND_DIMENSIONS.get(command);
+    const declared = await headlines();
+    expect(Object.fromEntries(declared)).toEqual(vercel?.dimensions ?? {});
+    for (const command of [...declared.keys(), "variable:list"]) {
+      const dimension = declared.get(command);
       const listed = (vercel?.properties ?? []).flatMap((key) =>
         key !== DIMENSION ? [key] : dimension === undefined ? [] : [dimension],
       );
-      expect(vercelEventKeys(command), command).toEqual(listed);
+      expect(vercelEventKeys(dimension), command).toEqual(listed);
     }
   });
 

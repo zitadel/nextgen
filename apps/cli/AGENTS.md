@@ -133,8 +133,8 @@
     uses lives in that step's file.
   - A step never imports another step or a value from the command's `index.ts`. It takes what it
     needs through its constructor, which the command's `execute` fills when it builds the wizard,
-    and the command keeps its flags, refusals and telemetry (recorded through the observer given
-    to `.step(...)`) and emits the one result the wizard returns.
+    and the command keeps its flags, refusals and telemetry (reported through the `watch` its
+    `this.watchWizard(...)` gives the wizard) and emits the one result the wizard returns.
 - Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
   `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
@@ -221,7 +221,8 @@
   | talks to one through `--server` or its environment | `ServerCommand(Base)` |
   | may have to ask which server | `ChoosingServerCommand(Base)` |
   | is about the local server | `LocalServerCommand(Base, folderRule)` |
-  | is destructive | `Destructive(...)`, outermost |
+  | is destructive | `Destructive(...)`, around the rest |
+  | reports its run | `Telemetered(...)`, outermost |
 
   A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
   the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
@@ -287,7 +288,9 @@
   global flag, or a deviation, in `SKILL.md`'s invocation rules.
 - Declare an environment variable that sets what a global flag sets as a
   `FlagVariable` beside the code that reads it, read it by its `name`, and add
-  it to `FLAG_VARIABLES` (`src/lib/oclif/base.ts`).
+  it to `FLAG_VARIABLES` (`src/lib/oclif/base.ts`); a flag a mixin adds (`--telemetry`)
+  keeps its variables in the mixin's static `flagVariables`, which the reference reads
+  from each command.
 
 ## Telemetry
 
@@ -315,7 +318,9 @@ Anonymous product analytics: a copy of each event to Vercel Web Analytics
   `describe()`, for what a command knows about its run; a layer or a command overrides it
   and keeps `super.describe()`.
 - Keep no table that maps command ids, step keys or properties to events: a command
-  says what it knows in its own `describe()` and `annotate()` calls.
+  says what it knows in its own `describe()` and `annotate()` calls. The one place a step
+  key meets an event name is the `step` function a wizard command hands to
+  `this.watchWizard`, kept in that command's `shared.ts`.
 - A wizard command passes `this.watchWizard({ flow, step })` as the wizard's `watch`;
   `step` is one function in the command that names a step for the event catalog and
   returns the choice the step settled.

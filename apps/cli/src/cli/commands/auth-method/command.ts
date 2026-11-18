@@ -1,5 +1,5 @@
 import type { Interfaces } from "@oclif/core";
-import { IDP_PROVIDERS } from "@zitadel/config/idp";
+import { CUSTOM_PROVIDER, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
@@ -326,6 +326,22 @@ const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"
 };
 
 /**
+ * The kind of identity provider a command was asked about: the catalog's name
+ * for it, or `custom` for any other, never the name a developer gave a
+ * connection.
+ *
+ * @param provider - What `--provider` was given.
+ * @returns The kind, or nothing when none was given.
+ */
+export function providerKind(provider: unknown): string | undefined {
+  if (typeof provider !== "string") {
+    return undefined;
+  }
+
+  return (IDP_PROVIDERS as readonly string[]).includes(provider) ? provider : CUSTOM_PROVIDER;
+}
+
+/**
  * What the `auth-method` commands share (ADR 070): finding the schema, asking
  * before a change leaves nobody able to sign in, writing the change, saying
  * what the configuration said about it, and the result shape. The changes and
@@ -340,36 +356,6 @@ const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"
 export abstract class AuthMethodCommand extends Telemetered(
   Destructive(ServerCommand(EnvironmentCommand)),
 ) {
-  /**
-   * Which sign-in method the command changes, taken from its name, and that it
-   * ran on its own.
-   *
-   * @returns The facts, with the layers below.
-   */
-  protected override describe(): Facts {
-    return {
-      ...super.describe(),
-      method: this.id?.split(":")[1],
-      entry_point: "standalone",
-    };
-  }
-
-  /**
-   * The kind of identity provider the command was asked about: the catalog's
-   * name for it, or `custom` for any other, never the name a developer gave a
-   * connection.
-   *
-   * @param provider - What `--provider` was given.
-   * @returns The kind, or nothing when none was given.
-   */
-  protected providerKind(provider: unknown): string | undefined {
-    if (typeof provider !== "string") {
-      return undefined;
-    }
-
-    return (IDP_PROVIDERS as readonly string[]).includes(provider) ? provider : "custom";
-  }
-
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.
@@ -406,6 +392,20 @@ export abstract class AuthMethodCommand extends Telemetered(
   static override meta = {
     environment: false,
   };
+
+  /**
+   * Which sign-in method the command changes, taken from its name, and that it
+   * ran on its own.
+   *
+   * @returns The facts, with the layers below.
+   */
+  protected override describe(): Facts {
+    return {
+      ...super.describe(),
+      method: this.id?.split(":")[1],
+      entry_point: "standalone",
+    };
+  }
 
   /**
    * The schema this run changes and the login flows that run against it. Every

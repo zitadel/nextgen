@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
+import { AuthMethodCommand, providerKind } from "@/cli/commands/auth-method/command";
 import { CANCELLED } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
@@ -60,7 +60,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
    *   chosen, or the change would leave no way to sign in and nobody agreed to it.
    */
   protected async execute({ flags }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
-    this.annotate({ provider_type: this.providerKind(flags.provider) });
+    this.annotate({ provider_type: providerKind(flags.provider) });
     const target = await this.loadSchemaTarget(flags);
     const config = target.config;
     const schema = target.schema;

@@ -238,6 +238,18 @@ describe("diffStep", () => {
       expect(result?.learned?.changedConfiguration).toEqual(["user_schema", "branding"]);
     });
 
+    it("does not count a README or a policy's test file as a changed policy", async ({ dir }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, {
+        ".zitadel/policies/README.md": "notes\n",
+        ".zitadel/policies/auth.factor.password.set.test.json": "{}\n",
+      });
+
+      const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(result?.learned?.changedConfiguration).toEqual([]);
+    });
+
     it("records no kind of configuration when the primary origins serve different releases", async ({
       dir,
     }) => {

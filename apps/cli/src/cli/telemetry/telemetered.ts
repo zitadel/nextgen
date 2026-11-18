@@ -80,7 +80,8 @@ export type FlowReport = Readonly<{
  * @returns The class, reporting on its run.
  */
 export function Telemetered<
-  TBase extends CommandClass<BaseCommand> & Pick<typeof BaseCommand, "baseFlags" | "enableJsonFlag">,
+  TBase extends CommandClass<BaseCommand> &
+    Pick<typeof BaseCommand, "baseFlags" | "enableJsonFlag">,
 >(Base: TBase) {
   abstract class Reporting extends Base {
     // oclif reads a command's statics up the chain of classes only while each
@@ -243,7 +244,8 @@ export function Telemetered<
     }
 
     /**
-     * Sends what is still unsent before the process ends.
+     * Sends what is still unsent before the process ends, once the command's
+     * own cleanup (the interrupt listener, the narration) is done.
      *
      * @remarks
      * The flush is bounded, so a hung or firewalled network adds at most about
@@ -253,11 +255,11 @@ export function Telemetered<
      * passed.
      */
     protected override async finally(error: Error | undefined): Promise<void> {
+      await super.finally(error);
       await this.reportClient?.shutdown(1000).catch(() => undefined);
       if (this.reportClient?.enabled) {
         setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
       }
-      await super.finally(error);
     }
 
     private reportBegin(reporting: boolean | undefined): void {
@@ -278,7 +280,7 @@ export function Telemetered<
       if (client.isFirstRun) {
         client.profile(deviceProfileProperties(this.meta, client.distinctId), { $ip: 0 });
         if (this.reportInteractive()) {
-          process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
+          this.logToStderr(FIRST_RUN_NOTICE);
         }
       }
     }

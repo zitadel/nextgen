@@ -1,8 +1,9 @@
 import { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
+import { Telemetered } from "@/cli/telemetry/telemetered";
 import { BaseCommand } from "@/lib/oclif/base";
-import { CLI_COMMAND_STARTED } from "@/lib/oclif/command-telemetry";
+import { CLI_COMMAND_STARTED } from "@/cli/telemetry/properties";
 import type { JsonEnvelope } from "@/lib/oclif/types";
 import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
@@ -36,7 +37,7 @@ class RecordingTelemetry {
  * building it opens telemetry, so a server worked out inside `execute` reaches
  * the first event too late.
  */
-class Sourced extends BaseCommand {
+class Sourced extends Telemetered(BaseCommand) {
   public static override readonly id = "sourced-test";
   public readonly recorder = new RecordingTelemetry();
 
@@ -122,7 +123,7 @@ describe("whether a run's output is coloured", () => {
     })) {
       vi.stubEnv(name, value);
     }
-    const coloured = new Coloured(["--no-telemetry", ...argv], config);
+    const coloured = new Coloured(argv, config);
 
     await onTerminalReadingAFile(() => {
       return coloured.run();

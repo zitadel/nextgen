@@ -7,7 +7,7 @@ import type {
   StepContext,
   StepResult,
 } from "@/lib/publish/pipeline";
-import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, POLICY_TEST_SUFFIX } from "@/lib/zitadel";
 
 /**
  * The directories whose changes can lock existing users out, which decide
@@ -110,14 +110,13 @@ export const diffStep: Step = {
     const note = noteOnReleases(releases.size, short);
     const unknown = `No diff available: ${short} is not in this repository's history.`;
 
-    const touched = await diffConfigFilesAgainst(ctx.cwd, sha, []);
-    // Origins serving different releases each move from their own baseline, so
-    // a diff against the newest says nothing about the others.
-    const learned = learnedFrom(touched, releases.size);
-
     const referenced = ctx.config.branding.all.flatMap((branding) => {
       return branding.listReferencedPaths(ctx.store);
     });
+    const touched = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
+    // Origins serving different releases each move from their own baseline, so
+    // a diff against the newest says nothing about the others.
+    const learned = learnedFrom(touched, releases.size, referenced);
     if (ctx.json) {
       const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
       if (files === null) {
@@ -158,7 +157,11 @@ function noteOnReleases(releases: number, short: string): string | undefined {
  * @returns Whether a schema or flow changed, or nothing when the diff cannot
  *   say: there was none, or the origins serve different releases.
  */
-function learnedFrom(touched: readonly DiffedFile[] | null, releases: number): Learned {
+function learnedFrom(
+  touched: readonly DiffedFile[] | null,
+  releases: number,
+  referenced: readonly string[],
+): Learned {
   if (touched === null || releases !== 1) {
     return {};
   }
@@ -170,11 +173,16 @@ function learnedFrom(touched: readonly DiffedFile[] | null, releases: number): L
       });
     });
   });
-  const changedConfiguration = CONFIGURATION_TYPES.filter(([directory]) => {
-    return touched.some((file) => {
-      return [file.path, file.previous_path ?? ""].some((path) => {
-        return path.startsWith(`${directory}/`);
-      });
+  // What a release carries: not a README, not a policy's test file, and an
+  // asset a branding file references counts as branding wherever it lives.
+  const carried = touched.flatMap((file) => {
+    return [file.path, file.previous_path ?? ""].filter((path) => {
+      return path !== "" && !path.endsWith("README.md") && !path.endsWith(POLICY_TEST_SUFFIX);
+    });
+  });
+  const changedConfiguration = CONFIGURATION_TYPES.filter(([directory, type]) => {
+    return carried.some((path) => {
+      return path.startsWith(`${directory}/`) || (type === "branding" && referenced.includes(path));
     });
   }).map(([, type]) => {
     return type;

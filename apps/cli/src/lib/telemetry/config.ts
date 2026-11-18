@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 
 import { SERVER } from "@/constants";
+import { Runtime } from "@/lib/runtime";
 import { ciFlag } from "./dimensions/ci-flag";
 
 /**
@@ -47,8 +48,9 @@ export type TelemetryEndpoint = { readonly host: string; readonly path: string }
  * `ZITADEL_TELEMETRY_ENV` selects `development` or `production` explicitly and
  * wins outright. With no explicit selection the default is `production`, so the
  * single generic build (no channel stamp) reports real user traffic with no
- * per-user env — EXCEPT that an unattended CI/automation run is development
- * instead. CI runs normally opt out entirely (`DO_NOT_TRACK` /
+ * per-user env — EXCEPT that an unattended CI/automation run, a run in the CLI's
+ * own development mode (`ZITADEL_CLI_DEV`) and a run from a checkout of its
+ * source are development instead. CI runs normally opt out entirely (`DO_NOT_TRACK` /
  * `ZITADEL_TELEMETRY=0`, which our own CI sets); the CI check is a belt-and-
  * braces guard so that if telemetry is somehow left on in an automated
  * environment, it can never pollute production data.
@@ -70,22 +72,10 @@ export function resolveChannel(env: NodeJS.ProcessEnv): "development" | "product
   }
   // Nor a run of the CLI's own development mode, nor one from a checkout of its
   // source instead of the installed package.
-  if (isDevelopmentFlag(env.ZITADEL_CLI_DEV) || !installedFromPackage()) {
+  if (Runtime.current().isDevelopment(env) || !installedFromPackage()) {
     return "development";
   }
   return "production";
-}
-
-/**
- * Whether a development switch is on: anything but unset, empty, `0` or `false`.
- *
- * @param value - The switch's value.
- * @returns Whether it is on.
- */
-function isDevelopmentFlag(value: string | undefined): boolean {
-  const flag = value?.trim().toLowerCase();
-
-  return flag !== undefined && flag !== "" && flag !== "0" && flag !== "false";
 }
 
 /**
@@ -122,29 +112,32 @@ const DEVELOPMENT: Project = { token: "0fb432b08a9797b87b0eebcbee11706e", region
 /**
  * The project a run sends to: a `ZITADEL_TELEMETRY_TOKEN` override, which is
  * taken to live in the EU region unless `ZITADEL_TELEMETRY_REGION` says
- * otherwise; else the production project for a production run and the
- * development project for any other.
+ * otherwise; else the production project for a production run, the development
+ * project for a development run, and none for a run in CI, which sends nothing.
  *
  * @param env - The environment the run reads.
- * @returns The project to send to.
+ * @returns The project to send to, if there is one.
  */
-function resolveProject(env: NodeJS.ProcessEnv): Project {
+function resolveProject(env: NodeJS.ProcessEnv): Project | undefined {
   const override = env.ZITADEL_TELEMETRY_TOKEN?.trim();
   if (override) {
     return { token: override, region: "eu" };
   }
+  if (resolveChannel(env) === "production") {
+    return PRODUCTION;
+  }
 
-  return resolveChannel(env) === "production" ? PRODUCTION : DEVELOPMENT;
+  return ciFlag.value(env) ? undefined : DEVELOPMENT;
 }
 
 /**
  * Resolve the Mixpanel ingestion token.
  *
  * @param env - The environment the run reads.
- * @returns The token of the project the run sends to.
+ * @returns The token of the project the run sends to, if it sends to one.
  */
 export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefined {
-  return resolveProject(env).token;
+  return resolveProject(env)?.token;
 }
 
 /**
@@ -157,7 +150,7 @@ export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefine
  */
 export function resolveTelemetryEndpoint(env: NodeJS.ProcessEnv): TelemetryEndpoint {
   const named = env.ZITADEL_TELEMETRY_REGION?.trim().toLowerCase();
-  const region = named === "us" || named === "eu" ? named : resolveProject(env).region;
+  const region = named === "us" || named === "eu" ? named : (resolveProject(env)?.region ?? "eu");
 
   return ENDPOINTS[region];
 }
