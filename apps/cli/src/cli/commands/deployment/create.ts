@@ -10,6 +10,7 @@ import { relatedFlags } from "@/lib/suggestion/relations";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The release `--release` deploys. The schema is the API spec's own, so a
@@ -55,7 +56,7 @@ const MESSAGE = {
  * `zitadel deployment create` — deploy an existing release to the project's
  * origins.
  */
-export default class DeploymentCreate extends EnvironmentCommand {
+export default class DeploymentCreate extends ServerCommand(EnvironmentCommand) {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;

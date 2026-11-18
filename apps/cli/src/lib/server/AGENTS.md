@@ -39,7 +39,7 @@ manages the wrong server: see [`local/AGENTS.md`](local/AGENTS.md).
 - Claiming a project is not a server concern: it lives in `lib/claim` and asks
   for an `AdminSession`. `Clock` is not either: it is `lib/clock.ts`.
 - Setup asks about this machine through the `LocalMachine` interface
-  (`local-machine.ts`). Production passes `SystemMachine`; tests pass the real,
+  (`local-machine.ts`). Production passes `RealMachine`; tests pass the real,
   in-memory `FakeMachine` (`tests/helpers/local-machine.ts`). That is why
   setup's tests need no `vi.mock` of the server.
 - `doctor` owns its own probes (`DoctorMachine`, `src/cli/commands/doctor/checks/machine.ts`);
@@ -87,7 +87,7 @@ namespace over loose functions. They disagreed on order, and this is the call:
 ## The commands
 
 The commands live in [`src/cli/commands/server`](../../cli/commands/server/AGENTS.md)
-and extend one `ServerCommand`. They call `plan()`, `launch()`, `stop()`,
+and extend `LocalServerCommand(...)`. They call `plan()`, `launch()`, `stop()`,
 `reset()` and `follow()` and render the answer; none builds a path, a container
 name or an address.
 

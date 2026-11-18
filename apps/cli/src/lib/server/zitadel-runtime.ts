@@ -1,7 +1,7 @@
 import { readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { DEFAULT_SERVER } from "@zitadel/config/server";
+import { SERVER } from "@/constants";
 import type { Parsed } from "@zitadel/config/idp";
 
 import { ZitadelError, errorMessage } from "@/lib/errors";
@@ -107,11 +107,11 @@ export type ResolveServerInput = {
  */
 export abstract class ZitadelRuntime {
   /**
-   * Server URL used when nothing else resolves (`@zitadel/config/server`, which
-   * the console shares). Also surfaced in hints and the interactive setup
+   * Server URL used when nothing else resolves (`SERVER` in `src/constants.ts`).
+   * Also surfaced in hints and the interactive setup
    * prompt as the suggested value.
    */
-  static readonly DEFAULT: string = DEFAULT_SERVER;
+  static readonly DEFAULT: string = SERVER;
 
   /** The runtime's address, as it was given. */
   readonly address: string;
@@ -232,8 +232,7 @@ export abstract class ZitadelRuntime {
   abstract get kind(): RuntimeKind;
 
   /**
-   * Whether this is Zitadel's hosted cloud: the default server or a host under
-   * `zitadel.cloud`.
+   * Whether this is Zitadel's hosted cloud: the default server.
    *
    * @returns `true` when the address is a hosted cloud's.
    */
@@ -284,8 +283,7 @@ export abstract class ZitadelRuntime {
  */
 export class CloudRuntime extends ZitadelRuntime {
   /**
-   * @returns `cloud` for Zitadel's hosted cloud (the default server or a host
-   *   under `zitadel.cloud`), `local` for an address on this machine,
+   * @returns `cloud` for Zitadel's hosted cloud (the default server), `local` for an address on this machine,
    *   `self_hosted` for any other server, `unknown` for an address that is not
    *   a URL.
    */
@@ -301,11 +299,7 @@ export class CloudRuntime extends ZitadelRuntime {
       return "local";
     }
 
-    if (
-      hostname === new URL(ZitadelRuntime.DEFAULT).hostname ||
-      hostname === "zitadel.cloud" ||
-      hostname.endsWith(".zitadel.cloud")
-    ) {
+    if (hostname === new URL(ZitadelRuntime.DEFAULT).hostname) {
       return "cloud";
     } else {
       return "self_hosted";

@@ -7,5 +7,6 @@ export type {
   InteractiveOptions,
   Resolved,
   ResolveEnvironmentInput,
+  ServerAddresses,
 } from "./types";
 export { Environment } from "./environment";

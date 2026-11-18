@@ -40,10 +40,6 @@ class Sourced extends BaseCommand {
   public static override readonly id = "sourced-test";
   public readonly recorder = new RecordingTelemetry();
 
-  public static override meta = {
-    resolveServer: false,
-  };
-
   protected override createTelemetry(_deps: TelemetryDeps): Telemetry {
     return this.recorder as unknown as Telemetry;
   }
@@ -81,10 +77,6 @@ describe("the server a run is about", () => {
 /** A command that answers with whether this run's output is coloured. */
 class Coloured extends BaseCommand {
   public static override readonly id = "coloured-test";
-
-  public static override meta = {
-    resolveServer: false,
-  };
 
   public answer: boolean | undefined;
 
