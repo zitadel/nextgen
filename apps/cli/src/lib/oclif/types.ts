@@ -96,8 +96,11 @@ export type GlobalOptions = {
  */
 export type FlagVariable = {
   readonly name: string;
-  /** The global flag it stands in for, without `--`. */
-  readonly flag: keyof (typeof BaseCommand)["baseFlags"];
+  /**
+   * The global flag it stands in for, without `--`: a base flag, or `server`,
+   * which `ServerCommand` adds to every command.
+   */
+  readonly flag: keyof (typeof BaseCommand)["baseFlags"] | "server";
   readonly description: string;
   /** How it ranks against the flag and the other sources of the setting. */
   readonly precedence: string;

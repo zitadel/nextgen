@@ -28,7 +28,7 @@ class WarningCommand extends BaseCommand {
   }
 
   public async fail(error: Error): Promise<void> {
-    await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
+    await this.toMeta({ "no-telemetry": true }, { source: "mock" });
     try {
       await this.catch(error);
     } catch {
@@ -42,7 +42,7 @@ class WarningCommand extends BaseCommand {
   public readonly json: unknown[] = [];
 
   public async finish(result: CommandResult): Promise<JsonEnvelope> {
-    await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
+    await this.toMeta({ "no-telemetry": true }, { source: "mock" });
     return this.emit(result);
   }
 }

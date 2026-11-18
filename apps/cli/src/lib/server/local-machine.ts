@@ -33,7 +33,7 @@ export interface LocalMachine {
 }
 
 /** This machine, answering from its sockets, its records and the CLI's own install. */
-export class SystemMachine implements LocalMachine {
+export class RealMachine implements LocalMachine {
   private readonly ports: Pick<TcpPorts, "isFree">;
 
   /**

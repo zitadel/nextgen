@@ -1117,9 +1117,9 @@ DESCRIPTION
   Bind an environment to a project, creating the project if needed.
 
 EXAMPLES
-  $ zitadel env add production --server https://api.zitadel.cloud --app-url https://app.acme.com
+  $ zitadel env add production --server https://preview.zitadel.com --app-url https://app.acme.com
 
-  $ zitadel env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T
+  $ zitadel env add staging --server https://preview.zitadel.com --project proj_01K9AA9M3K7E2QX8VB4T
 ```
 
 ## `zitadel env list`

@@ -234,7 +234,7 @@ describe("loopbackReach", () => {
     await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
     await writeRuntimeMetadata(cwd, binaryRuntime(cwd));
     await expect(loopbackReach(cwd, "http://localhost:9999")).resolves.toBe("unknown");
-    await expect(loopbackReach(cwd, "https://example.zitadel.cloud")).resolves.toBe("unknown");
+    await expect(loopbackReach(cwd, "https://example.zitadel.com")).resolves.toBe("unknown");
   });
 });
 

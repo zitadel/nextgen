@@ -238,7 +238,7 @@ function meta(): GlobalOptions {
     force: false,
     command: "setup",
     cliVersion: "0.1.0",
-    source: "https://api.zitadel.cloud",
+    source: "https://preview.zitadel.com",
     verbose: false,
     debug: false,
     env: {},

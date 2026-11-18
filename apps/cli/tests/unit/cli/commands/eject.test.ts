@@ -19,7 +19,7 @@ function eject(cwd: string, extra: string[] = []) {
     cwd,
     "--json",
     "--server",
-    "https://api.zitadel.cloud",
+    "https://preview.zitadel.com",
     ...extra,
   ]);
 }

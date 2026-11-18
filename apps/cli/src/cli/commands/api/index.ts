@@ -31,6 +31,7 @@ import { json, prose, type Rendering } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -220,7 +221,7 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Destructive(EnvironmentCommand) {
+export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override group = CommandGroups.apiAndEvents;

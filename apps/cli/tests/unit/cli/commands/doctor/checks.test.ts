@@ -42,7 +42,7 @@ const PROJECT_ID = "proj-001";
 /**
  * The server the config names: the hosted cloud.
  */
-const CLOUD = "https://api.zitadel.cloud";
+const CLOUD = "https://preview.zitadel.com";
 
 /**
  * The issuer a Next project's `.env.local` names.

@@ -8,6 +8,7 @@ import { Destructive, Settled } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { filled, type Refused, taken } from "@/lib/oclif/flags";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing
@@ -30,7 +31,7 @@ const URL = {
  * history. Idempotent on the server, but destructive from the caller's point
  * of view.
  */
-export default class PreviewRm extends Destructive(PreviewCommand) {
+export default class PreviewRm extends Destructive(ServerCommand(PreviewCommand)) {
   static override description = "Remove a live preview from the project.";
   static override group = CommandGroups.releases;
   static override groupOrder = 2;

@@ -57,7 +57,7 @@ import {
 } from "@/lib/oclif/crud";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = "https://preview.zitadel.com";
 const OPERATIONS = ["equals", "greater_than"] as const;
 
 /**

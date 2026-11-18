@@ -16,6 +16,7 @@ import { VariableView, type VariableType } from "@/lib/variable";
 import { warnings } from "@/lib/ui";
 
 import { variableNameArg } from "./name";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** How a secret asked to be stored as another type is refused. */
 const SECRET_AS_STRING_REFUSAL = {
@@ -50,7 +51,9 @@ const VALUE_TYPE_REFUSAL = {
  * the primary kind only, removing any preview value so a preview never keeps a
  * plaintext copy. `--preview` writes the preview kind alone.
  */
-export default class VariableSet extends Tabulatable(Promptable(EnvironmentCommand)) {
+export default class VariableSet extends Tabulatable(
+  Promptable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;
