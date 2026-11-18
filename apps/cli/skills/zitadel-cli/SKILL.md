@@ -197,7 +197,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
   it (`ZITADEL_TELEMETRY=0`, or the standard `DO_NOT_TRACK`, in their
   environment), but that is the user's environment choice, not a flag to attach
-  to every call.
+  to every call. The CLI prints a one-time notice about it only in an interactive
+  terminal, so a run you drive never shows it: when you first run the CLI for a
+  user, tell them it sends anonymous usage data (never project details, server
+  URLs or file contents), that it records the coding agent it runs inside, and
+  how to turn it off. Never turn it off for them without being asked.
 - **Flag conventions.** Flags follow what a model already expects from curl, ssh
   and wget: `--help`/`-h` (also `zitadel api help`), `--version`, `-v`/`--verbose`,
   kebab-case long flags, both `--flag value` and `--flag=value`, and
