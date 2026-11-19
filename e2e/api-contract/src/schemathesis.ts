@@ -63,7 +63,14 @@ export class Schemathesis {
     await copyFile(join(import.meta.dirname, "..", "hooks.py"), join(workDir, "hooks.py"));
     const container = await new GenericContainer(SCHEMATHESIS_IMAGE)
       .withEntrypoint(["sleep", String(IDLE_SECONDS)])
-      .withBindMounts([{ source: workDir, target: "/work", mode: "rw" }])
+      .withBindMounts([
+        { source: workDir, target: "/work", mode: "rw" },
+        {
+          source: join(import.meta.dirname, "..", "patches", "_hypothesis.py"),
+          target: "/app/schemathesis/specs/openapi/_hypothesis.py",
+          mode: "ro",
+        },
+      ])
       .withExtraHosts([{ host: HOST_ALIAS, ipAddress: "host-gateway" }])
       .start();
     return new Schemathesis(container, workDir);
