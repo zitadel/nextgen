@@ -75,6 +75,8 @@ properties:
                 const: equals
               value:
                 type: string
+                pattern: '^[^\x00]*$'
+                x-zitadel-pattern-message: "must not contain a NUL character"
           else:
             $ref: ../../../components/schemas/filter-text-value.yaml
       properties:

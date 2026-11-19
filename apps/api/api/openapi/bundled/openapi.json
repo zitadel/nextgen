@@ -18394,7 +18394,9 @@
                         "const": "equals"
                       },
                       "value": {
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^[^\\x00]*$",
+                        "x-zitadel-pattern-message": "must not contain a NUL character"
                       }
                     }
                   },
