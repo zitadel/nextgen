@@ -126,6 +126,12 @@ type AuthAttemptCreatedPayload struct{}
 // AuthAttemptHandedOffPayload is empty; session_id lives on the event column.
 type AuthAttemptHandedOffPayload struct{}
 
+// AuthRequestCreatedPayload names the OAuth client. State, the code
+// challenge and the redirect URI come from the request and stay out.
+type AuthRequestCreatedPayload struct {
+	ClientID string `json:"client_id"`
+}
+
 type AuthCheckPayload struct {
 	CheckID       string `json:"check_id"`
 	CheckType     string `json:"check_type,omitempty"`

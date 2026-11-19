@@ -366,6 +366,8 @@ webhooks:
     $ref: endpoints/events/webhooks/auth-factor-passkey-enrolled.yaml
   auth.factor.password.set:
     $ref: endpoints/events/webhooks/auth-factor-password-set.yaml
+  auth.request.created:
+    $ref: endpoints/events/webhooks/auth-request-created.yaml
   auth.sso.authorization.failed:
     $ref: endpoints/events/webhooks/auth-sso-authorization-failed.yaml
   auth.sso.exchange.failed:

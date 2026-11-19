@@ -273,15 +273,16 @@ func TestOAuthPlatformIssuerMetadata(t *testing.T) {
 
 // deployBundle builds a release from bundle and deploys it to the project's
 // primary origins.
-func deployBundle(t *testing.T, projectID string, bundle service.BuildReleaseInput) {
+func deployBundle(t *testing.T, projectID string, bundle service.BuildReleaseInput) *domain.Deployment {
 	t.Helper()
 	built, err := harness.EnsureReleaseService(t).Build(t.Context(), bundle)
 	require.NoError(t, err)
-	_, err = harness.EnsureDeploymentService(t).Deploy(t.Context(), service.DeployInput{
+	deployed, err := harness.EnsureDeploymentService(t).Deploy(t.Context(), service.DeployInput{
 		ProjectID: projectID,
 		ReleaseID: built.Release.ID,
 		To:        domain.DeployToPrimary(),
 		Reason:    domain.DeploymentReasonDeploy,
 	})
 	require.NoError(t, err)
+	return deployed.Deployment
 }

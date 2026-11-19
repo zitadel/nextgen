@@ -41,6 +41,10 @@ type AuthFactorPasswordSetRes interface {
 	authFactorPasswordSetRes()
 }
 
+type AuthRequestCreatedRes interface {
+	authRequestCreatedRes()
+}
+
 type AuthSsoAuthorizationFailedRes interface {
 	authSsoAuthorizationFailedRes()
 }

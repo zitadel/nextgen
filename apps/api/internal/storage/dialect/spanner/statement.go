@@ -33,6 +33,7 @@ type statements struct {
 	variableStatements
 	variableSetStatements
 	claimStatements
+	authRequestStatements
 	invitationStatements
 	resourceScopeStatements
 	searchEntryStatements
@@ -81,6 +82,7 @@ func newStatements(db queryExecutor) statements {
 		variableStatements:            newVariableStatements(db),
 		variableSetStatements:         newVariableSetStatements(db),
 		claimStatements:               newClaimStatements(db),
+		authRequestStatements:         newAuthRequestStatements(db),
 		invitationStatements:          newInvitationStatements(db),
 		resourceScopeStatements:       newResourceScopeStatements(db),
 		searchEntryStatements:         newSearchEntryStatements(db),
