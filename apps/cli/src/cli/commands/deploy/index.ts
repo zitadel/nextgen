@@ -136,12 +136,23 @@ const NO_PRIMARY_ORIGIN_REFUSAL = {
  *
  * @param deployed - The directory that was deployed.
  * @param message - The message the deploy was given, if any.
- * @returns `git add` then `git commit` of `.zitadel/`, one after the other.
+ * @param referenced - The files the release inlines from outside `.zitadel/`.
+ * @returns `git add` then `git commit` of `.zitadel/` and those files, one after the other.
  */
-function commitConfig(deployed: string, message: string | undefined): SuggestedCommand {
+function commitConfig(
+  deployed: string,
+  message: string | undefined,
+  referenced: readonly string[],
+): SuggestedCommand {
+  const paths = [
+    ".zitadel",
+    ...referenced.map((path) => {
+      return Cmd.quote(path);
+    }),
+  ];
   const where = resolve(deployed) === process.cwd() ? [] : ["-C", Cmd.quote(deployed)];
   return shellSteps(
-    shellCommand("git", ...where, "add", ".zitadel"),
+    shellCommand("git", ...where, "add", ...paths),
     shellCommand(
       "git",
       ...where,
@@ -149,7 +160,7 @@ function commitConfig(deployed: string, message: string | undefined): SuggestedC
       "-m",
       Cmd.quote(message ?? "<what changed>"),
       "--",
-      ".zitadel",
+      ...paths,
     ),
   );
 }
@@ -355,7 +366,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       next: {
         commands: [
           this.suggest({ id: "deployment:list" }),
-          ...(configUncommitted ? [commitConfig(this.cwd, message)] : []),
+          ...(configUncommitted ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
         ],
       },
     });

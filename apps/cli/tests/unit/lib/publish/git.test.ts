@@ -194,6 +194,15 @@ describe("bundleIsDirty", () => {
     expect(dirty).toBe(true);
   });
 
+  it("is true for a bundle file renamed out of the bundle", async ({ dir }) => {
+    await aCleanCommit(dir);
+    await git(dir, "mv", MARKER, "marker.json");
+
+    const dirty = await bundleIsDirty(dir);
+
+    expect(dirty).toBe(true);
+  });
+
   it("is false for that file when nothing inlines it", async ({ dir }) => {
     await aCleanCommit(dir);
     await write(dir, { "public/login.liquid": "<p>edited</p>\n" });

@@ -106,6 +106,12 @@ export type PreparedRelease = {
   readonly lockouts: readonly Lockout[];
   readonly gitSha: string | undefined;
   readonly gitDirty: boolean;
+
+  /**
+   * The project-relative files the bundle inlines from outside `.zitadel/`,
+   * which a commit of the release's files has to include.
+   */
+  readonly referenced: readonly string[];
 };
 
 /**
@@ -331,6 +337,7 @@ export class Publisher {
       lockouts: outcome.lockouts,
       gitSha: sha ?? undefined,
       gitDirty: dirty,
+      referenced,
     };
   }
 

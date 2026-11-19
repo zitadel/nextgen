@@ -143,7 +143,10 @@ export async function bundleIsDirty(
   );
 
   return files.some((file) => {
-    return isCarriedByRelease(file.path, referenced);
+    return (
+      isCarriedByRelease(file.path, referenced) ||
+      (file.from !== undefined && isCarriedByRelease(file.from, referenced))
+    );
   });
 }
 
