@@ -20111,6 +20111,26 @@
           }
         }
       },
+      "oauthset-not_found": {
+        "description": "Oauth settings: not found\n\nError code: oauthset.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "oauthset.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "oauth-settings": {
         "x-meta-schema": true,
         "type": "object",
@@ -27812,6 +27832,13 @@
           "message": "branding: missing project id"
         }
       },
+      "oauthset-not_found": {
+        "summary": "oauthset.not_found",
+        "value": {
+          "code": "oauthset.not_found",
+          "message": "oauth settings: not found"
+        }
+      },
       "idp-field_immutable": {
         "summary": "idp.field_immutable",
         "value": {
@@ -34401,6 +34428,9 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/oauthset-not_found"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -34413,6 +34443,7 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "oauthset.not_found": "#/components/schemas/oauthset-not_found",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
                 }
@@ -34427,6 +34458,9 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "oauthset.not_found": {
+                "$ref": "#/components/examples/oauthset-not_found"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"

@@ -1,9 +1,5 @@
 [
   {
-    "operation": "GET /oauth_settings/{oauth_settings_id}",
-    "check": "Server error"
-  },
-  {
     "operation": "POST /users/{user_id}/passkeys/registrations",
     "check": "Schema-valid request rejected"
   },

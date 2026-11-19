@@ -40168,6 +40168,7 @@ type GetOAuthSettingsErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
 	NotImplemented   NotImplemented
+	OauthsetNotFound OauthsetNotFound
 	ReqInvalid       ReqInvalid
 	Unavailable      Unavailable
 }
@@ -40180,6 +40181,7 @@ const (
 	AuthUnauthorizedGetOAuthSettingsErrorResponse GetOAuthSettingsErrorResponseType = "auth.unauthorized"
 	InternalGetOAuthSettingsErrorResponse         GetOAuthSettingsErrorResponseType = "internal"
 	NotImplementedGetOAuthSettingsErrorResponse   GetOAuthSettingsErrorResponseType = "not_implemented"
+	OauthsetNotFoundGetOAuthSettingsErrorResponse GetOAuthSettingsErrorResponseType = "oauthset.not_found"
 	ReqInvalidGetOAuthSettingsErrorResponse       GetOAuthSettingsErrorResponseType = "req.invalid"
 	UnavailableGetOAuthSettingsErrorResponse      GetOAuthSettingsErrorResponseType = "unavailable"
 )
@@ -40197,6 +40199,11 @@ func (s GetOAuthSettingsErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether GetOAuthSettingsErrorResponse is NotImplemented.
 func (s GetOAuthSettingsErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetOAuthSettingsErrorResponse
+}
+
+// IsOauthsetNotFound reports whether GetOAuthSettingsErrorResponse is OauthsetNotFound.
+func (s GetOAuthSettingsErrorResponse) IsOauthsetNotFound() bool {
+	return s.Type == OauthsetNotFoundGetOAuthSettingsErrorResponse
 }
 
 // IsReqInvalid reports whether GetOAuthSettingsErrorResponse is ReqInvalid.
@@ -40269,6 +40276,27 @@ func (s GetOAuthSettingsErrorResponse) GetNotImplemented() (v NotImplemented, ok
 func NewNotImplementedGetOAuthSettingsErrorResponse(v NotImplemented) GetOAuthSettingsErrorResponse {
 	var s GetOAuthSettingsErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetOauthsetNotFound sets GetOAuthSettingsErrorResponse to OauthsetNotFound.
+func (s *GetOAuthSettingsErrorResponse) SetOauthsetNotFound(v OauthsetNotFound) {
+	s.Type = OauthsetNotFoundGetOAuthSettingsErrorResponse
+	s.OauthsetNotFound = v
+}
+
+// GetOauthsetNotFound returns OauthsetNotFound and true boolean if GetOAuthSettingsErrorResponse is OauthsetNotFound.
+func (s GetOAuthSettingsErrorResponse) GetOauthsetNotFound() (v OauthsetNotFound, ok bool) {
+	if !s.IsOauthsetNotFound() {
+		return v, false
+	}
+	return s.OauthsetNotFound, true
+}
+
+// NewOauthsetNotFoundGetOAuthSettingsErrorResponse returns new GetOAuthSettingsErrorResponse from OauthsetNotFound.
+func NewOauthsetNotFoundGetOAuthSettingsErrorResponse(v OauthsetNotFound) GetOAuthSettingsErrorResponse {
+	var s GetOAuthSettingsErrorResponse
+	s.SetOauthsetNotFound(v)
 	return s
 }
 
@@ -58457,6 +58485,59 @@ func (s *OAuthSettingsRevisionResponse) SetOAuth(val OAuthSettings) {
 
 func (*OAuthSettingsRevisionResponse) getOAuthSettingsRes() {}
 
+// Merged schema.
+// Ref: #
+type OauthsetNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOauthsetNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OauthsetNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OauthsetNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OauthsetNotFound) GetDetails() OptOauthsetNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OauthsetNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OauthsetNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OauthsetNotFound) SetDetails(val OptOauthsetNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OauthsetNotFoundDetails map[string]jx.Raw
+
+func (s *OauthsetNotFoundDetails) init() OauthsetNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // NewOptAppClientIDTakenDetails returns new OptAppClientIDTakenDetails with value set to v.
 func NewOptAppClientIDTakenDetails(v AppClientIDTakenDetails) OptAppClientIDTakenDetails {
 	return OptAppClientIDTakenDetails{
@@ -72083,6 +72164,52 @@ func (o OptOAuthSettings) Get() (v OAuthSettings, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptOAuthSettings) Or(d OAuthSettings) OAuthSettings {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOauthsetNotFoundDetails returns new OptOauthsetNotFoundDetails with value set to v.
+func NewOptOauthsetNotFoundDetails(v OauthsetNotFoundDetails) OptOauthsetNotFoundDetails {
+	return OptOauthsetNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOauthsetNotFoundDetails is optional OauthsetNotFoundDetails.
+type OptOauthsetNotFoundDetails struct {
+	Value OauthsetNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOauthsetNotFoundDetails was set.
+func (o OptOauthsetNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOauthsetNotFoundDetails) Reset() {
+	var v OauthsetNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOauthsetNotFoundDetails) SetTo(v OauthsetNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOauthsetNotFoundDetails) Get() (v OauthsetNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOauthsetNotFoundDetails) Or(d OauthsetNotFoundDetails) OauthsetNotFoundDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
