@@ -4,15 +4,19 @@
     "check": "Server error"
   },
   {
-    "operation": "PATCH /users/me",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /auth_attempts",
+    "operation": "POST /auth_attempts/{attempt_id}/challenges",
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /auth_attempts/{attempt_id}/challenges",
+    "operation": "POST /deployments",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /flows",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /flows/{flow_id}/submit",
     "check": "API rejected schema-compliant request"
   },
   {
@@ -25,10 +29,6 @@
   },
   {
     "operation": "POST /teams/query",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /users/query",
     "check": "API rejected schema-compliant request"
   },
   {
