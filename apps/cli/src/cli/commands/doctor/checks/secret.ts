@@ -1,9 +1,7 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { parseEnv } from "node:util";
 
-import { createZitadelClient, Origins } from "@/lib/backend";
-import { isErrno } from "@/lib/errno";
+import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
+import { Dotenv } from "@/lib/environment/dotenv";
 import { Project } from "@/lib/project";
 import { Runtime } from "@/lib/runtime";
 
@@ -40,21 +38,11 @@ export class SecretCheck extends AbstractSanityCheck {
     if (await Project.at(ctx.cwd).hasSecret()) {
       return;
     }
-    const env = await readFile(join(ctx.cwd, DEVELOPMENT_ENV_FILE), "utf8").then(
-      parseEnv,
-      (error: unknown) => {
-        if (isErrno(error, "ENOENT")) {
-          throw new Error(
-            `${DEVELOPMENT_ENV_FILE} is missing, so the project's secrets cannot be restored from it`,
-          );
-        }
-        throw error;
-      },
-    );
-    const server = env.ZITADEL_URL;
-    const projectId = env.ZITADEL_PROJECT_ID;
-    const projectSecret = env.ZITADEL_PROJECT_SECRET;
-    const previewSecret = env.ZITADEL_PREVIEW_TOKEN;
+    const env = await Dotenv.at(join(ctx.cwd, DEVELOPMENT_ENV_FILE)).read();
+    const server = env?.ZITADEL_URL;
+    const projectId = env?.ZITADEL_PROJECT_ID;
+    const projectSecret = env?.ZITADEL_PROJECT_SECRET;
+    const previewSecret = env?.ZITADEL_PREVIEW_TOKEN;
     if (!server || !projectId || !projectSecret || !previewSecret) {
       throw new Error(
         `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
@@ -63,12 +51,14 @@ export class SecretCheck extends AbstractSanityCheck {
     if (ctx.dryRun) {
       return;
     }
-    const project = await createZitadelClient({
-      userAgent: Runtime.current().userAgent(),
-      baseUrl: server,
-      token: projectSecret,
-      signal: ctx.signal,
-    }).getProject(projectId);
+    const project = await new ProjectService(
+      createZitadelClient({
+        userAgent: Runtime.current().userAgent(),
+        baseUrl: server,
+        token: projectSecret,
+        signal: ctx.signal,
+      }),
+    ).get(projectId);
     const origins = Origins.wrap(project.origins);
     await Project.at(ctx.cwd).restoreSecret({
       project_id: project.id,
