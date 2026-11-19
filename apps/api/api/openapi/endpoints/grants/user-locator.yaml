@@ -5,6 +5,18 @@ description: |
   `req.invalid`.
 type: object
 additionalProperties: false
+# Exactly one of `user_id` and `identifier`. Written as if/then/else because ogen
+# cannot generate a `oneOf` of bare `required` lists.
+if:
+  required:
+    - user_id
+then:
+  not:
+    required:
+      - identifier
+else:
+  required:
+    - identifier
 properties:
   user_id:
     $ref: ../../components/schemas/user-id.yaml

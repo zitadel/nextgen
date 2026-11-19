@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 description: Request to query the teams of a project.
 properties:
   limit:
@@ -13,6 +14,7 @@ properties:
       - type: 'null'
   sorting:
     type: object
+    additionalProperties: false
     required:
       - field
       - direction
@@ -28,9 +30,40 @@ properties:
     description: Filter criteria for querying teams.
     items:
       type: object
+      additionalProperties: false
       required:
         - field
         - operation
+      # What a `value` and an `operation` may be depends on the field: a timestamp
+      # takes an RFC 3339 string and a comparison, a status or state one of its
+      # names with `equals`, any other field a string with `equals` or `contains`.
+      # The server refuses anything else, and a missing value, with `400`.
+      if:
+        required:
+          - field
+        properties:
+          field:
+            enum: [created_at]
+      then:
+        $ref: ../../../components/schemas/filter-timestamp-value.yaml
+      else:
+        if:
+          required:
+            - field
+          properties:
+            field:
+              enum: [status]
+        then:
+          required:
+            - value
+          properties:
+            field: {}
+            operation:
+              const: equals
+            value:
+              enum: [active, deactivated]
+        else:
+          $ref: ../../../components/schemas/filter-text-value.yaml
       properties:
         field:
           $ref: team-filter-field.yaml

@@ -6,6 +6,18 @@ description: |
 required:
   - targets
 additionalProperties: false
+# Exactly one of `release_id` and `content_hash`. Written as if/then/else
+# because ogen cannot generate a `oneOf` of bare `required` lists.
+if:
+  required:
+    - release_id
+then:
+  not:
+    required:
+      - content_hash
+else:
+  required:
+    - content_hash
 properties:
   release_id:
     description: The release to make live.

@@ -412,7 +412,7 @@ func TestUpdateTeam(t *testing.T) {
 
 			require.IsType(t, &api.UpdateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
 			badRequest := resp.(*api.UpdateTeamBadRequest)
-			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
+			assert.Equal(t, api.ErrorCode("req.invalid"), badRequest.Code)
 		})
 
 		t.Run("non existing team", func(t *testing.T) {

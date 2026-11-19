@@ -135,6 +135,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return idpErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixApplication.ErrorCodePrefix("")):
 		return applicationErrorResponse(e)
+	case e.Code == domain.ErrOAuthSettingsNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, e)
 	case strings.HasPrefix(e.Code, domain.PrefixDeployment.ErrorCodePrefix("")):
 		return deploymentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixOrigin.ErrorCodePrefix("")):

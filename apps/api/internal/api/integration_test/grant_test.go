@@ -32,7 +32,7 @@ func teamIDGrant(teamID string, rel api.CreateGrantRequestRelation) *api.CreateG
 	return &api.CreateGrantRequest{
 		Relation: rel,
 		Team: api.NewOptTeamLocator(api.TeamLocator{
-			TeamID: api.NewOptTeamID(api.TeamID(teamID)),
+			TeamID: api.NewOptString(teamID),
 		}),
 	}
 }
@@ -444,7 +444,7 @@ func TestGrantCreateLocators(t *testing.T) {
 		resp, err := client.CreateGrant(t.Context(), &api.CreateGrantRequest{
 			Relation: api.CreateGrantRequestRelationViewer,
 			User:     api.NewOptUserLocator(api.UserLocator{UserID: api.NewOptUserID("user_1")}),
-			Team:     api.NewOptTeamLocator(api.TeamLocator{TeamID: api.NewOptTeamID("team_1")}),
+			Team:     api.NewOptTeamLocator(api.TeamLocator{TeamID: api.NewOptString("team_1")}),
 		}, params)
 		require.NoError(t, err)
 		bad, ok := resp.(*api.CreateGrantBadRequest)

@@ -12,6 +12,12 @@ properties:
   rp_id:
     type: string
     minLength: 1
+    maxLength: 253
+    # A domain WebAuthn accepts: dot-separated labels of letters, digits, _ and
+    # inner hyphens, at most 63 characters each, ending in a label that starts
+    # with a letter or _ (so never an IP address or a number), or `localhost`.
+    pattern: '^(localhost|([A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?\.)+[A-Za-z_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?)$'
+    x-zitadel-pattern-message: "must be a domain name such as example.com, whose last label does not start with a digit, or localhost"
     description: The relying party ID, the domain the credential is scoped to.
     example: example.com
   rp_origins:

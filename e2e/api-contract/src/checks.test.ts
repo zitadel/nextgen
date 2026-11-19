@@ -30,6 +30,12 @@ describe("exemptionsFor", () => {
       ]),
     ).toEqual([{ operationId: "getTeam", check: "use_after_free" }]);
   });
+
+  test("exempts rollbackDeployment from negative data rejection", () => {
+    expect(exemptionsFor([{ id: "rollbackDeployment", alternatives: 1 }])).toEqual([
+      { operationId: "rollbackDeployment", check: "negative_data_rejection" },
+    ]);
+  });
 });
 
 describe("refusalsFor", () => {
@@ -46,6 +52,12 @@ describe("refusalsFor", () => {
   test("leaves out the operations that take a page token, which the hook keeps a token out of", () => {
     expect(Object.keys(REFUSALS)).not.toContain("GET /deployments");
     expect(Object.keys(REFUSALS)).not.toContain("POST /users/query");
+  });
+
+  test("lets setting a password refuse the one the project's policy does not accept", () => {
+    expect(refusalsFor([{ name: "PUT /users/{user_id}/password", id: "setUserPassword" }])).toEqual(
+      ["setUserPassword"],
+    );
   });
 
   test("gives every refusal a reason", () => {

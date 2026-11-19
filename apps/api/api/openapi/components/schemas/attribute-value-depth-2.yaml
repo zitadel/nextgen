@@ -1,0 +1,15 @@
+title: AttributeValue
+description: |
+  The value of a user attribute: anything the user's schema allows. An object
+  value follows the same rule as `attributes` itself: its property names are
+  not empty and hold no `.`, because the server stores an attribute under its
+  dot-joined path and `{"a.b": 1}` would be the same attribute as
+  `{"a": {"b": 1}}`. The rule is spelled out for 5 levels of nesting; the
+  server applies it at every depth.
+if:
+  type: object
+then:
+  propertyNames:
+    pattern: '^[^.]+$'
+  additionalProperties:
+    $ref: attribute-value-depth-3.yaml

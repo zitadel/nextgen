@@ -91,6 +91,10 @@ func ErrJSONSchemaFetchTimeout() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("fetch_timeout"), "fetching the schema URL timed out", nil, nil)
 }
 
+func ErrJSONSchemaFetchFailed() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("fetch_failed"), "the schema URL could not be fetched", nil, nil)
+}
+
 // SchemaFetchDetails names the URL a fetch_* error is about — the submitted
 // URL or a nested $ref target (ADR 030: details are explicitly attached,
 // caller-supplied data only).
@@ -548,8 +552,8 @@ func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string) ([]
 
 // classifyFetchError maps hardened-client failures onto distinct fetch_*
 // error codes so the caller learns exactly why the URL it chose (or a $ref
-// inside it) was refused. Anything else passes through for the service
-// layer's internal-error fallback.
+// inside it) was refused. Any other failure to fetch is fetch_failed; only a
+// cancelled request passes through.
 func classifyFetchError(schemaURL string, err error) error {
 	var denied *httputil.AddressDeniedError
 	var domErr Error
@@ -564,8 +568,13 @@ func classifyFetchError(schemaURL string, err error) error {
 		domErr = ErrJSONSchemaFetchDowngrade()
 	case isFetchTimeout(err):
 		domErr = ErrJSONSchemaFetchTimeout()
-	default:
+	case errors.Is(err, context.Canceled):
 		return err
+	default:
+		// The host is unreachable, it answered something other than the
+		// document, or the transfer broke: the caller's URL did not yield a
+		// schema, which is not a server fault.
+		domErr = ErrJSONSchemaFetchFailed()
 	}
 	// On a redirect failure the URL that actually failed is the hop the
 	// client last attempted, reported via *url.Error, not the URL the

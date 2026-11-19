@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -350,6 +351,11 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 // releaseContentHashWirePrefix names the digest algorithm on the wire. The
 // store keeps the bare hex; the prefix is added here and stripped here.
 const releaseContentHashWirePrefix = "sha256:"
+
+// releaseContentHashFromWire is the stored digest of a wire one.
+func releaseContentHashFromWire(hash api.ReleaseContentHash) string {
+	return strings.TrimPrefix(string(hash), releaseContentHashWirePrefix)
+}
 
 func toAPIReleaseContentHash(hash string) api.ReleaseContentHash {
 	return api.ReleaseContentHash(releaseContentHashWirePrefix + hash)

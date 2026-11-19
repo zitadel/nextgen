@@ -17654,6 +17654,45 @@ func (c *MockReleaseServiceGetCall) DoAndReturn(f func(context.Context, string, 
 	return c
 }
 
+// GetByContentHash mocks base method.
+func (m *MockReleaseService) GetByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByContentHash", ctx, projectID, contentHash)
+	ret0, _ := ret[0].(*domain.Release)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByContentHash indicates an expected call of GetByContentHash.
+func (mr *MockReleaseServiceMockRecorder) GetByContentHash(ctx, projectID, contentHash any) *MockReleaseServiceGetByContentHashCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByContentHash", reflect.TypeOf((*MockReleaseService)(nil).GetByContentHash), ctx, projectID, contentHash)
+	return &MockReleaseServiceGetByContentHashCall{Call: call}
+}
+
+// MockReleaseServiceGetByContentHashCall wrap *gomock.Call
+type MockReleaseServiceGetByContentHashCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockReleaseServiceGetByContentHashCall) Return(arg0 *domain.Release, arg1 error) *MockReleaseServiceGetByContentHashCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockReleaseServiceGetByContentHashCall) Do(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceGetByContentHashCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockReleaseServiceGetByContentHashCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceGetByContentHashCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // List mocks base method.
 func (m *MockReleaseService) List(ctx context.Context, input service.ListReleasesInput) (*service.ListReleasesOutput, error) {
 	m.ctrl.T.Helper()

@@ -21,6 +21,13 @@ post:
       application/json:
         schema:
           $ref: issue-challenge-request.yaml
+        # The docs build its SDK sample from the first example, because its
+        # sampler drops the required fields of a schema that uses `if`/`then`.
+        examples:
+          password:
+            summary: Challenge the password factor
+            value:
+              method: password
   responses:
     '201':
       description: The issued challenge.

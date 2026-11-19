@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 description: Request to query the users of a project.
 properties:
   limit:
@@ -22,6 +23,7 @@ properties:
       $ref: user-expand.yaml
   sorting:
     type: object
+    additionalProperties: false
     required:
       - field
       - direction
@@ -35,11 +37,119 @@ properties:
   filter:
     type: array
     description: Filter criteria for querying users. Criteria are combined with AND.
+    # `team_id` may be given once: the server refuses a second one.
+    contains:
+      type: object
+      properties:
+        field:
+          const: team_id
+    minContains: 0
+    maxContains: 1
+    # `identifier` may be given once too, for the same reason. It sits in an
+    # always-true `if`, which the generators ignore, so the clients keep their
+    # filter type.
+    if:
+      type: array
+    then:
+      contains:
+        type: object
+        properties:
+          field:
+            const: identifier
+      minContains: 0
+      maxContains: 1
     items:
       type: object
+      additionalProperties: false
       required:
         - field
         - operation
+      # What a `value` and an `operation` may be depends on the field: a timestamp
+      # takes an RFC 3339 string and a comparison, a status or state one of its
+      # names with `equals`, any other field a string with `equals` or `contains`.
+      # The server refuses anything else, and a missing value, with `400`.
+      if:
+        required:
+          - field
+        properties:
+          field:
+            enum: [created_at]
+      then:
+        $ref: ../../../components/schemas/filter-timestamp-value.yaml
+      else:
+        if:
+          required:
+            - field
+          properties:
+            field:
+              enum: [status]
+        then:
+          required:
+            - value
+          properties:
+            field: {}
+            operation:
+              const: equals
+            value:
+              enum: [active, suspended, deactivated, pending_purge]
+        else:
+          if:
+            required:
+              - field
+            properties:
+              field:
+                enum: [team_id]
+          then:
+            required:
+              - value
+            properties:
+              field: {}
+              operation:
+                const: equals
+              value:
+                type: string
+                pattern: '^[^\x00]*$'
+                x-zitadel-pattern-message: "must not contain a NUL character"
+          else:
+            if:
+              required:
+                - field
+              properties:
+                field:
+                  enum: [identifier]
+            then:
+              required:
+                - value
+              properties:
+                field: {}
+                operation:
+                  const: starts_with
+                value:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                  pattern: '^[^\x00]*$'
+                  x-zitadel-pattern-message: "must not contain a NUL character"
+            else:
+              if:
+                required:
+                  - field
+                properties:
+                  field:
+                    enum: [schema, schema_object_type]
+              then:
+                required:
+                  - value
+                properties:
+                  field: {}
+                  operation:
+                    enum: [equals, not_equals, contains]
+                  value:
+                    type: string
+                    pattern: '^[^\x00]*$'
+                    x-zitadel-pattern-message: "must not contain a NUL character"
+              else:
+                $ref: ../../../components/schemas/filter-text-value.yaml
       properties:
         field:
           $ref: user-filter-field.yaml

@@ -2,6 +2,16 @@ type: object
 description: Request to create an authentication attempt.
 required:
   - project_id
+# A session to step up needs the proof that it is the caller's.
+if:
+  required:
+    - session_id
+  properties:
+    session_id:
+      type: string
+then:
+  required:
+    - session_token
 properties:
   project_id:
     $ref: "../../components/schemas/project-id.yaml"

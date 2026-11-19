@@ -42,16 +42,19 @@ func TestIdPConnectionMirrorMatchesSchema(t *testing.T) {
 	mirrorProperties["protocol"] = readYAML(t, "../idps/idp-protocol.yaml")
 
 	// A root allOf turns the whole object into an untyped field, so the mirror
-	// does not state it. That the oidc protocol requires its block is enforced
-	// by the server against the schema. The body is pinned because the mirror
-	// header restates it in prose.
-	require.Equal(t, []any{
-		map[string]any{
-			"if":   map[string]any{"properties": map[string]any{"protocol": map[string]any{"const": "oidc"}}, "required": []any{"protocol"}},
-			"then": map[string]any{"required": []any{"oidc"}},
-		},
-	}, schema["allOf"], "the root allOf changed; update the mirror header")
+	// states its one rule, that the oidc protocol requires its block, as the
+	// if and then it holds. The body is pinned because the mirror header
+	// restates it in prose.
+	rule := map[string]any{
+		"if":   map[string]any{"properties": map[string]any{"protocol": map[string]any{"const": "oidc"}}, "required": []any{"protocol"}},
+		"then": map[string]any{"required": []any{"oidc"}},
+	}
+	require.Equal(t, []any{rule}, schema["allOf"], "the root allOf changed; update the mirror")
 	delete(schema, "allOf")
+	require.Equal(t, rule["if"], mirror["if"], "the mirror no longer states the oidc rule's if")
+	require.Equal(t, rule["then"], mirror["then"], "the mirror no longer states the oidc rule's then")
+	delete(mirror, "if")
+	delete(mirror, "then")
 
 	// ogen cannot carry the anyOf's const and pattern branches as one type.
 	// The mirror widens it to the two value classes ogen can carry; the schema

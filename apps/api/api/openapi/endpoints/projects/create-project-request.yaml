@@ -4,6 +4,10 @@ required:
 properties:
   name:
     type: string
+    # `NewProject` trims the name and refuses an empty one (`proj.name_invalid`).
+    minLength: 1
+    pattern: '\S'
+    x-zitadel-pattern-message: "must contain a character other than whitespace"
     description: The name of the project.
   origins:
     type: array

@@ -5,7 +5,9 @@ package integration_test
 import (
 	"cmp"
 	"context"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -395,6 +397,7 @@ func TestPatchProject(t *testing.T) {
 			{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 		}
 		nameInvalid   = domain.ErrProjectNameInvalid()
+		reqInvalid    = domain.ErrRequestInvalid()
 		notFound      = domain.ErrProjectNotFound()
 		validRenameTo = &api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())}
 	)
@@ -423,16 +426,11 @@ func TestPatchProject(t *testing.T) {
 		{
 			name: "absent name",
 			req:  &api.PatchProjectRequest{},
-			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(reqInvalid.Code), Message: reqInvalid.Message},
 		},
 		{
 			name: "null name",
 			req:  &api.PatchProjectRequest{Name: api.OptNilString{Set: true, Null: true}},
-			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
-		},
-		{
-			name: "empty name",
-			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("")},
 			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{
@@ -469,6 +467,37 @@ func TestPatchProject(t *testing.T) {
 			assertProjectResponse(t, tc.want, resp)
 		})
 	}
+}
+
+// The generated client refuses a blank name before it sends, so a blank rename
+// is sent raw to prove the server refuses it too.
+func TestPatchProjectBlankNameRawRequest(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	body := helpers.MustMarshal(t, api.PatchProjectRequest{Name: api.NewOptNilString("   ")})
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
+		harness.APIBaseURL(t)+"/projects/"+url.PathEscape(project.ID),
+		strings.NewReader(body),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+client.Token())
+
+	resp, err := harness.EnsureHttpClient(t).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
 }
 
 // ADR 029 §Hashing: a project admin chooses the hashing method, so what a PATCH

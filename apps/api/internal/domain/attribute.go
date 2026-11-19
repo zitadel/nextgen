@@ -312,3 +312,27 @@ func (attrs *CreateAttributes) fromMap(m map[string]any, schema map[string]any, 
 	}
 	return nil
 }
+
+// InvalidAttributeNames returns the paths, from the request body's attributes
+// object, of every attribute whose name is empty or contains ".". Attributes
+// are stored under their dot-joined path (see AttributeKey), so such a name
+// cannot be told apart from a nested one: {"a.b": 1} and {"a": {"b": 1}} are
+// the same key, and "" has no path at all.
+func InvalidAttributeNames(attributes map[string]any) []string {
+	var invalid []string
+	collectInvalidAttributeNames(attributes, "attributes", &invalid)
+	return invalid
+}
+
+func collectInvalidAttributeNames(m map[string]any, path string, invalid *[]string) {
+	for name, value := range m {
+		child := path + "." + name
+		if name == "" || strings.Contains(name, ".") {
+			*invalid = append(*invalid, child)
+			continue
+		}
+		if nested, ok := value.(map[string]any); ok {
+			collectInvalidAttributeNames(nested, child, invalid)
+		}
+	}
+}

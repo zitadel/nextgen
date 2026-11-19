@@ -102,6 +102,12 @@ patch:
       application/json:
         schema:
           $ref: patch-user-request.yaml
+        examples:
+          rename:
+            summary: Change one attribute
+            value:
+              attributes:
+                name: Ada King
   responses:
     '200':
       description: The updated user, or with `dry_run` the user as the patch would leave them.

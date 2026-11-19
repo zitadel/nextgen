@@ -1,0 +1,22 @@
+title: FilterTimestampValue
+description: |
+  What a filter on a timestamp field must hold: a `value`, as an RFC 3339
+  string, and an operation that compares it. The server refuses a missing
+  value, a `null`, a number or a boolean with `400`, and `contains` too.
+  Used under `then` of the filter items, which ogen ignores, so it checks
+  requests without changing the generated clients.
+required:
+  - value
+properties:
+  # Named so the linter, which closes a branch to the properties it names, counts
+  # them as evaluated; the item's own schema types them.
+  field: {}
+  operation:
+    enum:
+      - equals
+      - less_than
+      - greater_than
+      - greater_than_or_equal
+  value:
+    type: string
+    format: date-time

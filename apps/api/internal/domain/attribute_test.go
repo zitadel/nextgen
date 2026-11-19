@@ -331,6 +331,25 @@ func TestNewCreateAttribute_UniqueHashIsNormalized(t *testing.T) {
 	assert.Equal(t, "Alice@Example.com", a.Value, "the stored value keeps its casing")
 }
 
+func TestInvalidAttributeNames(t *testing.T) {
+	tcs := []struct {
+		name       string
+		attributes map[string]any
+		want       []string
+	}{
+		{"plain names", map[string]any{"department": "eng", "address": map[string]any{"city": "Paris"}}, nil},
+		{"dotted name", map[string]any{"a.b": 1}, []string{"attributes.a.b"}},
+		{"empty name", map[string]any{"": 1}, []string{"attributes."}},
+		{"nested dotted name", map[string]any{"address": map[string]any{"zip.code": "1"}}, []string{"attributes.address.zip.code"}},
+		{"nested empty name", map[string]any{"address": map[string]any{"": "1"}}, []string{"attributes.address."}},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, InvalidAttributeNames(tc.attributes))
+		})
+	}
+}
+
 func TestSearchText(t *testing.T) {
 	text, ok := SearchText("Alice@Example.COM")
 	require.True(t, ok)

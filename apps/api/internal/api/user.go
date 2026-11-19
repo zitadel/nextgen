@@ -25,6 +25,9 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.CreateUserRequest, pa
 	if err != nil {
 		return nil, err
 	}
+	if err := attributeNamesInvalid(*attributes); err != nil {
+		return nil, err
+	}
 
 	user, err := h.userService.CreateUser(ctx, service.CreateUserInput{
 		ProjectID:  string(params.ProjectID),
@@ -375,6 +378,9 @@ func (h *Handler) UpdateUser(ctx context.Context, req *api.PatchUserRequest, par
 		if err != nil {
 			return nil, err
 		}
+		if err := attributeNamesInvalid(*attributes); err != nil {
+			return nil, err
+		}
 		input.Attributes = *attributes
 	}
 
@@ -396,6 +402,9 @@ func (h *Handler) UpdateMyUser(ctx context.Context, req *api.PatchMyUserRequest,
 
 	attributes, err := convertUsingJson[map[string]any](req.Attributes)
 	if err != nil {
+		return nil, err
+	}
+	if err := attributeNamesInvalid(*attributes); err != nil {
 		return nil, err
 	}
 
@@ -651,6 +660,19 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+// attributeNamesInvalid refuses an attribute whose name is empty or holds a
+// ".", naming each one by its path from the request body.
+func attributeNamesInvalid(attributes map[string]any) error {
+	invalid := domain.InvalidAttributeNames(attributes)
+	if len(invalid) == 0 {
+		return nil
+	}
+	slices.Sort(invalid)
+	return domain.ErrRequestInvalid().
+		WithMessage("attribute names must not be empty or contain a dot").
+		WithDetails(domain.InvalidFieldPathsDetails{Fields: invalid})
 }
 
 // userAttributesRequestInvalid answers a user schema failure of a /users write

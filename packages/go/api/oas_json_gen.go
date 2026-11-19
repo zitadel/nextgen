@@ -18935,6 +18935,22 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchFetchFailedBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_failed")
+		{
+			s := s.SchFetchFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case SchFetchTimeoutBuildReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("sch.fetch_timeout")
@@ -19241,6 +19257,9 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "sch.fetch_downgrade":
 					s.Type = SchFetchDowngradeBuildReleaseErrorResponse
 					found = true
+				case "sch.fetch_failed":
+					s.Type = SchFetchFailedBuildReleaseErrorResponse
+					found = true
 				case "sch.fetch_timeout":
 					s.Type = SchFetchTimeoutBuildReleaseErrorResponse
 					found = true
@@ -19333,6 +19352,10 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SchFetchDowngradeBuildReleaseErrorResponse:
 		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchFailedBuildReleaseErrorResponse:
+		if err := s.SchFetchFailed.Decode(d); err != nil {
 			return err
 		}
 	case SchFetchTimeoutBuildReleaseErrorResponse:
@@ -24006,8 +24029,10 @@ func (s *ConfigurationBundle) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode ConfigurationBundle to nil")
 	}
+	var propertiesCount int
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		propertiesCount++
 		switch string(k) {
 		case "schemas":
 			if err := func() error {
@@ -24103,6 +24128,15 @@ func (s *ConfigurationBundle) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode ConfigurationBundle")
+	}
+	// Validate properties count.
+	if err := (validate.Object{
+		MinProperties:    1,
+		MinPropertiesSet: true,
+		MaxProperties:    0,
+		MaxPropertiesSet: false,
+	}).ValidateProperties(propertiesCount); err != nil {
+		return errors.Wrap(err, "object")
 	}
 
 	return nil
@@ -67086,6 +67120,22 @@ func (s GetOAuthSettingsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case OauthsetNotFoundGetOAuthSettingsErrorResponse:
+		e.FieldStart("code")
+		e.Str("oauthset.not_found")
+		{
+			s := s.OauthsetNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetOAuthSettingsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -67153,6 +67203,9 @@ func (s *GetOAuthSettingsErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedGetOAuthSettingsErrorResponse
 					found = true
+				case "oauthset.not_found":
+					s.Type = OauthsetNotFoundGetOAuthSettingsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetOAuthSettingsErrorResponse
 					found = true
@@ -67183,6 +67236,10 @@ func (s *GetOAuthSettingsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedGetOAuthSettingsErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case OauthsetNotFoundGetOAuthSettingsErrorResponse:
+		if err := s.OauthsetNotFound.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetOAuthSettingsErrorResponse:
@@ -95536,6 +95593,194 @@ func (s *OAuthSettingsRevisionResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *OauthsetNotFound) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *OauthsetNotFound) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("oauthset.not_found")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfOauthsetNotFound = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes OauthsetNotFound from json.
+func (s *OauthsetNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode OauthsetNotFound to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode OauthsetNotFound")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfOauthsetNotFound) {
+					name = jsonFieldsNameOfOauthsetNotFound[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *OauthsetNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OauthsetNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s OauthsetNotFoundDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s OauthsetNotFoundDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes OauthsetNotFoundDetails from json.
+func (s *OauthsetNotFoundDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode OauthsetNotFoundDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode OauthsetNotFoundDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OauthsetNotFoundDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OauthsetNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AppClientIDTakenDetails as json.
 func (o OptAppClientIDTakenDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -105245,6 +105490,40 @@ func (s *OptOAuthSettings) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes OauthsetNotFoundDetails as json.
+func (o OptOauthsetNotFoundDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes OauthsetNotFoundDetails from json.
+func (o *OptOauthsetNotFoundDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptOauthsetNotFoundDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(OauthsetNotFoundDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptOauthsetNotFoundDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptOauthsetNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes OriginAddedEventDelegationType as json.
 func (o OptOriginAddedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -107490,6 +107769,40 @@ func (s OptSchFetchDowngradeDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptSchFetchDowngradeDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes SchFetchFailedDetails as json.
+func (o OptSchFetchFailedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes SchFetchFailedDetails from json.
+func (o *OptSchFetchFailedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptSchFetchFailedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(SchFetchFailedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptSchFetchFailedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptSchFetchFailedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -114997,8 +115310,10 @@ func (s *PatchProjectRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode PatchProjectRequest to nil")
 	}
+	var propertiesCount int
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		propertiesCount++
 		switch string(k) {
 		case "name":
 			if err := func() error {
@@ -115026,6 +115341,15 @@ func (s *PatchProjectRequest) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode PatchProjectRequest")
+	}
+	// Validate properties count.
+	if err := (validate.Object{
+		MinProperties:    1,
+		MinPropertiesSet: true,
+		MaxProperties:    0,
+		MaxPropertiesSet: false,
+	}).ValidateProperties(propertiesCount); err != nil {
+		return errors.Wrap(err, "object")
 	}
 
 	return nil
@@ -126159,6 +126483,22 @@ func (s PublishSchemaErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SchFetchFailedPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_failed")
+		{
+			s := s.SchFetchFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case SchFetchTimeoutPublishSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("sch.fetch_timeout")
@@ -126363,6 +126703,9 @@ func (s *PublishSchemaErrorResponse) Decode(d *jx.Decoder) error {
 				case "sch.fetch_downgrade":
 					s.Type = SchFetchDowngradePublishSchemaErrorResponse
 					found = true
+				case "sch.fetch_failed":
+					s.Type = SchFetchFailedPublishSchemaErrorResponse
+					found = true
 				case "sch.fetch_timeout":
 					s.Type = SchFetchTimeoutPublishSchemaErrorResponse
 					found = true
@@ -126429,6 +126772,10 @@ func (s *PublishSchemaErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SchFetchDowngradePublishSchemaErrorResponse:
 		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchFailedPublishSchemaErrorResponse:
+		if err := s.SchFetchFailed.Decode(d); err != nil {
 			return err
 		}
 	case SchFetchTimeoutPublishSchemaErrorResponse:
@@ -127138,7 +127485,7 @@ func (s *QueryGrantsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -127232,7 +127579,7 @@ func (s *QueryGrantsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -127341,7 +127688,7 @@ func (s *QueryGrantsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -128026,7 +128373,7 @@ func (s *QueryIdpsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -128120,7 +128467,7 @@ func (s *QueryIdpsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -128229,7 +128576,7 @@ func (s *QueryIdpsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -128876,7 +129223,7 @@ func (s *QueryProjectsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -128970,7 +129317,7 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -129079,7 +129426,7 @@ func (s *QueryProjectsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -129764,7 +130111,7 @@ func (s *QuerySessionsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -129858,7 +130205,7 @@ func (s *QuerySessionsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -129967,7 +130314,7 @@ func (s *QuerySessionsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -130675,7 +131022,7 @@ func (s *QueryTeamsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -130769,7 +131116,7 @@ func (s *QueryTeamsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -130878,7 +131225,7 @@ func (s *QueryTeamsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -131591,7 +131938,7 @@ func (s *QueryUsersRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -131685,7 +132032,7 @@ func (s *QueryUsersRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -131794,7 +132141,7 @@ func (s *QueryUsersRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -141712,6 +142059,194 @@ func (s SchFetchDowngradeDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *SchFetchDowngradeDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *SchFetchFailed) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *SchFetchFailed) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("sch.fetch_failed")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfSchFetchFailed = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes SchFetchFailed from json.
+func (s *SchFetchFailed) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SchFetchFailed to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode SchFetchFailed")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfSchFetchFailed) {
+					name = jsonFieldsNameOfSchFetchFailed[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *SchFetchFailed) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SchFetchFailed) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s SchFetchFailedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s SchFetchFailedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes SchFetchFailedDetails from json.
+func (s *SchFetchFailedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SchFetchFailedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode SchFetchFailedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SchFetchFailedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SchFetchFailedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -157546,8 +158081,10 @@ func (s *UpdateTeamRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode UpdateTeamRequest to nil")
 	}
+	var propertiesCount int
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		propertiesCount++
 		switch string(k) {
 		case "name":
 			if err := func() error {
@@ -157565,6 +158102,15 @@ func (s *UpdateTeamRequest) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode UpdateTeamRequest")
+	}
+	// Validate properties count.
+	if err := (validate.Object{
+		MinProperties:    1,
+		MinPropertiesSet: true,
+		MaxProperties:    0,
+		MaxPropertiesSet: false,
+	}).ValidateProperties(propertiesCount); err != nil {
+		return errors.Wrap(err, "object")
 	}
 
 	return nil

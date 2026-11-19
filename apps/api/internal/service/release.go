@@ -55,6 +55,9 @@ type ReleaseService interface {
 	Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error)
 	Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
+	// GetByContentHash returns the release that pins contentHash, or
+	// domain.ErrReleaseNotFound when the project holds none.
+	GetByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
 	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
 	Revoke(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
@@ -231,6 +234,20 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *doma
 	defer end(&err)
 
 	return getRelease(ctx, s.v2Pool.Statements(), projectID, id)
+}
+
+func (s *releaseService) GetByContentHash(ctx context.Context, projectID, contentHash string) (_ *domain.Release, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.GetByContentHash")
+	defer end(&err)
+
+	release, err := s.getByContentHash(ctx, projectID, contentHash)
+	if err != nil {
+		return nil, err
+	}
+	if release == nil {
+		return nil, domain.ErrReleaseNotFound()
+	}
+	return release, nil
 }
 
 func getRelease(ctx context.Context, stmts ReleaseStatements, projectID, id string) (*domain.Release, error) {
