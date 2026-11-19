@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	platformbootstrap "github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
@@ -238,10 +240,7 @@ func TestOAuthAuthorizationServerMetadata(t *testing.T) {
 // is not parallel because another test bootstraps the same project.
 func TestOAuthPlatformIssuerMetadata(t *testing.T) {
 	projects := harness.EnsureProjectService(t)
-	_, err := projects.CreateWithID(t.Context(), domain.PlatformProjectID, "Platform", []domain.Origin{
-		{Pattern: helpers.ConsoleOrigin, Kind: domain.OriginKindPrimary},
-	}, false)
-	require.NoError(t, err)
+	require.NoError(t, platformbootstrap.Ensure(t.Context(), projects, harness.EnsureServiceDB(t), true))
 	t.Cleanup(func() {
 		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), domain.PlatformProjectID)
 	})
@@ -250,17 +249,17 @@ func TestOAuthPlatformIssuerMetadata(t *testing.T) {
 	resp, body := getMetadata(t, wellKnown("/oauth"), headers)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "nothing deployed: %s", body)
 
-	deployBundle(t, domain.PlatformProjectID, service.BuildReleaseInput{
-		ProjectID: domain.PlatformProjectID,
-		Branding:  &service.CreateBrandingInput{ProjectID: domain.PlatformProjectID, Layout: domain.BrandingLayoutCentered},
-	})
+	// The platform release is the server's own, as a start deploys it.
+	deployPlatform := func(oauthEnabled bool) {
+		t.Helper()
+		require.NoError(t, platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, time.Now(),
+			helpers.ConsoleOrigin, oauthEnabled, projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t)))
+	}
+	deployPlatform(false)
 	resp, body = getMetadata(t, wellKnown("/oauth"), headers)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "release without oauth: %s", body)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "started without oauth.enabled: %s", body)
 
-	deployBundle(t, domain.PlatformProjectID, service.BuildReleaseInput{
-		ProjectID: domain.PlatformProjectID,
-		OAuth:     &service.CreateOAuthSettingsInput{ProjectID: domain.PlatformProjectID, Enabled: true},
-	})
+	deployPlatform(true)
 	resp, body = getMetadata(t, wellKnown("/oauth"), headers)
 	assertMetadata(t, resp, body, helpers.ConsoleOrigin+"/oauth", helpers.ConsoleOrigin+"/oauth")
 
