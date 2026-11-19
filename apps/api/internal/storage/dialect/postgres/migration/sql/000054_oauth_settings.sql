@@ -3,9 +3,9 @@
 -- writer and pins a revision under kind oauth; the deployed release decides
 -- which revision an origin runs, so no column records which one is newest.
 CREATE TABLE zitadel_nextgen.oauth_settings (
-    project_id   TEXT NOT NULL
+    project_id   TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
-    , id         TEXT NOT NULL CHECK (id <> '')
+    , id         TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , definition JSONB NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 
