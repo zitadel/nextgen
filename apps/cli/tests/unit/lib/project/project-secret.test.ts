@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import { Project } from "@/lib/project";
+import { Project, ProjectSecret } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 const VALID_SECRET = {
@@ -44,7 +44,7 @@ describe("Project.secret", () => {
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
       expect(zerr.hint).toContain("zitadel doctor --fix");
-      expect(zerr.nextCommands).toEqual([{ id: "setup" }, { id: "doctor", flags: { fix: true } }]);
+      expect(zerr.nextCommands).toEqual([{ id: "doctor", flags: { fix: true } }]);
     }
   });
 
@@ -142,5 +142,13 @@ describe("ProjectSecret.write", () => {
 
     expect(first).toBe(second);
     expect(first.endsWith("\n")).toBe(true);
+  });
+});
+
+describe("ProjectSecret.write", () => {
+  it("creates .zitadel when it is gone", async ({ dir: cwd }) => {
+    await new ProjectSecret(cwd, VALID_SECRET).write();
+
+    expect((await Project.at(cwd).secret()).data).toEqual(VALID_SECRET);
   });
 });

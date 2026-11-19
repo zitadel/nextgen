@@ -1,8 +1,9 @@
 import { join } from "node:path";
 
 import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
-import { Dotenv } from "@/lib/environment/dotenv";
-import { Project } from "@/lib/project";
+import { Dotenv } from "@/lib/environment";
+import { Project, ProjectSecret } from "@/lib/project";
+import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
 import { AbstractSanityCheck, type CheckContext } from "./types";
@@ -39,19 +40,19 @@ export class SecretCheck extends AbstractSanityCheck {
       return;
     }
     const env = await Dotenv.at(join(ctx.cwd, DEVELOPMENT_ENV_FILE)).read();
-    const server = env?.ZITADEL_URL;
     const projectId = env?.ZITADEL_PROJECT_ID;
     const projectSecret = env?.ZITADEL_PROJECT_SECRET;
     const previewSecret = env?.ZITADEL_PREVIEW_TOKEN;
-    if (!server || !projectId || !projectSecret || !previewSecret) {
+    if (!projectId || !projectSecret || !previewSecret) {
       throw new Error(
-        `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
+        `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
       );
     }
-    const configured = (await Project.at(ctx.cwd).config()).data.project;
+    const config = await Project.at(ctx.cwd).config();
+    const configured = config.data.project;
     if (projectId !== configured) {
       throw new Error(
-        `${DEVELOPMENT_ENV_FILE} names project ${projectId}, not the ${String(configured)} that zitadel.json names, so its secrets are not restored`,
+        `${DEVELOPMENT_ENV_FILE} names project ${projectId} but zitadel.json names ${typeof configured === "string" ? configured : "no project"}, so its secrets are not restored`,
       );
     }
     if (ctx.dryRun) {
@@ -60,19 +61,22 @@ export class SecretCheck extends AbstractSanityCheck {
     const project = await new ProjectService(
       createZitadelClient({
         userAgent: Runtime.current().userAgent(),
-        baseUrl: server,
+        baseUrl: config.server ?? ZitadelRuntime.DEFAULT,
         token: projectSecret,
         signal: ctx.signal,
       }),
     ).get(projectId);
+    if (project.id !== projectId) {
+      throw new Error(`The server returned project ${project.id}, not ${projectId}`);
+    }
     const origins = Origins.wrap(project.origins);
-    await Project.at(ctx.cwd).restoreSecret({
+    await new ProjectSecret(ctx.cwd, {
       project_id: project.id,
       project_secret: projectSecret,
       preview_secret: previewSecret,
       primary_origins: [...origins.primary],
       preview_origins: [...origins.preview],
       created_at: project.created_at,
-    });
+    }).write();
   }
 }

@@ -51,20 +51,9 @@ export class ProjectSecret {
    * @param cwd - The project's directory.
    * @param data - What the file holds.
    */
-  private constructor(cwd: string, data: Readonly<ProjectSecretData>) {
+  constructor(cwd: string, data: Readonly<ProjectSecretData>) {
     this.cwd = cwd;
     this.data = data;
-  }
-
-  /**
-   * A secret built from known data, to be written with {@link ProjectSecret.write}.
-   *
-   * @param cwd - The project's directory.
-   * @param data - What the file should hold.
-   * @returns The secret.
-   */
-  static of(cwd: string, data: Readonly<ProjectSecretData>): ProjectSecret {
-    return new ProjectSecret(cwd, data);
   }
 
   /**
@@ -112,8 +101,8 @@ export class ProjectSecret {
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
-          hint: "Run `zitadel setup` first. If this project was set up before, `zitadel doctor --fix` restores the secret from .env.development.local.",
-          nextCommands: [{ id: "setup" }, { id: "doctor", flags: { fix: true } }],
+          hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+          nextCommands: [{ id: "doctor", flags: { fix: true } }],
         });
       }
       throw error;
