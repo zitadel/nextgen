@@ -4,10 +4,6 @@
     "check": "Server error"
   },
   {
-    "operation": "POST /releases/build",
-    "check": "Server error"
-  },
-  {
     "operation": "POST /users/{user_id}/passkeys/registrations",
     "check": "Schema-valid request rejected"
   },
