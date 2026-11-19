@@ -1946,12 +1946,8 @@ func uniqueFieldValues(values map[string]any, resolvedSets ...FlowResolvedFields
 			if field.Unique == AttributeUniquenessUnspecified || seen[field.Name] {
 				continue
 			}
-			raw, present := values[field.Name]
-			if !present {
-				continue
-			}
-			s, _ := raw.(string)
-			if s == "" {
+			s, ok := collectedString(values, field.Name)
+			if !ok {
 				continue
 			}
 			seen[field.Name] = true
@@ -2003,7 +1999,9 @@ type passkeyPhaseResult struct {
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
 //     was selected → use the collected user id (or let the registration
-//     service mint a provisional one), then issue a creation challenge.
+//     service mint a provisional one), then issue a creation challenge. When
+//     that mints a new user and a collected unique value is taken, route
+//     user_already_exists instead and send no challenge.
 func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
 	ctx, state, step, in := pc.ctx, pc.state, pc.currentStep, pc.in
 	switch {
@@ -2071,32 +2069,9 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				// undesignated unique attribute (e.g. a fresh email but a
 				// taken phone).
 				clearUserBoundState(state)
-				candidates := uniqueFieldValues(state.CollectedData.UserData, passkeyResolved)
-				if visited, verr := r.resolveVisitedFields(pc); verr == nil {
-					candidates = uniqueFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
-				}
-				for _, candidate := range candidates {
-					// Only a sign-up's create loses this race, so a free
-					// candidate is the sign-up's own value, not a failed
-					// sign-in: Register keeps it from writing one.
-					userID, rerr := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
-						ProjectID:     state.ProjectID,
-						AttemptID:     state.AuthAttemptID,
-						AttributeName: candidate[0],
-						Value:         candidate[1],
-						UserSchemaURL: state.UserSchemaURL,
-						Register:      true,
-					})
-					if rerr == nil {
-						recordResolvedUser(state, userID)
-						break
-					}
-					if !errors.Is(rerr, ErrAuthAttemptProofRejected(nil)) {
-						return passkeyPhaseResult{}, fmt.Errorf("flow state machine: resolve conflicting user: %w", rerr)
-					}
-					// Rejected means this field's value is not the taken one
-					// (or the owner vanished again); try the next candidate.
-					// All-rejected routes anyway and the next step re-collects.
+				// No owner found routes anyway and the next step re-collects.
+				if _, rerr := r.resolveTakenUniqueValue(pc, passkeyResolved); rerr != nil {
+					return passkeyPhaseResult{}, rerr
 				}
 				return passkeyPhaseResult{handled: true, outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
 			}
@@ -2199,6 +2174,19 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)
 		}
+		// Checked before the browser prompts, so a taken value leaves no
+		// passkey in the password manager that the verify step would refuse.
+		// Only a ceremony that creates its user is checked: the lookup pins
+		// the owner, which must never replace a user the attempt carries.
+		if out.Provisional {
+			taken, err := r.resolveTakenUniqueValue(pc, passkeyResolved)
+			if err != nil {
+				return passkeyPhaseResult{}, err
+			}
+			if taken {
+				return passkeyPhaseResult{handled: true, outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
+			}
+		}
 		// Keep the (possibly minted) user handle so a re-issued challenge
 		// stays stable and the verify leg knows which user it targets.
 		state.CollectedData.UserID = out.UserID
@@ -2217,6 +2205,56 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 	}
 	return passkeyPhaseResult{}, nil
+}
+
+// resolveTakenUniqueValue looks up the owner of each collected unique value
+// and pins the first one found on the attempt and the state. It reports
+// whether a value is taken, which holds even when no owner can be pinned.
+func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, passkeyResolved FlowResolvedFields) (bool, error) {
+	state := pc.state
+	candidates := uniqueFieldValues(state.CollectedData.UserData, passkeyResolved)
+	if visited, err := r.resolveVisitedFields(pc); err == nil {
+		candidates = uniqueFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
+	}
+	taken := false
+	for _, candidate := range candidates {
+		// The new user has no team, so only the claims it would collide with
+		// count: a value unique within some team is still free here.
+		owner, err := r.ssoIdentities.FindUniqueOwner(pc.ctx, state.ProjectID, state.UserSchemaURL, candidate[0], candidate[1])
+		if errors.Is(err, ErrSSOOwnerOtherSchema) {
+			// Creation would collide, but the flow cannot continue with that
+			// user; a later field may still name one it can.
+			taken = true
+			continue
+		}
+		if err != nil {
+			return false, fmt.Errorf("flow state machine: look up unique value %q: %w", candidate[0], err)
+		}
+		if owner == "" {
+			continue
+		}
+		// Only a sign-up looks here, so a miss is not a failed sign-in:
+		// Register keeps it from writing one.
+		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
+			ProjectID:     state.ProjectID,
+			AttemptID:     state.AuthAttemptID,
+			AttributeName: candidate[0],
+			Value:         candidate[1],
+			UserSchemaURL: state.UserSchemaURL,
+			Register:      true,
+		})
+		if err == nil {
+			recordResolvedUser(state, userID)
+			return true, nil
+		}
+		if !errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+			return false, fmt.Errorf("flow state machine: resolve conflicting user: %w", err)
+		}
+		// The owner holds the value, but the sign-in lookup cannot single it
+		// out (another team holds it too, or the owner vanished): still taken.
+		taken = true
+	}
+	return taken, nil
 }
 
 func needsPasskeyRegistrationVisitedFields(state *FlowState, in FlowSubmitInput, actionKind FlowActionKind) bool {

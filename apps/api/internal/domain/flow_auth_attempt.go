@@ -127,11 +127,13 @@ type FlowIssuePasskeyRegistrationChallengeInput struct {
 
 // FlowPasskeyRegistrationChallengeOutput is the issued challenge.
 // UserID is the WebAuthn user handle (minted by the attempt service when
-// the issue input had none).
+// the issue input had none). Provisional is true when verifying the
+// attestation creates that user.
 type FlowPasskeyRegistrationChallengeOutput struct {
 	ChallengeID string
 	UserID      string
 	Options     []byte
+	Provisional bool
 }
 
 // FlowSubmitPasskeyRegistrationInput carries the attestation plus the
