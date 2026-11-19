@@ -1793,7 +1793,7 @@ EXAMPLES
 
 ## `zitadel invitation cancel [INVITATION_ID]`
 
-Cancel a pending invitation so its link stops working.
+Cancel a pending invitation so its link stops working, or remove a declined one.
 
 ```
 USAGE
@@ -1801,7 +1801,7 @@ USAGE
     [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
-  [INVITATION_ID]  The invitation to cancel. Omit it to pick one of the pending invitations.
+  [INVITATION_ID]  The invitation to cancel. Omit it to pick a pending or declined one.
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1822,7 +1822,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Cancel a pending invitation so its link stops working.
+  Cancel a pending invitation so its link stops working, or remove a declined one.
 
 EXAMPLES
   $ zitadel invitation cancel
@@ -1917,7 +1917,7 @@ List the project's invitations, newest first.
 ```
 USAGE
   $ zitadel invitation list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--status pending|accepted|rejected|expired] [--type
+    [--telemetry] [-e <value>] [--env-file <value>] [--status pending|accepted|rejected|expired...] [--type
     project_member|team_member] [--limit <value>] [-a | --page-token <value>] [--plain]
 
 FLAGS
@@ -1936,7 +1936,8 @@ FLAGS
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
-      --status=<option>     Only invitations with this status.
+      --status=<option>...  Only invitations with this status; repeat it for several. Without it, every status but
+                            accepted.
                             <options: pending|accepted|rejected|expired>
       --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
       --type=<option>       Only invitations of this type.
@@ -1952,6 +1953,8 @@ EXAMPLES
   $ zitadel invitation list
 
   $ zitadel invitation list --status pending
+
+  $ zitadel invitation list --status accepted --status pending
 
   $ zitadel invitation list --all --json
 ```
