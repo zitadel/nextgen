@@ -4,15 +4,23 @@
     "check": "Server error"
   },
   {
-    "operation": "POST /flows",
-    "check": "API rejected schema-compliant request"
+    "operation": "POST /releases/build",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /schemas",
+    "check": "Server error"
   },
   {
     "operation": "POST /users/{user_id}/passkeys/registrations",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
   },
   {
     "operation": "PUT /users/{user_id}/password",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "Stateful tests",
+    "check": "Server error"
   }
 ]

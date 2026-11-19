@@ -11,7 +11,7 @@ import { SchemathesisReport } from "./report";
  * release adds checks, and a lane whose failures change without a change to
  * the API is a lane nobody trusts.
  */
-export const SCHEMATHESIS_IMAGE = "schemathesis/schemathesis:4.31.0";
+export const SCHEMATHESIS_IMAGE = "schemathesis/schemathesis:4.33.4";
 
 /**
  * The name the container reaches the host's loopback services under. Docker
