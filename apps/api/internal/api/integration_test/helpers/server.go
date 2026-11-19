@@ -208,7 +208,11 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(h.EnsureRuntimeResolver(t)).WithPolicyService(h.EnsurePolicyService(t)).WithOAuthSettingsService(h.EnsureOAuthSettingsService(t)).
+		).
+			WithBuiltinSchemaBases(BuiltinSchemaBases()).
+			WithRuntimeResolver(h.EnsureRuntimeResolver(t)).
+			WithPolicyService(h.EnsurePolicyService(t)).
+			WithOAuthSettingsService(h.EnsureOAuthSettingsService(t)).
 			WithInvitationService(h.EnsureInvitationService(t))
 	}
 	return h.handler.value
