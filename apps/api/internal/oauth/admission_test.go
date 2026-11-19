@@ -38,6 +38,7 @@ func appProject() *domain.Project {
 		{Pattern: "https://*.wild.example.com", Kind: domain.OriginKindPrimary},
 		{Pattern: "http://127.0.0.1:9999", Kind: domain.OriginKindPreview},
 		{Pattern: "https://console.example.com", Kind: domain.OriginKindPrimary},
+		{Pattern: "https://api.example.com:443", Kind: domain.OriginKindPrimary},
 	}}
 }
 
@@ -58,6 +59,7 @@ func TestProjectAdmissionAdmitsListedPrimariesOnly(t *testing.T) {
 		{name: "unknown host", origin: "https://evil.example.com", want: domain.ErrOriginNotFound()},
 		{name: "the server's own origin", origin: "https://api.example.com", want: domain.ErrOriginNotFound()},
 		{name: "a console alias listed as a primary", origin: "https://console.example.com", want: domain.ErrOriginNotFound()},
+		{name: "the server's own origin with its default port, listed as a primary", origin: "https://api.example.com:443", want: domain.ErrOriginNotFound()},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

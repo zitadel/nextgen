@@ -41,8 +41,7 @@ func NewProjectAdmission(projects projectReader, ownOrigins []string) *ProjectAd
 // Admit implements [Admission]. origin is normalized already, as
 // deriveIssuer leaves it.
 func (a *ProjectAdmission) Admit(ctx context.Context, projectID, origin string) error {
-	origin = strings.TrimSpace(origin)
-	own := slices.Contains(a.ownOrigins, origin)
+	own := slices.Contains(a.ownOrigins, withoutDefaultPort(origin))
 	if projectID == domain.PlatformProjectID {
 		// The platform project's issuer sits on the server's own origins
 		// and nothing else: it is reached directly, never through an app.
@@ -64,24 +63,25 @@ func (a *ProjectAdmission) Admit(ctx context.Context, projectID, origin string) 
 		}
 		return domain.ErrInternal(err).WithMessage("failed to read the project")
 	}
-	entry, ok := domain.MatchOrigin(originsOfKind(project.Origins, domain.OriginKindPrimary), origin)
-	if !ok || entry.Pattern != origin {
+	// A literal primary origin only: a preview or a wildcard is never an issuer.
+	if !slices.ContainsFunc(project.Origins, func(o domain.Origin) bool {
+		return o.Kind == domain.OriginKindPrimary && o.Pattern == origin
+	}) {
 		return domain.ErrOriginNotFound()
 	}
 	return nil
 }
 
-// originsOfKind keeps the entries of one kind, so that a primary origin is
-// matched among primaries only: a preview pattern admits a browser to a
-// preview deployment, never an issuer.
-func originsOfKind(origins []domain.Origin, kind domain.OriginKind) []domain.Origin {
-	kept := make([]domain.Origin, 0, len(origins))
-	for _, origin := range origins {
-		if origin.Kind == kind {
-			kept = append(kept, origin)
-		}
+// withoutDefaultPort spells origin as a browser does, as the server's own
+// origins are: https://host:443 is https://host.
+func withoutDefaultPort(origin string) string {
+	if rest, ok := strings.CutSuffix(origin, ":443"); ok && strings.HasPrefix(origin, "https://") {
+		return rest
 	}
-	return kept
+	if rest, ok := strings.CutSuffix(origin, ":80"); ok && strings.HasPrefix(origin, "http://") {
+		return rest
+	}
+	return origin
 }
 
 var _ Admission = (*ProjectAdmission)(nil)
