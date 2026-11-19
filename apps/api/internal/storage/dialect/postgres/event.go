@@ -156,8 +156,6 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	if err != nil {
 		return wrapError(err)
 	}
-	event.OccurredAt = event.OccurredAt.UTC()
-	event.CreatedAt = event.CreatedAt.UTC()
 	event.Payload = payload
 	event.Metadata = metadata
 	return nil
@@ -238,7 +236,6 @@ func (e eventStatements) ScanEvents(ctx context.Context, within *database.ListOp
 	scanned, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.Scanned, error) {
 		var s events.Scanned
 		err := row.Scan(&s.ID, &s.CreatedAt, &s.Matched)
-		s.CreatedAt = s.CreatedAt.UTC()
 		return s, err
 	})
 	if err != nil {
@@ -291,7 +288,6 @@ func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, project
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	c.LastCreatedAt = c.LastCreatedAt.UTC()
 	return &c, nil
 }
 
@@ -312,7 +308,7 @@ func (e eventStatements) EventsSettledBefore(ctx context.Context, projectID stri
 	if err := e.client.QueryRow(ctx, eventsSettledBeforeStmt, projectID).Scan(&before); err != nil {
 		return time.Time{}, wrapError(err)
 	}
-	return before.UTC(), nil
+	return before, nil
 }
 
 // ListEventsAfterCursor implements [service.EventStatements].
@@ -379,8 +375,6 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 	}
 	ev.EventType = domain.EventType(eventType)
 	ev.Category = domain.EventCategory(category)
-	ev.OccurredAt = ev.OccurredAt.UTC()
-	ev.CreatedAt = ev.CreatedAt.UTC()
 	ev.TeamID = nullStringPtr(teamID)
 	ev.ActorID = nullStringPtr(actorID)
 	if actorType.Valid {

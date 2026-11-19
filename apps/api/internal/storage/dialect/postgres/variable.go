@@ -114,8 +114,6 @@ func scanVariable(row pgx.CollectableRow) (*variable.VariableStorage, error) {
 	if err := json.Unmarshal(encoded, &stored.Value); err != nil {
 		return nil, err
 	}
-	stored.CreatedAt = stored.CreatedAt.UTC()
-	stored.ModifiedAt = stored.ModifiedAt.UTC()
 	return &stored, nil
 }
 
