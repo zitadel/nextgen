@@ -5,23 +5,19 @@
   },
   {
     "operation": "POST /auth_attempts/{attempt_id}/challenges",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /deployments",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /flows",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
   },
   {
     "operation": "POST /flows/{flow_id}/submit",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
   },
   {
     "operation": "POST /projects/query",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "POST /releases/build",
+    "check": "Server error"
   },
   {
     "operation": "POST /schemas",
@@ -29,19 +25,19 @@
   },
   {
     "operation": "POST /teams/query",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
   },
   {
     "operation": "POST /users/{user_id}/passkeys/registrations",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
   },
   {
     "operation": "PUT /users/{user_id}/password",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
   },
   {
     "operation": "Stateful tests",
-    "check": "API rejected schema-compliant request"
+    "check": "Schema-valid request rejected"
   },
   {
     "operation": "Stateful tests",
