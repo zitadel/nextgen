@@ -4,6 +4,12 @@ import { Box, Plus } from "lucide-react";
 import { api } from "@/api/zitadel";
 import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
 import {
+  TEAM_STATUS_LABEL,
+  TEAM_STATUSES,
+  type TeamStatus,
+  teamStatusLabel,
+} from "@/features/teams/status";
+import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
@@ -31,14 +37,6 @@ import { Page } from "@/components/layout";
 import { PAGE_TITLE_ROW } from "@/components/typography";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 
-/**
- * The two states `team-status` defines. The tabs filter on exactly these, so the
- * screen never shows a state the API does not have — the design's table draws
- * the second one as `Inactive`, but its own tab already writes `Deactivated`.
- */
-const STATUSES = ["active", "deactivated"] as const;
-type TeamStatus = (typeof STATUSES)[number];
-
 type TeamsSearch = { status: TeamStatus };
 
 export const Route = createFileRoute("/_authed/teams/")({
@@ -49,7 +47,7 @@ export const Route = createFileRoute("/_authed/teams/")({
   // changing it re-runs the loader, which resets the paged-in rows the way a
   // create or a delete does.
   validateSearch: (search: Record<string, unknown>): TeamsSearch => ({
-    status: STATUSES.find((status) => status === search.status) ?? "active",
+    status: TEAM_STATUSES.find((status) => status === search.status) ?? "active",
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
@@ -133,19 +131,17 @@ function TeamsScreen() {
           </div>
 
           <TabsList aria-label="Filter teams by status">
-            {/* `flex-none` — the triggers hug their labels, as the design draws
-                them at 56px and 92px; the shared component stretches them to
-                share the list evenly. */}
-            <TabsTrigger value="active" className="flex-none">
-              Active
-            </TabsTrigger>
-            <TabsTrigger value="deactivated" className="flex-none">
-              Deactivated
-            </TabsTrigger>
+            {/* `flex-none`: the triggers hug their labels; the shared component
+                stretches them to share the list evenly. */}
+            {TEAM_STATUSES.map((status) => (
+              <TabsTrigger key={status} value={status} className="flex-none">
+                {TEAM_STATUS_LABEL[status]}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 
-        {STATUSES.map((status) => (
+        {TEAM_STATUSES.map((status) => (
           <TabsContent key={status} value={status}>
             <div className={RESOURCE_TABLE_WRAP}>
               {/* The design lays the table on a fixed 248px grid, so a long team
@@ -188,7 +184,7 @@ function TeamsScreen() {
                           </Link>
                         </TableCell>
                         <TableCell className={RESOURCE_CELL}>
-                          <StatusBadge status={team.status} />
+                          <StatusBadge status={team.status} label={teamStatusLabel(team.status)} />
                         </TableCell>
                         <TableCell className={RESOURCE_CELL_MUTED}>
                           {formatDate(team.created_at)}
@@ -213,7 +209,7 @@ function TeamsScreen() {
 
 /** What an empty table means depends on which tab asked for it. */
 function emptyMessage({ status }: TeamsSearch): string {
-  return status === "active" ? "No active teams yet." : "No deactivated teams.";
+  return status === "active" ? "No active teams yet." : "No inactive teams.";
 }
 
 /**
