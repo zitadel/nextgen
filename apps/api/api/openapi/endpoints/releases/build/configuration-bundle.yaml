@@ -33,7 +33,20 @@ description: |
   Unknown keys are refused.
 additionalProperties: false
 # A bundle with nothing in it is refused (`rel.invalid`, "the bundle is empty").
+# Branding and the four collections count, an empty collection does not, and
+# neither does `oauth`, which is settings and not a resource of the bundle.
 minProperties: 1
+not:
+  properties:
+    schemas:
+      maxItems: 0
+    flow_definitions:
+      maxItems: 0
+    idps:
+      maxItems: 0
+    policies:
+      maxItems: 0
+    branding: false
 properties:
   schemas:
     type: array

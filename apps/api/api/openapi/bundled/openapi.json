@@ -13619,7 +13619,8 @@
                           "operation": {
                             "enum": [
                               "equals",
-                              "not_equals"
+                              "not_equals",
+                              "contains"
                             ]
                           },
                           "value": {
@@ -22085,6 +22086,23 @@
         "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`, and one that never turned on its\nOAuth authorization server omits `oauth`. `branding` and `oauth` are\nsingle objects, because a project has one of each. The bundle carries at\nleast one resource. The release it builds pins at most 50 resources, which\ncounts the resources the bundle carries plus those resolved from the\nproject. The server refuses anything outside that with `rel.invalid`.\nUnknown keys are refused.\n",
         "additionalProperties": false,
         "minProperties": 1,
+        "not": {
+          "properties": {
+            "schemas": {
+              "maxItems": 0
+            },
+            "flow_definitions": {
+              "maxItems": 0
+            },
+            "idps": {
+              "maxItems": 0
+            },
+            "policies": {
+              "maxItems": 0
+            },
+            "branding": false
+          }
+        },
         "properties": {
           "schemas": {
             "type": "array",

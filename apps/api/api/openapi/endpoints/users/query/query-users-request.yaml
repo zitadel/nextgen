@@ -130,7 +130,7 @@ properties:
                 properties:
                   field: {}
                   operation:
-                    enum: [equals, not_equals]
+                    enum: [equals, not_equals, contains]
                   value:
                     type: string
                     pattern: '^[^\x00]*$'
