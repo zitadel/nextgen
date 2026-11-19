@@ -9,6 +9,8 @@ properties:
       - type: string
         # An empty name is a bad rename, not a no-op, and is refused.
         minLength: 1
+        pattern: '\S'
+        x-zitadel-pattern-message: "must contain a character other than whitespace"
   password_hash:
     description: |
       The method this project's passwords are hashed with. Send `null` to drop
