@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 import type { CommandRun } from "./contract";
 import type { Failure } from "./report";
@@ -12,7 +13,8 @@ export interface KnownFailure {
  * The failures this API has today and is allowed to keep. It is a ratchet: a
  * failure that is not listed fails its operation's test, and so does a listed
  * one that no longer happens, so a fix removes its line and the list only
- * shrinks. `API_CONTRACT_UPDATE_BASELINE=1` rewrites it from a run.
+ * shrinks. `API_CONTRACT_UPDATE_BASELINE=1` proposes a new one from a run, in an
+ * ignored file, so the task never rewrites a committed file.
  */
 export class Baseline {
   private readonly path: string;
@@ -29,6 +31,7 @@ export class Baseline {
     const known = failures.map(({ operation, check }) => {
       return { operation, check };
     });
+    mkdirSync(dirname(this.path), { recursive: true });
     writeFileSync(this.path, `${JSON.stringify(known, null, 2)}\n`);
   }
 

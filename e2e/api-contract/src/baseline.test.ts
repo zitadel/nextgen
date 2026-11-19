@@ -65,6 +65,16 @@ describe("Baseline", () => {
       { operation: "GET /z", check: "Server error" },
     ]);
   });
+
+  test("creates the folder of a file it proposes, so an update never needs the committed one", async () => {
+    const proposed = join(directory, "test-output", "known-failures.proposed.json");
+
+    new Baseline(proposed).write([{ operation: "GET /z", check: "Server error", count: 1 }]);
+
+    expect(JSON.parse(await readFile(proposed, "utf8"))).toEqual([
+      { operation: "GET /z", check: "Server error" },
+    ]);
+  });
 });
 
 describe("BaselineUpdate", () => {

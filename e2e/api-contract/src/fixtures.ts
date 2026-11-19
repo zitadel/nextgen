@@ -30,6 +30,11 @@ export const API_PREFIX = "/api/v1";
 
 export const baseline = new Baseline(join(packageRoot, "known-failures.json"));
 
+/** Where an update run writes the baseline it proposes: ignored, never the committed file. */
+export const proposedBaseline = new Baseline(
+  join(packageRoot, "test-output", "known-failures.proposed.json"),
+);
+
 /** One booted instance of this working tree's server, and the spec it serves. */
 export interface Instance {
   zitadel: ConnectedZitadel;
@@ -186,7 +191,7 @@ export const test = base.extend<{
         },
       }).run();
       if (process.env.API_CONTRACT_UPDATE_BASELINE === "1") {
-        new BaselineUpdate(runs).apply(baseline);
+        new BaselineUpdate(runs).apply(proposedBaseline);
       }
       await publish(new ContractSummary(runs, baseline), instance);
       await use(runs);

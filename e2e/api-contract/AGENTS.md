@@ -51,11 +51,14 @@ root.
 - A listed failure that no longer happens also fails its operation's test, so a
   fix has to remove its line. The list only shrinks.
 
-After fixing something, or when a change is meant to alter the baseline, rewrite
-it from a run and read the diff:
+After fixing something, or when a change is meant to alter the baseline, propose
+a new one from a run. The task never writes a committed file: it writes
+`api-contract/test-output/known-failures.proposed.json`. Read it against the
+committed list, then copy it over `known-failures.json`:
 
 ```sh
 API_CONTRACT_UPDATE_BASELINE=1 turbo run api-contract --filter=@zitadel/e2e
+cp api-contract/test-output/known-failures.proposed.json api-contract/known-failures.json
 ```
 
 Never add a line to hide a failure you introduced. Fix it, or fix the spec.
