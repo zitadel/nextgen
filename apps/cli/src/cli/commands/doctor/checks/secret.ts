@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
 import { Dotenv } from "@/lib/environment";
-import { Project, ProjectSecret } from "@/lib/project";
+import { Project } from "@/lib/project";
 import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
@@ -70,13 +70,13 @@ export class SecretCheck extends AbstractSanityCheck {
       throw new Error(`The server returned project ${project.id}, not ${projectId}`);
     }
     const origins = Origins.wrap(project.origins);
-    await new ProjectSecret(ctx.cwd, {
+    await Project.at(ctx.cwd).writeSecret({
       project_id: project.id,
       project_secret: projectSecret,
       preview_secret: previewSecret,
       primary_origins: [...origins.primary],
       preview_origins: [...origins.preview],
       created_at: project.created_at,
-    }).write();
+    });
   }
 }

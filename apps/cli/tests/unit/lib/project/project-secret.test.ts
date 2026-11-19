@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import { Project, ProjectSecret } from "@/lib/project";
+import { Project } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 const VALID_SECRET = {
@@ -92,7 +92,7 @@ describe("Project.secret", () => {
   });
 });
 
-describe("ProjectSecret.write", () => {
+describe("Project.writeSecret", () => {
   async function seed(cwd: string, extra: Record<string, unknown> = {}): Promise<void> {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...VALID_SECRET, ...extra }));
@@ -147,7 +147,7 @@ describe("ProjectSecret.write", () => {
 
 describe("ProjectSecret.write", () => {
   it("creates .zitadel when it is gone", async ({ dir: cwd }) => {
-    await new ProjectSecret(cwd, VALID_SECRET).write();
+    await Project.at(cwd).writeSecret(VALID_SECRET);
 
     expect((await Project.at(cwd).secret()).data).toEqual(VALID_SECRET);
   });
