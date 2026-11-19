@@ -45,7 +45,7 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 
 	deploy := func() {
 		t.Helper()
-		require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, projects, releases, deployments))
+		require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, false, projects, releases, deployments))
 	}
 	served := func() []domain.OriginDeployment {
 		t.Helper()
@@ -92,6 +92,30 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
 }
 
+// A server started with oauth.enabled deploys the platform issuer's OAuth
+// settings with the login flows, and a restart keeps both.
+func TestEnsureDeployedSQLiteKeepsOAuthAcrossRestarts(t *testing.T) {
+	ctx := t.Context()
+	dbPool, stop, err := dbtest.SQLite(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+	pool := service.NewPool(dbPool)
+	projects, keys := newTestProjects(t, pool)
+	releases, deployments := newTestReleases(t, pool, keys)
+	require.NoError(t, Ensure(ctx, projects, pool, true))
+
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, true, projects, releases, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, true, projects, releases, deployments))
+
+	served, err := pool.Statements().GetNewestPerOrigin(ctx, domain.PlatformProjectID, []string{consoleOrigin})
+	require.NoError(t, err)
+	require.Len(t, served, 1)
+	release, err := releases.Get(ctx, domain.PlatformProjectID, served[0].ReleaseID)
+	require.NoError(t, err)
+	require.Len(t, release.Pins(domain.ReleasePointerKindOauth), 1, "the OAuth settings are pinned")
+	assert.NotEmpty(t, release.Pins(domain.ReleasePointerKindFlowDefinition), "the login flows stay")
+}
+
 // A server built before the one that made the live deployment leaves the
 // project alone, even when it was started with another public base.
 func TestEnsureDeployedSQLiteOlderBuildLeavesTheProjectAlone(t *testing.T) {
@@ -103,9 +127,9 @@ func TestEnsureDeployedSQLiteOlderBuildLeavesTheProjectAlone(t *testing.T) {
 	projects, keys := newTestProjects(t, pool)
 	releases, deployments := newTestReleases(t, pool, keys)
 	require.NoError(t, Ensure(ctx, projects, pool, true))
-	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, projects, releases, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, false, projects, releases, deployments))
 
-	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild.Add(-time.Hour), "https://old.example.com", projects, releases, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild.Add(-time.Hour), "https://old.example.com", false, projects, releases, deployments))
 
 	project, err := projects.Get(ctx, domain.PlatformProjectID, service.ProjectQueryOptions{})
 	require.NoError(t, err)
@@ -123,7 +147,7 @@ func TestEnsureDeployedSQLiteStartsWhenItsContentIsRevoked(t *testing.T) {
 	projects, keys := newTestProjects(t, pool)
 	releases, deployments := newTestReleases(t, pool, keys)
 	require.NoError(t, Ensure(ctx, projects, pool, true))
-	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, projects, releases, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, false, projects, releases, deployments))
 
 	read, err := pool.Statements().GetNewestPerOrigin(ctx, domain.PlatformProjectID, []string{consoleOrigin})
 	require.NoError(t, err)
@@ -147,7 +171,7 @@ func TestEnsureDeployedSQLiteStartsWhenItsContentIsRevoked(t *testing.T) {
 	_, err = releases.Revoke(ctx, domain.PlatformProjectID, revoked.ID)
 	require.NoError(t, err)
 
-	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, projects, releases, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, false, projects, releases, deployments))
 }
 
 // Every start leaves public_base's origin the one primary origin, so a public
@@ -163,11 +187,11 @@ func TestEnsureDeployedSQLiteOwnsThePrimaryOrigins(t *testing.T) {
 	require.NoError(t, Ensure(ctx, projects, pool, true))
 
 	const preview = "https://*-console.example.com"
-	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, "https://old.example.com", projects, releases, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, "https://old.example.com", false, projects, releases, deployments))
 	_, err = projects.AddOrigin(ctx, domain.PlatformProjectID, domain.Origin{Pattern: preview, Kind: domain.OriginKindPreview})
 	require.NoError(t, err)
 
-	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, projects, releases, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, false, projects, releases, deployments))
 
 	project, err := projects.Get(ctx, domain.PlatformProjectID, service.ProjectQueryOptions{})
 	require.NoError(t, err)
@@ -205,7 +229,7 @@ func TestEnsureDeployedSQLiteRetriesALostBuild(t *testing.T) {
 	require.NoError(t, Ensure(ctx, projects, pool, true))
 
 	losing := &conflictOnce{ReleaseService: releases}
-	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, projects, losing, deployments))
+	require.NoError(t, EnsureDeployed(ctx, testSchemaBase, testBuild, consoleOrigin, false, projects, losing, deployments))
 	assert.True(t, losing.lost)
 }
 
@@ -232,6 +256,7 @@ func newTestReleases(t *testing.T, pool *service.DB, keys service.KeyService) (s
 		service.NewIDPConnectionService(pool, validator),
 		service.NewApplicationService(pool, validator, secrets.NewRandomSecretGenerator(), service.NewVariableService(pool, keys), keys),
 		service.NewPolicyService(pool, engine),
+		service.NewOAuthSettingsService(pool),
 		bases,
 	)
 	return releases, service.NewDeploymentService(pool, service.NewVariableService(pool, keys))

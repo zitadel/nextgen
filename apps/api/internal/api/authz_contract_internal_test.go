@@ -110,6 +110,7 @@ var (
 	teamCodes        = gateCodes{domain.ErrTeamPermissionDenied().Code, domain.ErrTeamNotFound().Code, domain.ErrTeamProjectNotFound().Code}
 	userCodes        = gateCodes{domain.ErrUserPermissionDenied().Code, domain.ErrUserNotFound().Code, domain.ErrUserInvalid().Code}
 	variableCodes    = gateCodes{domain.ErrVariablePermissionDenied().Code, domain.ErrVariableNotFound().Code, domain.ErrVariableNotFound().Code}
+	oauthSetCodes    = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsNotFound().Code}
 )
 
 // Open decisions: relations the catalog (docs/design/api/system-permission-catalog.md)
@@ -139,6 +140,7 @@ var gateRows = []gateRow{
 	{op: "ListBranding", cookie: true, relation: viewer, target: onProject, list: true, miss: brandingCodes.readMiss},
 	{op: "PublishBranding", relation: editor, target: onProject, denied: brandingCodes.denied, miss: brandingCodes.writeMiss},
 	{op: "GetBranding", cookie: true, relation: viewer, target: onResource, idField: "BrandingID", kind: domain.ResourceKindBranding, denied: brandingCodes.denied, miss: brandingCodes.readMiss},
+	{op: "GetOAuthSettings", cookie: true, relation: viewer, target: onResource, idField: "OAuthSettingsID", kind: domain.ResourceKindOAuthSettings, denied: oauthSetCodes.denied, miss: oauthSetCodes.readMiss},
 
 	// Deployments and previews.
 	{op: "ListDeployments", cookie: true, relation: viewer, target: onProject, list: true, miss: deploymentCodes.readMiss},

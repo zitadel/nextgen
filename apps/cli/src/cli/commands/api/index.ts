@@ -10,6 +10,7 @@ import {
   Operation,
   OperationService,
   type Target,
+  UnauthorizedError,
   type ZitadelClient,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
@@ -230,6 +231,7 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
     "<%= config.bin %> api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
+    "<%= config.bin %> api updateUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W -F attributes.age=1",
     "<%= config.bin %> api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json",
     "<%= config.bin %> api listEvents -F category=auth --paginate --json",
     "<%= config.bin %> api createTeam -F name=Support --dry-run",
@@ -410,9 +412,20 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
-    const response = flags.paginate
-      ? await operationService.callAll(request)
-      : await operationService.call(request);
+    const response = await (flags.paginate
+      ? operationService.callAll(request)
+      : operationService.call(request)
+    ).catch((error: unknown) => {
+      if (error instanceof UnauthorizedError && operation.auth === "secret") {
+        throw new ZitadelError("E_AUTH", error.message, {
+          hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
+          details: {
+            server,
+          },
+        });
+      }
+      throw error;
+    });
 
     const answer = this.answered(operation.id, response);
 

@@ -612,6 +612,17 @@ describe("doctor", () => {
         expect((await before.changes()).added).toContain("app/login/page.tsx");
       });
 
+      it("restores a project secret the developer deleted", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLocalSecret();
+        const before = await app.snapshot();
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({ status: "ok", data: { ok: true } });
+        expect((await before.changes()).added).toContain(".zitadel/secret");
+      });
+
       it("moves a Vite app's dev proxy that fixes the server's address onto ZITADEL_URL", async () => {
         const app = await aSetUpReactApp();
         await app.fixesItsServerAddress();

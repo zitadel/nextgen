@@ -110,14 +110,14 @@ func TestDeclaredApplication(t *testing.T) {
 
 	t.Run("each deployment serves the revision its release pins", func(t *testing.T) {
 		assert.NotEqual(t, v1.Pointers[0].RevisionID, v2.Pointers[0].RevisionID)
-		served, err := applications.Client(servedByV1, f.project, "shop-web")
+		served, err := applications.ServedClient(servedByV1, f.project, "shop-web")
 		require.NoError(t, err)
 		assert.Equal(t, v1.Pointers[0].RevisionID, served.Application.RevisionID)
 		assert.Equal(t, []string{"https://web.example.com/callback"}, served.Document.RedirectURIs)
 
 		deployedV2 := f.deploy(t, v2.ID)
 		require.IsType(t, &api.CreateDeploymentCreated{}, deployedV2, helpers.MustMarshal(t, deployedV2))
-		served, err = applications.Client(f.servedBy(t, string(deployedV2.(*api.CreateDeploymentCreated).ID)), f.project, "shop-web")
+		served, err = applications.ServedClient(f.servedBy(t, string(deployedV2.(*api.CreateDeploymentCreated).ID)), f.project, "shop-web")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"https://shop.example.com/auth/callback"}, served.Document.RedirectURIs)
 	})
@@ -125,7 +125,7 @@ func TestDeclaredApplication(t *testing.T) {
 	t.Run("a deployment whose release does not pin the application does not serve its client", func(t *testing.T) {
 		deployed := f.deploy(t, f.release.ID)
 		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
-		_, err := applications.Client(f.servedBy(t, string(deployed.(*api.CreateDeploymentCreated).ID)), f.project, "shop-web")
+		_, err := applications.ServedClient(f.servedBy(t, string(deployed.(*api.CreateDeploymentCreated).ID)), f.project, "shop-web")
 		assert.ErrorIs(t, err, domain.ErrApplicationClientNotFound())
 	})
 
@@ -215,7 +215,7 @@ func TestRegisteredApplicationClient(t *testing.T) {
 
 	_, err = applications.AuthenticateClient(t.Context(), f.project.ID, web.ClientID, "guess")
 	assert.ErrorIs(t, err, domain.ErrApplicationClientSecretInvalid())
-	_, err = applications.Client(t.Context(), f.project.ID, "unknown")
+	_, err = applications.ServedClient(t.Context(), f.project.ID, "unknown")
 	assert.ErrorIs(t, err, domain.ErrApplicationClientNotFound())
 }
 

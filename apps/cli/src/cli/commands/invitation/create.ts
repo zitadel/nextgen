@@ -5,6 +5,7 @@ import {
   type Invitation,
   type InvitationRelation,
   InvitationService,
+  invitationGrant,
   invitationRole,
 } from "@/lib/backend";
 import { createInvitationBodyOneOneMetadataNameMax } from "@/lib/backend/schemas";
@@ -18,6 +19,9 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Parsed } from "@zitadel/config/idp";
 import { invitationIdSchema } from "./id";
 import { ServerCommand } from "@/cli/commands/server-command";
+
+/** The product event a create or replace sends once the API confirms it (ADR 086 §9). */
+const INVITATION_CREATED = "invitation_created";
 
 /** The project roles an invitation can grant, least first. */
 const RELATIONS = ["viewer", "editor", "admin"] as const satisfies readonly InvitationRelation[];
@@ -144,9 +148,9 @@ export default class InvitationCreate extends Promptable(ServerCommand(Environme
       name,
       replaces: flags.replaces,
     });
-    this.recordTelemetry({
-      role: `project_${invitationRole(invitation)}`,
-      is_replace: flags.replaces !== undefined,
+    this.trackEvent(INVITATION_CREATED, {
+      role: invitationGrant(invitation),
+      invitation_journey_id: invitation.journey_id,
     });
 
     return this.emit({
@@ -161,7 +165,7 @@ export default class InvitationCreate extends Promptable(ServerCommand(Environme
         ],
       },
       next: {
-        commands: [this.suggest({ id: "invitation:list", flags: { status: "pending" } })],
+        commands: [this.suggest({ id: "invitation:list", flags: { status: ["pending"] } })],
       },
     });
   }

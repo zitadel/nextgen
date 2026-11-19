@@ -106,6 +106,10 @@ export async function resolvePointer(
         const body = await api.getBranding(pointer.revision_id);
         return { ...base, name: handleName(pointer), document: body.branding };
       }
+      case "oauth": {
+        const body = await api.getOAuthSettings(pointer.revision_id);
+        return { ...base, name: handleName(pointer), document: body.oauth };
+      }
       case "idp": {
         const body = await api.getIdpRevision(pointer.revision_id, { project_id: projectId });
         return { ...base, name: handleName(pointer), document: body.definition };
@@ -115,10 +119,6 @@ export async function resolvePointer(
           project_id: projectId,
         });
         return { ...base, name: body.definition.name, document: body.definition };
-      }
-      case "oauth": {
-        const body = await api.getOAuthSettings(pointer.revision_id);
-        return { ...base, name: handleName(pointer), document: body.oauth };
       }
       case "policy": {
         const revision = await api.getPolicyRevision(pointer.revision_id, {

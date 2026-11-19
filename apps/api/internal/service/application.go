@@ -41,14 +41,13 @@ type ApplicationService interface {
 	Get(ctx context.Context, projectID, id string) (*domain.Application, error)
 	// GetRevision reads one revision by its id, the one a release pins.
 	GetRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error)
-	// Client finds the client clientID names, as it serves the request in ctx:
-	// a registered application at its newest revision, a declared one at the
-	// revision the request's release pins (ADR 082 §3). Errors:
-	// app.client_not_found when no client serving the request holds clientID,
-	// rel.not_deployed when it is declared and the request resolved no
-	// release.
-	Client(ctx context.Context, projectID, clientID string) (*ServedApplicationClient, error)
-	// AuthenticateClient is [ApplicationService.Client] for a client that
+	// Client resolves the client's document for the deployment's release.
+	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
+	// ServedClient finds the client clientID names, as it serves the request in
+	// ctx: a registered application at its newest revision, a declared one at
+	// the revision the request's release pins (ADR 082 §3).
+	ServedClient(ctx context.Context, projectID, clientID string) (*ServedApplicationClient, error)
+	// AuthenticateClient is [ApplicationService.ServedClient] for a client that
 	// presents secret: a registered client's must match one of its stored
 	// hashes, a declared one's the variable its `secret` names, as the
 	// request's deployment froze it. Errors: those of Client, and
@@ -499,8 +498,26 @@ func declaredWriteError(err error) error {
 	return applicationReadError(err)
 }
 
-func (s *applicationService) Client(ctx context.Context, projectID, clientID string) (_ *ServedApplicationClient, err error) {
+func (s *applicationService) Client(ctx context.Context, projectID, deploymentID, clientID string) (_ domain.ApplicationClientDocument, err error) {
 	ctx, end := startSpan(ctx, "ApplicationService.Client")
+	defer end(&err)
+
+	served, err := s.servedClient(ctx, projectID, deploymentID, clientID)
+	if err != nil {
+		return domain.ApplicationClientDocument{}, err
+	}
+	return served.Document, nil
+}
+
+func (s *applicationService) ServedClient(ctx context.Context, projectID, clientID string) (_ *ServedApplicationClient, err error) {
+	ctx, end := startSpan(ctx, "ApplicationService.ServedClient")
+	defer end(&err)
+
+	return s.servedClient(ctx, projectID, "", clientID)
+}
+
+func (s *applicationService) servedClient(ctx context.Context, projectID, deploymentID, clientID string) (_ *ServedApplicationClient, err error) {
+	ctx, end := startSpan(ctx, "ApplicationService.ServedClient")
 	defer end(&err)
 
 	stmts := s.v2Pool.Statements()
@@ -512,7 +529,28 @@ func (s *applicationService) Client(ctx context.Context, projectID, clientID str
 	if err != nil {
 		return nil, clientLookupError(err)
 	}
+	declared := entity.IsDeclared
 	if entity.IsDeclared {
+		resolution := RuntimeResolutionFromContext(ctx)
+		if deploymentID != "" {
+			if resolution != nil && resolution.Deployment != nil && resolution.Deployment.ID != deploymentID {
+				return nil, domain.ErrInternal(nil).WithMessage("OAuth client lookup resolved a different deployment")
+			}
+			if resolution == nil || resolution.Deployment == nil || resolution.Release == nil {
+				deployment, err := stmts.GetDeploymentByID(ctx, projectID, deploymentID)
+				if err != nil {
+					return nil, applicationReadError(err)
+				}
+				release, err := stmts.GetReleaseByID(ctx, projectID, deployment.ReleaseID)
+				if err != nil {
+					return nil, applicationReadError(err)
+				}
+				if release.Revoked() {
+					return nil, domain.ErrReleaseRevoked()
+				}
+				ctx = WithRuntimeResolution(ctx, &RuntimeResolution{Deployment: deployment, Release: release})
+			}
+		}
 		pins, err := runtimePins(ctx, domain.ReleasePointerKindApplication)
 		if err != nil {
 			return nil, err
@@ -531,8 +569,11 @@ func (s *applicationService) Client(ctx context.Context, projectID, clientID str
 	}
 	i := slices.IndexFunc(doc.Clients, func(client domain.ApplicationClientDocument) bool { return client.Slug == stored.Slug })
 	if i < 0 {
-		// The pinned revision predates the client: the release does not serve it.
-		return nil, domain.ErrApplicationClientNotFound()
+		if declared {
+			// The pinned revision predates the client: the release does not serve it.
+			return nil, domain.ErrApplicationClientNotFound()
+		}
+		return nil, domain.ErrInternal(nil).WithMessage("stored client is missing from its application document")
 	}
 	return &ServedApplicationClient{Application: entity, Document: doc.Clients[i], Stored: stored}, nil
 }
@@ -541,7 +582,7 @@ func (s *applicationService) AuthenticateClient(ctx context.Context, projectID, 
 	ctx, end := startSpan(ctx, "ApplicationService.AuthenticateClient")
 	defer end(&err)
 
-	served, err := s.Client(ctx, projectID, clientID)
+	served, err := s.ServedClient(ctx, projectID, clientID)
 	if err != nil {
 		return nil, err
 	}

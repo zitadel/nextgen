@@ -28,6 +28,10 @@ const (
 	ReleasePointerKindBranding
 	ReleasePointerKindIDP
 	ReleasePointerKindPolicy
+	// ReleasePointerKindOauth pins a project's OAuth settings revision. It is
+	// spelled Oauth, not OAuth, so that enumer's snake transform gives the
+	// wire value oauth rather than o_auth.
+	ReleasePointerKindOauth
 	ReleasePointerKindApplication
 )
 
@@ -192,6 +196,7 @@ type ReleaseContent struct {
 	Applications    []*Application
 	Policies        []*Policy
 	Branding        *Branding
+	OAuth           *OAuthSettings
 }
 
 // Pointers returns one pointer per revision, under the handle it declares,
@@ -229,6 +234,9 @@ func (c ReleaseContent) pointers() ([]ReleasePointer, error) {
 	}
 	if c.Branding != nil {
 		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindBranding, Handle: ReleaseBrandingHandle, RevisionID: c.Branding.ID})
+	}
+	if c.OAuth != nil {
+		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindOauth, Handle: ReleaseOAuthHandle, RevisionID: c.OAuth.ID})
 	}
 
 	for _, pointer := range pointers {

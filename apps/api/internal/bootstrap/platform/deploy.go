@@ -26,7 +26,8 @@ const maxBuildAttempts = 3
 // EnsureDeployed deploys the platform project the way the CLI deploys any
 // project: the configuration this server ships (the platform user schema, the
 // default login flows, the recommended password policy and the default sign-up
-// policy) is built into one release and deployed to consoleOrigin, the project's one primary origin. It
+// policy, and with oauthEnabled the platform issuer's OAuth settings) is built
+// into one release and deployed to consoleOrigin, the project's one primary origin. It
 // runs on every seeding, so an upgrade's defaults go live. A seeding that changes
 // nothing deploys nothing, and a server built before the one that made the live
 // deployment leaves it alone.
@@ -35,6 +36,7 @@ func EnsureDeployed(
 	builtinBase string,
 	builtAt time.Time,
 	consoleOrigin string,
+	oauthEnabled bool,
 	projects service.ProjectService,
 	releases service.ReleaseService,
 	deployments *service.DeploymentService,
@@ -49,7 +51,7 @@ func EnsureDeployed(
 		return nil
 	}
 
-	bundle, err := platformBundle(builtinBase)
+	bundle, err := platformBundle(builtinBase, oauthEnabled)
 	if err != nil {
 		return err
 	}
@@ -154,8 +156,10 @@ func ownPrimaryOrigin(ctx context.Context, projects service.ProjectService, cons
 
 // platformBundle is the configuration this server ships for the platform
 // project, as a release bundle: the documents a `.zitadel/` directory would
-// hold, so the build stores them under ids it mints, as for any project.
-func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
+// hold, so the build stores them under ids it mints, as for any project. The
+// OAuth settings come from oauth.enabled, so a restart keeps the platform
+// issuer as configured and no admin deploy has to drop the login flows.
+func platformBundle(builtinBase string, oauthEnabled bool) (service.BuildReleaseInput, error) {
 	schema, err := schemas.PlatformHumanUserSchema(builtinBase)
 	if err != nil {
 		return service.BuildReleaseInput{}, fmt.Errorf("platform user schema: %w", err)
@@ -172,6 +176,9 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 		ProjectID: domain.PlatformProjectID,
 		Schemas:   []service.BuildSchema{{Document: schema}},
 		Policies:  policies,
+	}
+	if oauthEnabled {
+		bundle.OAuth = &service.CreateOAuthSettingsInput{ProjectID: domain.PlatformProjectID, Enabled: true}
 	}
 	for i, flow := range flows {
 		purposes := make(map[string]string, len(flow.Purposes))

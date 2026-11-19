@@ -45,6 +45,7 @@ type BundleShapeInput struct {
 	Applications []BundleShapeApplication
 	Policies     []BundleShapePolicy
 	HasBranding  bool
+	HasOAuth     bool
 }
 
 // BundleShapeFailure is one shape rule that a bundle entry broke.
@@ -62,6 +63,9 @@ type BundleShapeFailure struct {
 func ValidateBundleShape(input BundleShapeInput) []BundleShapeFailure {
 	total := len(input.Schemas) + len(input.Flows) + len(input.IDPs) + len(input.Applications) + len(input.Policies)
 	if input.HasBranding {
+		total++
+	}
+	if input.HasOAuth {
 		total++
 	}
 	if total == 0 {
@@ -242,5 +246,5 @@ func IDPDocumentSlug(document []byte) (string, error) {
 
 // BundleEmpty reports whether the bundle carries no resources.
 func BundleEmpty(input BundleShapeInput) bool {
-	return len(input.Schemas)+len(input.Flows)+len(input.IDPs)+len(input.Applications)+len(input.Policies) == 0 && !input.HasBranding
+	return len(input.Schemas)+len(input.Flows)+len(input.IDPs)+len(input.Applications)+len(input.Policies) == 0 && !input.HasBranding && !input.HasOAuth
 }

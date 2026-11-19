@@ -59,6 +59,7 @@ var payloadByEventType = map[string]string{
 	"auth.attempt.handed_off":        "empty-event-payload.yaml",
 	"auth.check.failed":              "auth-check-payload.yaml",
 	"auth.check.succeeded":           "auth-check-payload.yaml",
+	"auth.request.created":           "auth-request-created-payload.yaml",
 
 	"auth.sso.authorization.failed": "auth-check-payload.yaml",
 	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
@@ -71,6 +72,8 @@ var payloadByEventType = map[string]string{
 	"schema.created": "schema-created-payload.yaml",
 
 	"branding.created": "branding-created-payload.yaml",
+
+	"oauth_settings.created": "oauth-settings-created-payload.yaml",
 
 	"policy.created": "policy-payload.yaml",
 	"policy.updated": "policy-payload.yaml",
@@ -172,6 +175,8 @@ var webhookByEventType = map[string]webhookDoc{
 		"password."},
 	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. The event is also sent " +
 		"when a factor is recorded without a challenge, as on sign-up."},
+	"auth.request.created": {description: "An app started a sign-in at the OAuth authorization endpoint. The " +
+		"payload names the app by its `client_id`."},
 
 	"auth.sso.authorization.failed": {description: "A sign-in through an identity provider (SSO) failed at the provider. " +
 		"It answered with an error, `access_denied` included, or the callback carried no code."},
@@ -189,6 +194,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"schema.created": {description: "A schema was created."},
 
 	"branding.created": {description: "A branding revision was created."},
+
+	"oauth_settings.created": {description: "A project published a new revision of its OAuth settings, " +
+		"which say whether its OAuth authorization server answers. A release build publishes one when the " +
+		"bundle's `oauth` resource differs from every earlier revision."},
 
 	"policy.created": {description: "A project published the first revision of its policy for an operation. " +
 		"A policy guards an operation, such as setting a password."},

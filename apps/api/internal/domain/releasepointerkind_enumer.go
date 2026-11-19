@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _ReleasePointerKindName = "schemaflow_definitionbrandingidppolicyapplication"
+const _ReleasePointerKindName = "schemaflow_definitionbrandingidppolicyoauthapplication"
 
-var _ReleasePointerKindIndex = [...]uint8{0, 6, 21, 29, 32, 38, 49}
+var _ReleasePointerKindIndex = [...]uint8{0, 6, 21, 29, 32, 38, 43, 54}
 
-const _ReleasePointerKindLowerName = "schemaflow_definitionbrandingidppolicyapplication"
+const _ReleasePointerKindLowerName = "schemaflow_definitionbrandingidppolicyoauthapplication"
 
 func (i ReleasePointerKind) String() string {
 	if i >= ReleasePointerKind(len(_ReleasePointerKindIndex)-1) {
@@ -30,10 +30,11 @@ func _ReleasePointerKindNoOp() {
 	_ = x[ReleasePointerKindBranding-(2)]
 	_ = x[ReleasePointerKindIDP-(3)]
 	_ = x[ReleasePointerKindPolicy-(4)]
-	_ = x[ReleasePointerKindApplication-(5)]
+	_ = x[ReleasePointerKindOauth-(5)]
+	_ = x[ReleasePointerKindApplication-(6)]
 }
 
-var _ReleasePointerKindValues = []ReleasePointerKind{ReleasePointerKindSchema, ReleasePointerKindFlowDefinition, ReleasePointerKindBranding, ReleasePointerKindIDP, ReleasePointerKindPolicy, ReleasePointerKindApplication}
+var _ReleasePointerKindValues = []ReleasePointerKind{ReleasePointerKindSchema, ReleasePointerKindFlowDefinition, ReleasePointerKindBranding, ReleasePointerKindIDP, ReleasePointerKindPolicy, ReleasePointerKindOauth, ReleasePointerKindApplication}
 
 var _ReleasePointerKindNameToValueMap = map[string]ReleasePointerKind{
 	_ReleasePointerKindName[0:6]:        ReleasePointerKindSchema,
@@ -46,8 +47,10 @@ var _ReleasePointerKindNameToValueMap = map[string]ReleasePointerKind{
 	_ReleasePointerKindLowerName[29:32]: ReleasePointerKindIDP,
 	_ReleasePointerKindName[32:38]:      ReleasePointerKindPolicy,
 	_ReleasePointerKindLowerName[32:38]: ReleasePointerKindPolicy,
-	_ReleasePointerKindName[38:49]:      ReleasePointerKindApplication,
-	_ReleasePointerKindLowerName[38:49]: ReleasePointerKindApplication,
+	_ReleasePointerKindName[38:43]:      ReleasePointerKindOauth,
+	_ReleasePointerKindLowerName[38:43]: ReleasePointerKindOauth,
+	_ReleasePointerKindName[43:54]:      ReleasePointerKindApplication,
+	_ReleasePointerKindLowerName[43:54]: ReleasePointerKindApplication,
 }
 
 var _ReleasePointerKindNames = []string{
@@ -56,7 +59,8 @@ var _ReleasePointerKindNames = []string{
 	_ReleasePointerKindName[21:29],
 	_ReleasePointerKindName[29:32],
 	_ReleasePointerKindName[32:38],
-	_ReleasePointerKindName[38:49],
+	_ReleasePointerKindName[38:43],
+	_ReleasePointerKindName[43:54],
 }
 
 // ReleasePointerKindString retrieves an enum value from the enum constants string name.

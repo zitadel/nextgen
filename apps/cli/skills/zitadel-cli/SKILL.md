@@ -92,10 +92,15 @@ nothing; `data.skills` and `data.directories` say what it added where.
   already asked for this exact change, put `details.question` to them and run
   the retry only once they say yes. `doctor --fix` reports a repair that
   waited for such a yes in `warnings`.
+- **A missing `.zitadel/secret` is restored by `doctor --fix`**, not by `setup`,
+  which skips an app that is already set up. The repair rebuilds the file from
+  `.env.development.local` and the origins the server reports; without those
+  credentials it fails and `doctor` keeps reporting the `secret` check.
 - **Commit `.zitadel/` before you `deploy`.** A release records the commit it
-  was built from, and records it as approximate when the tree has uncommitted
-  changes, so the next deploy cannot diff and the next session, which remembers
-  nothing of yours, cannot tell your work from someone else's. After editing,
+  was built from, and records it as approximate when a file the release is
+  built from has uncommitted changes, so the next deploy cannot diff and the
+  next session, which remembers nothing of yours, cannot tell your work from
+  someone else's. After editing,
   run `git add .zitadel && git commit -m "<why>" -- .zitadel`, then `deploy -m "<why>"`.
   Skip the commit only when `git status` shows nothing under `.zitadel/`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
@@ -186,10 +191,14 @@ nothing; `data.skills` and `data.directories` say what it added where.
   - `--replaces <invitation_id>` makes a new link for a lost, expired or
     declined one, keeping its name unless `--name` gives another; an accepted
     one fails with `E_VALIDATION`.
-  - `invitation list [--status …] [--type …]` and `invitation get
-    <invitation_id>` read them. `invitation cancel <invitation_id>` stops a
-    pending link or removes a declined one and needs `--force` when
-    non-interactive; its `--dry-run` needs the id.
+  - `invitation list` leaves accepted invitations out, as the console does;
+    repeat `--status` to pick statuses (`--status accepted` lists them).
+    `invitation get <invitation_id>` reads one; `responded_by` and
+    `responded_at` say who accepted or declined it, and when.
+  - `invitation cancel <invitation_id>` stops a pending link, or removes a
+    declined invitation, and needs `--force` when non-interactive; its
+    `--dry-run` needs the id. An accepted or expired one fails with
+    `E_VALIDATION`.
   - A project nobody has claimed refuses invitations until it is claimed
     (`zitadel claim`). Existing members are read with `grant list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
@@ -226,7 +235,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   any operation of the API with the server, project and project secret every
   project command resolves (`--server`, `--env`, `--env-file`, the `.env`
   files, `.zitadel/secret`). One that needs the secret fails with
-  `E_VALIDATION` when no `ZITADEL_URL` resolves; one that needs none runs
+  `E_VALIDATION` when no `ZITADEL_URL` resolves, and with `E_AUTH` when that
+  server does not accept the secret, the hint naming the server and the variable
+  (a secret belongs to the project on one server); one that needs none runs
   against the cloud where nothing names a server. One
   that deletes, revokes or rolls back asks first and needs `--force` when
   non-interactive, as the command that covers it does. An update is not
@@ -391,6 +402,12 @@ Each invocation prints one JSON object:
   when no identifier step comes before it. A step reached through a
   `user_already_exists` collision, such as `sso-conflict`, is exempt: the
   collision names the user.
+- `deploy`, `deploy --dry-run` and `preview` probe the branding image URLs
+  (`logo_url`, `hero_url`, `theme.light.logo_url`, `theme.dark.logo_url`) and
+  add one `warnings` line per field whose public `https` URL is unreachable,
+  not a 2xx or not an image, naming the field. It never fails the command; set
+  `ZITADEL_SKIP_ASSET_PROBE` to skip it, or `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to
+  change the per-URL budget.
 - `deploy` and `deploy --dry-run` read the project's users and refuse when the
   config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
@@ -493,7 +510,7 @@ Each invocation prints one JSON object:
   inlines. Review it before you deploy. `files` is `[]` when nothing changed
   and `null` when there is nothing to diff against, with `diff.note` saying
   why. The diff is against the commit the live release recorded, not against
-  what the server holds. A deploy from uncommitted changes records an
+  what the server holds. A deploy from uncommitted `.zitadel/` changes records an
   approximate commit, so the next deploy cannot show a diff (`files` is `null`,
   with a note); it still publishes the files as they are now, so a revert is
   published too. Commit your `.zitadel/` changes before every `deploy` so the
@@ -737,7 +754,8 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 ```
 
 Commit first. A release records the commit it was built from, and records it
-as approximate when the tree has uncommitted changes, which leaves the next
+as approximate when a file the release is built from (`.zitadel/`, or a file
+a branding template inlines) has uncommitted changes, which leaves the next
 deploy no diff to show (`deploy --dry-run` reports no reliable diff). It also
 leaves a clean tree for the next session, which remembers nothing of yours.
 Skip the commit only when `git status` shows nothing under `.zitadel/`. If you

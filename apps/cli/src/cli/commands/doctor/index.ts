@@ -233,6 +233,7 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
             continue;
           }
           log.debug(`doctor --fix: ${check.name} repair failed`, error);
+          invocationWarnings.report(`${check.name} could not be repaired: ${errorMessage(error)}`);
         }
       }
     }

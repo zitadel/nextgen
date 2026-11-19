@@ -19,7 +19,7 @@ import (
 func newMockedReleaseServiceWithBranding(t *testing.T) (service.ReleaseService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
-	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, nil, nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, nil, nil, nil, testBuiltinBases), statements
 }
 
 // newMockedReleaseServiceWithSchemas builds with the schema writer. Its
@@ -28,7 +28,7 @@ func newMockedReleaseServiceWithSchemas(t *testing.T) (service.ReleaseService, *
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
 	schemas := service.NewSchemaService(pool, nil, nil, testBuiltinBases)
-	return service.NewReleaseService(pool, schemas, nil, nil, nil, nil, nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, schemas, nil, nil, nil, nil, nil, nil, testBuiltinBases), statements
 }
 
 // mockedBuildPool runs every transaction inline on statements and accepts
@@ -308,7 +308,7 @@ func TestBuildRelease_NeverFetchesTheBuiltinNamespace(t *testing.T) {
 func TestBuildRelease_PolicyForAMissingProjectIsProjectNotFound(t *testing.T) {
 	t.Parallel()
 	pool, statements := mockedBuildPool(t)
-	svc := service.NewReleaseService(pool, nil, nil, nil, nil, nil, service.NewPolicyService(pool, mustPolicyEngine(t)), testBuiltinBases)
+	svc := service.NewReleaseService(pool, nil, nil, nil, nil, nil, service.NewPolicyService(pool, mustPolicyEngine(t)), nil, testBuiltinBases)
 
 	statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
 	statements.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
@@ -343,7 +343,7 @@ func TestBuildRelease_ReplayedTransactionReportsARefusalOnce(t *testing.T) {
 	validator, err := domain.NewSchemaValidator("https://example.com/api/schemas")
 	require.NoError(t, err)
 	db := service.NewPool(pool)
-	svc := service.NewReleaseService(db, nil, nil, nil, nil, service.NewApplicationService(db, validator, nil, nil, nil), nil, testBuiltinBases)
+	svc := service.NewReleaseService(db, nil, nil, nil, nil, service.NewApplicationService(db, validator, nil, nil, nil), nil, nil, testBuiltinBases)
 	_, err = svc.Build(t.Context(), service.BuildReleaseInput{
 		ProjectID: "proj_1",
 		Applications: []service.BuildApplication{{Index: 0, Document: []byte(`{"slug":"shop","name":"Shop","clients":[` +
@@ -363,7 +363,7 @@ func TestBuildRelease_SecretNamingAnImpossibleVariable(t *testing.T) {
 	pool, _ := mockedBuildPool(t)
 	validator, err := domain.NewSchemaValidator("https://example.com/api/schemas")
 	require.NoError(t, err)
-	svc := service.NewReleaseService(pool, nil, nil, nil, nil, service.NewApplicationService(pool, validator, nil, nil, nil), nil, testBuiltinBases)
+	svc := service.NewReleaseService(pool, nil, nil, nil, nil, service.NewApplicationService(pool, validator, nil, nil, nil), nil, nil, testBuiltinBases)
 	name := strings.Repeat("A", domain.MaxVariableNameLength+1)
 	_, err = svc.Build(t.Context(), service.BuildReleaseInput{
 		ProjectID: "proj_1",

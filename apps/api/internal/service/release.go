@@ -68,6 +68,7 @@ type releaseService struct {
 	// applications writes the applications a release declares.
 	applications *applicationService
 	policies     *PolicyService
+	oauth        *OAuthSettingsService
 	// builtinBases resolves a schema given as a built-in schema's `$id` under
 	// whichever base the project stores it; the release pins the row found.
 	builtinBases domain.BuiltinSchemaBases
@@ -84,6 +85,7 @@ func NewReleaseService(
 	idps *idpConnectionService,
 	applications *applicationService,
 	policies *PolicyService,
+	oauth *OAuthSettingsService,
 	builtinBases domain.BuiltinSchemaBases,
 ) ReleaseService {
 	return &releaseService{
@@ -94,6 +96,7 @@ func NewReleaseService(
 		idps:         idps,
 		applications: applications,
 		policies:     policies,
+		oauth:        oauth,
 		builtinBases: builtinBases,
 	}
 }
@@ -404,6 +407,17 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 					domain.ReleasePointerKindBranding, domain.ReleaseBrandingHandle), nil)
 			}
 			content.Branding = branding
+
+		case domain.ReleasePointerKindOauth:
+			settings, err := stmts.GetOAuthSettingsByID(ctx, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			if content.OAuth != nil {
+				return content, domain.ErrReleaseInvalid(fmt.Sprintf("%s %q is referenced twice",
+					domain.ReleasePointerKindOauth, domain.ReleaseOAuthHandle), nil)
+			}
+			content.OAuth = settings
 
 		default:
 			// Unreachable over HTTP: the wire enum admits only the kinds above.

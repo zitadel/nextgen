@@ -606,6 +606,26 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
+   * Send a product event the catalog lists for the CLI, with the header and
+   * context every CLI event carries. Only for an event an ADR names; a
+   * command's own facts are dimensions ({@link recordTelemetry}).
+   */
+  protected trackEvent(event: string, properties: Properties): void {
+    if (!this.telemetry?.enabled) {
+      return;
+    }
+    this.telemetry.track(
+      event,
+      commandEventProperties(
+        this.meta,
+        ZitadelRuntime.fromUrl(this.meta.source).kind,
+        this.telemetryInvocationId,
+        properties,
+      ),
+    );
+  }
+
+  /**
    * Builds {@link GlobalOptions} from parsed flags and stores the result on
    * `this.meta` so the error handler can render a complete envelope. The server
    * `source` is what the command's {@link sourceOf} names, or else what

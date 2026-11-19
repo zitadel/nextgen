@@ -595,6 +595,44 @@ describe("SecretCheck", () => {
   });
 });
 
+describe("SecretCheck.fix", () => {
+  it("says what the env file lacks when it cannot restore the secret", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+    await rm(join(dir, ".env.development.local"), { force: true });
+
+    await expect(new SecretCheck().fix(aCheckContext(dir))).rejects.toThrow(
+      ".env.development.local must hold ZITADEL_PROJECT_ID",
+    );
+  });
+
+  it("refuses credentials for a project zitadel.json does not name", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+    await write(dir, {
+      ".env.development.local":
+        "ZITADEL_PROJECT_ID=other\nZITADEL_PROJECT_SECRET=sk\nZITADEL_PREVIEW_TOKEN=pk\n",
+    });
+
+    await expect(new SecretCheck().fix(aCheckContext(dir))).rejects.toThrow(
+      `names project other but zitadel.json names ${PROJECT_ID}`,
+    );
+    expect(existsSync(join(dir, SECRET_FILE))).toBe(false);
+  });
+
+  it("writes nothing on a dry run", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+    await write(dir, {
+      ".env.development.local": `ZITADEL_PROJECT_ID=${PROJECT_ID}\nZITADEL_PROJECT_SECRET=sk\nZITADEL_PREVIEW_TOKEN=pk\n`,
+    });
+
+    await new SecretCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+    expect(existsSync(join(dir, SECRET_FILE))).toBe(false);
+  });
+});
+
 describe("SecretPermissionsCheck", () => {
   it("passes at 0600", async ({ dir }) => {
     await aNextProject(dir);
