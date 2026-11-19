@@ -2107,6 +2107,11 @@ export class ScaffoldedApp {
     return this.deleteProjectFile(`.zitadel/meta/${dialect}.json`);
   }
 
+  /** Removes the local secret, as a developer who deleted `.zitadel/secret` would. */
+  losesItsLocalSecret(): Promise<void> {
+    return this.deleteProjectFile(".zitadel/secret");
+  }
+
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);

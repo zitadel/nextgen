@@ -48,6 +48,12 @@ export class SecretCheck extends AbstractSanityCheck {
         `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
       );
     }
+    const configured = (await Project.at(ctx.cwd).config()).data.project;
+    if (projectId !== configured) {
+      throw new Error(
+        `${DEVELOPMENT_ENV_FILE} names project ${projectId}, not the ${String(configured)} that zitadel.json names, so its secrets are not restored`,
+      );
+    }
     if (ctx.dryRun) {
       return;
     }

@@ -1,5 +1,5 @@
-import { readFile, rename } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, rename } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
@@ -144,6 +144,7 @@ export class ProjectSecret {
    */
   async write(): Promise<void> {
     const path = join(this.cwd, PATH);
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
     const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
     await new SecretFile(tmp).write(`${stableStringify(this.data)}\n`);
     await rename(tmp, path);

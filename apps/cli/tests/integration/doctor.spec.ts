@@ -614,7 +614,7 @@ describe("doctor", () => {
 
       it("restores a project secret the developer deleted", async () => {
         const app = await aSetUpApp();
-        await app.deleteProjectFile(".zitadel/secret");
+        await app.losesItsLocalSecret();
         const before = await app.snapshot();
 
         const result = await app.doctor(["--fix"]);
