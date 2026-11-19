@@ -96,7 +96,23 @@ properties:
               value:
                 type: string
           else:
-            $ref: ../../../components/schemas/filter-text-value.yaml
+            if:
+              required:
+                - field
+              properties:
+                field:
+                  enum: [identifier]
+            then:
+              required:
+                - value
+              properties:
+                field: {}
+                operation:
+                  const: starts_with
+                value:
+                  type: string
+            else:
+              $ref: ../../../components/schemas/filter-text-value.yaml
       properties:
         field:
           $ref: user-filter-field.yaml

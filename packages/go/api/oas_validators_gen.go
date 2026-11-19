@@ -14806,7 +14806,7 @@ func (s *ProjectOrigin) Validate() error {
 			MaxLengthSet:  false,
 			Email:         false,
 			Hostname:      false,
-			Regex:         regexMap["^https?://(\\*[a-z0-9._-]*|[a-z0-9._-]+\\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$"],
+			Regex:         regexMap["^https?://(\\*[a-z0-9._-]*|[a-z0-9._-]+\\*?[a-z0-9._-]*|\\[[0-9a-f:.]+\\])(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$"],
 			MinNumeric:    0,
 			MinNumericSet: false,
 			MaxNumeric:    0,
