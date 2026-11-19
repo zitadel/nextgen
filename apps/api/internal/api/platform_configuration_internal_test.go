@@ -32,6 +32,7 @@ var platformConfigurationAccess = map[string]resourceAccess{
 	"deploymentAccess":     deploymentAccess,
 	"flowDefinitionAccess": flowDefinitionAccess,
 	"idpAccess":            idpAccess,
+	"oauthSettingsAccess":  oauthSettingsAccess,
 	"originAccess":         originAccess,
 	"policyAccess":         policyAccess,
 	"releaseAccess":        releaseAccess,

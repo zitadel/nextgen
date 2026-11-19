@@ -277,6 +277,14 @@ row and cards 16px apart (`DETAIL_STACK`).
   control takes `FIELD_LABEL_RAIL` (or `FIELD_GROUP_LABEL_RAIL` in a
   responsive `FieldGroup`) so the control starts there too.
 
+- A row whose value is several items that each open to more (a release's
+  pinned revisions, an application's clients) is a `DetailRow` with
+  `align="control"` holding a `DetailAccordion` of `DetailAccordionItem`s
+  (`src/components/detail-accordion.tsx`): a 24px title line, a 48px row
+  pitch, and the opened content 16px under its title. A client's settings in
+  that content are `DetailRows container dense`: 28px rows, 8px either side
+  of the rule.
+
 Settings (Profile) is a different composition: a bare title over one card of
 labelled rows, in a centred column `--zl-container-settings` wide. Compose
 `Page` + `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE`
