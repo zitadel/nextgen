@@ -133,6 +133,8 @@ const (
 
 	EventTypeBrandingCreated EventType = "branding.created"
 
+	EventTypeOAuthSettingsCreated EventType = "oauth_settings.created"
+
 	EventTypePolicyCreated EventType = "policy.created"
 	EventTypePolicyUpdated EventType = "policy.updated"
 

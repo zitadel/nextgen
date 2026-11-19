@@ -157,6 +157,8 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 			return nil, domain.ErrInternal(err).WithMessage("failed to read a branding revision")
 		}
 		return raw, nil
+	case domain.ReleasePointerKindOauth:
+		return nil, nil // an OAuth settings revision holds no variables
 	default:
 		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("unknown release pointer kind %d", pointer.Kind))
 	}
