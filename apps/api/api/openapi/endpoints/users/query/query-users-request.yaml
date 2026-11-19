@@ -45,6 +45,15 @@ properties:
           const: team_id
     minContains: 0
     maxContains: 1
+    # `identifier` may be given once too, for the same reason.
+    allOf:
+      - contains:
+          type: object
+          properties:
+            field:
+              const: identifier
+        minContains: 0
+        maxContains: 1
     items:
       type: object
       additionalProperties: false

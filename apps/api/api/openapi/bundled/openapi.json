@@ -13482,6 +13482,20 @@
             },
             "minContains": 0,
             "maxContains": 1,
+            "allOf": [
+              {
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "const": "identifier"
+                    }
+                  }
+                },
+                "minContains": 0,
+                "maxContains": 1
+              }
+            ],
             "items": {
               "type": "object",
               "additionalProperties": false,
