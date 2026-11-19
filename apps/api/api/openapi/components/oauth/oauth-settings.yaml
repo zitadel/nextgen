@@ -6,8 +6,7 @@ description: |
   bundle `buildRelease` (`POST /releases/build`) takes, which publishes it as
   a new immutable revision, and the read-only revision
   `getOAuthSettings` (`GET /oauth_settings/{oauth_settings_id}`)
-  returns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`
-  publishes with the rest of the bundle.
+  returns.
 
   A release is the only writer: there is no operation that publishes OAuth
   settings on their own. A release without `oauth` leaves the authorization

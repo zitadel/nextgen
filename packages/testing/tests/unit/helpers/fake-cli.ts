@@ -6,6 +6,8 @@ export interface FakeCliBehavior {
   startExitCode?: number;
   startStdout?: string;
   startStderr?: string;
+  /** Refuse the first N start invocations with E_PORT_IN_USE, then succeed. */
+  startPortInUseBeforeSuccess?: number;
   stopExitCode?: number;
   stopStdout?: string;
   /** Fail the first N stop invocations with exit 1, then succeed. */
@@ -37,6 +39,13 @@ const argValue = (flag) => {
   return index === -1 ? undefined : args[index + 1];
 };
 if (command === "start") {
+  const startCalls = fs.readFileSync(${JSON.stringify(recordPath)}, "utf8")
+    .split("\\n")
+    .filter((line) => line.startsWith('["start"')).length;
+  if (startCalls <= ${JSON.stringify(behavior.startPortInUseBeforeSuccess ?? 0)}) {
+    process.stderr.write("E_PORT_IN_USE: Port " + argValue("--port") + " is already in use");
+    process.exit(1);
+  }
   process.stderr.write(${JSON.stringify(behavior.startStderr ?? "")});
   const canned = ${JSON.stringify(behavior.startStdout ?? null)};
   if (canned !== null) {
