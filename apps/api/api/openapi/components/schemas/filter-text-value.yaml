@@ -17,3 +17,6 @@ properties:
       - contains
   value:
     type: string
+    # The server refuses a NUL, which a database text parameter cannot hold.
+    pattern: '^[^\x00]*$'
+    x-zitadel-pattern-message: "must not contain a NUL character"

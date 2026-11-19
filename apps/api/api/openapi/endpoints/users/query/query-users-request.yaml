@@ -95,6 +95,8 @@ properties:
                 const: equals
               value:
                 type: string
+                pattern: '^[^\x00]*$'
+                x-zitadel-pattern-message: "must not contain a NUL character"
           else:
             if:
               required:
@@ -111,6 +113,10 @@ properties:
                   const: starts_with
                 value:
                   type: string
+                  minLength: 1
+                  maxLength: 256
+                  pattern: '^[^\x00]*$'
+                  x-zitadel-pattern-message: "must not contain a NUL character"
             else:
               if:
                 required:
@@ -127,6 +133,8 @@ properties:
                     enum: [equals, not_equals]
                   value:
                     type: string
+                    pattern: '^[^\x00]*$'
+                    x-zitadel-pattern-message: "must not contain a NUL character"
               else:
                 $ref: ../../../components/schemas/filter-text-value.yaml
       properties:

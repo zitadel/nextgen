@@ -104,8 +104,6 @@ export const REFUSALS: Readonly<Record<string, string>> = {
   "POST /users": "the `schema` must name a schema that exists in the project",
   "PUT /users/{user_id}/password":
     "the project's password policy decides which passwords it accepts, its minimum length among them, and that policy is data of the project",
-  "POST /users/query":
-    "an identifier search term must hold text the search index keeps, and one that normalises to nothing is refused, which no pattern states",
   "POST /projects": PRIMARY_ORIGIN,
   "POST /projects/{project_id}/origins": PRIMARY_ORIGIN,
   "POST /policies/evaluate":

@@ -13372,7 +13372,9 @@
             ]
           },
           "value": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[^\\x00]*$",
+            "x-zitadel-pattern-message": "must not contain a NUL character"
           }
         }
       },
@@ -13557,7 +13559,9 @@
                         "const": "equals"
                       },
                       "value": {
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^[^\\x00]*$",
+                        "x-zitadel-pattern-message": "must not contain a NUL character"
                       }
                     }
                   },
@@ -13584,7 +13588,11 @@
                           "const": "starts_with"
                         },
                         "value": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[^\\x00]*$",
+                          "x-zitadel-pattern-message": "must not contain a NUL character"
                         }
                       }
                     },
@@ -13615,7 +13623,9 @@
                             ]
                           },
                           "value": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[^\\x00]*$",
+                            "x-zitadel-pattern-message": "must not contain a NUL character"
                           }
                         }
                       },
