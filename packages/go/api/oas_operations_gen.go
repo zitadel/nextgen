@@ -143,6 +143,7 @@ const (
 	InvitationCancelledOperation             OperationName = "InvitationCancelled"
 	InvitationCreatedOperation               OperationName = "InvitationCreated"
 	InvitationRejectedOperation              OperationName = "InvitationRejected"
+	OauthSettingsCreatedOperation            OperationName = "OauthSettingsCreated"
 	OriginAddedOperation                     OperationName = "OriginAdded"
 	OriginRemovedOperation                   OperationName = "OriginRemoved"
 	PolicyCreatedOperation                   OperationName = "PolicyCreated"

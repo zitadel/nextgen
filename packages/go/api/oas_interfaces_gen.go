@@ -437,6 +437,10 @@ type LookupInvitationRes interface {
 	lookupInvitationRes()
 }
 
+type OauthSettingsCreatedRes interface {
+	oauthSettingsCreatedRes()
+}
+
 type OriginAddedRes interface {
 	originAddedRes()
 }

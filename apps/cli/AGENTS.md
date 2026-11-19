@@ -302,7 +302,12 @@ paused.
   `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
   email, name, IP, URL, project id, file path, secret or free text. Allowed
-  values are enums, booleans, counts and versions.
+  values are enums, booleans, counts and versions, and one exception:
+  `invitation_journey_id`, a random id that only ties one invitation's events
+  together (ADR 086 §9).
+- Send a product event of its own (`this.trackEvent`) only where an ADR names
+  one, as ADR 086 does for its invitation events; `catalog.test.ts` holds its
+  properties to the catalog. Anything else is a dimension (next section).
 - The install id is a random UUID (`src/lib/telemetry/identity.ts`); there is
   no `identify()`. The server URL is bucketed into `server_kind`, and the
   country comes from the timezone with `ip: 0`.

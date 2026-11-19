@@ -427,10 +427,13 @@ properties:
   role:
     type: string
     values: [project_viewer, project_editor, project_admin]
-    description: The role `invitation create` invited someone into; never a name, an id or the link.
-  is_replace:
-    type: boolean
-    description: Whether `invitation create` replaced an earlier invitation.
+    description: The role an invitation grants, its type and role combined; never a name, an id or the link.
+  invitation_journey_id:
+    type: string
+    description: >-
+      The invitation's `journey_id`, which a replacement keeps: a random
+      correlation id, not a resource id, joining a journey's events to time
+      acceptance (ADR 086 §9). Never the token, the link or the invitation id.
   operation:
     type: string
     description: The `operationId` `zitadel api` called, never a path, an id or a field.
@@ -502,6 +505,22 @@ components:
         trigger: A command failed.
         destinations: [mixpanel, vercel]
         properties: [status, reason, exit_code, duration_ms]
+      invitation_created:
+        status: emitted
+        trigger: >-
+          `invitation create`, including `--replaces`, after the API confirms
+          the create. The Vercel copy keeps only the header's keys, never the
+          journey.
+        destinations: [mixpanel, vercel]
+        properties: [role, invitation_journey_id]
+      invitation_cancelled:
+        status: emitted
+        trigger: >-
+          `invitation cancel`, after the API confirms the cancel (ADR 086's
+          amendment). The Vercel copy keeps only the header's keys, never the
+          journey.
+        destinations: [mixpanel, vercel]
+        properties: [role, invitation_journey_id]
       flow_started:
         status: planned
         plan: "#2200"
@@ -581,7 +600,6 @@ components:
       variable:list: [variable_count]
       variable:set: [is_secret]
       variable:resolve: [variable_count]
-      invitation:create: [role, is_replace]
       api: [operation, is_paginated]
       claim: [claim_outcome, poll_count, browser_opened]
     profile:
@@ -613,6 +631,30 @@ components:
           Analytics Plus's limit.
         destinations: [vercel]
         properties: [page, utm_source, utm_medium, utm_campaign, referrer_host]
+      invitation_created:
+        status: planned
+        plan: "#2859"
+        trigger: The invite dialog's create or replace, after the API confirms it.
+        destinations: [mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_accepted:
+        status: planned
+        plan: "#2859"
+        trigger: The invitation page's accept, after the API confirms it.
+        destinations: [mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_rejected:
+        status: planned
+        plan: "#2859"
+        trigger: The invitation page's decline, after the API confirms it.
+        destinations: [mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_cancelled:
+        status: planned
+        plan: "#2859"
+        trigger: The invitations list's cancel, after the API confirms it.
+        destinations: [mixpanel]
+        properties: [role, invitation_journey_id]
       viewed_page:
         status: planned
         plan: "#2233"

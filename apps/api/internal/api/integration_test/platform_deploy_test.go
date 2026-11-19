@@ -33,7 +33,7 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	builtAt := time.Now()
 	deploy := func() error {
 		return platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, builtAt,
-			helpers.ConsoleOrigin, projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t))
+			helpers.ConsoleOrigin, false, projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t))
 	}
 	served := func() []domain.OriginDeployment {
 		t.Helper()

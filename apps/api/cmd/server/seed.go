@@ -80,7 +80,7 @@ func (s seeder) seed(ctx context.Context, cfg Config, userFiles []string) error 
 	// project. Before the user import, which needs the platform user schema
 	// this release stores.
 	if cfg.Platform.BootstrapProject {
-		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), s.consoleOrigin, s.projects, s.releases, s.deployments); err != nil {
+		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), s.consoleOrigin, cfg.OAuth.Enabled, s.projects, s.releases, s.deployments); err != nil {
 			return fmt.Errorf("failed to deploy the platform project: %w", err)
 		}
 	}
