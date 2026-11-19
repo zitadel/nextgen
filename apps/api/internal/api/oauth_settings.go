@@ -45,7 +45,7 @@ func oauthSettingsErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrOAuthSettingsNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrOAuthSettingsInvalid(nil, nil).Code, domain.ErrOAuthSettingsMissingProjectID().Code:
+	case domain.ErrOAuthSettingsMissingProjectID().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrOAuthSettingsPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

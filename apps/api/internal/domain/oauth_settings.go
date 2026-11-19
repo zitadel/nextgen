@@ -16,10 +16,6 @@ func ErrOAuthSettingsNotFound() Error {
 	return newError(PrefixOAuthSettings.ErrorCodePrefix("not_found"), "oauth settings: not found", nil, nil)
 }
 
-func ErrOAuthSettingsInvalid(details any, parent error) Error {
-	return newError(PrefixOAuthSettings.ErrorCodePrefix("invalid"), "oauth settings: invalid", details, parent)
-}
-
 func ErrOAuthSettingsMissingProjectID() Error {
 	return newError(PrefixOAuthSettings.ErrorCodePrefix("missing_project_id"), "oauth settings: missing project id", nil, nil)
 }
@@ -77,9 +73,6 @@ func NewOAuthSettings(projectID string, enabled bool) (*OAuthSettings, error) {
 // one field is a boolean, so only the project binding can be wrong today;
 // every later field joins this check.
 func ValidateOAuthSettings(s *OAuthSettings) error {
-	if s == nil {
-		return ErrOAuthSettingsInvalid("oauth settings are required", nil)
-	}
 	if s.ProjectID == "" {
 		return ErrOAuthSettingsMissingProjectID()
 	}

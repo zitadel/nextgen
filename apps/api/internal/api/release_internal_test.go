@@ -268,6 +268,6 @@ func TestOAuthSettingsResponses(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, oauthSettingsErrorResponse(domain.ErrOAuthSettingsNotFound()).StatusCode)
 	assert.Equal(t, http.StatusForbidden, oauthSettingsErrorResponse(domain.ErrOAuthSettingsPermissionDenied()).StatusCode)
-	assert.Equal(t, http.StatusBadRequest, oauthSettingsErrorResponse(domain.ErrOAuthSettingsInvalid(nil, nil)).StatusCode)
+	assert.Equal(t, http.StatusBadRequest, oauthSettingsErrorResponse(domain.ErrOAuthSettingsMissingProjectID()).StatusCode)
 	assert.Equal(t, http.StatusNotFound, errorResponse(domain.ErrOAuthSettingsNotFound()).StatusCode, "errorResponse routes the prefix")
 }

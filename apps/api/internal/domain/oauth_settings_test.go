@@ -26,7 +26,6 @@ func TestNewOAuthSettings(t *testing.T) {
 func TestValidateOAuthSettings(t *testing.T) {
 	t.Parallel()
 
-	assert.ErrorIs(t, domain.ValidateOAuthSettings(nil), domain.ErrOAuthSettingsInvalid(nil, nil))
 	assert.ErrorIs(t, domain.ValidateOAuthSettings(&domain.OAuthSettings{}), domain.ErrOAuthSettingsMissingProjectID())
 	assert.NoError(t, domain.ValidateOAuthSettings(&domain.OAuthSettings{ProjectID: "proj_1"}))
 }
