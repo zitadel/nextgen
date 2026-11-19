@@ -8,10 +8,6 @@
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /flows/{flow_id}/submit",
-    "check": "API rejected schema-compliant request"
-  },
-  {
     "operation": "POST /users/{user_id}/passkeys/registrations",
     "check": "API rejected schema-compliant request"
   },
