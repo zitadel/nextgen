@@ -38,7 +38,7 @@ func (o oauthSettingsStatements) CreateOAuthSettings(ctx context.Context, entity
 	if err := ensureManagedID(&entity.ID, domain.PrefixOAuthSettings); err != nil {
 		return err
 	}
-	raw, err := oauthsettings.Marshal(entity)
+	raw, err := oauthsettings.MarshalDefinition(entity)
 	if err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ func TestMarshalAndToDomain(t *testing.T) {
 		CreatedAt: time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC),
 	}
 
-	raw, err := oauthsettings.Marshal(in)
+	raw, err := oauthsettings.MarshalDefinition(in)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"enabled":true}`, string(raw))
 
@@ -34,9 +34,16 @@ func TestMarshalAndToDomain(t *testing.T) {
 // existed.
 func TestMarshalWritesDisabledExplicitly(t *testing.T) {
 	t.Parallel()
-	raw, err := oauthsettings.Marshal(&domain.OAuthSettings{})
+	raw, err := oauthsettings.MarshalDefinition(&domain.OAuthSettings{})
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"enabled":false}`, string(raw))
+}
+
+// A nil revision is a server fault, never a stored definition.
+func TestMarshalDefinitionRefusesNil(t *testing.T) {
+	t.Parallel()
+	_, err := oauthsettings.MarshalDefinition(nil)
+	assert.True(t, domain.IsServerFault(err), "%v", err)
 }
 
 // The column is NOT NULL, so an empty definition is a corrupt row, not an
