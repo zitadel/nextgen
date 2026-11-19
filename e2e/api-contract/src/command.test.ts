@@ -30,6 +30,12 @@ describe("SchemathesisCommand", () => {
     expect(args.slice(args.indexOf("--workers"))[1]).toBe(String(WORKERS));
   });
 
+  test("keeps no example database, so a run never replays the examples of an earlier one", () => {
+    const args = command().toArgs();
+
+    expect(args.slice(args.indexOf("--generation-database"))[1]).toBe("none");
+  });
+
   test("selects the checks in the config, never with a flag that would override an exemption", () => {
     expect(command().toArgs()).not.toContain("--checks");
     expect(command().config()).toBe(CHECKS_TABLE);
