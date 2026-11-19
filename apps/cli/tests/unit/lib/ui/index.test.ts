@@ -19,7 +19,7 @@ const asWritten = (file: string): string => relative(SRC, file).split(sep).join(
  * pinned so that it only ever shrinks.
  */
 const STILL_DRAWING_THEMSELVES = [
-  "cli/commands/logs/index.ts: writes to process.stdout",
+  "cli/commands/server/logs.ts: writes to process.stdout",
   "cli/hooks/version-notice.ts: writes to process.stderr",
   "lib/oclif/base.ts: writes to process.stderr",
   "lib/telemetry/sink.ts: writes to process.stderr",

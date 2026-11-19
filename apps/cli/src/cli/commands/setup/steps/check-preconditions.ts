@@ -1,7 +1,10 @@
-import { toZitadelError } from "@/lib/errors";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { isObject } from "@/lib/json";
+import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
-import { Server } from "@/lib/server";
+import { LocalServerError, ZitadelRuntime } from "@/lib/server";
+import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
+import { Cmd } from "@/lib/cmd";
+import { resolve } from "node:path";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -20,7 +23,7 @@ const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
   hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
-  next: [{ id: "start" }, "{setup}"],
+  next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
@@ -69,7 +72,7 @@ type Needs = Fact<"flags">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<SetupServices, "meta" | "suggest" | "useServer">;
+type Deps = Pick<SetupServices, "machine" | "meta" | "suggest" | "useServer">;
 
 /**
  * Checks everything that does not depend on an answer before anything is
@@ -124,20 +127,34 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    const server = await Server.resolve({
+    const server = await ZitadelRuntime.resolve({
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
     }).catch((error: unknown) => {
-      const normalized = toZitadelError(error);
-      if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+      if (!(error instanceof LocalServerError) || error.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
         throw error;
       }
+      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
+      const details = isObject(error.details) ? error.details : {};
+      const { directory } = details;
+      const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
+      const startFlags: { cwd?: string } = {};
+      if (elsewhere) {
+        startFlags.cwd = directory;
+      }
+      const text = [elsewhere && advice.elsewhere, advice.hint].find((candidate) => {
+        return typeof candidate === "string";
+      });
+      const hint = interpolate(text ?? advice.hint, {
+        ...details,
+        ...(elsewhere && { directory: Cmd.quote(directory) }),
+      });
       const retry = retryOptionsFromFlags(flags);
       const recovery = ssoRecovery(retry, suggest);
       throw refusalError(
         NO_LOCAL_SERVER_REFUSAL,
         {
-          reason: normalized.hint ? `${normalized.hint} ` : "",
+          reason: `${hint} `,
           scripting:
             retry.sso && retry.sso.length > 0
               ? "The rerun asks for the client id and secret, because a command carries neither. " +
@@ -149,6 +166,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
               : recovery.hint,
         },
         {
+          start: { id: "start", flags: startFlags },
           setup: {
             id: "setup",
             flags: setupRetryFlags(retry),
@@ -205,6 +223,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
     if (!configured) {
       await refuseOutdatedLocalServer({
         cwd: meta.cwd,
+        machine: this.deps.machine,
         serverUrl: server.value,
         flags,
       });

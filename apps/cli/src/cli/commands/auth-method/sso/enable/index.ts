@@ -1,3 +1,4 @@
+import { RealMachine } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   type ClientId,
@@ -122,7 +123,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   };
 
   static override meta = {
-    resolveServer: true,
     environment: true,
   };
 
@@ -182,6 +182,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .step(
           new PlanChange({
             ask: this.ask,
+            machine: new RealMachine(),
             developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
             suggest: this.suggest,
             again: this.again,

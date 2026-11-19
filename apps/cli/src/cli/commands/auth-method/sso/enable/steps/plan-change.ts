@@ -7,7 +7,6 @@ import {
   CredentialPrompt,
   loopbackIssuerWarning,
 } from "@/lib/idp";
-import { loopbackReach } from "@/lib/server/local/runtime";
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
@@ -23,7 +22,7 @@ type Needs = Fact<
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest" | "again">;
+type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest" | "again" | "machine">;
 
 /**
  * Works out the whole change before anything is asked or written, so every
@@ -80,7 +79,7 @@ export class PlanChange extends WizardStep<
     );
     const loopback = loopbackIssuerWarning(
       needs.selection,
-      await loopbackReach(needs.target.cwd, needs.remote.server),
+      await this.deps.machine.loopbackReach(needs.target.cwd, needs.remote.server),
     );
     if (loopback !== undefined) {
       warnings.report(loopback);

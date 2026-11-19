@@ -59,7 +59,7 @@ const LIMIT = {
   },
 } as const satisfies Refused<number>;
 
-export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, ListInput> {
+export abstract class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, ListInput> {
   static describe<Ctx>({
     topic,
     resource,

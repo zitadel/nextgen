@@ -185,13 +185,19 @@ function variables(
   ].join("\n");
 }
 
+/** Every invitation status, which `invitation list` lists only when asked. */
+const INVITATION_STATUSES = ["pending", "accepted", "rejected", "expired"];
+
 // The invitation commands take flags, not `--data`: `create` says a project
 // invitation with `--relation`, `--name` and `--replaces`, and `list` filters
 // with `--status`, once per status, and `--type`. A team invitation has no flag yet, so it is
 // `undefined` and the sample is the api call.
 function invitationFlags(verb: string, request: RequestData): string[] | undefined {
   if (verb === "list") {
-    const statuses = request.query.status?.values ?? [];
+    const requested = request.query.status?.values ?? [];
+    // Without `--status` the command leaves accepted invitations out, which the
+    // unfiltered request does not, so the sample names every status.
+    const statuses = requested.length === 0 ? INVITATION_STATUSES : requested;
     const type = request.query.type?.values[0];
     return [
       ...statuses.flatMap((status) =>

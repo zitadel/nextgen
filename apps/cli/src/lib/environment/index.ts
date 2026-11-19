@@ -7,5 +7,7 @@ export type {
   InteractiveOptions,
   Resolved,
   ResolveEnvironmentInput,
+  ServerAddresses,
 } from "./types";
+export { Dotenv } from "./dotenv";
 export { Environment } from "./environment";

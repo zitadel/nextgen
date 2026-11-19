@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { join } from "node:path";
 
 import { beforeEach, describe, expect } from "vitest";
@@ -118,7 +119,7 @@ const ENVIRONMENTS = ["staging", "qa", "production", "development"];
 function secretFilesTheCliWrites(): string[] {
   const written = new Set<string>();
   for (const { framework } of detectors) {
-    const patcher = createOrca().patcherFor(framework) as AbstractRulePatcher;
+    const patcher = createOrca(LocalRuntime.DIR).patcherFor(framework) as AbstractRulePatcher;
     const context = aPatchContext(framework, { scaffoldedFramework: true });
     for (const op of patcher.plan(context).ops) {
       if ("path" in op && typeof op.path === "string" && Project.isSecret(op.path)) {

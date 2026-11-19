@@ -7,14 +7,14 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { scratchDir } from "@tests/fixtures/scratch";
 
 /** The platform the unit tests' msw server answers for. */
-export const PLATFORM_URL = Server.DEFAULT;
+export const PLATFORM_URL = ZitadelRuntime.DEFAULT;
 
 /**
  * POSTs to the mock platform as a project's secret, and returns the parsed

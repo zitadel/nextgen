@@ -15,14 +15,22 @@ admin credential, and the CLI talks only to the server a
   the tree (`findUpward` in `runtime.ts`).
 - Never fall back to a default port.
 - Never trust a recorded URL or pid on its own: the record's own process or
-  container must be the one serving (`LocalServer.resolveUrl`).
+  container must be the one serving (`LocalRuntime.resolveUrl`).
 
 ## Where things live
 
-- Commands may import any top-level module here; `internal/` is private to
-  `server.ts` (`LocalServer`).
+- Everything outside `src/lib/server` reaches it through `@/lib/server` alone
+  (`index.ts` exports classes and their types, never a loose function);
+  `tests/unit/lib/server/layering.test.ts` keeps `lib/ui`, `lib/suggestion`,
+  `lib/consent`, `lib/oclif` and `cli` out of the package.
+- Add to the class that owns the concern (`LocalRuntime` for the lifecycle and
+  a directory's record, `AdminSession`, `LogLines`, `LocalMachine`) before
+  adding an export.
+- Claiming a project is not a server concern: it lives in `lib/claim` and asks
+  the server for an `AdminSession`.
+- `internal/` is private to `zitadel-runtime.ts` (`LocalRuntime`).
 - A command that needs more from a running server gets it from a new
-  `LocalServer` method (and a launcher method), not code of its own.
+  `LocalRuntime` method (and a launcher method), not code of its own.
 - `internal/lifecycle.ts` decides against interfaces (reuse, restart, port,
   failure), so its tests need no processes, sockets or real time.
 
@@ -51,7 +59,7 @@ admin credential, and the CLI talks only to the server a
 Layout and specs: [`tests/AGENTS.md`](../../../../tests/AGENTS.md).
 
 - Never wait in real time: code that waits takes a `Clock`
-  (`internal/clock.ts`), and tests pass `ManualClock` (`tests/helpers/clock.ts`).
+  (`lib/clock.ts`), and tests pass `ManualClock` (`tests/helpers/clock.ts`).
 - Get a deterministic outcome by construction (the `orphaned` shape in
   `tests/helpers/local-server.ts`), never by sleeping.
 - Make no test depend on whether Docker is installed: fake Docker, or take

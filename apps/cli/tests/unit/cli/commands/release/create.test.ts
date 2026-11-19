@@ -41,7 +41,7 @@ describe("-m", () => {
 });
 
 describe("release create at a terminal", () => {
-  const SERVER = "https://api.zitadel.cloud";
+  const SERVER = "https://preview.zitadel.com";
   const HASH = `sha256:${"d9b331a42e4e2d770718644ee48b679d9ffa7c3821f84d6e6ca849d4e2377691"}`;
 
   /** A user-schema the server would accept, so the bundle validates. */

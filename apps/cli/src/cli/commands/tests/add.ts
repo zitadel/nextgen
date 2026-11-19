@@ -9,6 +9,7 @@ import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { createOrca } from "@/lib/orca";
+import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
 import { type DependencyInstall, type PackageCommand, PM } from "@/lib/pm";
@@ -16,6 +17,7 @@ import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { TestKit } from "@/lib/test-kit";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** Where the guide to the kit lives, for a refusal to point at. */
 const GUIDE_URL = "https://preview.zitadel.com/docs/guides/test-your-app";
@@ -72,7 +74,7 @@ type Manifest = Readonly<{
  * that no longer matches this CLI's template, edited or written by another
  * version, is refused unless `--force` replaces it.
  */
-export default class TestsAdd extends BaseCommand {
+export default class TestsAdd extends ServerCommand(BaseCommand) {
   static override description =
     `Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to ${TestKit.PACKAGE}. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.`;
   static override group = CommandGroups.gettingStarted;
@@ -93,9 +95,14 @@ export default class TestsAdd extends BaseCommand {
     "<%= config.bin %> <%= command.id %> --skip-install",
   ];
 
-  static override meta = {
-    resolveServer: false,
-  };
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ flags }: Admitted<typeof TestsAdd>): Promise<JsonEnvelope> {
     const framework = await this.projectFramework();
@@ -138,7 +145,7 @@ export default class TestsAdd extends BaseCommand {
     const written = result.filesWritten.map((file) => {
       return relative(this.cwd, file).split(sep).join("/");
     });
-    const suite = `${createOrca().displayName(framework)} test suite on ${TestKit.PACKAGE}`;
+    const suite = `${createOrca(LocalRuntime.DIR).displayName(framework)} test suite on ${TestKit.PACKAGE}`;
     const title = this.dryRun
       ? `Would add a ${suite} (dry run)`
       : written.length === 0
@@ -208,7 +215,7 @@ export default class TestsAdd extends BaseCommand {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
     if (!new TestKit(framework).supported()) {
-      const orca = createOrca();
+      const orca = createOrca(LocalRuntime.DIR);
       throw refusalError(FRAMEWORK_REFUSAL, {
         framework,
         supported: TestKit.FRAMEWORKS.map((id) => {

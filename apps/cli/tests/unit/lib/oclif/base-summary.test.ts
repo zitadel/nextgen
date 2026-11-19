@@ -39,7 +39,7 @@ class SummarisingCommand extends BaseCommand {
     flags: Record<string, unknown> = {},
     source = "mock",
   ): Promise<JsonEnvelope> {
-    await this.toMeta({ "no-telemetry": true, ...flags }, { resolveServer: false, source });
+    await this.toMeta({ "no-telemetry": true, ...flags }, { source });
     try {
       return this.emit(result);
     } finally {

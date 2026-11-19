@@ -123,11 +123,7 @@ describe("local admin", () => {
     expect(doc.authenticators.password.change_required).toBe(false);
   });
 
-  // `zitadel reset` keeps admin.json and deleting the file alone orphans the
-  // imported password, so the advice has to name both steps.
-  it("points a malformed credential at deleting the file and resetting the data", async ({
-    dir: cwd,
-  }) => {
+  it("names a malformed credential by kind, for the command to advise on", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{ truncated");
 
@@ -135,13 +131,10 @@ describe("local admin", () => {
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      nextCommands: [
-        `rm ${LOCAL_ADMIN_FILE}`,
-        { id: "reset", flags: { force: true } },
-        { id: "start" },
-      ],
+      kind: "admin-malformed",
+      hint: undefined,
+      nextCommands: undefined,
     });
-    expect((error as { hint: string }).hint).toContain("Both are needed");
   });
 
   // A credential that exists but cannot be read is still the one the server
@@ -153,7 +146,10 @@ describe("local admin", () => {
       await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
 
       try {
-        await expect(ensureLocalAdmin(cwd)).rejects.toThrow(/cannot be read/);
+        await expect(ensureLocalAdmin(cwd)).rejects.toMatchObject({
+          kind: "admin-unreadable",
+          message: expect.stringMatching(/cannot be read/),
+        });
       } finally {
         await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o600);
       }

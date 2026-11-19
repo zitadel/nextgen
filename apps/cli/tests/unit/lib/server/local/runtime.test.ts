@@ -2,11 +2,10 @@ import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 
 import { join } from "node:path";
 
-import { describe, expect, vi } from "vitest";
+import { describe, expect } from "vitest";
 
 import { it, type Serve } from "@tests/fixtures";
 
-import { ZitadelError } from "@/lib/errors";
 import {
   LOCAL_RUNTIME_FILE,
   checkLocalServerHealth,
@@ -22,7 +21,6 @@ import {
   readRuntimeMetadata,
   removeLocalData,
   resolveRuntimeBackend,
-  retargetMalformedRuntime,
   sameLocalServer,
   writeRuntimeMetadata,
   type RuntimeMetadata,
@@ -172,26 +170,23 @@ describe("readNearestRuntimeMetadata", () => {
     await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
   }
 
-  it("recovers a malformed record in a parent where it is", async ({ dir: cwd }) => {
+  it("names a malformed record in a parent by kind, aimed at nothing", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
     const app = join(cwd, "my-app");
     await mkdir(app);
 
     await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
-      nextCommands: [
-        { id: "reset", flags: { force: true, cwd } },
-        { id: "start", flags: { cwd } },
-      ],
+      kind: "record-malformed",
+      nextCommands: undefined,
     });
   });
 
-  it("recovers a malformed record in the working directory without naming it", async ({
-    dir: cwd,
-  }) => {
+  it("names a malformed record in the working directory by kind", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
 
     await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
-      nextCommands: [{ id: "reset", flags: { force: true } }, { id: "start" }],
+      kind: "record-malformed",
+      nextCommands: undefined,
     });
   });
 });
@@ -239,7 +234,7 @@ describe("loopbackReach", () => {
     await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
     await writeRuntimeMetadata(cwd, binaryRuntime(cwd));
     await expect(loopbackReach(cwd, "http://localhost:9999")).resolves.toBe("unknown");
-    await expect(loopbackReach(cwd, "https://example.zitadel.cloud")).resolves.toBe("unknown");
+    await expect(loopbackReach(cwd, "https://example.zitadel.com")).resolves.toBe("unknown");
   });
 });
 
@@ -271,9 +266,9 @@ describe("checkLocalServerHealth", () => {
 
   it("reads the health response body to the end", async () => {
     const { response, isRead } = aResponseWhoseBodyIsRead(200);
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+    const fetcher: typeof fetch = async () => response;
 
-    await checkLocalServerHealth("http://localhost:8081");
+    await checkLocalServerHealth("http://localhost:8081", 1500, fetcher);
 
     expect(isRead()).toBe(true);
   });
@@ -282,9 +277,9 @@ describe("checkLocalServerHealth", () => {
 describe("readPlatformRuntime", () => {
   it("reads a refused runtime document body to the end", async () => {
     const { response, isRead } = aResponseWhoseBodyIsRead(404);
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+    const fetcher: typeof fetch = async () => response;
 
-    await readPlatformRuntime("http://localhost:8081");
+    await readPlatformRuntime("http://localhost:8081", 1500, fetcher);
 
     expect(isRead()).toBe(true);
   });
@@ -308,32 +303,6 @@ function aResponseWhoseBodyIsRead(status: number): { response: Response; isRead:
   );
   return { response: new Response(body, { status }), isRead: () => pulls.length > 1 };
 }
-
-describe("retargetMalformedRuntime", () => {
-  const malformed = new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
-    details: { x: 1 },
-  });
-
-  it.for<[string, string]>([
-    ["a Windows path with a space", "C:\\work\\my app"],
-    ["a Windows path with an apostrophe", "C:\\work\\it's"],
-    ["a POSIX path with a space", "/home/dev/my app"],
-  ])("aims the commands at %s and hands it over as it is in the arguments", ([_name, dir]) => {
-    const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
-
-    expect(retargeted.nextCommands).toEqual([
-      { id: "reset", flags: { force: true, cwd: dir } },
-      { id: "start", flags: { cwd: dir } },
-    ]);
-    expect(retargeted.details).toEqual({
-      x: 1,
-      suggested_args: [
-        ["reset", "--force", "--cwd", dir],
-        ["start", "--cwd", dir],
-      ],
-    });
-  });
-});
 
 function runtimeFor(cwd: string): RuntimeMetadata {
   const paths = localRuntimePaths(cwd);

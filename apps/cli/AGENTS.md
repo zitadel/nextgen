@@ -47,8 +47,8 @@
   `{ id, … }` object; the failure handler renders it with the run's scope.
 - A helper that renders now takes a `Suggest` (`this.suggest`, or `suggestWith(scope)`
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
-- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/`,
-  `oclif/` and `local-server/` may): hand the command data or a `{ id, … }` suggestion object, or
+- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/` and
+  `oclif/` may): hand the command data or a `{ id, … }` suggestion object, or
   take a function the command supplies. `tests/unit/lib/suggestion/layering.test.ts` fails on it.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
@@ -210,6 +210,31 @@
   first question, and each one that does as soon as its answer is given.
 - Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
+- Pick the command's base by what it does with a server (all from
+  `src/cli/commands/server-command.ts`, wrapping what a command extends the way
+  `Promptable` does); a command never resolves, parses or normalises a server
+  address itself:
+
+  | The command | It extends |
+  | --- | --- |
+  | never talks to a server | `BaseCommand` |
+  | talks to one through `--server` or its environment | `ServerCommand(Base)` |
+  | may have to ask which server | `ChoosingServerCommand(Base)` |
+  | is about the local server | `LocalServerCommand(Base, folderRule)` |
+  | is destructive | `Destructive(...)`, outermost |
+
+  A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
+  the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
+  `Destructive` around it. `LocalServerCommand` does not take `--server`; a
+  command that also reads one is `LocalServerCommand(ServerCommand(Base))`.
+  Each local-server command declares its own `group`.
+  `start`, `stop`, `logs`, `reset`, `setup`, `upgrade`, `eject` and a few more
+  still wrap `ServerCommand(...)` only to keep accepting `--server`, which they
+  ignore, each overriding `resolveServer` to name no server: leave them as they
+  are until the flag is removed from them.
+- "Server" on its own is the Zitadel instance a command talks to by URL. The
+  "local server" is the one `zitadel start` runs in a folder. The "server
+  binary" is `@zitadel/server`.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so
@@ -277,7 +302,12 @@ paused.
   `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
   email, name, IP, URL, project id, file path, secret or free text. Allowed
-  values are enums, booleans, counts and versions.
+  values are enums, booleans, counts and versions, and one exception:
+  `invitation_journey_id`, a random id that only ties one invitation's events
+  together (ADR 086 §9).
+- Send a product event of its own (`this.trackEvent`) only where an ADR names
+  one, as ADR 086 does for its invitation events; `catalog.test.ts` holds its
+  properties to the catalog. Anything else is a dimension (next section).
 - The install id is a random UUID (`src/lib/telemetry/identity.ts`); there is
   no `identify()`. The server URL is bucketed into `server_kind`, and the
   country comes from the timezone with `ip: 0`.

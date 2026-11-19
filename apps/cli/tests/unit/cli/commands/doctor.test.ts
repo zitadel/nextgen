@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 import { type Serve, test } from "@tests/fixtures";
 
 import { failureAdvice } from "@/cli/commands/doctor";
-import type { LocalServers } from "@/lib/server/local/processes";
+import { type LocalServers, ZitadelRuntime } from "@/lib/server";
 import { MetaSchemas } from "@/lib/meta-schemas";
 import { advisoryForWarnings, type DoctorAgain } from "@/cli/commands/doctor/index";
 import type { Suggest } from "@/lib/suggestion";
@@ -58,6 +58,16 @@ async function setProjectServer(cwd: string, server: string): Promise<void> {
   const path = join(cwd, "zitadel.json");
   const config = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
   await writeFile(path, JSON.stringify({ ...config, server }));
+}
+
+/** Drops the `server` key from the project's `zitadel.json`, as a hand-written one may lack it. */
+async function removeProjectServer(cwd: string): Promise<void> {
+  const path = join(cwd, "zitadel.json");
+  const { server: _server, ...config } = JSON.parse(await readFile(path, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  await writeFile(path, JSON.stringify(config));
 }
 
 /** Records a healthy local server in `dir`, as `zitadel start` does, and returns its port. */
@@ -117,7 +127,7 @@ async function makeHealthyProject(cwd: string): Promise<string> {
     join(cwd, "zitadel.json"),
     JSON.stringify({
       project: "proj-001",
-      server: "https://api.zitadel.cloud",
+      server: "https://preview.zitadel.com",
       framework: { id: "next" },
     }),
   );
@@ -206,7 +216,7 @@ type DoctorWithoutPort = (cwd: string) => Promise<Awaited<ReturnType<typeof runC
  * `it` with a stand-in `docker` and the two ways the tests run `doctor` against it.
  *
  * - `docker` is written into the `other` directory, so it is removed with the test.
- * - `doctor` is the run with `--json`, a port from `port`, and `--server https://api.zitadel.cloud`.
+ * - `doctor` is the run with `--json`, a port from `port`, and `--server https://preview.zitadel.com`.
  * - `doctorWithoutPort` is the run as setup's next steps make it: no flag about the local runtime.
  */
 const it = test.extend<{
@@ -228,7 +238,7 @@ const it = test.extend<{
           "--port",
           String(port),
           "--server",
-          "https://api.zitadel.cloud",
+          "https://preview.zitadel.com",
           ...extra,
         ],
         {
@@ -241,7 +251,7 @@ const it = test.extend<{
   async doctorWithoutPort({ docker }, use) {
     await use((cwd) => {
       return runCliForTest(
-        ["doctor", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
+        ["doctor", "--cwd", cwd, "--json", "--server", "https://preview.zitadel.com"],
         { PATH: `${docker.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: docker.logPath },
       );
     });
@@ -298,7 +308,7 @@ describe("doctor command", () => {
     // The nudge carries doctor's own --server so claim reconciles the project
     // on the server doctor checked, not the default environment.
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -326,7 +336,7 @@ describe("doctor command", () => {
 
     const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
     expect(data.next_commands).toContain(
-      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -389,7 +399,7 @@ describe("doctor command", () => {
       (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
     ).toContain(
       expectedPublicCliCommand(
-        `claim --env-file ${cwd}/.env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `claim --env-file ${cwd}/.env.development.local --server https://preview.zitadel.com --cwd ${cwd}`,
       ),
     );
   });
@@ -414,7 +424,7 @@ describe("doctor command", () => {
     expect(claim?.message).toContain("claim window has closed");
     expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
     expect(json.data.next_commands ?? []).toContain(
-      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -431,7 +441,9 @@ describe("doctor command", () => {
       DOCKER_LOG: docker.logPath,
     });
 
-    const claim = expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`);
+    const claim = expectedPublicCliCommand(
+      `claim --server https://preview.zitadel.com --cwd ${cwd}`,
+    );
     expect(stripAnsi(res.stdout).split(claim)).toHaveLength(2);
     expect(stripAnsi(res.stdout)).not.toContain("Next:");
   });
@@ -605,7 +617,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         "--port",
         String(occupiedPort),
         "--server",
-        "https://api.zitadel.cloud",
+        "https://preview.zitadel.com",
       ],
       {
         PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
@@ -641,6 +653,19 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       const res = await doctorWithoutPort(cwd);
 
       expect(checkNamesOf(res.stdout).filter((name) => LOCAL_RUNTIME_CHECKS.has(name))).toEqual([]);
+    });
+
+    it("checks no local runtime when zitadel.json names no server", async ({
+      dir,
+      doctorWithoutPort,
+    }) => {
+      const cwd = await makeHealthyProject(dir);
+      await removeProjectServer(cwd);
+
+      const res = await doctorWithoutPort(cwd);
+
+      expect(checkNamesOf(res.stdout).filter((name) => LOCAL_RUNTIME_CHECKS.has(name))).toEqual([]);
+      expect((parseJson(res.stdout) as { source: string }).source).toBe(ZitadelRuntime.DEFAULT);
     });
 
     it("reports no local port", async ({ dir, doctorWithoutPort }) => {
@@ -938,7 +963,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     );
 
     expect(stripAnsi(res.stdout)).toContain(
-      "All checks passed · project proj-001 on api.zitadel.cloud",
+      "All checks passed · project proj-001 on preview.zitadel.com",
     );
     expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
   });
@@ -1039,7 +1064,7 @@ describe("doctor's managed runtime process check", () => {
         "--port",
         String(port),
         "--server",
-        "https://api.zitadel.cloud",
+        "https://preview.zitadel.com",
       ],
       {
         PATH: `${await failingPs(docker.binDir)}:${docker.binDir}:${process.env.PATH ?? ""}`,
@@ -1205,7 +1230,7 @@ describe("advisoryForWarnings", () => {
       name: "issuer-origin",
       status: "warn" as const,
       message: "preview",
-      details: { pattern: "http://localhost:3000", server: "https://api.zitadel.cloud" },
+      details: { pattern: "http://localhost:3000", server: "https://preview.zitadel.com" },
     };
 
     const advice = advisoryForWarnings(

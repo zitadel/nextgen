@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readdir, readFile, rm, stat, symlink } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { join } from "node:path";
 
 import { beforeEach, describe, expect, vi } from "vitest";
@@ -41,7 +42,7 @@ const PROJECT_ID = "proj-001";
 /**
  * The server the config names: the hosted cloud.
  */
-const CLOUD = "https://api.zitadel.cloud";
+const CLOUD = "https://preview.zitadel.com";
 
 /**
  * The issuer a Next project's `.env.local` names.
@@ -591,6 +592,44 @@ describe("SecretCheck", () => {
     const outcome = await new SecretCheck().run(aCheckContext(dir));
 
     expect(outcome.status).toBe("fail");
+  });
+});
+
+describe("SecretCheck.fix", () => {
+  it("says what the env file lacks when it cannot restore the secret", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+    await rm(join(dir, ".env.development.local"), { force: true });
+
+    await expect(new SecretCheck().fix(aCheckContext(dir))).rejects.toThrow(
+      ".env.development.local must hold ZITADEL_PROJECT_ID",
+    );
+  });
+
+  it("refuses credentials for a project zitadel.json does not name", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+    await write(dir, {
+      ".env.development.local":
+        "ZITADEL_PROJECT_ID=other\nZITADEL_PROJECT_SECRET=sk\nZITADEL_PREVIEW_TOKEN=pk\n",
+    });
+
+    await expect(new SecretCheck().fix(aCheckContext(dir))).rejects.toThrow(
+      `names project other but zitadel.json names ${PROJECT_ID}`,
+    );
+    expect(existsSync(join(dir, SECRET_FILE))).toBe(false);
+  });
+
+  it("writes nothing on a dry run", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+    await write(dir, {
+      ".env.development.local": `ZITADEL_PROJECT_ID=${PROJECT_ID}\nZITADEL_PROJECT_SECRET=sk\nZITADEL_PREVIEW_TOKEN=pk\n`,
+    });
+
+    await new SecretCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+    expect(existsSync(join(dir, SECRET_FILE))).toBe(false);
   });
 });
 
@@ -2762,7 +2801,7 @@ describe("loadPatchContext", () => {
   it("reconstructs the patch context from on-disk project files", async ({ dir }) => {
     await aNextProject(dir);
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context).toMatchObject({
       framework: { id: "next" },
@@ -2789,7 +2828,7 @@ describe("loadPatchContext", () => {
     });
     await writeScaffold(dir, { files: {}, scaffolded_framework: true, dev_port: 3005 });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context).toMatchObject({
       preset: "passkey-first",
@@ -2805,7 +2844,7 @@ describe("loadPatchContext", () => {
       "zitadel.json": JSON.stringify({ project: PROJECT_ID, framework: { id: "next" } }),
     });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.server).toBe("");
   });
@@ -2816,7 +2855,7 @@ describe("loadPatchContext", () => {
   ])("pins the SDK for CLI %s at %s", async ([cliVersion, expected], { dir }) => {
     await aNextProject(dir);
 
-    const context = await loadPatchContext(dir, createOrca(), cliVersion ?? "");
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), cliVersion ?? "");
 
     expect(context.sdkVersion).toBe(expected);
   });
@@ -2828,7 +2867,7 @@ describe("loadPatchContext", () => {
     vi.stubEnv("ZITADEL_ENV", "production");
     vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.issuer).toBe(ISSUER);
   });
@@ -2838,7 +2877,7 @@ describe("loadPatchContext", () => {
     await rm(join(dir, ".env.local"));
     await writeScaffold(dir, { files: {}, dev_port: 3005 });
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.issuer).toBe("http://localhost:3005");
   });
@@ -2855,7 +2894,7 @@ describe("loadPatchContext", () => {
     await aNextProject(dir);
     await writeScaffold(dir, scaffold);
 
-    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+    const context = await loadPatchContext(dir, createOrca(LocalRuntime.DIR), CHECK_CLI_VERSION);
 
     expect(context.posture).toBe(posture);
   });

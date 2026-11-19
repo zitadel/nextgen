@@ -13,11 +13,12 @@ import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/ocli
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -147,7 +148,7 @@ const CHALLENGE_ID: Refused<string> = {
  * `--no-wait` returns the link as the result, and `--challenge-id` resumes
  * waiting on it in a second run.
  */
-export default class Claim extends EnvironmentCommand {
+export default class Claim extends ServerCommand(EnvironmentCommand) {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
@@ -306,8 +307,8 @@ export default class Claim extends EnvironmentCommand {
       // servers legitimately use a console origin different from the API one,
       // so only a loopback API paired with a non-loopback claim page warns.
       if (
-        Server.at(this.meta.source).isLoopback() &&
-        !Server.at(challenge.claim_url).isLoopback()
+        ZitadelRuntime.fromUrl(this.meta.source).isLoopback() &&
+        !ZitadelRuntime.fromUrl(challenge.claim_url).isLoopback()
       ) {
         warnings.report(
           `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
@@ -553,7 +554,9 @@ export default class Claim extends EnvironmentCommand {
     // console, so a project claimed earlier still says where to manage it.
     const consoleUrl =
       data.dashboard_url ??
-      (URL.canParse(this.meta.source) ? Server.at(this.meta.source).consoleUrl() : undefined);
+      (URL.canParse(this.meta.source)
+        ? ZitadelRuntime.fromUrl(this.meta.source).consoleUrl()
+        : undefined);
 
     return this.emit({
       status: "skipped",
