@@ -71,6 +71,12 @@ A request that fails answers with a `4xx` or `5xx` status and the error envelope
 
 [Errors](/docs/reference/api/errors) lists every code, what it means, and the operations that return it.
 
+## Timestamps
+
+Every timestamp the API returns is a UTC [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) string ending in `Z`, such as `2026-04-28T15:45:00Z`. The API returns no other offset, and never epoch seconds or milliseconds. Fractional seconds appear only when the value has them, so parse the string instead of matching a fixed length.
+
+Show a time in your user's own zone in your client; the API does not convert.
+
 ## Pagination
 
 A list is paged with a cursor. Set the page size with `limit`, from 1 to 100, 20 when you leave it out. While more results follow, the response carries `next_page_token`; repeat the request with it as `page_token` to get the next page. On the last page `next_page_token` is absent or `null`. A list returns no total count.

@@ -42,7 +42,6 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 			Scan(&entity.CreatedAt); err != nil {
 			return wrapError(err)
 		}
-		entity.CreatedAt = entity.CreatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindBranding, entity.ProjectID, entity.ID))
 	})

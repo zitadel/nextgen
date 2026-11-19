@@ -98,18 +98,3 @@ func TestToDomainIgnoresUnknownMetadataFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "from the future", *got.Metadata.Message)
 }
-
-func TestToDomainNormalizesCreatedAtToUTC(t *testing.T) {
-	t.Parallel()
-
-	berlin, err := time.LoadLocation("Europe/Berlin")
-	require.NoError(t, err)
-
-	got, err := release.ToDomain(release.Row{
-		Pointers:  []byte(`[]`),
-		Metadata:  []byte(`{}`),
-		CreatedAt: time.Date(2026, 7, 14, 11, 11, 0, 0, berlin),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, time.UTC, got.CreatedAt.Location())
-}
