@@ -2,9 +2,5 @@
   {
     "operation": "POST /users/{user_id}/passkeys/registrations",
     "check": "Schema-valid request rejected"
-  },
-  {
-    "operation": "PUT /users/{user_id}/password",
-    "check": "Schema-valid request rejected"
   }
 ]

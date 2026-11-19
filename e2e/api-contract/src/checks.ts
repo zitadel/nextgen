@@ -102,6 +102,8 @@ export const REFUSALS: Readonly<Record<string, string>> = {
   "POST /policies": "`min_length` may not exceed `max_length`, which compares two properties",
   "POST /schemas": "the document must be a valid user schema, which the spec only mirrors",
   "POST /users": "the `schema` must name a schema that exists in the project",
+  "PUT /users/{user_id}/password":
+    "the project's password policy decides which passwords it accepts, its minimum length among them, and that policy is data of the project",
   "POST /projects": PRIMARY_ORIGIN,
   "POST /projects/{project_id}/origins": PRIMARY_ORIGIN,
   "POST /policies/evaluate":

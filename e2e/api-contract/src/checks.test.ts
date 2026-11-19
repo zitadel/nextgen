@@ -54,6 +54,12 @@ describe("refusalsFor", () => {
     expect(Object.keys(REFUSALS)).not.toContain("POST /users/query");
   });
 
+  test("lets setting a password refuse the one the project's policy does not accept", () => {
+    expect(refusalsFor([{ name: "PUT /users/{user_id}/password", id: "setUserPassword" }])).toEqual(
+      ["setUserPassword"],
+    );
+  });
+
   test("gives every refusal a reason", () => {
     Object.values(REFUSALS).forEach((reason) => {
       expect(reason.length).toBeGreaterThan(10);
