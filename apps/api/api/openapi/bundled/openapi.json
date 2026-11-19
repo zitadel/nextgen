@@ -13589,7 +13589,39 @@
                       }
                     },
                     "else": {
-                      "$ref": "#/components/schemas/filter-text-value"
+                      "if": {
+                        "required": [
+                          "field"
+                        ],
+                        "properties": {
+                          "field": {
+                            "enum": [
+                              "schema",
+                              "schema_object_type"
+                            ]
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "value"
+                        ],
+                        "properties": {
+                          "field": {},
+                          "operation": {
+                            "enum": [
+                              "equals",
+                              "not_equals"
+                            ]
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "else": {
+                        "$ref": "#/components/schemas/filter-text-value"
+                      }
                     }
                   }
                 }
