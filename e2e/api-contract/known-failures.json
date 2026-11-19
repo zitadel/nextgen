@@ -1,6 +1,1 @@
-[
-  {
-    "operation": "POST /users/{user_id}/passkeys/registrations",
-    "check": "Schema-valid request rejected"
-  }
-]
+[]
