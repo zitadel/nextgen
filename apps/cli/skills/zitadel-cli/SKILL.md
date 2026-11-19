@@ -93,9 +93,10 @@ nothing; `data.skills` and `data.directories` say what it added where.
   the retry only once they say yes. `doctor --fix` reports a repair that
   waited for such a yes in `warnings`.
 - **Commit `.zitadel/` before you `deploy`.** A release records the commit it
-  was built from, and records it as approximate when the tree has uncommitted
-  changes, so the next deploy cannot diff and the next session, which remembers
-  nothing of yours, cannot tell your work from someone else's. After editing,
+  was built from, and records it as approximate when a file the release is
+  built from has uncommitted changes, so the next deploy cannot diff and the
+  next session, which remembers nothing of yours, cannot tell your work from
+  someone else's. After editing,
   run `git add .zitadel && git commit -m "<why>" -- .zitadel`, then `deploy -m "<why>"`.
   Skip the commit only when `git status` shows nothing under `.zitadel/`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
@@ -505,7 +506,7 @@ Each invocation prints one JSON object:
   inlines. Review it before you deploy. `files` is `[]` when nothing changed
   and `null` when there is nothing to diff against, with `diff.note` saying
   why. The diff is against the commit the live release recorded, not against
-  what the server holds. A deploy from uncommitted changes records an
+  what the server holds. A deploy from uncommitted `.zitadel/` changes records an
   approximate commit, so the next deploy cannot show a diff (`files` is `null`,
   with a note); it still publishes the files as they are now, so a revert is
   published too. Commit your `.zitadel/` changes before every `deploy` so the
@@ -749,7 +750,8 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 ```
 
 Commit first. A release records the commit it was built from, and records it
-as approximate when the tree has uncommitted changes, which leaves the next
+as approximate when a file the release is built from (`.zitadel/`, or a file
+a branding template inlines) has uncommitted changes, which leaves the next
 deploy no diff to show (`deploy --dry-run` reports no reliable diff). It also
 leaves a clean tree for the next session, which remembers nothing of yours.
 Skip the commit only when `git status` shows nothing under `.zitadel/`. If you
