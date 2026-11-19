@@ -29,6 +29,7 @@ const PREPARED: PreparedRelease = {
   changedConfiguration: undefined,
   gitSha: "abc1234",
   gitDirty: false,
+  referenced: [],
 };
 
 /**

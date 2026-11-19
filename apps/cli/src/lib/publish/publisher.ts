@@ -18,7 +18,7 @@ import { isCancellation, ZitadelError } from "@/lib/errors";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
-import { headSha, worktreeIsDirty } from "./git";
+import { bundleIsDirty, headSha } from "./git";
 import {
   type ConfigurationType,
   type Lockout,
@@ -113,6 +113,12 @@ export type PreparedRelease = {
   readonly changedConfiguration: readonly ConfigurationType[] | undefined;
   readonly gitSha: string | undefined;
   readonly gitDirty: boolean;
+
+  /**
+   * The project-relative files the bundle inlines from outside `.zitadel/`,
+   * which a commit of the release's files has to include.
+   */
+  readonly referenced: readonly string[];
 };
 
 /**
@@ -288,6 +294,9 @@ export class Publisher {
     const known = await this.loadKnowingDeployed(store);
     const config = known.config;
     const built = config.bundle(store);
+    const referenced = config.branding.all.flatMap((branding) => {
+      return branding.listReferencedPaths(store);
+    });
     const context: StepContext = {
       cwd: request.cwd,
       deployments: this.deployments,
@@ -302,6 +311,7 @@ export class Publisher {
       config,
       deployedUnknown: known.deployedUnknown,
       store,
+      referenced,
       bundle: built.bundle,
       // The steps hand on what they learned, so a later one can stand on what
       // an earlier one found rather than reading it again.
@@ -320,7 +330,10 @@ export class Publisher {
     const outcome = await runSteps(steps, context);
     // Together: neither answer depends on the other and each spawns git, so
     // asking in turn would cost a whole process for nothing.
-    const [sha, dirty] = await Promise.all([headSha(request.cwd), worktreeIsDirty(request.cwd)]);
+    const [sha, dirty] = await Promise.all([
+      headSha(request.cwd),
+      bundleIsDirty(request.cwd, referenced),
+    ]);
 
     return {
       bundle: Publisher.narrow(built.bundle),
@@ -332,6 +345,7 @@ export class Publisher {
       changedConfiguration: outcome.learned.changedConfiguration,
       gitSha: sha ?? undefined,
       gitDirty: dirty,
+      referenced,
     };
   }
 

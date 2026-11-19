@@ -110,9 +110,7 @@ export const diffStep: Step = {
     const note = noteOnReleases(releases.size, short);
     const unknown = `No diff available: ${short} is not in this repository's history.`;
 
-    const referenced = ctx.config.branding.all.flatMap((branding) => {
-      return branding.listReferencedPaths(ctx.store);
-    });
+    const referenced = ctx.referenced;
     const touched = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
     // Origins serving different releases each move from their own baseline, so
     // a diff against the newest says nothing about the others.
