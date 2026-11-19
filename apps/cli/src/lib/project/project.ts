@@ -1,7 +1,7 @@
 import { EnvFile } from "./env-file";
 import { Gitignore, type GitignoreRule } from "./gitignore";
 import { ProjectConfig } from "./project-config";
-import { ProjectSecret } from "./project-secret";
+import { ProjectSecret, type ProjectSecretData } from "./project-secret";
 import { SecretFile } from "./secret-file";
 import { SecretPath } from "./secret-path";
 
@@ -182,5 +182,14 @@ export class Project {
    */
   secret(): Promise<ProjectSecret> {
     return ProjectSecret.read(this.cwd);
+  }
+
+  /**
+   * Writes `.zitadel/secret` from data known elsewhere, to restore a lost file.
+   *
+   * @param data - What the file should hold.
+   */
+  restoreSecret(data: ProjectSecretData): Promise<void> {
+    return ProjectSecret.of(this.cwd, data).write();
   }
 }

@@ -92,6 +92,10 @@ nothing; `data.skills` and `data.directories` say what it added where.
   already asked for this exact change, put `details.question` to them and run
   the retry only once they say yes. `doctor --fix` reports a repair that
   waited for such a yes in `warnings`.
+- **A missing `.zitadel/secret` is restored by `doctor --fix`**, not by `setup`,
+  which skips an app that is already set up. The repair rebuilds the file from
+  `.env.development.local` and the origins the server reports; without those
+  credentials it fails and `doctor` keeps reporting the `secret` check.
 - **Commit `.zitadel/` before you `deploy`.** A release records the commit it
   was built from, and records it as approximate when a file the release is
   built from has uncommitted changes, so the next deploy cannot diff and the

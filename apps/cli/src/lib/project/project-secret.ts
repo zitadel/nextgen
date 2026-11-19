@@ -57,6 +57,17 @@ export class ProjectSecret {
   }
 
   /**
+   * A secret built from known data, to be written with {@link ProjectSecret.write}.
+   *
+   * @param cwd - The project's directory.
+   * @param data - What the file should hold.
+   * @returns The secret.
+   */
+  static of(cwd: string, data: Readonly<ProjectSecretData>): ProjectSecret {
+    return new ProjectSecret(cwd, data);
+  }
+
+  /**
    * Whether local secret material is present. Gates commands that need
    * credentials, and signals that secrets were already pulled.
    *
@@ -101,7 +112,7 @@ export class ProjectSecret {
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
-          hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
+          hint: "Run `zitadel setup` first. If this project was set up before, `zitadel doctor --fix` restores the secret from .env.development.local.",
           nextCommands: [{ id: "setup" }, { id: "doctor", flags: { fix: true } }],
         });
       }
