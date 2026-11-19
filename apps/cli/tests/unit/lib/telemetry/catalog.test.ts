@@ -502,7 +502,7 @@ describe("CLI telemetry against the catalog", () => {
     const { profile } = cliOf(await loadCatalog());
     const sent = [
       ...Object.keys(deviceProfileProperties(meta(), "09233195-cd34-468c")),
-      ...Object.keys(firstSeenProperties(meta())),
+      ...Object.keys(firstSeenProperties("0.1.0-alpha.11")),
     ];
     expect(new Set(profile?.properties)).toEqual(new Set(sent));
   });

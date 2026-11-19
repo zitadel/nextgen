@@ -18,8 +18,8 @@ import {
   CLI_COMMAND_STARTED,
   commandEventProperties,
   deviceProfileProperties,
-  FIRST_RUN_NOTICE,
   firstSeenProperties,
+  FIRST_RUN_NOTICE,
   serverKindOf,
   vercelEventKeys,
 } from "./properties";
@@ -328,9 +328,13 @@ export function Telemetered<
       const hash = createHash("sha256")
         .update(JSON.stringify([facts.cli_version, facts.node_version, facts.os, facts.arch]))
         .digest("hex");
-      const due = profileDue(this.env, hash, client.record);
+      const due = profileDue(this.env, hash, client.record, this.meta.cliVersion);
       if (due !== undefined) {
-        client.profile(facts, { $ip: 0 }, due.first ? firstSeenProperties(this.meta) : {});
+        client.profile(
+          facts,
+          { $ip: 0 },
+          due.firstVersion === undefined ? {} : firstSeenProperties(due.firstVersion),
+        );
       }
     }
 

@@ -98,7 +98,7 @@ describe("profileDue", () => {
 
   /** One run: it reads the install's record, then asks whether its profile is due. */
   const run = (env: NodeJS.ProcessEnv, hash: string, now: number) => {
-    return profileDue(env, hash, loadOrCreateIdentity(env).record, now);
+    return profileDue(env, hash, loadOrCreateIdentity(env).record, "1.0.0", now);
   };
 
   it("is due the first time, and not again for the same facts within a day", ({ dir }) => {
@@ -135,25 +135,28 @@ describe("profileDue", () => {
       throw new Error("no home directory");
     });
 
-    expect(profileDue({}, "h1", undefined, 1000)).toBeUndefined();
+    expect(profileDue({}, "h1", undefined, "1.0.0", 1000)).toBeUndefined();
   });
 
-  it("calls the first profile of an install this release created its first, and no later one", ({
+  it("names the version an install began on with every profile write, so a lost first write is made up", ({
     dir,
   }) => {
     const env = { XDG_CONFIG_HOME: dir };
+    const record = (version: string, hash: string, now: number) => {
+      return profileDue(env, hash, loadOrCreateIdentity(env).record, version, now);
+    };
 
-    expect(run(env, "h1", 1000)).toEqual({ first: true });
-    expect(run(env, "h2", 2000)).toEqual({ first: false });
+    expect(record("1.0.0", "h1", 1000)).toEqual({ firstVersion: "1.0.0" });
+    expect(record("1.1.0", "h2", 2000)).toEqual({ firstVersion: "1.0.0" });
   });
 
-  it("does not call the first profile of an install that predates it its first", ({ dir }) => {
+  it("names no first version for an install that predates it", ({ dir }) => {
     const env = { XDG_CONFIG_HOME: dir };
     const file = join(dir, "zitadel", "cli", "telemetry.json");
     mkdirSync(join(dir, "zitadel", "cli"), { recursive: true });
     writeFileSync(file, `${JSON.stringify({ distinctId: "an-earlier-install" })}\n`);
 
-    expect(run(env, "h1", 1000)).toEqual({ first: false });
+    expect(run(env, "h1", 1000)).toEqual({ firstVersion: undefined });
   });
 });
 

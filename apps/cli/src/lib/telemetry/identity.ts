@@ -22,6 +22,8 @@ export type StoredIdentity = {
   distinctId: string;
   /** Set when this install's record was created by a release that writes profiles, so its first version is known. */
   began?: true;
+  /** The CLI version the install's first profile was written on, kept to send again until Mixpanel has it. */
+  firstVersion?: string;
   /** When the install's profile was last written, and a hash of what was written. */
   profile?: { at: number; hash: string };
 };
@@ -150,16 +152,19 @@ function readStored(dir: string): Identity | undefined {
  * @param env - The environment the run reads.
  * @param hash - A hash of what the profile would say.
  * @param record - The install's record as the run read it.
+ * @param version - The CLI version the run is on.
  * @param now - The time in milliseconds.
- * @returns Nothing when no profile is due; else whether this is the install's first
- *   profile, written by the release that created the install, so its version is the first one.
+ * @returns Nothing when no profile is due; else the version the install began on, for an
+ *   install created by a release that writes profiles. It is sent with every profile write,
+ *   as `set_once`, so a first write that failed to arrive is made up by the next one.
  */
 export function profileDue(
   env: NodeJS.ProcessEnv,
   hash: string,
   record: StoredIdentity | undefined,
+  version: string,
   now: number = Date.now(),
-): { readonly first: boolean } | undefined {
+): { readonly firstVersion: string | undefined } | undefined {
   const dir = telemetryConfigDir(env);
   if (dir === undefined || record === undefined) {
     return undefined;
@@ -169,13 +174,18 @@ export function profileDue(
   if (!due) {
     return undefined;
   }
+  const firstVersion = record.began === true ? (record.firstVersion ?? version) : undefined;
   try {
-    writeStored(join(dir, "telemetry.json"), { ...record, profile: { at: now, hash } });
+    writeStored(join(dir, "telemetry.json"), {
+      ...record,
+      ...(firstVersion === undefined ? {} : { firstVersion }),
+      profile: { at: now, hash },
+    });
   } catch {
     return undefined;
   }
 
-  return { first: record.began === true && last === undefined };
+  return { firstVersion };
 }
 
 /**

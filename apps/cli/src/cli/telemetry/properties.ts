@@ -170,14 +170,14 @@ export function deviceProfileProperties(meta: GlobalOptions, distinctId: string)
 }
 
 /**
- * What an install's profile says only once, the first time it is written: the
- * version it began on, which lets a cohort ask who installed which version.
+ * What an install's profile says only once: the version it began on, which
+ * lets a cohort ask who installed which version.
  *
- * @param meta - What the run is about.
+ * @param version - The version the install began on.
  * @returns The facts to write where the profile does not have them yet.
  */
-export function firstSeenProperties(meta: GlobalOptions): Properties {
-  return { first_cli_version: meta.cliVersion };
+export function firstSeenProperties(version: string): Properties {
+  return { first_cli_version: version };
 }
 
 /**

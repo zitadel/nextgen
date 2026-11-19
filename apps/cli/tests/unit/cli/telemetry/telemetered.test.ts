@@ -1,8 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { type FlowReport, Telemetered } from "@/cli/telemetry/telemetered";
 import { ZitadelError } from "@/lib/errors";
@@ -10,6 +6,7 @@ import { BaseCommand, type Facts } from "@/lib/oclif/base";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { loadOrCreateIdentity, markNoticed, type StoredIdentity } from "@/lib/telemetry/identity";
 import type { RunWatcher } from "@/lib/wizard";
+import { it as fixtures } from "@tests/fixtures";
 import { aConfigAt } from "@tests/helpers/suggestions";
 
 /** What one event was sent with, and the destinations it was limited to. */
@@ -154,19 +151,21 @@ const FLOW: FlowReport = {
   },
 };
 
-/** Where the install's id and profile record live, so a test never touches the real one. */
-const config = { dir: "" };
-
-beforeEach(() => {
-  config.dir = mkdtempSync(join(tmpdir(), "zitadel-telemetered-"));
-  vi.stubEnv("XDG_CONFIG_HOME", config.dir);
-  // The real client mints the install's id before the mixin asks about its profile.
-  loadOrCreateIdentity({ XDG_CONFIG_HOME: config.dir });
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  rmSync(config.dir, { recursive: true, force: true });
+/**
+ * Every test runs with its own XDG config home, where the install's id and profile record
+ * live, so a test never touches the real one. The install's id is minted first, as the real
+ * client does before the mixin asks about its profile.
+ */
+const it = fixtures.extend<{ configHome: string }>({
+  configHome: [
+    async ({ dir }, use) => {
+      vi.stubEnv("XDG_CONFIG_HOME", dir);
+      loadOrCreateIdentity({ XDG_CONFIG_HOME: dir });
+      await use(dir);
+      vi.unstubAllEnvs();
+    },
+    { auto: true },
+  ],
 });
 
 function makeCommand(): TestCommand {
@@ -248,17 +247,19 @@ describe("Telemetered first-run notice", () => {
     expect(cmd.recorder.order).not.toContain("notice");
   });
 
-  it("remembers that it was shown, so no later run shows it", async () => {
+  it("remembers that it was shown, so no later run shows it", async ({ configHome }) => {
     const cmd = makeCommand();
     cmd.recorder.isFirstRun = true;
     cmd.interactive = true;
     await cmd.open();
 
-    expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: config.dir }).isFirstRun).toBe(false);
+    expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: configHome }).isFirstRun).toBe(false);
   });
 
-  it("does not show it to a run that lost the claim to a concurrent first run", async () => {
-    markNoticed({ XDG_CONFIG_HOME: config.dir });
+  it("does not show it to a run that lost the claim to a concurrent first run", async ({
+    configHome,
+  }) => {
+    markNoticed({ XDG_CONFIG_HOME: configHome });
     const cmd = makeCommand();
     cmd.recorder.isFirstRun = true;
     cmd.interactive = true;
@@ -267,12 +268,12 @@ describe("Telemetered first-run notice", () => {
     expect(cmd.recorder.order).not.toContain("notice");
   });
 
-  it("leaves it for a later run when the first run could not show it", async () => {
+  it("leaves it for a later run when the first run could not show it", async ({ configHome }) => {
     const cmd = makeCommand();
     cmd.recorder.isFirstRun = true;
     await cmd.open();
 
-    expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: config.dir }).isFirstRun).toBe(true);
+    expect(loadOrCreateIdentity({ XDG_CONFIG_HOME: configHome }).isFirstRun).toBe(true);
   });
 });
 

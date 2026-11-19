@@ -182,6 +182,6 @@ describe("the install's profile", () => {
   });
 
   it("names the version an install began on, to be written once", () => {
-    expect(firstSeenProperties(meta())).toEqual({ first_cli_version: "0.1.0-alpha.11" });
+    expect(firstSeenProperties("0.1.0-alpha.11")).toEqual({ first_cli_version: "0.1.0-alpha.11" });
   });
 });
