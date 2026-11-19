@@ -71,6 +71,9 @@ A baseline is only worth anything if a run repeats.
   and with more than 1 they share that command's project and find failures
   that come and go. Measured on CI with identical commits, this setup repeats
   exactly.
+- `--generation-database none` keeps Hypothesis from replaying the examples an
+  earlier run left in `.hypothesis/`, which every command in the container
+  shares; without it, two same-seed runs send different requests.
 - A command draws the inputs of its operations from a single seeded stream, so
   adding or removing an operation can change what the others in its shard
   receive. A change to the spec can therefore change the baseline: regenerate
