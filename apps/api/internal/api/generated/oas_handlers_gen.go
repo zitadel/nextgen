@@ -14990,8 +14990,11 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 // `relation=admin` lists the people who can administer the project.
 //
 // The list follows the authorization check. A person who left a team, or whose team or user was
-// deactivated, is not listed through it. Expired grants are left out. Like the check, the list does
-// not look at a person's user status beyond that, so a direct grant to a suspended person is listed.
+// deactivated, is not listed through it. Expired grants are left out. Like the check, a direct user
+// grant requires an active user, so a suspended person's direct grant is not listed.
+//
+// Every caller who passes the project read check sees every listed person and every team name on
+// `sources`. Co-membership no longer filters the roster.
 //
 // The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
 // (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
