@@ -146,6 +146,11 @@ export const SETUP_ORIGIN: ProjectOrigin = { pattern: "http://localhost:3000", k
 export interface RegisteredIdp {
   readonly id: string;
   readonly slug: string;
+  readonly definition?: {
+    readonly claim_mapping?: Readonly<Record<string, string>>;
+    readonly verified_claims?: Readonly<Record<string, string | true>>;
+    readonly oidc?: { readonly scopes?: readonly string[] };
+  };
 }
 
 export interface PublishedPolicy {
@@ -749,7 +754,11 @@ export class ScaffoldedApp {
   }
 
   /** `auth-method sso enable` for a connection the developer describes, secret piped as a script would. */
-  enableCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+  enableCustomSso(
+    connection: CustomConnection,
+    credentials: Credentials,
+    extraArgs: string[] = [],
+  ): Promise<CliResult> {
     return this.enableSsoWith(
       [
         "--provider",
@@ -757,6 +766,7 @@ export class ScaffoldedApp {
         ...customFlags(connection, "--"),
         "--client-id",
         credentials.clientId,
+        ...extraArgs,
       ],
       credentials.secret,
     );
@@ -796,7 +806,11 @@ export class ScaffoldedApp {
   }
 
   /** `setup` with a custom connection described on the command line. */
-  setupWithCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+  setupWithCustomSso(
+    connection: CustomConnection,
+    credentials: Credentials,
+    extraArgs: string[] = [],
+  ): Promise<CliResult> {
     return this.setupSsoWith(
       [
         "--sso",
@@ -804,6 +818,7 @@ export class ScaffoldedApp {
         ...customFlags(connection, "--sso-"),
         "--sso-client-id",
         credentials.clientId,
+        ...extraArgs,
       ],
       credentials.secret,
     );

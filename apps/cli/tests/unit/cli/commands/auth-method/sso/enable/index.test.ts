@@ -6,7 +6,7 @@ import { describe, expect, onTestFinished } from "vitest";
 
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
-import type { JsonObject } from "@/lib/zitadel";
+import { isJsonObject, isJsonValue, type JsonObject } from "@/lib/zitadel";
 import { answering } from "@tests/helpers/keyboard";
 import { authMethodJson, authMethodText } from "@tests/helpers/auth-method";
 import {
@@ -91,14 +91,24 @@ const ANOTHER_CONNECTION = anOidcConnection({ slug: "something-else" });
  * reads them.
  */
 const QUESTION = {
-  slug: "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
-  displayName: "What name should the sign-in button show? For example Acme SSO.",
-  issuer: "What is the issuer URL of the provider?",
-  scopes: "Which scopes should we request? Separate them with spaces.",
-  clientId: "What is the client ID of your Acme SSO OAuth app?",
+  slug: "What would you like to call this connection? Pick a short ID for your config files, such as acme-sso. Use lowercase letters, numbers and hyphens.",
+  displayName:
+    "What should the sign-in button say? Enter the provider's name as your users know it, such as Acme SSO.",
+  issuer:
+    "What is the provider's issuer URL? This is the base address of its OpenID Connect service, such as https://sso.acme.example. Its admin console or docs list it.",
+  scopes:
+    "Which scopes should we request? Scopes decide what user information the provider sends back. Separate them with spaces; openid is required.",
+  clientId:
+    "What is the client ID of your Acme SSO OAuth app? Copy it from the application you just created.",
   secret:
-    "What is the client secret of your Acme SSO OAuth app? It will be stored on the project as ACME_SSO_CLIENT_SECRET.",
+    "What is the client secret of your Acme SSO OAuth app? Copy it from the same place. We store it in your project as ACME_SSO_CLIENT_SECRET.",
+  claims: "Map more claims from Acme SSO?",
 };
+
+/**
+ * What a person picks to keep the claims the connection maps by default.
+ */
+const KEEP_CLAIMS = "No, continue";
 
 /**
  * The exit codes the CLI ends a refused run with.
@@ -233,6 +243,7 @@ describe("auth-method sso enable", () => {
         "openid email",
         ACME.clientId,
         ACME.secret,
+        KEEP_CLAIMS,
       ]);
 
       expect(asked).toEqual([
@@ -242,6 +253,7 @@ describe("auth-method sso enable", () => {
         QUESTION.scopes,
         QUESTION.clientId,
         QUESTION.secret,
+        QUESTION.claims,
       ]);
     });
 
@@ -255,6 +267,7 @@ describe("auth-method sso enable", () => {
         "openid email",
         ACME.clientId,
         ACME.secret,
+        KEEP_CLAIMS,
       ]);
 
       expect(await readJson(cwd, ACME.file)).toMatchObject({
@@ -268,7 +281,7 @@ describe("auth-method sso enable", () => {
 
       const { asked } = await enterCustom(
         cwd,
-        [ACME.displayName, ACME.scopes, ACME.clientId, ACME.secret],
+        [ACME.displayName, ACME.scopes, ACME.clientId, ACME.secret, KEEP_CLAIMS],
         "--slug",
         ACME.slug,
         "--issuer",
@@ -280,6 +293,7 @@ describe("auth-method sso enable", () => {
         QUESTION.scopes,
         QUESTION.clientId,
         QUESTION.secret,
+        QUESTION.claims,
       ]);
     });
 
@@ -288,7 +302,7 @@ describe("auth-method sso enable", () => {
 
       await enterCustom(
         cwd,
-        [ACME.displayName, ACME.scopes, ACME.clientId, ACME.secret],
+        [ACME.displayName, ACME.scopes, ACME.clientId, ACME.secret, KEEP_CLAIMS],
         "--slug",
         ACME.slug,
         "--issuer",
@@ -303,7 +317,7 @@ describe("auth-method sso enable", () => {
 
       const { asked } = await enterCustom(
         cwd,
-        [ACME.clientId, ACME.secret],
+        [ACME.clientId, ACME.secret, KEEP_CLAIMS],
         "--slug",
         ACME.slug,
         "--display-name",
@@ -314,7 +328,7 @@ describe("auth-method sso enable", () => {
         ACME.scopes,
       );
 
-      expect(asked).toEqual([QUESTION.clientId, QUESTION.secret]);
+      expect(asked).toEqual([QUESTION.clientId, QUESTION.secret, QUESTION.claims]);
     });
   });
 
@@ -694,15 +708,15 @@ describe("auth-method sso enable", () => {
     it.for([
       [
         "an optional one",
-        { nickname: { type: "string" } },
+        { favouriteColour: { type: "string" } },
         [],
-        "- nickname is optional, so it can stay empty.",
+        "Not filled by Acme SSO (optional): favouriteColour.",
       ],
       [
         "a required one",
         { companyName: { type: "string" } },
         ["companyName"],
-        "- companyName is required, so sign-up will have to ask for it.",
+        "• companyName, so sign-up will have to ask for it.",
       ],
       [
         "an object whose members are required",
@@ -714,7 +728,7 @@ describe("auth-method sso enable", () => {
           },
         },
         ["address"],
-        "- address is required, so sign-up will have to ask for it.",
+        "• address, so sign-up will have to ask for it.",
       ],
     ] as const)("lists %s", async ([, properties, required, line], { dir }) => {
       const cwd = await setUpProject(dir, {
@@ -746,9 +760,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain(
-        "- companyName is required, but this connection does not create users.",
-      );
+      expect(result.stdout).toContain("• companyName, but this connection does not create users.");
       expect(result.stdout).toContain(
         "Acme SSO does not create users in Zitadel, so these claims are not used to fill one:",
       );
@@ -767,7 +779,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("It always counts as");
+      expect(result.stdout).toContain("(always verified)");
     });
 
     it("says a mapped attribute nothing verifies is not verified", async ({ dir }) => {
@@ -781,7 +793,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("It is not treated as");
+      expect(result.stdout).toContain("(not verified)");
     });
 
     it("draws no mapping lines for a connection that maps nothing", async ({ dir }) => {
@@ -824,7 +836,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("- nick\\x1b[2Jname is optional");
+      expect(result.stdout).toContain("(optional): nick\\x1b[2Jname.");
     });
 
     it("prints a display name as text in the title", async ({ dir }) => {
@@ -874,7 +886,7 @@ describe("auth-method sso enable", () => {
   describe("with --provider custom and --json", () => {
     it("reports what the connection maps and who signs in through it", async ({ dir }) => {
       const cwd = await setUpProject(dir, {
-        "default-human-user": aSchemaWith({ nickname: { type: "string" } }),
+        "default-human-user": aSchemaWith({ favouriteColour: { type: "string" } }),
       });
 
       const result = await withStdin(ACME.secret, () => {
@@ -887,7 +899,7 @@ describe("auth-method sso enable", () => {
             claim_mapping: { email: "email" },
             verified_claims: { email: "email_verified" },
             scopes: ["openid", "profile", "email"],
-            unmapped: [{ property: "nickname", required: false }],
+            unmapped: [{ property: "favouriteColour", required: false }],
             used_by: ["default-human-user"],
           },
         },
@@ -898,13 +910,11 @@ describe("auth-method sso enable", () => {
   describe("with --provider custom in a script", () => {
     it.for([
       "When someone signs in with Acme SSO for the first time, Zitadel fills in their new user",
-      "- email comes from the provider's email claim.",
-      "It counts as verified",
-      "email_verified is true.",
+      "• email ← email (verified when email_verified is true)",
       "Zitadel asks Acme SSO for these scopes: openid, profile, and email.",
-      "This connection is used by default-human-user",
-      "To change which claim fills an attribute, edit claim_mapping in",
-      ".zitadel/idps/acme-sso.json and run deploy.",
+      "Changes here affect everyone who signs in through default-human-user.",
+      "To change a mapping later, edit claim_mapping in",
+      ".zitadel/idps/acme-sso.json, then deploy.",
     ])("says %s", async (line, { dir }) => {
       const cwd = await setUpProject(dir);
 
@@ -1048,12 +1058,337 @@ describe("auth-method sso enable when the schema cannot be written", () => {
   });
 });
 
+describe("auth-method sso enable with claims", () => {
+  /**
+   * A Project whose user schema holds an integer `staffNumber` and a string
+   * `badge` besides the properties the standard claims fill.
+   *
+   * @param dir - The directory to write the Project into.
+   * @returns The Project's directory.
+   */
+  async function aProjectWithStaffNumbers(dir: string): Promise<string> {
+    return setUpProject(dir, {
+      "default-human-user": aSchemaWith({
+        givenName: { type: "string" },
+        familyName: { type: "string" },
+        staffNumber: { type: "integer", "x-unique": "project" },
+        badge: { type: "string" },
+      }),
+    });
+  }
+
+  /**
+   * `--provider custom --json` with the claim flags, the secret piped as a script would.
+   *
+   * @param cwd - The Project.
+   * @param flags - The claim flags.
+   * @returns What the run printed and how it ended.
+   */
+  function enableWith(cwd: string, ...flags: string[]) {
+    return withStdin(ACME.secret, () => {
+      return runCliForTest(authMethodJson(cwd, ...CUSTOM, ...ACME_FLAGS, ...flags));
+    });
+  }
+
+  /**
+   * What the run reported of the connection it made.
+   *
+   * @param stdout - What the run printed.
+   * @returns The connection's block of the result.
+   */
+  function connectionOf(stdout: string): JsonObject {
+    const result = parseJson(stdout);
+    if (
+      !isJsonValue(result) ||
+      !isJsonObject(result) ||
+      !isJsonObject(result.data) ||
+      !isJsonObject(result.data.connection)
+    ) {
+      throw new Error(`the run reported no connection: ${stdout}`);
+    }
+    return result.data.connection;
+  }
+
+  it("maps the standard claims whose names the schema has", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(cwd);
+
+    expect(connectionOf(result.stdout).claim_mapping).toEqual({
+      email: "email",
+      givenName: "given_name",
+      familyName: "family_name",
+    });
+  });
+
+  it("fills a property from the claim it is given", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(cwd, "--claim", "staffNumber=employee_id:integer");
+
+    expect(connectionOf(result.stdout).claim_mapping).toMatchObject({
+      staffNumber: "employee_id",
+    });
+  });
+
+  it("writes the mapping into the connection file", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+    await enableWith(cwd, "--claim", "staffNumber=employee_id:integer");
+
+    expect(await readJson(cwd, ACME.file)).toMatchObject({
+      claim_mapping: { staffNumber: "employee_id" },
+    });
+  });
+
+  it("asks the provider for the scopes the claims need", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(cwd, "--claim-scope", "employee");
+
+    expect(connectionOf(result.stdout).scopes).toEqual(["openid", "profile", "email", "employee"]);
+  });
+
+  it("records how a mapped property is verified", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(
+      cwd,
+      "--claim",
+      "staffNumber=employee_id:integer",
+      "--verified-claim",
+      "staffNumber=true",
+    );
+
+    expect(connectionOf(result.stdout).verified_claims).toMatchObject({ staffNumber: true });
+  });
+
+  it("replaces a default with the claim it is given", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(cwd, "--claim", "email=mail");
+
+    expect(connectionOf(result.stdout).claim_mapping).toMatchObject({ email: "mail" });
+  });
+
+  it("no longer verifies a default it replaced, and says so", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(cwd, "--claim", "email=mail");
+
+    expect(result.stdout).toContain("--verified-claim email=<claim>");
+  });
+
+  it("verifies a replaced default by the claim it is then given", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(
+      cwd,
+      "--claim",
+      "email=mail",
+      "--verified-claim",
+      "email=mail_verified",
+    );
+
+    expect(connectionOf(result.stdout).verified_claims).toEqual({ email: "mail_verified" });
+  });
+
+  it.for([
+    ["a string claim for an integer property", ["--claim", "staffNumber=employee_id"]],
+    ["a claim that already fills another property", ["--claim", "badge=given_name"]],
+    ["a property the schema does not define", ["--claim", "shoeSize=shoe"]],
+    ["a verification of a property that is not mapped", ["--verified-claim", "staffNumber=true"]],
+  ] as const)("refuses %s before it writes anything", async ([, flags], { dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(cwd, ...flags);
+
+    expect(result.exitCode).toBe(EXIT.validation);
+  });
+
+  it("writes no connection for a mapping it refuses", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+    await enableWith(cwd, "--claim", "staffNumber=employee_id");
+
+    expect(await readdir(join(cwd, ".zitadel"))).not.toContain("idps");
+  });
+
+  it("warns that the claims were not applied to a connection that already exists", async ({
+    dir,
+  }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+    await enableWith(cwd);
+
+    const result = await enableWith(cwd, "--claim", "staffNumber=employee_id:integer");
+
+    expect(result.stdout).toContain("claims you gave were not applied");
+  });
+
+  it("keeps the mapping a connection that already exists has", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+    await enableWith(cwd);
+
+    const result = await enableWith(cwd, "--claim", "staffNumber=employee_id:integer");
+
+    expect(connectionOf(result.stdout).claim_mapping).not.toHaveProperty("staffNumber");
+  });
+
+  it("reports no new attributes for claims that fill what the schema has", async ({ dir }) => {
+    const cwd = await aProjectWithStaffNumbers(dir);
+
+    const result = await enableWith(cwd, "--claim", "badge=nickname");
+
+    expect(connectionOf(result.stdout).new_attributes).toEqual([]);
+  });
+});
+
+describe("auth-method sso enable asking for claims at a terminal", () => {
+  /**
+   * The questions a person is asked about claims, then the credentials.
+   */
+  const CREDENTIALS = [ACME.clientId, ACME.secret] as const;
+
+  /**
+   * Runs the command for a custom connection with every setting given, the
+   * person answering what is asked.
+   *
+   * @param cwd - The Project.
+   * @param answers - What the person answers, in the order asked.
+   * @returns What was asked, shown and how the run ended.
+   */
+  function enterWith(cwd: string, answers: readonly string[]) {
+    return enterCustom(
+      cwd,
+      answers,
+      "--slug",
+      ACME.slug,
+      "--display-name",
+      ACME.displayName,
+      "--issuer",
+      ACME.issuer,
+      "--scopes",
+      ACME.scopes,
+    );
+  }
+
+  /**
+   * A Project whose user schema holds an integer `staffNumber` and a string `badge`.
+   *
+   * @param dir - The directory to write the Project into.
+   * @returns The Project's directory.
+   */
+  function aProject(dir: string): Promise<string> {
+    return setUpProject(dir, {
+      "default-human-user": aSchemaWith({
+        givenName: { type: "string" },
+        staffNumber: { type: "integer", "x-unique": "project" },
+        badge: { type: "string" },
+      }),
+    });
+  }
+
+  it("shows what the provider maps by default before it asks for more", async ({ dir }) => {
+    const cwd = await aProject(dir);
+
+    const { shown } = await enterWith(cwd, [...CREDENTIALS, KEEP_CLAIMS]);
+
+    expect(shown).toMatch(/givenName\s+given_name\s+no/);
+  });
+
+  it("asks for each part of a claim, in order", async ({ dir }) => {
+    const cwd = await aProject(dir);
+
+    const { asked } = await enterWith(cwd, [
+      ...CREDENTIALS,
+      "Yes, add another",
+      "employee_id",
+      "Integer",
+      "staffNumber",
+      "employee",
+      "No, leave it unverified",
+      KEEP_CLAIMS,
+    ]);
+
+    expect(asked.slice(2)).toEqual([
+      QUESTION.claims,
+      "Which Acme SSO claim do you want to use? Enter the name exactly as the provider sends it, such as phone_number.",
+      "What type of value is it?",
+      "Which Zitadel attribute should store employee_id?",
+      "Does Acme SSO need an extra scope to send employee_id? Enter its name, such as phone. Leave blank if it sends it by default.",
+      "Treat staffNumber as verified? Choose yes only if Acme SSO has already confirmed it belongs to the user.",
+      QUESTION.claims,
+    ]);
+  });
+
+  it("writes the claim the person mapped, and the scope it needs", async ({ dir }) => {
+    const cwd = await aProject(dir);
+    await enterWith(cwd, [
+      ...CREDENTIALS,
+      "Yes, add another",
+      "employee_id",
+      "Integer",
+      "staffNumber",
+      "employee",
+      "Yes, trust Acme SSO",
+      KEEP_CLAIMS,
+    ]);
+
+    expect(await readJson(cwd, ACME.file)).toMatchObject({
+      claim_mapping: { staffNumber: "employee_id" },
+      verified_claims: { staffNumber: true },
+      oidc: { scopes: ["openid", "profile", "email", "employee"] },
+    });
+  });
+
+  it("adds a new attribute to the user schema", async ({ dir }) => {
+    const cwd = await aProject(dir);
+    await enterWith(cwd, [
+      ...CREDENTIALS,
+      "Yes, add another",
+      "department",
+      "Text",
+      "Create a new attribute",
+      "departmentName",
+      "",
+      KEEP_CLAIMS,
+    ]);
+
+    expect(await readJson(cwd, ".zitadel/schemas/default-human-user.json")).toMatchObject({
+      properties: { departmentName: { type: "string" } },
+    });
+  });
+
+  it("asks nothing about claims when the flags gave some", async ({ dir }) => {
+    const cwd = await aProject(dir);
+
+    const { asked } = await enterCustom(
+      cwd,
+      CREDENTIALS,
+      "--slug",
+      ACME.slug,
+      "--display-name",
+      ACME.displayName,
+      "--issuer",
+      ACME.issuer,
+      "--scopes",
+      ACME.scopes,
+      "--claim",
+      "badge=nickname",
+    );
+
+    expect(asked).not.toContain(QUESTION.claims);
+  });
+});
+
 describe("AuthMethodSsoEnable.flags", () => {
   it.each([
     ["slug", AuthMethodSsoEnable.flags.slug, "Acme SSO"],
     ["display-name", AuthMethodSsoEnable.flags["display-name"], ""],
     ["issuer", AuthMethodSsoEnable.flags.issuer, "not a url"],
     ["scopes", AuthMethodSsoEnable.flags.scopes, "profile"],
+    ["claim", AuthMethodSsoEnable.flags.claim, "nonsense"],
+    ["claim", AuthMethodSsoEnable.flags.claim, "staffNumber=employee_id:Integer"],
+    ["verified-claim", AuthMethodSsoEnable.flags["verified-claim"], "email=false"],
+    ["claim-scope", AuthMethodSsoEnable.flags["claim-scope"], " "],
   ])("refuses what --%s cannot carry, naming that flag", async (name, flag, value) => {
     const error = await rejectionOf(() => {
       return parseFlag(flag, value, name);
@@ -1071,6 +1406,9 @@ describe("AuthMethodSsoEnable.flags", () => {
     ["display-name", AuthMethodSsoEnable.flags["display-name"], "Acme SSO"],
     ["issuer", AuthMethodSsoEnable.flags.issuer, "https://sso.acme.example"],
     ["scopes", AuthMethodSsoEnable.flags.scopes, "openid profile"],
+    ["claim", AuthMethodSsoEnable.flags.claim, "staffNumber=employee_id:integer"],
+    ["verified-claim", AuthMethodSsoEnable.flags["verified-claim"], "staffNumber=true"],
+    ["claim-scope", AuthMethodSsoEnable.flags["claim-scope"], "employee groups"],
   ])("takes what --%s can, trimmed", async (name, flag, value) => {
     const parsed = await parseFlag(flag, ` ${value} `, name);
 

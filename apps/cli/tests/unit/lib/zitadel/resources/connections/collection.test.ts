@@ -381,6 +381,41 @@ describe("Connections.enable", () => {
       });
     });
   });
+  describe("with a register-sso step edited by hand and a new attribute", () => {
+    const handEdited = () => {
+      return aConfig({
+        ...CUSTOMERS_PROJECT,
+        flows: {
+          "customers-login.json": withStepChanged(
+            onlyFlowOf(WITH_GOOGLE),
+            "register-sso",
+            HAND_EDIT,
+          ),
+        },
+      });
+    };
+    const attributes = [{ name: "employeeNumber", type: "string" }] as const;
+
+    it("does not add the attribute to the step", () => {
+      const change = handEdited().connections.enable(CUSTOMERS_SCHEMA, GOOGLE, { attributes });
+
+      expect(
+        change.after.flows.all[0]?.steps.find((step) => {
+          return step.name === "register-sso";
+        })?.fields,
+      ).not.toContain("employeeNumber");
+    });
+
+    it("says the step was left alone and which field to add to it", () => {
+      const change = handEdited().connections.enable(CUSTOMERS_SCHEMA, GOOGLE, { attributes });
+
+      expect(change.notices).toContainEqual({
+        severity: "warning",
+        message: `${FLOW_FILE} steps.register-sso has been edited by hand, so it was left alone. Add employeeNumber to its fields.`,
+      });
+    });
+  });
+
   describe("with a provider route of the developer's own", () => {
     it("says the step offers the provider and kept its own routes", () => {
       const config = aConfig({

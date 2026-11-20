@@ -16,7 +16,13 @@ import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
-import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
+import {
+  customExample,
+  ENABLE_FLAG_NAMES,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
+} from "@/lib/idp";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult, JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
@@ -25,6 +31,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 
+import { AskClaims } from "./steps/ask-claims";
 import { BuildChange } from "./steps/build-change";
 import { ChooseProvider } from "./steps/choose-provider";
 import { CollectCredentials } from "./steps/collect-credentials";
@@ -33,6 +40,7 @@ import { LoadSchema } from "./steps/load-schema";
 import { PlanChange } from "./steps/plan-change";
 import { PreviewChange } from "./steps/preview-change";
 import { PublishCredentials } from "./steps/publish-credentials";
+import { ReadClaims } from "./steps/read-claims";
 import { ReadIssuer } from "./steps/read-issuer";
 import { ReadOrigins } from "./steps/read-origins";
 import { SelectConnection } from "./steps/select-connection";
@@ -63,10 +71,24 @@ const PROVIDER_IS_NAMED_REFUSAL = {
  * history, a process listing, or CI logs.
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
+  /**
+   * What `--help` says the command does.
+   */
   static override description = "Add an identity provider to a user schema.";
+
+  /**
+   * The group the command index lists it under.
+   */
   static override group = CommandGroups.signIn;
+
+  /**
+   * Where the command sits in its group.
+   */
   static override groupOrder = 1;
 
+  /**
+   * The examples `--help` shows.
+   */
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -74,10 +96,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES)}`,
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES, true)} --client-id abc123 --non-interactive < secret.txt`,
   ];
+  /**
+   * The flags every `auth-method` command takes, and the environment's.
+   */
   static override baseFlags = {
     ...AuthMethodCommand.baseFlags,
     ...environmentFlags,
   };
+  /**
+   * The flags the command takes.
+   */
   static override flags = {
     provider: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
@@ -120,8 +148,31 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     })({
       description: "Client id of the application registered with the provider.",
     }),
+    claim: Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseClaimEntry, { blankAsValue: true }),
+    })({
+      description:
+        "Fill a user-schema property from a provider claim: <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim the provider returns as a number or boolean says so after a colon (string is the default). Repeatable. Given, it replaces the interactive claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "verified-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseVerifiedEntry, { blankAsValue: true }),
+    })({
+      description:
+        "Say how a mapped property is verified: <property>=<claim> names the boolean claim that must be true, <property>=true trusts the provider. Repeatable.",
+    }),
+    "claim-scope": Flags.custom<string>({
+      parse: accepts(parseScopeList, { blankAsValue: true }),
+    })({
+      description:
+        "Extra scopes the mapped claims need before the provider returns them, separated by spaces or commas.",
+    }),
   };
 
+  /**
+   * That the command resolves the server and the environment before it runs.
+   */
   static override meta = {
     environment: true,
   };
@@ -135,8 +186,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * work out the whole change and refuse what cannot be done, preview it or ask
    * for the credentials, then store them and write the files.
    *
-   * @param input.flags - The provider, its settings, the schema and the environment flags.
-   * @returns The result.
+   * @param admitted - What the command admitted.
+   * @param admitted.flags - The provider, its settings, the schema and the environment flags.
+   * @returns The envelope the run answers with.
    * @throws {@link ZitadelError} When no provider is named, a setting is
    *   refused, the schema cannot be chosen, or no flow can offer the provider.
    */
@@ -179,13 +231,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             dryRun: this.dryRun,
           }),
         )
+        .step(new ReadClaims())
         .step(
           new PlanChange({
-            ask: this.ask,
             machine: new RealMachine(),
-            developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
-            suggest: this.suggest,
-            again: this.again,
           }),
         )
         .step(new IntroduceProvider())
@@ -204,12 +253,25 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             },
           }),
         )
-        .step(new CollectCredentials())
+        .step(
+          new CollectCredentials({
+            ask: this.ask,
+            developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
+            again: this.again,
+          }),
+        )
+        .step(
+          new AskClaims({
+            ask: this.ask,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
         .step(new BuildChange())
         .step(
           new PublishCredentials({
             signal: this.signal,
             source: this.meta.source,
+            suggest: this.suggest,
           }),
         )
         .step(

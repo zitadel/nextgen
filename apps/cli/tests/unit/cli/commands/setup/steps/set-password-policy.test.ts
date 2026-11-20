@@ -9,7 +9,7 @@ import { isCancel, select } from "@clack/prompts";
 import type { SetupFlags } from "@/cli/commands/setup";
 import { SetPasswordPolicy } from "@/cli/commands/setup/steps/set-password-policy";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
-import { aPromptDeps } from "@tests/helpers/setup";
+import { aQuestionDeps } from "@tests/helpers/setup";
 
 /**
  * The hosted cloud, the server a run falls back to.
@@ -46,7 +46,7 @@ async function passwordPolicyFor(
   flags: Partial<SetupFlags> = {},
 ): Promise<SetupAnswers> {
   return (
-    await new SetPasswordPolicy(aPromptDeps()).run({
+    await new SetPasswordPolicy(aQuestionDeps()).run({
       flags: flags as SetupFlags,
       answers,
     })

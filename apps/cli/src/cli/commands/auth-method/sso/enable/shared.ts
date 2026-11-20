@@ -5,11 +5,11 @@ import type { FollowUps, SchemaTarget } from "@/cli/commands/auth-method/command
 import type AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import type { Origins } from "@/lib/backend";
 import type {
-  CredentialDelivery,
+  ClaimRequest,
   CredentialNames,
-  CredentialPrompt,
+  CustomFlagValues,
   GivenCredentials,
-  ProviderChoice,
+  MappingState,
   PublishedCredentials,
 } from "@/lib/idp";
 import { log } from "@/lib/ui";
@@ -18,7 +18,12 @@ import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Again, Suggest, SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Questions } from "@/lib/ui";
-import type { Change, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
+import type { Change, ClaimChoice, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
+
+/**
+ * How `--verified-claim` is spelled, for the note about a replaced default.
+ */
+export const VERIFIED_FLAG = "--verified-claim";
 
 /**
  * Joins a list the way a sentence does: "a, b and c".
@@ -94,7 +99,18 @@ export type EnableFacts = Readonly<{
   /**
    * How the flags choose a provider.
    */
-  choice: ProviderChoice;
+  choice: Readonly<{
+    /**
+     * The provider, or `undefined` for a custom connection a person will be
+     * asked to finish.
+     */
+    selection: ProviderSelection | undefined;
+
+    /**
+     * The custom connection's settings the flags gave.
+     */
+    values: CustomFlagValues;
+  }>;
 
   /**
    * The origin the app serves from, which every callback URI is built on.
@@ -132,7 +148,31 @@ export type EnableFacts = Readonly<{
   options: SsoOptions;
 
   /**
-   * The connection the provider's defaults make.
+   * What the flags asked for beyond the provider's claim mapping defaults.
+   */
+  claimRequest: ClaimRequest;
+
+  /**
+   * What the connection maps before anything is asked, or `undefined` when the
+   * connection already exists and keeps its own mapping.
+   */
+  mapping: MappingState | undefined;
+
+  /**
+   * What the connection is written with once the flags are applied, or
+   * `undefined` for a connection that already exists.
+   */
+  claims: ClaimChoice | undefined;
+
+  /**
+   * What the connection is written with once the person has been asked, which
+   * is {@link EnableFacts.claims} when nothing was asked.
+   */
+  answered: ClaimChoice | undefined;
+
+  /**
+   * The connection the provider's defaults make, with the claims the flags
+   * mapped.
    */
   candidate: Connection;
 
@@ -142,14 +182,9 @@ export type EnableFacts = Readonly<{
   preview: DocumentChange<Connection>;
 
   /**
-   * Where the credentials go, and how that is reported.
+   * The project variables the connection reads its credentials from.
    */
-  delivery: CredentialDelivery;
-
-  /**
-   * The questions that ask for the credentials.
-   */
-  prompt: CredentialPrompt;
+  names: CredentialNames;
 
   /**
    * What the run says about the connection.
@@ -319,7 +354,7 @@ export type EnableServices = Readonly<{
  * @param value - The value.
  * @returns The value, safe to print on one line.
  */
-function plain(value: string): string {
+export function plain(value: string): string {
   return escapeControlCharacters(value, { keepLayout: false });
 }
 
@@ -336,6 +371,8 @@ function plain(value: string): string {
  * @param input.change - The change that adds the connection.
  * @param input.published - What became of each credential.
  * @param input.names - The variables the credentials go to.
+ * @param input.claims - What the claim mapping makes of the connection, or
+ *   `undefined` for one the project already had.
  * @returns The result's data.
  */
 export function payload(
@@ -344,6 +381,7 @@ export function payload(
     change: DocumentChange<Connection>;
     published: PublishedCredentials;
     names: CredentialNames;
+    claims: ClaimChoice | undefined;
   }>,
 ) {
   const mapped = input.change.after.connections.summarize(input.change.document);
@@ -360,6 +398,9 @@ export function payload(
           return [property, claim];
         }),
       ),
+      new_attributes: (input.claims?.created ?? []).map((property) => {
+        return property.name;
+      }),
       verified_claims: Object.fromEntries(
         mapped.verifications.map(({ property, claim }) => {
           return [property, claim];
@@ -407,10 +448,10 @@ export function drawMapping(change: DocumentChange<Connection>): void {
   const verifiedBy = new Map(
     verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
       if (claim === true) {
-        return [[property, "always counts as verified"]];
+        return [[property, "always verified"]];
       }
       if (typeof claim === "string") {
-        return [[property, `counts as verified when ${plain(claim)} is true`]];
+        return [[property, `verified when ${plain(claim)} is true`]];
       }
       return [];
     }),
@@ -424,11 +465,8 @@ export function drawMapping(change: DocumentChange<Connection>): void {
               ? `When someone signs in with ${plain(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
               : `${plain(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
             ...mappings.map(({ property, claim }) => {
-              const verified = verifiedBy.get(property) ?? "is not treated as verified";
-              return [
-                `- ${plain(property)} comes from the provider's ${plain(claim)} claim.`,
-                `  It ${verified}.`,
-              ].join("\n");
+              const verified = verifiedBy.get(property) ?? "not verified";
+              return `• ${plain(property)} ← ${plain(claim)} (${verified})`;
             }),
           ],
       scopes.length === 0
@@ -439,24 +477,44 @@ export function drawMapping(change: DocumentChange<Connection>): void {
       unmapped.length === 0
         ? []
         : [
-            "These attributes have no claim yet:",
-            ...unmapped.map(({ property, required }) => {
-              if (!required) {
-                return `- ${plain(property)} is optional, so it can stay empty.`;
-              }
-              return createsUsers
-                ? `- ${plain(property)} is required, so sign-up will have to ask for it.`
-                : `- ${plain(property)} is required, but this connection does not create users.`;
-            }),
+            ...(unmapped.some(({ required }) => {
+              return !required;
+            })
+              ? [
+                  `Not filled by ${plain(connection.displayName)} (optional): ${CONJUNCTION.format(
+                    unmapped
+                      .filter(({ required }) => {
+                        return !required;
+                      })
+                      .map(({ property }) => {
+                        return plain(property);
+                      }),
+                  )}.`,
+                ]
+              : []),
+            ...(unmapped.some(({ required }) => {
+              return required;
+            })
+              ? [
+                  `No claim fills these required attributes of ${plain(connection.displayName)}:`,
+                  ...unmapped
+                    .filter(({ required }) => {
+                      return required;
+                    })
+                    .map(({ property }) => {
+                      return createsUsers
+                        ? `• ${plain(property)}, so sign-up will have to ask for it.`
+                        : `• ${plain(property)}, but this connection does not create users.`;
+                    }),
+                ]
+              : []),
           ],
       usedBy.length === 0
         ? []
         : [
-            `This connection is used by ${CONJUNCTION.format(usedBy.map(plain))}, so a change here affects the people who sign in with it.`,
+            `Changes here affect everyone who signs in through ${CONJUNCTION.format(usedBy.map(plain))}.`,
           ],
-      [
-        `To change which claim fills an attribute, edit claim_mapping in ${plain(connection.path)} and run deploy.`,
-      ],
+      [`To change a mapping later, edit claim_mapping in ${plain(connection.path)}, then deploy.`],
     ]
       .filter((section) => {
         return section.length > 0;

@@ -4,6 +4,7 @@ import type { CreatedProject } from "@/lib/backend";
 import { type FrameworkFacts, issuerFromPort } from "@/lib/orca";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext } from "@/lib/orca/patchers/types";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { CliPackage } from "@/lib/upgrade";
 
@@ -73,6 +74,12 @@ export class PlanConfiguration extends WizardStep<
     const issuer = issuerFromPort(answers.devPort);
     const rendererId = flags.renderer ?? DEFAULT_RENDERER;
     const posture = derivePosture(app.framework, scaffoldedFramework);
+    const planned = await scaffoldOf(this.deps.cwd, this.deps.force, answers);
+    for (const note of planned.connections.flatMap((entry) => {
+      return entry.notes;
+    })) {
+      warnings.report(note);
+    }
     return {
       issuer,
       rendererId,
@@ -94,7 +101,7 @@ export class PlanConfiguration extends WizardStep<
           useCase: answers.useCase,
         };
       },
-      planned: await scaffoldOf(this.deps.cwd, this.deps.force, answers),
+      planned,
     };
   }
 }

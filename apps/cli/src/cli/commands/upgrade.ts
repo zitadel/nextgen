@@ -157,7 +157,7 @@ export default class Upgrade extends ServerCommand(BaseCommand) {
       rows.push(`  ${style.mark.warn} Could not refresh generated files`);
     }
     for (const { name, specifier } of plan.leftAlone) {
-      const said = `- ${name} left at "${specifier}", not an exact version`;
+      const said = `• ${name} left at "${specifier}", not an exact version`;
       rows.push(`  ${style.dim(escapeControlCharacters(said))}`);
     }
 

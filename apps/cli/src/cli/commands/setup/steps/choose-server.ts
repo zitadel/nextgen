@@ -1,8 +1,8 @@
 import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { outdatedLocalServer, promptContext } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
+import { outdatedLocalServer } from "@/cli/commands/setup/shared";
 
 /**
  * The value the choice select returns when the person picks "Custom URL".
@@ -30,7 +30,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
  */
 type Deps = Pick<
   SetupServices,
-  "ask" | "cwd" | "dryRun" | "machine" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  "ask" | "cwd" | "dryRun" | "machine" | "nonInteractive" | "serverFlag" | "ui"
 >;
 
 /**
@@ -72,24 +72,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
   }
 
   /**
-   * Ask the question, or leave the answers as they are when nothing can be asked.
-   *
-   * @param needs - The flags, the app and the answers so far.
-   * @returns The answers, with this question's settled.
-   */
-  async run(needs: Needs): Promise<Fact<"answers">> {
-    if (this.deps.nonInteractive || this.deps.dryRun) {
-      return {
-        answers: needs.answers,
-      };
-    }
-    return {
-      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
-    };
-  }
-
-  /**
-   * Ask which server the app uses.
+   * Ask which server the app uses, or leave the answers as they are when nothing can be asked.
    *
    * @remarks
    * `--server <url>` overrides the wizard entirely. The command already validated and resolved the
@@ -105,23 +88,25 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
    * is asked for again: the question keeps the wizard going where a refusal would end it after
    * the questions before this one were answered.
    *
-   * @param answers - The answers so far.
-   * @param ctx - What the question needs to ask.
+   * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with the server settled.
    */
-  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.serverFlag) {
-      return answers;
+  async run(needs: Needs): Promise<Fact<"answers">> {
+    const { answers } = needs;
+    if (this.deps.nonInteractive || this.deps.dryRun || this.deps.serverFlag) {
+      return {
+        answers,
+      };
     }
-    const probing = ctx.spinner("Checking for a local Zitadel server", { guide: false });
-    const detected = await this.deps.machine.detectUrl(ctx.cwd);
-    const outdated = await outdatedLocalServer(ctx.cwd, this.deps.machine);
+    const probing = this.deps.ui.spinner("Checking for a local Zitadel server", { guide: false });
+    const detected = await this.deps.machine.detectUrl(this.deps.cwd);
+    const outdated = await outdatedLocalServer(this.deps.cwd, this.deps.machine);
     probing.clear();
     const usable =
       detected && !(outdated && LocalRuntime.same(outdated.serverUrl, detected))
         ? detected
         : undefined;
-    const choice = await ctx.ask.select({
+    const choice = await this.deps.ask.select({
       name: "server",
       message: "Which Zitadel server should your app use?",
       options: [
@@ -156,24 +141,28 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
       initialValue: usable ?? answers.server ?? ZitadelRuntime.DEFAULT,
     });
     return {
-      ...answers,
-      server:
-        choice === CUSTOM
-          ? await ctx.ask.text({
-              name: "server URL",
-              message: "What is the URL of your Zitadel server?",
-              placeholder: "https://zitadel.internal",
-              parse: (value) => {
-                const parsed = ZitadelRuntime.parse(value);
-                return parsed.ok && outdated && LocalRuntime.same(outdated.serverUrl, parsed.value)
-                  ? {
-                      ok: false,
-                      problem: `That local server runs ${outdated.running}, but this CLI ships ${outdated.expected}. Restart it first, or enter another URL`,
-                    }
-                  : parsed;
-              },
-            })
-          : choice,
+      answers: {
+        ...answers,
+        server:
+          choice === CUSTOM
+            ? await this.deps.ask.text({
+                name: "server URL",
+                message: "What is the URL of your Zitadel server?",
+                placeholder: "https://zitadel.internal",
+                parse: (value) => {
+                  const parsed = ZitadelRuntime.parse(value);
+                  return parsed.ok &&
+                    outdated &&
+                    LocalRuntime.same(outdated.serverUrl, parsed.value)
+                    ? {
+                        ok: false,
+                        problem: `That local server runs ${outdated.running}, but this CLI ships ${outdated.expected}. Restart it first, or enter another URL`,
+                      }
+                    : parsed;
+                },
+              })
+            : choice,
+      },
     };
   }
 }

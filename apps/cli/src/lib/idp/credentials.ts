@@ -6,11 +6,6 @@ import type {
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
 
-import { log } from "@/lib/ui/log";
-import { warnings } from "@/lib/ui/warnings";
-import type { SuggestedCommand } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-
 /**
  * The project variable a connection reads one of its credentials from.
  */
@@ -156,8 +151,7 @@ async function publishSecret(
     await publish(name, value, { secret });
 
     return "stored";
-  } catch (error) {
-    log.debug(`Publishing ${name} to the project failed`, error);
+  } catch {
     return "failed";
   }
 }
@@ -183,7 +177,7 @@ export type CredentialRecovery = {
  * where both were stored.
  *
  * @remarks
- * Typed, not rendered, for the command that reports each as a command and as
+ * Typed, not rendered, for a caller that reports each as a command and as
  * `next_args`: it builds both from the same `variable set` input.
  *
  * @param credentials - Each credential of the run and what became of it.
@@ -217,84 +211,6 @@ export type Unpublished = {
    */
   readonly secret: boolean;
 };
-
-/**
- * Say whether the project received a credential, and how to retry when it did
- * not.
- *
- * @remarks
- * Shared by both credentials, because the project is the destination that
- * decides whether sign-in works and the wording should not drift between them.
- * `noValue` separates the two ways a publish can be deferred: nothing was
- * supplied, or there was no project to publish to. They read the same to the
- * code and call for different things from the developer.
- *
- * @param name - The variable.
- * @param state - What became of it.
- * @param republish - The command that publishes it.
- * @param noValue - Whether a deferral means no value was given.
- */
-function reportPublished(
-  name: CredentialVariable,
-  state: PublishState,
-  republish: SuggestedCommand,
-  noValue: boolean,
-): void {
-  switch (state) {
-    case "stored": {
-      log.done(`Published ${escapeControlCharacters(name)} to the project`);
-      return;
-    }
-    case "deferred": {
-      if (noValue) {
-        warnings.report(`${name} has no value yet. Publish it with: ${republish}`);
-        return;
-      }
-      warnings.report(`${name} was not published to the project. Publish it with: ${republish}`);
-      return;
-    }
-    case "failed": {
-      warnings.report(`${name} could not be published. Sign-in fails until it is: ${republish}`);
-      return;
-    }
-  }
-}
-
-/**
- * Tell the developer what became of the secret.
- *
- * @param outcome - Where the secret ended up.
- * @param noValue - Whether a deferral means no value was given.
- * @param republish - The command that publishes it, which the running
- *   command rendered.
- */
-export function reportSecretOutcome(
-  outcome: SecretOutcome,
-  noValue: boolean,
-  republish: SuggestedCommand,
-): void {
-  reportPublished(outcome.name, outcome.published, republish, noValue);
-}
-
-/**
- * Tell the developer what became of the client id.
- *
- * @remarks
- * A missing one is never "no value yet": the command refuses without a client
- * id, so the only way here is a project it could not reach.
- *
- * @param name - The variable.
- * @param state - What became of it.
- * @param republish - The command that publishes it, which the running
- *   command rendered.
- */
-export function reportClientIdOutcome(
-  name: ClientIdVariable,
-  state: PublishState,
-  republish: SuggestedCommand,
-): void {
-  reportPublished(name, state, republish, false);
-}
 
 /**
  * The project variables a connection reads its credentials from.

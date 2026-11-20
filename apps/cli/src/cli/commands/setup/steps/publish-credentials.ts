@@ -3,16 +3,17 @@ import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/c
 import type { Fact, SetupServices, SsoAnswer } from "@/cli/commands/setup/shared";
 import { createZitadelClient, VariableService, VariableWrite } from "@/lib/backend";
 import {
+  type CredentialVariable,
   publishClientId,
   type PublishState,
-  reportClientIdOutcome,
-  reportSecretOutcome,
   type SecretOutcome,
   type SecretPublisher,
   storeClientSecret,
 } from "@/lib/idp";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
-import { warnings } from "@/lib/ui";
+import { log, warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -98,6 +99,24 @@ export class PublishCredentials extends WizardStep<
             }),
             project.id,
           );
+    const publish: SecretPublisher | undefined =
+      variables === undefined
+        ? undefined
+        : async (name, value, options) => {
+            try {
+              await variables.set(
+                name,
+                value,
+                VariableWrite.of({
+                  secret: options.secret,
+                  preview: false,
+                }),
+              );
+            } catch (error) {
+              log.debug(`Publishing ${name} to the project failed`, error);
+              throw error;
+            }
+          };
     return {
       ssoOutcomes: new Map(
         await this.publishEach(
@@ -116,18 +135,7 @@ export class PublishCredentials extends WizardStep<
               },
             };
           }),
-          variables === undefined
-            ? undefined
-            : async (name, value, { secret }) => {
-                await variables.set(
-                  name,
-                  value,
-                  VariableWrite.of({
-                    secret,
-                    preview: false,
-                  }),
-                );
-              },
+          publish,
         ),
       ),
     };
@@ -183,14 +191,14 @@ export class PublishCredentials extends WizardStep<
           `${answer.endpoints.issuer}, not the provider`,
       );
     }
-    reportClientIdOutcome(
+    this.reportPublished(
       idVariable,
       clientId,
       this.deps.suggest({ id: "variable:set", args: { name: idVariable } }),
     );
-    reportSecretOutcome(
-      secret,
-      false,
+    this.reportPublished(
+      secret.name,
+      secret.published,
       this.deps.suggest({
         id: "variable:set",
         args: { name: secret.name },
@@ -207,5 +215,38 @@ export class PublishCredentials extends WizardStep<
       ],
       ...(await this.publishEach(rest, publish)),
     ];
+  }
+
+  /**
+   * Say whether the project received a credential, and how to retry when it did
+   * not.
+   *
+   * @remarks
+   * The wizard refuses an empty secret, so a deferred publish only ever means
+   * there was no project to publish to, and never that no value was given.
+   *
+   * @param name - The variable.
+   * @param state - What became of it.
+   * @param republish - The command that publishes it.
+   */
+  private reportPublished(
+    name: CredentialVariable,
+    state: PublishState,
+    republish: SuggestedCommand,
+  ): void {
+    switch (state) {
+      case "stored": {
+        log.done(`Saved ${escapeControlCharacters(name)} in your project`);
+        return;
+      }
+      case "deferred": {
+        warnings.report(`${name} was not published to the project. Publish it with: ${republish}`);
+        return;
+      }
+      case "failed": {
+        warnings.report(`${name} could not be published. Sign-in fails until it is: ${republish}`);
+        return;
+      }
+    }
   }
 }

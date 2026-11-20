@@ -126,10 +126,12 @@ export {
   UserSchema,
   type EnabledMethods,
   type ForceOptions,
+  type NewProperty,
   type SchemaEdit,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas";
 export { DiskStore } from "@/lib/zitadel/storage";
+export { standardClaim, STANDARD_CLAIMS, type StandardClaimName } from "@/lib/zitadel/rules/claims";
 export {
   RULE_IDS,
   type FlowCheck,
@@ -149,6 +151,7 @@ export {
   type ConfigFile,
   type ConfigurationBundle,
   type ConfigFiles,
+  type ClaimChoice,
   type ConfigKind,
   type JsonArray,
   type JsonObject,

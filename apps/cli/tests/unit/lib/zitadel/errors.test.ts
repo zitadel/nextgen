@@ -125,7 +125,7 @@ describe("BrokenFlowsError", () => {
     expect(error.message).toBe(
       [
         "A login flow would stop validating after this change:",
-        `  - ${FLOW_PATH}: step "password": no such field`,
+        `  • ${FLOW_PATH}: step "password": no such field`,
       ].join("\n"),
     );
   });
@@ -168,19 +168,19 @@ describe("BrokenFlowsError", () => {
         "still lists an issue on a step that does not use the method",
         [BROKEN, issueOn("other", "also broken")],
         [useOf("password")],
-        `  - ${FLOW_PATH}: also broken`,
+        `  • ${FLOW_PATH}: also broken`,
       ],
       [
         "says what a step keeps without the method",
         [BROKEN],
         [useOf("password", { keeps: ['field "email"', "gates"] })],
-        `  - ${FLOW_PATH}: step "password" collects password\n    Still has field "email", gates.`,
+        `  • ${FLOW_PATH}: step "password" collects password\n    Still has field "email", gates.`,
       ],
       [
         "says a step left with nothing is left with nothing",
         [BROKEN],
         [useOf("password")],
-        `  - ${FLOW_PATH}: step "password" collects password\n    Left with no field or sign-in method.`,
+        `  • ${FLOW_PATH}: step "password" collects password\n    Left with no field or sign-in method.`,
       ],
       [
         "names the purposes a step left with nothing is the entry step of",
@@ -305,8 +305,8 @@ describe("BrokenFilesError", () => {
     ]);
 
     expect(error.message.split("\n").slice(1)).toEqual([
-      "  - .zitadel/idps/acme.json: protocol is missing",
-      "  - .zitadel/idps/acme.json: name is missing",
+      "  • .zitadel/idps/acme.json: protocol is missing",
+      "  • .zitadel/idps/acme.json: name is missing",
     ]);
   });
 });

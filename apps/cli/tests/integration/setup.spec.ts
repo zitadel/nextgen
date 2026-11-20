@@ -1886,6 +1886,7 @@ describe("setup", () => {
                   client_id: provider.credentials.clientId,
                   connection: `.zitadel/idps/${provider.slug}.json`,
                   claim_mapping: { email: "email" },
+                  new_attributes: [],
                   verified_claims: { email: "email_verified" },
                   scopes: ["openid", "profile", "email"],
                   unmapped: [],
@@ -2075,6 +2076,75 @@ describe("setup", () => {
           const data = await app.deployDryRunData();
 
           expect(data.diff?.files).toEqual([]);
+        });
+      });
+
+      describe("with a custom provider and claim mappings", () => {
+        const BUSINESS = ["--use-case", "business"];
+
+        it("registers the connection with the claim it was given", async () => {
+          const app = await anApp();
+          await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "companyName=organization",
+          ]);
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.claim_mapping).toMatchObject({
+            companyName: "organization",
+            givenName: "given_name",
+          });
+        });
+
+        it("leaves nothing to reconcile after the provider is set up with a claim", async () => {
+          const app = await anApp();
+          await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "companyName=organization",
+          ]);
+
+          const data = await app.deployDryRunData();
+
+          expect(data.diff?.files).toEqual([]);
+        });
+
+        it.each([
+          ["a property the schema does not define", "shoeSize=shoe"],
+          ["a claim that already fills a property", "companyName=given_name"],
+        ])("refuses %s", async (_what, claim) => {
+          const app = await anApp();
+
+          const result = await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            claim,
+          ]);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("writes nothing when the claim is refused", async () => {
+          const app = await anApp();
+          const before = await app.snapshot();
+
+          await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "shoeSize=shoe",
+          ]);
+
+          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+
+        it("refuses a claim given without a provider", async () => {
+          const app = await anApp();
+
+          const result = await app.setup(["--sso-claim", "companyName=organization"]);
+
+          expect(result).toFailWith("E_VALIDATION");
         });
       });
 
@@ -2325,7 +2395,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("- email comes from the provider's email claim.");
+        expect(result).toPrint("• email ← email");
       });
 
       it("says which schemas sign in through the connection", async () => {
@@ -2333,7 +2403,9 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("This connection is used by default-human-user");
+        expect(result).toPrint(
+          "Changes here affect everyone who signs in through default-human-user.",
+        );
       });
 
       it("says which scopes it asks the provider for", async () => {
@@ -2351,7 +2423,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("To change which claim fills an attribute, edit claim_mapping in");
+        expect(result).toPrint("To change a mapping later, edit claim_mapping in");
       });
     });
   });

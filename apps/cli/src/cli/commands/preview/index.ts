@@ -314,7 +314,7 @@ export default class Preview extends ServerCommand(PreviewCommand) {
           [
             title,
             ...urls.map((url) => {
-              return `  - ${url}`;
+              return `  • ${url}`;
             }),
           ].join("\n"),
         ),
@@ -322,7 +322,7 @@ export default class Preview extends ServerCommand(PreviewCommand) {
           title,
           sections: [],
           lines: urls.map((url) => {
-            return `  - ${escapeControlCharacters(url)}`;
+            return `  • ${escapeControlCharacters(url)}`;
           }),
         },
         next: {
@@ -388,8 +388,8 @@ export default class Preview extends ServerCommand(PreviewCommand) {
           `Previewed ${release.content_hash} on ${previewUrls}`,
           ...previews.map((preview) => {
             return preview.expires_at === null
-              ? `  - ${preview.url}`
-              : `  - ${preview.url} (until ${preview.expires_at})`;
+              ? `  • ${preview.url}`
+              : `  • ${preview.url} (until ${preview.expires_at})`;
           }),
           `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
         ].join("\n"),
@@ -400,8 +400,8 @@ export default class Preview extends ServerCommand(PreviewCommand) {
         lines: [
           ...previews.map((preview) => {
             return preview.expires_at === null
-              ? `  - ${escapeControlCharacters(preview.url)}`
-              : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
+              ? `  • ${escapeControlCharacters(preview.url)}`
+              : `  • ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
           }),
           `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
         ],

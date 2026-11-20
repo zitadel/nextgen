@@ -1102,3 +1102,102 @@ describe("ZitadelConfig.withOptions", () => {
     expect(config.broken).toMatchObject([{ path: BROKEN_SCHEMA }]);
   });
 });
+
+describe("ZitadelConfig.scaffold with a claim choice", () => {
+  const choice = {
+    mapping: { email: "email", employeeNumber: "employee_id" },
+    verified: { email: "email_verified" },
+    scopes: ["openid", "profile", "email"],
+    created: [{ name: "employeeNumber", type: "string" }],
+    notes: ["employee_id is not a standard claim."],
+  };
+  const withChoice = () => {
+    return ZitadelConfig.empty().scaffold({
+      ...MINIMAL,
+      sso: [{ selection: googleSelection, claims: () => choice }],
+    });
+  };
+
+  it("writes the mapping into the connection", () => {
+    const { connections } = withChoice();
+
+    expect(
+      connections.map((entry) => {
+        return entry.connection.body.claim_mapping;
+      }),
+    ).toEqual([choice.mapping]);
+  });
+
+  it("adds the attributes it creates to the schema", () => {
+    const { schema } = withChoice();
+
+    expect(schema.propertyNames).toContain("employeeNumber");
+  });
+
+  it("asks for them on the register step of the flow", () => {
+    const { flow } = withChoice();
+
+    expect(
+      flow.steps.find((step) => {
+        return step.name === "register";
+      })?.fields,
+    ).toContain("employeeNumber");
+  });
+
+  it("hands back what the choice has to say", () => {
+    const { connections } = withChoice();
+
+    expect(
+      connections.flatMap((entry) => {
+        return entry.notes;
+      }),
+    ).toEqual(choice.notes);
+  });
+
+  it("adds an attribute two providers create the same way to the schema once", () => {
+    const { schema } = ZitadelConfig.empty().scaffold({
+      ...MINIMAL,
+      sso: [
+        { selection: googleSelection, claims: () => choice },
+        { selection: acmeSelection, claims: () => choice },
+      ],
+    });
+
+    expect(
+      schema.propertyNames.filter((name) => {
+        return name === "employeeNumber";
+      }),
+    ).toEqual(["employeeNumber"]);
+  });
+
+  it("refuses an attribute two providers would create as different types", () => {
+    const error = thrownBy(() => {
+      return ZitadelConfig.empty().scaffold({
+        ...MINIMAL,
+        sso: [
+          { selection: googleSelection, claims: () => choice },
+          {
+            selection: acmeSelection,
+            claims: () => ({ ...choice, created: [{ name: "employeeNumber", type: "integer" }] }),
+          },
+        ],
+      });
+    });
+
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ details: { property: "employeeNumber" } });
+  });
+
+  it("keeps the provider's defaults for a provider with no choice", () => {
+    const { connections } = ZitadelConfig.empty().scaffold({
+      ...MINIMAL,
+      sso: [{ selection: googleSelection }],
+    });
+
+    expect(
+      connections.map((entry) => {
+        return entry.created;
+      }),
+    ).toEqual([[]]);
+  });
+});

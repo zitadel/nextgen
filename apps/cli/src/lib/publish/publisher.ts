@@ -452,7 +452,7 @@ export class Publisher {
     const issues = BuildReleaseBodySchema.shape.bundle.safeParse(bundle).error?.issues ?? [];
     const lines = issues.map((issue) => {
       const field = issue.path.join(".") || "(root)";
-      return `  - bundle.${field} ${issue.message}`;
+      return `  • bundle.${field} ${issue.message}`;
     });
     throw new ZitadelError(
       "E_VALIDATION",

@@ -7,22 +7,16 @@ vi.mock("@clack/prompts", async () => {
 import { isCancel, select, text } from "@clack/prompts";
 
 import { ChooseServer } from "@/cli/commands/setup/steps/choose-server";
+import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
-import type { PromptContext } from "@/cli/commands/setup/shared";
+import type { Ui } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
-import { Ui } from "@/lib/ui";
 import { it } from "@tests/fixtures";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-import { aSuggest } from "@tests/helpers/suggestions";
-import { aPromptDeps } from "@tests/helpers/setup";
-
-/**
- * The framework setup detected.
- */
-const FRAMEWORK = { id: "next", displayName: "Next.js" };
+import { aQuestionDeps } from "@tests/helpers/setup";
 
 /**
  * The hosted cloud, the server a run falls back to.
@@ -55,35 +49,26 @@ const CUSTOM_SERVER = "__custom__";
 const APP_DIR = "/tmp/app";
 
 /**
- * How the wizard asks: interactively, without `--force`.
- */
-const ask = Ui.asker({ interactive: true, force: false });
-
-/**
- * The boxes a prompt drew, as setup's own context would have drawn them.
+ * The boxes the step drew.
  */
 const noted = vi.fn<(title: string, lines: readonly string[]) => void>();
 
 /**
- * The lines a prompt said, as setup's own context would have said them.
+ * The lines the step said.
  */
 const said = vi.fn<(text: string) => void>();
 
 /**
- * What every prompt is given, as setup builds it: its suggestions are aimed
- * at the project setup creates.
+ * What the step prints through: the boxes and lines it draws are recorded, and the spinner draws
+ * nothing.
  */
-const CONTEXT: PromptContext = {
-  ask,
+const UI = {
   note: noted,
   say: said,
   spinner: () => {
     return { message: vi.fn(), stop: vi.fn(), clear: vi.fn() };
   },
-  framework: FRAMEWORK,
-  cwd: APP_DIR,
-  suggest: aSuggest({ envFile: ".env.development.local" }, "1.2.3"),
-};
+} as unknown as Ui;
 
 /**
  * The answers setup has gathered for a passkey-first, minimal app on the
@@ -104,6 +89,35 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
 }
 
 /**
+ * The step, run for an interactive setup that was given `options`.
+ *
+ * @param answers - The answers so far.
+ * @param options - What the run was given.
+ * @param options.serverFlag - The `--server` value the command line carried.
+ * @param options.cwd - The directory setup runs in.
+ * @param options.detected - The local server the machine finds running, if any.
+ * @returns The answers the step settled.
+ */
+async function serverFor(
+  answers: SetupAnswers,
+  options: { serverFlag?: string; cwd?: string; detected?: string } = {},
+): Promise<SetupAnswers> {
+  return (
+    await new ChooseServer({
+      ...aQuestionDeps(
+        options.cwd ?? APP_DIR,
+        new FakeMachine({ bundled: BUNDLED_VERSION, detected: options.detected }),
+      ),
+      ui: UI,
+      serverFlag: options.serverFlag,
+    }).run({
+      flags: {} as SetupFlags,
+      answers,
+    } as Parameters<ChooseServer["run"]>[0])
+  ).answers;
+}
+
+/**
  * Records, in `dir`, the local server `zitadel start` ran there at {@link LOCAL}.
  *
  * @param dir - The directory start ran in.
@@ -116,8 +130,6 @@ async function startedLocally(dir: string, serverVersion: string): Promise<void>
   );
 }
 
-const machine = new FakeMachine({ bundled: BUNDLED_VERSION });
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
@@ -128,10 +140,7 @@ describe("ChooseServer", () => {
     it("writes the cloud", async () => {
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-      const answers = await new ChooseServer(aPromptDeps(undefined, machine)).ask(
-        setupAnswers(),
-        CONTEXT,
-      );
+      const answers = await serverFor(setupAnswers());
 
       expect(answers.server).toBe(CLOUD);
     });
@@ -139,7 +148,7 @@ describe("ChooseServer", () => {
     it("does not ask for a URL", async () => {
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers());
 
       expect(text).not.toHaveBeenCalled();
     });
@@ -150,10 +159,7 @@ describe("ChooseServer", () => {
       vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
       vi.mocked(text).mockResolvedValueOnce("https://zitadel.internal");
 
-      const answers = await new ChooseServer(aPromptDeps(undefined, machine)).ask(
-        setupAnswers(),
-        CONTEXT,
-      );
+      const answers = await serverFor(setupAnswers());
 
       expect(answers.server).toBe("https://zitadel.internal");
     });
@@ -162,10 +168,7 @@ describe("ChooseServer", () => {
       vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
       vi.mocked(text).mockResolvedValueOnce("https://zitadel.internal/console?tab=1");
 
-      const answers = await new ChooseServer(aPromptDeps(undefined, machine)).ask(
-        setupAnswers(),
-        CONTEXT,
-      );
+      const answers = await serverFor(setupAnswers());
 
       expect(answers.server).toBe("https://zitadel.internal");
     });
@@ -175,7 +178,7 @@ describe("ChooseServer", () => {
       vi.mocked(text).mockResolvedValueOnce("ftp://zitadel.internal");
 
       const refused = await rejectionOf(() => {
-        return new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+        return serverFor(setupAnswers());
       });
 
       expect(refused).toBeInstanceOf(ZitadelError);
@@ -186,42 +189,37 @@ describe("ChooseServer", () => {
       vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
       vi.mocked(text).mockResolvedValueOnce("https://zitadel.internal");
 
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers());
 
       expect(text).toHaveBeenCalledOnce();
     });
   });
 
   describe("when a local server is detected", () => {
-    const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
-
     beforeEach(() => {
       vi.mocked(select).mockResolvedValueOnce(LOCAL);
     });
 
     it("writes it when it is picked", async () => {
-      const answers = await new ChooseServer(aPromptDeps(undefined, machine)).ask(
-        setupAnswers(),
-        CONTEXT,
-      );
+      const answers = await serverFor(setupAnswers(), { detected: LOCAL });
 
       expect(answers.server).toBe(LOCAL);
     });
 
     it("does not ask for a URL when it is picked", async () => {
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers(), { detected: LOCAL });
 
       expect(text).not.toHaveBeenCalled();
     });
 
     it("preselects it", async () => {
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers(), { detected: LOCAL });
 
       expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: LOCAL });
     });
 
     it("lists it between the cloud and a custom URL", async () => {
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers(), { detected: LOCAL });
 
       expect(
         vi.mocked(select).mock.calls[0]?.[0].options.map((option) => {
@@ -231,7 +229,7 @@ describe("ChooseServer", () => {
     });
 
     it("labels it with its URL", async () => {
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers(), { detected: LOCAL });
 
       expect(vi.mocked(select).mock.calls[0]?.[0].options[1]).toMatchObject({
         label: "Local server (http://localhost:8080)",
@@ -243,7 +241,7 @@ describe("ChooseServer", () => {
     it("lists the local server as unavailable, and says to start it", async () => {
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers());
 
       expect(vi.mocked(select).mock.calls[0]?.[0].options).toEqual([
         { value: CLOUD, label: "Zitadel Cloud (preview.zitadel.com)" },
@@ -260,7 +258,7 @@ describe("ChooseServer", () => {
     it("preselects the cloud", async () => {
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+      await serverFor(setupAnswers());
 
       expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: CLOUD });
     });
@@ -269,7 +267,7 @@ describe("ChooseServer", () => {
   it("asks which server the app uses, not which one a file points to", async () => {
     vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-    await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
+    await serverFor(setupAnswers());
 
     expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
       "Which Zitadel server should your app use?",
@@ -278,22 +276,13 @@ describe("ChooseServer", () => {
 
   describe("with --server", () => {
     it("keeps the pinned server", async () => {
-      const answers = await new ChooseServer(aPromptDeps(undefined, machine)).ask(
-        setupAnswers({ server: LOCAL }),
-        {
-          ...CONTEXT,
-          serverFlag: "local",
-        },
-      );
+      const answers = await serverFor(setupAnswers({ server: LOCAL }), { serverFlag: "local" });
 
       expect(answers).toEqual(setupAnswers({ server: LOCAL }));
     });
 
     it("does not ask", async () => {
-      await new ChooseServer(aPromptDeps(undefined, machine)).ask(setupAnswers({ server: LOCAL }), {
-        ...CONTEXT,
-        serverFlag: "local",
-      });
+      await serverFor(setupAnswers({ server: LOCAL }), { serverFlag: "local" });
 
       expect(select).not.toHaveBeenCalled();
     });
@@ -302,13 +291,9 @@ describe("ChooseServer", () => {
   describe("when the detected local server was started by another CLI release", () => {
     it("lists it as unavailable, and says to restart it", async ({ dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-      await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
-        ...CONTEXT,
-        cwd: dir,
-      });
+      await serverFor(setupAnswers(), { cwd: dir, detected: LOCAL });
 
       expect(vi.mocked(select).mock.calls[0]?.[0].options[1]).toEqual({
         value: "__local_outdated__",
@@ -320,13 +305,9 @@ describe("ChooseServer", () => {
 
     it("preselects the cloud", async ({ dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-      await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
-        ...CONTEXT,
-        cwd: dir,
-      });
+      await serverFor(setupAnswers(), { cwd: dir, detected: LOCAL });
 
       expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: CLOUD });
     });
@@ -336,15 +317,11 @@ describe("ChooseServer", () => {
       { how: "under its other loopback name", url: "http://127.0.0.1:8080" },
     ])("refuses its URL entered as a custom one, $how", async ({ url }, { dir }) => {
       await startedLocally(dir, OLDER_VERSION);
-      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
       vi.mocked(text).mockResolvedValueOnce(url);
 
       const refused = await rejectionOf(() => {
-        return new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
-          ...CONTEXT,
-          cwd: dir,
-        });
+        return serverFor(setupAnswers(), { cwd: dir, detected: LOCAL });
       });
 
       expect(refused).toBeInstanceOf(ZitadelError);
@@ -359,13 +336,9 @@ describe("ChooseServer", () => {
   describe("when the detected local server is this CLI's own release", () => {
     it("offers it", async ({ dir }) => {
       await startedLocally(dir, BUNDLED_VERSION);
-      const machine = new FakeMachine({ bundled: BUNDLED_VERSION, detected: LOCAL });
       vi.mocked(select).mockResolvedValueOnce(LOCAL);
 
-      await new ChooseServer(aPromptDeps(dir, machine)).ask(setupAnswers(), {
-        ...CONTEXT,
-        cwd: dir,
-      });
+      await serverFor(setupAnswers(), { cwd: dir, detected: LOCAL });
 
       expect(vi.mocked(select).mock.calls[0]?.[0].options[1]).toMatchObject({ value: LOCAL });
     });
