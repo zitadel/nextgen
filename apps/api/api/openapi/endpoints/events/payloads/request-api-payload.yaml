@@ -10,7 +10,6 @@ required:
 properties:
   operation_id:
     type: string
-    minLength: 1
     description: 'The `operationId` of the operation the request called.'
   method:
     type: string

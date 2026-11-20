@@ -1949,7 +1949,7 @@
         },
         {
           "name": "provisioning-creation",
-          "description": "",
+          "description": "Whether a user who signs in with this provider and has no account gets one: `auto` creates it, `disabled`…",
           "type": "option",
           "options": [
             "disabled",

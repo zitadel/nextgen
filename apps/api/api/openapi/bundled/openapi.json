@@ -25697,7 +25697,6 @@
         "properties": {
           "check_id": {
             "type": "string",
-            "minLength": 1,
             "description": "The ID of the check."
           },
           "check_type": {
@@ -25772,7 +25771,6 @@
         "properties": {
           "user_id": {
             "type": "string",
-            "minLength": 1,
             "description": "The ID of the user the factor belongs to."
           },
           "factor_id": {
@@ -26395,7 +26393,6 @@
           },
           "revision_id": {
             "type": "string",
-            "minLength": 1,
             "description": "The revision the write appended."
           }
         }
@@ -26437,12 +26434,10 @@
         "properties": {
           "connection_id": {
             "type": "string",
-            "minLength": 1,
             "description": "The IdP connection the account signed in through."
           },
           "user_id": {
             "type": "string",
-            "minLength": 1,
             "description": "The user the provider account is linked to."
           }
         }
@@ -27011,12 +27006,10 @@
         "properties": {
           "operation": {
             "type": "string",
-            "minLength": 1,
             "description": "The operation the policy guards, for example `auth.factor.password.set`."
           },
           "revision_id": {
             "type": "string",
-            "minLength": 1,
             "description": "The revision the publish appended."
           },
           "config": {
@@ -27329,7 +27322,6 @@
         "properties": {
           "operation_id": {
             "type": "string",
-            "minLength": 1,
             "description": "The `operationId` of the operation the request called."
           },
           "method": {

@@ -25,5 +25,4 @@ properties:
     description: 'The name shown for the identity provider.'
   revision_id:
     type: string
-    minLength: 1
     description: The revision the write appended.
