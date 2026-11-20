@@ -1201,14 +1201,14 @@ describe("auth-method sso enable", () => {
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(
-          authMethodJson(cwd, ...GOOGLE, "--server", "https://api.zitadel.cloud"),
+          authMethodJson(cwd, ...GOOGLE, "--server", "https://preview.zitadel.com"),
         );
       });
 
       expect(parseJson(result.stdout)).toMatchObject({
         next_commands: [
           expect.stringContaining(
-            "auth-method sso enable --provider google --client-id '<client-id>' --server https://api.zitadel.cloud",
+            "auth-method sso enable --provider google --client-id '<client-id>' --server https://preview.zitadel.com",
           ),
         ],
       });

@@ -56,7 +56,7 @@ export type StopBinaryRuntimeResult = Readonly<{
   target: "process" | "process-group";
 }>;
 
-export type ServerCommand = Readonly<{
+export type ServerLaunch = Readonly<{
   command: string;
   args: string[];
   serverPackage: string;
@@ -199,7 +199,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
    * What `start` runs: the `ZITADEL_SERVER_BINARY` override, else the platform
    * binary of the bundled `@zitadel/server`, which must be built.
    */
-  static command(env: NodeJS.ProcessEnv = process.env): ServerCommand {
+  static command(env: NodeJS.ProcessEnv = process.env): ServerLaunch {
     const version = BinaryLauncher.version(env);
     return {
       command: env[COMMAND_ENV] || resolveServerBinary(),

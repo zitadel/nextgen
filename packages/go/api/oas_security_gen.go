@@ -330,6 +330,7 @@ var operationRolesSessionCookie = map[string][]string{
 	DeleteGrantOperation:           []string{},
 	DeleteUserOperation:            []string{},
 	EvaluatePolicyOperation:        []string{},
+	GetApplicationOperation:        []string{},
 	GetBrandingOperation:           []string{},
 	GetDeploymentOperation:         []string{},
 	GetEventOperation:              []string{},

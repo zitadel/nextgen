@@ -109,10 +109,9 @@ describe("team detail", () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team({ status: "deactivated" }))));
     await renderDetail();
 
-    // The status sits on the detail as well as the list, so a deactivated team
-    // reads as deactivated on its own screen.
+    // The status sits on the detail as well as the list, in the list's word.
     await screen.findByRole("heading", { name: "Acme Web" });
-    expect(screen.getByText("Deactivated")).toBeInTheDocument();
+    expect(screen.getByText("Inactive")).toBeInTheDocument();
   });
 
   it("leaves out the primary domain the API does not carry", async () => {
@@ -131,6 +130,7 @@ describe("team detail", () => {
     await renderDetail();
 
     const field = await screen.findByLabelText("Team name");
+    expect(screen.getByRole("heading", { name: "Team details" })).toBeInTheDocument();
     const save = screen.getByRole("button", { name: "Save" });
     expect(save).toBeDisabled();
 

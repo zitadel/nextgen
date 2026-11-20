@@ -63,7 +63,6 @@ func (s invitationStatements) CreateInvitation(ctx context.Context, entity *doma
 	).Scan(&entity.CreatedAt); err != nil {
 		return wrapError(err)
 	}
-	entity.CreatedAt = entity.CreatedAt.UTC()
 	entity.Status = domain.InvitationStatusPending
 	return nil
 }

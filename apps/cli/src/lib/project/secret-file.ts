@@ -1,4 +1,5 @@
-import { chmod, writeFile } from "node:fs/promises";
+import { chmod, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { warnings } from "@/lib/ui/warnings";
 
@@ -43,6 +44,60 @@ export class SecretFile {
       warnings.report(
         `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
       );
+    }
+  }
+
+  /**
+   * Whether the file is owner read/write only. Where the filesystem keeps no
+   * modes (Windows, FAT), nothing more can be done to it, so it is secure.
+   *
+   * @param path - The file.
+   * @returns `true` when it is as private as its filesystem lets it be.
+   * @throws Any `stat` error, such as the file being missing.
+   */
+  static async isSecure(path: string): Promise<boolean> {
+    const mode = (await stat(path)).mode & 0o777;
+    return mode === SECRET_MODE || !(await SecretFile.keepsModes(dirname(path)));
+  }
+
+  /**
+   * Makes the file owner read/write only, as far as its filesystem allows.
+   *
+   * @param path - The file.
+   */
+  static secure(path: string): Promise<void> {
+    return SecretFile.enforceMode(path, SECRET_MODE);
+  }
+
+  /**
+   * Whether a file keeps the mode it is given, found by trying one in the
+   * directory the secret lives in, so it needs no list of the platforms and
+   * filesystems that do not and answers for the filesystem the secret is on.
+   * The probe file is removed again. A filesystem that refuses `chmod` keeps
+   * no modes; where the probe cannot be made at all, modes are taken to be kept.
+   *
+   * @param dir - The directory the secret is in.
+   * @returns `true` when the mode a file is given is the mode it reads back.
+   */
+  private static async keepsModes(dir: string): Promise<boolean> {
+    const probe = join(dir, `.modes-probe-${process.pid}`);
+    try {
+      await writeFile(probe, "", { mode: SECRET_MODE });
+      const accepted = await chmod(probe, 0o640).then(
+        () => {
+          return true;
+        },
+        () => {
+          return false;
+        },
+      );
+      return accepted && ((await stat(probe)).mode & 0o777) === 0o640;
+    } catch {
+      return true;
+    } finally {
+      await rm(probe, { force: true }).catch(() => {
+        return undefined;
+      });
     }
   }
 

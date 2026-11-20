@@ -5,6 +5,7 @@ import {
   type Invitation,
   type InvitationRelation,
   InvitationService,
+  invitationGrant,
   invitationRole,
 } from "@/lib/backend";
 import { createInvitationBodyOneOneMetadataNameMax } from "@/lib/backend/schemas";
@@ -17,6 +18,10 @@ import { Promptable } from "@/lib/oclif/promptable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Parsed } from "@zitadel/config/idp";
 import { invitationIdSchema } from "./id";
+import { ServerCommand } from "@/cli/commands/server-command";
+
+/** The product event a create or replace sends once the API confirms it (ADR 086 §9). */
+const INVITATION_CREATED = "invitation_created";
 
 /** The project roles an invitation can grant, least first. */
 const RELATIONS = ["viewer", "editor", "admin"] as const satisfies readonly InvitationRelation[];
@@ -77,7 +82,7 @@ const REPLACES_ACCEPTED_REFUSAL = {
  * never recorded anywhere but the output. `--replaces` makes a new link for an
  * invitation that was lost or expired, keeping its journey (ADR 086).
  */
-export default class InvitationCreate extends Promptable(EnvironmentCommand) {
+export default class InvitationCreate extends Promptable(ServerCommand(EnvironmentCommand)) {
   static override description = "Invite someone into the project with a link to share.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 5;
@@ -143,9 +148,9 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
       name,
       replaces: flags.replaces,
     });
-    this.recordTelemetry({
-      role: `project_${invitationRole(invitation)}`,
-      is_replace: flags.replaces !== undefined,
+    this.trackEvent(INVITATION_CREATED, {
+      role: invitationGrant(invitation),
+      invitation_journey_id: invitation.journey_id,
     });
 
     return this.emit({
@@ -160,7 +165,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
         ],
       },
       next: {
-        commands: [this.suggest({ id: "invitation:list", flags: { status: "pending" } })],
+        commands: [this.suggest({ id: "invitation:list", flags: { status: ["pending"] } })],
       },
     });
   }

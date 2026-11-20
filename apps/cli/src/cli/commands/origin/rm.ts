@@ -9,6 +9,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -16,7 +17,7 @@ import { warnings } from "@/lib/ui";
  * It says what stops being admitted. Removing a preview pattern leaves its live
  * previews to expire on their own.
  */
-export default class OriginRm extends Destructive(EnvironmentCommand) {
+export default class OriginRm extends Destructive(ServerCommand(EnvironmentCommand)) {
   static override description = "Remove an origin pattern from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 3;
