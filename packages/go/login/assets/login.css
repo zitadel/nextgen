@@ -1,0 +1,145 @@
+/* The login's one page: a card with a heading, a sentence, the fields, the
+   actions and the sign-in providers. Colours, faces, spacing and radii are
+   the --zl-* tokens inlined before this file. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  display: grid;
+  min-height: 100vh;
+  margin: 0;
+  padding: var(--zl-spacing-10) var(--zl-spacing-6);
+  place-items: center;
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--zl-spacing-8) var(--zl-spacing-6);
+  border: 1px solid var(--zl-border);
+  border-radius: var(--zl-radius-lg);
+  background: var(--zl-card);
+  color: var(--zl-card-foreground);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-4);
+}
+
+/* APK Futural has one weight: a heading in it is never bold. */
+h1 {
+  margin: 0;
+  font-family: var(--zl-font-family-heading);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.description {
+  color: var(--zl-muted-foreground);
+}
+
+.error {
+  color: var(--zl-destructive);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-2);
+  font-size: 0.875rem;
+}
+
+label.checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+
+input:not([type="checkbox"]),
+select {
+  height: 2.5rem;
+  padding: 0 var(--zl-spacing-3);
+  border: 1px solid var(--zl-input);
+  border-radius: var(--zl-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--zl-ring);
+  outline-offset: 2px;
+}
+
+/* The password manager's identifier: in the form, out of sight. */
+.identifier {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+button {
+  height: 2.5rem;
+  padding: 0 var(--zl-spacing-5);
+  border: 1px solid var(--zl-border);
+  border-radius: var(--zl-radius-md);
+  background: var(--zl-secondary);
+  color: var(--zl-secondary-foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: transparent;
+  background: var(--zl-primary);
+  color: var(--zl-primary-foreground);
+}
+
+button.back {
+  border-color: transparent;
+  background: transparent;
+  color: var(--zl-muted-foreground);
+}
+
+.divider {
+  margin: var(--zl-spacing-4) 0;
+  color: var(--zl-muted-foreground);
+  font-size: 0.75rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+form.sso + form.sso {
+  margin-top: var(--zl-spacing-2);
+}

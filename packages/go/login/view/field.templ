@@ -1,0 +1,86 @@
+package view
+
+import (
+	"encoding/json"
+
+	"go.zitadel.com/zitadel/v5/api"
+)
+
+// Texts resolves the text keys the API sends to one locale's copy; the login
+// package's Texts is one.
+type Texts interface {
+	Text(key string) string
+	// Errors is a step's error payload as sentences, one per key.
+	Errors(raw string) []string
+}
+
+// inputType is the native input type for a field type; the two differ only
+// where HTML spells the kind otherwise.
+func inputType(t api.FieldType) string {
+	if t == api.FieldTypeDateTime {
+		// shortcut: a date_time value is RFC 3339 both ways, which this input
+		// neither shows nor produces, so a prefill is dropped and a submission
+		// refused; convert in both directions once the submit path knows the
+		// step's field types. Only a custom schema has one.
+		return "datetime-local"
+	}
+	return string(t)
+}
+
+// fieldValue is the field's prefilled value as a form value: a JSON string
+// unquoted, any other JSON as written, nothing for null or none.
+func fieldValue(f api.Field) string {
+	var s string
+	if json.Unmarshal(f.Value, &s) == nil {
+		return s
+	}
+	if v := string(f.Value); v != "null" {
+		return v
+	}
+	return ""
+}
+
+// controlAttrs is what every control carries. The attributes are a map so an
+// absent autocomplete renders no attribute, as the API asks, rather than an
+// empty one.
+func controlAttrs(f api.Field, kind string) templ.Attributes {
+	attrs := templ.Attributes{
+		"name":        f.Name,
+		"required":    f.Required.Or(false),
+		"readonly":    f.ReadOnly.Or(false),
+		"data-testid": "zitadel-" + kind + "-" + f.Name,
+	}
+	if ac, ok := f.Autocomplete.Get(); ok {
+		attrs["autocomplete"] = ac
+	}
+	return attrs
+}
+
+// Field is one native control for an API field, labelled with its text key.
+// A hidden field is only its input.
+templ Field(f api.Field, t Texts) {
+	switch f.Type {
+		case api.FieldTypeHidden:
+			<input type="hidden" name={ f.Name } value={ fieldValue(f) }/>
+		case api.FieldTypeCheckbox:
+			<label class="checkbox">
+				<input type="checkbox" value="true" checked?={ fieldValue(f) == "true" } { controlAttrs(f, "checkbox")... }/>
+				{ t.Text(f.TextKey) }
+			</label>
+		case api.FieldTypeSelect:
+			<label>
+				{ t.Text(f.TextKey) }
+				<select { controlAttrs(f, "select")... }>
+					<option value=""></option>
+					for _, option := range f.Validation.Value.Enum {
+						<option value={ option } selected?={ option == fieldValue(f) }>{ option }</option>
+					}
+				</select>
+			</label>
+		default:
+			<label>
+				{ t.Text(f.TextKey) }
+				<input type={ inputType(f.Type) } value={ fieldValue(f) } { controlAttrs(f, "input")... }/>
+			</label>
+	}
+}

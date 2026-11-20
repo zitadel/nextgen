@@ -9,10 +9,13 @@
  *   output is stable whatever order the catalogs list them in; the leading
  *   `$comment` is the marker scripts/generated-outputs.mjs checks before it
  *   deletes a file.
+ * - the `--zl-*` stylesheet `packages/design-tokens/src/generated/tokens.css`,
+ *   copied to `packages/go/login/assets/tokens.css` under a header naming
+ *   this script, so a reader is not sent to the tokens' own generator.
  *
  *   corepack pnpm exec tsx scripts/generate-go-login-assets.ts
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,3 +36,12 @@ for (const [tag, catalog] of Object.entries({ en, de, it })) {
   writeFileSync(outPath, `${JSON.stringify({ $comment: MARKER, ...sorted }, null, 2)}\n`);
   console.log(`locales/${tag}.ts → ${outPath.slice(ROOT.length + 1)}`);
 }
+
+const TOKENS = "packages/design-tokens/src/generated/tokens.css";
+const TOKENS_OUT = "packages/go/login/assets/tokens.css";
+// The source names its own generator, whose re-run does not reach this copy.
+writeFileSync(
+  join(ROOT, TOKENS_OUT),
+  `/* ${MARKER} Source: ${TOKENS}; re-run: turbo run generate --filter=@zitadel/server */\n${readFileSync(join(ROOT, TOKENS), "utf8")}`,
+);
+console.log(`${TOKENS} → ${TOKENS_OUT}`);

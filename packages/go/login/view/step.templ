@@ -1,0 +1,69 @@
+package view
+
+import (
+	"strings"
+
+	"go.zitadel.com/zitadel/v5/api"
+)
+
+// Step is one step of a flow as a form that posts to action: the heading and
+// description, the notice and error of the previous submission, the fields,
+// a button per action and a button per sign-in provider. Each button names
+// what it submits, so the whole step works without JavaScript. A passkey
+// button does too: it posts its action, and the step comes back with the
+// challenge, the one thing that needs a script.
+templ Step(step api.FlowStep, t Texts, action string) {
+	// novalidate: a passkey button submits through requestSubmit(), which
+	// native validation would refuse while a required field is empty — and
+	// the password field of every auth method is required. The API validates
+	// each submission anyway, and reports it as the step's error.
+	<form method="post" action={ templ.SafeURL(action) } class="step" data-step={ step.Name } novalidate>
+		if key, ok := step.Texts.Value.TitleKey.Get(); ok {
+			<h1>{ t.Text(key) }</h1>
+		}
+		if key, ok := step.Texts.Value.DescriptionKey.Get(); ok && key != "" {
+			<p class="description">{ t.Text(key) }</p>
+		}
+		if key, ok := step.Notice.Get(); ok {
+			<p class="notice" role="status">{ t.Text(key) }</p>
+		}
+		if raw, ok := step.Error.Get(); ok {
+			for _, msg := range t.Errors(raw) {
+				<p class="error" role="alert">{ msg }</p>
+			}
+		}
+		for _, f := range step.Fields {
+			@Field(f, t)
+		}
+		if id, ok := step.Identifier.Get(); ok {
+			// The identifier of an earlier step, for a password manager to pair
+			// with the password: no name, so it is never submitted; hidden by
+			// CSS rather than type, so a manager still finds it.
+			<input class="identifier" type="text" value={ id.Value } autocomplete={ id.Autocomplete } readonly tabindex="-1" aria-hidden="true"/>
+		}
+		for _, a := range step.Actions {
+			<button
+				type="submit"
+				name="action"
+				value={ a.Name }
+				class={ "action", templ.KV("primary", a.Primary.Or(false)), templ.KV("back", a.Kind == api.FlowStepActionKindBack) }
+				data-testid={ "zitadel-button-" + a.Name }
+			>
+				{ t.Text(a.TextKey.Or(a.Name)) }
+			</button>
+		}
+	</form>
+	if len(step.SSOProviders) > 0 {
+		<p class="divider">{ t.Text("sso.divider") }</p>
+		for _, p := range step.SSOProviders {
+			// A form of its own: the step's form carries the fields, and a
+			// provider needs only its id.
+			<form method="post" action={ templ.SafeURL(action) } class="sso">
+				<input type="hidden" name="action" value="sso"/>
+				<button type="submit" name="sso_provider_id" value={ p.ID } class="action" data-testid={ "zitadel-sso-" + p.ID }>
+					{ strings.Replace(t.Text("sso.continue_with"), "{name}", p.Name, 1) }
+				</button>
+			</form>
+		}
+	}
+}
