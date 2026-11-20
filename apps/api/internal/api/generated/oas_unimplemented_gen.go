@@ -1353,12 +1353,11 @@ func (UnimplementedHandler) ListPolicyRevisions(ctx context.Context, params List
 // The list follows the authorization check. A person who left a team, or whose team or user was
 // deactivated, is not listed through it. Grants that expired or carry a lower role are left out. A
 // person whose only access is a `viewer` or `editor` grant is not an admin and is not listed. Like the
-// check, the list does not look at a person's user status beyond that, so a direct grant to a
-// suspended person is listed.
+// check, a direct user grant requires an active user, so a suspended person's direct grant is not
+// listed.
 //
-// A person whose access comes only through teams the caller is not a member of is left out. A team the
-// caller is not in is named by `team_id` only. The grant to such a team still shows in the project's
-// grants.
+// Every caller who passes the project read check sees every listed admin and every team name on
+// `sources`. Co-membership no longer filters the roster.
 //
 // The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
 // (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
