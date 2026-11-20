@@ -66,7 +66,7 @@ function aContext(overrides: Partial<PatchContext> = {}): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "http://localhost:8080",
-    defaultServer: "https://api.zitadel.cloud",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: CLI_VERSION,
     sdkVersion: CliPackage.at(CLI_VERSION).selector(),
     ...overrides,

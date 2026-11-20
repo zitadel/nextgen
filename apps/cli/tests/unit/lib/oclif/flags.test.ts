@@ -325,7 +325,7 @@ describe("an argument built with taken", () => {
 });
 
 describe("the server flag", () => {
-  it.each(["local", "https://acme.zitadel.cloud", "http://localhost:8080"])(
+  it.each(["local", "https://preview.zitadel.com", "http://localhost:8080"])(
     "takes %j as typed",
     async (value) => {
       await expect(parseFlag(serverFlag({}), value, "server")).resolves.toBe(value);

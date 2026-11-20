@@ -123,15 +123,7 @@ func ToDomain(row Row) (*domain.Release, error) {
 			CreatedBy:     encodedMetadata.CreatedBy,
 			CreatedByType: actorType,
 		},
-		// Spanner returns UTC while pgx defaults to local; normalize.
-		CreatedAt: row.CreatedAt.UTC(),
-		RevokedAt: utcOrNil(row.RevokedAt),
+		CreatedAt: row.CreatedAt,
+		RevokedAt: row.RevokedAt,
 	}, nil
-}
-
-func utcOrNil(t *time.Time) *time.Time {
-	if t == nil {
-		return nil
-	}
-	return new(t.UTC())
 }

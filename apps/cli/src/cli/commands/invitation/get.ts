@@ -8,6 +8,7 @@ import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { json } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * The invitation `invitation get` reads. The schema is the API spec's own, so
@@ -31,7 +32,7 @@ const INVITATION_ID: Refused<string> = {
  * for, the role it grants, its status and when it expires. The link is never
  * shown again after `invitation create`.
  */
-export default class InvitationGet extends Tabulatable(EnvironmentCommand) {
+export default class InvitationGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "Read one invitation by id.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 7;

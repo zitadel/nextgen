@@ -28,6 +28,7 @@ const PREPARED: PreparedRelease = {
   lockouts: [],
   gitSha: "abc1234",
   gitDirty: false,
+  referenced: [],
 };
 
 /**

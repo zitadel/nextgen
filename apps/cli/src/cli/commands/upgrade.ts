@@ -24,6 +24,7 @@ import {
   type UpgradeResult,
 } from "@/lib/upgrade";
 import { Project } from "@/lib/project";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * How long the new release's `doctor --fix` may run before it counts as failed.
@@ -45,7 +46,7 @@ type Refresh = "done" | "issues" | "failed" | "planned" | "skipped";
  * choice the user made, as `doctor`'s `dependency-version` check also holds, so
  * it is reported and left alone.
  */
-export default class Upgrade extends BaseCommand {
+export default class Upgrade extends ServerCommand(BaseCommand) {
   static override description =
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
   static override group = CommandGroups.projectSettings;
@@ -57,12 +58,13 @@ export default class Upgrade extends BaseCommand {
   ];
 
   /**
-   * Everything this command does is about npm and the project, so there is no
-   * server to ask.
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
    */
-  static override meta = {
-    resolveServer: false,
-  };
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   /**
    * Upgrades the project in four steps, in an order that lets a person stop:

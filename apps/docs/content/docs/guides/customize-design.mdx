@@ -271,7 +271,7 @@ Without `font_url` the login loads no font of its own: it renders in Arimo where
 
 Set a logo on both sides or on neither. A side without its own `logo_url` shows no logo, even when the other side has one. The top-level `logo_url` applies only when neither side sets one.
 
-`deploy --dry-run` checks that the top-level `logo_url` and `hero_url` load. It does not check the logos under `theme`, so open the login in both themes to see them.
+`deploy --dry-run` checks that the top-level `logo_url` and `hero_url`, and the `logo_url` under each of `theme.light` and `theme.dark`, load.
 
 ## Publish your design as a revision
 
