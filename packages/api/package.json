@@ -93,6 +93,7 @@
     "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "orval": "catalog:",
+    "testcontainers": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "typescript": "catalog:",

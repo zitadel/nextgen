@@ -1,0 +1,6 @@
+# Suppressions for the vacuum lint of the OpenAPI document, one entry per location and never a whole rule.
+# The rule stays on everywhere else, so new violations are still reported.
+#
+# The format is a map from a rule id to a list of exact JSONPaths, as the linter prints them.
+# Inline `x-lint-ignore` does not work inside `$ref`'d files, and the spec is split over many of them.
+{}

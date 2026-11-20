@@ -1,0 +1,2250 @@
+description: Extra rules for the vacuum OpenAPI linter.
+rules:
+  extra-action-verbs-in-path:
+    description: Path segments must be nouns, not action verbs such as create or delete.
+    message: '{{error}}'
+    howToFix: Rename the path segment to a noun and let the HTTP method express the action.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-action-verbs-in-path
+      functionOptions:
+        verbs:
+        - get
+        - create
+        - update
+        - delete
+        - fetch
+        - remove
+        - add
+        - set
+        - find
+        - search
+        - make
+        - do
+        - run
+        - execute
+        - process
+        - handle
+        - list
+        - post
+        - put
+  extra-additional-properties-object-only:
+    description: additionalProperties is only valid inside object schemas.
+    message: '{{error}}'
+    howToFix: Remove additionalProperties or change the schema type to object.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-additional-properties-object-only
+      functionOptions: {}
+  extra-admin-security-differs:
+    description: Admin endpoints must not share a security requirement with non-admin endpoints.
+    message: '{{error}}'
+    howToFix: Give admin operations a dedicated security scheme or scope that no non-admin operation uses.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-admin-security-differs
+      functionOptions:
+        adminMatch: segment
+        adminUrl: /admin
+  extra-allof-schema-type-intersection:
+    description: A schema and its immediate allOf branches must declare types with a non-empty intersection.
+    message: '{{error}}'
+    howToFix: Make the types of the schema and of its allOf branches compatible, or remove the conflicting branch.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-allof-schema-type-intersection
+      functionOptions: {}
+  extra-allow-reserved-query-only:
+    description: allowReserved must only be set on query parameters.
+    message: '{{error}}'
+    howToFix: Remove allowReserved from the parameter or header, or move the parameter to the query string.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-allow-reserved-query-only
+      functionOptions: {}
+  extra-api-max-operations:
+    description: 'DISABLED: The API surface keeps growing in one document and cannot be capped. | The document must not define more operations than the configured limit.'
+    message: '{{error}}'
+    howToFix: Split the API into several smaller documents or raise the maxOperations option.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-api-max-operations
+      functionOptions:
+        maxOperations: 40
+  extra-api-symmetry-get-vs-write-schemas:
+    description: Summary, Prototype and Patch variants of a resource schema must be graph fragments of its canonical schema.
+    message: '{{error}}'
+    howToFix: Remove the property from the variant, add it to the canonical schema, or give it the canonical type.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-api-symmetry-get-vs-write-schemas
+      functionOptions:
+        casing:
+        - PascalCase
+  extra-api-version-in-url:
+    description: The API must expose a version in a server URL, a path or a version header.
+    message: '{{error}}'
+    howToFix: Add a version segment such as /v1 to a server URL or path, or declare a version header.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-api-version-in-url
+      functionOptions: {}
+  extra-array-bounds-and-items-consistency:
+    description: Array schemas must define items and should define consistent minItems and maxItems.
+    message: '{{error}}'
+    howToFix: Add an items schema and numeric minItems and maxItems with minItems not above maxItems.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-array-bounds-and-items-consistency
+      functionOptions:
+        requireBounds: true
+        requireMinItems: false
+  extra-array-parameter-serialization:
+    description: Array parameters must declare both style and explode.
+    message: '{{error}}'
+    howToFix: Add style and explode to the array parameter so its serialization is explicit.
+    given: $
+    formats:
+    - oas3
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-array-parameter-serialization
+      functionOptions:
+        in:
+        - query
+        - header
+        - path
+        - cookie
+  extra-array-requires-items:
+    description: Schemas of type array must define items.
+    message: '{{error}}'
+    howToFix: Add an items schema to the array schema.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-array-requires-items
+      functionOptions:
+        allowPrefixItems: true
+  extra-avoid-inline-object-schemas:
+    description: Object schemas must be defined in components/schemas and referenced instead of being inlined.
+    message: '{{error}}'
+    howToFix: Move the inline object schema to components/schemas and reference it with $ref.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-avoid-inline-object-schemas
+      functionOptions:
+        allowAllOfExtension: true
+        allowNested: true
+        allowReferenceUnions: true
+  extra-banned-words-in-docs:
+    description: Descriptions, summaries and titles must not contain the configured banned words.
+    message: '{{error}}'
+    howToFix: Reword the text so that it no longer uses the banned word.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-banned-words-in-docs
+      functionOptions: {}
+  extra-boolean-parameter-prefix:
+    description: 'DISABLED: The API names booleans as plain adjectives or nouns; a prefix would contradict that. | Boolean parameter names must start with one of the configured prefixes.'
+    message: '{{error}}'
+    howToFix: Rename the parameter so that it starts with an allowed prefix such as is or has.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-boolean-parameter-prefix
+      functionOptions:
+        casing:
+        - camelCase
+        - snake_case
+        - kebab-case
+        prefixes:
+        - is
+        - has
+  extra-collection-response-has-named-array:
+    description: 'DISABLED: Phase 2: events data and branding bare array need standardising (wire change). | List operation responses must contain an array property named after the last path segment.'
+    message: '{{error}}'
+    howToFix: Wrap the collection in an object whose array property is named after the last path segment.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-collection-response-has-named-array
+      functionOptions:
+        operationIdPrefix: list
+  extra-component-name-max-length:
+    description: Component names must not be longer than a maximum length.
+    message: '{{error}}'
+    howToFix: Rename the component to a shorter name and update the references to it.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-component-name-max-length
+      functionOptions:
+        maxLength: 50
+  extra-component-schema-name-case:
+    description: Component schema names must follow the configured case convention.
+    message: '{{error}}'
+    howToFix: Rename the schema to the configured case convention and update every $ref to it.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-component-schema-name-case
+      functionOptions:
+        casing:
+        - kebab-case
+        ignore: []
+  extra-composition-branches-same-type:
+    description: All leaf schemas of a oneOf, allOf or anyOf must have the same type.
+    message: '{{error}}'
+    howToFix: Make every branch of the composition declare the same type, or restructure the schema.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-composition-branches-same-type
+      functionOptions:
+        ignoreNull: true
+  extra-consistent-property-name-and-type:
+    description: Properties with the same name in different schemas must have the same type.
+    message: '{{error}}'
+    howToFix: Align the type of the property with its earlier declaration, or rename the property.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-consistent-property-name-and-type
+      functionOptions:
+        ignoreNull: true
+        ignore:
+        - identifier
+        - challenge
+        - primary
+        - fields
+        - user_agent
+        - status
+  extra-content-must-have-schema:
+    description: Every content entry of a request body, response or parameter must contain a schema.
+    message: '{{error}}'
+    howToFix: Add a schema to the media type object.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-content-must-have-schema
+      functionOptions: {}
+  extra-content-type-allow-list:
+    description: Request and response media types must be in the allowed list.
+    message: '{{error}}'
+    howToFix: Use one of the allowed media types, or extend the mimetypes option.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-content-type-allow-list
+      functionOptions:
+        mimetypes:
+        - application/json
+        - text/plain
+        validateExamples: true
+  extra-cors-origin-header:
+    description: 'DISABLED: The API is same-origin; only the OpenAPI document endpoint sets Access-Control-Allow-Origin. | Every response must define the Access-Control-Allow-Origin header.'
+    message: '{{error}}'
+    howToFix: Add the Access-Control-Allow-Origin header to the headers of the response.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-cors-origin-header
+      functionOptions:
+        header: Access-Control-Allow-Origin
+  extra-date-named-property-must-use-date-format:
+    description: Date-based schemas and properties must be strings with format date or date-time.
+    message: '{{error}}'
+    howToFix: Use type string with format date or date-time for the schema.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-date-named-property-must-use-date-format
+      functionOptions:
+        names: []
+  extra-date-time-property-suffix:
+    description: String properties with a date, time or date-time format must have a matching name.
+    message: '{{error}}'
+    howToFix: Rename the property so that it matches one of the configured name patterns.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-date-time-property-suffix
+      functionOptions:
+        patterns:
+        - .+_at
+        - (.+_)*time(stamp)?(_.+)?
+        - (.+_)*date(_.+)*
+        - (.+_)*day(_.+)*
+  extra-deepobject-example-keys:
+    description: Examples of deepObject query parameters must use keys defined by the parameter schema.
+    message: '{{error}}'
+    howToFix: Rename the example key to a property of the schema, or add the property to the schema.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-deepobject-example-keys
+      functionOptions: {}
+  extra-default-equals-example-redundant:
+    description: A schema example must not be identical to the schema default.
+    message: '{{error}}'
+    howToFix: Remove the redundant example or replace it with a value that differs from the default.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-default-equals-example-redundant
+      functionOptions: {}
+  extra-description-usage-hint-wording:
+    description: 'DISABLED: A keyword match that does not measure whether a description helps. | Operation descriptions should contain a usage hint word such as returns, allows or use.'
+    message: '{{error}}'
+    howToFix: Reword the description to say what the operation returns, allows or is used for.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-description-usage-hint-wording
+      functionOptions:
+        hintWords:
+        - use
+        - call
+        - returns
+        - when
+        - used to
+        - allows
+        - enables
+        - provides
+        - retrieves
+        - creates
+        - updates
+        - deletes
+        minLength: 30
+  extra-discourage-http-422:
+    description: Operations should use status code 400 instead of 422.
+    message: '{{error}}'
+    howToFix: Replace the 422 response with a 400 response.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-discourage-http-422
+      functionOptions: {}
+  extra-discriminator-property-exists:
+    description: 'DISABLED: Second pass: same cause as illogical-composition-keywords. | The property named by a discriminator must exist in the schema.'
+    message: '{{error}}'
+    howToFix: Define the discriminator property in the schema, or change propertyName to an existing property.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: validation
+    then:
+      function: extra-discriminator-property-exists
+      functionOptions: {}
+  extra-discriminator-property-required:
+    description: 'DISABLED: Second pass: same cause as illogical-composition-keywords. | The discriminator property must be listed in the required list of the schema.'
+    message: '{{error}}'
+    howToFix: Add the discriminator property to the required list of the schema.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: validation
+    then:
+      function: extra-discriminator-property-required
+      functionOptions: {}
+  extra-document-has-operations:
+    description: The document must define at least one operation.
+    message: '{{error}}'
+    howToFix: Add an operation to paths, or lint the correct file.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-document-has-operations
+      functionOptions: {}
+  extra-empty-required-or-enum:
+    description: The required and enum lists of a schema must be non-empty and free of duplicates.
+    message: '{{error}}'
+    howToFix: Remove the empty list or the duplicated entry.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-empty-required-or-enum
+      functionOptions: {}
+  extra-encoding-keys-match-properties:
+    description: Encoding map keys must name properties of the media type schema.
+    message: '{{error}}'
+    howToFix: Rename or remove the encoding key so that it matches a property of the schema.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-encoding-keys-match-properties
+      functionOptions: {}
+  extra-enum-value-case:
+    description: String enum values must follow the configured case convention, snake_case or SCREAMING_SNAKE_CASE by default.
+    message: '{{error}}'
+    howToFix: Rename the enum value to the configured case convention.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-enum-value-case
+      functionOptions:
+        allowValues:
+        - public-key
+        - cross-platform
+        - date-time
+        - user-schema
+        - auth.factor.password.set
+        casing:
+        - snake_case
+        - SCREAMING_SNAKE_CASE
+  extra-error-container-schema-shape:
+    description: 'DISABLED: Every error response uses one shape, {code, message, details}; the rule demands a different wire format. | Error response schemas must follow the API Handbook error container model.'
+    message: '{{error}}'
+    howToFix: Make the error schema an object with trace and an errors array of error models with code, message and more_info.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-error-container-schema-shape
+      functionOptions: {}
+  extra-error-response-content-type:
+    description: Error responses that define content must offer an application/json entry.
+    message: '{{error}}'
+    howToFix: Add an application/json entry to the content of the error response.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-error-response-content-type
+      functionOptions: {}
+  extra-error-response-has-body:
+    description: 4xx responses must declare a response body with a schema.
+    message: '{{error}}'
+    howToFix: Add a content map with an error schema to the response.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-error-response-has-body
+      functionOptions:
+        requireSchema: true
+  extra-etag-with-conditional-headers:
+    description: A path item with If-Match or If-None-Match parameters must return an ETag header from GET.
+    message: '{{error}}'
+    howToFix: Declare an ETag response header on the 2xx responses of the GET operation.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-etag-with-conditional-headers
+      functionOptions: {}
+  extra-example-body-key-case:
+    description: Property names in example bodies must follow the configured case style.
+    message: '{{error}}'
+    howToFix: Rename the example property so that it follows the configured case style.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-example-body-key-case
+      functionOptions:
+        casing:
+        - snake_case
+        ignoreKeys:
+        - $schema
+        - metaSchema
+        - objectType
+        - x-*
+  extra-example-value-xor-external:
+    description: An Example Object must define exactly one of value and externalValue.
+    message: '{{error}}'
+    howToFix: Keep either value or externalValue in the example, not both and not neither.
+    given: $
+    formats:
+    - oas3
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-example-value-xor-external
+      functionOptions:
+        forbidBoth: true
+        requireOne: true
+  extra-exploded-object-query-required-property:
+    description: A required exploded object query parameter needs at least one required property.
+    message: '{{error}}'
+    howToFix: Add a required property to the object schema, set explode to false, or make the parameter optional.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-exploded-object-query-required-property
+      functionOptions: {}
+  extra-extensible-enum-string-type:
+    description: Schemas with x-extensible-enum must have type string.
+    message: '{{error}}'
+    howToFix: 'Declare type: string on the schema that carries x-extensible-enum.'
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-extensible-enum-string-type
+      functionOptions: {}
+  extra-format-matches-type:
+    description: Standard formats must be used with a compatible type.
+    message: '{{error}}'
+    howToFix: Change the type to one the format applies to, or use a different format.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-format-matches-type
+      functionOptions: {}
+  extra-global-security-required:
+    description: The root security property must exist and hold at least one security requirement.
+    message: '{{error}}'
+    howToFix: Add a non-empty security list at the document root.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-global-security-required
+      functionOptions: {}
+  extra-header-name-max-length:
+    description: Response header names must not exceed the maximum length.
+    message: '{{error}}'
+    howToFix: Shorten the response header name.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-header-name-max-length
+      functionOptions:
+        maxLength: 50
+  extra-hoist-repeated-path-parameters:
+    description: Identical path parameters repeated across operations must move to the path item.
+    message: '{{error}}'
+    howToFix: Declare the path parameter once in the parameters of the path item and remove it from the operations.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-hoist-repeated-path-parameters
+      functionOptions: {}
+  extra-ignored-header-names:
+    description: Header parameters named Accept, Content-Type or Authorization are ignored.
+    message: '{{error}}'
+    howToFix: Remove the header and describe the media type with content and credentials with securitySchemes.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-ignored-header-names
+      functionOptions:
+        names:
+        - Accept
+        - Content-Type
+        - Authorization
+  extra-illogical-composition-keywords:
+    description: 'DISABLED: Second pass: the challenge payload oneOf needs a required method const in each member. | allOf, anyOf and oneOf must combine schemas that a value can actually resolve against.'
+    message: '{{error}}'
+    howToFix: Give the composition at least two distinct, non-empty, mutually exclusive members, or use the schema directly.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: validation
+    then:
+      function: extra-illogical-composition-keywords
+      functionOptions: {}
+  extra-integer-bounds-in-format-range:
+    description: Integer schemas must define an int32 or int64 format and bounds inside its range.
+    message: '{{error}}'
+    howToFix: Add format int32 or int64 and minimum and maximum values within the range of the format.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-integer-bounds-in-format-range
+      functionOptions:
+        requireBounds: true
+        requireFormat: true
+  extra-link-parameter-exists:
+    description: Links must identify an existing operation and use parameters that exist in it.
+    message: '{{error}}'
+    howToFix: Give the link exactly one valid operationId or operationRef and rename its parameters to match the target operation.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-link-parameter-exists
+      functionOptions:
+        reportRemoteOperationRef: true
+  extra-link-target-exists:
+    description: Link objects must reference an operation that exists in the document.
+    message: '{{error}}'
+    howToFix: Point the link at an existing operationId or at a valid relative operationRef.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-link-target-exists
+      functionOptions:
+        operationRefMethods: []
+  extra-major-version-in-path:
+    description: The major version must be a v<n> segment in a server URL or at the start of every path.
+    message: '{{error}}'
+    howToFix: Add a version segment such as /v1 to the server URL or to the start of every path.
+    given: $
+    formats:
+    - oas3
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-major-version-in-path
+      functionOptions:
+        allowServerVersion: true
+        consistent: true
+  extra-media-type-allow-list:
+    description: Media types must be in the configured allow-list.
+    message: '{{error}}'
+    howToFix: Use one of the allowed media types or extend the allowed option.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-media-type-allow-list
+      functionOptions:
+        allowed: []
+        includeResponses: false
+  extra-merge-patch-no-required:
+    description: Schemas of merge patch request bodies must not define required properties.
+    message: '{{error}}'
+    howToFix: Remove required from the schema, or use a separate schema for the merge patch request.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-merge-patch-no-required
+      functionOptions: {}
+  extra-multiple-path-params:
+    description: Paths should not contain more than one path parameter.
+    message: '{{error}}'
+    howToFix: Address the nested resource through its own root path, or raise the max option.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-multiple-path-params
+      functionOptions:
+        max: 2
+  extra-no-array-of-arrays:
+    description: Array schemas must not use another array schema as their items.
+    message: '{{error}}'
+    howToFix: Wrap the inner array in an object schema.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-array-of-arrays
+      functionOptions: {}
+  extra-no-binary-in-json-api:
+    description: Binary string schemas must not be used for parameters or JSON request and response bodies.
+    message: '{{error}}'
+    howToFix: Use a non-JSON media type for binary data, or encode the value as a base64 string with format byte.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-no-binary-in-json-api
+      functionOptions: {}
+  extra-no-body-on-safe-methods:
+    description: Operations with a method such as GET, HEAD, DELETE or OPTIONS must not define a request body.
+    message: '{{error}}'
+    howToFix: Remove the requestBody, or move its data into parameters.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-no-body-on-safe-methods
+      functionOptions:
+        httpMethods:
+        - delete
+        - get
+        - head
+        - options
+  extra-no-circular-schema-refs:
+    description: Component schemas must not reference themselves through $ref cycles.
+    message: '{{error}}'
+    howToFix: Break the cycle, for example by referencing the related resource by identifier.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-no-circular-schema-refs
+      functionOptions:
+        ignoreProperties: true
+  extra-no-consecutive-path-parameter-segments:
+    description: A path must not contain two consecutive path parameter segments.
+    message: '{{error}}'
+    howToFix: Add a resource name segment between the two path parameters.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-consecutive-path-parameter-segments
+      functionOptions: {}
+  extra-no-default-for-required-parameter:
+    description: A required parameter must not have a default value.
+    message: '{{error}}'
+    howToFix: Remove the default, or make the parameter optional.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-no-default-for-required-parameter
+      functionOptions:
+        onlyTruthy: false
+  extra-no-eval-in-title:
+    description: Titles and descriptions must not contain eval(.
+    message: '{{error}}'
+    howToFix: Remove the eval( text from the title or description.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-no-eval-in-title
+      functionOptions: {}
+  extra-no-inline-schema:
+    description: Parameter, request body and response schemas must be $refs to reusable schemas.
+    message: '{{error}}'
+    howToFix: Move the inline schema to components/schemas and reference it with $ref.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-no-inline-schema
+      functionOptions:
+        allowPrimitives: true
+        allowReferenceUnions: true
+        parameters: true
+        requestBodies: true
+        responses: true
+  extra-no-link-header:
+    description: Header parameters and response headers must not be named Link.
+    message: '{{error}}'
+    howToFix: Remove the Link header and return the links in the response body.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-link-header
+      functionOptions: {}
+  extra-no-mixed-number-range-constraints:
+    description: Schemas must not define both an inclusive and a numeric exclusive bound on the same side.
+    message: '{{error}}'
+    howToFix: Keep either the inclusive or the exclusive bound for the side that is reported.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-no-mixed-number-range-constraints
+      functionOptions: {}
+  extra-no-nested-callbacks:
+    description: A callback must not contain its own callbacks.
+    message: '{{error}}'
+    howToFix: Remove the nested callbacks, or model the workflow with separate operations.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-nested-callbacks
+      functionOptions: {}
+  extra-no-nullable-properties:
+    description: Properties must not be nullable, except in merge-patch request bodies.
+    message: '{{error}}'
+    howToFix: 'Remove nullable: true or the null type and make the property optional instead.'
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-nullable-properties
+      functionOptions: {}
+  extra-no-path-item-level-parameters:
+    description: Path items must not define a parameters list.
+    message: '{{error}}'
+    howToFix: Move the parameters into each operation of the path item.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-path-item-level-parameters
+      functionOptions: {}
+  extra-no-ref-in-example:
+    description: A $ref must not be used inside an example field; use examples instead.
+    message: '{{error}}'
+    howToFix: Inline the example value, or move the reference into an examples entry.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-no-ref-in-example
+      functionOptions: {}
+  extra-no-reserved-header-parameter:
+    description: Header parameters must not be named Accept, Authorization, Content-Type or similar reserved headers.
+    message: '{{error}}'
+    howToFix: Remove the header parameter and describe the behavior with content, security schemes or preconditions.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-reserved-header-parameter
+      functionOptions:
+        headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - If-Modified-Since
+        - If-Unmodified-Since
+  extra-no-uuid-suffix-property:
+    description: UUID properties must not have names ending in _uuid.
+    message: '{{error}}'
+    howToFix: Rename the property to end in id, such as project_id.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-uuid-suffix-property
+      functionOptions:
+        casing:
+        - snake_case
+  extra-no-whitespace-in-example-keys:
+    description: Keys of response examples maps must not contain whitespace.
+    message: '{{error}}'
+    howToFix: Remove the whitespace from the example key and use summary for the readable label.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-whitespace-in-example-keys
+      functionOptions: {}
+  extra-no-wildcard-media-type:
+    description: Content maps must not use the */* media type.
+    message: '{{error}}'
+    howToFix: Replace */* with the concrete media types that the API supports.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-no-wildcard-media-type
+      functionOptions: {}
+  extra-nullable-body-schema:
+    description: Request body schemas must not be nullable.
+    message: '{{error}}'
+    howToFix: Remove nullable from the body schema and make the body or one of its members optional instead.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-nullable-body-schema
+      functionOptions: {}
+  extra-nullable-requires-type:
+    description: A schema using nullable must declare a sibling type.
+    message: '{{error}}'
+    howToFix: 'Add a type next to nullable, for example type: object.'
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-nullable-requires-type
+      functionOptions: {}
+  extra-oauth2-refresh-url:
+    description: OAuth2 flows other than clientCredentials must define a refreshUrl.
+    message: '{{error}}'
+    howToFix: Add a refreshUrl to the OAuth2 flow.
+    given: $
+    formats:
+    - oas3
+    resolved: false
+    severity: error
+    type: style
+    then:
+      function: extra-oauth2-refresh-url
+      functionOptions: {}
+  extra-oauth2-scope-name-pattern:
+    description: OAuth2 scope names must match the configured pattern and every endpoint must be secured by scopes.
+    message: '{{error}}'
+    howToFix: Rename the scope so that it matches the configured pattern, and secure the endpoint with defined OAuth2 scopes.
+    given: $
+    resolved: false
+    severity: error
+    type: style
+    then:
+      function: extra-oauth2-scope-name-pattern
+      functionOptions:
+        allowExplicitPublic: true
+        allowed: []
+        pathWhitelist: []
+        pattern: ^(openid|profile|email)$|^[a-z]+(_[a-z]+)*\.(read|write|delete|create)$
+  extra-openapi31-allowed-schema-keywords:
+    description: OpenAPI 3.1 schemas may only use allow-listed keywords or x- extensions.
+    message: '{{error}}'
+    howToFix: Remove the keyword or add it to the allowedKeywords option.
+    given: $
+    formats:
+    - oas3_1
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-openapi31-allowed-schema-keywords
+      functionOptions:
+        profile: oas31
+  extra-operation-2xx-required:
+    description: Every operation must declare a 2xx response.
+    message: '{{error}}'
+    howToFix: Add a 2xx response such as 200, 201, 204 or 2XX to the operation.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-operation-2xx-required
+      functionOptions: {}
+  extra-operation-description-min-chars:
+    description: The longer of an operation's description and summary must reach a minimum length.
+    message: '{{error}}'
+    howToFix: Write a more descriptive summary or description for the operation.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-operation-description-min-chars
+      functionOptions:
+        minLength: 30
+  extra-operation-description-opens-with-sentence:
+    description: Operation descriptions must open with a sentence, not a heading, quote, list, table, code fence or HTML.
+    message: '{{error}}'
+    howToFix: Start the description with a plain sentence and move structured content after it.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-operation-description-opens-with-sentence
+      functionOptions: {}
+  extra-operation-description-restates-path:
+    description: Operation descriptions and summaries must not merely restate the method and path.
+    message: '{{error}}'
+    howToFix: Describe what the operation does instead of repeating its method and path.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-operation-description-restates-path
+      functionOptions: {}
+  extra-operation-id-casing:
+    description: operationId must follow the configured case convention.
+    message: '{{error}}'
+    howToFix: Rename the operationId to follow the configured case convention.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-operation-id-casing
+      functionOptions:
+        casing:
+        - camelCase
+        strictCharset: false
+  extra-operation-id-max-length:
+    description: The operationId must not be longer than the configured limit.
+    message: '{{error}}'
+    howToFix: Shorten the operationId.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-operation-id-max-length
+      functionOptions:
+        maxLength: 64
+  extra-operation-id-max-prefixes:
+    description: 'DISABLED: Same family as the closed verb-prefix rule. | The document must not use more than a few distinct operationId verb prefixes.'
+    message: '{{error}}'
+    howToFix: Standardise the operationIds on a smaller set of verb prefixes, or raise the max option.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-operation-id-max-prefixes
+      functionOptions:
+        casing:
+        - camelCase
+        max: 5
+  extra-operation-id-reserved-word:
+    description: The operationId must not be a reserved word of the target language.
+    message: '{{error}}'
+    howToFix: Rename the operationId so that it is not a reserved word.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-operation-id-reserved-word
+      functionOptions:
+        words:
+        - 'False'
+        - None
+        - 'True'
+        - and
+        - as
+        - assert
+        - async
+        - await
+        - break
+        - class
+        - continue
+        - def
+        - del
+        - elif
+        - else
+        - except
+        - finally
+        - for
+        - from
+        - global
+        - if
+        - import
+        - in
+        - is
+        - lambda
+        - nonlocal
+        - not
+        - or
+        - pass
+        - raise
+        - return
+        - try
+        - while
+        - with
+        - yield
+  extra-operation-id-verb-matches-method:
+    description: The verb and resource of an operationId must match the HTTP method and path of the operation.
+    message: '{{error}}'
+    howToFix: Name it <verb><resource> in the configured casing, such as list_bands or listBands.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-operation-id-verb-matches-method
+      functionOptions:
+        casing:
+        - camelCase
+        strict: true
+  extra-operation-id-verb-prefix:
+    description: 'DISABLED: The API mixes CRUD verbs with custom action verbs by design; revisit with operation-id-verb-matches-method. | An operationId must start with a common verb followed by an upper-case letter.'
+    message: '{{error}}'
+    howToFix: Rename the operationId so that it starts with a verb such as get, list, create, update or delete.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-operation-id-verb-prefix
+      functionOptions:
+        casing:
+        - camelCase
+        prefixes:
+        - get
+        - list
+        - create
+        - update
+        - delete
+        - remove
+        - search
+        - find
+        - fetch
+        - add
+        - set
+        - check
+        - verify
+        - send
+        - upload
+        - download
+        - export
+        - batch
+        - bulk
+  extra-operation-max-parameters:
+    description: 'DISABLED: GET /events is a filterable audit log with 17 optional filters. | Operations must not have too many parameters or required parameters.'
+    message: '{{error}}'
+    howToFix: Reduce the number of parameters, for example by moving inputs into a request body.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-operation-max-parameters
+      functionOptions:
+        maxParameters: 15
+        maxRequiredParameters: 7
+  extra-operation-summary-max-length:
+    description: The operation summary must not be longer than the configured limit.
+    message: '{{error}}'
+    howToFix: Shorten the summary and move the details to the description.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-operation-summary-max-length
+      functionOptions:
+        maxLength: 80
+  extra-operation-summary-required:
+    description: Every operation must have a non-empty summary.
+    message: '{{error}}'
+    howToFix: Add a short summary to the operation.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-operation-summary-required
+      functionOptions: {}
+  extra-optional-body-with-required-properties:
+    description: An optional request body must not have a schema with required properties.
+    message: '{{error}}'
+    howToFix: Mark the request body as required, or drop the required properties from the schema.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-optional-body-with-required-properties
+      functionOptions: {}
+  extra-pagination-parameters-shape:
+    description: 'DISABLED: Wants limit/first/next and start; our cursor pagination (limit, page_token, next_page_token) is consistent across 20 list responses. | Paginated list operations must define limit, offset or page token parameters, response properties and page links consistently.'
+    message: '{{error}}'
+    howToFix: Make limit an optional integer with default and maximum, offset an optional integer, the page token an optional string named start, and echo them with page links in the response.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-pagination-parameters-shape
+      functionOptions: {}
+  extra-param-name-vs-body-property-name:
+    description: Parameter names must not equal top-level property names of the JSON request body.
+    message: '{{error}}'
+    howToFix: Rename the parameter or the request body property so that the names are unique.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-param-name-vs-body-property-name
+      functionOptions: {}
+  extra-parameter-name-constraints:
+    description: Parameter names must be non-empty, short and match the configured pattern.
+    message: '{{error}}'
+    howToFix: Rename the parameter so that it satisfies the length and pattern constraints.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-parameter-name-constraints
+      functionOptions:
+        maxLength: 50
+        minLength: 1
+        pattern: ''
+  extra-parameter-schema-type-required:
+    description: Every parameter must have a schema with a declared type.
+    message: '{{error}}'
+    howToFix: Add a schema with a type to the parameter.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-parameter-schema-type-required
+      functionOptions: {}
+  extra-patch-content-type:
+    description: PATCH request bodies must use a JSON Patch or JSON Merge Patch media type.
+    message: '{{error}}'
+    howToFix: Use application/json-patch+json or application/merge-patch+json for the PATCH request body.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-patch-content-type
+      functionOptions:
+        allowed:
+        - application/json
+  extra-path-http-verbs-order:
+    description: Operations within a path item must follow the configured HTTP method order.
+    message: '{{error}}'
+    howToFix: Reorder the operations of the path item to follow the configured method order.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-path-http-verbs-order
+      functionOptions:
+        order:
+        - get
+        - head
+        - post
+        - put
+        - patch
+        - delete
+        - options
+        - trace
+  extra-path-item-summary-or-description:
+    description: 'DISABLED: Every operation has its own summary and description; a path-level copy would repeat them. | Each path item must have a summary or a description.'
+    message: '{{error}}'
+    howToFix: Add a summary or a description to the path item.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-path-item-summary-or-description
+      functionOptions: {}
+  extra-path-param-placement:
+    description: Paths must not start with a path parameter, and path parameters must fill a whole segment.
+    message: '{{error}}'
+    howToFix: Start the path with a literal segment and keep each path parameter in a segment of its own.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-path-param-placement
+      functionOptions: {}
+  extra-path-parameter-case:
+    description: Path template variables must use the configured case style.
+    message: '{{error}}'
+    howToFix: Rename the path variable to the configured case style and update the parameter definition.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-path-parameter-case
+      functionOptions:
+        casing:
+        - snake_case
+  extra-path-segment-case:
+    description: Paths must start with a slash, have no trailing slash or empty segments and use one casing.
+    message: '{{error}}'
+    howToFix: Fix the shape of the path and rename the segments to the configured case.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-path-segment-case
+      functionOptions:
+        casing:
+        - snake_case
+  extra-path-segment-param-only:
+    description: A path segment with a parameter must contain only that parameter.
+    message: '{{error}}'
+    howToFix: Move the literal text into its own path segment so the segment is only a parameter reference.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-path-segment-param-only
+      functionOptions: {}
+  extra-path-segment-plural:
+    description: Literal path segments must be plural nouns.
+    message: '{{error}}'
+    howToFix: Use the plural form of the path segment, or add it to the exceptions option.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-path-segment-plural
+      functionOptions:
+        exceptions:
+        - flow
+        - branding
+        ignoreLastPathSegment: false
+        onlyCollectionSegments: true
+  extra-pattern-anchored:
+    description: String schema patterns must be anchored with ^ and $.
+    message: '{{error}}'
+    howToFix: Start the pattern with ^ and end it with $.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-pattern-anchored
+      functionOptions:
+        requireEnd: true
+        requireStart: true
+  extra-pattern-length-satisfiable:
+    description: A pattern must be able to match a string within the schema minLength and maxLength.
+    message: '{{error}}'
+    howToFix: Change the pattern or the minLength and maxLength so that a string can satisfy both.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-pattern-length-satisfiable
+      functionOptions: {}
+  extra-pattern-properties-restrictions:
+    description: patternProperties must have one anchored entry and no additionalProperties.
+    message: '{{error}}'
+    howToFix: Use a single anchored pattern and remove additionalProperties from the same schema.
+    given: $
+    formats:
+    - oas3_1
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-pattern-properties-restrictions
+      functionOptions: {}
+  extra-precondition-headers-on-412:
+    description: Operations that return a 412 response must define a conditional request header.
+    message: '{{error}}'
+    howToFix: Add an If-Match, If-None-Match, If-Modified-Since or If-Unmodified-Since header parameter.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-precondition-headers-on-412
+      functionOptions:
+        headers:
+        - If-Match
+        - If-None-Match
+        - If-Modified-Since
+        - If-Unmodified-Since
+  extra-prefer-token-pagination-over-offset:
+    description: Paginated list operations should use token-based pagination, rather than offset/limit pagination.
+    message: '{{error}}'
+    howToFix: Replace the offset parameter with a start page token parameter and return the next page link.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-prefer-token-pagination-over-offset
+      functionOptions: {}
+  extra-property-name-collision-after-normalising:
+    description: Property names within a schema must be unique after normalising their case convention.
+    message: '{{error}}'
+    howToFix: Rename one of the properties so that the names differ by more than case or separators.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-property-name-collision-after-normalising
+      functionOptions: {}
+  extra-put-body-matches-get-response:
+    description: The PUT request body schema must equal the GET success response schema of the same path.
+    message: '{{error}}'
+    howToFix: Use the same schema for the PUT request body and the GET response.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-put-body-matches-get-response
+      functionOptions:
+        responseCode: '200'
+  extra-query-array-style-form:
+    description: Array query parameters must set style to form explicitly.
+    message: '{{error}}'
+    howToFix: 'Add style: form to the array query parameter.'
+    given: $
+    formats:
+    - oas3
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-query-array-style-form
+      functionOptions: {}
+  extra-query-param-wire-key-collision:
+    description: Query parameters that serialise to the same wire key must have compatible schemas.
+    message: '{{error}}'
+    howToFix: Rename one of the parameters or properties, or give the colliding schemas the same type.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-query-param-wire-key-collision
+      functionOptions: {}
+  extra-readonly-and-writeonly-exclusive:
+    description: A schema must not be both readOnly and writeOnly.
+    message: '{{error}}'
+    howToFix: Remove either readOnly or writeOnly from the schema.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-readonly-and-writeonly-exclusive
+      functionOptions: {}
+  extra-ref-pattern-component-location:
+    description: A $ref must start with the components prefix that matches the kind of object it sits in.
+    message: '{{error}}'
+    howToFix: 'Move the target into components under the matching section and reference it as #/components/<kind>/<name>.'
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-ref-pattern-component-location
+      functionOptions: {}
+  extra-ref-sibling-description-not-duplicate:
+    description: A description beside a $ref must not duplicate the description of the referenced schema.
+    message: '{{error}}'
+    howToFix: Remove the duplicated description or give it a text that adds information.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-ref-sibling-description-not-duplicate
+      functionOptions: {}
+  extra-request-body-json-media-type:
+    description: Request bodies must offer the application/json media type.
+    message: '{{error}}'
+    howToFix: Add an application/json entry to the request body content.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-request-body-json-media-type
+      functionOptions:
+        mediaType: application/json
+  extra-request-body-required-list:
+    description: A JSON request body schema with properties must state its required properties, an empty list included.
+    message: '{{error}}'
+    howToFix: Add a required list with the mandatory properties to the request body schema.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-request-body-required-list
+      functionOptions:
+        mediaTypes:
+        - application/json
+  extra-request-body-schema-has-properties:
+    description: JSON request body schemas must define properties.
+    message: '{{error}}'
+    howToFix: Describe the fields of the request body with properties.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-request-body-schema-has-properties
+      functionOptions: {}
+  extra-request-response-must-be-models:
+    description: JSON request and response body object schemas must define static properties (models, not dictionaries).
+    message: '{{error}}'
+    howToFix: Define the properties of the body in its object schema.
+    given: $
+    resolved: false
+    severity: error
+    type: style
+    then:
+      function: extra-request-response-must-be-models
+      functionOptions:
+        allowDictionaries: true
+  extra-required-parameters-before-optional:
+    description: Required parameters must be listed before optional parameters.
+    message: '{{error}}'
+    howToFix: Move the required parameters to the start of the parameters list.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-required-parameters-before-optional
+      functionOptions: {}
+  extra-required-string-min-length:
+    description: 'DISABLED: Redundant with extra-string-length-and-pattern-required, which reports every string without minLength. | Required string properties must declare minLength.'
+    message: '{{error}}'
+    howToFix: 'Add minLength to the required string property, for example minLength: 1.'
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-required-string-min-length
+      functionOptions:
+        shapedFormats:
+        - date
+        - date-time
+        - time
+        - duration
+        - uuid
+        - uri
+        - uri-reference
+        - iri
+        - url
+        - email
+        - idn-email
+        - hostname
+        - idn-hostname
+        - ipv4
+        - ipv6
+        - json-pointer
+        - regex
+        - byte
+  extra-reserved-header-parameter:
+    description: Header parameters must not use the reserved names Accept, Content-Type or Authorization.
+    message: '{{error}}'
+    howToFix: Remove the parameter; describe the media type with content keys and authentication with security schemes.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-reserved-header-parameter
+      functionOptions:
+        names:
+        - Accept
+        - Content-Type
+        - Authorization
+  extra-resource-response-consistency:
+    description: Create and update operations must return the same schema as the GET of the resource, or an extension of it.
+    message: '{{error}}'
+    howToFix: Return the schema that the GET operation of the resource returns.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-resource-response-consistency
+      functionOptions: {}
+  extra-resource-schema-naming-convention:
+    description: 'DISABLED: Wants Prototype/Collection/Patch suffixes in PascalCase; the spec names schemas create-<x>-request, <x>-response and list-<x>-response in kebab-case. | Schema names of resource paths must derive from the canonical schema name.'
+    message: '{{error}}'
+    howToFix: Rename the schemas to <Canonical>Collection, <Canonical>Prototype and <Canonical>Patch.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-resource-schema-naming-convention
+      functionOptions:
+        casing:
+        - PascalCase
+  extra-response-contains-header:
+    description: Responses must declare the headers configured for their status code.
+    message: '{{error}}'
+    howToFix: Add the missing header to the headers of the response.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-response-contains-header
+      functionOptions: {}
+  extra-response-contains-property:
+    description: Configured response codes must define the configured top-level properties in their schema.
+    message: '{{error}}'
+    howToFix: Add the required property to the response schema.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-response-contains-property
+      functionOptions: {}
+  extra-response-request-content-required:
+    description: Request bodies and responses other than 204 must have a content field.
+    message: '{{error}}'
+    howToFix: Add a content map describing the payload, or use a status code that has no body.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-response-request-content-required
+      functionOptions:
+        ignoreCodes:
+        - '204'
+        - '304'
+        - '202'
+  extra-response-required-properties:
+    description: Array and enum properties of response schemas must be listed as required.
+    message: '{{error}}'
+    howToFix: Add the property to the required list of the schema, and always return it.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-response-required-properties
+      functionOptions:
+        arrays: true
+        enums: true
+        ignoreWithDefault: true
+  extra-response-status-code-semantics:
+    description: Operations must use status codes consistently with their meaning.
+    message: '{{error}}'
+    howToFix: 'Use the status codes recommended by the message: 400 for 422, 303 or 307 for 302, 201 for creates, and so on.'
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-response-status-code-semantics
+      functionOptions:
+        allowPutNoContent: true
+  extra-schema-description-required:
+    description: 'DISABLED: schema-property-description stays on and covers the properties. | Schemas must have a description.'
+    message: '{{error}}'
+    howToFix: Add a description to the schema.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-schema-description-required
+      functionOptions:
+        scope: all
+  extra-schema-keyword-type-consistency:
+    description: Schema keywords must match the declared type and lower bounds must not exceed upper bounds.
+    message: '{{error}}'
+    howToFix: Change the type, remove the keyword or fix the bounds.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-schema-keyword-type-consistency
+      functionOptions: {}
+  extra-schema-property-description:
+    description: Every schema property must have a non-empty description.
+    message: '{{error}}'
+    howToFix: Add a description to the property.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-schema-property-description
+      functionOptions: {}
+  extra-schema-type-format-whitelist:
+    description: Schema types and formats must come from the allowed lists.
+    message: '{{error}}'
+    howToFix: Use a standard type and a format that is valid for that type.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-schema-type-format-whitelist
+      functionOptions:
+        integerFormats:
+        - int32
+        - int64
+        numberFormats:
+        - float
+        - double
+        - int32
+        - int64
+        stringFormats:
+        - byte
+        - binary
+        - date
+        - date-time
+        - password
+        - email
+        - uuid
+        - uri
+        - url
+        - hostname
+        - ipv4
+        - ipv6
+        - duration
+        - time
+        - uri-reference
+        - iri
+        - iri-reference
+        - idn-email
+        - idn-hostname
+        - json-pointer
+        - relative-json-pointer
+        - regex
+        - uri-template
+        types:
+        - array
+        - boolean
+        - integer
+        - number
+        - object
+        - string
+        - 'null'
+  extra-schema-type-keyword-mismatch:
+    description: A schema must not carry items or properties that contradict its type, and properties require type object.
+    message: '{{error}}'
+    howToFix: Declare type array next to items and type object next to properties, or remove the keyword.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-schema-type-keyword-mismatch
+      functionOptions:
+        requireExplicitType: true
+  extra-security-scopes-declared:
+    description: Use OAuth2 or bearer security schemes and declare every scope that is used.
+    message: '{{error}}'
+    howToFix: Define an OAuth2 or bearer scheme, remove other scheme types and declare each used scope in the OAuth2 flows.
+    given: $
+    formats:
+    - oas3
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-security-scopes-declared
+      functionOptions:
+        allowedTypes:
+        - oauth2
+        - apiKey
+  extra-security-scopes-defined:
+    description: Security requirements must use defined schemes and declared scopes.
+    message: '{{error}}'
+    howToFix: Define the scheme in components.securitySchemes or declare the scope in the oauth2 flows.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-security-scopes-defined
+      functionOptions:
+        reportUnused: false
+  extra-server-environment-description:
+    description: Every server description must name the environment of the server.
+    message: '{{error}}'
+    howToFix: Add a description to the server that names its environment, such as Production or Staging.
+    given: $
+    formats:
+    - oas3
+    resolved: false
+    severity: error
+    type: style
+    then:
+      function: extra-server-environment-description
+      functionOptions:
+        pattern: (?i)(local|sandbox|alpha|beta|test|testing|stag|staging|prod|production|next|preprod|preproduction)
+        requireDescription: false
+  extra-server-variables-consistent:
+    description: Server variables must have a default, which must be one of the enum values.
+    message: '{{error}}'
+    howToFix: Give every server variable a non-empty default that is part of its enum, and define all URL placeholders.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-server-variables-consistent
+      functionOptions:
+        requireEnum: false
+  extra-server-variables-defined:
+    description: Server URL variables must be defined, and defined variables must be used.
+    message: '{{error}}'
+    howToFix: Add the missing variable to server.variables or remove the unused one.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-server-variables-defined
+      functionOptions: {}
+  extra-server-x-internal:
+    description: 'DISABLED: No tool here reads x-internal. | Every server object must define x-internal as true or false.'
+    message: '{{error}}'
+    howToFix: 'Add x-internal: true or x-internal: false to the server object.'
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-server-x-internal
+      functionOptions:
+        extension: x-internal
+  extra-single-type-plus-null:
+    description: A schema type list must not hold more than one type besides null.
+    message: '{{error}}'
+    howToFix: Keep one type, optionally with null, or model the union with oneOf.
+    given: $
+    formats:
+    - oas3_1
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-single-type-plus-null
+      functionOptions: {}
+  extra-single-uri-version-segment:
+    description: Paths must not contain more than one version segment.
+    message: '{{error}}'
+    howToFix: Keep a single version segment in the path.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-single-uri-version-segment
+      functionOptions: {}
+  extra-ssrf-parameter-name:
+    description: Parameter names must not suggest a caller-supplied URL.
+    message: '{{error}}'
+    howToFix: Review the parameter for server-side request forgery and rename or suppress it.
+    given: $
+    resolved: false
+    severity: info
+    type: validation
+    then:
+      function: extra-ssrf-parameter-name
+      functionOptions:
+        pattern: (^(callback|redirect)|(_url|Url|-url))$
+  extra-strict-ref-locations:
+    description: A $ref may only appear in objects that the specification allows to be references.
+    message: '{{error}}'
+    howToFix: Inline the referenced object, or move the $ref to an object that the specification allows to be a reference.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-strict-ref-locations
+      functionOptions: {}
+  extra-string-length-and-pattern-required:
+    description: String schemas must define pattern, minLength and maxLength, and other schemas must not.
+    message: '{{error}}'
+    howToFix: Add the missing pattern, minLength and maxLength keywords to the string schema, or remove them from non-string schemas.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-string-length-and-pattern-required
+      functionOptions:
+        requireMaxLength: true
+        requireMinLength: true
+        requirePattern: false
+        shapedFormats:
+        - date
+        - date-time
+        - time
+        - duration
+        - uuid
+        - uri
+        - uri-reference
+        - iri
+        - url
+        - email
+        - idn-email
+        - hostname
+        - idn-hostname
+        - ipv4
+        - ipv6
+        - json-pointer
+        - regex
+        - byte
+  extra-string-length-limits:
+    description: minLength must be a positive integer and string lengths must not exceed 4 MiB.
+    message: '{{error}}'
+    howToFix: Use an integer minLength of at least 1 and keep minLength and maxLength within the ceiling.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-string-length-limits
+      functionOptions:
+        lengthCeiling: 4194304
+        minLengthFloor: 1
+  extra-success-response-example:
+    description: Success response media types should include an example.
+    message: '{{error}}'
+    howToFix: Add an example or examples keyword to the media type, or an example to its schema.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-success-response-example
+      functionOptions:
+        mediaTypes:
+        - application/json
+  extra-success-response-has-schema:
+    description: The first success response of an operation must define a body schema.
+    message: '{{error}}'
+    howToFix: Add content with a schema to the success response.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-success-response-has-schema
+      functionOptions:
+        ignoredCodes:
+        - '204'
+        - '205'
+  extra-summary-no-trailing-period:
+    description: Operation summaries must not end with a period.
+    message: '{{error}}'
+    howToFix: Remove the trailing period from the operation summary.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-summary-no-trailing-period
+      functionOptions: {}
+  extra-tracing-headers-required:
+    description: 'DISABLED: Tracing headers are optional server middleware, not part of any operation''s contract. | Requests must provide the B3 or W3C tracing headers.'
+    message: '{{error}}'
+    howToFix: Add the X-B3-TraceId and X-B3-SpanId header parameters, or the traceparent header parameter.
+    given: $
+    resolved: false
+    severity: 'off'
+    type: style
+    then:
+      function: extra-tracing-headers-required
+      functionOptions:
+        requireOnAllOperations: false
+  extra-unevaluated-properties-must-be-false:
+    description: unevaluatedProperties, when set, must be false.
+    message: '{{error}}'
+    howToFix: Set unevaluatedProperties to false or remove it.
+    given: $
+    formats:
+    - oas3_1
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-unevaluated-properties-must-be-false
+      functionOptions: {}
+  extra-unique-tag-names:
+    description: Tag names in the top-level tags list must be unique.
+    message: '{{error}}'
+    howToFix: Rename or merge the duplicated tags.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-unique-tag-names
+      functionOptions:
+        caseInsensitive: false
+  extra-unreachable-405:
+    description: A 405 response must not be declared when all HTTP methods are already declared for the path.
+    message: '{{error}}'
+    howToFix: Remove the 405 response, or remove the methods the server does not implement.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-unreachable-405
+      functionOptions:
+        methods:
+        - get
+        - put
+        - post
+        - delete
+        - options
+        - head
+        - patch
+        - trace
+  extra-unsupported-3-1-keywords:
+    description: 'DISABLED: webhooks is valid OpenAPI 3.1 and documents the events the server emits. | OpenAPI 3.1 documents must not use the top-level keywords jsonSchemaDialect or webhooks.'
+    message: '{{error}}'
+    howToFix: Remove the unsupported keyword from the document, or move its content elsewhere.
+    given: $
+    formats:
+    - oas3_1
+    resolved: false
+    severity: 'off'
+    type: validation
+    then:
+      function: extra-unsupported-3-1-keywords
+      functionOptions:
+        keywords:
+        - jsonSchemaDialect
+        - webhooks
+  extra-unused-global-tags:
+    description: Every global tag must be used by at least one operation.
+    message: '{{error}}'
+    howToFix: Remove the unused tag or add it to an operation.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-unused-global-tags
+      functionOptions: {}
+  extra-url-field-format:
+    description: URL fields must hold well formed URLs.
+    message: '{{error}}'
+    howToFix: Correct the URL, and make it absolute where the field requires it.
+    given: $
+    resolved: false
+    severity: error
+    type: validation
+    then:
+      function: extra-url-field-format
+      functionOptions: {}
+  extra-valid-media-type-syntax:
+    description: Request body content keys must be valid media types.
+    message: '{{error}}'
+    howToFix: Use a media type of the form type/subtype, such as application/json.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-valid-media-type-syntax
+      functionOptions:
+        types:
+        - application
+        - audio
+        - font
+        - image
+        - message
+        - model
+        - multipart
+        - text
+        - video
+  extra-webhook-restrictions:
+    description: Webhooks must not define callbacks, and webhook path items and operations must not define servers.
+    message: '{{error}}'
+    howToFix: Remove the callbacks or servers keyword from the webhook.
+    given: $
+    formats:
+    - oas3_1
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-webhook-restrictions
+      functionOptions:
+        noCallbacks: true
+        noServers: true
+  extra-well-defined-dictionaries:
+    description: A schema must be either a model or a dictionary, and dictionaries need a well-defined value type.
+    message: '{{error}}'
+    howToFix: Remove either properties or additionalProperties, and give the dictionary values a single type.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-well-defined-dictionaries
+      functionOptions:
+        allowEmptyObjects: true
+        allowOpenModels: true
+        forbidNestedDictionaries: true
+        requireObjectDefinition: true
+        requireValueType: false
+  extra-well-known-property-types:
+    description: Properties named id, created and modified must have the common types.
+    message: '{{error}}'
+    howToFix: Give id the type string, and created and modified the type string with format date-time.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-well-known-property-types
+      functionOptions:
+        idProperties:
+        - id
+        idType: string
+        timestampFormat: date-time
+        timestampProperties:
+        - created
+        - modified
+        timestampType: string
+  extra-wire-enum-no-camel-case:
+    description: Enum values must not be written in camelCase.
+    message: '{{error}}'
+    howToFix: Spell the enum value in snake_case or SCREAMING_SNAKE_CASE.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-wire-enum-no-camel-case
+      functionOptions: {}
+  extra-wire-parameter-no-camel-case:
+    description: Parameter names must not be camelCase.
+    message: '{{error}}'
+    howToFix: Rename the parameter to kebab case or snake case.
+    given: $
+    resolved: false
+    severity: warn
+    type: style
+    then:
+      function: extra-wire-parameter-no-camel-case
+      functionOptions:
+        pattern: '[a-z][A-Z]'
+  extra-write-operation-requires-request-body:
+    description: POST, PUT and PATCH operations must declare a request body.
+    message: '{{error}}'
+    howToFix: Add a requestBody to the operation.
+    given: $
+    resolved: false
+    severity: warn
+    type: validation
+    then:
+      function: extra-write-operation-requires-request-body
+      functionOptions:
+        methods:
+        - post
+        - put
+        - patch
+  extra-write-response-returns-resource-or-location:
+    description: POST, PUT and PATCH 2xx responses must return the resource or a Location header.
+    message: '{{error}}'
+    howToFix: Return the resource in the response content, or declare a Location header for 201 and 204.
+    given: $
+    resolved: false
+    severity: info
+    type: style
+    then:
+      function: extra-write-response-returns-resource-or-location
+      functionOptions:
+        ignoreCodes:
+        - '202'
+        - '204'
