@@ -1,5 +1,12 @@
 # @zitadel/cloud
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [[`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8)]:
+  - @zitadel/config@0.8.0
+
 ## 0.0.3
 
 ### Patch Changes

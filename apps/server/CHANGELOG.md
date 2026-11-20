@@ -1,5 +1,35 @@
 # @zitadel/server
 
+## 0.8.0
+
+### Minor Changes
+
+- [#3214](https://github.com/zitadel/nextgen/pull/3214) [`7642a50`](https://github.com/zitadel/nextgen/commit/7642a50a60e397af8a3782366b93eb36a2004b4b) - The console shows an application at `/applications/{application_id}`: each OAuth client with its client ID, type, grant types, redirect URIs and document as JSON or YAML. The page is read-only and opened by its URL; the console does not list applications yet. `GET /applications/{application_id}` now also accepts a console session with access to the project.
+
+- [#3073](https://github.com/zitadel/nextgen/pull/3073) [`f764fd6`](https://github.com/zitadel/nextgen/commit/f764fd69f3fff15a23d46746fc03c99730207f28) - Invitations record who accepted or declined them and when as `responded_by` and `responded_at`, replacing `accepted_by` and `accepted_at`; `status` says which. Declining keeps the invitation's `metadata`, so administrators still see who a declined link was for, and `DELETE /projects/{project_id}/invitations/{id}` now also removes a declined invitation. `GET /projects/{project_id}/invitations` takes `status` more than once to match any of several statuses (for example `status=pending&status=expired&status=rejected`), and `expand=inviter` adds the creator to each invitation as `inviter`.
+
+- [#3073](https://github.com/zitadel/nextgen/pull/3073) [`f764fd6`](https://github.com/zitadel/nextgen/commit/f764fd69f3fff15a23d46746fc03c99730207f28) - A signed-in platform user redeems an invitation link: `POST /invitations/lookup` shows the project, role and expiry, and names the inviter in `inviter` so the invited user can see who invited them without access to the inviter's account. `POST /invitations/accept` grants the invitation's role and `POST /invitations/reject` declines it. The inviter can neither accept (`inv.self_accept`) nor decline (`inv.self_reject`) their own invitation, and accepting is refused with `inv.inviter_not_admin` when the user who created the invitation no longer administers the project. Every unknown or finished token answers the same `404`. Accepting sends `invitation.accepted`, with `authz.granted` when the role is new, and declining sends `invitation.rejected`.
+
+- [#3075](https://github.com/zitadel/nextgen/pull/3075) [`a72fa58`](https://github.com/zitadel/nextgen/commit/a72fa58b120b3bbc90f786d0bd9955ef5b7293ef) - Every issuer still answers 404 until a project can turn OAuth on. Once one can, the authorization endpoint `/oauth/<project_id>/authorize` accepts authorization code requests from registered applications and sends the browser to the login page. A request must send `state`, a code challenge must use `S256`, and OpenID Connect scopes are ignored for now. Each request records an `auth.request.created` event.
+
+- [#2885](https://github.com/zitadel/nextgen/pull/2885) [`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c) - A release bundle's `oauth: { "enabled": true }` now takes effect: the server stores it as an OAuth settings revision, `GET /oauth_settings/{oauth_settings_id}` reads that revision back instead of answering 501, and every new revision is recorded as an `oauth_settings.created` event. On a server started with `oauth.enabled`, each primary origin the release is deployed to serves the project's RFC 8414 metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>`. The console's release detail lists the pinned OAuth settings. The platform project's issuer follows `oauth.enabled` itself: the server's own platform release carries the OAuth settings, so a restart keeps them.
+  
+  OAuth stays on only while the deployed release carries `oauth`. `zitadel deploy` cannot send it yet and a new release does not copy it from the previous one, so deploying with the CLI turns a project's OAuth off, with no warning.
+
+- [#2897](https://github.com/zitadel/nextgen/pull/2897) [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d) - The API reference now describes `GET /projects/{project_id}/members`, which lists everyone with a role on a project, with each person's strongest role and how they hold it, and an optional `relation` filter. It answers `501` until the list itself ships.
+
+- [#2898](https://github.com/zitadel/nextgen/pull/2898) [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1) - The API now lists everyone with a role on a project. `GET /projects/{project_id}/members` lists each person once, with their strongest role (`viewer`, `editor` or `admin`) and every way they hold it: as an active member of the team that owns the project, which gives `admin`, through a grant to them, or through a grant to a team they belong to. Pass `relation` to list only people with at least that role; `relation=admin` gives the same people as `GET /projects/{project_id}/admins`. Expired grants and people who left a team are left out, and the list is ordered by user id and paginated with `page_token`.
+  
+  Both lists now show every member to every caller who may read them, with each team named. Before, a person whose access came only through a team the caller was not in was left out, so an admin added by a direct grant did not see the project's owners, and a project secret saw only people with a grant of their own. Like the authorization check, a direct user grant is listed only while that user is active.
+
+### Patch Changes
+
+- [#3215](https://github.com/zitadel/nextgen/pull/3215) [`891ab88`](https://github.com/zitadel/nextgen/commit/891ab88b99c376f89a260a93b14e04aedac057ba) - The console calls a deactivated team inactive, in the Teams tabs, list and team detail, and titles the team's details card "Team details".
+
+- [#3213](https://github.com/zitadel/nextgen/pull/3213) [`8c8514f`](https://github.com/zitadel/nextgen/commit/8c8514f289a6d8b1aad2089a5e177feb50305b6a) - Timestamps the API returns are now always UTC. pgx scanned Postgres `timestamptz` into the process's local time zone, and a read path that did not convert the value itself passed that zone on: running with `TZ=Europe/Berlin`, `getProjectClaimStatus` returned `claimed_at` and the claim window's `expires_at` with a `+01:00` offset instead of `Z`. The pool now scans `timestamptz` in UTC, so every read returns UTC whatever zone the server runs in. `initProjectClaim` built its `expires_at` from the clock rather than a read, and now stamps it in UTC too.
+
+- [#3188](https://github.com/zitadel/nextgen/pull/3188) [`1ed5058`](https://github.com/zitadel/nextgen/commit/1ed50580301384f552a1ffdd7083f422883667c5) - The local server now starts on Windows, which it did not before because its SQLite location was not a valid URI for a drive path. `zitadel setup` scaffolds beside a running local server instead of renaming its `.zitadel` folder, which Windows refuses while the server holds files open, and `zitadel doctor` no longer reports a file mode Windows cannot hold.
+
 ## 0.7.0
 
 ### Minor Changes

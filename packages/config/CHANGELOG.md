@@ -1,5 +1,13 @@
 # @zitadel/config
 
+## 0.8.0
+
+### Patch Changes
+
+- [#3179](https://github.com/zitadel/nextgen/pull/3179) [`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8) - A branding `typography.font_url` without a `typography.font_family` is now refused with the spec's own wording, "font_family is required when font_url is present", reported at `typography.font_family`. The rule is generated from the spec's `dependentRequired` instead of repeated by hand.
+- Updated dependencies [[`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c), [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d), [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1)]:
+  - @zitadel/api@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes
