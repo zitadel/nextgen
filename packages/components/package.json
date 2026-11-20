@@ -62,6 +62,7 @@
       "import": "./dist/avatar.mjs"
     },
     "./avatar.css": "./dist/avatar.css",
+    "./passkey-standalone": "./dist/passkey-standalone.mjs",
     "./events": {
       "types": "./dist/events.d.mts",
       "import": "./dist/events.mjs"
@@ -83,7 +84,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown && attw --pack . --profile=esm-only --exclude-entrypoints=./avatar.css",
+    "build": "tsdown && attw --pack . --profile=esm-only --exclude-entrypoints ./avatar.css ./passkey-standalone",
     "cem": "cem analyze",
     "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",

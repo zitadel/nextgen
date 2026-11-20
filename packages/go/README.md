@@ -94,7 +94,9 @@ signed-in user gets the session cookie the Zitadel SDKs read
 plain `http` origin) and lands on the flow's redirect, else on
 `PostSignInURL`. Failures are logged in full to `Config.Logger` and told to the
 browser only in general. The same code runs as `login/example_test.go`
-against a test server. The copy comes in `en`, `de` and `it`
+against a test server. A passkey step loads `passkey.js` from under the login's
+route, the `<zl-passkey>` atom of `@zitadel/components` with its form glue, the
+one thing that needs JavaScript. The copy comes in `en`, `de` and `it`
 (`Config.Locale`).
 
 A sign-in provider's button sends the browser to the provider, but the

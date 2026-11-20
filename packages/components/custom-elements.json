@@ -10500,6 +10500,12 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/passkey-standalone.ts",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/server.ts",
       "declarations": [],
       "exports": [

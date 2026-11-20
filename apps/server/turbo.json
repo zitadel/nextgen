@@ -63,13 +63,17 @@
     // files that differ (not cached: it writes committed files), and
     // `check-generate`, in `lint`, fails when any differs. Neither writes a
     // file another task reads while it runs.
+    // The Go login SDK's assets generator copies the components package's
+    // built passkey atom (scripts/generate-go-login-assets.ts), the one
+    // generated file made from a build output: its build goes first, and its
+    // hash is in check-generate's key.
     "generate": {
       "cache": false,
-      "dependsOn": ["go-sources"],
+      "dependsOn": ["go-sources", "@zitadel/components#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     "check-generate": {
-      "dependsOn": ["go-sources"],
+      "dependsOn": ["go-sources", "@zitadel/components#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",

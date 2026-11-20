@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { defineConfig, type TsdownPlugin } from "tsdown";
+import { defineConfig, type TsdownPlugin, type UserConfig } from "tsdown";
 
 /**
  * Rolldown plugin that turns `.liquid` files into default-exported strings.
@@ -44,6 +44,45 @@ const INLINE_STANDALONE_ONLY = [/^@zitadel\/config(\/|$)/];
 
 /** Third-party runtime deps the components need in the browser. */
 const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
+
+/**
+ * Standalone build — one self-contained file for a plain HTML page. Here the
+ * third-party UI deps ARE inlined, so `<script type="module"
+ * src="…/standalone.mjs">` works with no import map and no bundler. Kept
+ * separate from the library build so npm/SDK consumers are unaffected.
+ *
+ * One config per file: entries that share a config share chunks, and a chunk
+ * import is what a standalone file must not have.
+ *
+ * `platform: "browser"` is required: the default ("node") makes rolldown emit
+ * `import { createRequire } from "node:module"` for its CJS-interop helper,
+ * which a browser cannot resolve — the whole module then fails to load. The
+ * browser platform also picks the `browser`/`import` export conditions of the
+ * inlined deps so no Node-only entry points leak in.
+ */
+function standalone(name: string, source: string): UserConfig {
+  return {
+    plugins: [liquidRaw()],
+    entry: { [name]: source },
+    outDir: "dist",
+    format: ["esm"],
+    failOnWarn: true,
+    platform: "browser",
+    // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
+    // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
+    fixedExtension: true,
+    tsconfig: "tsconfig.lib.json",
+    dts: false,
+    sourcemap: false,
+    // The library build above cleans dist; a standalone file is appended.
+    clean: false,
+    target: "es2022",
+    deps: {
+      neverBundle: ["@zitadel/api-mock"],
+      alwaysBundle: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
+    },
+  };
+}
 
 export default defineConfig([
   /**
@@ -89,8 +128,8 @@ export default defineConfig([
       // `./legacy-designs/*` for Storybook, which shows them for review.
       { from: "src/orchestrator/__fixtures__/legacy-designs", to: "dist" },
     ],
-    // The first entry cleans dist; the standalone entry below keeps
-    // `clean: false` so it appends standalone.mjs instead of wiping this one.
+    // The first entry cleans dist; the standalone entries below keep
+    // `clean: false` so they append to it instead of wiping this one.
     clean: true,
     target: "es2022",
     deps: {
@@ -99,36 +138,8 @@ export default defineConfig([
     },
   },
 
-  /**
-   * Standalone build — one self-contained file for a plain HTML page. Here the
-   * third-party UI deps ARE inlined, so `<script type="module"
-   * src="…/standalone.mjs">` works with no import map and no bundler. Kept
-   * separate from the library build above so npm/SDK consumers are unaffected.
-   *
-   * `platform: "browser"` is required: the default ("node") makes rolldown emit
-   * `import { createRequire } from "node:module"` for its CJS-interop helper,
-   * which a browser cannot resolve — the whole module then fails to load. The
-   * browser platform also picks the `browser`/`import` export conditions of the
-   * inlined deps so no Node-only entry points leak in.
-   */
-  {
-    plugins: [liquidRaw()],
-    entry: { standalone: "src/index.ts" },
-    outDir: "dist",
-    format: ["esm"],
-    failOnWarn: true,
-    platform: "browser",
-    // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
-    // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
-    fixedExtension: true,
-    tsconfig: "tsconfig.lib.json",
-    dts: false,
-    sourcemap: false,
-    clean: false,
-    target: "es2022",
-    deps: {
-      neverBundle: ["@zitadel/api-mock"],
-      alwaysBundle: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
-    },
-  },
+  standalone("standalone", "src/index.ts"),
+  // `<zl-passkey>` alone, for a page that renders its own form: the Go login
+  // SDK embeds this file (packages/go/login).
+  standalone("passkey-standalone", "src/passkey-standalone.ts"),
 ]);

@@ -23,6 +23,7 @@
       "!**/*.svelte",
       "!**/*.vue",
       "!**/mockServiceWorker.js",
+      "!packages/go/login/assets/passkey-standalone.mjs",
       "!**/generated",
       "!**/dist",
       "!**/out-tsc",

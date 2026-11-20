@@ -86,10 +86,11 @@ func (f *Flow) Step(ctx context.Context, flowID string) (*api.FlowResponse, erro
 	return f.response("get step", res)
 }
 
-// Submit submits action with the form's fields and returns the next step. A
-// submission the API refuses for its values comes back as the same step with
-// its Error set, not as a Go error, so the host renders it again.
-func (f *Flow) Submit(ctx context.Context, flowID, action string, fields map[string]string) (*api.FlowResponse, error) {
+// Submit submits action with the form's fields, and the answer to the step's
+// challenge when there is one, and returns the next step. A submission the
+// API refuses for its values comes back as the same step with its Error set,
+// not as a Go error, so the host renders it again.
+func (f *Flow) Submit(ctx context.Context, flowID, action string, fields map[string]string, challenge *api.FlowSubmitRequestChallengeResponse) (*api.FlowResponse, error) {
 	// shortcut: every value goes as a JSON string, so a checkbox (a boolean
 	// property) would be refused; the built-in login collects none. Upgrade
 	// by reading the step's field types before submitting.
@@ -98,10 +99,14 @@ func (f *Flow) Submit(ctx context.Context, flowID, action string, fields map[str
 		raw, _ := json.Marshal(value)
 		values[name] = jx.Raw(raw)
 	}
-	return f.submit(ctx, flowID, &api.FlowSubmitRequest{
+	req := &api.FlowSubmitRequest{
 		Action: action,
 		Fields: api.NewOptFlowSubmitRequestFields(values),
-	})
+	}
+	if challenge != nil {
+		req.ChallengeResponse = api.NewOptFlowSubmitRequestChallengeResponse(*challenge)
+	}
+	return f.submit(ctx, flowID, req)
 }
 
 // SubmitSSO starts a sign-in with providerID; the returned step's RedirectURL

@@ -143,3 +143,10 @@ button.back {
 form.sso + form.sso {
   margin-top: var(--zl-spacing-2);
 }
+
+/* <zl-passkey> renders its pending status and cancel button into light DOM. */
+.zl-passkey-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
+}

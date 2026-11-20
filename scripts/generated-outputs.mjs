@@ -37,10 +37,12 @@ export const GENERATED_GLOBS = [
   "packages/go/api/*_gen.go",
   // The Go login SDK: templ output beside each view/*.templ, and what
   // scripts/generate-go-login-assets.ts exports from the rest of the repo:
-  // the components package's TS catalogs as JSON, the design tokens' CSS.
+  // the components package's TS catalogs as JSON, the design tokens' CSS,
+  // the components package's built passkey atom.
   "packages/go/login/view/*_templ.go",
   "packages/go/login/locales/*.json",
   "packages/go/login/assets/tokens.css",
+  "packages/go/login/assets/passkey-standalone.mjs",
 ];
 
 /**

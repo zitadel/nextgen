@@ -54,6 +54,9 @@ templ Step(step api.FlowStep, t Texts, action string) {
 				{ t.Text(a.TextKey.Or(a.Name)) }
 			</button>
 		}
+		if c, ok := step.Challenge.Get(); ok {
+			@passkey(c, t)
+		}
 	</form>
 	if len(step.SSOProviders) > 0 {
 		<p class="divider">{ t.Text("sso.divider") }</p>
@@ -68,4 +71,42 @@ templ Step(step api.FlowStep, t Texts, action string) {
 			</form>
 		}
 	}
+}
+
+// passkey mounts the <zl-passkey> atom of @zitadel/components over the step's
+// challenge: on connect it runs the WebAuthn ceremony, and passkey-form.js
+// (in passkey.js, served beside the page) posts the proof as the hidden
+// challenge_response, or shows the ceremony's error in the paragraph. A
+// registration is told by the method, or by the user the options name, as
+// the widget's template tells it.
+templ passkey(c api.FlowStepChallenge, t Texts) {
+	{{ ceremony, method := "authenticate", string(api.FlowStepChallengeMethodPasskey) }}
+	if _, user := c.Options.Value["user"]; user || c.Method.Value == api.FlowStepChallengeMethodPasskeyRegister {
+		{{ ceremony, method = "register", string(api.FlowStepChallengeMethodPasskeyRegister) }}
+	}
+	<zl-passkey
+		ceremony={ ceremony }
+		method={ method }
+		challenge-id={ c.ChallengeID.Value }
+		options={ challengeOptions(c) }
+		pending-label={ t.Text("passkey.pending.status") }
+		cancel-label={ t.Text("action.cancel") }
+	></zl-passkey>
+	<input type="hidden" name="challenge_response"/>
+	<p
+		class="error passkey-error"
+		role="alert"
+		hidden
+		data-cancelled={ t.Text("error.passkey_cancelled") }
+		data-timeout={ t.Text("error.passkey_timeout") }
+		data-failed={ t.Text("error.passkey_failed") }
+	></p>
+	<script type="module" src="passkey.js"></script>
+}
+
+// challengeOptions is the challenge's WebAuthn options as the JSON the atom's
+// options attribute takes; templ escapes it like any attribute value.
+func challengeOptions(c api.FlowStepChallenge) string {
+	raw, _ := c.Options.Value.MarshalJSON()
+	return string(raw)
 }

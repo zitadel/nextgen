@@ -142,11 +142,17 @@ export async function goGenerate({ moduleRoot = ROOT, log = console.log } = {}) 
 
   for (const dir of ordered) {
     log(`--- ${dir}`);
-    await run("go", ["generate", "."], { cwd: join(moduleRoot, dir) });
+    await run("go", ["generate", "."], { cwd: join(moduleRoot, dir), env: DIRECTIVE_ENV });
   }
 
   await runPhase(moduleRoot, rest, MOCKGEN_PHASE, log);
 }
+
+// The directives run in a pruned copy of the tree (see below) that holds no
+// ignored build output, only a symlink to the real node_modules. A generator
+// that reads a build artifact needs the tree it was built in, so every
+// directive is told where that is rather than inferring it.
+const DIRECTIVE_ENV = { ...process.env, ZITADEL_SOURCE_ROOT: REPO_ROOT };
 
 // `go generate -run` filters directives by matching against the command text,
 // so between them these two decide what this runner runs at all — see
@@ -200,6 +206,7 @@ async function runPhase(moduleRoot, dirs, phase, log) {
       // failure runCapture folds both streams into the thrown error's message.
       const { stdout, stderr } = await runCapture("go", ["generate", "-run", phase.filter, "."], {
         cwd: join(moduleRoot, dir),
+        env: DIRECTIVE_ENV,
       });
       const output = `${stdout}${stderr}`.trim();
       // Most packages have nothing to do in a given phase; only say so when

@@ -5,10 +5,12 @@ The public Go client module, `go.zitadel.com/zitadel/v5`.
 - `api/*_gen.go` is ogen output of `apps/api/api/.ogen-client.yaml`; never
   hand-edit it, run `turbo run generate --filter=@zitadel/server`
   (`@zitadel/server#check-generate`).
-- `login/view/*_templ.go`, `login/locales/*.json` and `login/assets/tokens.css`
-  are generated too, by the directives in `apps/api/api/generate.go` (the
-  `templ` tool lives in `apps/api/go.mod`); same command, same check.
-  `login/assets/login.css` is hand-written.
+- `login/view/*_templ.go`, `login/locales/*.json`, `login/assets/tokens.css`
+  and `login/assets/passkey-standalone.mjs` (the components package's built
+  `<zl-passkey>`) are generated too, by the directives in
+  `apps/api/api/generate.go` (the `templ` tool lives in `apps/api/go.mod`);
+  same command, same check. `login/assets/login.css` and
+  `login/assets/passkey-form.js` are hand-written.
 - Keep this module free of the server: never require `github.com/zitadel/nextgen`;
   the server and `tools/bench` reach it through a `replace` to this directory.
 - A type the spec names with `x-ogen-type` lives in `ogenx/`, because a
