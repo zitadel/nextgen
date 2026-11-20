@@ -51,7 +51,6 @@ func (rs releaseStatements) CreateRelease(ctx context.Context, entity *domain.Re
 		).Scan(&entity.CreatedAt); err != nil {
 			return wrapError(err)
 		}
-		entity.CreatedAt = entity.CreatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindRelease, entity.ProjectID, entity.ID))
 	})

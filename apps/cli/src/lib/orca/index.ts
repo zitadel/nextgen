@@ -1,9 +1,9 @@
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
-import { pathExists, readDirIfExists } from "@/lib/fs";
+import { readDirIfExists } from "@/lib/fs";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -14,6 +14,7 @@ import type { Patcher } from "./patchers/types";
 import { ScaffoldManifestFile } from "./scaffold-manifest";
 import type { ScaffoldManifest } from "@/lib/sync/types";
 import { scaffolders } from "./scaffolders";
+import { ScaffoldWorkspace } from "./scaffold-workspace";
 import type { Scaffolder } from "./scaffolders/types";
 
 export { issuerFromPort } from "./detectors/port";
@@ -54,11 +55,6 @@ export type PlannedApp = Readonly<{
    * the scaffold keeps, else the default.
    */
   devPort: number;
-}>;
-
-type ScaffoldStash = Readonly<{
-  root: string;
-  names: ReadonlyArray<string>;
 }>;
 
 /**
@@ -268,24 +264,20 @@ export class Orca {
     // parent it took to create it.
     const created = await mkdir(cwd, { recursive: true });
     const before = await listEntries(cwd);
-    // The underlying scaffolders require an empty directory. When it holds the
-    // local runtime `start` left, or --force lets us scaffold into a non-empty
-    // one, move the existing entries aside, scaffold, then restore anything the
-    // scaffold did not create itself.
-    const stash = await stashScaffoldDir(cwd, target.entries);
+    const workspace = await ScaffoldWorkspace.open(cwd, target.entries);
     const undo = () => {
       return created === undefined
-        ? undoScaffold(cwd, before, stash)
+        ? undoScaffold(cwd, before, workspace)
         : rm(created, { recursive: true, force: true });
     };
     // Starting from a resolved promise puts the scaffolder lookup, which throws
     // for an unknown framework, under the same undo as the scaffold itself.
     const facts = await Promise.resolve()
       .then(() => {
-        return this.scaffolderFor(framework).scaffold(cwd, framework);
+        return this.scaffolderFor(framework).scaffold(workspace?.work ?? cwd, framework);
       })
       .then(() => {
-        return restoreBesideScaffold(cwd, stash);
+        return workspace?.moveInto(cwd);
       })
       .then(() => {
         return this.detect(cwd, framework);
@@ -297,8 +289,8 @@ export class Orca {
     return {
       facts,
       undo,
-      keep: () => {
-        return dropStash(stash);
+      keep: async () => {
+        await workspace?.drop();
       },
     };
   }
@@ -480,63 +472,6 @@ async function isLocalRuntimeEntry(
   return false;
 }
 
-async function stashScaffoldDir(
-  cwd: string,
-  names: ReadonlyArray<string>,
-): Promise<ScaffoldStash | undefined> {
-  if (names.length === 0) {
-    return undefined;
-  }
-
-  const root = join(
-    dirname(cwd),
-    `.${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
-  );
-  await mkdir(root, { mode: 0o700 });
-  const moved: string[] = [];
-  try {
-    for (const name of names) {
-      await rename(join(cwd, name), join(root, name));
-      moved.push(name);
-    }
-  } catch (error) {
-    // Put back what already moved, so a stash that fails halfway leaves the
-    // directory as it was rather than stranding entries in the stash.
-    for (const name of moved) {
-      await rename(join(root, name), join(cwd, name));
-    }
-    await rm(root, { recursive: true, force: true });
-    throw error;
-  }
-  return { root, names };
-}
-
-/**
- * Moves back each stashed entry the scaffold left free. An entry the scaffold
- * created its own file at stays in the stash, so an undo can put it back.
- */
-async function restoreBesideScaffold(cwd: string, stash: ScaffoldStash | undefined): Promise<void> {
-  if (!stash) {
-    return;
-  }
-  for (const name of stash.names) {
-    const dest = join(cwd, name);
-    if (await pathExists(dest)) {
-      // The scaffold created its own file at a stashed name. For `.gitignore`,
-      // union the stashed rules back in so ignores the pre-existing setup
-      // relied on — notably `.zitadel/local/`, which keeps the local admin
-      // credential out of git — are not silently dropped. Any other collision
-      // keeps the scaffold's version (that is what `--force` is for).
-      if (name === ".gitignore") {
-        await mergeGitignore(join(stash.root, name), dest);
-      }
-    } else {
-      // The scaffold left this name free; restore the pre-existing entry.
-      await rename(join(stash.root, name), dest);
-    }
-  }
-}
-
 /**
  * What a directory holds: each entry, with the entries inside it when it is a
  * directory, so an undo can tell what was added since.
@@ -557,18 +492,18 @@ async function listEntries(cwd: string): Promise<DirectoryListing> {
 /**
  * Puts `cwd` back to `before`: removes what the scaffold and anything after
  * it added, including entries added inside a directory `cwd` already held,
- * then moves back what is still in the stash, which the scaffold replaced or
+ * then moves back what is still in the backup, which the scaffold replaced or
  * a failure kept from coming back.
  */
 async function undoScaffold(
   cwd: string,
   before: DirectoryListing,
-  stash: ScaffoldStash | undefined,
+  workspace: ScaffoldWorkspace | undefined,
 ): Promise<void> {
-  const stashed = new Set(stash ? await readdir(stash.root) : []);
+  const replaced = new Set(await workspace?.replaced());
   for (const entry of await readdir(cwd)) {
     const inside = before.get(entry);
-    if (!before.has(entry) || stashed.has(entry)) {
+    if (!before.has(entry) || replaced.has(entry)) {
       await rm(join(cwd, entry), { recursive: true, force: true });
     } else if (inside !== undefined) {
       for (const child of await readdir(join(cwd, entry))) {
@@ -578,33 +513,6 @@ async function undoScaffold(
       }
     }
   }
-  if (stash) {
-    for (const name of stashed) {
-      await rename(join(stash.root, name), join(cwd, name));
-    }
-  }
-  await dropStash(stash);
-}
-
-async function dropStash(stash: ScaffoldStash | undefined): Promise<void> {
-  if (stash) {
-    await rm(stash.root, { recursive: true, force: true });
-  }
-}
-
-/** Append any lines from the stashed `.gitignore` that the scaffold's own one lacks. */
-async function mergeGitignore(stashed: string, dest: string): Promise<void> {
-  const [from, into] = await Promise.all([readFile(stashed, "utf8"), readFile(dest, "utf8")]);
-  const present = new Set(
-    into.split("\n").map((line) => {
-      return line.trim();
-    }),
-  );
-  const missing = from.split("\n").filter((line) => {
-    return line.trim() && !present.has(line.trim());
-  });
-  if (missing.length === 0) {
-    return;
-  }
-  await writeFile(dest, `${into}${into.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
+  await workspace?.restoreInto(cwd);
+  await workspace?.drop();
 }

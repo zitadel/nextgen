@@ -109,8 +109,6 @@ func (s applicationStatements) CreateApplication(ctx context.Context, entity *do
 		).Scan(&entity.UpdatedAt); err != nil {
 			return wrapError(err)
 		}
-		// pgx scans timestamptz in Local; reads normalize to UTC.
-		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		entity.Document = document
 		if err := insertApplicationClients(ctx, tx, clients, entity.UpdatedAt); err != nil {
 			return err
@@ -149,7 +147,6 @@ func (s applicationStatements) ReviseApplication(ctx context.Context, entity *do
 		).Scan(&updatedAt); err != nil {
 			return idpconnection.ReviseNotFound(wrapError(err))
 		}
-		updatedAt = updatedAt.UTC()
 		if err := insertApplicationClients(ctx, tx, clients, updatedAt); err != nil {
 			return err
 		}
@@ -196,7 +193,6 @@ func (s applicationStatements) getOne(ctx context.Context, filter database.Filte
 		if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.IsDeclared, &entity.RevisionID, &entity.Document, &entity.CreatedAt, &entity.UpdatedAt); err != nil {
 			return nil, err
 		}
-		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		return entity, nil
 	})
 	if err != nil {
@@ -244,7 +240,6 @@ func (s applicationStatements) CreateApplicationClientSecret(ctx context.Context
 	).Scan(&secret.CreatedAt); err != nil {
 		return wrapError(err)
 	}
-	secret.CreatedAt = secret.CreatedAt.UTC()
 	return nil
 }
 
@@ -259,7 +254,6 @@ func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context,
 		if err := row.Scan(&secret.ProjectID, &secret.ID, &secret.ApplicationClientID, &secret.SecretHash, &secret.CreatedAt); err != nil {
 			return nil, err
 		}
-		secret.CreatedAt = secret.CreatedAt.UTC()
 		return secret, nil
 	})
 	if err != nil {
@@ -314,6 +308,5 @@ func scanApplicationClient(row pgx.CollectableRow) (*domain.ApplicationClient, e
 	if err := row.Scan(&client.ProjectID, &client.ApplicationID, &client.ID, &client.Slug, &client.ClientID, &client.CreatedAt); err != nil {
 		return nil, err
 	}
-	client.CreatedAt = client.CreatedAt.UTC()
 	return client, nil
 }

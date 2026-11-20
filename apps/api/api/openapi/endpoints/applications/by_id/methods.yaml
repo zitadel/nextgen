@@ -13,6 +13,7 @@ get:
   security:
     - oauth2:
         - application.read
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/application-id.yaml

@@ -1,16 +1,11 @@
 import { EllipsisVertical, GitCommitHorizontal } from "lucide-react";
 import { useState } from "react";
 import { DeploySheet } from "@/features/deployments/components/deploy-sheet";
+import { DetailAccordion, DetailAccordionItem } from "@/components/detail-accordion";
 import { DETAIL_VALUE, DetailRow, DetailRows, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { RevokeReleaseDialog } from "@/features/deployments/components/revoke-release-dialog";
 import { RollbackSheet } from "@/features/deployments/components/rollback-sheet";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,32 +102,16 @@ export function ReleaseActions({
 export function PointerGroupSection({ group }: { group: PointerGroup }) {
   return (
     <DetailRow align="control" label={<h3>{group.label}</h3>}>
-      <Accordion type="multiple" className="min-w-0 flex-1">
-        {/* 12px above and below the rule between rows, a 48px row pitch as the
-            frame draws it; the rule between groups is `DetailRows`'. */}
+      <DetailAccordion>
         {group.pointers.map((pointer) => (
-          <AccordionItem
+          <DetailAccordionItem
             key={pointer.revisionId}
             value={pointer.revisionId}
-            className="py-3 first:pt-0 last:pb-0"
-          >
-            {/* 24px: a 20px line with 2px above and below, so the row's text
-                sits level with the group's label. The shared trigger underlines
-                on hover and tops its chevron on the first line of a wrapped
-                label; this row is one line, centred. `min-w-0` lets the row
-                shrink below the pill's text, which is what makes the pill
-                truncate on a phone instead of pushing the chevron off the card. */}
-            <AccordionTrigger
-              level={4}
-              className="min-w-0 items-center py-0.5 hover:no-underline [&>svg]:translate-y-0"
-            >
-              {/* The literal space is for the accessible name: a flex row drops it
-                  visually, and without it the row reads "Customersch_1". */}
-              <span className="flex min-w-0 flex-wrap items-center gap-2">
-                {/* The shared trigger is medium; the frame sets the name regular. */}
-                <span className="text-sm leading-5 font-normal text-foreground">
-                  {pointer.name}
-                </span>{" "}
+            title={
+              <>
+                {/* The literal space is for the accessible name: a flex row drops it
+                    visually, and without it the row reads "Customersch_1". */}
+                <span>{pointer.name}</span>{" "}
                 {/* The commit glyph says the id names one revision of the
                     resource, not that the revision is in any state. A schema's
                     revision id can be a URL the operator authored; the badge
@@ -143,25 +122,24 @@ export function PointerGroupSection({ group }: { group: PointerGroup }) {
                   <GitCommitHorizontal aria-hidden="true" />
                   <span className="truncate">{pointer.revisionId}</span>
                 </Badge>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent className="flex flex-col gap-4 pt-4 pb-4">
-              {pointer.document === undefined ? (
-                <p className="text-sm text-muted-foreground">
-                  This revision could not be read, so its document cannot be shown.
-                </p>
-              ) : (
-                <>
-                  {pointer.settings?.length ? (
-                    <PolicySettingsRows settings={pointer.settings} />
-                  ) : null}
-                  <DocumentViewer document={pointer.document} noun={group.noun} />
-                </>
-              )}
-            </AccordionContent>
-          </AccordionItem>
+              </>
+            }
+          >
+            {pointer.document === undefined ? (
+              <p className="text-sm text-muted-foreground">
+                This revision could not be read, so its document cannot be shown.
+              </p>
+            ) : (
+              <>
+                {pointer.settings?.length ? (
+                  <PolicySettingsRows settings={pointer.settings} />
+                ) : null}
+                <DocumentViewer document={pointer.document} noun={group.noun} />
+              </>
+            )}
+          </DetailAccordionItem>
         ))}
-      </Accordion>
+      </DetailAccordion>
     </DetailRow>
   );
 }

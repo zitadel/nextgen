@@ -1,9 +1,10 @@
-import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
 import {
+  entryExists,
   isFile,
   pathExists,
   pathExistsStrict,
@@ -121,5 +122,21 @@ describe("isFile", () => {
 
   it("is false for a path that does not exist", async ({ dir }) => {
     expect(await isFile(join(dir, "missing"))).toBe(false);
+  });
+});
+
+describe("entryExists", () => {
+  it("counts a link whose target is missing as an entry", async ({ dir }) => {
+    await symlink(join(dir, "missing"), join(dir, "dangling"));
+
+    expect(await entryExists(join(dir, "dangling"))).toBe(true);
+    expect(await pathExists(join(dir, "dangling"))).toBe(false);
+  });
+
+  it("is false for a missing path and true for a file", async ({ dir }) => {
+    await writeFile(join(dir, "a.txt"), "x");
+
+    expect(await entryExists(join(dir, "a.txt"))).toBe(true);
+    expect(await entryExists(join(dir, "missing"))).toBe(false);
   });
 });

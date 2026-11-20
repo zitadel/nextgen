@@ -59,7 +59,6 @@ func ToDomain(projectID, id string, createdAt time.Time, definition []byte) (*do
 		Theme:          def.Theme,
 		Typography:     def.Typography,
 		Shape:          def.Shape,
-		// Spanner returns UTC while pgx defaults to local; normalize to UTC.
-		CreatedAt: createdAt.UTC(),
+		CreatedAt:      createdAt,
 	}, nil
 }
