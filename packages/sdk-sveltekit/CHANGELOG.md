@@ -1,5 +1,13 @@
 # @zitadel/sdk-sveltekit
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [[`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c), [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d), [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1)]:
+  - @zitadel/api@0.8.0
+  - @zitadel/sdk-core@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes
