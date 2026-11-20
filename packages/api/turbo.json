@@ -14,8 +14,11 @@
     "build": {
       "dependsOn": ["generate"]
     },
+    // The OpenAPI lint test reads the spec sources, the vacuum ruleset, the
+    // ignore file and the baseline outside the package, and runs a container.
     "test": {
-      "dependsOn": ["generate"]
+      "dependsOn": ["generate"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/apps/api/api/openapi/**"]
     }
   }
 }
