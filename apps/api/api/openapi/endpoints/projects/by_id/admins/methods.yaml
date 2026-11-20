@@ -35,13 +35,13 @@ get:
   tags:
     - Projects
   parameters:
-    - $ref: ../../../../components/parameters/limit.yaml
-    - $ref: ../../../../components/parameters/page-token.yaml
     - name: project_id
       in: path
       required: true
       schema:
         $ref: ../../../../components/schemas/project-id.yaml
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
   security:
     - oauth2:
         # project.write, not project.read: project.read is carried by the
@@ -56,6 +56,18 @@ get:
         application/json:
           schema:
             $ref: list-project-admins-response.yaml
+          example:
+            admins:
+              - user:
+                  user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  identifier: ada@example.com
+                  identifier_property: email
+                  display: Ada Lovelace
+                sources:
+                  - type: owning_team
+                    team:
+                      team_id: team_01KZZY8PX8K8ATNVDSMRCZY4N1
+            next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
     '400':
       description: The page token is not valid. Send the `next_page_token` from the previous response unchanged.
       content:

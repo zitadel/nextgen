@@ -38,6 +38,14 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 		return nil
 
 	case *AcceptInvitationBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -50,6 +58,14 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 		return nil
 
 	case *AcceptInvitationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -62,6 +78,14 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 		return nil
 
 	case *AcceptInvitationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -74,6 +98,14 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 		return nil
 
 	case *AcceptInvitationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -86,6 +118,14 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 		return nil
 
 	case *AcceptInvitationConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -98,6 +138,14 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 		return nil
 
 	case *AcceptInvitationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -148,6 +196,14 @@ func encodeAddProjectOriginResponse(response AddProjectOriginRes, w http.Respons
 		return nil
 
 	case *AddProjectOriginErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -238,6 +294,14 @@ func encodeBuildReleaseResponse(response BuildReleaseRes, w http.ResponseWriter,
 		return nil
 
 	case *BuildReleaseErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -273,6 +337,14 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 		return nil
 
 	case *CancelInvitationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -285,6 +357,14 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 		return nil
 
 	case *CancelInvitationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -297,6 +377,14 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 		return nil
 
 	case *CancelInvitationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -309,6 +397,14 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 		return nil
 
 	case *CancelInvitationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -359,6 +455,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 		return nil
 
 	case *CompleteProjectClaimBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -371,6 +475,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -383,6 +495,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 		return nil
 
 	case *CompleteProjectClaimForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -395,6 +515,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 		return nil
 
 	case *CompleteProjectClaimNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -427,6 +555,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 		return nil
 
 	case *CompleteProjectClaimGone:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
 
@@ -439,6 +575,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 		return nil
 
 	case *CompleteProjectClaimTooManyRequests:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -451,6 +595,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 		return nil
 
 	case *CompleteProjectClaimErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -481,6 +633,14 @@ func encodeCompleteProjectClaimResponse(response CompleteProjectClaimRes, w http
 func encodeCompleteUserPasskeyRegistrationResponse(response CompleteUserPasskeyRegistrationRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *FinishUserPasskeyRegistrationResponse:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
 
@@ -493,6 +653,14 @@ func encodeCompleteUserPasskeyRegistrationResponse(response CompleteUserPasskeyR
 		return nil
 
 	case *CompleteUserPasskeyRegistrationBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -505,6 +673,14 @@ func encodeCompleteUserPasskeyRegistrationResponse(response CompleteUserPasskeyR
 		return nil
 
 	case *CompleteUserPasskeyRegistrationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -517,6 +693,14 @@ func encodeCompleteUserPasskeyRegistrationResponse(response CompleteUserPasskeyR
 		return nil
 
 	case *CompleteUserPasskeyRegistrationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -529,6 +713,14 @@ func encodeCompleteUserPasskeyRegistrationResponse(response CompleteUserPasskeyR
 		return nil
 
 	case *CompleteUserPasskeyRegistrationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -581,6 +773,14 @@ func encodeCompleteUserPasskeyRegistrationResponse(response CompleteUserPasskeyR
 		return nil
 
 	case *CompleteUserPasskeyRegistrationInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -594,6 +794,14 @@ func encodeCompleteUserPasskeyRegistrationResponse(response CompleteUserPasskeyR
 		return nil
 
 	case *CompleteUserPasskeyRegistrationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -644,6 +852,14 @@ func encodeCreateAuthAttemptResponse(response CreateAuthAttemptRes, w http.Respo
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -656,6 +872,14 @@ func encodeCreateAuthAttemptResponse(response CreateAuthAttemptRes, w http.Respo
 		return nil
 
 	case *CreateAuthAttemptErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -706,6 +930,14 @@ func encodeCreateAuthAttemptChallengeResponse(response CreateAuthAttemptChalleng
 		return nil
 
 	case *CreateAuthAttemptChallengeErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -736,6 +968,14 @@ func encodeCreateAuthAttemptChallengeResponse(response CreateAuthAttemptChalleng
 func encodeCreateAuthAttemptHandoffResponse(response CreateAuthAttemptHandoffRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *HandoffResponse:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 
@@ -748,6 +988,14 @@ func encodeCreateAuthAttemptHandoffResponse(response CreateAuthAttemptHandoffRes
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -760,6 +1008,14 @@ func encodeCreateAuthAttemptHandoffResponse(response CreateAuthAttemptHandoffRes
 		return nil
 
 	case *CreateAuthAttemptHandoffErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -850,6 +1106,14 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 		return nil
 
 	case *CreateDeploymentForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -862,6 +1126,14 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 		return nil
 
 	case *CreateDeploymentNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -894,6 +1166,14 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 		return nil
 
 	case *CreateDeploymentErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -988,6 +1268,14 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateFlowBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1000,6 +1288,14 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateFlowForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -1012,6 +1308,14 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateFlowConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -1024,6 +1328,14 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateFlowErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1079,6 +1391,14 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *CreateGrantBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1091,6 +1411,14 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *CreateGrantUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -1103,6 +1431,14 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *CreateGrantForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -1115,6 +1451,14 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *CreateGrantNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -1127,6 +1471,14 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *CreateGrantConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -1139,6 +1491,14 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *CreateGrantTooManyRequests:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -1151,6 +1511,14 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *CreateGrantErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1201,6 +1569,14 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		return nil
 
 	case *CreateInvitationBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1213,6 +1589,14 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		return nil
 
 	case *CreateInvitationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -1225,6 +1609,14 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		return nil
 
 	case *CreateInvitationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -1237,6 +1629,14 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		return nil
 
 	case *CreateInvitationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -1249,6 +1649,14 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		return nil
 
 	case *CreateInvitationConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -1261,6 +1669,14 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		return nil
 
 	case *NotImplemented:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(501)
 		span.SetStatus(codes.Error, http.StatusText(501))
@@ -1274,6 +1690,14 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		return nil
 
 	case *CreateInvitationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1324,6 +1748,14 @@ func encodeCreateProjectResponse(response CreateProjectRes, w http.ResponseWrite
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -1336,6 +1768,14 @@ func encodeCreateProjectResponse(response CreateProjectRes, w http.ResponseWrite
 		return nil
 
 	case *CreateProjectErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1386,6 +1826,14 @@ func encodeCreateProjectClaimResponse(response CreateProjectClaimRes, w http.Res
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -1398,6 +1846,14 @@ func encodeCreateProjectClaimResponse(response CreateProjectClaimRes, w http.Res
 		return nil
 
 	case *ProjNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -1430,6 +1886,14 @@ func encodeCreateProjectClaimResponse(response CreateProjectClaimRes, w http.Res
 		return nil
 
 	case *ProjClaimWindowExpired:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
 
@@ -1442,6 +1906,14 @@ func encodeCreateProjectClaimResponse(response CreateProjectClaimRes, w http.Res
 		return nil
 
 	case *CreateProjectClaimErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1512,6 +1984,14 @@ func encodeCreateReleaseResponse(response CreateReleaseRes, w http.ResponseWrite
 		return nil
 
 	case *CreateReleaseErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1579,6 +2059,14 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1591,6 +2079,14 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 		return nil
 
 	case *CreateSessionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1641,6 +2137,14 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateTeamBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1653,6 +2157,14 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateTeamUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -1665,6 +2177,14 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateTeamForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -1677,6 +2197,14 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateTeamNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -1689,6 +2217,14 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateTeamConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -1701,6 +2237,14 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateTeamTooManyRequests:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -1713,6 +2257,14 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateTeamErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1763,6 +2315,14 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateUserBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1775,6 +2335,14 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateUserUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -1787,6 +2355,14 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateUserForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -1799,6 +2375,14 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateUserConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -1811,6 +2395,14 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateUserInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -1824,6 +2416,14 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *CreateUserErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1854,6 +2454,14 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 func encodeCreateUserPasskeyRegistrationResponse(response CreateUserPasskeyRegistrationRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *BeginUserPasskeyRegistrationResponse:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
 
@@ -1866,6 +2474,14 @@ func encodeCreateUserPasskeyRegistrationResponse(response CreateUserPasskeyRegis
 		return nil
 
 	case *CreateUserPasskeyRegistrationBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1878,6 +2494,14 @@ func encodeCreateUserPasskeyRegistrationResponse(response CreateUserPasskeyRegis
 		return nil
 
 	case *CreateUserPasskeyRegistrationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -1890,6 +2514,14 @@ func encodeCreateUserPasskeyRegistrationResponse(response CreateUserPasskeyRegis
 		return nil
 
 	case *CreateUserPasskeyRegistrationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -1902,6 +2534,14 @@ func encodeCreateUserPasskeyRegistrationResponse(response CreateUserPasskeyRegis
 		return nil
 
 	case *CreateUserPasskeyRegistrationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -1914,6 +2554,14 @@ func encodeCreateUserPasskeyRegistrationResponse(response CreateUserPasskeyRegis
 		return nil
 
 	case *CreateUserPasskeyRegistrationInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -1927,6 +2575,14 @@ func encodeCreateUserPasskeyRegistrationResponse(response CreateUserPasskeyRegis
 		return nil
 
 	case *CreateUserPasskeyRegistrationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1962,6 +2618,14 @@ func encodeDeactivateTeamResponse(response DeactivateTeamRes, w http.ResponseWri
 		return nil
 
 	case *DeactivateTeamBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -1974,6 +2638,14 @@ func encodeDeactivateTeamResponse(response DeactivateTeamRes, w http.ResponseWri
 		return nil
 
 	case *DeactivateTeamUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -1986,6 +2658,14 @@ func encodeDeactivateTeamResponse(response DeactivateTeamRes, w http.ResponseWri
 		return nil
 
 	case *DeactivateTeamForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -1998,6 +2678,14 @@ func encodeDeactivateTeamResponse(response DeactivateTeamRes, w http.ResponseWri
 		return nil
 
 	case *DeactivateTeamConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -2010,6 +2698,14 @@ func encodeDeactivateTeamResponse(response DeactivateTeamRes, w http.ResponseWri
 		return nil
 
 	case *DeactivateTeamErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2045,6 +2741,14 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *DeleteGrantUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -2057,6 +2761,14 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *DeleteGrantForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -2069,6 +2781,14 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *DeleteGrantNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2081,6 +2801,14 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 		return nil
 
 	case *DeleteGrantErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2116,6 +2844,14 @@ func encodeDeleteUserResponse(response DeleteUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *DeleteUserUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -2128,6 +2864,14 @@ func encodeDeleteUserResponse(response DeleteUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *DeleteUserNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2140,6 +2884,14 @@ func encodeDeleteUserResponse(response DeleteUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *DeleteUserConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -2152,6 +2904,14 @@ func encodeDeleteUserResponse(response DeleteUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *DeleteUserErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2187,6 +2947,14 @@ func encodeDeleteVariableResponse(response DeleteVariableRes, w http.ResponseWri
 		return nil
 
 	case *DeleteVariableErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2229,6 +2997,14 @@ func encodeEvaluatePolicyResponse(response EvaluatePolicyRes, w http.ResponseWri
 		return nil
 
 	case *EvaluatePolicyErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2296,6 +3072,14 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 		return nil
 
 	case *ExchangeHandoffBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -2308,6 +3092,14 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 		return nil
 
 	case *ExchangeHandoffUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -2320,6 +3112,14 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 		return nil
 
 	case *ExchangeHandoffForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -2332,6 +3132,14 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 		return nil
 
 	case *ExchangeHandoffConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -2344,6 +3152,14 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 		return nil
 
 	case *ExchangeHandoffErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2394,6 +3210,14 @@ func encodeGetApplicationResponse(response GetApplicationRes, w http.ResponseWri
 		return nil
 
 	case *GetApplicationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -2406,6 +3230,14 @@ func encodeGetApplicationResponse(response GetApplicationRes, w http.ResponseWri
 		return nil
 
 	case *GetApplicationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -2418,6 +3250,14 @@ func encodeGetApplicationResponse(response GetApplicationRes, w http.ResponseWri
 		return nil
 
 	case *GetApplicationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2430,6 +3270,14 @@ func encodeGetApplicationResponse(response GetApplicationRes, w http.ResponseWri
 		return nil
 
 	case *GetApplicationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2480,6 +3328,14 @@ func encodeGetAuthAttemptResponse(response GetAuthAttemptRes, w http.ResponseWri
 		return nil
 
 	case *GetAuthAttemptErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2530,6 +3386,14 @@ func encodeGetBrandingResponse(response GetBrandingRes, w http.ResponseWriter, s
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2542,6 +3406,14 @@ func encodeGetBrandingResponse(response GetBrandingRes, w http.ResponseWriter, s
 		return nil
 
 	case *GetBrandingErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2592,6 +3464,14 @@ func encodeGetDeploymentResponse(response GetDeploymentRes, w http.ResponseWrite
 		return nil
 
 	case *GetDeploymentErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2642,6 +3522,14 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetEventUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -2654,6 +3542,14 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetEventForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -2666,6 +3562,14 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetEventNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2678,6 +3582,14 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetEventErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2728,6 +3640,14 @@ func encodeGetFlowDefinitionResponse(response GetFlowDefinitionRes, w http.Respo
 		return nil
 
 	case *GetFlowDefinitionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2822,6 +3742,14 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 		return nil
 
 	case *GetFlowStepNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2834,6 +3762,14 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 		return nil
 
 	case *GetFlowStepConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -2846,6 +3782,14 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 		return nil
 
 	case *GetFlowStepGone:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
 
@@ -2898,6 +3842,14 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 		return nil
 
 	case *GetFlowStepErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2948,6 +3900,14 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetGrantUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -2960,6 +3920,14 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetGrantForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -2972,6 +3940,14 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetGrantNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -2984,6 +3960,14 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetGrantErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3034,6 +4018,14 @@ func encodeGetIdpResponse(response GetIdpRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *GetIdpUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -3046,6 +4038,14 @@ func encodeGetIdpResponse(response GetIdpRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *GetIdpForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -3058,6 +4058,14 @@ func encodeGetIdpResponse(response GetIdpRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *GetIdpNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -3070,6 +4078,14 @@ func encodeGetIdpResponse(response GetIdpRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *GetIdpErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3120,6 +4136,14 @@ func encodeGetIdpRevisionResponse(response GetIdpRevisionRes, w http.ResponseWri
 		return nil
 
 	case *GetIdpRevisionUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -3132,6 +4156,14 @@ func encodeGetIdpRevisionResponse(response GetIdpRevisionRes, w http.ResponseWri
 		return nil
 
 	case *GetIdpRevisionForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -3144,6 +4176,14 @@ func encodeGetIdpRevisionResponse(response GetIdpRevisionRes, w http.ResponseWri
 		return nil
 
 	case *GetIdpRevisionNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -3156,6 +4196,14 @@ func encodeGetIdpRevisionResponse(response GetIdpRevisionRes, w http.ResponseWri
 		return nil
 
 	case *GetIdpRevisionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3206,6 +4254,14 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 		return nil
 
 	case *GetInvitationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -3218,6 +4274,14 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 		return nil
 
 	case *GetInvitationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -3230,6 +4294,14 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 		return nil
 
 	case *GetInvitationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -3242,6 +4314,14 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 		return nil
 
 	case *GetInvitationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3286,6 +4366,14 @@ func encodeGetLiveResponse(response GetLiveRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *ErrorDetailsStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3309,6 +4397,14 @@ func encodeGetLiveResponse(response GetLiveRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *GetLiveErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3370,6 +4466,14 @@ func encodeGetMyPasswordStateResponse(response GetMyPasswordStateRes, w http.Res
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -3382,6 +4486,14 @@ func encodeGetMyPasswordStateResponse(response GetMyPasswordStateRes, w http.Res
 		return nil
 
 	case *SessProjectMismatch:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -3394,6 +4506,14 @@ func encodeGetMyPasswordStateResponse(response GetMyPasswordStateRes, w http.Res
 		return nil
 
 	case *GetMyPasswordStateErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3463,6 +4583,14 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 		return nil
 
 	case *AuthUnauthorizedHeaders:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		// Encoding response headers.
 		{
@@ -3494,6 +4622,14 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 		return nil
 
 	case *SessProjectMismatchHeaders:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		// Encoding response headers.
 		{
@@ -3525,6 +4661,14 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 		return nil
 
 	case *SessNotFoundHeaders:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		// Encoding response headers.
 		{
@@ -3556,6 +4700,14 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 		return nil
 
 	case *GetMySessionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3586,6 +4738,14 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *CsrfTokenResponseHeaders:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		// Encoding response headers.
 		{
@@ -3617,6 +4777,14 @@ func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w ht
 		return nil
 
 	case *AuthUnauthorizedHeaders:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		// Encoding response headers.
 		{
@@ -3648,6 +4816,14 @@ func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w ht
 		return nil
 
 	case *SessProjectMismatchHeaders:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		// Encoding response headers.
 		{
@@ -3679,6 +4855,14 @@ func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w ht
 		return nil
 
 	case *GetMySessionCsrfTokenErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3729,6 +4913,14 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -3741,6 +4933,14 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 		return nil
 
 	case *SessProjectMismatch:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -3753,6 +4953,14 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 		return nil
 
 	case *UserNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -3765,6 +4973,14 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 		return nil
 
 	case *GetMyUserErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3834,6 +5050,14 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -3846,6 +5070,14 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 		return nil
 
 	case *SessProjectMismatch:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -3858,6 +5090,14 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 		return nil
 
 	case *UserNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -3870,6 +5110,14 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 		return nil
 
 	case *GetMyUserSchemaErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3912,6 +5160,14 @@ func encodeGetOAuthSettingsResponse(response GetOAuthSettingsRes, w http.Respons
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -3924,6 +5180,14 @@ func encodeGetOAuthSettingsResponse(response GetOAuthSettingsRes, w http.Respons
 		return nil
 
 	case *GetOAuthSettingsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3974,6 +5238,14 @@ func encodeGetPolicyResponse(response GetPolicyRes, w http.ResponseWriter, span 
 		return nil
 
 	case *GetPolicyErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4024,6 +5296,14 @@ func encodeGetPolicyRevisionResponse(response GetPolicyRevisionRes, w http.Respo
 		return nil
 
 	case *GetPolicyRevisionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4074,6 +5354,14 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetProjectUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -4086,6 +5374,14 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetProjectNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -4098,6 +5394,14 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetProjectErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4148,6 +5452,14 @@ func encodeGetProjectClaimStatusResponse(response GetProjectClaimStatusRes, w ht
 		return nil
 
 	case *GetProjectClaimStatusUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -4160,6 +5472,14 @@ func encodeGetProjectClaimStatusResponse(response GetProjectClaimStatusRes, w ht
 		return nil
 
 	case *ProjPermissionDenied:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -4172,6 +5492,14 @@ func encodeGetProjectClaimStatusResponse(response GetProjectClaimStatusRes, w ht
 		return nil
 
 	case *GetProjectClaimStatusNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -4184,6 +5512,14 @@ func encodeGetProjectClaimStatusResponse(response GetProjectClaimStatusRes, w ht
 		return nil
 
 	case *GetProjectClaimStatusGone:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
 
@@ -4196,6 +5532,14 @@ func encodeGetProjectClaimStatusResponse(response GetProjectClaimStatusRes, w ht
 		return nil
 
 	case *GetProjectClaimStatusTooManyRequests:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -4208,6 +5552,14 @@ func encodeGetProjectClaimStatusResponse(response GetProjectClaimStatusRes, w ht
 		return nil
 
 	case *GetProjectClaimStatusErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4250,6 +5602,14 @@ func encodeGetProjectClaimWindowResponse(response GetProjectClaimWindowRes, w ht
 		return nil
 
 	case *GetProjectClaimWindowNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -4262,6 +5622,14 @@ func encodeGetProjectClaimWindowResponse(response GetProjectClaimWindowRes, w ht
 		return nil
 
 	case *GetProjectClaimWindowTooManyRequests:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -4274,6 +5642,14 @@ func encodeGetProjectClaimWindowResponse(response GetProjectClaimWindowRes, w ht
 		return nil
 
 	case *GetProjectClaimWindowErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4333,6 +5709,14 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *ErrorDetailsStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4356,6 +5740,14 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 		return nil
 
 	case *GetReadyErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4406,6 +5798,14 @@ func encodeGetReleaseResponse(response GetReleaseRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetReleaseErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4456,6 +5856,14 @@ func encodeGetSchemaResponse(response GetSchemaRes, w http.ResponseWriter, span 
 		return nil
 
 	case *GetSchemaErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4506,6 +5914,14 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetSessionUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -4518,6 +5934,14 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetSessionForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -4530,6 +5954,14 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetSessionNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -4542,6 +5974,14 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 		return nil
 
 	case *GetSessionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4592,6 +6032,14 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *GetTeamUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -4604,6 +6052,14 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *GetTeamNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -4616,6 +6072,14 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *GetTeamErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4666,6 +6130,14 @@ func encodeGetUserResponse(response GetUserRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *GetUserUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -4678,6 +6150,14 @@ func encodeGetUserResponse(response GetUserRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *GetUserNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -4690,6 +6170,14 @@ func encodeGetUserResponse(response GetUserRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *GetUserErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4732,6 +6220,14 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 		return nil
 
 	case *GetUserPasswordStateUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -4744,6 +6240,14 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 		return nil
 
 	case *GetUserPasswordStateForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -4756,6 +6260,14 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 		return nil
 
 	case *GetUserPasswordStateNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -4768,6 +6280,14 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 		return nil
 
 	case *GetUserPasswordStateInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -4781,6 +6301,14 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 		return nil
 
 	case *GetUserPasswordStateErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4831,6 +6359,14 @@ func encodeGetVariableResponse(response GetVariableRes, w http.ResponseWriter, s
 		return nil
 
 	case *GetVariableErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4881,6 +6417,14 @@ func encodeListBrandingResponse(response ListBrandingRes, w http.ResponseWriter,
 		return nil
 
 	case *ListBrandingErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4931,6 +6475,14 @@ func encodeListDeploymentVariablesResponse(response ListDeploymentVariablesRes, 
 		return nil
 
 	case *ListDeploymentVariablesErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4981,6 +6533,14 @@ func encodeListDeploymentsResponse(response ListDeploymentsRes, w http.ResponseW
 		return nil
 
 	case *ListDeploymentsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5031,6 +6591,14 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *ListEventsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5043,6 +6611,14 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *ListEventsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5055,6 +6631,14 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *ListEventsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5067,6 +6651,14 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *ListEventsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5117,6 +6709,14 @@ func encodeListFlowDefinitionsResponse(response ListFlowDefinitionsRes, w http.R
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5129,6 +6729,14 @@ func encodeListFlowDefinitionsResponse(response ListFlowDefinitionsRes, w http.R
 		return nil
 
 	case *ListFlowDefinitionsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5179,6 +6787,14 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 		return nil
 
 	case *ListIdpRevisionsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5191,6 +6807,14 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 		return nil
 
 	case *ListIdpRevisionsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5203,6 +6827,14 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 		return nil
 
 	case *ListIdpRevisionsNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -5215,6 +6847,14 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 		return nil
 
 	case *ListIdpRevisionsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5265,6 +6905,14 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 		return nil
 
 	case *ListInvitationsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5277,6 +6925,14 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 		return nil
 
 	case *ListInvitationsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5289,6 +6945,14 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 		return nil
 
 	case *ListInvitationsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5301,6 +6965,14 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 		return nil
 
 	case *ListInvitationsNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -5313,6 +6985,14 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 		return nil
 
 	case *ListInvitationsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5382,6 +7062,14 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5394,6 +7082,14 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5406,6 +7102,14 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 		return nil
 
 	case *SessProjectMismatch:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5418,6 +7122,14 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 		return nil
 
 	case *ListMyIdentityLinksErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5487,6 +7199,14 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5499,6 +7219,14 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5511,6 +7239,14 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 		return nil
 
 	case *SessProjectMismatch:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5523,6 +7259,14 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 		return nil
 
 	case *ListMyPasskeysErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5592,6 +7336,14 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 		return nil
 
 	case *ListMyProjectsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5604,6 +7356,14 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5616,6 +7376,14 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 		return nil
 
 	case *SessProjectMismatch:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5628,6 +7396,14 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 		return nil
 
 	case *ListMyProjectsInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -5641,6 +7417,14 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 		return nil
 
 	case *ListMyProjectsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5710,6 +7494,14 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5722,6 +7514,14 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5734,6 +7534,14 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 		return nil
 
 	case *SessProjectMismatch:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5746,6 +7554,14 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 		return nil
 
 	case *ListMyTeamsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5796,6 +7612,14 @@ func encodeListPoliciesResponse(response ListPoliciesRes, w http.ResponseWriter,
 		return nil
 
 	case *ListPoliciesErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5846,6 +7670,14 @@ func encodeListPolicyRevisionsResponse(response ListPolicyRevisionsRes, w http.R
 		return nil
 
 	case *ListPolicyRevisionsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5896,6 +7728,14 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 		return nil
 
 	case *ListProjectAdminsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -5908,6 +7748,14 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 		return nil
 
 	case *ListProjectAdminsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -5920,6 +7768,14 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 		return nil
 
 	case *ListProjectAdminsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -5932,6 +7788,14 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 		return nil
 
 	case *ListProjectAdminsNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -5944,6 +7808,14 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 		return nil
 
 	case *ListProjectAdminsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5994,6 +7866,14 @@ func encodeListProjectPreviewsResponse(response ListProjectPreviewsRes, w http.R
 		return nil
 
 	case *ListProjectPreviewsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6044,6 +7924,14 @@ func encodeListReleasesResponse(response ListReleasesRes, w http.ResponseWriter,
 		return nil
 
 	case *ListReleasesErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6094,6 +7982,14 @@ func encodeListSchemasResponse(response ListSchemasRes, w http.ResponseWriter, s
 		return nil
 
 	case *ListSchemasErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6144,6 +8040,14 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 		return nil
 
 	case *ListUserIdentityLinksBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6156,6 +8060,14 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 		return nil
 
 	case *ListUserIdentityLinksUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -6168,6 +8080,14 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 		return nil
 
 	case *ListUserIdentityLinksForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -6180,6 +8100,14 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 		return nil
 
 	case *ListUserIdentityLinksNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -6192,6 +8120,14 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 		return nil
 
 	case *ListUserIdentityLinksInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -6205,6 +8141,14 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 		return nil
 
 	case *ListUserIdentityLinksErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6255,6 +8199,14 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 		return nil
 
 	case *ListUserPasskeysBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6267,6 +8219,14 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 		return nil
 
 	case *ListUserPasskeysUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -6279,6 +8239,14 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 		return nil
 
 	case *ListUserPasskeysForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -6291,6 +8259,14 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 		return nil
 
 	case *ListUserPasskeysNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -6303,6 +8279,14 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 		return nil
 
 	case *ListUserPasskeysInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -6316,6 +8300,14 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 		return nil
 
 	case *ListUserPasskeysErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6366,6 +8358,14 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 		return nil
 
 	case *ListUserTeamsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6378,6 +8378,14 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 		return nil
 
 	case *ListUserTeamsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -6390,6 +8398,14 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 		return nil
 
 	case *ListUserTeamsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -6402,6 +8418,14 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 		return nil
 
 	case *ListUserTeamsNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -6414,6 +8438,14 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 		return nil
 
 	case *ListUserTeamsInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -6427,6 +8459,14 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 		return nil
 
 	case *ListUserTeamsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6477,6 +8517,14 @@ func encodeListVariablesResponse(response ListVariablesRes, w http.ResponseWrite
 		return nil
 
 	case *ListVariablesErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6527,6 +8575,14 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 		return nil
 
 	case *LookupInvitationBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6539,6 +8595,14 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 		return nil
 
 	case *LookupInvitationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -6551,6 +8615,14 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 		return nil
 
 	case *LookupInvitationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -6563,6 +8635,14 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 		return nil
 
 	case *LookupInvitationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6633,6 +8713,14 @@ func encodePublishApplicationResponse(response PublishApplicationRes, w http.Res
 		return nil
 
 	case *PublishApplicationBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6645,6 +8733,14 @@ func encodePublishApplicationResponse(response PublishApplicationRes, w http.Res
 		return nil
 
 	case *PublishApplicationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -6657,6 +8753,14 @@ func encodePublishApplicationResponse(response PublishApplicationRes, w http.Res
 		return nil
 
 	case *PublishApplicationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -6669,6 +8773,14 @@ func encodePublishApplicationResponse(response PublishApplicationRes, w http.Res
 		return nil
 
 	case *PublishApplicationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -6681,6 +8793,14 @@ func encodePublishApplicationResponse(response PublishApplicationRes, w http.Res
 		return nil
 
 	case *PublishApplicationConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -6693,6 +8813,14 @@ func encodePublishApplicationResponse(response PublishApplicationRes, w http.Res
 		return nil
 
 	case *PublishApplicationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6743,6 +8871,14 @@ func encodePublishBrandingResponse(response PublishBrandingRes, w http.ResponseW
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6755,6 +8891,14 @@ func encodePublishBrandingResponse(response PublishBrandingRes, w http.ResponseW
 		return nil
 
 	case *PublishBrandingErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6805,6 +8949,14 @@ func encodePublishFlowDefinitionResponse(response PublishFlowDefinitionRes, w ht
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6817,6 +8969,14 @@ func encodePublishFlowDefinitionResponse(response PublishFlowDefinitionRes, w ht
 		return nil
 
 	case *PublishFlowDefinitionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6887,6 +9047,14 @@ func encodePublishIdpResponse(response PublishIdpRes, w http.ResponseWriter, spa
 		return nil
 
 	case *PublishIdpBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -6899,6 +9067,14 @@ func encodePublishIdpResponse(response PublishIdpRes, w http.ResponseWriter, spa
 		return nil
 
 	case *PublishIdpUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -6911,6 +9087,14 @@ func encodePublishIdpResponse(response PublishIdpRes, w http.ResponseWriter, spa
 		return nil
 
 	case *PublishIdpForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -6923,6 +9107,14 @@ func encodePublishIdpResponse(response PublishIdpRes, w http.ResponseWriter, spa
 		return nil
 
 	case *PublishIdpNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -6935,6 +9127,14 @@ func encodePublishIdpResponse(response PublishIdpRes, w http.ResponseWriter, spa
 		return nil
 
 	case *PublishIdpErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6985,6 +9185,14 @@ func encodePublishPolicyResponse(response PublishPolicyRes, w http.ResponseWrite
 		return nil
 
 	case *PublishPolicyErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7035,6 +9243,14 @@ func encodePublishSchemaResponse(response PublishSchemaRes, w http.ResponseWrite
 		return nil
 
 	case *PublishSchemaErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7085,6 +9301,14 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 		return nil
 
 	case *QueryGrantsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -7097,6 +9321,14 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 		return nil
 
 	case *QueryGrantsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7109,6 +9341,14 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 		return nil
 
 	case *QueryGrantsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7121,6 +9361,14 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 		return nil
 
 	case *QueryGrantsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7171,6 +9419,14 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 		return nil
 
 	case *QueryIdpsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -7183,6 +9439,14 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 		return nil
 
 	case *QueryIdpsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7195,6 +9459,14 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 		return nil
 
 	case *QueryIdpsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7207,6 +9479,14 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 		return nil
 
 	case *QueryIdpsNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -7219,6 +9499,14 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 		return nil
 
 	case *QueryIdpsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7269,6 +9557,14 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 		return nil
 
 	case *QueryProjectsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -7281,6 +9577,14 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 		return nil
 
 	case *QueryProjectsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7293,6 +9597,14 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 		return nil
 
 	case *QueryProjectsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7305,6 +9617,14 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 		return nil
 
 	case *QueryProjectsTooManyRequests:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -7317,6 +9637,14 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 		return nil
 
 	case *QueryProjectsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7367,6 +9695,14 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 		return nil
 
 	case *QuerySessionsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -7379,6 +9715,14 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 		return nil
 
 	case *QuerySessionsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7391,6 +9735,14 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 		return nil
 
 	case *QuerySessionsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7403,6 +9755,14 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 		return nil
 
 	case *QuerySessionsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7453,6 +9813,14 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryTeamsBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -7465,6 +9833,14 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryTeamsUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7477,6 +9853,14 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryTeamsForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7489,6 +9873,14 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryTeamsNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -7501,6 +9893,14 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryTeamsTooManyRequests:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
 
@@ -7513,6 +9913,14 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryTeamsErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7563,6 +9971,14 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryUsersBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -7575,6 +9991,14 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryUsersUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7587,6 +10011,14 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryUsersForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7599,6 +10031,14 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 		return nil
 
 	case *QueryUsersErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7649,6 +10089,14 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 		return nil
 
 	case *RejectInvitationBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -7661,6 +10109,14 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 		return nil
 
 	case *RejectInvitationUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7673,6 +10129,14 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 		return nil
 
 	case *RejectInvitationForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7685,6 +10149,14 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 		return nil
 
 	case *RejectInvitationNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -7697,6 +10169,14 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 		return nil
 
 	case *RejectInvitationErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7732,6 +10212,14 @@ func encodeRemoveProjectOriginResponse(response RemoveProjectOriginRes, w http.R
 		return nil
 
 	case *RemoveProjectOriginErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7767,6 +10255,14 @@ func encodeRemoveProjectPreviewResponse(response RemoveProjectPreviewRes, w http
 		return nil
 
 	case *RemoveProjectPreviewErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7819,6 +10315,14 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 		return nil
 
 	case *AuthUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7831,6 +10335,14 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7843,6 +10355,14 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 		return nil
 
 	case *RevokeMySessionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7913,6 +10433,14 @@ func encodeRevokeReleaseResponse(response RevokeReleaseRes, w http.ResponseWrite
 		return nil
 
 	case *RevokeReleaseErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7948,6 +10476,14 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 		return nil
 
 	case *RevokeSessionUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -7960,6 +10496,14 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 		return nil
 
 	case *RevokeSessionForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -7972,6 +10516,14 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 		return nil
 
 	case *RevokeSessionErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8042,6 +10594,14 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -8074,6 +10634,14 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 		return nil
 
 	case *RollbackDeploymentErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8124,6 +10692,14 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *SearchBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -8136,6 +10712,14 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *SearchUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -8148,6 +10732,14 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *SearchForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -8160,6 +10752,14 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *SearchNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -8172,6 +10772,14 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 		return nil
 
 	case *SearchErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8207,6 +10815,14 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 		return nil
 
 	case *SetUserPasswordBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -8219,6 +10835,14 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 		return nil
 
 	case *SetUserPasswordNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -8271,6 +10895,14 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 		return nil
 
 	case *SetUserPasswordInternalServerError:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -8284,6 +10916,14 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 		return nil
 
 	case *SetUserPasswordErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8334,6 +10974,14 @@ func encodeSetVariablesResponse(response SetVariablesRes, w http.ResponseWriter,
 		return nil
 
 	case *SetVariablesErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8492,6 +11140,14 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -8544,6 +11200,14 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 		return nil
 
 	case *SubmitFlowStepErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8594,6 +11258,14 @@ func encodeUpdateMyUserResponse(response UpdateMyUserRes, w http.ResponseWriter,
 		return nil
 
 	case *UpdateMyUserBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -8606,6 +11278,14 @@ func encodeUpdateMyUserResponse(response UpdateMyUserRes, w http.ResponseWriter,
 		return nil
 
 	case *UpdateMyUserUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -8618,6 +11298,14 @@ func encodeUpdateMyUserResponse(response UpdateMyUserRes, w http.ResponseWriter,
 		return nil
 
 	case *UpdateMyUserForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -8630,6 +11318,14 @@ func encodeUpdateMyUserResponse(response UpdateMyUserRes, w http.ResponseWriter,
 		return nil
 
 	case *UserNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -8642,6 +11338,14 @@ func encodeUpdateMyUserResponse(response UpdateMyUserRes, w http.ResponseWriter,
 		return nil
 
 	case *UpdateMyUserConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -8654,6 +11358,14 @@ func encodeUpdateMyUserResponse(response UpdateMyUserRes, w http.ResponseWriter,
 		return nil
 
 	case *UpdateMyUserErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8704,6 +11416,14 @@ func encodeUpdateProjectResponse(response UpdateProjectRes, w http.ResponseWrite
 		return nil
 
 	case *UpdateProjectBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -8716,6 +11436,14 @@ func encodeUpdateProjectResponse(response UpdateProjectRes, w http.ResponseWrite
 		return nil
 
 	case *UpdateProjectUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -8728,6 +11456,14 @@ func encodeUpdateProjectResponse(response UpdateProjectRes, w http.ResponseWrite
 		return nil
 
 	case *UpdateProjectNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -8740,6 +11476,14 @@ func encodeUpdateProjectResponse(response UpdateProjectRes, w http.ResponseWrite
 		return nil
 
 	case *UpdateProjectErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8790,6 +11534,14 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateTeamBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -8802,6 +11554,14 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateTeamUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -8814,6 +11574,14 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateTeamForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -8826,6 +11594,14 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateTeamNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -8838,6 +11614,14 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateTeamConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -8850,6 +11634,14 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateTeamErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -8900,6 +11692,14 @@ func encodeUpdateUserResponse(response UpdateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateUserBadRequest:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -8912,6 +11712,14 @@ func encodeUpdateUserResponse(response UpdateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateUserUnauthorized:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -8924,6 +11732,14 @@ func encodeUpdateUserResponse(response UpdateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateUserForbidden:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 
@@ -8936,6 +11752,14 @@ func encodeUpdateUserResponse(response UpdateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateUserNotFound:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 
@@ -8948,6 +11772,14 @@ func encodeUpdateUserResponse(response UpdateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateUserConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -8960,6 +11792,14 @@ func encodeUpdateUserResponse(response UpdateUserRes, w http.ResponseWriter, spa
 		return nil
 
 	case *UpdateUserErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -9010,6 +11850,14 @@ func encodeVerifyAuthAttemptChallengeResponse(response VerifyAuthAttemptChalleng
 		return nil
 
 	case *ErrorDetails:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 
@@ -9062,6 +11910,14 @@ func encodeVerifyAuthAttemptChallengeResponse(response VerifyAuthAttemptChalleng
 		return nil
 
 	case *VerifyAuthAttemptChallengeErrorResponseStatusCode:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {

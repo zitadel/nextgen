@@ -81,6 +81,16 @@ post:
         application/json:
           schema:
             $ref: search-response.yaml
+          example:
+            results:
+              - type: user
+                id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                title: Ann Lee
+                subtitle: ann@example.com
+            incomplete_types:
+              - user
+            more_projects: true
     '400':
       description: Invalid request, for example no `types`.
       content:

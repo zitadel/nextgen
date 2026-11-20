@@ -6,6 +6,7 @@ properties:
   session_token:
     type: string
     description: Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+    writeOnly: true
   action:
     type: string
     description: |

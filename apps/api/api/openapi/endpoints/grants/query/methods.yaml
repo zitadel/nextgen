@@ -43,6 +43,32 @@ post:
         application/json:
           schema:
             $ref: query-grants-response.yaml
+          example:
+            grants:
+              - id: grant_01KWH3B72K7M7F0N9WD3P2E4YM
+                project_id: proj_01KWH3B72K7M7F0N9WD3P2E4YM
+                object_type: project
+                relation: viewer
+                created_at: '2026-01-15T09:30:00Z'
+                expires_at: '2026-01-15T09:30:00Z'
+                user:
+                  user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  identifier: ada@example.com
+                  identifier_property: email
+                  display: Ada Lovelace
+                  schema: example
+                  attributes: {}
+                  metadata:
+                    created_at: '2026-01-15T09:30:00Z'
+                    updated_at: '2026-01-15T09:30:00Z'
+                    status: active
+                team:
+                  team_id: team_01KZZY8PX8K8ATNVDSMRCZY4N1
+                  name: Platform admins
+                  status: active
+                  created_at: '2026-01-15T09:30:00Z'
+                  updated_at: '2026-01-15T09:30:00Z'
+            next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
     '400':
       description: Invalid request, for example invalid query parameters.
       content:

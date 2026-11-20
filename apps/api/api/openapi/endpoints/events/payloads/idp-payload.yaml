@@ -11,8 +11,10 @@ required:
 properties:
   slug:
     type: string
+    description: 'The slug of the identity provider.'
   protocol:
     type: string
+    description: 'The protocol of the identity provider, such as `oidc`.'
   template:
     type: string
     description: |
@@ -20,6 +22,8 @@ properties:
       the revision removed it.
   display_name:
     type: string
+    description: 'The name shown for the identity provider.'
   revision_id:
     type: string
+    minLength: 1
     description: The revision the write appended.

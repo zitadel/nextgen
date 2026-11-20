@@ -12,3 +12,4 @@ properties:
     description: Shared by an invitation and every invitation that replaces it.
   user_id:
     type: string
+    description: 'The ID of the user who rejected the invitation.'

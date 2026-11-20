@@ -39,6 +39,9 @@ post:
         application/json:
           schema:
             $ref: handoff-response.yaml
+          example:
+            handoff_token: handoff_abc123def456xyz
+            expires_at: '2026-04-28T15:31:00Z'
     '409':
       description: |
         The attempt is not complete (`att.not_completed`). Verify the

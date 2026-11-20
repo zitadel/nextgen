@@ -5,6 +5,8 @@ required:
 properties:
   previews:
     type: array
+    maxItems: 100
+    description: 'The page of preview origins of the project.'
     items:
       $ref: preview.yaml
   next_page_token:

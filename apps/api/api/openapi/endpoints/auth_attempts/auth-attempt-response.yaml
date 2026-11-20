@@ -19,6 +19,7 @@ properties:
     $ref: ../../components/schemas/attempt-id.yaml
   project_id:
     $ref: ../../components/schemas/project-id.yaml
+    description: 'The ID of the project, as `createProject` (`POST /projects`) returns it.'
   state:
     type: string
     description: |
@@ -49,6 +50,7 @@ properties:
       - type: 'null'
   required_factors:
     type: array
+    maxItems: 20
     description: |
       The authentication factor methods that the project policy requires to
       complete this attempt. The server computes them from the project's
@@ -58,6 +60,7 @@ properties:
     example: [identifier, password]
   completed_factors:
     type: array
+    maxItems: 100
     description: |
       The factors verified in this attempt so far.
       Each item includes method-specific metadata in the `payload` field.
@@ -71,6 +74,7 @@ properties:
       $ref: ../../components/checks/completed-factor.yaml
   challenges:
     type: array
+    maxItems: 1000
     description: |
       All challenges issued within this attempt, in creation order.
       Use them to track the state of each factor challenge: pending, verified, failed or expired.

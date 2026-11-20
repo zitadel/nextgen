@@ -27,6 +27,9 @@ get:
         application/json:
           schema:
             $ref: ../variable-by-kind.yaml
+          example:
+            primary: example
+            preview: example
     default:
       $ref: getVariable-error-response.yaml
 

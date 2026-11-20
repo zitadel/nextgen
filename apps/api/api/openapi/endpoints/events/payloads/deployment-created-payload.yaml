@@ -6,14 +6,19 @@ description: |
 properties:
   release_id:
     type: string
+    description: 'The ID of the release the deployment makes live.'
   targets:
     type: array
+    maxItems: 1000
     description: The origins the release went live on, sorted.
     items:
       type: string
   reason:
     type: string
+    description: 'Why the deployment was created.'
   message:
     type: string
+    description: 'The message the deployment was created with.'
   rollback_to:
     type: string
+    description: 'The ID of the deployment this one rolled back to. Absent when it is not a rollback.'

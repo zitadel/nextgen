@@ -9,12 +9,14 @@ allOf:
     properties:
       details:
         type: object
+        description: 'Who holds the project and where to manage it: the team and its dashboard URL.'
         required:
           - team_id
           - dashboard_url
         properties:
           team_id:
             $ref: ../../../../../components/schemas/team-id.yaml
+            description: 'The team that holds the project.'
           dashboard_url:
             type: string
             format: uri

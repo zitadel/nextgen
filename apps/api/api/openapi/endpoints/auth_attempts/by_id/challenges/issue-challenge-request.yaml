@@ -25,6 +25,7 @@ properties:
         example: example.com
       rp_origins:
         type: array
+        maxItems: 20
         description: List of allowed origins for this WebAuthn challenge. Optional; if not provided, the server may use a default value.
         items:
           type: string
@@ -32,5 +33,6 @@ properties:
         example: [ 'https://example.com' ]
       user_verification:
         type: string
+        description: 'Whether the authenticator must verify the user: `required`, `preferred` or `discouraged`.'
         enum: [ required, preferred, discouraged ]
         example: required

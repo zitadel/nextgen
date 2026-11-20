@@ -6,10 +6,14 @@ description: |
 properties:
   schema_id:
     type: string
+    description: 'The ID of the user schema the user was created under.'
   attribute_keys:
     type: array
+    maxItems: 1000
+    description: 'The names of the attributes the user was created with. Their values are in `attributes`.'
     items:
       type: string
   attributes:
     type: object
+    description: 'The attributes the user was created with.'
     additionalProperties: true

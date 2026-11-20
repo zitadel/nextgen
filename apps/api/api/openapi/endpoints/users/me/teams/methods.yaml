@@ -24,6 +24,14 @@ get:
         application/json:
           schema:
             $ref: ../../by_id/teams/list-user-teams-response.yaml
+          example:
+            teams:
+              - id: team_01KWH3B72K7M7F0N9WD3P2E4YM
+                name: Acme
+                membership_status: pending
+                created_at: '2026-01-15T09:30:00Z'
+                updated_at: '2026-01-15T09:30:00Z'
+            next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
     '400':
       description: The page token or limit was not valid.
       content:

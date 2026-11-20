@@ -29,6 +29,8 @@ get:
         application/json:
           schema:
             $ref: csrf-token-response.yaml
+          example:
+            csrf_token: 3q9Y5mJ7m1wq0yBqS4kz0mJ3o1bG8v7t2Y4r6Pp9Ls0
     '401':
       description: Missing or invalid session token.
       headers:

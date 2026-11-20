@@ -1,3 +1,111 @@
+get:
+  operationId: listReleases
+  x-zitadel-cli: release list
+  summary: List releases
+  description: |
+    Lists the project's releases, newest first. A release is a snapshot of the
+    project's configuration.
+
+    Entries carry the digest, the metadata and `revoked_at`. The pinned set is
+    omitted: read one release with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
+
+    The `id` of an entry is the release ID that `getRelease`,
+    `revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.
+
+    `content_hash` looks a release up by its content, as the CLI does when a
+    person types the digest a transcript printed. The project holds at most
+    one release per digest, so the filtered list has one entry or none. An
+    unknown digest is an empty list rather than an error. Paths take the
+    `rel_` ID only, so use the matched entry's `id` there.
+  tags:
+    - Releases
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/release-content-hash-filter.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - release.read
+    - sessionCookie: []
+  responses:
+    '200':
+      description: A page of the project's releases.
+      content:
+        application/json:
+          schema:
+            $ref: list-releases-response.yaml
+          examples:
+            firstPage:
+              summary: A page with more results behind it
+              value:
+                releases:
+                  - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                    metadata:
+                      message: add phone_number to human-user
+                      git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                      git_dirty: false
+                      created_at: '2026-07-14T09:11:00Z'
+                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      created_by_type: human
+                    revoked_at: null
+                  - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
+                    metadata:
+                      message: initial import
+                      git_sha: 0f1e2d3c4b5a69788796a5b4c3d2e1f009182736
+                      git_dirty: false
+                      created_at: '2026-07-13T08:00:00Z'
+                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      created_by_type: human
+                    revoked_at: '2026-07-14T10:30:00Z'
+                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+            lastPage:
+              summary: The final page
+              description: |
+                `next_page_token` is absent when there are no further results.
+                Metadata fields the caller never supplied are null, not absent.
+              value:
+                releases:
+                  - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
+                    metadata:
+                      message: initial import
+                      git_sha: null
+                      git_dirty: false
+                      created_at: '2026-07-13T08:00:00Z'
+                      created_by: null
+                      created_by_type: null
+                    revoked_at: null
+            byContentHash:
+              summary: Looked up by digest
+              description: |
+                The `content_hash` filter matched one release. The same filter
+                with a digest no release of the project carries answers
+                `releases: []`.
+              value:
+                releases:
+                  - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                    metadata:
+                      message: add phone_number to human-user
+                      git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                      git_dirty: false
+                      created_at: '2026-07-14T09:11:00Z'
+                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      created_by_type: human
+                    revoked_at: null
+            unknownDigest:
+              summary: A digest no release carries
+              value:
+                releases: []
+    default:
+      $ref: listReleases-error-response.yaml
 post:
   operationId: createRelease
   summary: Create a release
@@ -151,112 +259,3 @@ post:
                     revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
     default:
       $ref: createRelease-error-response.yaml
-
-get:
-  operationId: listReleases
-  x-zitadel-cli: release list
-  summary: List releases
-  description: |
-    Lists the project's releases, newest first. A release is a snapshot of the
-    project's configuration.
-
-    Entries carry the digest, the metadata and `revoked_at`. The pinned set is
-    omitted: read one release with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
-
-    The `id` of an entry is the release ID that `getRelease`,
-    `revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.
-
-    `content_hash` looks a release up by its content, as the CLI does when a
-    person types the digest a transcript printed. The project holds at most
-    one release per digest, so the filtered list has one entry or none. An
-    unknown digest is an empty list rather than an error. Paths take the
-    `rel_` ID only, so use the matched entry's `id` there.
-  tags:
-    - Releases
-  parameters:
-    - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/release-content-hash-filter.yaml
-    - $ref: ../../components/parameters/limit.yaml
-    - $ref: ../../components/parameters/page-token.yaml
-  security:
-    - oauth2:
-        - release.read
-    - sessionCookie: []
-  responses:
-    '200':
-      description: A page of the project's releases.
-      content:
-        application/json:
-          schema:
-            $ref: list-releases-response.yaml
-          examples:
-            firstPage:
-              summary: A page with more results behind it
-              value:
-                releases:
-                  - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
-                    metadata:
-                      message: add phone_number to human-user
-                      git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
-                      git_dirty: false
-                      created_at: '2026-07-14T09:11:00Z'
-                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                      created_by_type: human
-                    revoked_at: null
-                  - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
-                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
-                    metadata:
-                      message: initial import
-                      git_sha: 0f1e2d3c4b5a69788796a5b4c3d2e1f009182736
-                      git_dirty: false
-                      created_at: '2026-07-13T08:00:00Z'
-                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                      created_by_type: human
-                    revoked_at: '2026-07-14T10:30:00Z'
-                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
-            lastPage:
-              summary: The final page
-              description: |
-                `next_page_token` is absent when there are no further results.
-                Metadata fields the caller never supplied are null, not absent.
-              value:
-                releases:
-                  - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
-                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
-                    metadata:
-                      message: initial import
-                      git_sha: null
-                      git_dirty: false
-                      created_at: '2026-07-13T08:00:00Z'
-                      created_by: null
-                      created_by_type: null
-                    revoked_at: null
-            byContentHash:
-              summary: Looked up by digest
-              description: |
-                The `content_hash` filter matched one release. The same filter
-                with a digest no release of the project carries answers
-                `releases: []`.
-              value:
-                releases:
-                  - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
-                    metadata:
-                      message: add phone_number to human-user
-                      git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
-                      git_dirty: false
-                      created_at: '2026-07-14T09:11:00Z'
-                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                      created_by_type: human
-                    revoked_at: null
-            unknownDigest:
-              summary: A digest no release carries
-              value:
-                releases: []
-    default:
-      $ref: listReleases-error-response.yaml

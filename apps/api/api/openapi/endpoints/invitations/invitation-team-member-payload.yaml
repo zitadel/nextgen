@@ -7,6 +7,7 @@ required:
 properties:
   team_id:
     $ref: ../../components/schemas/team-id.yaml
+    description: 'The ID of the team, as `createTeam` (`POST /teams`) returns it.'
   role:
     type: string
     enum:

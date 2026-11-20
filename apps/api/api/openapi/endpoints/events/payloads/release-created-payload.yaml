@@ -8,20 +8,29 @@ description: |
 properties:
   content_hash:
     type: string
+    description: 'The hash of the release''s content.'
   message:
     type: string
+    description: 'The message the release was created with.'
   git_sha:
     type: string
+    description: 'The Git commit the release was built from.'
   git_dirty:
     type: boolean
+    description: 'Whether the Git working tree had uncommitted changes when the release was built.'
   pointers:
     type: array
+    maxItems: 1000
+    description: 'The revisions the release pins, one for each resource.'
     items:
       type: object
       properties:
         kind:
           type: string
+          description: 'The kind of the resource the pointer names.'
         handle:
           type: string
+          description: 'The handle of the resource the pointer names.'
         revision_id:
           type: string
+          description: 'The ID of the revision of the resource the release pins.'

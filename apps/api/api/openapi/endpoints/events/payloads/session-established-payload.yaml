@@ -4,3 +4,4 @@ description: Payload for `session.established` events.
 properties:
   user_id:
     type: string
+    description: 'The ID of the user the session was established for.'

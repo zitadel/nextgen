@@ -18,6 +18,7 @@ properties:
     type: array
     description: The origins allowed for this ceremony's attestation.
     minItems: 1
+    maxItems: 20
     items:
       type: string
       format: uri

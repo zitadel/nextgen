@@ -481,6 +481,9 @@ type GetTeamParams struct {
 
 // GetUserParams is parameters of getUser operation.
 type GetUserParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Serves the user only when they hold an active membership in this team, and answers `404` otherwise.
 	// Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
 	//
@@ -495,9 +498,6 @@ type GetUserParams struct {
 	// `POST /users/query`: `team_membership.read` for a project secret, read on the whole project for a
 	// console session. Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 // GetUserPasswordStateParams is parameters of getUserPasswordState operation.
@@ -627,16 +627,16 @@ type ListEventsParams struct {
 
 // ListFlowDefinitionsParams is parameters of listFlowDefinitions operation.
 type ListFlowDefinitionsParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
-	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
-	// `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
 	// Only flow definitions with this purpose, for example `login`.
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
 	// The flow name to filter by. Every revision of a flow shares its `name`, so the result is that flow's
@@ -821,13 +821,13 @@ type ListPolicyRevisionsParams struct {
 
 // ListProjectAdminsParams is parameters of listProjectAdmins operation.
 type ListProjectAdminsParams struct {
+	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	ProjectID ProjectID
 }
 
 // ListProjectPreviewsParams is parameters of listProjectPreviews operation.
@@ -902,41 +902,41 @@ type ListSchemasParams struct {
 
 // ListUserIdentityLinksParams is parameters of listUserIdentityLinks operation.
 type ListUserIdentityLinksParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 // ListUserPasskeysParams is parameters of listUserPasskeys operation.
 type ListUserPasskeysParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 // ListUserTeamsParams is parameters of listUserTeams operation.
 type ListUserTeamsParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 // ListVariablesParams is parameters of listVariables operation.

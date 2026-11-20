@@ -5,6 +5,8 @@ required:
 properties:
   schemas:
     type: array
+    maxItems: 100
+    description: 'The page of schemas.'
     items:
       $ref: schema.yaml
   next_page_token:

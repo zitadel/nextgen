@@ -8,8 +8,11 @@ required:
 properties:
   pattern:
     type: string
+    minLength: 1
+    description: 'The origin pattern that was added or removed.'
   kind:
     type: string
+    description: 'Whether the origin is the project''s `primary` origin or a `preview` one.'
     enum:
       - primary
       - preview

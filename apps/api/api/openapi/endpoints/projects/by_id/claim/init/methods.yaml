@@ -35,6 +35,10 @@ post:
         application/json:
           schema:
             $ref: init-claim-response.yaml
+          example:
+            claim_url: https://example.com/path
+            challenge_id: ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
+            expires_at: '2026-01-15T09:30:00Z'
     '401':
       description: Missing or invalid credentials.
       content:

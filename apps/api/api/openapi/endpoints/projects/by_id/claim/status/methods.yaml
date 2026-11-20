@@ -36,6 +36,8 @@ get:
         application/json:
           schema:
             $ref: claim-status-response.yaml
+          example:
+            status: pending
     '401':
       description: Missing or invalid credentials.
       content:

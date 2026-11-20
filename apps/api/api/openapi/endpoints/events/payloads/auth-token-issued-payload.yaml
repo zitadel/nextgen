@@ -4,5 +4,7 @@ description: Payload for `auth.token.issued` events.
 properties:
   scopes:
     type: array
+    maxItems: 1000
+    description: 'The scopes the token carries.'
     items:
       type: string

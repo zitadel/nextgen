@@ -13,9 +13,9 @@ get:
   tags:
     - Users
   parameters:
+    - $ref: ../../../../components/parameters/user-id.yaml
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
-    - $ref: ../../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.read
@@ -28,6 +28,14 @@ get:
         application/json:
           schema:
             $ref: list-user-teams-response.yaml
+          example:
+            teams:
+              - id: team_01KWH3B72K7M7F0N9WD3P2E4YM
+                name: Acme
+                membership_status: pending
+                created_at: '2026-01-15T09:30:00Z'
+                updated_at: '2026-01-15T09:30:00Z'
+            next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
     '400':
       description: The provided input was not valid.
       content:

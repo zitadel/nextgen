@@ -14,4 +14,5 @@ properties:
     description: The invitation this one replaces, when it was created as a replacement.
   expires_at:
     type: string
+    description: 'When the invitation expires.'
     format: date-time

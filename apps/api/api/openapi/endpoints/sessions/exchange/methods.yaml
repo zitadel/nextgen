@@ -61,6 +61,34 @@ post:
         application/json:
           schema:
             $ref: ../session-with-token-response.yaml
+          example:
+            session:
+              session_id: sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
+              project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+              state: active
+              user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+              user:
+                user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                identifier: ada@example.com
+                identifier_property: email
+                display: Ada Lovelace
+              factors:
+                - method: password
+                  verified_at: '2026-04-28T15:32:00Z'
+                  payload:
+                    method: passkey
+                    credential_id: Y3JlZGVudGlhbDE=
+                    user_verified: true
+              assurance_levels:
+                - urn:nist:aal:1
+                - urn:nist:aal:2
+              metadata: {}
+              user_agent:
+                fingerprint: fp_abc123
+                ip: 203.0.113.42
+              created_at: '2026-04-29T10:00:00Z'
+              expires_at: '2026-04-30T10:00:00Z'
+            session_token: stok_abc123def456
     '400':
       description: |
         Invalid request. A handoff token that is unknown, already exchanged, or

@@ -5,6 +5,8 @@ required:
 properties:
   revisions:
     type: array
+    maxItems: 100
+    description: 'The page of revisions of the policy, newest first.'
     items:
       $ref: ../../policy.yaml
   next_page_token:

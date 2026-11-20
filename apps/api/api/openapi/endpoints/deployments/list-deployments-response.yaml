@@ -5,6 +5,8 @@ required:
 properties:
   deployments:
     type: array
+    maxItems: 100
+    description: 'The page of deployments, newest first.'
     items:
       $ref: deployment.yaml
   next_page_token:

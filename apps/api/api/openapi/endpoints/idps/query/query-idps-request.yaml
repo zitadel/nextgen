@@ -3,6 +3,7 @@ description: Request to query the identity providers of a project.
 properties:
   limit:
     $ref: ../../../components/schemas/limit.yaml
+    description: 'The most results to return in one page, from 1 to 100. The default is 20; `next_page_token` continues a longer list.'
   page_token:
     description: |
       Token to retrieve the next page of results. Must be sent with the same
@@ -26,6 +27,7 @@ properties:
         description: The direction to sort by.
   filter:
     type: array
+    maxItems: 50
     description: Filter criteria for querying identity providers. Combined with AND.
     items:
       type: object

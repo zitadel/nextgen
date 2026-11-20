@@ -961,6 +961,7 @@ func (*AlreadyClaimedResponse) createProjectClaimRes()   {}
 
 // Merged schema.
 type AlreadyClaimedResponseDetails struct {
+	// The team that holds the project.
 	TeamID TeamID `json:"team_id"`
 	// The dashboard URL for the team that owns the project.
 	DashboardURL    url.URL `json:"dashboard_url"`
@@ -1614,7 +1615,8 @@ func (s *ApplicationClientType) UnmarshalText(data []byte) error {
 // Ref: #
 type ApplicationCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -1644,8 +1646,11 @@ type ApplicationCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptApplicationCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -2076,7 +2081,9 @@ func (s *ApplicationCreatedEventDelegationType) UnmarshalText(data []byte) error
 // never included.
 // Ref: #
 type ApplicationPayload struct {
+	// The application's slug.
 	Slug OptString `json:"slug"`
+	// The application's name.
 	Name OptString `json:"name"`
 	// The `client_id` of each client the write created. Each of them got a new secret.
 	ClientIds []string `json:"client_ids"`
@@ -2211,7 +2218,8 @@ func (*ApplicationResponse) getApplicationRes() {}
 // Ref: #
 type ApplicationUpdatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -2241,8 +2249,11 @@ type ApplicationUpdatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptApplicationUpdatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -3097,7 +3108,8 @@ type AttemptID string
 // Ref: #
 type AuthAttemptCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -3127,8 +3139,11 @@ type AuthAttemptCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthAttemptCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -3557,7 +3572,8 @@ func (s *AuthAttemptCreatedEventDelegationType) UnmarshalText(data []byte) error
 // Ref: #
 type AuthAttemptHandedOffEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -3587,8 +3603,11 @@ type AuthAttemptHandedOffEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthAttemptHandedOffEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                  `json:"delegation_id"`
-	Grantor        OptString                                  `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -4024,6 +4043,7 @@ func (s *AuthAttemptHandedOffEventDelegationType) UnmarshalText(data []byte) err
 // Ref: #
 type AuthAttemptResponse struct {
 	AttemptID AttemptID `json:"attempt_id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// Overall state of the authentication attempt:
 	//
@@ -4231,7 +4251,8 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 // Ref: #
 type AuthCheckFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -4261,8 +4282,11 @@ type AuthCheckFailedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthCheckFailedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                             `json:"delegation_id"`
-	Grantor        OptString                             `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -4692,8 +4716,11 @@ func (s *AuthCheckFailedEventDelegationType) UnmarshalText(data []byte) error {
 // its authentication attempt, so a SIEM tool can correlate them.
 // Ref: #
 type AuthCheckPayload struct {
-	CheckID       string    `json:"check_id"`
-	CheckType     OptString `json:"check_type"`
+	// The ID of the check.
+	CheckID string `json:"check_id"`
+	// The type of the check.
+	CheckType OptString `json:"check_type"`
+	// The ID of the authentication attempt the check ran in.
 	AuthAttemptID OptString `json:"auth_attempt_id"`
 }
 
@@ -4731,7 +4758,8 @@ func (s *AuthCheckPayload) SetAuthAttemptID(val OptString) {
 // Ref: #
 type AuthCheckSucceededEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -4761,8 +4789,11 @@ type AuthCheckSucceededEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthCheckSucceededEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -5244,7 +5275,8 @@ func (s *AuthCsrfInvalidDetails) init() AuthCsrfInvalidDetails {
 // Ref: #
 type AuthFactorPasskeyEnrolledEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -5274,8 +5306,11 @@ type AuthFactorPasskeyEnrolledEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthFactorPasskeyEnrolledEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                       `json:"delegation_id"`
-	Grantor        OptString                                       `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -5704,7 +5739,8 @@ func (s *AuthFactorPasskeyEnrolledEventDelegationType) UnmarshalText(data []byte
 // Ref: #
 type AuthFactorPasswordSetEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -5734,8 +5770,11 @@ type AuthFactorPasswordSetEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthFactorPasswordSetEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                   `json:"delegation_id"`
-	Grantor        OptString                                   `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -6163,7 +6202,9 @@ func (s *AuthFactorPasswordSetEventDelegationType) UnmarshalText(data []byte) er
 // Payload for `auth.factor.*` events.
 // Ref: #
 type AuthFactorPayload struct {
-	UserID   string    `json:"user_id"`
+	// The ID of the user the factor belongs to.
+	UserID string `json:"user_id"`
+	// The ID of the factor.
 	FactorID OptString `json:"factor_id"`
 }
 
@@ -6268,7 +6309,8 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 // Ref: #
 type AuthRequestCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -6298,8 +6340,11 @@ type AuthRequestCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthRequestCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -6727,6 +6772,7 @@ func (s *AuthRequestCreatedEventDelegationType) UnmarshalText(data []byte) error
 // Payload for `auth.request.created` events.
 // Ref: #
 type AuthRequestCreatedPayload struct {
+	// The client ID of the authorization request.
 	ClientID string `json:"client_id"`
 }
 
@@ -6744,7 +6790,8 @@ func (s *AuthRequestCreatedPayload) SetClientID(val string) {
 // Ref: #
 type AuthSSOAuthorizationFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -6774,8 +6821,11 @@ type AuthSSOAuthorizationFailedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthSSOAuthorizationFailedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                        `json:"delegation_id"`
-	Grantor        OptString                                        `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -7204,7 +7254,8 @@ func (s *AuthSSOAuthorizationFailedEventDelegationType) UnmarshalText(data []byt
 // Ref: #
 type AuthSSOExchangeFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -7234,8 +7285,11 @@ type AuthSSOExchangeFailedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthSSOExchangeFailedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                   `json:"delegation_id"`
-	Grantor        OptString                                   `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -7664,7 +7718,8 @@ func (s *AuthSSOExchangeFailedEventDelegationType) UnmarshalText(data []byte) er
 // Ref: #
 type AuthSSOExchangeSucceededEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -7694,8 +7749,11 @@ type AuthSSOExchangeSucceededEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthSSOExchangeSucceededEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                      `json:"delegation_id"`
-	Grantor        OptString                                      `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -8124,7 +8182,8 @@ func (s *AuthSSOExchangeSucceededEventDelegationType) UnmarshalText(data []byte)
 // Ref: #
 type AuthTokenIssuedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -8154,8 +8213,11 @@ type AuthTokenIssuedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthTokenIssuedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                             `json:"delegation_id"`
-	Grantor        OptString                             `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -8583,6 +8645,7 @@ func (s *AuthTokenIssuedEventDelegationType) UnmarshalText(data []byte) error {
 // Payload for `auth.token.issued` events.
 // Ref: #
 type AuthTokenIssuedPayload struct {
+	// The scopes the token carries.
 	Scopes []string `json:"scopes"`
 }
 
@@ -8600,7 +8663,8 @@ func (s *AuthTokenIssuedPayload) SetScopes(val []string) {
 // Ref: #
 type AuthTokenRevokedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -8630,8 +8694,11 @@ type AuthTokenRevokedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthTokenRevokedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                              `json:"delegation_id"`
-	Grantor        OptString                              `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -9151,7 +9218,8 @@ func (*AuthUnauthorizedHeaders) getMySessionRes()          {}
 // Ref: #
 type AuthzGrantedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -9181,8 +9249,11 @@ type AuthzGrantedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthzGrantedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                          `json:"delegation_id"`
-	Grantor        OptString                          `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -9610,9 +9681,12 @@ func (s *AuthzGrantedEventDelegationType) UnmarshalText(data []byte) error {
 // Payload for `authz.granted` events.
 // Ref: #
 type AuthzGrantedPayload struct {
+	// The type of principal that received the grant.
 	PrincipalType OptString `json:"principal_type"`
-	PrincipalID   OptString `json:"principal_id"`
-	Relation      OptString `json:"relation"`
+	// The ID of the principal that received the grant.
+	PrincipalID OptString `json:"principal_id"`
+	// The relation the grant gives the principal.
+	Relation OptString `json:"relation"`
 }
 
 // GetPrincipalType returns the value of PrincipalType.
@@ -9649,7 +9723,8 @@ func (s *AuthzGrantedPayload) SetRelation(val OptString) {
 // Ref: #
 type AuthzRevokedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -9679,8 +9754,11 @@ type AuthzRevokedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthzRevokedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                          `json:"delegation_id"`
-	Grantor        OptString                          `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -10329,7 +10407,8 @@ type BrandingColor string
 // Ref: #
 type BrandingCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -10359,8 +10438,11 @@ type BrandingCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptBrandingCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                             `json:"delegation_id"`
-	Grantor        OptString                             `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -10789,9 +10871,13 @@ func (s *BrandingCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // `liquid_template`.
 // Ref: #
 type BrandingCreatedPayload struct {
-	Layout  OptString `json:"layout"`
+	// The login layout of the branding revision.
+	Layout OptString `json:"layout"`
+	// The URL of the logo of the branding revision.
 	LogoURL OptString `json:"logo_url"`
+	// The URL of the font of the branding revision.
 	FontURL OptString `json:"font_url"`
+	// The URL of the hero image of the branding revision.
 	HeroURL OptString `json:"hero_url"`
 }
 
@@ -13511,7 +13597,8 @@ func (s *ClaimPersonalTeamNotActiveDetails) init() ClaimPersonalTeamNotActiveDet
 type ClaimStatusCompleted struct {
 	// The claim has completed.
 	Status ClaimStatusCompletedStatus `json:"status"`
-	TeamID TeamID                     `json:"team_id"`
+	// The team that claimed the project.
+	TeamID TeamID `json:"team_id"`
 	// The time when the project was claimed.
 	ClaimedAt time.Time `json:"claimed_at"`
 	// The dashboard URL for the owning team.
@@ -13772,8 +13859,10 @@ func (s *CompleteClaimRequest) SetChallengeID(val ChallengeID) {
 // The result of a completed project claim.
 // Ref: #
 type CompleteClaimResponse struct {
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
-	TeamID    TeamID    `json:"team_id"`
+	// The ID of the team, as `createTeam` (`POST /teams`) returns it.
+	TeamID TeamID `json:"team_id"`
 	// The time when the project was claimed.
 	ClaimedAt time.Time `json:"claimed_at"`
 }
@@ -16662,6 +16751,7 @@ func (*CreateAuthAttemptHandoffErrorResponseStatusCode) createAuthAttemptHandoff
 // Request to create an authentication attempt.
 // Ref: #
 type CreateAuthAttemptRequest struct {
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID      ProjectID         `json:"project_id"`
 	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
 	// Optional. If provided, this attempt adds factors to an existing session (step-up authentication). If
@@ -17475,6 +17565,7 @@ func (*CreateFlowConflict) createFlowRes() {}
 // The request body for creating a flow definition.
 // Ref: #
 type CreateFlowDefinitionRequest struct {
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID      ProjectID      `json:"project_id"`
 	SchemaURI      OptSchemaURI   `json:"schema_uri"`
 	FlowDefinition FlowDefinition `json:"flow_definition"`
@@ -18200,6 +18291,7 @@ func (*CreateFlowForbidden) createFlowRes() {}
 // The request body for starting a flow.
 // Ref: #
 type CreateFlowRequest struct {
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// What the user is doing. It selects the entry step the flow definition lists for this purpose.
 	Purpose CreateFlowRequestPurpose `json:"purpose"`
@@ -18218,9 +18310,10 @@ type CreateFlowRequest struct {
 	SessionID    OptString            `json:"session_id"`
 	SessionToken OptSessionProofToken `json:"session_token"`
 	// OIDC/SAML auth request ID (links flow to protocol request).
-	AuthRequestID OptString   `json:"auth_request_id"`
-	RedirectURI   OptURI      `json:"redirect_uri"`
-	Hint          OptFlowHint `json:"hint"`
+	AuthRequestID OptString `json:"auth_request_id"`
+	// The URI to send the user to once the flow completes.
+	RedirectURI OptURI      `json:"redirect_uri"`
+	Hint        OptFlowHint `json:"hint"`
 }
 
 // GetProjectID returns the value of ProjectID.
@@ -19533,9 +19626,10 @@ type CreateInvitationProjectMemberRequest struct {
 	// and, without `metadata` of its own, the original's metadata. The original is deleted in the same
 	// transaction. An accepted invitation cannot be replaced. Use the `id` that `createInvitation`
 	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
-	ReplacesInvitationID OptInvitationID                          `json:"replaces_invitation_id"`
-	Type                 CreateInvitationProjectMemberRequestType `json:"type"`
-	ProjectMember        InvitationProjectMemberPayload           `json:"project_member"`
+	ReplacesInvitationID OptInvitationID `json:"replaces_invitation_id"`
+	// The kind of invitation: always `project_member`.
+	Type          CreateInvitationProjectMemberRequestType `json:"type"`
+	ProjectMember InvitationProjectMemberPayload           `json:"project_member"`
 }
 
 // GetMetadata returns the value of Metadata.
@@ -19578,6 +19672,7 @@ func (s *CreateInvitationProjectMemberRequest) SetProjectMember(val InvitationPr
 	s.ProjectMember = val
 }
 
+// The kind of invitation: always `project_member`.
 type CreateInvitationProjectMemberRequestType string
 
 const (
@@ -19615,8 +19710,9 @@ func (s *CreateInvitationProjectMemberRequestType) UnmarshalText(data []byte) er
 // Merged schema.
 // Ref: #
 type CreateInvitationProjectMemberResponse struct {
-	ID        InvitationID `json:"id"`
-	ProjectID ProjectID    `json:"project_id"`
+	ID InvitationID `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
+	ProjectID ProjectID `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
 	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
@@ -19640,7 +19736,8 @@ type CreateInvitationProjectMemberResponse struct {
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
-	Inviter       OptNilUserRef                             `json:"inviter"`
+	Inviter OptNilUserRef `json:"inviter"`
+	// The kind of invitation: always `project_member`.
 	Type          CreateInvitationProjectMemberResponseType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 	// The browser URL to share. It carries the redeem token in the fragment. Only this create or replace
@@ -19853,6 +19950,7 @@ func (s *CreateInvitationProjectMemberResponseCreatedByType) UnmarshalText(data 
 	}
 }
 
+// The kind of invitation: always `project_member`.
 type CreateInvitationProjectMemberResponseType string
 
 const (
@@ -20041,9 +20139,10 @@ type CreateInvitationTeamMemberRequest struct {
 	// and, without `metadata` of its own, the original's metadata. The original is deleted in the same
 	// transaction. An accepted invitation cannot be replaced. Use the `id` that `createInvitation`
 	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
-	ReplacesInvitationID OptInvitationID                       `json:"replaces_invitation_id"`
-	Type                 CreateInvitationTeamMemberRequestType `json:"type"`
-	TeamMember           InvitationTeamMemberPayload           `json:"team_member"`
+	ReplacesInvitationID OptInvitationID `json:"replaces_invitation_id"`
+	// The kind of invitation: always `team_member`.
+	Type       CreateInvitationTeamMemberRequestType `json:"type"`
+	TeamMember InvitationTeamMemberPayload           `json:"team_member"`
 }
 
 // GetMetadata returns the value of Metadata.
@@ -20086,6 +20185,7 @@ func (s *CreateInvitationTeamMemberRequest) SetTeamMember(val InvitationTeamMemb
 	s.TeamMember = val
 }
 
+// The kind of invitation: always `team_member`.
 type CreateInvitationTeamMemberRequestType string
 
 const (
@@ -20123,8 +20223,9 @@ func (s *CreateInvitationTeamMemberRequestType) UnmarshalText(data []byte) error
 // Merged schema.
 // Ref: #
 type CreateInvitationTeamMemberResponse struct {
-	ID        InvitationID `json:"id"`
-	ProjectID ProjectID    `json:"project_id"`
+	ID InvitationID `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
+	ProjectID ProjectID `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
 	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
@@ -20148,7 +20249,8 @@ type CreateInvitationTeamMemberResponse struct {
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
-	Inviter    OptNilUserRef                          `json:"inviter"`
+	Inviter OptNilUserRef `json:"inviter"`
+	// The kind of invitation: always `team_member`.
 	Type       CreateInvitationTeamMemberResponseType `json:"type"`
 	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 	// The browser URL to share. It carries the redeem token in the fragment. Only this create or replace
@@ -20361,6 +20463,7 @@ func (s *CreateInvitationTeamMemberResponseCreatedByType) UnmarshalText(data []b
 	}
 }
 
+// The kind of invitation: always `team_member`.
 type CreateInvitationTeamMemberResponseType string
 
 const (
@@ -22222,6 +22325,7 @@ func (*CreateSessionErrorResponseStatusCode) createSessionRes() {}
 // Request to create an anonymous session.
 // Ref: #
 type CreateSessionRequest struct {
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// Optional user agent / device context to attach to the session. Useful for correlating telemetry and
 	// device signals with the eventual authenticated session from the start.
@@ -25301,7 +25405,8 @@ func (*DeploymentConflict) rollbackDeploymentRes() {}
 // Ref: #
 type DeploymentCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -25331,8 +25436,11 @@ type DeploymentCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptDeploymentCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                               `json:"delegation_id"`
-	Grantor        OptString                               `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -25761,11 +25869,15 @@ func (s *DeploymentCreatedEventDelegationType) UnmarshalText(data []byte) error 
 // which release went live on which origins.
 // Ref: #
 type DeploymentCreatedPayload struct {
+	// The ID of the release the deployment makes live.
 	ReleaseID OptString `json:"release_id"`
 	// The origins the release went live on, sorted.
-	Targets    []string  `json:"targets"`
-	Reason     OptString `json:"reason"`
-	Message    OptString `json:"message"`
+	Targets []string `json:"targets"`
+	// Why the deployment was created.
+	Reason OptString `json:"reason"`
+	// The message the deployment was created with.
+	Message OptString `json:"message"`
+	// The ID of the deployment this one rolled back to. Absent when it is not a rollback.
 	RollbackTo OptString `json:"rollback_to"`
 }
 
@@ -25865,9 +25977,11 @@ func (s *DeploymentExpand) UnmarshalText(data []byte) error {
 // `expected_deployment_id` is not the deployment this write replaces.
 // Ref: #
 type DeploymentGuardConflict struct {
+	// The error code, always `dep.conflict` for this error.
 	Code string `json:"code"`
 	// Human-readable explanation of the error.
-	Message string                         `json:"message"`
+	Message string `json:"message"`
+	// What the guard found: the deployment this write would replace.
 	Details DeploymentGuardConflictDetails `json:"details"`
 }
 
@@ -25901,6 +26015,7 @@ func (s *DeploymentGuardConflict) SetDetails(val DeploymentGuardConflictDetails)
 	s.Details = val
 }
 
+// What the guard found: the deployment this write would replace.
 type DeploymentGuardConflictDetails struct {
 	// The deployment this write replaces, null when there is none. Retry with its ID as
 	// `expected_deployment_id`.
@@ -26304,9 +26419,11 @@ func NewDeploymentPreviewUrlsDeploymentTargetsRequest(v DeploymentPreviewUrls) D
 // The release references variables the project holds no value for.
 // Ref: #
 type DeploymentVariablesMissing struct {
+	// The error code, always `dep.variables_missing` for this error.
 	Code string `json:"code"`
 	// Human-readable explanation of the error.
-	Message string                            `json:"message"`
+	Message string `json:"message"`
+	// Which variables the deployment needs and has no value for.
 	Details DeploymentVariablesMissingDetails `json:"details"`
 }
 
@@ -26340,6 +26457,7 @@ func (s *DeploymentVariablesMissing) SetDetails(val DeploymentVariablesMissingDe
 	s.Details = val
 }
 
+// Which variables the deployment needs and has no value for.
 type DeploymentVariablesMissingDetails struct {
 	// The kind whose variable values the deployment would freeze.
 	Kind DeploymentKind `json:"kind"`
@@ -30642,6 +30760,7 @@ func (s *FlowDefinitionExpand) UnmarshalText(data []byte) error {
 // List of flow definitions, newest by creation time first.
 // Ref: #
 type FlowDefinitionListResponse struct {
+	// The page of flow definitions.
 	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
 	// The token to retrieve the next page of results. Absent if there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
@@ -31843,7 +31962,8 @@ func (s *FlowSSOUserSchemaMismatchDetails) init() FlowSSOUserSchemaMismatchDetai
 // Ref: #
 type FlowSignupChallengeConsumedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -31873,8 +31993,11 @@ type FlowSignupChallengeConsumedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowSignupChallengeConsumedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                         `json:"delegation_id"`
-	Grantor        OptString                                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -32303,7 +32426,8 @@ func (s *FlowSignupChallengeConsumedEventDelegationType) UnmarshalText(data []by
 // Ref: #
 type FlowSignupChallengeIssuedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -32333,8 +32457,11 @@ type FlowSignupChallengeIssuedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowSignupChallengeIssuedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                       `json:"delegation_id"`
-	Grantor        OptString                                       `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -33644,7 +33771,8 @@ func (s *FlowUnsupportedDetails) init() FlowUnsupportedDetails {
 // Ref: #
 type FlowdefCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -33674,8 +33802,11 @@ type FlowdefCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowdefCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -34104,7 +34235,8 @@ func (s *FlowdefCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // Ref: #
 type FlowdefDeletedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -34134,8 +34266,11 @@ type FlowdefDeletedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowdefDeletedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -34776,10 +34911,14 @@ func (s *FlowdefNotFoundDetails) init() FlowdefNotFoundDetails {
 // steps. The retired `flowdef.updated` event carries the changed fields in the same shape.
 // Ref: #
 type FlowdefPayload struct {
-	Name       OptString                 `json:"name"`
-	UserSchema OptString                 `json:"user_schema"`
-	Purposes   OptFlowdefPayloadPurposes `json:"purposes"`
-	Audience   OptFlowdefPayloadAudience `json:"audience"`
+	// The name of the flow definition.
+	Name OptString `json:"name"`
+	// The `objectType` of the user schema the flow definition operates on.
+	UserSchema OptString `json:"user_schema"`
+	// The flow definition's purposes: each purpose and the step it starts at.
+	Purposes OptFlowdefPayloadPurposes `json:"purposes"`
+	// The apps and teams the flow definition applies to.
+	Audience OptFlowdefPayloadAudience `json:"audience"`
 }
 
 // GetName returns the value of Name.
@@ -34822,8 +34961,11 @@ func (s *FlowdefPayload) SetAudience(val OptFlowdefPayloadAudience) {
 	s.Audience = val
 }
 
+// The apps and teams the flow definition applies to.
 type FlowdefPayloadAudience struct {
-	AppIds  []string `json:"app_ids"`
+	// The IDs of the apps the flow definition applies to.
+	AppIds []string `json:"app_ids"`
+	// The IDs of the teams the flow definition applies to.
 	TeamIds []string `json:"team_ids"`
 }
 
@@ -34847,6 +34989,7 @@ func (s *FlowdefPayloadAudience) SetTeamIds(val []string) {
 	s.TeamIds = val
 }
 
+// The flow definition's purposes: each purpose and the step it starts at.
 type FlowdefPayloadPurposes map[string]string
 
 func (s *FlowdefPayloadPurposes) init() FlowdefPayloadPurposes {
@@ -35074,7 +35217,8 @@ func (s *FlowdefSchemaFetchFailedDetails) init() FlowdefSchemaFetchFailedDetails
 // Ref: #
 type FlowdefUpdatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -35104,8 +35248,11 @@ type FlowdefUpdatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowdefUpdatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -45322,6 +45469,8 @@ func (s *IdpConnectionOidcTokenEndpointAuthMethod) UnmarshalText(data []byte) er
 // (`is_linking_allowed`, `auto_linking`), together with the account-linking journey; and
 // `is_auto_update`, together with per-property verification state.
 type IdpConnectionProvisioning struct {
+	// Whether a user who signs in with this provider and has no account gets one: `auto` creates it,
+	// `disabled` does not.
 	Creation OptIdpConnectionProvisioningCreation `json:"creation"`
 }
 
@@ -45335,6 +45484,8 @@ func (s *IdpConnectionProvisioning) SetCreation(val OptIdpConnectionProvisioning
 	s.Creation = val
 }
 
+// Whether a user who signs in with this provider and has no account gets one: `auto` creates it,
+// `disabled` does not.
 type IdpConnectionProvisioningCreation string
 
 const (
@@ -45463,7 +45614,8 @@ func NewStringIdpConnectionVerifiedClaimsItem(v string) IdpConnectionVerifiedCla
 // Ref: #
 type IdpCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -45493,8 +45645,11 @@ type IdpCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptIdpCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                        `json:"delegation_id"`
-	Grantor        OptString                        `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -46129,7 +46284,8 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 // Ref: #
 type IdpIdentityLinkCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -46159,8 +46315,11 @@ type IdpIdentityLinkCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptIdpIdentityLinkCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                    `json:"delegation_id"`
-	Grantor        OptString                                    `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -46675,10 +46834,13 @@ func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
 // included.
 // Ref: #
 type IdpPayload struct {
-	Slug     OptString `json:"slug"`
+	// The slug of the identity provider.
+	Slug OptString `json:"slug"`
+	// The protocol of the identity provider, such as `oidc`.
 	Protocol OptString `json:"protocol"`
 	// The rendering template hint. On `idp.updated`, the empty string means the revision removed it.
-	Template    OptString `json:"template"`
+	Template OptString `json:"template"`
+	// The name shown for the identity provider.
 	DisplayName OptString `json:"display_name"`
 	// The revision the write appended.
 	RevisionID string `json:"revision_id"`
@@ -47072,7 +47234,8 @@ func (s *IdpScopesMissingOpenidDetails) init() IdpScopesMissingOpenidDetails {
 // Ref: #
 type IdpUpdatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -47102,8 +47265,11 @@ type IdpUpdatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptIdpUpdatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                        `json:"delegation_id"`
-	Grantor        OptString                        `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -48179,7 +48345,8 @@ func (*Invitation) rejectInvitationRes() {}
 // Ref: #
 type InvitationAcceptedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -48209,8 +48376,11 @@ type InvitationAcceptedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptInvitationAcceptedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -48713,8 +48883,10 @@ func NewInvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload(v Invitatio
 // Ref: #
 type InvitationAcceptedProjectMemberPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
-	JourneyID     string                                     `json:"journey_id"`
-	UserID        string                                     `json:"user_id"`
+	JourneyID string `json:"journey_id"`
+	// The ID of the user who accepted the invitation.
+	UserID string `json:"user_id"`
+	// The kind of invitation that was accepted: always `project_member`.
 	Type          InvitationAcceptedProjectMemberPayloadType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload             `json:"project_member"`
 }
@@ -48759,6 +48931,7 @@ func (s *InvitationAcceptedProjectMemberPayload) SetProjectMember(val Invitation
 	s.ProjectMember = val
 }
 
+// The kind of invitation that was accepted: always `project_member`.
 type InvitationAcceptedProjectMemberPayloadType string
 
 const (
@@ -48797,8 +48970,10 @@ func (s *InvitationAcceptedProjectMemberPayloadType) UnmarshalText(data []byte) 
 // Ref: #
 type InvitationAcceptedTeamMemberPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
-	JourneyID  string                                  `json:"journey_id"`
-	UserID     string                                  `json:"user_id"`
+	JourneyID string `json:"journey_id"`
+	// The ID of the user who accepted the invitation.
+	UserID string `json:"user_id"`
+	// The kind of invitation that was accepted: always `team_member`.
 	Type       InvitationAcceptedTeamMemberPayloadType `json:"type"`
 	TeamMember InvitationTeamMemberPayload             `json:"team_member"`
 }
@@ -48843,6 +49018,7 @@ func (s *InvitationAcceptedTeamMemberPayload) SetTeamMember(val InvitationTeamMe
 	s.TeamMember = val
 }
 
+// The kind of invitation that was accepted: always `team_member`.
 type InvitationAcceptedTeamMemberPayloadType string
 
 const (
@@ -48881,8 +49057,9 @@ func (s *InvitationAcceptedTeamMemberPayloadType) UnmarshalText(data []byte) err
 // Ref: #
 type InvitationCancelledByAdministratorPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
-	JourneyID string                                          `json:"journey_id"`
-	Reason    InvitationCancelledByAdministratorPayloadReason `json:"reason"`
+	JourneyID string `json:"journey_id"`
+	// Why the invitation was cancelled: always `cancelled`, an administrator cancelled it.
+	Reason InvitationCancelledByAdministratorPayloadReason `json:"reason"`
 }
 
 // GetJourneyID returns the value of JourneyID.
@@ -48905,6 +49082,7 @@ func (s *InvitationCancelledByAdministratorPayload) SetReason(val InvitationCanc
 	s.Reason = val
 }
 
+// Why the invitation was cancelled: always `cancelled`, an administrator cancelled it.
 type InvitationCancelledByAdministratorPayloadReason string
 
 const (
@@ -48943,8 +49121,9 @@ func (s *InvitationCancelledByAdministratorPayloadReason) UnmarshalText(data []b
 // Ref: #
 type InvitationCancelledByReplacementPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
-	JourneyID string                                        `json:"journey_id"`
-	Reason    InvitationCancelledByReplacementPayloadReason `json:"reason"`
+	JourneyID string `json:"journey_id"`
+	// Why the invitation was cancelled: always `replaced`, a newer invitation replaced it.
+	Reason InvitationCancelledByReplacementPayloadReason `json:"reason"`
 	// The invitation that replaced this one.
 	ReplacedByInvitationID string `json:"replaced_by_invitation_id"`
 }
@@ -48979,6 +49158,7 @@ func (s *InvitationCancelledByReplacementPayload) SetReplacedByInvitationID(val 
 	s.ReplacedByInvitationID = val
 }
 
+// Why the invitation was cancelled: always `replaced`, a newer invitation replaced it.
 type InvitationCancelledByReplacementPayloadReason string
 
 const (
@@ -49017,7 +49197,8 @@ func (s *InvitationCancelledByReplacementPayloadReason) UnmarshalText(data []byt
 // Ref: #
 type InvitationCancelledEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -49047,8 +49228,11 @@ type InvitationCancelledEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptInvitationCancelledEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                 `json:"delegation_id"`
-	Grantor        OptString                                 `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -49550,7 +49734,8 @@ func NewInvitationCancelledByReplacementPayloadInvitationCancelledPayload(v Invi
 // Ref: #
 type InvitationCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -49580,8 +49765,11 @@ type InvitationCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptInvitationCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                               `json:"delegation_id"`
-	Grantor        OptString                               `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -50085,10 +50273,12 @@ type InvitationCreatedProjectMemberPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
 	JourneyID string `json:"journey_id"`
 	// The invitation this one replaces, when it was created as a replacement.
-	ReplacesInvitationID OptString                                 `json:"replaces_invitation_id"`
-	ExpiresAt            time.Time                                 `json:"expires_at"`
-	Type                 InvitationCreatedProjectMemberPayloadType `json:"type"`
-	ProjectMember        InvitationProjectMemberPayload            `json:"project_member"`
+	ReplacesInvitationID OptString `json:"replaces_invitation_id"`
+	// When the invitation expires.
+	ExpiresAt time.Time `json:"expires_at"`
+	// The kind of invitation that was created: always `project_member`.
+	Type          InvitationCreatedProjectMemberPayloadType `json:"type"`
+	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 }
 
 // GetJourneyID returns the value of JourneyID.
@@ -50141,6 +50331,7 @@ func (s *InvitationCreatedProjectMemberPayload) SetProjectMember(val InvitationP
 	s.ProjectMember = val
 }
 
+// The kind of invitation that was created: always `project_member`.
 type InvitationCreatedProjectMemberPayloadType string
 
 const (
@@ -50181,10 +50372,12 @@ type InvitationCreatedTeamMemberPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
 	JourneyID string `json:"journey_id"`
 	// The invitation this one replaces, when it was created as a replacement.
-	ReplacesInvitationID OptString                              `json:"replaces_invitation_id"`
-	ExpiresAt            time.Time                              `json:"expires_at"`
-	Type                 InvitationCreatedTeamMemberPayloadType `json:"type"`
-	TeamMember           InvitationTeamMemberPayload            `json:"team_member"`
+	ReplacesInvitationID OptString `json:"replaces_invitation_id"`
+	// When the invitation expires.
+	ExpiresAt time.Time `json:"expires_at"`
+	// The kind of invitation that was created: always `team_member`.
+	Type       InvitationCreatedTeamMemberPayloadType `json:"type"`
+	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 }
 
 // GetJourneyID returns the value of JourneyID.
@@ -50237,6 +50430,7 @@ func (s *InvitationCreatedTeamMemberPayload) SetTeamMember(val InvitationTeamMem
 	s.TeamMember = val
 }
 
+// The kind of invitation that was created: always `team_member`.
 type InvitationCreatedTeamMemberPayloadType string
 
 const (
@@ -50318,6 +50512,7 @@ type InvitationID string
 // Merged schema.
 // Ref: #
 type InvitationLookupProjectMemberResponse struct {
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The project's display name.
 	ProjectName string `json:"project_name"`
@@ -50328,8 +50523,9 @@ type InvitationLookupProjectMemberResponse struct {
 	// falling back to `identifier`, then `user_id`. Null when a project secret created it.
 	Inviter OptNilUserRef `json:"inviter"`
 	// When the invitation expires.
-	ExpiresAt     time.Time                                 `json:"expires_at"`
-	Status        InvitationStatus                          `json:"status"`
+	ExpiresAt time.Time        `json:"expires_at"`
+	Status    InvitationStatus `json:"status"`
+	// The kind of invitation: always `project_member`.
 	Type          InvitationLookupProjectMemberResponseType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 }
@@ -50479,6 +50675,7 @@ func (s *InvitationLookupProjectMemberResponseCreatedByType) UnmarshalText(data 
 	}
 }
 
+// The kind of invitation: always `project_member`.
 type InvitationLookupProjectMemberResponseType string
 
 const (
@@ -50590,6 +50787,7 @@ func (*InvitationLookupResponse) lookupInvitationRes() {}
 // Merged schema.
 // Ref: #
 type InvitationLookupTeamMemberResponse struct {
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The project's display name.
 	ProjectName string `json:"project_name"`
@@ -50600,8 +50798,9 @@ type InvitationLookupTeamMemberResponse struct {
 	// falling back to `identifier`, then `user_id`. Null when a project secret created it.
 	Inviter OptNilUserRef `json:"inviter"`
 	// When the invitation expires.
-	ExpiresAt  time.Time                              `json:"expires_at"`
-	Status     InvitationStatus                       `json:"status"`
+	ExpiresAt time.Time        `json:"expires_at"`
+	Status    InvitationStatus `json:"status"`
+	// The kind of invitation: always `team_member`.
 	Type       InvitationLookupTeamMemberResponseType `json:"type"`
 	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 }
@@ -50751,6 +50950,7 @@ func (s *InvitationLookupTeamMemberResponseCreatedByType) UnmarshalText(data []b
 	}
 }
 
+// The kind of invitation: always `team_member`.
 type InvitationLookupTeamMemberResponseType string
 
 const (
@@ -50807,8 +51007,9 @@ func (s *InvitationMetadata) SetName(val string) {
 // Merged schema.
 // Ref: #
 type InvitationProjectMember struct {
-	ID        InvitationID `json:"id"`
-	ProjectID ProjectID    `json:"project_id"`
+	ID InvitationID `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
+	ProjectID ProjectID `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
 	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
@@ -50832,7 +51033,8 @@ type InvitationProjectMember struct {
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
-	Inviter       OptNilUserRef                  `json:"inviter"`
+	Inviter OptNilUserRef `json:"inviter"`
+	// The kind of invitation: always `project_member`.
 	Type          InvitationProjectMemberType    `json:"type"`
 	ProjectMember InvitationProjectMemberPayload `json:"project_member"`
 }
@@ -51098,6 +51300,7 @@ func (s *InvitationProjectMemberPayloadRelation) UnmarshalText(data []byte) erro
 	}
 }
 
+// The kind of invitation: always `project_member`.
 type InvitationProjectMemberType string
 
 const (
@@ -51136,7 +51339,8 @@ func (s *InvitationProjectMemberType) UnmarshalText(data []byte) error {
 // Ref: #
 type InvitationRejectedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -51166,8 +51370,11 @@ type InvitationRejectedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptInvitationRejectedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -51598,7 +51805,8 @@ func (s *InvitationRejectedEventDelegationType) UnmarshalText(data []byte) error
 type InvitationRejectedPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
 	JourneyID string `json:"journey_id"`
-	UserID    string `json:"user_id"`
+	// The ID of the user who rejected the invitation.
+	UserID string `json:"user_id"`
 }
 
 // GetJourneyID returns the value of JourneyID.
@@ -51682,8 +51890,9 @@ func (s *InvitationStatus) UnmarshalText(data []byte) error {
 // Merged schema.
 // Ref: #
 type InvitationTeamMember struct {
-	ID        InvitationID `json:"id"`
-	ProjectID ProjectID    `json:"project_id"`
+	ID InvitationID `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
+	ProjectID ProjectID `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
 	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
@@ -51707,7 +51916,8 @@ type InvitationTeamMember struct {
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
-	Inviter    OptNilUserRef               `json:"inviter"`
+	Inviter OptNilUserRef `json:"inviter"`
+	// The kind of invitation: always `team_member`.
 	Type       InvitationTeamMemberType    `json:"type"`
 	TeamMember InvitationTeamMemberPayload `json:"team_member"`
 }
@@ -51910,6 +52120,7 @@ func (s *InvitationTeamMemberCreatedByType) UnmarshalText(data []byte) error {
 // Type-specific input for a `team_member` invitation.
 // Ref: #
 type InvitationTeamMemberPayload struct {
+	// The ID of the team, as `createTeam` (`POST /teams`) returns it.
 	TeamID TeamID `json:"team_id"`
 	// The team role the accepter receives.
 	Role InvitationTeamMemberPayloadRole `json:"role"`
@@ -51970,6 +52181,7 @@ func (s *InvitationTeamMemberPayloadRole) UnmarshalText(data []byte) error {
 	}
 }
 
+// The kind of invitation: always `team_member`.
 type InvitationTeamMemberType string
 
 const (
@@ -52065,7 +52277,8 @@ type IssueChallengeRequestPasskeyOptions struct {
 	RpID OptString `json:"rp_id"`
 	// List of allowed origins for this WebAuthn challenge. Optional; if not provided, the server may use a
 	// default value.
-	RpOrigins        []url.URL                                              `json:"rp_origins"`
+	RpOrigins []url.URL `json:"rp_origins"`
+	// Whether the authenticator must verify the user: `required`, `preferred` or `discouraged`.
 	UserVerification OptIssueChallengeRequestPasskeyOptionsUserVerification `json:"user_verification"`
 }
 
@@ -52099,6 +52312,7 @@ func (s *IssueChallengeRequestPasskeyOptions) SetUserVerification(val OptIssueCh
 	s.UserVerification = val
 }
 
+// Whether the authenticator must verify the user: `required`, `preferred` or `discouraged`.
 type IssueChallengeRequestPasskeyOptionsUserVerification string
 
 const (
@@ -52147,7 +52361,7 @@ func (s *IssueChallengeRequestPasskeyOptionsUserVerification) UnmarshalText(data
 	}
 }
 
-type Limit int
+type Limit int64
 
 // ListBrandingErrorResponse represents sum type.
 type ListBrandingErrorResponse struct {
@@ -52389,6 +52603,7 @@ func (*ListBrandingErrorResponseStatusCode) listBrandingRes() {}
 // A page of the project's branding revisions, newest first.
 // Ref: #
 type ListBrandingResponse struct {
+	// The page of branding revisions, newest first.
 	Branding []BrandingRevisionSummary `json:"branding"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -52950,6 +53165,7 @@ func (*ListDeploymentsErrorResponseStatusCode) listDeploymentsRes() {}
 // One page of deployments, ordered as the operation describes.
 // Ref: #
 type ListDeploymentsResponse struct {
+	// The page of deployments, newest first.
 	Deployments []Deployment `json:"deployments"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -54166,6 +54382,7 @@ func (*ListIdpRevisionsNotFound) listIdpRevisionsRes() {}
 // Paginated list of the revisions of one identity provider, newest first.
 // Ref: #
 type ListIdpRevisionsResponse struct {
+	// The page of revisions of the identity provider, newest first.
 	Revisions []IdpResponse `json:"revisions"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -54450,6 +54667,7 @@ func (*ListInvitationsNotFound) listInvitationsRes() {}
 // A page of a project's invitations, newest first.
 // Ref: #
 type ListInvitationsResponse struct {
+	// The page of invitations.
 	Invitations []Invitation `json:"invitations"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -55217,6 +55435,7 @@ func (*ListMyProjectsInternalServerError) listMyProjectsRes() {}
 // Paginated list of projects, ordered by project ID.
 // Ref: #
 type ListMyProjectsResponse struct {
+	// The page of projects the user can access.
 	Projects []ProjectResponse `json:"projects"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Present when the page
 	// was full. A following request may return an empty page and no token, which ends the listing.
@@ -55748,6 +55967,7 @@ func (*ListPoliciesErrorResponseStatusCode) listPoliciesRes() {}
 // A page of the project's policies, one per operation, each as its newest revision.
 // Ref: #
 type ListPoliciesResponse struct {
+	// The page of policies.
 	Policies []Policy `json:"policies"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -56016,6 +56236,7 @@ func (*ListPolicyRevisionsErrorResponseStatusCode) listPolicyRevisionsRes() {}
 // A page of the revisions of one policy, newest first.
 // Ref: #
 type ListPolicyRevisionsResponse struct {
+	// The page of revisions of the policy, newest first.
 	Revisions []Policy `json:"revisions"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -56047,6 +56268,7 @@ func (*ListPolicyRevisionsResponse) listPolicyRevisionsRes() {}
 // The project's live previews, newest first.
 // Ref: #
 type ListPreviewsResponse struct {
+	// The page of preview origins of the project.
 	Previews []Preview `json:"previews"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -56355,6 +56577,7 @@ func (*ListProjectAdminsNotFound) listProjectAdminsRes() {}
 // A page of the people who administer a project.
 // Ref: #
 type ListProjectAdminsResponse struct {
+	// The page of admins of the project.
 	Admins []ProjectAdmin `json:"admins"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -56864,6 +57087,7 @@ func (*ListReleasesErrorResponseStatusCode) listReleasesRes() {}
 // A page of the project's releases, newest first.
 // Ref: #
 type ListReleasesResponse struct {
+	// The page of releases, newest first.
 	Releases []ReleaseSummary `json:"releases"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -57166,6 +57390,7 @@ func (s *ListSchemasKind) UnmarshalText(data []byte) error {
 // A page of schemas, newest first.
 // Ref: #
 type ListSchemasResponse struct {
+	// The page of schemas.
 	Schemas []Schema `json:"schemas"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -57491,6 +57716,7 @@ func (*ListUserIdentityLinksNotFound) listUserIdentityLinksRes() {}
 // Response containing the provider accounts linked to the user.
 // Ref: #
 type ListUserIdentityLinksResponse struct {
+	// The page of identity links the user holds.
 	IdentityLinks []UserIdentityLink `json:"identity_links"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -57807,6 +58033,7 @@ func (*ListUserPasskeysNotFound) listUserPasskeysRes() {}
 // Response containing the user's passkeys.
 // Ref: #
 type ListUserPasskeysResponse struct {
+	// The page of passkeys the user has registered.
 	Passkeys []ListUserPasskeysResponsePasskeysItem `json:"passkeys"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -58162,6 +58389,7 @@ func (*ListUserTeamsNotFound) listUserTeamsRes() {}
 // Paginated list of the teams a user belongs to.
 // Ref: #
 type ListUserTeamsResponse struct {
+	// The page of teams the user belongs to.
 	Teams []UserTeam `json:"teams"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -58965,7 +59193,8 @@ func (s *OAuthSettings) SetEnabled(val bool) {
 // Ref: #
 type OAuthSettingsCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -58995,8 +59224,11 @@ type OAuthSettingsCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptOAuthSettingsCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                  `json:"delegation_id"`
-	Grantor        OptString                                  `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -80262,7 +80494,8 @@ type Origin string
 // Ref: #
 type OriginAddedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -80292,8 +80525,11 @@ type OriginAddedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptOriginAddedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                         `json:"delegation_id"`
-	Grantor        OptString                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -80880,8 +81116,10 @@ func (s *OriginNotFoundDetails) init() OriginNotFoundDetails {
 // Payload for `origin.added` and `origin.removed`.
 // Ref: #
 type OriginPayload struct {
-	Pattern string            `json:"pattern"`
-	Kind    OriginPayloadKind `json:"kind"`
+	// The origin pattern that was added or removed.
+	Pattern string `json:"pattern"`
+	// Whether the origin is the project's `primary` origin or a `preview` one.
+	Kind OriginPayloadKind `json:"kind"`
 }
 
 // GetPattern returns the value of Pattern.
@@ -80904,6 +81142,7 @@ func (s *OriginPayload) SetKind(val OriginPayloadKind) {
 	s.Kind = val
 }
 
+// Whether the origin is the project's `primary` origin or a `preview` one.
 type OriginPayloadKind string
 
 const (
@@ -81055,7 +81294,8 @@ func (s *OriginPrimaryNotExactDetails) init() OriginPrimaryNotExactDetails {
 // Ref: #
 type OriginRemovedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -81085,8 +81325,11 @@ type OriginRemovedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptOriginRemovedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                           `json:"delegation_id"`
-	Grantor        OptString                           `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -81586,7 +81829,8 @@ func (s *PasskeyChallengePayloadPublicKey) SetRpID(val OptString) {
 
 type PasskeyChallengePayloadPublicKeyAllowedCredentialsItem struct {
 	// Base64-encoded credential ID.
-	ID   string                                                     `json:"id"`
+	ID string `json:"id"`
+	// The credential type: always `public-key`.
 	Type PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType `json:"type"`
 }
 
@@ -81610,6 +81854,7 @@ func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) SetType(val Pas
 	s.Type = val
 }
 
+// The credential type: always `public-key`.
 type PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType string
 
 const (
@@ -83026,7 +83271,8 @@ func (*Policy) publishPolicyRes()     {}
 // Ref: #
 type PolicyCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -83056,8 +83302,11 @@ type PolicyCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptPolicyCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                           `json:"delegation_id"`
-	Grantor        OptString                           `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -83588,7 +83837,8 @@ type PolicyRevisionID string
 // Ref: #
 type PolicyUpdatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -83618,8 +83868,11 @@ type PolicyUpdatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptPolicyUpdatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                           `json:"delegation_id"`
-	Grantor        OptString                           `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -84052,13 +84305,21 @@ func (s *PolicyUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 // user is created (for a password, before it is hashed), even if user creation fails.
 // Ref: #
 type PowChallenge struct {
-	Protocol    string    `json:"protocol"`
-	ChallengeID string    `json:"challenge_id"`
-	ProfileID   string    `json:"profile_id"`
-	Salt        string    `json:"salt"`
-	Nonce       string    `json:"nonce"`
-	KeyPrefix   string    `json:"key_prefix"`
-	ExpiresAt   time.Time `json:"expires_at"`
+	// The proof-of-work protocol the client solves, such as `zitadel_pow_poc_v1`.
+	Protocol string `json:"protocol"`
+	// The unique ID of this challenge, which the client sends back with its proof.
+	ChallengeID string `json:"challenge_id"`
+	// The work profile that fixes the hash and the cost of solving the challenge, such as
+	// `pbkdf2_sha256_5000_l1`.
+	ProfileID string `json:"profile_id"`
+	// The salt, as 32 lowercase hex digits, that the client derives the key with.
+	Salt string `json:"salt"`
+	// The nonce, as 32 lowercase hex digits, that the client derives the key with.
+	Nonce string `json:"nonce"`
+	// The first 16 bytes of the derived key, as 32 lowercase hex digits, that the client matches.
+	KeyPrefix string `json:"key_prefix"`
+	// When the challenge expires. A proof sent after this is refused.
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 // GetProtocol returns the value of Protocol.
@@ -84182,7 +84443,8 @@ func (s *Preview) SetCreatedAt(val time.Time) {
 // Ref: #
 type PreviewRemovedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -84212,8 +84474,11 @@ type PreviewRemovedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptPreviewRemovedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -85316,6 +85581,7 @@ func (s *ProjectAdmin) SetSources(val []ProjectAdminSource) {
 // member of.
 // Ref: #
 type ProjectAdminGrantSource struct {
+	// Where the admin role comes from: always `grant`, a grant on the project.
 	Type ProjectAdminGrantSourceType `json:"type"`
 	// The grant (`asgn_<opaque>`), as served by `GET /grants/{grant_id}`.
 	GrantID string `json:"grant_id"`
@@ -85354,6 +85620,7 @@ func (s *ProjectAdminGrantSource) SetTeam(val OptTeamRef) {
 	s.Team = val
 }
 
+// Where the admin role comes from: always `grant`, a grant on the project.
 type ProjectAdminGrantSourceType string
 
 const (
@@ -85391,6 +85658,7 @@ func (s *ProjectAdminGrantSourceType) UnmarshalText(data []byte) error {
 // Admin access as an active member of the team that owns the project.
 // Ref: #
 type ProjectAdminOwningTeamSource struct {
+	// Where the admin role comes from: always `owning_team`, the team that owns the project.
 	Type ProjectAdminOwningTeamSourceType `json:"type"`
 	// The owning team. Its `name` is present only when the caller is a member of it.
 	Team TeamRef `json:"team"`
@@ -85416,6 +85684,7 @@ func (s *ProjectAdminOwningTeamSource) SetTeam(val TeamRef) {
 	s.Team = val
 }
 
+// Where the admin role comes from: always `owning_team`, the team that owns the project.
 type ProjectAdminOwningTeamSourceType string
 
 const (
@@ -85532,7 +85801,8 @@ func NewProjectAdminGrantSourceProjectAdminSource(v ProjectAdminGrantSource) Pro
 // Ref: #
 type ProjectCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -85562,8 +85832,11 @@ type ProjectCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptProjectCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -85992,7 +86265,8 @@ func (s *ProjectCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // Ref: #
 type ProjectDeletedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -86022,8 +86296,11 @@ type ProjectDeletedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptProjectDeletedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -86632,7 +86909,9 @@ func (s *ProjectOriginKind) UnmarshalText(data []byte) error {
 // changed fields.
 // Ref: #
 type ProjectPayload struct {
-	Name    OptString       `json:"name"`
+	// The name of the project.
+	Name OptString `json:"name"`
+	// The origins of the project.
 	Origins []ProjectOrigin `json:"origins"`
 	// The password hashing algorithm the project switched to. The empty string means it was handed back to
 	// the server default. Absent when the update did not touch hashing.
@@ -86751,7 +87030,8 @@ func (s *ProjectResponse) SetPasswordHash(val OptNilPasswordHashPolicy) {
 // Ref: #
 type ProjectUpdatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -86781,8 +87061,11 @@ type ProjectUpdatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptProjectUpdatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -89961,6 +90244,8 @@ func (*QueryGrantsForbidden) queryGrantsRes() {}
 // Request to query the grants of a project.
 // Ref: #
 type QueryGrantsRequest struct {
+	// The most results to return in one page, from 1 to 100. The default is 20; `next_page_token`
+	// continues a longer list.
 	Limit OptLimit `json:"limit"`
 	// Token to retrieve the next page of results. Must be sent with the same `sorting` as the request that
 	// issued the token. Omitting `sorting` reuses the default sort and only succeeds when that default
@@ -89968,7 +90253,8 @@ type QueryGrantsRequest struct {
 	PageToken OptNilPageToken `json:"page_token"`
 	// Extra principal fields to add onto each grant's `user` or `team`. Omit it and those objects stay
 	// refs. An unrecognised value is rejected.
-	Expand  []GrantExpand                `json:"expand"`
+	Expand []GrantExpand `json:"expand"`
+	// How to order the results: the field to sort by and the direction.
 	Sorting OptQueryGrantsRequestSorting `json:"sorting"`
 	// Filter criteria for querying grants. Combined with AND.
 	Filter []QueryGrantsRequestFilterItem `json:"filter"`
@@ -90061,6 +90347,7 @@ func (s *QueryGrantsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
+// How to order the results: the field to sort by and the direction.
 type QueryGrantsRequestSorting struct {
 	// The field to sort by.
 	Field GrantSortingField `json:"field"`
@@ -90091,6 +90378,7 @@ func (s *QueryGrantsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of grants.
 // Ref: #
 type QueryGrantsResponse struct {
+	// The page of grants, in the requested order.
 	Grants []Grant `json:"grants"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results. The follow-up request must repeat the same `sorting` that produced this token (omit
@@ -90402,6 +90690,8 @@ func (*QueryIdpsNotFound) queryIdpsRes() {}
 // Request to query the identity providers of a project.
 // Ref: #
 type QueryIdpsRequest struct {
+	// The most results to return in one page, from 1 to 100. The default is 20; `next_page_token`
+	// continues a longer list.
 	Limit OptLimit `json:"limit"`
 	// Token to retrieve the next page of results. Must be sent with the same `sorting` as the request that
 	// issued the token. Omitting `sorting` reuses the default sort and only succeeds when that default
@@ -90521,6 +90811,7 @@ func (s *QueryIdpsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of identity providers.
 // Ref: #
 type QueryIdpsResponse struct {
+	// The page of identity providers, in the requested order.
 	Idps []IdpResponse `json:"idps"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results. The follow-up request must repeat the same `sorting` that produced this token (omit
@@ -90830,12 +91121,15 @@ func (*QueryProjectsForbidden) queryProjectsRes() {}
 // Request to query projects.
 // Ref: #
 type QueryProjectsRequest struct {
+	// The most results to return in one page, from 1 to 100. The default is 20; `next_page_token`
+	// continues a longer list.
 	Limit OptLimit `json:"limit"`
 	// Token to retrieve the next page of results. Must be sent with the same `sorting` as the request that
 	// issued the token. Omitting `sorting` reuses the default sort and only succeeds when that default
 	// matches the token.
-	PageToken OptNilPageToken                `json:"page_token"`
-	Sorting   OptQueryProjectsRequestSorting `json:"sorting"`
+	PageToken OptNilPageToken `json:"page_token"`
+	// How to order the results: the field to sort by and the direction.
+	Sorting OptQueryProjectsRequestSorting `json:"sorting"`
 	// Filter criteria for querying projects.
 	Filter []QueryProjectsRequestFilterItem `json:"filter"`
 }
@@ -90917,6 +91211,7 @@ func (s *QueryProjectsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
+// How to order the results: the field to sort by and the direction.
 type QueryProjectsRequestSorting struct {
 	// The field to sort by.
 	Field FilterField `json:"field"`
@@ -90947,6 +91242,7 @@ func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of projects.
 // Ref: #
 type QueryProjectsResponse struct {
+	// The page of projects, in the requested order.
 	Projects []ProjectResponse `json:"projects"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results. The follow-up request must repeat the same `sorting` that produced this token (omit
@@ -91260,10 +91556,13 @@ func (*QuerySessionsForbidden) querySessionsRes() {}
 // Request to query the sessions of a project.
 // Ref: #
 type QuerySessionsRequest struct {
+	// The most results to return in one page, from 1 to 100. The default is 20; `next_page_token`
+	// continues a longer list.
 	Limit OptLimit `json:"limit"`
 	// Token to retrieve the next page of results.
-	PageToken OptNilPageToken                `json:"page_token"`
-	Sorting   OptQuerySessionsRequestSorting `json:"sorting"`
+	PageToken OptNilPageToken `json:"page_token"`
+	// How to order the results: the field to sort by and the direction.
+	Sorting OptQuerySessionsRequestSorting `json:"sorting"`
 	// Filter criteria for querying sessions.
 	Filter []QuerySessionsRequestFilterItem `json:"filter"`
 }
@@ -91345,6 +91644,7 @@ func (s *QuerySessionsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
+// How to order the results: the field to sort by and the direction.
 type QuerySessionsRequestSorting struct {
 	// The field to sort by.
 	Field SessionSortField `json:"field"`
@@ -91375,6 +91675,7 @@ func (s *QuerySessionsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of sessions.
 // Ref: #
 type QuerySessionsResponse struct {
+	// The page of sessions, in the requested order.
 	Sessions []SessionResponse `json:"sessions"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -91713,12 +92014,15 @@ func (*QueryTeamsNotFound) queryTeamsRes() {}
 // Request to query the teams of a project.
 // Ref: #
 type QueryTeamsRequest struct {
+	// The most results to return in one page, from 1 to 100. The default is 20; `next_page_token`
+	// continues a longer list.
 	Limit OptLimit `json:"limit"`
 	// Token to retrieve the next page of results. Must be sent with the same `sorting` as the request that
 	// issued the token. Omitting `sorting` reuses the default sort and only succeeds when that default
 	// matches the token.
-	PageToken OptNilPageToken             `json:"page_token"`
-	Sorting   OptQueryTeamsRequestSorting `json:"sorting"`
+	PageToken OptNilPageToken `json:"page_token"`
+	// How to order the results: the field to sort by and the direction.
+	Sorting OptQueryTeamsRequestSorting `json:"sorting"`
 	// Filter criteria for querying teams.
 	Filter []QueryTeamsRequestFilterItem `json:"filter"`
 }
@@ -91800,6 +92104,7 @@ func (s *QueryTeamsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
+// How to order the results: the field to sort by and the direction.
 type QueryTeamsRequestSorting struct {
 	// The field to sort by.
 	Field TeamFilterField `json:"field"`
@@ -91830,6 +92135,7 @@ func (s *QueryTeamsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of teams.
 // Ref: #
 type QueryTeamsResponse struct {
+	// The page of teams, in the requested order.
 	Teams []TeamResponse `json:"teams"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results. The follow-up request must repeat the same `sorting` that produced this token (omit
@@ -92141,6 +92447,8 @@ func (*QueryUsersForbidden) queryUsersRes() {}
 // Request to query the users of a project.
 // Ref: #
 type QueryUsersRequest struct {
+	// The most results to return in one page, from 1 to 100. The default is 20; `next_page_token`
+	// continues a longer list.
 	Limit OptLimit `json:"limit"`
 	// Token to retrieve the next page of results. Must be sent with the same `sorting` as the request that
 	// issued the token. Omitting `sorting` reuses the default sort and only succeeds when that default
@@ -92148,7 +92456,8 @@ type QueryUsersRequest struct {
 	PageToken OptNilPageToken `json:"page_token"`
 	// Related collections to embed on each user. Omit it and no embedded collection is returned. An
 	// unrecognised value is rejected.
-	Expand  []UserExpand                `json:"expand"`
+	Expand []UserExpand `json:"expand"`
+	// How to order the results: the field to sort by and the direction.
 	Sorting OptQueryUsersRequestSorting `json:"sorting"`
 	// Filter criteria for querying users. Criteria are combined with AND.
 	Filter []QueryUsersRequestFilterItem `json:"filter"`
@@ -92241,6 +92550,7 @@ func (s *QueryUsersRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
+// How to order the results: the field to sort by and the direction.
 type QueryUsersRequestSorting struct {
 	// The field to sort by.
 	Field UserSortField `json:"field"`
@@ -92271,6 +92581,7 @@ func (s *QueryUsersRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of users.
 // Ref: #
 type QueryUsersResponse struct {
+	// The page of users, in the requested order.
 	Users []User `json:"users"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results.
@@ -93297,7 +93608,8 @@ type ReleaseContentHash string
 // Ref: #
 type ReleaseCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -93327,8 +93639,11 @@ type ReleaseCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptReleaseCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -93760,11 +94075,16 @@ func (s *ReleaseCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // [release]: /docs/concepts/repo-config
 // Ref: #
 type ReleaseCreatedPayload struct {
-	ContentHash OptString                           `json:"content_hash"`
-	Message     OptString                           `json:"message"`
-	GitSha      OptString                           `json:"git_sha"`
-	GitDirty    OptBool                             `json:"git_dirty"`
-	Pointers    []ReleaseCreatedPayloadPointersItem `json:"pointers"`
+	// The hash of the release's content.
+	ContentHash OptString `json:"content_hash"`
+	// The message the release was created with.
+	Message OptString `json:"message"`
+	// The Git commit the release was built from.
+	GitSha OptString `json:"git_sha"`
+	// Whether the Git working tree had uncommitted changes when the release was built.
+	GitDirty OptBool `json:"git_dirty"`
+	// The revisions the release pins, one for each resource.
+	Pointers []ReleaseCreatedPayloadPointersItem `json:"pointers"`
 }
 
 // GetContentHash returns the value of ContentHash.
@@ -93818,8 +94138,11 @@ func (s *ReleaseCreatedPayload) SetPointers(val []ReleaseCreatedPayloadPointersI
 }
 
 type ReleaseCreatedPayloadPointersItem struct {
-	Kind       OptString `json:"kind"`
-	Handle     OptString `json:"handle"`
+	// The kind of the resource the pointer names.
+	Kind OptString `json:"kind"`
+	// The handle of the resource the pointer names.
+	Handle OptString `json:"handle"`
+	// The ID of the revision of the resource the release pins.
 	RevisionID OptString `json:"revision_id"`
 }
 
@@ -94132,6 +94455,7 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 // The release is revoked and cannot be deployed.
 // Ref: #
 type ReleaseRevokedConflict struct {
+	// The error code, always `rel.revoked` for this error.
 	Code string `json:"code"`
 	// Human-readable explanation of the error.
 	Message string `json:"message"`
@@ -94161,7 +94485,8 @@ func (s *ReleaseRevokedConflict) SetMessage(val string) {
 // Ref: #
 type ReleaseRevokedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -94191,8 +94516,11 @@ type ReleaseRevokedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptReleaseRevokedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -95447,7 +95775,8 @@ func (s *ReqInvalidDetails) init() ReqInvalidDetails {
 // Ref: #
 type RequestAPIEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -95477,8 +95806,11 @@ type RequestAPIEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptRequestAPIEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                        `json:"delegation_id"`
-	Grantor        OptString                        `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -95906,12 +96238,16 @@ func (s *RequestAPIEventDelegationType) UnmarshalText(data []byte) error {
 // Payload for `request.api` events.
 // Ref: #
 type RequestAPIPayload struct {
+	// The `operationId` of the operation the request called.
 	OperationID string `json:"operation_id"`
 	// HTTP method.
-	Method        RequestAPIPayloadMethod `json:"method"`
-	RouteTemplate string                  `json:"route_template"`
-	Status        int                     `json:"status"`
-	DurationMs    int64                   `json:"duration_ms"`
+	Method RequestAPIPayloadMethod `json:"method"`
+	// The route template of the request, such as `/users/{user_id}`.
+	RouteTemplate string `json:"route_template"`
+	// The HTTP status code of the response.
+	Status int `json:"status"`
+	// How long the request took to answer, in milliseconds.
+	DurationMs int64 `json:"duration_ms"`
 }
 
 // GetOperationID returns the value of OperationID.
@@ -96356,7 +96692,8 @@ func (*RevokeMySessionNoContent) revokeMySessionRes() {}
 type RevokeReleaseConflict struct {
 	Code ErrorCode `json:"code"`
 	// Human-readable explanation of the error.
-	Message string                       `json:"message"`
+	Message string `json:"message"`
+	// What blocks the revocation: the origins that still serve the release.
 	Details RevokeReleaseConflictDetails `json:"details"`
 }
 
@@ -96392,6 +96729,7 @@ func (s *RevokeReleaseConflict) SetDetails(val RevokeReleaseConflictDetails) {
 
 func (*RevokeReleaseConflict) revokeReleaseRes() {}
 
+// What blocks the revocation: the origins that still serve the release.
 type RevokeReleaseConflictDetails struct {
 	// Every origin that still serves the release.
 	Origins []RevokeReleaseConflictDetailsOriginsItem `json:"origins"`
@@ -98345,8 +98683,9 @@ func (s *SchRevisionConflictDetails) init() SchRevisionConflictDetails {
 type Schema struct {
 	// The schema's ID: the server-generated `sch_*` identifier, or the customer-supplied `$id` URI when
 	// the document declared one at creation.
-	ID       string         `json:"id"`
-	Schema   SchemaDocument `json:"schema"`
+	ID     string         `json:"id"`
+	Schema SchemaDocument `json:"schema"`
+	// Details about the schema that the server sets, such as when it was published.
 	Metadata SchemaMetadata `json:"metadata"`
 }
 
@@ -98387,7 +98726,8 @@ func (*Schema) publishSchemaRes() {}
 // Ref: #
 type SchemaCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -98417,8 +98757,11 @@ type SchemaCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptSchemaCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                           `json:"delegation_id"`
-	Grantor        OptString                           `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -100275,7 +100618,8 @@ func (s *SessionCookie) SetRoles(val []string) {
 // Ref: #
 type SessionDeletedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -100305,8 +100649,11 @@ type SessionDeletedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptSessionDeletedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                            `json:"delegation_id"`
-	Grantor        OptString                            `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -100734,6 +101081,7 @@ func (s *SessionDeletedEventDelegationType) UnmarshalText(data []byte) error {
 // Payload for `session.deleted` events.
 // Ref: #
 type SessionDeletedPayload struct {
+	// Why the session was deleted.
 	Reason OptString `json:"reason"`
 }
 
@@ -100751,7 +101099,8 @@ func (s *SessionDeletedPayload) SetReason(val OptString) {
 // Ref: #
 type SessionEstablishedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -100781,8 +101130,11 @@ type SessionEstablishedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptSessionEstablishedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                `json:"delegation_id"`
-	Grantor        OptString                                `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -101210,6 +101562,7 @@ func (s *SessionEstablishedEventDelegationType) UnmarshalText(data []byte) error
 // Payload for `session.established` events.
 // Ref: #
 type SessionEstablishedPayload struct {
+	// The ID of the user the session was established for.
 	UserID OptString `json:"user_id"`
 }
 
@@ -101304,6 +101657,7 @@ type SessionProofToken string
 // Ref: #
 type SessionResponse struct {
 	SessionID SessionID `json:"session_id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// Current lifecycle state of the session:
 	//
@@ -104550,7 +104904,8 @@ func (s *TeamAlreadyExistsDetails) init() TeamAlreadyExistsDetails {
 // Ref: #
 type TeamCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -104580,8 +104935,11 @@ type TeamCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptTeamCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                         `json:"delegation_id"`
-	Grantor        OptString                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -105010,7 +105368,8 @@ func (s *TeamCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // Ref: #
 type TeamDeactivatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -105040,8 +105399,11 @@ type TeamDeactivatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptTeamDeactivatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                             `json:"delegation_id"`
-	Grantor        OptString                             `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -105662,6 +106024,7 @@ func (s *TeamOwnsProjectDetails) init() TeamOwnsProjectDetails {
 // changed fields.
 // Ref: #
 type TeamPayload struct {
+	// The name of the team.
 	Name OptString `json:"name"`
 }
 
@@ -105985,7 +106348,8 @@ func (s *TeamTeamNotFoundDetails) init() TeamTeamNotFoundDetails {
 // Ref: #
 type TeamUpdatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -106015,8 +106379,11 @@ type TeamUpdatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptTeamUpdatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                         `json:"delegation_id"`
-	Grantor        OptString                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -108303,12 +108670,14 @@ func (s *UpdateVariablesRequest) init() UpdateVariablesRequest {
 // expects.
 // Ref: #
 type User struct {
+	// The unique ID of the user.
 	ID UserID `json:"id"`
 	// The ID of the schema that defines the content of `attributes`. `getSchema`
 	// (`GET /schemas/{schema_id}`) returns it, and `publishSchema` (`POST /schemas`) creates one.
 	Schema     string         `json:"schema"`
 	Attributes UserAttributes `json:"attributes"`
-	Metadata   UserMetadata   `json:"metadata"`
+	// Details about the user that the server sets, such as when it was created.
+	Metadata UserMetadata `json:"metadata"`
 	// The current value of the user schema's designated identifier (`x-identifier`), resolved when the
 	// user is read. Absent when the schema designates no identifier or the user carries no value for it.
 	Identifier OptString `json:"identifier"`
@@ -108740,7 +109109,8 @@ func (s *UserCreateEvaluateRequestOperation) UnmarshalText(data []byte) error {
 // Ref: #
 type UserCreateFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -108770,8 +109140,11 @@ type UserCreateFailedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptUserCreateFailedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                              `json:"delegation_id"`
-	Grantor        OptString                              `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -109402,7 +109775,8 @@ func (s *UserCreatePolicyOperation) UnmarshalText(data []byte) error {
 // Ref: #
 type UserCreatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -109432,8 +109806,11 @@ type UserCreatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptUserCreatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                         `json:"delegation_id"`
-	Grantor        OptString                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -109862,9 +110239,12 @@ func (s *UserCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // for schema fields marked `x-audit`.
 // Ref: #
 type UserCreatedPayload struct {
-	SchemaID      OptString                       `json:"schema_id"`
-	AttributeKeys []string                        `json:"attribute_keys"`
-	Attributes    OptUserCreatedPayloadAttributes `json:"attributes"`
+	// The ID of the user schema the user was created under.
+	SchemaID OptString `json:"schema_id"`
+	// The names of the attributes the user was created with. Their values are in `attributes`.
+	AttributeKeys []string `json:"attribute_keys"`
+	// The attributes the user was created with.
+	Attributes OptUserCreatedPayloadAttributes `json:"attributes"`
 }
 
 // GetSchemaID returns the value of SchemaID.
@@ -109897,6 +110277,7 @@ func (s *UserCreatedPayload) SetAttributes(val OptUserCreatedPayloadAttributes) 
 	s.Attributes = val
 }
 
+// The attributes the user was created with.
 type UserCreatedPayloadAttributes map[string]jx.Raw
 
 func (s *UserCreatedPayloadAttributes) init() UserCreatedPayloadAttributes {
@@ -109912,7 +110293,8 @@ func (s *UserCreatedPayloadAttributes) init() UserCreatedPayloadAttributes {
 // Ref: #
 type UserDeletedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -109942,8 +110324,11 @@ type UserDeletedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptUserDeletedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                         `json:"delegation_id"`
-	Grantor        OptString                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -111412,7 +111797,8 @@ type UserSchema struct {
 	// Must be `user-schema`. It selects this schema type in a create request.
 	Kind string `json:"kind"`
 	// The URI of the user meta-schema version this schema uses.
-	MetaSchema             url.URL     `json:"metaSchema"`
+	MetaSchema url.URL `json:"metaSchema"`
+	// Which authentication methods users of this schema can use, and whether each is enabled.
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
 	// Path of the leaf property whose value identifies a user. Nested leaves are addressed by their
 	// dot-joined attribute path. The property must carry `x-unique` "project".
@@ -111736,7 +112122,8 @@ func (s *UserTeamMembershipStatus) UnmarshalText(data []byte) error {
 // Ref: #
 type UserUpdatedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -111766,8 +112153,11 @@ type UserUpdatedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptUserUpdatedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                         `json:"delegation_id"`
-	Grantor        OptString                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -112196,8 +112586,10 @@ func (s *UserUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 // values only for fields marked `x-audit`.
 // Ref: #
 type UserUpdatedPayload struct {
-	AttributeKeys []string                        `json:"attribute_keys"`
-	Attributes    OptUserUpdatedPayloadAttributes `json:"attributes"`
+	// The names of the attributes the update changed. Their values are in `attributes`.
+	AttributeKeys []string `json:"attribute_keys"`
+	// The attributes the update changed, with their new values.
+	Attributes OptUserUpdatedPayloadAttributes `json:"attributes"`
 }
 
 // GetAttributeKeys returns the value of AttributeKeys.
@@ -112220,6 +112612,7 @@ func (s *UserUpdatedPayload) SetAttributes(val OptUserUpdatedPayloadAttributes) 
 	s.Attributes = val
 }
 
+// The attributes the update changed, with their new values.
 type UserUpdatedPayloadAttributes map[string]jx.Raw
 
 func (s *UserUpdatedPayloadAttributes) init() UserUpdatedPayloadAttributes {
@@ -112863,7 +113256,8 @@ type VariableName string
 // Ref: #
 type VariableRemovedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -112893,8 +113287,11 @@ type VariableRemovedEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptVariableRemovedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                             `json:"delegation_id"`
-	Grantor        OptString                             `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -113322,6 +113719,7 @@ func (s *VariableRemovedEventDelegationType) UnmarshalText(data []byte) error {
 // Payload for `variable.removed` events, one value of the variable removed.
 // Ref: #
 type VariableRemovedPayload struct {
+	// The kind of the variable that was removed: `primary` or `preview`.
 	Kind OptVariableRemovedPayloadKind `json:"kind"`
 }
 
@@ -113335,6 +113733,7 @@ func (s *VariableRemovedPayload) SetKind(val OptVariableRemovedPayloadKind) {
 	s.Kind = val
 }
 
+// The kind of the variable that was removed: `primary` or `preview`.
 type VariableRemovedPayloadKind string
 
 const (
@@ -113478,7 +113877,8 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 // Ref: #
 type VariableSetEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// The ID of the project, as `createProject` (`POST /projects`) returns it.
 	ProjectID ProjectID `json:"project_id"`
 	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
@@ -113508,8 +113908,11 @@ type VariableSetEvent struct {
 	TokenID OptString `json:"token_id"`
 	// The kind of delegation. Absent when unset.
 	DelegationType OptVariableSetEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                         `json:"delegation_id"`
-	Grantor        OptString                         `json:"grantor"`
+	// The ID of the delegation the actor acted under. Absent when the event was not made under a
+	// delegation.
+	DelegationID OptString `json:"delegation_id"`
+	// Who granted the delegation. Absent when the event was not made under a delegation.
+	Grantor OptString `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
 	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
@@ -113938,8 +114341,10 @@ func (s *VariableSetEventDelegationType) UnmarshalText(data []byte) error {
 // included, plain or encrypted.
 // Ref: #
 type VariableSetPayload struct {
-	Kind   OptVariableSetPayloadKind `json:"kind"`
-	Secret OptBool                   `json:"secret"`
+	// The kind of the variable that was set: `primary` or `preview`.
+	Kind OptVariableSetPayloadKind `json:"kind"`
+	// Whether the variable is a secret. A secret's value is never returned.
+	Secret OptBool `json:"secret"`
 }
 
 // GetKind returns the value of Kind.
@@ -113962,6 +114367,7 @@ func (s *VariableSetPayload) SetSecret(val OptBool) {
 	s.Secret = val
 }
 
+// The kind of the variable that was set: `primary` or `preview`.
 type VariableSetPayloadKind string
 
 const (

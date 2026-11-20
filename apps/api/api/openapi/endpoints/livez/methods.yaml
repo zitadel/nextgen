@@ -18,6 +18,11 @@ get:
       description: The server process serves HTTP.
       content:
         text/plain:
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 4
+            example: ok
           examples:
             ok:
               summary: Server is live

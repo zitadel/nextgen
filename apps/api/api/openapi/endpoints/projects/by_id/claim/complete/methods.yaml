@@ -33,6 +33,10 @@ post:
         application/json:
           schema:
             $ref: complete-claim-response.yaml
+          example:
+            project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+            team_id: team_01KZZY8PX8K8ATNVDSMRCZY4N1
+            claimed_at: '2026-01-15T09:30:00Z'
     '400':
       description: Invalid request body.
       content:

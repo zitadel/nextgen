@@ -11,7 +11,9 @@ required:
 properties:
   connection_id:
     type: string
+    minLength: 1
     description: The IdP connection the account signed in through.
   user_id:
     type: string
+    minLength: 1
     description: The user the provider account is linked to.

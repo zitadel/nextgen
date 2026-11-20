@@ -3,6 +3,7 @@ flows:
   authorizationCode:
     authorizationUrl: https://acc.nextgen.zitadel.com/oauth/authorize
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
+    refreshUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes:
       openid: OpenID Connect scope
       profile: Access to the user's profile information

@@ -6,6 +6,8 @@ required:
 properties:
   revisions:
     type: array
+    maxItems: 100
+    description: 'The page of revisions of the identity provider, newest first.'
     items:
       $ref: ../../idp-response.yaml
   next_page_token:

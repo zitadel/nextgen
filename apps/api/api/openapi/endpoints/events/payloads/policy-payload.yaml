@@ -12,9 +12,11 @@ required:
 properties:
   operation:
     type: string
+    minLength: 1
     description: The operation the policy guards, for example `auth.factor.password.set`.
   revision_id:
     type: string
+    minLength: 1
     description: The revision the publish appended.
   config:
     type: object

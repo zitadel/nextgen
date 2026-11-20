@@ -12,5 +12,6 @@ properties:
     description: Shared by an invitation and every invitation that replaces it.
   reason:
     type: string
+    description: 'Why the invitation was cancelled: always `cancelled`, an administrator cancelled it.'
     enum:
       - cancelled

@@ -6,6 +6,7 @@ required:
 properties:
   csrf_token:
     type: string
+    minLength: 1
     description: |
       Send it in the `X-Zitadel-CSRF` header on state-changing requests the
       session cookie authenticates.

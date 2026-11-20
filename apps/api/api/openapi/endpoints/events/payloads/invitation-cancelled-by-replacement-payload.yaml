@@ -13,6 +13,7 @@ properties:
     description: Shared by an invitation and every invitation that replaces it.
   reason:
     type: string
+    description: 'Why the invitation was cancelled: always `replaced`, a newer invitation replaced it.'
     enum:
       - replaced
   replaced_by_invitation_id:

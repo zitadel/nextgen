@@ -12,6 +12,7 @@ properties:
     description: Always `passkey`; the discriminator of the payload union.
   credential_id:
     type: string
+    minLength: 1
     description: The ID of the credential that was used.
     example: 'Y3JlZGVudGlhbDE='
   user_verified:

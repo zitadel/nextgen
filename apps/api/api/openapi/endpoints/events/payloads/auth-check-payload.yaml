@@ -11,7 +11,11 @@ required:
 properties:
   check_id:
     type: string
+    minLength: 1
+    description: 'The ID of the check.'
   check_type:
     type: string
+    description: 'The type of the check.'
   auth_attempt_id:
     type: string
+    description: 'The ID of the authentication attempt the check ran in.'

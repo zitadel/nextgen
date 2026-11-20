@@ -8,10 +8,12 @@ required:
 properties:
   id:
     type: string
+    minLength: 1
     description: The unique identifier of the link.
     example: idplink_01KWH3B5Q8Z6V4N2M0X9C7R1TD
   connection_id:
     type: string
+    minLength: 1
     description: |
       The ID of the identity provider connection the account signs in through,
       not a revision ID. `getIdp` (`GET /idps/{idp_id}`) resolves it.

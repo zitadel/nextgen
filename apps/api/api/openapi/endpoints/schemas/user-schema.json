@@ -36,7 +36,8 @@
       "description": "The URI of the user meta-schema version this schema uses."
     },
     "x-auth-methods": {
-      "$ref": "auth-methods.json"
+      "$ref": "auth-methods.json",
+      "description": "Which authentication methods users of this schema can use, and whether each is enabled."
     },
     "x-identifier": {
       "type": "string",
@@ -49,6 +50,7 @@
     "x-display": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 20,
       "items": {
         "type": "string",
         "minLength": 1

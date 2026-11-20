@@ -7,7 +7,9 @@ required:
 properties:
   code:
     type: string
+    description: 'The error code, always `rel.revoked` for this error.'
     const: rel.revoked
   message:
     type: string
+    minLength: 1
     description: Human-readable explanation of the error.

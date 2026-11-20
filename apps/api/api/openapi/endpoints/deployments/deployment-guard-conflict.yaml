@@ -8,12 +8,15 @@ required:
 properties:
   code:
     type: string
+    description: 'The error code, always `dep.conflict` for this error.'
     const: dep.conflict
   message:
     type: string
+    minLength: 1
     description: Human-readable explanation of the error.
   details:
     type: object
+    description: 'What the guard found: the deployment this write would replace.'
     required:
       - deployment
     properties:

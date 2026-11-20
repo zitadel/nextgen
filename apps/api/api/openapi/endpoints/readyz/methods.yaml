@@ -18,6 +18,11 @@ get:
       description: The server and its database answer.
       content:
         text/plain:
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 4
+            example: ok
           examples:
             ok:
               summary: Server is ready
@@ -26,6 +31,11 @@ get:
       description: The database did not answer within a second.
       content:
         text/plain:
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 4
+            example: fail
           examples:
             fail:
               summary: Server is not ready

@@ -4,7 +4,10 @@ description: Payload for `authz.granted` events.
 properties:
   principal_type:
     type: string
+    description: 'The type of principal that received the grant.'
   principal_id:
     type: string
+    description: 'The ID of the principal that received the grant.'
   relation:
     type: string
+    description: 'The relation the grant gives the principal.'

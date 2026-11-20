@@ -7,6 +7,7 @@ description: |
 properties:
   name:
     type: string
+    minLength: 1
     description: |
       Field name, matching a property in the flow's user schema. Carries
       the submitted value back to the server.
@@ -25,6 +26,7 @@ properties:
       its own.
   text_key:
     type: string
+    minLength: 1
     description: Localization key for the field label.
     example: login.field.email
   autocomplete:
@@ -102,6 +104,7 @@ properties:
         description: Maximum length in characters (inclusive). Mirrors `maxLength`.
       enum:
         type: array
+        maxItems: 1000
         items:
           type: string
         description: |

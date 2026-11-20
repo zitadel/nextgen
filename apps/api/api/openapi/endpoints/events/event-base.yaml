@@ -15,10 +15,12 @@ required:
 properties:
   id:
     type: string
+    minLength: 1
     description: The event ID, in the form `evt_<opaque>`.
     example: evt_01HZYABCDEFGHJKMNPQRSTVWXY
   project_id:
     $ref: ../../components/schemas/project-id.yaml
+    description: 'The ID of the project, as `createProject` (`POST /projects`) returns it.'
   team_id:
     description: The team the actor operated under when the event was emitted, if any.
     oneOf:
@@ -26,6 +28,7 @@ properties:
       - type: 'null'
   event_type:
     type: string
+    minLength: 1
     # The event types are catalogued in docs/design/api/events-catalog.md.
     description: |
       The event type, dot-separated, for example `user.created`. It says which
@@ -108,8 +111,10 @@ properties:
       - exchanged
   delegation_id:
     type: string
+    description: 'The ID of the delegation the actor acted under. Absent when the event was not made under a delegation.'
   grantor:
     type: string
+    description: 'Who granted the delegation. Absent when the event was not made under a delegation.'
   fingerprint:
     type: string
     description: A device fingerprint ID that correlates events from the same device.

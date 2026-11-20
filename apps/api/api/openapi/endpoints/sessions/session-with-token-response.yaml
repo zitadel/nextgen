@@ -10,6 +10,7 @@ properties:
     $ref: session-response.yaml
   session_token:
     type: string
+    minLength: 1
     description: |
       Bearer token authorising management of this session (GET and DELETE).
       For anonymous sessions this token is superseded when a handoff exchange completes.

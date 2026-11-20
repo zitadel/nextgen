@@ -20,6 +20,31 @@ get:
         application/json:
           schema:
             $ref: ../branding-revision-response.yaml
+          example:
+            id: brnd_01KWH3B72K7M7F0N9WD3P2E4YM
+            created_at: '2026-01-15T09:30:00Z'
+            branding:
+              $schema: example
+              layout: centered
+              liquid_template: example
+              logo_url: https://example.com/path
+              hero_url: https://example.com/path
+              theme:
+                mode: auto
+                light:
+                  logo_url: https://cdn.example.com/logo-on-light.svg
+                  palette: {}
+                dark:
+                  logo_url: https://cdn.example.com/logo-on-light.svg
+                  palette: {}
+              typography:
+                font_family: Inter, ui-sans-serif, sans-serif
+                font_url: https://fonts.googleapis.com/css2?family=Inter&display=swap
+                scale: 1
+              shape:
+                radius: 10
+                density: regular
+                logo_scale: 1
     '404':
       description: No branding revision was found with the given ID.
       content:

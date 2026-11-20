@@ -27,6 +27,21 @@ post:
         application/json:
           schema:
             $ref: invitation-lookup-response.yaml
+          example:
+            project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+            project_name: example
+            created_by: user_01JC9X3N5Q7S9U1W3Y5A7C9E1G
+            created_by_type: human
+            inviter:
+              user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+              identifier: ada@example.com
+              identifier_property: email
+              display: Ada Lovelace
+            expires_at: '2026-01-15T09:30:00Z'
+            status: pending
+            type: project_member
+            project_member:
+              relation: viewer
     '400':
       description: The request body was not acceptable.
       content:

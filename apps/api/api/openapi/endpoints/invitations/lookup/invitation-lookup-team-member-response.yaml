@@ -11,6 +11,7 @@ allOf:
     properties:
       type:
         type: string
+        description: 'The kind of invitation: always `team_member`.'
         enum:
           - team_member
       team_member:

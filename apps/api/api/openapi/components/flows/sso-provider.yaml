@@ -5,10 +5,12 @@ description: An identity provider (an external sign-in such as Google) that a st
 properties:
   id:
     type: string
+    minLength: 1
     description: Provider instance identifier.
     example: google
   name:
     type: string
+    minLength: 1
     description: Display name for the provider.
     example: Google
   template:

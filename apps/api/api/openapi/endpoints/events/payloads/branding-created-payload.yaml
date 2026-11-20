@@ -6,9 +6,13 @@ description: |
 properties:
   layout:
     type: string
+    description: 'The login layout of the branding revision.'
   logo_url:
     type: string
+    description: 'The URL of the logo of the branding revision.'
   font_url:
     type: string
+    description: 'The URL of the font of the branding revision.'
   hero_url:
     type: string
+    description: 'The URL of the hero image of the branding revision.'

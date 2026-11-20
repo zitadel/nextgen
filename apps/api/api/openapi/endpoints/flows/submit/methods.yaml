@@ -106,6 +106,78 @@ post:
         application/json:
           schema:
             $ref: ../../../components/flows/flow-response.yaml
+          example:
+            id: flow_01H8Z
+            session_id: sess_01KWH3B72K7M7F0N9WD3P2E4YM
+            session_token: example
+            step:
+              name: login
+              texts:
+                title_key: login.title
+                description_key: login.description.sso
+              fields:
+                - name: email
+                  type: email
+                  text_key: login.field.email
+                  autocomplete: username
+                  required: true
+                - name: password
+                  type: password
+                  text_key: login.field.password
+                  autocomplete: current-password
+                  required: true
+              actions:
+                - name: submit
+                  kind: submit
+                  text_key: login.action.submit
+                  primary: true
+                - name: register
+                  kind: navigate
+                  text_key: login.action.register
+                - name: recover
+                  kind: navigate
+                  text_key: login.action.recover
+              gates:
+                captcha:
+                  kind: captcha
+                  provider: altcha
+                  config:
+                    algorithm: SHA-256
+                    challenge: abc123
+                    salt: xyz789
+                    max_number: 100000
+              sso_providers:
+                - id: google
+                  name: Google
+                  template: google
+                - id: entra
+                  name: Microsoft
+                  template: entraid
+            branding:
+              $schema: example
+              layout: centered
+              liquid_template: example
+              logo_url: https://example.com/path
+              hero_url: https://example.com/path
+              theme:
+                mode: auto
+                light:
+                  logo_url: https://cdn.example.com/logo-on-light.svg
+                  palette: {}
+                dark:
+                  logo_url: https://cdn.example.com/logo-on-light.svg
+                  palette: {}
+              typography:
+                font_family: Inter, ui-sans-serif, sans-serif
+                font_url: https://fonts.googleapis.com/css2?family=Inter&display=swap
+                scale: 1
+              shape:
+                radius: 10
+                density: regular
+                logo_scale: 1
+            redirect_uri: https://example.com/path
+            handoff_token: example
+            handoff_token_expires_at: '2026-01-15T09:30:00Z'
     '400':
       description: |
         The submission was refused, in one of two shapes:

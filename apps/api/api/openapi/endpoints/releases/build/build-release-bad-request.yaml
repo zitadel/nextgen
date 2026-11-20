@@ -16,9 +16,11 @@ allOf:
     properties:
       details:
         type: object
+        description: 'What failed: the bundle resources that did not validate.'
         properties:
           resources:
             type: array
+            maxItems: 1000
             description: Every bundle resource that failed validation.
             items:
               $ref: bundle-resource-error.yaml

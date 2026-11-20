@@ -6,6 +6,8 @@ required:
 properties:
   invitations:
     type: array
+    maxItems: 100
+    description: 'The page of invitations.'
     items:
       $ref: invitation.yaml
   next_page_token:

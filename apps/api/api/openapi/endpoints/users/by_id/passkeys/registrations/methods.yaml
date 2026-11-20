@@ -31,6 +31,9 @@ post:
         application/json:
           schema:
             $ref: begin-user-passkey-registration-response.yaml
+          example:
+            registration_id: reg_01KWH3B72K7M7F0N9WD3P2E4YM
+            options: {}
     '400':
       description: The provided input was not valid.
       content:

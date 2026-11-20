@@ -1,5 +1,6 @@
 title: Origin
 type: string
+minLength: 1
 description: |
   A web origin: `http` or `https`, a lowercase host (a DNS name or a
   bracketed IPv6 address) and, when it is not the scheme's default, a port
