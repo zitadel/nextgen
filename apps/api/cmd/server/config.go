@@ -85,15 +85,17 @@ type PlatformConfig struct {
 	ProjectID string `mapstructure:"project_id"`
 
 	// BootstrapProject, when true, ensures the well-known platform project
-	// (domain.PlatformProjectID) exists at startup (idempotent insert) and
-	// resolves it as the default. Off by default: no environment gets a
+	// (domain.PlatformProjectID) exists when the server seeds (idempotent
+	// insert), at startup or in the seed command, and resolves it as the
+	// default. Off by default: no environment gets a
 	// platform project created silently. Needs no ProjectID. (#605)
 	BootstrapProject bool `mapstructure:"bootstrap_project"`
 
 	// Operators lists, by id, the platform-project users who hold
 	// platform.operator and so administer every project of the deployment
-	// (ADR 075). The server reconciles it at startup: it grants every listed
-	// user that exists and revokes what an earlier list granted. Needs a
+	// (ADR 075). The server reconciles it when it seeds, at startup or in the
+	// seed command: it grants every listed user that exists and revokes what
+	// an earlier list granted. Needs a
 	// platform project, from BootstrapProject or ProjectID.
 	Operators []string `mapstructure:"operators"`
 }

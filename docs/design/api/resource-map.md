@@ -37,7 +37,7 @@ revision for the project.
 
 ```http
 /branding
-/branding/{id}
+/branding/{branding_id}
 ```
 
 Create/list are project-scoped (project id on the request, matching OpenAPI):
@@ -45,7 +45,7 @@ Create/list are project-scoped (project id on the request, matching OpenAPI):
 ```http
 POST /branding                  # publish a new revision
 GET  /branding                  # list revisions for the project, newest first
-GET  /branding/{id}
+GET  /branding/{branding_id}
 ```
 
 Permission names in
@@ -140,7 +140,7 @@ records follow. Only user schemas exist today; the collection is project-scoped.
 
 ```http
 /schemas
-/schemas/{id}
+/schemas/{schema_id}
 ```
 
 Create/list with explicit scope:
@@ -148,10 +148,10 @@ Create/list with explicit scope:
 ```http
 POST /schemas                   # create a user schema
 GET  /schemas?project_id=…&object_type=…
-GET  /schemas/{id}
+GET  /schemas/{schema_id}
 ```
 
-`PATCH`/`DELETE /schemas/{id}` are **not yet exposed** — create, list, and get
+`PATCH`/`DELETE /schemas/{schema_id}` are **not yet exposed** — create, list, and get
 only. Permission names in
 [`system-permission-catalog.md`](system-permission-catalog.md#schemas-user-schemas).
 
@@ -179,9 +179,9 @@ was part of the same sketch. Detail in [`credentials.md`](credentials.md).
 ## Other identity resources
 
 ```http
-/applications/{id}              # registered applications with their OAuth clients
-/idps/{id}
-/grants/{id}
+/applications/{application_id}              # registered applications with their OAuth clients
+/idps/{idp_id}
+/grants/{grant_id}
 /app_groups/{id}                # what used to be called "project" (the authz container)
 ```
 
@@ -227,19 +227,21 @@ sessions; factor changes flow through `auth_attempts`. Detail in
 The UI-orchestration layer that runs on top of auth_attempts. Detail in [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 
 ```http
-POST /flow                      # start a flow run
-GET  /flow/{id}                 # read the current step
-POST /flow/{id}/submit          # submit the current step
+POST /flows                      # start a flow run
+GET  /flows/{flow_id}                 # read the current step
+POST /flows/{flow_id}/submit          # submit the current step
 ```
+
+Until 1.0.0 the three also answer, deprecated, at `/flow`, the collection's name before it became plural ([ADR 077 §4](../../adrs/077-api-path-prefix.md#4-the-root-keeps-answering-through-0x)).
 
 Flow definition management:
 
 ```http
 POST /flow_definitions          # publish a new revision
 GET  /flow_definitions?project_id=…&name=…
-GET  /flow_definitions/{id}
-# planned: POST /flow_definitions/{id}/validate
-# planned: POST /flow_definitions/{id}/simulate
+GET  /flow_definitions/{flow_definition_id}
+# planned: POST /flow_definitions/{flow_definition_id}/validate
+# planned: POST /flow_definitions/{flow_definition_id}/simulate
 ```
 
 A flow definition is an immutable revision ([ADR 035](../../adrs/035-configuration-environments.md)):
@@ -257,7 +259,7 @@ Unified wide-event audit stream. See [ADR 048](../../adrs/048-wide-events-intern
 retention, export).
 
 ```http
-GET /events/{id}?project_id=… # project-scoped get (events not in resource_scope_index)
+GET /events/{event_id}?project_id=… # project-scoped get (events not in resource_scope_index)
 GET /events?project_id=…
          &category=…          # request | auth | session | admin | entity | signal
          &event_type=…
@@ -275,7 +277,7 @@ GET /events?project_id=…
          &page_token=…
 ```
 
-`GET /events/{id}` is **project-scoped**: resolve `project_id` from the
+`GET /events/{event_id}` is **project-scoped**: resolve `project_id` from the
 credential (or require it explicitly), authorize, then load
 `(project_id, id)`. Events are **not** registered in `resource_scope_index`
 (TTL audit volume). List/get authorization uses emit-time `team_id` stored on
@@ -297,10 +299,10 @@ access. The server stores webhooks and does not deliver to them yet.
 ```http
 POST   /webhooks?project_id=…                    # returns the signing secret, this once
 GET    /webhooks?project_id=…                    # newest first
-GET    /webhooks/{id}?project_id=…
-PATCH  /webhooks/{id}?project_id=…               # url, description, event_types, enabled
-DELETE /webhooks/{id}?project_id=…               # removes the row
-POST   /webhooks/{id}/rotate_secret?project_id=… # returns the new secret, this once
+GET    /webhooks/{webhook_id}?project_id=…
+PATCH  /webhooks/{webhook_id}?project_id=…               # url, description, event_types, enabled
+DELETE /webhooks/{webhook_id}?project_id=…               # removes the row
+POST   /webhooks/{webhook_id}/rotate_secret?project_id=… # returns the new secret, this once
 ```
 
 Permission names in

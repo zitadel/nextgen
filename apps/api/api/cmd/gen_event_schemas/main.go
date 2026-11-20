@@ -132,7 +132,7 @@ type webhookDoc struct {
 var webhookByEventType = map[string]webhookDoc{
 	"request.api": {description: "An API request in the project completed. One event per request; " +
 		"the health, liveness, and readiness probes send none. The requester's IP, user agent and origin " +
-		"are in `metadata.client` of the event that `getEvent` (`GET /events/{id}`) returns, and its " +
+		"are in `metadata.client` of the event that `getEvent` (`GET /events/{event_id}`) returns, and its " +
 		"`request_id` joins the other events of the same request to it."},
 
 	"project.created": {description: "A project was created."},
@@ -156,7 +156,7 @@ var webhookByEventType = map[string]webhookDoc{
 	"auth.token.issued": {description: "A token was issued."},
 	"auth.token.revoked": {description: "A token was revoked. Deleting a session revokes its tokens too. " +
 		"Those events have an `entity.id` of `null`; the session's ID is `session_id` of the event that " +
-		"`getEvent` (`GET /events/{id}`) returns."},
+		"`getEvent` (`GET /events/{event_id}`) returns."},
 
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
@@ -228,10 +228,9 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"invitation.created": {description: "An invitation was created, new or as the replacement of another."},
 	"invitation.accepted": {description: "An invitation was accepted. The grant events the acceptance writes " +
-		"share its `request_id`, which is on the event that `getEvent` (`GET /events/{id}`) returns; there are " +
-		"none when the user already holds an identical active grant.",
-		status: statusContracted},
-	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
+		"share its `request_id`, which is on the event that `getEvent` (`GET /events/{event_id}`) returns; there are " +
+		"none when the user already holds an identical active grant."},
+	"invitation.rejected": {description: "An invitation was declined."},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +
 		"or an unaccepted one was deleted by its replacement."},
 

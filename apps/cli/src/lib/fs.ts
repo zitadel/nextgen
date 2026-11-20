@@ -1,6 +1,6 @@
 import { access, readdir, readFile, stat } from "node:fs/promises";
 
-import { isErrno } from "./errors";
+import { isErrno } from "./errno";
 
 /**
  * Whether anything exists at `path`. Any failure to look, not only a missing

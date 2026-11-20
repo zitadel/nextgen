@@ -4,12 +4,13 @@ import { join, posix } from "node:path";
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect } from "vitest";
 
-import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
-import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { ReactPatcher } from "@/lib/orca/patchers/rule/react";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
+import { CliPackage } from "@/lib/upgrade";
 
 /**
  * The CLI version the patcher scaffolds for.
@@ -65,7 +66,9 @@ function aContext(overrides: Partial<PatchContext> = {}): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "http://localhost:8080",
+    defaultServer: "https://api.zitadel.cloud",
     cliVersion: CLI_VERSION,
+    sdkVersion: CliPackage.at(CLI_VERSION).selector(),
     ...overrides,
   };
 }
@@ -110,7 +113,7 @@ function metaSchemaNamedBy(document: unknown): ProjectMetaSchema | undefined {
   if (typeof ref !== "string") {
     return undefined;
   }
-  return projectMetaSchemas(CLI_VERSION).find((file) => {
+  return MetaSchemas.of(CLI_VERSION).files.find((file) => {
     return file.path === posix.normalize(ref);
   });
 }
@@ -136,12 +139,23 @@ function metaSchemaErrors(document: unknown): unknown[] {
  * @returns Its contents, or undefined when this CLI ships none there.
  */
 function metaSchemaContents(path: string): string | undefined {
-  return projectMetaSchemas(CLI_VERSION).find((file) => {
+  return MetaSchemas.of(CLI_VERSION).files.find((file) => {
     return file.path === path;
   })?.contents;
 }
 
 describe("AbstractRulePatcher.plan", () => {
+  it("writes the server's address to .env.local, which the app reads", () => {
+    const env = aRulePatcher()
+      .plan(aContext())
+      .ops.filter(
+        (op): op is Extract<FileOp, { kind: "merge-env" }> =>
+          op.kind === "merge-env" && op.path === ".env.local",
+      );
+
+    expect(env.map((op) => op.entries.ZITADEL_URL)).toContain("http://localhost:8080");
+  });
+
   describe("with a preset and a use case", () => {
     const context = aContext({ preset: "passkey-first", useCase: "consumer" });
 
@@ -170,7 +184,7 @@ describe("AbstractRulePatcher.plan", () => {
 describe("AbstractRulePatcher.patch", () => {
   it("writes this CLI's meta-schemas and reports each one", async ({ dir }) => {
     await write(dir, REACT_APP);
-    const expected = projectMetaSchemas(CLI_VERSION).map((file) => {
+    const expected = MetaSchemas.of(CLI_VERSION).files.map((file) => {
       return join(dir, file.path);
     });
 

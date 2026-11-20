@@ -13,7 +13,7 @@ post:
     answers the same opaque `404`.
 
     Authenticate with a platform-project user session cookie (`sessionCookie`).
-    Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+    Cookie requests follow that scheme's CSRF rules.
   tags:
     - Invitations
   security:
@@ -59,14 +59,6 @@ post:
             $ref: ../../../components/error-details.yaml
     '409':
       description: The project is unclaimed or inactive, so acceptance cannot complete.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '429':
-      description: |
-        Too many requests. Accept is rate-limited so a guessed token cannot be
-        brute-forced. Wait and retry.
       content:
         application/json:
           schema:

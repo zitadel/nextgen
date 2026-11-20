@@ -32,6 +32,7 @@ describe("commandEventProperties", () => {
   it("emits allow-listed dimensions and never the raw source/cwd", () => {
     const props = commandEventProperties(
       meta({ source: "https://auth.internal.acme.com/x" }),
+      "self_hosted",
       "sess-1",
     );
     const serialized = JSON.stringify(props);
@@ -47,7 +48,10 @@ describe("commandEventProperties", () => {
   });
 
   it("merges per-command extras", () => {
-    const props = commandEventProperties(meta(), "sess-1", { framework: "react", step: "x" });
+    const props = commandEventProperties(meta(), "self_hosted", "sess-1", {
+      framework: "react",
+      step: "x",
+    });
     expect(props.framework).toBe("react");
     expect(props.step).toBe("x");
   });
@@ -55,7 +59,7 @@ describe("commandEventProperties", () => {
 
 describe("vercelEventKeys", () => {
   function vercelCopy(event: string, command: string, extra: Properties) {
-    const props = commandEventProperties(meta({ command }), "sess-1", extra);
+    const props = commandEventProperties(meta({ command }), "self_hosted", "sess-1", extra);
     return JSON.parse(
       vercelEventBody(
         event,

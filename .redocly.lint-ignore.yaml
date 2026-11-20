@@ -18,11 +18,11 @@ apps/api/api/openapi/endpoints/schemas/sso-auth-method.yaml:
 apps/api/api/openapi/openapi-spec.yaml:
   no-ambiguous-paths:
     # Redocly compares templates and does not know the id format. Exactly one
-    # request fits both `/idps/{id}/revisions` and
-    # `/idps/revisions/{revision_id}`: `/idps/revisions/revisions`, with `{id}`
+    # request fits both `/idps/{idp_id}/revisions` and
+    # `/idps/revisions/{revision_id}`: `/idps/revisions/revisions`, with `{idp_id}`
     # set to the literal `revisions`. No minted connection id is that literal,
     # because ids carry the `idp_` prefix, and the generated router matches the
-    # literal before `{id}`, so such a request is a 404 on the revision read.
+    # literal before `{idp_id}`, so such a request is a 404 on the revision read.
     # ADR 063 gives every revisioned kind this pair.
     - '#/paths/~1idps~1revisions~1{revision_id}'
     # The same for policies, whose ids carry the `pol_` prefix.
@@ -37,3 +37,50 @@ apps/api/api/openapi/components/flows/flow-definition-step.yaml:
     - '#/not/anyOf/1/required/0'
     - '#/not/anyOf/2/not/required/0'
     - '#/not/anyOf/2/properties/transitions/not/required/0'
+# rule/path-id-parameter-pattern: ID path parameters that predate the rule and
+# take any string. Each entry goes when its resource gets an ID schema with a
+# pattern (components/schemas/<resource>-id.yaml) and the parameter $refs it.
+apps/api/api/openapi/components/parameters/application-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No application-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/branding-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No branding-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/event-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No event-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/flow-definition-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No flow-definition-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/flow-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No flow-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/grant-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No grant-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/idp-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No idp-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/idp-revision-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No idp-revision-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/oauth-settings-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No oauth-settings-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/passkey-registration-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No passkey-registration-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/schema-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No schema-id schema yet.
+    - '#/schema/pattern'

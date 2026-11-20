@@ -4,7 +4,7 @@ import { delimiter } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, test, vi } from "vitest";
 
-import { runReplayed, withWorkspaceTools } from "./dev-process.mjs";
+import { isOneShotServerCommand, runReplayed, withWorkspaceTools } from "./dev-process.mjs";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -86,4 +86,13 @@ test("the pnpm shim is an executable that runs corepack pnpm", () => {
   const shim = fileURLToPath(new URL("./shims/pnpm", import.meta.url));
   accessSync(shim, constants.X_OK);
   assert.match(readFileSync(shim, "utf8"), /^exec corepack pnpm "\$@"$/m);
+});
+
+test("only the server's one-shot commands skip the console build and --migrate", () => {
+  for (const command of ["migrate", "seed", "completion"]) {
+    assert.equal(isOneShotServerCommand([command, "--config", "nextgen.yaml"]), true, command);
+  }
+  for (const args of [[], ["server"], ["--seed=false"], ["server", "seed"]]) {
+    assert.equal(isOneShotServerCommand(args), false, args.join(" "));
+  }
 });

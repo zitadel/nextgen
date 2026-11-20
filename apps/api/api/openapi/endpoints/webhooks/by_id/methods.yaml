@@ -175,7 +175,7 @@ delete:
     it had not yet delivered, and its signing secret stops being valid.
 
     This cannot be undone. To stop delivery and keep the webhook, send
-    `enabled: false` to `updateWebhook` (`PATCH /webhooks/{id}`)
+    `enabled: false` to `updateWebhook` (`PATCH /webhooks/{webhook_id}`)
     instead.
 
     The delete records a `webhook.deleted` event.

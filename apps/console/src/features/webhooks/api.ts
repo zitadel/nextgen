@@ -8,7 +8,7 @@ import { createBody, type Webhook, WEBHOOK_LIMIT, type WebhookDraft } from "./mo
  */
 export async function listWebhooks(projectId: string): Promise<Webhook[]> {
   const page = await api.listWebhooks({ project_id: projectId, limit: WEBHOOK_LIMIT });
-  return page.data;
+  return page.webhooks;
 }
 
 /**

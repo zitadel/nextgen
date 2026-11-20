@@ -666,9 +666,9 @@ Behaviors this design relies on but does not implement.
   What remains is the CLI join, and it is a real gap rather than a naming one.
   Credential capture still ends in `.env.local`: the local runtime gets the CLI
   process environment plus two fixed server variables
-  ([`internal/binary-launcher.ts`](../../../apps/cli/src/lib/local-server/internal/binary-launcher.ts)) or two fixed
+  ([`internal/binary-launcher.ts`](../../../apps/cli/src/lib/server/local/internal/binary-launcher.ts)) or two fixed
   docker `--env` values
-  ([`internal/docker-launcher.ts`](../../../apps/cli/src/lib/local-server/internal/docker-launcher.ts)); nothing
+  ([`internal/docker-launcher.ts`](../../../apps/cli/src/lib/server/local/internal/docker-launcher.ts)); nothing
   loads `.env.local`, and `plan` checks references against `process.env` alone,
   so no configured provider can complete a token exchange. ADR 062 is explicit
   that these are **not** operating-system environment variables, so the capture

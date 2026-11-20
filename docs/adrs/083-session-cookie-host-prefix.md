@@ -232,7 +232,7 @@ change are not a supported mixed-version combination.
 - **CLI**: update the hooks in
   `apps/cli/src/lib/orca/patchers/rule/session-cookie.ts`, their recognition in
   `vite-support.ts` and `angular/templates.ts`, scaffold READMEs,
-  `apps/cli/src/lib/local-server/sign-in.ts`, the doctor checks and
+  `apps/cli/src/lib/server/local/sign-in.ts`, the doctor checks and
   `apps/cli/skills/zitadel-cli/SKILL.md`. Update setup, doctor, proxy and local
   sign-in tests for the new names and immediate v1-hook failure.
 - **Test kit and mock**: update `packages/testing/src/session.ts`,

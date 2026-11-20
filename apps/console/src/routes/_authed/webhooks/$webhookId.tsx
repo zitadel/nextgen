@@ -5,7 +5,6 @@ import { toast } from "sonner";
 
 import { api } from "@/api/zitadel";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_CARD, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -62,13 +61,10 @@ function WebhookDetail() {
         title={webhook.url}
         status={<WebhookStatusBadge state={webhookState(webhook)} />}
         subtitle={webhook.description || undefined}
-        meta={
-          <>
-            <MetaValue label="Webhook ID" value={webhook.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(webhook.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Webhook ID", value: webhook.id, copyable: true },
+          { label: "Created", value: formatDate(webhook.created_at) },
+        ]}
       />
 
       {/* The page owns the 16px between its cards. */}

@@ -80,7 +80,7 @@ func TestRequestEventMiddleware_EmitsWhenProjectIDWithoutAuth(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		w.WriteHeader(http.StatusCreated)
 	}))
-	req := httptest.NewRequest(http.MethodPost, "/flow", nil)
+	req := httptest.NewRequest(http.MethodPost, "/flows", nil)
 	req = req.WithContext(middleware.WithRequestIDContext(req.Context(), "req_flow"))
 	h.ServeHTTP(httptest.NewRecorder(), req)
 
@@ -141,7 +141,7 @@ func TestRequestEventMiddleware_OmitsOriginWhenHeaderMissing(t *testing.T) {
 func TestRequestEventMiddleware_TruncatesOversizedClientHeaders(t *testing.T) {
 	ins, buf := startPathA(t)
 	h := WithRequestEventMiddleware(buf, stampProject("proj_1"))
-	req := httptest.NewRequest(http.MethodGet, "/flow", nil)
+	req := httptest.NewRequest(http.MethodGet, "/flows", nil)
 	req.Header.Set("User-Agent", strings.Repeat("a", maxEventUserAgentBytes-1)+"☃"+strings.Repeat("x", 2048))
 	req.Header.Set("Origin", strings.Repeat("b", maxEventOriginBytes+2048))
 	h.ServeHTTP(httptest.NewRecorder(), req)

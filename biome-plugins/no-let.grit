@@ -1,0 +1,14 @@
+language js
+
+// A `let` makes a reader track every place the binding changes before they can
+// trust what it holds where it is used, and the count only grows as commands
+// are added. Compute the value as a `const` (a ternary, `??`, or a function
+// that returns it), or restructure the loop with an array method, `for...of`
+// or recursion.
+or {
+  JsVariableDeclaration(),
+  JsForVariableDeclaration()
+} as $declaration where {
+  $declaration <: r"^let\b[\s\S]*",
+  register_diagnostic(span=$declaration, message="Do not declare a mutable binding with `let`. Compute a `const`, or restructure with an array method, `for...of` or recursion.", severity="error")
+}

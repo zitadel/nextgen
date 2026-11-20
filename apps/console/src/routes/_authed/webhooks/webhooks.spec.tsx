@@ -37,7 +37,7 @@ function webhook(overrides: Record<string, unknown> = {}) {
 }
 
 function listWebhooks(...webhooks: ReturnType<typeof webhook>[]) {
-  return http.get(WEBHOOKS_URL, () => HttpResponse.json({ data: webhooks }));
+  return http.get(WEBHOOKS_URL, () => HttpResponse.json({ webhooks }));
 }
 
 async function renderWebhooks() {
@@ -85,7 +85,7 @@ describe("webhooks screen", () => {
       http.get(WEBHOOKS_URL, ({ request }) => {
         requests.push(new URL(request.url));
         return HttpResponse.json({
-          data: [
+          webhooks: [
             webhook(),
             webhook({
               id: "hook_2",

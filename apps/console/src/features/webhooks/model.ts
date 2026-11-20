@@ -1,14 +1,14 @@
 import type {
   CreateWebhookBody,
-  ListWebhooks200DataItem,
+  ListWebhooks200WebhooksItem,
   UpdateWebhookBody,
 } from "@zitadel/api/generated/model";
 
 import { errorFieldNames, errorMessage } from "@/lib/api-error";
 import { formatDateTime } from "@/lib/date";
 
-/** A project's webhook, as `GET /webhooks` and `GET /webhooks/{id}` return it: never with its secret. */
-export type Webhook = ListWebhooks200DataItem;
+/** A project's webhook, as `GET /webhooks` and `GET /webhooks/{webhook_id}` return it: never with its secret. */
+export type Webhook = ListWebhooks200WebhooksItem;
 
 /** How many webhooks a project holds at most; one more answers `webhook.limit_reached`. */
 export const WEBHOOK_LIMIT = 10;

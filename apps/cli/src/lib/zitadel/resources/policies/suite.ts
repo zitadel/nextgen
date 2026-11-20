@@ -26,7 +26,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
 
 /**
  * A policy's test suite under `.zitadel/policies/`: the cases that
- * `zitadel policies test` runs, which a release never carries.
+ * `zitadel policy test` runs, which a release never carries.
  */
 export class PolicyTest extends ConfigDocument<PolicyTestValue> {
   /**
@@ -190,7 +190,7 @@ export class PolicyTest extends ConfigDocument<PolicyTestValue> {
   }
 
   /**
-   * The body as `zitadel policies test` reads it.
+   * The body as `zitadel policy test` reads it.
    *
    * @remarks
    * A release never carries a test file; this is the body without what an

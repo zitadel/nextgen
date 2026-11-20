@@ -2,12 +2,12 @@ import { intro, log, note, outro } from "@clack/prompts";
 import pc from "picocolors";
 
 import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
-import { asker } from "@/lib/input";
-import { log as logger } from "@/lib/log";
 
 import type { Audience } from "./audience";
+import { Asker } from "./asker";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
+import { log as logger } from "./log";
 import { GUIDE, MARK } from "./marks";
 import type { Narratable } from "./narration";
 import type { Presentation } from "./presentation";
@@ -108,10 +108,7 @@ export class Chain implements Drawing, Narratable {
   narrate(symbol: string, text: string): void {
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
-      let line = "\n";
-      if (body !== "") {
-        line = `${symbol === GUIDE ? " " : symbol}  ${body}\n`;
-      }
+      const line = body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`;
       (symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout).write(
         line,
       );
@@ -244,31 +241,30 @@ export class Chain implements Drawing, Narratable {
       force: audience.force,
     };
 
-    let resume: (() => void) | undefined;
-    const pause = (): void => {
-      resume = DrawnSpinner.pause();
-    };
-    const resumeSpinners = (): void => {
-      resume?.();
-      resume = undefined;
-    };
-
     return this.presentation === "plain"
-      ? asker({
+      ? Asker.for({
           ...session,
           guide: false,
-          before: pause,
-          after: resumeSpinners,
-        })
-      : asker({
-          ...session,
-          before: () => {
-            pause();
-            return this.open();
+          around: async (draw) => {
+            const resume = DrawnSpinner.pause();
+            try {
+              return await draw();
+            } finally {
+              resume();
+            }
           },
-          after: () => {
-            this.answered();
-            return resumeSpinners();
+        })
+      : Asker.for({
+          ...session,
+          around: async (draw) => {
+            const resume = DrawnSpinner.pause();
+            this.open();
+            try {
+              return await draw();
+            } finally {
+              this.answered();
+              resume();
+            }
           },
         });
   }

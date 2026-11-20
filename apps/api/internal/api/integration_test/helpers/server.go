@@ -68,7 +68,8 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		api.MountAPI(mux, func(next http.Handler) http.Handler {
 			return h.SpecChecked(t, h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next))))
 		}, h.withServerLog, h.EnsureAPIServers(t))
-		h.testServer.value = httptest.NewServer(mux)
+		// In front of every mount, as on the production server (withTracing).
+		h.testServer.value = httptest.NewServer(middleware.WithServerSpan(otel.GetTracerProvider())(mux))
 	}
 	return h.testServer.value
 }
@@ -198,12 +199,12 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
 			service.NewClaimService(db, ConsoleOrigin+"/ui/console", platform.ID),
-			service.NewGrantService(db, service.StatementsUserRefResolver{Pool: db}, platform.ID),
+			h.EnsureGrantService(t),
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
 		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).
-			WithInvitationService(service.NewInvitationService(db, h.EnsureKeyService(t), ConsoleOrigin+"/ui/console", platform.ID)).
+			WithInvitationService(h.EnsureInvitationService(t)).
 			WithWebhookService(service.NewWebhookService(db, h.EnsureKeyService(t)))
 	}
 	return h.handler.value

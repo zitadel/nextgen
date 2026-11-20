@@ -24,7 +24,7 @@ properties:
     type: string
     description: |
       The ID of the schema that defines the content of `attributes`.
-      `getSchemaById` (`GET /schemas/{id}`) returns it, and `createSchema` (`POST /schemas`) creates one.
+      `getSchema` (`GET /schemas/{schema_id}`) returns it, and `publishSchema` (`POST /schemas`) creates one.
   attributes:
     $ref: ../../components/schemas/user-attributes.yaml
   metadata:

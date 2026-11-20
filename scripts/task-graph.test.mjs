@@ -341,21 +341,38 @@ describe.sequential("task graph cache and ordering contracts", () => {
         .filter(({ taskId, hash }) => hash !== baseline.get(taskId).hash)
         .map(({ taskId }) => taskId);
       expect(changedJourneys).toEqual(["@zitadel/e2e#journey:svelte"]);
+      // The conformance fixtures reach their SDKs through `^build`
+      // (conformance/suite/turbo.json), so only the ones that install it move:
+      // the Svelte and the SvelteKit app.
+      const changedFixtures = [...next.values()]
+        .filter(({ taskId }) => /^@zitadel\/conformance-[^#]+#/.test(taskId))
+        .filter(({ taskId, hash }) => hash !== baseline.get(taskId).hash)
+        .map(({ taskId }) => taskId)
+        .sort();
+      expect(changedFixtures).toEqual([
+        "@zitadel/conformance-svelte#conformance",
+        "@zitadel/conformance-svelte#typecheck",
+        "@zitadel/conformance-sveltekit#conformance",
+        "@zitadel/conformance-sveltekit#typecheck",
+      ]);
     });
   });
 
-  // The cached e2e lanes, the CI journeys and the kit's suite boot what a
-  // switch replaces (another server binary, a server setting, a lane's port),
-  // so their key holds the switches; the telemetry opt-outs change no result.
+  // The cached e2e lanes, the CI journeys, the kit's suite and the
+  // conformance lane and its drift check boot what a switch replaces (another
+  // server binary, a server setting, a lane's port), so their key holds the
+  // switches; the telemetry opt-outs change no result.
   test("a cached lane's key holds the switches that change what it tests", () => {
     const lanes = [...baseline.values()].filter(
       ({ taskId, command, resolvedTaskDefinition }) =>
         resolvedTaskDefinition.cache &&
         // Their input-only bases run nothing.
         command !== "<NONEXISTENT>" &&
-        /^@zitadel\/(e2e#((console|demo)-|journey:)|testing#test:integration$)/.test(taskId),
+        /^@zitadel\/(e2e#((console|demo)-|journey:)|testing#test:integration$|conformance-[^#]+#(conformance|check-generate)$)/.test(
+          taskId,
+        ),
     );
-    expect(lanes.length).toBeGreaterThanOrEqual(21);
+    expect(lanes.length).toBeGreaterThanOrEqual(25);
     const switched = dry({ ZITADEL_SERVER_BINARY: "/elsewhere/nextgen" });
     const optedOut = dry({ ZITADEL_TELEMETRY: "0", ZITADEL_TELEMETRY_ENV: "development" });
     for (const { taskId, hash } of lanes) {

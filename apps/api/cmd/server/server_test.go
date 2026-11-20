@@ -395,7 +395,7 @@ func TestRunLogsTheErrorItReturns(t *testing.T) {
 	// waited on until go test's own timeout.
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	err = run(ctx, cfg, nil, false)
+	err = run(ctx, cfg, nil, phases{seed: true, serve: true})
 	require.ErrorContains(t, err, "failed to bootstrap platform project")
 
 	var runError map[string]any

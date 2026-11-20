@@ -8,7 +8,7 @@ import { signIn } from "../support/sign-in";
  *
  * Read-only, so this leaves the instance exactly as it found it. What it covers
  * that the unit specs cannot is the *shape of the embed*: `expand=user_schema`
- * returns the same `{ id, schema, metadata }` envelope `GET /schemas/{id}`
+ * returns the same `{ id, schema, metadata }` envelope `GET /schemas/{schema_id}`
  * does, and the row has to read the display name one level inside it. A fixture
  * is only ever as right as the assumption that wrote it — this one was wrong
  * first, and the row silently fell back to printing the raw `sch_…` id under a
