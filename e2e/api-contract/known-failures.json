@@ -1,0 +1,46 @@
+[
+  {
+    "operation": "GET /oauth_settings/{oauth_settings_id}",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /auth_attempts/{attempt_id}/challenges",
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "POST /flows/{flow_id}/submit",
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "POST /projects/query",
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "POST /releases/build",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /schemas",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /teams/query",
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "POST /users/{user_id}/passkeys/registrations",
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "PUT /users/{user_id}/password",
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "Stateful tests",
+    "check": "Schema-valid request rejected"
+  },
+  {
+    "operation": "Stateful tests",
+    "check": "Server error"
+  }
+]
