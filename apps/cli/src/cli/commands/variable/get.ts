@@ -10,6 +10,7 @@ import { VariableView } from "@/lib/variable";
 
 import { variableNameArg } from "./name";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -19,7 +20,9 @@ import { ServerCommand } from "@/cli/commands/server-command";
  * `--preview` it reads the primary value; with it, the preview value. A name with
  * no value of the kind asked for is a miss.
  */
-export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class VariableGet extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;
@@ -46,7 +49,7 @@ export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCo
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
     const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
-    this.recordTelemetry({
+    this.annotate({
       is_secret: variable.secret,
     });
 

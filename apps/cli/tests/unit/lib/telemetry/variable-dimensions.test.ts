@@ -43,12 +43,12 @@ async function commandBodies(): Promise<Map<string, string>> {
   return bodies;
 }
 
-/** The dimension names each command passes to `recordTelemetry`. */
+/** The dimension names each command passes to `annotate`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {
   const entries = await Promise.all(
     [...(await commandBodies())].map(async ([command, body]) => {
       const source = await readFile(body, "utf8");
-      const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
+      const calls = [...source.matchAll(/annotate\(\{([^}]*)\}/gs)];
       const keys = calls.flatMap((call) => {
         return [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => {
           return key[1] as string;

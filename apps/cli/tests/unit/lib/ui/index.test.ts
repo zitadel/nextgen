@@ -21,7 +21,6 @@ const asWritten = (file: string): string => relative(SRC, file).split(sep).join(
 const STILL_DRAWING_THEMSELVES = [
   "cli/commands/server/logs.ts: writes to process.stdout",
   "cli/hooks/version-notice.ts: writes to process.stderr",
-  "lib/oclif/base.ts: writes to process.stderr",
   "lib/telemetry/sink.ts: writes to process.stderr",
 ].sort();
 

@@ -214,6 +214,11 @@ export type WriteShape = Readonly<{
    * `team`, which no generated example can know.
    */
   example?: string;
+  /**
+   * What the write knows about its run from the body it sends: enums and
+   * counts only, never a value the developer typed.
+   */
+  facts?(body: Json): Readonly<Record<string, string | number | boolean | undefined>>;
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
   /**

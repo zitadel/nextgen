@@ -1,12 +1,13 @@
-import type { RuntimeKind } from "@/lib/server";
+import { type RuntimeKind, ZitadelRuntime } from "@/lib/server";
 import type { Properties } from "@/lib/telemetry";
+import { installedFromPackage, resolveChannel } from "@/lib/telemetry/config";
 import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
 import { ciProvider } from "@/lib/telemetry/dimensions/ci-provider";
 import { country } from "@/lib/telemetry/dimensions/country";
 import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
 import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
 import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
-import type { GlobalOptions } from "./types";
+import type { GlobalOptions } from "@/lib/oclif/types";
 
 /**
  * CLI-specific telemetry glue: the only place that turns a {@link GlobalOptions}
@@ -19,25 +20,15 @@ export const CLI_COMMAND_COMPLETED = "cli_command_completed";
 export const CLI_COMMAND_FAILED = "cli_command_failed";
 
 /**
- * The one dimension of its own a command's Vercel Web Analytics copy keeps, by
- * command id; the rest go to Mixpanel only.
- */
-export const VERCEL_COMMAND_DIMENSIONS: ReadonlyMap<string, string> = new Map([
-  ["setup", "framework"],
-  ["claim", "claim_outcome"],
-  ["doctor", "failed_checks"],
-  ["api", "operation"],
-  ["start", "runtime"],
-]);
-
-/**
- * The properties the Vercel Web Analytics copy of `command`'s lifecycle events
+ * The properties the Vercel Web Analytics copy of a command's lifecycle events
  * keeps, in priority order, the header first: the intake takes 8. The
- * command's own dimension ranks after `host_agent`, so on a failed run, where
+ * command's own headline ranks after `host_agent`, so on a failed run, where
  * `reason` fills the eighth place, it takes `non_interactive`'s.
+ *
+ * @param dimension - The one fact of its own the command keeps, if it has one.
+ * @returns The property names the copy keeps.
  */
-export function vercelEventKeys(command: string): readonly string[] {
-  const dimension = VERCEL_COMMAND_DIMENSIONS.get(command);
+export function vercelEventKeys(dimension?: string): readonly string[] {
   return [
     "surface",
     "cli_version",
@@ -81,11 +72,19 @@ function deviceFacts(meta: GlobalOptions): DeviceFacts {
   };
 }
 
-function eventDeviceProperties(meta: GlobalOptions): Properties {
+/**
+ * The device facts of an event or of the install's profile, which name the
+ * country differently (`mp_country_code` on an event, `$country_code` on the
+ * profile).
+ */
+function deviceProperties(
+  meta: GlobalOptions,
+  countryKey: "mp_country_code" | "$country_code",
+): Properties {
   const facts = deviceFacts(meta);
   return {
     $os: facts.osLabel,
-    mp_country_code: facts.countryCode,
+    [countryKey]: facts.countryCode,
     os: facts.platform,
     arch: facts.arch,
     node_version: facts.nodeVersion,
@@ -93,17 +92,11 @@ function eventDeviceProperties(meta: GlobalOptions): Properties {
   };
 }
 
-function profileDeviceProperties(meta: GlobalOptions): Properties {
-  const facts = deviceFacts(meta);
-  return {
-    $os: facts.osLabel,
-    $country_code: facts.countryCode,
-    os: facts.platform,
-    arch: facts.arch,
-    node_version: facts.nodeVersion,
-    cli_version: facts.cliVersion,
-  };
-}
+/**
+ * Whether the CLI runs from an installed package, which cannot change within a
+ * process.
+ */
+const INSTALL_SOURCE = installedFromPackage() ? "package" : "source";
 
 /**
  * Build the dimensions shared by every lifecycle event, merged with any
@@ -118,15 +111,18 @@ function profileDeviceProperties(meta: GlobalOptions): Properties {
  */
 export function commandEventProperties(
   meta: GlobalOptions,
-  serverKind: RuntimeKind,
+  serverKind: RuntimeKind | "none",
   invocationId: string,
   extra: Properties = {},
 ): Properties {
   const { env } = meta;
+  const host = hostAgent.value(env);
   return {
     ...extra,
     surface: "cli",
-    ...eventDeviceProperties(meta),
+    environment: resolveChannel(env),
+    install_source: INSTALL_SOURCE,
+    ...deviceProperties(meta, "mp_country_code"),
     ip: 0,
     invocation_id: invocationId,
     command: meta.command,
@@ -134,12 +130,24 @@ export function commandEventProperties(
     is_tty: meta.isTTY,
     is_ci: ciFlag.value(env),
     ci_provider: ciProvider.value(env),
-    host_agent: hostAgent.value(env),
+    host_agent: host,
+    is_agent: isAgent(host),
     invocation_channel: invocationChannel.value(env),
     dry_run: meta.dryRun,
     force: meta.force,
     server_kind: serverKind,
   };
+}
+
+/**
+ * Whether a host is a coding agent: any the detector recognised, not an editor's
+ * terminal or an unknown one. It says where the CLI ran, never who typed.
+ *
+ * @param host - The `host_agent` value.
+ * @returns Whether it is a coding agent.
+ */
+function isAgent(host: string): boolean {
+  return host !== "vscode" && host !== "unknown";
 }
 
 /**
@@ -152,8 +160,33 @@ export function deviceProfileProperties(meta: GlobalOptions, distinctId: string)
   const agent = hostAgent.value(meta.env);
   const label = agent === "unknown" ? process.platform : agent;
   return {
-    ...profileDeviceProperties(meta),
+    ...deviceProperties(meta, "$country_code"),
     $name: `${label} · ${distinctId.slice(0, 8)}`,
     host_agent: agent,
+    is_agent: isAgent(agent),
+    invocation_channel: invocationChannel.value(meta.env),
+    install_source: INSTALL_SOURCE,
   };
+}
+
+/**
+ * What an install's profile says only once: the version it began on, which
+ * lets a cohort ask who installed which version.
+ *
+ * @param version - The version the install began on.
+ * @returns The facts to write where the profile does not have them yet.
+ */
+export function firstSeenProperties(version: string): Properties {
+  return { first_cli_version: version };
+}
+
+/**
+ * The kind of server a run is about, or `none` for a command that talks to no
+ * server and so has no address.
+ *
+ * @param source - The run's server address, empty when it names none.
+ * @returns The kind.
+ */
+export function serverKindOf(source: string): RuntimeKind | "none" {
+  return source === "" ? "none" : ZitadelRuntime.fromUrl(source).kind;
 }

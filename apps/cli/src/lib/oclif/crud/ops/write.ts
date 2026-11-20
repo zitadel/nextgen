@@ -1,5 +1,6 @@
 import { Flags, type Interfaces } from "@oclif/core";
 
+import type { Facts } from "@/lib/oclif/base";
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
   type BodyField,
@@ -188,6 +189,23 @@ abstract class WriteOperation<
 > extends ResourceCommand<Ctx, Spec, WriteInput> {
   protected abstract verb: "create" | "update";
 
+  /**
+   * The body this run sent, once it has.
+   */
+  private written: Json | undefined;
+
+  /**
+   * What the write knows about its run from the body it sent.
+   *
+   * @returns The facts the resource's write declares, with the layers below.
+   */
+  protected override describe(): Facts {
+    return {
+      ...super.describe(),
+      ...(this.written === undefined ? {} : this.definition.spec.facts?.(this.written)),
+    };
+  }
+
   protected override async operate({ args, flags }: WriteInput): Promise<CommandResult> {
     const { topic, spec, resource, options } = this.definition;
     const fields = fieldsOf(spec, options);
@@ -234,6 +252,7 @@ abstract class WriteOperation<
 
     // Some writes answer without a body (`grant create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
+    this.written = body;
     const result = await this.send(await this.context(), body, id);
     const summary: Summary =
       result === undefined

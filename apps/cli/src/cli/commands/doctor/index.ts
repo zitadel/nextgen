@@ -46,6 +46,7 @@ import { LocalRuntimeChecks } from "./checks/local-runtime";
 import { doctorReport, renderDoctorReport, withCategories } from "./report";
 import { Project } from "@/lib/project";
 import { BaseCommand } from "@/lib/oclif";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -111,9 +112,12 @@ type Checking = Readonly<{
 /**
  * `zitadel doctor` — verify local runtime and project state.
  */
-export default class Doctor extends Destructive(LocalServerCommand(ServerCommand(BaseCommand))) {
+export default class Doctor extends Telemetered(
+  Destructive(LocalServerCommand(ServerCommand(BaseCommand))),
+) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.gettingStarted;
+  static override readonly headline = "failed_checks";
   static override groupOrder = 3;
 
   static override flags = relatedFlags(
@@ -344,7 +348,7 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
       ...(warningAdvice?.nextActions ?? []),
       ...(serving ? [new Guidance(this.suggest).serverLog()] : []),
     ];
-    this.recordTelemetry({
+    this.annotate({
       runtime: runtimeBackend,
       checks_total: checks.length,
       checks_failed: failed.length,

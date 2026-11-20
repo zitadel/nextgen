@@ -10,6 +10,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import { variableNameArg } from "./name";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -17,7 +18,9 @@ import { ServerCommand } from "@/cli/commands/server-command";
  * `--preview` removes the preview value and leaves the primary one standing;
  * without it the variable is removed for both kinds.
  */
-export default class VariableRm extends Destructive(ServerCommand(EnvironmentCommand)) {
+export default class VariableRm extends Telemetered(
+  Destructive(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;

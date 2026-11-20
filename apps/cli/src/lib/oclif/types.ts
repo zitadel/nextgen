@@ -97,10 +97,10 @@ export type GlobalOptions = {
 export type FlagVariable = {
   readonly name: string;
   /**
-   * The global flag it stands in for, without `--`: a base flag, or `server`,
-   * which `ServerCommand` adds to every command.
+   * The global flag it stands in for, without `--`: a base flag, or one a
+   * mixin adds to every command that takes it (`server`, `telemetry`).
    */
-  readonly flag: keyof (typeof BaseCommand)["baseFlags"] | "server";
+  readonly flag: keyof (typeof BaseCommand)["baseFlags"] | "server" | "telemetry";
   readonly description: string;
   /** How it ranks against the flag and the other sources of the setting. */
   readonly precedence: string;

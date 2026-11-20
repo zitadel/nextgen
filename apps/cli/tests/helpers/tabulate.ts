@@ -65,7 +65,7 @@ export const aTabulatingCommand = (argv: string[] = []): Drawing => new Drawing(
 
 /** Draws one table through a whole run, for a test about what the run decided. */
 export const aTableDrawnByARun = async (argv: string[] = []): Promise<string> => {
-  const command = new Running(["--no-telemetry", ...argv]);
+  const command = new Running(argv);
   await command.run();
   return command.drawn;
 };

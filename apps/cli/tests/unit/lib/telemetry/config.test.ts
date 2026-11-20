@@ -10,8 +10,9 @@ import {
 } from "@/lib/telemetry/config";
 
 describe("resolveChannel", () => {
-  it("defaults to production (single generic build, no channel stamp)", () => {
-    expect(resolveChannel({})).toBe("production");
+  // Tests run from a checkout of the source, which is never customer traffic.
+  it("treats a run from a source checkout as development", () => {
+    expect(resolveChannel({})).toBe("development");
   });
 
   it("selects development on an explicit development env", () => {
@@ -24,7 +25,14 @@ describe("resolveChannel", () => {
   });
 
   it("ignores a falsey CI flag (CI=false is not a CI run)", () => {
-    expect(resolveChannel({ CI: "false" })).toBe("production");
+    expect(resolveChannel({ CI: "false", ZITADEL_TELEMETRY_ENV: "production" })).toBe("production");
+  });
+
+  it("treats the CLI's own development mode as development", () => {
+    expect(resolveChannel({ ZITADEL_CLI_DEV: "1" })).toBe("development");
+    expect(resolveChannel({ ZITADEL_CLI_DEV: "0", ZITADEL_TELEMETRY_ENV: "production" })).toBe(
+      "production",
+    );
   });
 
   it("lets an explicit production env win over the CI safeguard", () => {
@@ -36,21 +44,28 @@ describe("resolveChannel", () => {
   });
 });
 
+const PRODUCTION_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";
+const DEVELOPMENT_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
+
 describe("resolveTelemetryToken", () => {
-  it("names no Mixpanel project on any channel while Mixpanel is paused", () => {
-    for (const env of [
-      {},
-      { ZITADEL_TELEMETRY_ENV: "production" },
-      { ZITADEL_TELEMETRY_ENV: "development" },
-      { CI: "true" },
-    ]) {
-      expect(resolveTelemetryToken(env)).toBeUndefined();
-    }
+  it("names the production project on the production channel", () => {
+    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: "production" })).toBe(PRODUCTION_TOKEN);
   });
 
-  it("lets ZITADEL_TELEMETRY_TOKEN name one, trimmed", () => {
-    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: " custom " })).toBe("custom");
-    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: " " })).toBeUndefined();
+  it("names the development project on the development channel", () => {
+    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: "development" })).toBe(DEVELOPMENT_TOKEN);
+    expect(resolveTelemetryToken({ ZITADEL_CLI_DEV: "1" })).toBe(DEVELOPMENT_TOKEN);
+  });
+
+  it("names no project for a run in CI, which sends nothing", () => {
+    expect(resolveTelemetryToken({ CI: "true" })).toBeUndefined();
+    expect(resolveTelemetryToken({ GITHUB_ACTIONS: "true" })).toBeUndefined();
+  });
+
+  it("lets ZITADEL_TELEMETRY_TOKEN name one, trimmed, even in CI", () => {
+    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: " custom ", CI: "true" })).toBe(
+      "custom",
+    );
   });
 });
 
@@ -58,14 +73,42 @@ const CLOUD_PROXY = { host: "preview.zitadel.com", path: "/telemetry/mixpanel" }
 const US_DIRECT = { host: "api.mixpanel.com", path: "" };
 
 describe("resolveTelemetryEndpoint", () => {
-  it("sends EU events (the Zitadel projects' region) through the cloud, US ones to Mixpanel", () => {
-    expect(resolveTelemetryEndpoint({})).toEqual(CLOUD_PROXY);
-    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: "us" })).toEqual(US_DIRECT);
-    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: "EU" })).toEqual(CLOUD_PROXY);
+  it("sends each project's events to the region it lives in: production US, development EU", () => {
+    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_ENV: "production" })).toEqual(US_DIRECT);
+    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_ENV: "development" })).toEqual(CLOUD_PROXY);
+  });
+
+  it("lets ZITADEL_TELEMETRY_REGION name the region, and takes a token of one's own as EU", () => {
+    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_TOKEN: "own" })).toEqual(CLOUD_PROXY);
+    const own = { ZITADEL_TELEMETRY_TOKEN: "own" };
+    expect(resolveTelemetryEndpoint({ ...own, ZITADEL_TELEMETRY_REGION: "us" })).toEqual(US_DIRECT);
+    expect(resolveTelemetryEndpoint({ ...own, ZITADEL_TELEMETRY_REGION: "EU" })).toEqual(
+      CLOUD_PROXY,
+    );
   });
 
   it("trims surrounding whitespace on the region env", () => {
-    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: " us " })).toEqual(US_DIRECT);
+    expect(
+      resolveTelemetryEndpoint({
+        ZITADEL_TELEMETRY_TOKEN: "own",
+        ZITADEL_TELEMETRY_REGION: " us ",
+      }),
+    ).toEqual(US_DIRECT);
+  });
+
+  it("keeps a baked-in project on its own region, whatever the region env names", () => {
+    expect(
+      resolveTelemetryEndpoint({
+        ZITADEL_TELEMETRY_ENV: "development",
+        ZITADEL_TELEMETRY_REGION: "us",
+      }),
+    ).toEqual(CLOUD_PROXY);
+    expect(
+      resolveTelemetryEndpoint({
+        ZITADEL_TELEMETRY_ENV: "production",
+        ZITADEL_TELEMETRY_REGION: "eu",
+      }),
+    ).toEqual(US_DIRECT);
   });
 
   // Released CLIs send to this path, so the cloud has to keep forwarding it.

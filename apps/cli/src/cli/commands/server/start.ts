@@ -19,6 +19,7 @@ import { Guidance, shellCommand, type Suggest, type SuggestedCommand } from "@/l
 import { section } from "@/lib/ui";
 import { BaseCommand } from "@/lib/oclif";
 import { CommandGroups } from "@/cli/commands/groups";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * How an image beside the binary runtime is refused: an image is a container's,
@@ -130,8 +131,11 @@ const NOT_READY_REASONS = {
  * exists, and the port it actually got afterwards, so an agent that follows it
  * targets the server that was started.
  */
-export default class Start extends LocalServerCommand(ServerCommand(BaseCommand), "exact") {
+export default class Start extends Telemetered(
+  LocalServerCommand(ServerCommand(BaseCommand), "exact"),
+) {
   static override group = CommandGroups.localServer;
+  static override readonly headline = "runtime";
   static override description = "Start a local Zitadel server.";
   static override groupOrder = 1;
 
@@ -181,7 +185,7 @@ export default class Start extends LocalServerCommand(ServerCommand(BaseCommand)
     };
     const plan = await server.plan(request);
     const { apiUrl, consoleUrl } = plan;
-    this.recordTelemetry({ runtime: plan.backend });
+    this.annotate({ runtime: plan.backend });
 
     if (this.dryRun) {
       const title = "Would start the local Zitadel server (dry run)";

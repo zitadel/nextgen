@@ -1,7 +1,7 @@
 import { createZitadelClient } from "@/lib/backend";
 import { Environment, type ServerAddresses } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
-import { BaseCommand, type MetaOptions } from "./base";
+import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags } from "./environment-flags";
 import { byName } from "@/lib/names";
@@ -27,6 +27,21 @@ export abstract class EnvironmentCommand extends BaseCommand {
   static credential: CredentialKind = "project";
 
   private readonly connections = new Map<string, Promise<Connection>>();
+  private credentialUsed: { credential: string; hasEnvFile: boolean } | undefined;
+
+  /**
+   * Which credential the run connected with, once it has tried one, and
+   * whether an env file was named; never a token or a path.
+   *
+   * @returns The facts, with the layers below.
+   */
+  protected override describe(): Facts {
+    return {
+      ...super.describe(),
+      credential: this.credentialUsed?.credential,
+      has_env_file: this.credentialUsed?.hasEnvFile,
+    };
+  }
 
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
@@ -118,9 +133,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
   private async openConnection(options: ConnectOptions): Promise<Connection> {
     const { credential } = this.constructor as typeof EnvironmentCommand;
     const { environment } = this;
-    // Recorded before anything is required, so a run stopped for a missing
-    // value still says which credential it was after.
-    this.recordTelemetry({ credential, has_env_file: environment.envFile !== undefined });
+    // Kept before anything is required, so a run stopped for a missing value
+    // still says which credential it was after.
+    this.credentialUsed = { credential, hasEnvFile: environment.envFile !== undefined };
     // On a terminal a missing value is prompted for and persisted to
     // `.env.<name>.local`; non-interactively each still throws, naming
     // the sources consulted, so a scripted run stays deterministic.

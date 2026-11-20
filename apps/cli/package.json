@@ -154,6 +154,7 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
+    "agent-cli-detector": "^0.1.7",
     "ajv": "catalog:",
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",

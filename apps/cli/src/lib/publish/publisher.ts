@@ -20,6 +20,7 @@ import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
 import { bundleIsDirty, headSha } from "./git";
 import {
+  type ConfigurationType,
   type Lockout,
   type PipelineMode,
   type RunEnvironment,
@@ -104,6 +105,12 @@ export type PreparedRelease = {
    * command must not deploy without consent.
    */
   readonly lockouts: readonly Lockout[];
+
+  /**
+   * The kinds of configuration that differ from what is live, when the diff
+   * could tell.
+   */
+  readonly changedConfiguration: readonly ConfigurationType[] | undefined;
   readonly gitSha: string | undefined;
   readonly gitDirty: boolean;
 
@@ -335,6 +342,7 @@ export class Publisher {
       warnings: outcome.warnings,
       notices: outcome.notices,
       lockouts: outcome.lockouts,
+      changedConfiguration: outcome.learned.changedConfiguration,
       gitSha: sha ?? undefined,
       gitDirty: dirty,
       referenced,
@@ -362,10 +370,16 @@ export class Publisher {
    * a deploy that raced in.
    *
    * @param request - The prepared bundle, the message and the origins it lands on.
+   * @param onStage - Told which stage the deploy is entering, so a failure can say where it was.
    * @returns The release, and whether the deploy landed, lost a race, or met a revoked release.
    */
-  async deploy(request: DeployRequest): Promise<DeployOutcome> {
+  async deploy(
+    request: DeployRequest,
+    onStage?: (stage: "release_creation" | "deployment") => void,
+  ): Promise<DeployOutcome> {
+    onStage?.("release_creation");
     const release = await this.createRelease(request);
+    onStage?.("deployment");
     const publication = await this.deployments.deployToPrimary({
       releaseId: release.id,
       message: request.message,

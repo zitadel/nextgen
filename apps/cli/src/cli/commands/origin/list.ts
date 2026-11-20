@@ -3,6 +3,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["pattern", "kind"] as const;
@@ -14,7 +15,9 @@ const COLUMNS = ["pattern", "kind"] as const;
  * project state, so the server is the authority. An empty list means every
  * origin is admitted until the first pattern is added.
  */
-export default class OriginList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class OriginList extends Telemetered(
+  Tabulatable(ServerCommand(EnvironmentCommand)),
+) {
   static override description = "List the origin patterns on the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 3;

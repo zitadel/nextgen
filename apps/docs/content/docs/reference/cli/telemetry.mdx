@@ -20,11 +20,11 @@ Each event keeps at most eight properties:
 | --- | --- |
 | `surface` | The Zitadel component that sent it: always `cli`. |
 | `cli_version` | The version of the CLI. |
-| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted` or `unknown`, never its URL. |
+| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted`, `none` for a command that talks to no server, or `unknown`, never its URL. |
 | `command` | The command, such as `variables:set`. |
 | `status` | How the command ended: `ok`, `skipped` or `error`. |
 | `reason` | A failed command's error code, such as `E_NETWORK`. |
-| `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
+| `host_agent` | The coding agent it ran inside, such as `claude_code`, `cursor` or `codex`, `vscode` for an editor's terminal, or `unknown`. |
 | `non_interactive` | Whether it ran without prompts. |
 
 A few commands add one property of their own. When a failed command's event already holds eight, it takes the place of `non_interactive`.
@@ -43,7 +43,7 @@ Run a command with `--debug` to see each event on stderr before it is sent.
 
 ### What Mixpanel would get
 
-The CLI can also send its events to [Mixpanel](https://mixpanel.com), in its EU region, through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`). That is paused: the CLI sends Mixpanel nothing. When it sends again, `cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
+The CLI can also send its events to [Mixpanel](https://mixpanel.com), in the US region for production and the EU region for development, where EU events go through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`). A run in development mode or from a source checkout goes to a separate development project, so it never reaches customer data, and a run in CI sends nothing. `cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
 
 | Property | What it holds |
 | --- | --- |
@@ -54,9 +54,11 @@ The CLI can also send its events to [Mixpanel](https://mixpanel.com), in its EU 
 | `mp_country_code` | The country of your timezone, for the timezones the CLI knows; none for others. |
 | `is_tty`, `non_interactive`, `dry_run`, `force` | Whether it ran in a terminal, without prompts, as a dry run, and with `--force`. |
 | `is_ci`, `ci_provider` | Whether it ran in CI, and which: `github_actions`, `gitlab_ci`, `circleci`, `buildkite`, `jenkins` or `unknown`. |
-| `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
+| `environment`, `install_source` | Whether the run counts as customer traffic (`production`, or `development` for CI, development mode and runs from a source checkout), and whether the CLI ran from an installed package or from source. |
+| `host_agent` | The coding agent it ran inside, such as `claude_code`, `cursor` or `codex`, `vscode` for an editor's terminal, or `unknown`. |
+| `is_agent` | Whether the CLI ran inside a coding agent (`host_agent` says which). It says where the CLI ran, never who typed the command. |
 | `invocation_channel` | The package manager that started it: `npm`, `pnpm`, `yarn`, `bun` or `unknown`. |
-| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted` or `unknown`, never its URL. |
+| `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted`, `none` for a command that talks to no server, or `unknown`, never its URL. |
 | `invocation_id` | A random ID that ties one run's events together. |
 | `distinct_id` | The [install ID](#the-install-id). |
 
@@ -64,7 +66,7 @@ Some commands add what they did, as counts and fixed values:
 
 | Command | Adds |
 | --- | --- |
-| `setup` | The framework, renderer, package manager, preset and use case, the sign-in provider (its slug, `custom`, `none` or `multiple`), whether a minimum password length was set (never the value), whether it created the app, skipped the install or was given a port, how many files it wrote, and the last step it reached. |
+| `setup` | The framework, renderer, package manager, preset and use case, the sign-in provider (its slug, `custom`, `none` or `multiple`), whether a minimum password length was set (never the value), whether it created the app, skipped the install or was given a port, how many files it wrote, and the furthest stage it reached (`setup_stage`). |
 | `deploy` | How many resources the release pinned, and how many origins it went live on. |
 | `doctor` | How many checks ran, failed and warned, and the names of the checks that failed. |
 | `policy test` | Whether it tested the policy files or a release, and how many cases ran and failed, never a case, an input or a config. |
@@ -76,6 +78,13 @@ Some commands add what they did, as counts and fixed values:
 
 `invitation_created` and `invitation_cancelled` carry the role the invitation grants, such as `project_editor`, and its journey ID: a random ID the invitation and its replacements share, so the time to accept can be measured. They never carry the name you gave, the invitation ID or the link. Their Vercel copies keep only the eight properties above.
 
+When it sends again, a few journeys also send events of their own. They carry the properties above, and only fixed names, counts and durations:
+
+| Event | When | What it adds |
+| --- | --- | --- |
+| `flow_started`, `flow_completed`, `flow_failed` | `setup` (the `onboarding` flow) or `auth-method sso enable` (the `oidc_provider_setup` flow) begins, succeeds or fails. | The flow, how long it took, the step a failure stopped at, an error code, and the choices made so far: framework, server (`local` or `remote`), use case, preset and the kinds of sign-in provider. |
+| `viewed_step`, `step_completed` | A `setup` prompt is shown, or a choice is settled. | The flow, the step, and the choice made at it. Never the port, a provider name, an issuer URL, a client ID or a secret. |
+
 Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead.
 
 ## What it never sends
@@ -86,7 +95,7 @@ Nothing that identifies you, your machine or your project: no name, email addres
 
 The first time it sends anything, the CLI creates a random ID for the install and keeps it in `~/.config/zitadel/cli/telemetry.json`: under `$XDG_CONFIG_HOME` when that is set, and under `%APPDATA%` on Windows. The ID ties the runs of one install together in Mixpanel, and holds nothing about you or the machine. The events for Vercel leave it out, so while Mixpanel is paused it stays on your machine. Delete the file to start over with a new one. Where the file cannot be written, every run takes a new ID.
 
-On that first run, in an interactive terminal, the CLI says on stderr that it collects analytics, and how to opt out. With Mixpanel, it also records the install itself, with the platform, versions, country and `host_agent` its events carry.
+The first time the CLI runs in an interactive terminal, before it sends anything, it says on stderr that it collects analytics, and how to opt out. A first run that is not interactive, such as `--json` or a script, leaves that notice for the first run that is. With Mixpanel, it also records the install itself: the platform, the CLI and Node versions, the country, `host_agent`, how it was launched, and, for an install this release created, the version it began on. It writes that record again when something in it changes, such as an upgrade, and at most once a day, so the record shows when the install was last used.
 
 ## When it sends
 

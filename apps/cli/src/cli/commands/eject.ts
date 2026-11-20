@@ -24,6 +24,7 @@ import {
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -362,7 +363,7 @@ function ejected(
  * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
  * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
  */
-export default class Eject extends Destructive(ServerCommand(BaseCommand)) {
+export default class Eject extends Telemetered(Destructive(ServerCommand(BaseCommand))) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 7;

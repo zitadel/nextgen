@@ -20,6 +20,8 @@ export type MixpanelSettings = {
 
 /** Sends events and profiles to the Mixpanel project a token names. */
 export class MixpanelSink implements TelemetrySink {
+  readonly destination = "mixpanel" as const;
+
   private readonly client: MixpanelClient;
   private readonly distinctId: string;
   private readonly debug: boolean;
@@ -56,13 +58,24 @@ export class MixpanelSink implements TelemetrySink {
     );
   }
 
-  profile(payload: Properties, modifiers: Modifiers): void {
+  profile(payload: Properties, modifiers: Modifiers, once: Properties = {}): void {
     trace(this.debug, () => {
       return `people.set ${JSON.stringify(payload)}`;
     });
     this.outbox.add(
       this.deliver((done) => {
         this.client.people.set(this.distinctId, payload, modifiers, done);
+      }),
+    );
+    if (Object.keys(once).length === 0) {
+      return;
+    }
+    trace(this.debug, () => {
+      return `people.set_once ${JSON.stringify(once)}`;
+    });
+    this.outbox.add(
+      this.deliver((done) => {
+        this.client.people.set_once(this.distinctId, once, modifiers, done);
       }),
     );
   }

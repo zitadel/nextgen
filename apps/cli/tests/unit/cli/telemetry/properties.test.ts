@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   commandEventProperties,
   deviceProfileProperties,
+  firstSeenProperties,
+  serverKindOf,
   vercelEventKeys,
-} from "@/lib/oclif/command-telemetry";
+} from "@/cli/telemetry/properties";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { VERCEL_ENDPOINT, vercelEventBody } from "@/lib/telemetry/vercel";
 
@@ -58,13 +60,13 @@ describe("commandEventProperties", () => {
 });
 
 describe("vercelEventKeys", () => {
-  function vercelCopy(event: string, command: string, extra: Properties) {
+  function vercelCopy(event: string, command: string, extra: Properties, headline?: string) {
     const props = commandEventProperties(meta({ command }), "self_hosted", "sess-1", extra);
     return JSON.parse(
       vercelEventBody(
         event,
         props,
-        { endpoint: VERCEL_ENDPOINT, keys: vercelEventKeys(command) },
+        { endpoint: VERCEL_ENDPOINT, keys: vercelEventKeys(headline) },
         0,
       ),
     ).ed as Record<string, unknown>;
@@ -77,7 +79,7 @@ describe("vercelEventKeys", () => {
       exit_code: 1,
       duration_ms: 12,
     });
-    expect(Object.keys(copy)).toEqual([...vercelEventKeys("variable:list")]);
+    expect(Object.keys(copy)).toEqual([...vercelEventKeys()]);
     expect(copy).toMatchObject({
       surface: "cli",
       command: "variable:list",
@@ -89,22 +91,23 @@ describe("vercelEventKeys", () => {
   });
 
   it("keeps a completed command's own dimension beside whether it ran without prompts", () => {
-    const copy = vercelCopy("cli_command_completed", "setup", {
-      framework: "nextjs",
-      renderer: "react",
-      status: "ok",
-    });
+    const copy = vercelCopy(
+      "cli_command_completed",
+      "setup",
+      { framework: "nextjs", renderer: "react", status: "ok" },
+      "framework",
+    );
     expect(copy).toMatchObject({ framework: "nextjs", non_interactive: true });
     expect(copy).not.toHaveProperty("renderer");
   });
 
   it("puts a failed command's own dimension in place of whether it ran without prompts", () => {
-    const copy = vercelCopy("cli_command_failed", "doctor", {
-      checks_failed: 1,
-      failed_checks: "port",
-      status: "error",
-      reason: "E_PORT_IN_USE",
-    });
+    const copy = vercelCopy(
+      "cli_command_failed",
+      "doctor",
+      { checks_failed: 1, failed_checks: "port", status: "error", reason: "E_PORT_IN_USE" },
+      "failed_checks",
+    );
     expect(copy).toMatchObject({ failed_checks: "port", reason: "E_PORT_IN_USE" });
     expect(copy).not.toHaveProperty("non_interactive");
     expect(copy).not.toHaveProperty("checks_failed");
@@ -129,5 +132,56 @@ describe("deviceProfileProperties", () => {
     const serialized = JSON.stringify(props);
     expect(serialized).not.toContain("/work/app");
     expect(serialized).not.toContain("zitadel.com");
+  });
+});
+
+describe("the run's environment", () => {
+  it("says whether the run counts as customer traffic and where the CLI ran from", () => {
+    const props = commandEventProperties(
+      meta({ env: { ZITADEL_TELEMETRY_ENV: "production" } }),
+      "cloud",
+      "sess-1",
+    );
+
+    expect(props.environment).toBe("production");
+    expect(["package", "source"]).toContain(props.install_source);
+  });
+
+  it("says a run inside a coding agent is one, and any other run is not", () => {
+    const inside = commandEventProperties(meta({ env: { CLAUDECODE: "1" } }), "cloud", "sess-1");
+    const outside = commandEventProperties(meta({ env: {} }), "cloud", "sess-1");
+
+    expect({ host: inside.host_agent, is_agent: inside.is_agent }).toEqual({
+      host: "claude_code",
+      is_agent: true,
+    });
+    expect(outside.is_agent).toBe(false);
+  });
+});
+
+describe("serverKindOf", () => {
+  it("is none for a command that names no server, and the kind of any other", () => {
+    expect(serverKindOf("")).toBe("none");
+    expect(serverKindOf("http://localhost:8080")).toBe("local");
+    expect(serverKindOf("not a url")).toBe("unknown");
+  });
+});
+
+describe("the install's profile", () => {
+  it("carries how the CLI was launched and whether it ran in an agent, beside its versions", () => {
+    const props = deviceProfileProperties(meta({ env: { CLAUDECODE: "1" } }), "09233195-cd34");
+
+    expect(props).toMatchObject({
+      cli_version: "0.1.0-alpha.11",
+      host_agent: "claude_code",
+      is_agent: true,
+    });
+    expect(Object.keys(props)).toEqual(
+      expect.arrayContaining(["node_version", "invocation_channel", "install_source"]),
+    );
+  });
+
+  it("names the version an install began on, to be written once", () => {
+    expect(firstSeenProperties("0.1.0-alpha.11")).toEqual({ first_cli_version: "0.1.0-alpha.11" });
   });
 });

@@ -224,6 +224,18 @@ export class Chain implements Drawing, Narratable {
     outro(pc.red(CANCELLED));
   }
 
+  private promptListener: (() => void) | undefined;
+
+  /**
+   * Be told each time a prompt is about to be drawn, and only then: a question
+   * a flag, a pipe or a default answers draws nothing and tells no one.
+   *
+   * @param listener - Called before the prompt is drawn.
+   */
+  listenToPrompts(listener: () => void): void {
+    this.promptListener = listener;
+  }
+
   /**
    * The questions, asked the way this command presents itself. A wizard's
    * are drawn in its chain: each one opens the chain before its prompt and
@@ -236,6 +248,13 @@ export class Chain implements Drawing, Narratable {
   questions(
     audience: Pick<Audience, "interactive" | "force"> = this.audience,
   ): Questions & Confirmer {
+    const shown = (): void => {
+      try {
+        this.promptListener?.();
+      } catch {
+        // Whoever listens never changes what the person sees.
+      }
+    };
     const session = {
       interactive: audience.interactive,
       force: audience.force,
@@ -246,6 +265,7 @@ export class Chain implements Drawing, Narratable {
           ...session,
           guide: false,
           around: async (draw) => {
+            shown();
             const resume = DrawnSpinner.pause();
             try {
               return await draw();
@@ -257,6 +277,7 @@ export class Chain implements Drawing, Narratable {
       : Asker.for({
           ...session,
           around: async (draw) => {
+            shown();
             const resume = DrawnSpinner.pause();
             this.open();
             try {

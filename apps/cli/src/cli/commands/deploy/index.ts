@@ -30,6 +30,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { Project } from "@/lib/project";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -174,7 +175,7 @@ function commitConfig(
  * (primary origins are never named one by one). `--dry-run` stops after the
  * diff, writing nothing to the server.
  */
-export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand)) {
+export default class Deploy extends Telemetered(Destructive(ServerCommand(EnvironmentCommand))) {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
   static override group = CommandGroups.releases;
@@ -224,6 +225,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
     if (!this.dryRun) {
       await this.requirePrimaryOrigin(publisher, projectId, environment);
     }
+    this.annotate({ stage: "validation" });
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -233,6 +235,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       json: this.isJson,
       color: this.isColored,
     });
+    this.annotate({ stage: undefined });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
     }
@@ -248,7 +251,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       });
     }
     const { resourceCount } = prepared;
-    this.recordTelemetry({ resources: resourceCount });
+    this.annotate({ resources: resourceCount });
     // The deploy again as it was typed (message and `--force` included), so a retry
     // or the real run after a dry run asks for the same thing.
     const again = async (): Promise<SuggestedCommand> => {
@@ -291,10 +294,15 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       );
     }
 
-    const { release, publication } = await publisher.deploy({
-      prepared,
-      message,
-    });
+    const { release, publication } = await publisher.deploy(
+      {
+        prepared,
+        message,
+      },
+      (stage) => {
+        this.annotate({ stage });
+      },
+    );
     switch (publication.outcome) {
       case "revoked": {
         throw new ZitadelError(
@@ -328,9 +336,13 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       }
     }
     const { deployment } = publication;
+    this.annotate({
+      stage: undefined,
+      changed_configuration_types: prepared.changedConfiguration,
+    });
 
     const servedOrigins = deployment.origins;
-    this.recordTelemetry({ origin_count: servedOrigins.length });
+    this.annotate({ origin_count: servedOrigins.length });
 
     // The release is live; if the tree was dirty, committing now keeps what was
     // deployed in git (the warning above says to commit before the next deploy).

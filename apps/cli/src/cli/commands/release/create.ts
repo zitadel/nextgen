@@ -8,6 +8,7 @@ import { MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -35,7 +36,7 @@ const MESSAGE = {
 /**
  * `zitadel release create` — build a release from .zitadel/ without deploying it.
  */
-export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
+export default class ReleaseCreate extends Telemetered(ServerCommand(EnvironmentCommand)) {
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.releases;
   static override groupOrder = 4;

@@ -52,7 +52,7 @@ import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
-import { DEFAULT_RENDERER, type Fact, PORT } from "./shared";
+import { DEFAULT_RENDERER, type Fact, onboardingStep, PORT } from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
 import { CheckPatch } from "./steps/check-patch";
 import { CheckPreconditions } from "./steps/check-preconditions";
@@ -82,6 +82,7 @@ import { ShowResult } from "./steps/show-result";
 import { WriteConfiguration } from "./steps/write-configuration";
 import { WriteManifest } from "./steps/write-manifest";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * How `--design`, which setup no longer takes, is refused.
@@ -187,7 +188,7 @@ const RENDERER_FLAG_DESCRIPTION =
  * `--design` is hidden so scripts and agents passing it get a targeted error
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
-export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
+export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCommand))) {
   /**
    * What `--help` says the command does.
    */
@@ -198,6 +199,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
    * The group the command index lists it under.
    */
   static override group = CommandGroups.gettingStarted;
+  static override readonly headline = "framework";
 
   /**
    * Where it sits in its group.
@@ -458,7 +460,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             ui: this.ui,
           }),
           ({ flags, found, scaffoldedFramework }) => {
-            this.recordTelemetry({
+            this.annotate({
               framework: found.app.framework,
               renderer: flags.renderer ?? DEFAULT_RENDERER,
               scaffolded_skeleton: scaffoldedFramework,
@@ -468,7 +470,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
               use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
               sso: flags.sso ?? "none",
               password_policy: flags.passwordMinLength === null ? "empty" : "set",
-              step: "framework_resolved",
+              setup_stage: "framework_resolved",
             });
           },
         )
@@ -488,7 +490,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             suggest: this.suggest,
           }),
           ({ answers }) => {
-            this.recordTelemetry({
+            this.annotate({
               preset: answers.preset,
               use_case: answers.useCase,
               sso:
@@ -533,7 +535,7 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             ui: this.ui,
           }),
           () => {
-            this.recordTelemetry({ step: "project_created" });
+            this.annotate({ setup_stage: "project_created" });
           },
         )
         .step(
@@ -561,12 +563,12 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             dryRun: this.dryRun,
           }),
           ({ allFilesWritten, scaffolded }) => {
-            this.recordTelemetry({
-              step: "files_patched",
+            this.annotate({
+              setup_stage: "files_patched",
               files_written_count: allFilesWritten.length,
             });
             if (!this.dryRun) {
-              this.recordTelemetry({
+              this.annotate({
                 password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
               });
             }
@@ -597,8 +599,8 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             ui: this.ui,
           }),
           ({ installOutcome }) => {
-            this.recordTelemetry({
-              step: "dependencies_installed",
+            this.annotate({
+              setup_stage: "dependencies_installed",
               package_manager: installOutcome.install.package_manager,
             });
           },
@@ -653,6 +655,11 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
         .run(
           { flags },
           {
+            watch: this.watchWizard({
+              flow: "onboarding",
+              otherwise: "application_setup",
+              step: onboardingStep,
+            }),
             onUndoError: (key, error) => {
               warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

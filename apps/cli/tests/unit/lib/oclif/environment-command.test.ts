@@ -26,7 +26,7 @@ class ProjectProbe extends ServerCommand(EnvironmentCommand) {
   async probe() {
     const { flags } = await this.parse(ProjectProbe);
     await this.toMeta(flags);
-    return { connection: await this.connect(), telemetry: this.telemetryProps };
+    return { connection: await this.connect(), telemetry: this.describe() };
   }
 }
 
@@ -71,7 +71,7 @@ class PreviewProbe extends ServerCommand(EnvironmentCommand) {
   async probe() {
     const { flags } = await this.parse(PreviewProbe);
     await this.toMeta(flags);
-    return { connection: await this.connect(), telemetry: this.telemetryProps };
+    return { connection: await this.connect(), telemetry: this.describe() };
   }
 }
 

@@ -133,8 +133,8 @@
     uses lives in that step's file.
   - A step never imports another step or a value from the command's `index.ts`. It takes what it
     needs through its constructor, which the command's `execute` fills when it builds the wizard,
-    and the command keeps its flags, refusals and telemetry (recorded through the observer given
-    to `.step(...)`) and emits the one result the wizard returns.
+    and the command keeps its flags, refusals and telemetry (reported through the `watch` its
+    `this.watchWizard(...)` gives the wizard) and emits the one result the wizard returns.
 - Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
   `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
@@ -221,7 +221,8 @@
   | talks to one through `--server` or its environment | `ServerCommand(Base)` |
   | may have to ask which server | `ChoosingServerCommand(Base)` |
   | is about the local server | `LocalServerCommand(Base, folderRule)` |
-  | is destructive | `Destructive(...)`, outermost |
+  | is destructive | `Destructive(...)`, around the rest |
+  | reports its run | `Telemetered(...)`, outermost |
 
   A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
   the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
@@ -287,17 +288,18 @@
   global flag, or a deviation, in `SKILL.md`'s invocation rules.
 - Declare an environment variable that sets what a global flag sets as a
   `FlagVariable` beside the code that reads it, read it by its `name`, and add
-  it to `FLAG_VARIABLES` (`src/lib/oclif/base.ts`).
+  it to `FLAG_VARIABLES` (`src/lib/oclif/base.ts`); a flag a mixin adds (`--telemetry`)
+  keeps its variables in the mixin's static `flagVariables`, which the reference reads
+  from each command.
 
 ## Telemetry
 
 Anonymous product analytics: a copy of each event to Vercel Web Analytics
-(`src/lib/telemetry/vercel.ts`), and Mixpanel's Node SDK (`mixpanel`), which is
-paused.
+(`src/lib/telemetry/vercel.ts`), and Mixpanel's Node SDK (`mixpanel`).
 
 - Add no other analytics tool or SDK, browser SDK included.
-- The Vercel copy sends only `VERCEL_EVENT_KEYS` (`src/lib/oclif/command-telemetry.ts`),
-  the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
+- The Vercel copy sends only the keys `vercelEventKeys` (`src/cli/telemetry/properties.ts`)
+  returns, the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
 - Development runs (`resolveChannel`, CI included) send no Vercel copy unless
   `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
@@ -314,29 +316,31 @@ paused.
 - Consent is opt-out (`--no-telemetry`, `DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`)
   and resolved once in `resolveConsent` (`src/lib/telemetry/consent.ts`).
   Never send around it.
-- `BaseCommand` (`src/lib/oclif/base.ts`) is the only place a client is
-  built; CLI-specific properties live in `src/lib/oclif/command-telemetry.ts`.
-- Telemetry never writes to stdout and never fails a command. The first-run
-  notice goes to stderr, in interactive mode only.
-- Mixpanel is paused: `src/lib/telemetry/config.ts` bakes in no token, so only
-  `ZITADEL_TELEMETRY_TOKEN` sends to it. Bake one back in only for a project in
-  the region its endpoint names; tokens are write-only, published on purpose.
-- Without settings a run is production traffic; `ZITADEL_TELEMETRY_ENV=development`
-  (`scripts/run-cli.mjs` sets it) is not, and CI sets `DO_NOT_TRACK=1`.
-- Mixpanel events for the EU region go through the cloud's
-  `/telemetry/mixpanel/*` rewrite in `vercel.json` (`config.test.ts`).
-- `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
-  (`Runtime.userAgent()` in `src/lib/runtime`) and obey the same opt-out.
-- The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)
-  tells users what is sent and how to opt out: change it with any of the above.
+- `Telemetered` (`src/cli/telemetry/telemetered.ts`) is the only place a client is built
+  and an event is sent. A command that extends it reports on its own run; one that does
+  not sends nothing. Put it outermost: `extends Telemetered(Destructive(ServerCommand(…)))`.
+- `BaseCommand` and `src/lib` hold no telemetry. The base command offers one neutral hook,
+  `describe()`, for what a command knows about its run; a layer or a command overrides it
+  and keeps `super.describe()`.
+- Keep no table that maps command ids, step keys or properties to events: a command
+  says what it knows in its own `describe()` and `annotate()` calls. The one place a step
+  key meets an event name is the `step` function a wizard command hands to
+  `this.watchWizard`, kept in that command's `shared.ts`.
+- A wizard command passes `this.watchWizard({ flow, step })` as the wizard's `watch`;
+  `step` is one function in the command that names a step for the event catalog and
+  returns the choice the step settled.
+- A command's Vercel copy keeps one fact of its own: `static override readonly headline`.
+- A generated resource says what it knows from the body it sends with `facts` on its
+  `create` or `update`, in `resources.ts`.
 
 ### Adding a dimension
 
-`cli_command_started`, `cli_command_completed` and `cli_command_failed` fire
-from `BaseCommand` for every command. Add a dimension rather than an event:
+`cli_command_started`, `cli_command_completed` and `cli_command_failed` are sent by
+`Telemetered` for every command that extends it. Add a dimension rather than an event:
 
-1. Record it with `this.recordTelemetry({ … })`. It reaches the events fired
-   after it, so not `started`. Never fetch data just to record it.
+1. Note it with `this.annotate({ … })` as the run learns it, or return it from `describe()`
+   once the run is over. It reaches the events fired after it, so not `started`. Never
+   fetch data just to note it.
 2. Name it `snake_case`; a boolean starts with `is_`, `has_`, `dry_` or
    `non_`. Leave out empty values; `compact()` drops them.
 3. List it under its command in the
@@ -344,6 +348,6 @@ from `BaseCommand` for every command. Add a dimension rather than an event:
    telemetry page; `tests/unit/lib/telemetry/catalog.test.ts` fails when the
    code and the catalog disagree.
 4. Check that it arrives in Mixpanel's Live View, with `ZITADEL_TELEMETRY_TOKEN`
-   naming the dev project while Mixpanel is paused. The region defaults to
+   naming a project of your own, or rely on the development project a development run sends to. Each baked-in project carries its own region; a token of your own defaults to
    `eu`; set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are
    silently dropped.

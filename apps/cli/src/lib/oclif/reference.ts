@@ -79,7 +79,12 @@ export type CliReference = {
 };
 
 /** A command class with the root-help statics {@link BaseCommand} declares. */
-type ReferencedCommand = typeof Command & { group?: string; groupOrder?: number };
+type ReferencedCommand = typeof Command & {
+  group?: string;
+  groupOrder?: number;
+  /** The environment variables that set what a flag the command adds sets. */
+  flagVariables?: readonly FlagVariable[];
+};
 
 /**
  * The `--json` oclif puts before the base flags of a command that sets
@@ -120,9 +125,17 @@ export function cliReference(
   // The global flags are `BaseCommand`'s, and those a variable stands in for
   // (`--server`, which `ServerCommand` adds), each taken by every command as one
   // and the same flag, in the order the commands list them.
+  const variables: readonly FlagVariable[] = [
+    ...FLAG_VARIABLES,
+    ...new Set(
+      entries.flatMap(({ command }) => {
+        return command.flagVariables ?? [];
+      }),
+    ),
+  ];
   const named = new Set([
     ...Object.keys(BaseCommand.baseFlags),
-    ...FLAG_VARIABLES.map((variable) => {
+    ...variables.map((variable) => {
       return variable.flag;
     }),
   ]);
@@ -147,7 +160,7 @@ export function cliReference(
         return text;
       }),
     ],
-    env: [...FLAG_VARIABLES].sort((a, b) => {
+    env: [...variables].sort((a, b) => {
       return flagOrder.indexOf(a.flag) - flagOrder.indexOf(b.flag);
     }),
     exitCodes: { ...EXIT_CODES },
