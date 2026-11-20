@@ -201,6 +201,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetProjectOperation:          true,
 	api.UpdateProjectOperation:       true,
 	api.ListProjectAdminsOperation:   true,
+	api.ListProjectMembersOperation:  true,
 	api.LookupInvitationOperation:    true,
 	api.AcceptInvitationOperation:    true,
 	api.RejectInvitationOperation:    true,
