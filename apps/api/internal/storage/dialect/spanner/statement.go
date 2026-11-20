@@ -29,9 +29,11 @@ type statements struct {
 	userPasskeyStatements
 	userRecoveryCodesStatements
 	brandingStatements
+	oauthSettingsStatements
 	variableStatements
 	variableSetStatements
 	claimStatements
+	authRequestStatements
 	invitationStatements
 	resourceScopeStatements
 	searchEntryStatements
@@ -77,9 +79,11 @@ func newStatements(db queryExecutor) statements {
 		userPasskeyStatements:         newUserPasskeyStatements(db),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(db),
 		brandingStatements:            newBrandingStatements(db),
+		oauthSettingsStatements:       newOAuthSettingsStatements(db),
 		variableStatements:            newVariableStatements(db),
 		variableSetStatements:         newVariableSetStatements(db),
 		claimStatements:               newClaimStatements(db),
+		authRequestStatements:         newAuthRequestStatements(db),
 		invitationStatements:          newInvitationStatements(db),
 		resourceScopeStatements:       newResourceScopeStatements(db),
 		searchEntryStatements:         newSearchEntryStatements(db),

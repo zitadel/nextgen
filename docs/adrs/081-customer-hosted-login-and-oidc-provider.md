@@ -207,10 +207,15 @@ switch, on from the start, and declares the issuer login-only (ADR 082 §9).
    `/login?auth_request=<handle>`.
 3. The handle is not a capability: a cookie set with the redirect binds it to
    the browser, as `_zsso` binds a provider callback, and `POST /flows`
-   accepts it only with that binding. A second request in the same browser
-   must not end the first: bindings are per request, the flow cookie (one
-   `_zflow` per host today) gets one name per flow before the authorization
-   server ships, and the proxies pass both through unchanged.
+   accepts it only with that binding. Concurrent requests in one browser do
+   not end each other, up to a bounded number of bindings: bindings are per
+   request, the flow cookie (one `_zflow` per host today) gets one name per
+   flow before the authorization server ships, and the proxies pass both
+   through unchanged. The bound exists because `client_id` and `redirect_uri`
+   are public, so any site can send a browser to the endpoint and every
+   binding is sent on every request to the origin; the authorization endpoint
+   sets it, and reaching it expires the browser's oldest binding, which ends
+   the sign-in that started it.
 4. `<zitadel-login>` reads `auth_request` from the page URL and sends it as
    `auth_request_id` on `POST /flows`, also when it restarts a flow; a
    provider round trip returns to the same URL. Generated page code never

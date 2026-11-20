@@ -55,7 +55,7 @@ describe("--tail", () => {
 
 /** `logs`, with the server it resolves before the run has a context exposed. */
 class Reading extends Logs {
-  public sourceFor(cwd: string): Promise<string> {
+  public sourceFor(cwd: string): Promise<string | undefined> {
     return this.sourceOf({}, cwd);
   }
 }

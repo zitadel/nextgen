@@ -12,7 +12,7 @@ import { it } from "@tests/fixtures";
 import { parseArg } from "@tests/helpers/inputs";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = "https://preview.zitadel.com";
 
 const DEPLOYMENT = {
   id: "dep_1",

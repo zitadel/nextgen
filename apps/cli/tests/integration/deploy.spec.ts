@@ -36,7 +36,7 @@ const NO_BASELINE = {
 };
 
 const UNCOMMITTED =
-  "The git working tree has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.";
+  "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.";
 
 const NO_EMAIL_LOCKOUT = expect.stringContaining(
   '1 of 1 existing user of "human-user" has no "email"',
@@ -1719,7 +1719,34 @@ describe("deploy", () => {
             },
             next_commands: [expectedPublicCliCommand(app.againAsRun("deployment list"))],
           },
-          warnings: [UNCOMMITTED],
+          warnings: [],
+        });
+      });
+
+      it("records a clean release when only files outside .zitadel are uncommitted", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+        await app.commit();
+        await app.editPackageJson((pkg) => {
+          pkg.dependencies.left = "1.0.0";
+        });
+        await app.deploy();
+        await app.editUserSchema((schema) => {
+          schema.properties.title = { type: "string" };
+        });
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          data: {
+            diff: {
+              files: [
+                expect.objectContaining({ path: ".zitadel/schemas/default-human-user.json" }),
+              ],
+            },
+          },
         });
       });
 

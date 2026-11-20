@@ -8,6 +8,7 @@ import { BaseCommand } from "@/lib/oclif/base";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** Suggests commands and keeps the directory alone as its scope, as `start` does. */
 class DirectoryProbe extends BaseCommand {
@@ -31,7 +32,7 @@ class DirectoryProbe extends BaseCommand {
 }
 
 /** Suggests commands and carries the environment selection, as `deploy` does. */
-class EnvironmentProbe extends EnvironmentCommand {
+class EnvironmentProbe extends ServerCommand(EnvironmentCommand) {
   protected async execute(): Promise<never> {
     throw new Error("unused");
   }
@@ -59,8 +60,8 @@ class EnvironmentProbe extends EnvironmentCommand {
 }
 
 /** Resolves no environment, as the `auth-method` commands do, yet takes the flags. */
-class FilesOnlyProbe extends EnvironmentCommand {
-  static override meta = { resolveServer: false, environment: false };
+class FilesOnlyProbe extends ServerCommand(EnvironmentCommand) {
+  static override meta = { environment: false };
 
   protected async execute(): Promise<never> {
     throw new Error("unused");
@@ -73,7 +74,7 @@ class FilesOnlyProbe extends EnvironmentCommand {
    */
   async probe() {
     const { flags } = await this.parse(FilesOnlyProbe);
-    await this.toMeta(flags, { resolveServer: false, environment: false });
+    await this.toMeta(flags, { environment: false });
     return this.suggest({ id: "deploy", flags: { dryRun: true } });
   }
 }
@@ -102,9 +103,9 @@ class SwitchProbe extends BaseCommand {
 }
 
 /** Asks before it acts on an environment, as `variable rm` does, and offers itself with `--force`. */
-class ConsentProbe extends EnvironmentCommand {
+class ConsentProbe extends ServerCommand(EnvironmentCommand) {
   public static override readonly id: string = "variable:rm";
-  static override meta = { resolveServer: false, environment: false };
+  static override meta = { environment: false };
   static override flags = {
     force: Flags.boolean({ description: "Remove it without asking." }),
   };
@@ -120,7 +121,7 @@ class ConsentProbe extends EnvironmentCommand {
    */
   async probe() {
     const { flags } = await this.parse(ConsentProbe);
-    await this.toMeta(flags, { resolveServer: false, environment: false });
+    await this.toMeta(flags, { environment: false });
     return this.rerun<typeof ConsentProbe.flags>({ with: { force: true } });
   }
 
@@ -131,7 +132,7 @@ class ConsentProbe extends EnvironmentCommand {
    */
   async leavingOutAFlagItLacks() {
     const { flags } = await this.parse(ConsentProbe);
-    await this.toMeta(flags, { resolveServer: false, environment: false });
+    await this.toMeta(flags, { environment: false });
     return this.rerun<{ ghost: Interfaces.BooleanFlag<boolean> }>({ without: ["ghost"] });
   }
 

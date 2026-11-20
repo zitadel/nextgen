@@ -2,7 +2,6 @@ package migration
 
 import (
 	"database/sql"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,12 +30,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 // it and the snapshot of its schema.
 func openRoundTrip(t *testing.T) (*goose.Provider, func(t *testing.T) migrationtest.Schema) {
 	t.Helper()
-	dsn := &url.URL{
-		Scheme:   "file",
-		Path:     filepath.ToSlash(filepath.Join(t.TempDir(), "roundtrip.db")),
-		RawQuery: PragmaQuery,
-	}
-	db, err := sql.Open("sqlite", dsn.String())
+	dsn := FileURI(filepath.ToSlash(filepath.Join(t.TempDir(), "roundtrip.db")))
+	db, err := sql.Open("sqlite", dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	db.SetMaxOpenConns(1)

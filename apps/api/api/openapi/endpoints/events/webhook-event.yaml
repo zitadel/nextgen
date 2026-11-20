@@ -129,6 +129,22 @@ oneOf:
             const: auth.factor.password.set
           data:
             $ref: payloads/auth-factor-payload.yaml
+  - title: auth.request.created
+    description: |
+      An app started a sign-in at the OAuth authorization endpoint. `data`
+      names the app by its `client_id`.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: auth.request.created
+          data:
+            $ref: payloads/auth-request-created-payload.yaml
   - title: auth.sso.authorization.failed
     description: |
       A sign-in through an identity provider (SSO) failed at the provider.
@@ -470,6 +486,24 @@ oneOf:
             const: invitation.rejected
           data:
             $ref: payloads/invitation-rejected-payload.yaml
+  - title: oauth_settings.created
+    description: |
+      A project published a new revision of its OAuth settings, which say
+      whether its OAuth authorization server answers. A release build
+      publishes one when the bundle's `oauth` resource differs from every
+      earlier revision.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: oauth_settings.created
+          data:
+            $ref: payloads/oauth-settings-created-payload.yaml
   - title: origin.added
     description: |
       An origin was added to a project. `data` holds its `pattern` and its

@@ -14,7 +14,7 @@
 <main class="error">
 <p class="error-status">Error {{.Status}}</p>
 <h1 class="error-title">{{.Title}}</h1>
-<p class="error-description">{{.Description}}</p>
+{{with .Description}}<p class="error-description">{{.}}</p>{{end}}
 {{- with .Action}}
 <a class="error-action" href="{{.Href}}">{{.Label}}</a>
 {{- end}}

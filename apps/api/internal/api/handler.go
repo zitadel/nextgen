@@ -22,6 +22,7 @@ type Handler struct {
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
+	oauthSettingsService  *service.OAuthSettingsService
 	policyService         *service.PolicyService
 	webhookService        *service.WebhookService
 	releaseService        service.ReleaseService

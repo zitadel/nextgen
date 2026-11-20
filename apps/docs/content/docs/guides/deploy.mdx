@@ -45,7 +45,7 @@ The full digest is `content_hash` in the `--json` envelope.
 
 Under `--json` the result is one envelope on stdout. `data` carries `release_id`, `content_hash`, `deployment_id`, `resources`, `origins` and `diff`, and `data.next_commands` suggests `deployment list`. `diff.files` lists each changed file with its `status` and its `patch`, the file's part of the diff. It is `null` when there is nothing to diff against yet, such as before the first deploy, and `diff.note` says why.
 
-`warnings` lists what went wrong without stopping the deploy, such as uncommitted changes (the release records its commit as approximate) or non-blocking guidance on your flows. The deploy still happened. Fix each cause and deploy again before you report success.
+`warnings` lists what went wrong without stopping the deploy, such as uncommitted `.zitadel/` changes (the release records its commit as approximate, and the next `deploy --dry-run` shows no diff until a release is built from a committed tree) or non-blocking guidance on your flows. The deploy still happened. Fix each cause and deploy again before you report success.
 
 When the release would leave existing users unable to sign in, such as users who lack the identifier the login flow now looks them up by, `deploy` lists them and asks before it deploys. A non-interactive run, `deploy --dry-run` included, refuses with `E_CONFIRMATION_REQUIRED`. Migrate the users first, or pass `--force` to deploy anyway.
 

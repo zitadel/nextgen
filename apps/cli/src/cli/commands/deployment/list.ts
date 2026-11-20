@@ -8,6 +8,7 @@ import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;
@@ -51,7 +52,7 @@ const COLUMNS = [
  * empty for any other deployment. It is also empty, with a warning, when the
  * live view or the previews cannot be read.
  */
-export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
+export default class DeploymentList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;

@@ -40,7 +40,14 @@ async function makeProject(cwd: string): Promise<void> {
 }
 
 function status(cwd: string) {
-  return runCliForTest(["status", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"]);
+  return runCliForTest([
+    "status",
+    "--cwd",
+    cwd,
+    "--json",
+    "--server",
+    "https://preview.zitadel.com",
+  ]);
 }
 
 /**
@@ -55,7 +62,7 @@ async function configuredProject(cwd: string): Promise<void> {
     join(cwd, "zitadel.json"),
     JSON.stringify({
       project: "proj-001",
-      server: "https://api.zitadel.cloud",
+      server: "https://preview.zitadel.com",
     }),
   );
   await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
@@ -85,7 +92,7 @@ describe("status command", () => {
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`doctor --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`doctor --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -99,7 +106,7 @@ describe("status command", () => {
       "--cwd",
       cwd,
       "--server",
-      "https://api.zitadel.cloud",
+      "https://preview.zitadel.com",
     ]);
     const json = await status(cwd);
 
@@ -124,7 +131,7 @@ describe("status command", () => {
     expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -157,7 +164,7 @@ describe("status command", () => {
     expect(actions).toContain("no longer be claimed");
     expect(actions).not.toContain("its data may be lost");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -184,7 +191,7 @@ describe("status command", () => {
     });
     expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
     expect(json.data.next_commands).not.toContain(
-      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -208,7 +215,7 @@ describe("status command", () => {
     };
     expect(json.data.project.claim).toBeUndefined();
     expect(json.data.next_commands).not.toContain(
-      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });
 
@@ -218,7 +225,7 @@ describe("status command", () => {
     await makeProject(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
-      JSON.stringify({ project: "orphan", server: "https://api.zitadel.cloud" }),
+      JSON.stringify({ project: "orphan", server: "https://preview.zitadel.com" }),
     );
 
     const res = await status(cwd);
@@ -245,11 +252,11 @@ describe("status command", () => {
     await makeProject(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
-      JSON.stringify({ project: "proj-local", server: "https://api.zitadel.cloud" }),
+      JSON.stringify({ project: "proj-local", server: "https://preview.zitadel.com" }),
     );
     await writeFile(
       join(cwd, ".env.production.local"),
-      "ZITADEL_URL=https://api.zitadel.cloud\nZITADEL_PROJECT_ID=proj-prod\nZITADEL_PROJECT_SECRET=sk_prod\n",
+      "ZITADEL_URL=https://preview.zitadel.com\nZITADEL_PROJECT_ID=proj-prod\nZITADEL_PROJECT_SECRET=sk_prod\n",
     );
 
     const res = await runCliForTest(["status", "--cwd", cwd, "--json", "--env", "production"]);
@@ -272,7 +279,7 @@ describe("status command", () => {
 
     await writeFile(
       join(cwd, "zitadel.json"),
-      JSON.stringify({ project: "proj-local", server: "https://api.zitadel.cloud" }),
+      JSON.stringify({ project: "proj-local", server: "https://preview.zitadel.com" }),
     );
 
     const res = await runCliForTest(["status", "--cwd", cwd, "--json", "--env", "production"]);
@@ -334,7 +341,7 @@ describe("status command", () => {
         relative(process.cwd(), cwd),
         "--json",
         "--server",
-        "https://api.zitadel.cloud",
+        "https://preview.zitadel.com",
       ],
       { PATH: `${binDir}:${process.env.PATH ?? ""}` },
     );
@@ -353,7 +360,7 @@ describe("status command", () => {
     await makeProject(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
-      JSON.stringify({ server: "https://api.zitadel.cloud" }),
+      JSON.stringify({ server: "https://preview.zitadel.com" }),
     );
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
 
@@ -390,11 +397,13 @@ describe("status command", () => {
     // next_commands is staged in lockstep: preview is fine, publishing
     // waits for the first proven login.
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`deploy --dry-run --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(
+        `deploy --dry-run --server https://preview.zitadel.com --cwd ${cwd}`,
+      ),
     );
     expect(json.data.next_commands).not.toContain(
       expectedPublicCliCommand(
-        `deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `deploy --message '<what changed>' --server https://preview.zitadel.com --cwd ${cwd}`,
       ),
     );
   });
@@ -413,13 +422,13 @@ describe("status command", () => {
     expect(actions).toContain("Customize what you ask for and how people sign in");
     expect(actions).toContain(".zitadel/schemas/");
     expect(actions).toContain(
-      `See your changes before they go live: ${expectedPublicCliCommand(`deploy --dry-run --server https://api.zitadel.cloud --cwd ${cwd}`)} to ` +
-        `preview, then ${expectedPublicCliCommand(`deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`)} to publish.`,
+      `See your changes before they go live: ${expectedPublicCliCommand(`deploy --dry-run --server https://preview.zitadel.com --cwd ${cwd}`)} to ` +
+        `preview, then ${expectedPublicCliCommand(`deploy --message '<what changed>' --server https://preview.zitadel.com --cwd ${cwd}`)} to publish.`,
     );
     expect(actions).not.toContain("register a user");
     expect(json.data.next_commands).toContain(
       expectedPublicCliCommand(
-        `deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `deploy --message '<what changed>' --server https://preview.zitadel.com --cwd ${cwd}`,
       ),
     );
   });
@@ -432,7 +441,7 @@ describe("status command", () => {
         join(cwd, "zitadel.json"),
         JSON.stringify({
           project: "proj-001",
-          server: "https://api.zitadel.cloud",
+          server: "https://preview.zitadel.com",
           framework: { id: framework },
         }),
       );
@@ -527,7 +536,7 @@ describe("status command", () => {
     expect(actions).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(
       expectedPublicCliCommand(
-        `deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `deploy --message '<what changed>' --server https://preview.zitadel.com --cwd ${cwd}`,
       ),
     );
   });
@@ -536,7 +545,7 @@ describe("status command", () => {
     await configuredProject(cwd);
 
     const res = await asTerminal(() =>
-      runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),
+      runCliForTest(["status", "--cwd", cwd, "--server", "https://preview.zitadel.com"]),
     );
 
     expect(stripAnsi(res.stdout)).toContain("No local server was started in this directory.");
@@ -550,7 +559,7 @@ describe("status command", () => {
       "--cwd",
       cwd,
       "--server",
-      "https://api.zitadel.cloud",
+      "https://preview.zitadel.com",
     ]);
 
     expect(stripAnsi(res.stdout)).toContain("No local server was started in this directory.");
@@ -563,7 +572,7 @@ describe("status command", () => {
     await chmod(join(binDir, "docker"), 0o755);
 
     const res = await runCliForTest(
-      ["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      ["status", "--cwd", cwd, "--server", "https://preview.zitadel.com"],
       { PATH: `${binDir}:${process.env.PATH ?? ""}` },
     );
 
@@ -580,7 +589,7 @@ describe("status command", () => {
     await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:9"));
 
     const res = await runCliForTest(
-      ["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      ["status", "--cwd", cwd, "--server", "https://preview.zitadel.com"],
       { PATH: noDocker },
     );
 
@@ -594,10 +603,10 @@ describe("status command", () => {
     await configuredProject(cwd);
 
     const res = await asTerminal(() =>
-      runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),
+      runCliForTest(["status", "--cwd", cwd, "--server", "https://preview.zitadel.com"]),
     );
 
-    expect(stripAnsi(res.stdout)).toContain("project proj-001 on api.zitadel.cloud");
+    expect(stripAnsi(res.stdout)).toContain("project proj-001 on preview.zitadel.com");
     expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
   });
 });

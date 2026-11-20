@@ -10,13 +10,15 @@ import {
   ServerStartError,
   ServerStopError,
 } from "@/lib/server";
-import { ServerCommand } from "@/cli/commands/server/base";
+import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import { type Admitted, type CommandResult, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Guidance, shellCommand, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import { section } from "@/lib/ui";
+import { BaseCommand } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
 
 /**
  * How an image beside the binary runtime is refused: an image is a container's,
@@ -128,7 +130,8 @@ const NOT_READY_REASONS = {
  * exists, and the port it actually got afterwards, so an agent that follows it
  * targets the server that was started.
  */
-export default class Start extends ServerCommand {
+export default class Start extends LocalServerCommand(ServerCommand(BaseCommand), "exact") {
+  static override group = CommandGroups.localServer;
   static override description = "Start a local Zitadel server.";
   static override groupOrder = 1;
 
@@ -153,6 +156,15 @@ export default class Start extends ServerCommand {
     });
 
     return plan.apiUrl;
+  }
+
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
   }
 
   protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {

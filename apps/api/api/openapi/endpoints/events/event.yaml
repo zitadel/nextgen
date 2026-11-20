@@ -12,6 +12,7 @@ oneOf:
   - $ref: types/auth-check-succeeded-event.yaml
   - $ref: types/auth-factor-passkey-enrolled-event.yaml
   - $ref: types/auth-factor-password-set-event.yaml
+  - $ref: types/auth-request-created-event.yaml
   - $ref: types/auth-sso-authorization-failed-event.yaml
   - $ref: types/auth-sso-exchange-failed-event.yaml
   - $ref: types/auth-sso-exchange-succeeded-event.yaml
@@ -33,6 +34,7 @@ oneOf:
   - $ref: types/invitation-cancelled-event.yaml
   - $ref: types/invitation-created-event.yaml
   - $ref: types/invitation-rejected-event.yaml
+  - $ref: types/oauth_settings-created-event.yaml
   - $ref: types/origin-added-event.yaml
   - $ref: types/origin-removed-event.yaml
   - $ref: types/policy-created-event.yaml
@@ -71,6 +73,7 @@ discriminator:
     auth.check.succeeded: types/auth-check-succeeded-event.yaml
     auth.factor.passkey.enrolled: types/auth-factor-passkey-enrolled-event.yaml
     auth.factor.password.set: types/auth-factor-password-set-event.yaml
+    auth.request.created: types/auth-request-created-event.yaml
     auth.sso.authorization.failed: types/auth-sso-authorization-failed-event.yaml
     auth.sso.exchange.failed: types/auth-sso-exchange-failed-event.yaml
     auth.sso.exchange.succeeded: types/auth-sso-exchange-succeeded-event.yaml
@@ -92,6 +95,7 @@ discriminator:
     invitation.cancelled: types/invitation-cancelled-event.yaml
     invitation.created: types/invitation-created-event.yaml
     invitation.rejected: types/invitation-rejected-event.yaml
+    oauth_settings.created: types/oauth_settings-created-event.yaml
     origin.added: types/origin-added-event.yaml
     origin.removed: types/origin-removed-event.yaml
     policy.created: types/policy-created-event.yaml
