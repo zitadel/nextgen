@@ -6266,6 +6266,482 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 
 // Merged schema.
 // Ref: #
+type AuthRequestCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category AuthRequestCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock, to the millisecond.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock, to the millisecond.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilAuthRequestCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptAuthRequestCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  AuthRequestCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *AuthRequestCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *AuthRequestCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AuthRequestCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *AuthRequestCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *AuthRequestCreatedEvent) GetCategory() AuthRequestCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *AuthRequestCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AuthRequestCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *AuthRequestCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *AuthRequestCreatedEvent) GetActorType() OptNilAuthRequestCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *AuthRequestCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *AuthRequestCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthRequestCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *AuthRequestCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *AuthRequestCreatedEvent) GetDelegationType() OptAuthRequestCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *AuthRequestCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *AuthRequestCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *AuthRequestCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *AuthRequestCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *AuthRequestCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *AuthRequestCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *AuthRequestCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *AuthRequestCreatedEvent) GetPayload() AuthRequestCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *AuthRequestCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *AuthRequestCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AuthRequestCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *AuthRequestCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *AuthRequestCreatedEvent) SetCategory(val AuthRequestCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *AuthRequestCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AuthRequestCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *AuthRequestCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *AuthRequestCreatedEvent) SetActorType(val OptNilAuthRequestCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *AuthRequestCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *AuthRequestCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthRequestCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *AuthRequestCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *AuthRequestCreatedEvent) SetDelegationType(val OptAuthRequestCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *AuthRequestCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *AuthRequestCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *AuthRequestCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *AuthRequestCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *AuthRequestCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *AuthRequestCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *AuthRequestCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *AuthRequestCreatedEvent) SetPayload(val AuthRequestCreatedPayload) {
+	s.Payload = val
+}
+
+type AuthRequestCreatedEventActorType string
+
+const (
+	AuthRequestCreatedEventActorTypeHuman   AuthRequestCreatedEventActorType = "human"
+	AuthRequestCreatedEventActorTypeService AuthRequestCreatedEventActorType = "service"
+	AuthRequestCreatedEventActorTypeSystem  AuthRequestCreatedEventActorType = "system"
+	AuthRequestCreatedEventActorTypeAgent   AuthRequestCreatedEventActorType = "agent"
+)
+
+// AllValues returns all AuthRequestCreatedEventActorType values.
+func (AuthRequestCreatedEventActorType) AllValues() []AuthRequestCreatedEventActorType {
+	return []AuthRequestCreatedEventActorType{
+		AuthRequestCreatedEventActorTypeHuman,
+		AuthRequestCreatedEventActorTypeService,
+		AuthRequestCreatedEventActorTypeSystem,
+		AuthRequestCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case AuthRequestCreatedEventActorTypeService:
+		return []byte(s), nil
+	case AuthRequestCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case AuthRequestCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch AuthRequestCreatedEventActorType(data) {
+	case AuthRequestCreatedEventActorTypeHuman:
+		*s = AuthRequestCreatedEventActorTypeHuman
+		return nil
+	case AuthRequestCreatedEventActorTypeService:
+		*s = AuthRequestCreatedEventActorTypeService
+		return nil
+	case AuthRequestCreatedEventActorTypeSystem:
+		*s = AuthRequestCreatedEventActorTypeSystem
+		return nil
+	case AuthRequestCreatedEventActorTypeAgent:
+		*s = AuthRequestCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type AuthRequestCreatedEventCategory string
+
+const (
+	AuthRequestCreatedEventCategoryRequest AuthRequestCreatedEventCategory = "request"
+	AuthRequestCreatedEventCategoryAuth    AuthRequestCreatedEventCategory = "auth"
+	AuthRequestCreatedEventCategorySession AuthRequestCreatedEventCategory = "session"
+	AuthRequestCreatedEventCategoryAdmin   AuthRequestCreatedEventCategory = "admin"
+	AuthRequestCreatedEventCategoryEntity  AuthRequestCreatedEventCategory = "entity"
+	AuthRequestCreatedEventCategorySignal  AuthRequestCreatedEventCategory = "signal"
+)
+
+// AllValues returns all AuthRequestCreatedEventCategory values.
+func (AuthRequestCreatedEventCategory) AllValues() []AuthRequestCreatedEventCategory {
+	return []AuthRequestCreatedEventCategory{
+		AuthRequestCreatedEventCategoryRequest,
+		AuthRequestCreatedEventCategoryAuth,
+		AuthRequestCreatedEventCategorySession,
+		AuthRequestCreatedEventCategoryAdmin,
+		AuthRequestCreatedEventCategoryEntity,
+		AuthRequestCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategorySession:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch AuthRequestCreatedEventCategory(data) {
+	case AuthRequestCreatedEventCategoryRequest:
+		*s = AuthRequestCreatedEventCategoryRequest
+		return nil
+	case AuthRequestCreatedEventCategoryAuth:
+		*s = AuthRequestCreatedEventCategoryAuth
+		return nil
+	case AuthRequestCreatedEventCategorySession:
+		*s = AuthRequestCreatedEventCategorySession
+		return nil
+	case AuthRequestCreatedEventCategoryAdmin:
+		*s = AuthRequestCreatedEventCategoryAdmin
+		return nil
+	case AuthRequestCreatedEventCategoryEntity:
+		*s = AuthRequestCreatedEventCategoryEntity
+		return nil
+	case AuthRequestCreatedEventCategorySignal:
+		*s = AuthRequestCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type AuthRequestCreatedEventDelegationType string
+
+const (
+	AuthRequestCreatedEventDelegationTypeDirect    AuthRequestCreatedEventDelegationType = "direct"
+	AuthRequestCreatedEventDelegationTypeDelegated AuthRequestCreatedEventDelegationType = "delegated"
+	AuthRequestCreatedEventDelegationTypePatShared AuthRequestCreatedEventDelegationType = "pat_shared"
+	AuthRequestCreatedEventDelegationTypeExchanged AuthRequestCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all AuthRequestCreatedEventDelegationType values.
+func (AuthRequestCreatedEventDelegationType) AllValues() []AuthRequestCreatedEventDelegationType {
+	return []AuthRequestCreatedEventDelegationType{
+		AuthRequestCreatedEventDelegationTypeDirect,
+		AuthRequestCreatedEventDelegationTypeDelegated,
+		AuthRequestCreatedEventDelegationTypePatShared,
+		AuthRequestCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case AuthRequestCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case AuthRequestCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case AuthRequestCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch AuthRequestCreatedEventDelegationType(data) {
+	case AuthRequestCreatedEventDelegationTypeDirect:
+		*s = AuthRequestCreatedEventDelegationTypeDirect
+		return nil
+	case AuthRequestCreatedEventDelegationTypeDelegated:
+		*s = AuthRequestCreatedEventDelegationTypeDelegated
+		return nil
+	case AuthRequestCreatedEventDelegationTypePatShared:
+		*s = AuthRequestCreatedEventDelegationTypePatShared
+		return nil
+	case AuthRequestCreatedEventDelegationTypeExchanged:
+		*s = AuthRequestCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `auth.request.created` events.
+// Ref: #
+type AuthRequestCreatedPayload struct {
+	ClientID string `json:"client_id"`
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestCreatedPayload) GetClientID() string {
+	return s.ClientID
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestCreatedPayload) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// Merged schema.
+// Ref: #
 type AuthSSOAuthorizationFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
@@ -27370,6 +27846,7 @@ type Event struct {
 	AuthCheckSucceededEvent          AuthCheckSucceededEvent
 	AuthFactorPasskeyEnrolledEvent   AuthFactorPasskeyEnrolledEvent
 	AuthFactorPasswordSetEvent       AuthFactorPasswordSetEvent
+	AuthRequestCreatedEvent          AuthRequestCreatedEvent
 	AuthSSOAuthorizationFailedEvent  AuthSSOAuthorizationFailedEvent
 	AuthSSOExchangeFailedEvent       AuthSSOExchangeFailedEvent
 	AuthSSOExchangeSucceededEvent    AuthSSOExchangeSucceededEvent
@@ -27391,6 +27868,7 @@ type Event struct {
 	InvitationCancelledEvent         InvitationCancelledEvent
 	InvitationCreatedEvent           InvitationCreatedEvent
 	InvitationRejectedEvent          InvitationRejectedEvent
+	OAuthSettingsCreatedEvent        OAuthSettingsCreatedEvent
 	OriginAddedEvent                 OriginAddedEvent
 	OriginRemovedEvent               OriginRemovedEvent
 	PolicyCreatedEvent               PolicyCreatedEvent
@@ -27429,6 +27907,7 @@ const (
 	AuthCheckSucceededEventEvent          EventType = "auth.check.succeeded"
 	AuthFactorPasskeyEnrolledEventEvent   EventType = "auth.factor.passkey.enrolled"
 	AuthFactorPasswordSetEventEvent       EventType = "auth.factor.password.set"
+	AuthRequestCreatedEventEvent          EventType = "auth.request.created"
 	AuthSSOAuthorizationFailedEventEvent  EventType = "auth.sso.authorization.failed"
 	AuthSSOExchangeFailedEventEvent       EventType = "auth.sso.exchange.failed"
 	AuthSSOExchangeSucceededEventEvent    EventType = "auth.sso.exchange.succeeded"
@@ -27450,6 +27929,7 @@ const (
 	InvitationCancelledEventEvent         EventType = "invitation.cancelled"
 	InvitationCreatedEventEvent           EventType = "invitation.created"
 	InvitationRejectedEventEvent          EventType = "invitation.rejected"
+	OAuthSettingsCreatedEventEvent        EventType = "oauth_settings.created"
 	OriginAddedEventEvent                 EventType = "origin.added"
 	OriginRemovedEventEvent               EventType = "origin.removed"
 	PolicyCreatedEventEvent               EventType = "policy.created"
@@ -27500,6 +27980,9 @@ func (s Event) IsAuthFactorPasskeyEnrolledEvent() bool {
 
 // IsAuthFactorPasswordSetEvent reports whether Event is AuthFactorPasswordSetEvent.
 func (s Event) IsAuthFactorPasswordSetEvent() bool { return s.Type == AuthFactorPasswordSetEventEvent }
+
+// IsAuthRequestCreatedEvent reports whether Event is AuthRequestCreatedEvent.
+func (s Event) IsAuthRequestCreatedEvent() bool { return s.Type == AuthRequestCreatedEventEvent }
 
 // IsAuthSSOAuthorizationFailedEvent reports whether Event is AuthSSOAuthorizationFailedEvent.
 func (s Event) IsAuthSSOAuthorizationFailedEvent() bool {
@@ -27573,6 +28056,9 @@ func (s Event) IsInvitationCreatedEvent() bool { return s.Type == InvitationCrea
 
 // IsInvitationRejectedEvent reports whether Event is InvitationRejectedEvent.
 func (s Event) IsInvitationRejectedEvent() bool { return s.Type == InvitationRejectedEventEvent }
+
+// IsOAuthSettingsCreatedEvent reports whether Event is OAuthSettingsCreatedEvent.
+func (s Event) IsOAuthSettingsCreatedEvent() bool { return s.Type == OAuthSettingsCreatedEventEvent }
 
 // IsOriginAddedEvent reports whether Event is OriginAddedEvent.
 func (s Event) IsOriginAddedEvent() bool { return s.Type == OriginAddedEventEvent }
@@ -27808,6 +28294,27 @@ func (s Event) GetAuthFactorPasswordSetEvent() (v AuthFactorPasswordSetEvent, ok
 func NewAuthFactorPasswordSetEventEvent(v AuthFactorPasswordSetEvent) Event {
 	var s Event
 	s.SetAuthFactorPasswordSetEvent(v)
+	return s
+}
+
+// SetAuthRequestCreatedEvent sets Event to AuthRequestCreatedEvent.
+func (s *Event) SetAuthRequestCreatedEvent(v AuthRequestCreatedEvent) {
+	s.Type = AuthRequestCreatedEventEvent
+	s.AuthRequestCreatedEvent = v
+}
+
+// GetAuthRequestCreatedEvent returns AuthRequestCreatedEvent and true boolean if Event is AuthRequestCreatedEvent.
+func (s Event) GetAuthRequestCreatedEvent() (v AuthRequestCreatedEvent, ok bool) {
+	if !s.IsAuthRequestCreatedEvent() {
+		return v, false
+	}
+	return s.AuthRequestCreatedEvent, true
+}
+
+// NewAuthRequestCreatedEventEvent returns new Event from AuthRequestCreatedEvent.
+func NewAuthRequestCreatedEventEvent(v AuthRequestCreatedEvent) Event {
+	var s Event
+	s.SetAuthRequestCreatedEvent(v)
 	return s
 }
 
@@ -28249,6 +28756,27 @@ func (s Event) GetInvitationRejectedEvent() (v InvitationRejectedEvent, ok bool)
 func NewInvitationRejectedEventEvent(v InvitationRejectedEvent) Event {
 	var s Event
 	s.SetInvitationRejectedEvent(v)
+	return s
+}
+
+// SetOAuthSettingsCreatedEvent sets Event to OAuthSettingsCreatedEvent.
+func (s *Event) SetOAuthSettingsCreatedEvent(v OAuthSettingsCreatedEvent) {
+	s.Type = OAuthSettingsCreatedEventEvent
+	s.OAuthSettingsCreatedEvent = v
+}
+
+// GetOAuthSettingsCreatedEvent returns OAuthSettingsCreatedEvent and true boolean if Event is OAuthSettingsCreatedEvent.
+func (s Event) GetOAuthSettingsCreatedEvent() (v OAuthSettingsCreatedEvent, ok bool) {
+	if !s.IsOAuthSettingsCreatedEvent() {
+		return v, false
+	}
+	return s.OAuthSettingsCreatedEvent, true
+}
+
+// NewOAuthSettingsCreatedEventEvent returns new Event from OAuthSettingsCreatedEvent.
+func NewOAuthSettingsCreatedEventEvent(v OAuthSettingsCreatedEvent) Event {
+	var s Event
+	s.SetOAuthSettingsCreatedEvent(v)
 	return s
 }
 
@@ -40790,12 +41318,14 @@ func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
 // GetOAuthSettingsErrorResponse represents sum type.
 type GetOAuthSettingsErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
-	Type             GetOAuthSettingsErrorResponseType
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                     GetOAuthSettingsErrorResponseType
+	AuthUnauthorized         AuthUnauthorized
+	Internal                 Internal
+	NotImplemented           NotImplemented
+	OauthsetNotFound         OauthsetNotFound
+	OauthsetPermissionDenied OauthsetPermissionDenied
+	ReqInvalid               ReqInvalid
+	Unavailable              Unavailable
 }
 
 // GetOAuthSettingsErrorResponseType is oneOf type of GetOAuthSettingsErrorResponse.
@@ -40803,11 +41333,13 @@ type GetOAuthSettingsErrorResponseType string
 
 // Possible values for GetOAuthSettingsErrorResponseType.
 const (
-	AuthUnauthorizedGetOAuthSettingsErrorResponse GetOAuthSettingsErrorResponseType = "auth.unauthorized"
-	InternalGetOAuthSettingsErrorResponse         GetOAuthSettingsErrorResponseType = "internal"
-	NotImplementedGetOAuthSettingsErrorResponse   GetOAuthSettingsErrorResponseType = "not_implemented"
-	ReqInvalidGetOAuthSettingsErrorResponse       GetOAuthSettingsErrorResponseType = "req.invalid"
-	UnavailableGetOAuthSettingsErrorResponse      GetOAuthSettingsErrorResponseType = "unavailable"
+	AuthUnauthorizedGetOAuthSettingsErrorResponse         GetOAuthSettingsErrorResponseType = "auth.unauthorized"
+	InternalGetOAuthSettingsErrorResponse                 GetOAuthSettingsErrorResponseType = "internal"
+	NotImplementedGetOAuthSettingsErrorResponse           GetOAuthSettingsErrorResponseType = "not_implemented"
+	OauthsetNotFoundGetOAuthSettingsErrorResponse         GetOAuthSettingsErrorResponseType = "oauthset.not_found"
+	OauthsetPermissionDeniedGetOAuthSettingsErrorResponse GetOAuthSettingsErrorResponseType = "oauthset.permission_denied"
+	ReqInvalidGetOAuthSettingsErrorResponse               GetOAuthSettingsErrorResponseType = "req.invalid"
+	UnavailableGetOAuthSettingsErrorResponse              GetOAuthSettingsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetOAuthSettingsErrorResponse is AuthUnauthorized.
@@ -40823,6 +41355,16 @@ func (s GetOAuthSettingsErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether GetOAuthSettingsErrorResponse is NotImplemented.
 func (s GetOAuthSettingsErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetOAuthSettingsErrorResponse
+}
+
+// IsOauthsetNotFound reports whether GetOAuthSettingsErrorResponse is OauthsetNotFound.
+func (s GetOAuthSettingsErrorResponse) IsOauthsetNotFound() bool {
+	return s.Type == OauthsetNotFoundGetOAuthSettingsErrorResponse
+}
+
+// IsOauthsetPermissionDenied reports whether GetOAuthSettingsErrorResponse is OauthsetPermissionDenied.
+func (s GetOAuthSettingsErrorResponse) IsOauthsetPermissionDenied() bool {
+	return s.Type == OauthsetPermissionDeniedGetOAuthSettingsErrorResponse
 }
 
 // IsReqInvalid reports whether GetOAuthSettingsErrorResponse is ReqInvalid.
@@ -40895,6 +41437,48 @@ func (s GetOAuthSettingsErrorResponse) GetNotImplemented() (v NotImplemented, ok
 func NewNotImplementedGetOAuthSettingsErrorResponse(v NotImplemented) GetOAuthSettingsErrorResponse {
 	var s GetOAuthSettingsErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetOauthsetNotFound sets GetOAuthSettingsErrorResponse to OauthsetNotFound.
+func (s *GetOAuthSettingsErrorResponse) SetOauthsetNotFound(v OauthsetNotFound) {
+	s.Type = OauthsetNotFoundGetOAuthSettingsErrorResponse
+	s.OauthsetNotFound = v
+}
+
+// GetOauthsetNotFound returns OauthsetNotFound and true boolean if GetOAuthSettingsErrorResponse is OauthsetNotFound.
+func (s GetOAuthSettingsErrorResponse) GetOauthsetNotFound() (v OauthsetNotFound, ok bool) {
+	if !s.IsOauthsetNotFound() {
+		return v, false
+	}
+	return s.OauthsetNotFound, true
+}
+
+// NewOauthsetNotFoundGetOAuthSettingsErrorResponse returns new GetOAuthSettingsErrorResponse from OauthsetNotFound.
+func NewOauthsetNotFoundGetOAuthSettingsErrorResponse(v OauthsetNotFound) GetOAuthSettingsErrorResponse {
+	var s GetOAuthSettingsErrorResponse
+	s.SetOauthsetNotFound(v)
+	return s
+}
+
+// SetOauthsetPermissionDenied sets GetOAuthSettingsErrorResponse to OauthsetPermissionDenied.
+func (s *GetOAuthSettingsErrorResponse) SetOauthsetPermissionDenied(v OauthsetPermissionDenied) {
+	s.Type = OauthsetPermissionDeniedGetOAuthSettingsErrorResponse
+	s.OauthsetPermissionDenied = v
+}
+
+// GetOauthsetPermissionDenied returns OauthsetPermissionDenied and true boolean if GetOAuthSettingsErrorResponse is OauthsetPermissionDenied.
+func (s GetOAuthSettingsErrorResponse) GetOauthsetPermissionDenied() (v OauthsetPermissionDenied, ok bool) {
+	if !s.IsOauthsetPermissionDenied() {
+		return v, false
+	}
+	return s.OauthsetPermissionDenied, true
+}
+
+// NewOauthsetPermissionDeniedGetOAuthSettingsErrorResponse returns new GetOAuthSettingsErrorResponse from OauthsetPermissionDenied.
+func NewOauthsetPermissionDeniedGetOAuthSettingsErrorResponse(v OauthsetPermissionDenied) GetOAuthSettingsErrorResponse {
+	var s GetOAuthSettingsErrorResponse
+	s.SetOauthsetPermissionDenied(v)
 	return s
 }
 
@@ -65888,6 +66472,276 @@ func (o NilWebhookEvent51Entity) Or(d WebhookEvent51Entity) WebhookEvent51Entity
 	return d
 }
 
+// NewNilWebhookEvent52Actor returns new NilWebhookEvent52Actor with value set to v.
+func NewNilWebhookEvent52Actor(v WebhookEvent52Actor) NilWebhookEvent52Actor {
+	return NilWebhookEvent52Actor{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent52Actor is nullable WebhookEvent52Actor.
+type NilWebhookEvent52Actor struct {
+	Value WebhookEvent52Actor
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent52Actor) SetTo(v WebhookEvent52Actor) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent52Actor) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent52Actor) SetToNull() {
+	o.Null = true
+	var v WebhookEvent52Actor
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent52Actor) Get() (v WebhookEvent52Actor, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent52Actor) Or(d WebhookEvent52Actor) WebhookEvent52Actor {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilWebhookEvent52ActorType returns new NilWebhookEvent52ActorType with value set to v.
+func NewNilWebhookEvent52ActorType(v WebhookEvent52ActorType) NilWebhookEvent52ActorType {
+	return NilWebhookEvent52ActorType{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent52ActorType is nullable WebhookEvent52ActorType.
+type NilWebhookEvent52ActorType struct {
+	Value WebhookEvent52ActorType
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent52ActorType) SetTo(v WebhookEvent52ActorType) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent52ActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent52ActorType) SetToNull() {
+	o.Null = true
+	var v WebhookEvent52ActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent52ActorType) Get() (v WebhookEvent52ActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent52ActorType) Or(d WebhookEvent52ActorType) WebhookEvent52ActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilWebhookEvent52Entity returns new NilWebhookEvent52Entity with value set to v.
+func NewNilWebhookEvent52Entity(v WebhookEvent52Entity) NilWebhookEvent52Entity {
+	return NilWebhookEvent52Entity{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent52Entity is nullable WebhookEvent52Entity.
+type NilWebhookEvent52Entity struct {
+	Value WebhookEvent52Entity
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent52Entity) SetTo(v WebhookEvent52Entity) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent52Entity) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent52Entity) SetToNull() {
+	o.Null = true
+	var v WebhookEvent52Entity
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent52Entity) Get() (v WebhookEvent52Entity, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent52Entity) Or(d WebhookEvent52Entity) WebhookEvent52Entity {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilWebhookEvent53Actor returns new NilWebhookEvent53Actor with value set to v.
+func NewNilWebhookEvent53Actor(v WebhookEvent53Actor) NilWebhookEvent53Actor {
+	return NilWebhookEvent53Actor{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent53Actor is nullable WebhookEvent53Actor.
+type NilWebhookEvent53Actor struct {
+	Value WebhookEvent53Actor
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent53Actor) SetTo(v WebhookEvent53Actor) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent53Actor) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent53Actor) SetToNull() {
+	o.Null = true
+	var v WebhookEvent53Actor
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent53Actor) Get() (v WebhookEvent53Actor, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent53Actor) Or(d WebhookEvent53Actor) WebhookEvent53Actor {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilWebhookEvent53ActorType returns new NilWebhookEvent53ActorType with value set to v.
+func NewNilWebhookEvent53ActorType(v WebhookEvent53ActorType) NilWebhookEvent53ActorType {
+	return NilWebhookEvent53ActorType{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent53ActorType is nullable WebhookEvent53ActorType.
+type NilWebhookEvent53ActorType struct {
+	Value WebhookEvent53ActorType
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent53ActorType) SetTo(v WebhookEvent53ActorType) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent53ActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent53ActorType) SetToNull() {
+	o.Null = true
+	var v WebhookEvent53ActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent53ActorType) Get() (v WebhookEvent53ActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent53ActorType) Or(d WebhookEvent53ActorType) WebhookEvent53ActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilWebhookEvent53Entity returns new NilWebhookEvent53Entity with value set to v.
+func NewNilWebhookEvent53Entity(v WebhookEvent53Entity) NilWebhookEvent53Entity {
+	return NilWebhookEvent53Entity{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent53Entity is nullable WebhookEvent53Entity.
+type NilWebhookEvent53Entity struct {
+	Value WebhookEvent53Entity
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent53Entity) SetTo(v WebhookEvent53Entity) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent53Entity) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent53Entity) SetToNull() {
+	o.Null = true
+	var v WebhookEvent53Entity
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent53Entity) Get() (v WebhookEvent53Entity, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent53Entity) Or(d WebhookEvent53Entity) WebhookEvent53Entity {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewNilWebhookEvent5Actor returns new NilWebhookEvent5Actor with value set to v.
 func NewNilWebhookEvent5Actor(v WebhookEvent5Actor) NilWebhookEvent5Actor {
 	return NilWebhookEvent5Actor{
@@ -66646,8 +67500,7 @@ func (s *OAuth2) SetScopes(val []string) {
 // The OAuth settings of a project: whether the project's OAuth authorization server answers. It has
 // one shape in two places: the `oauth` resource of the bundle `buildRelease` (`POST /releases/build`)
 // takes, which publishes it as a new immutable revision, and the read-only revision `getOAuthSettings`
-// (`GET /oauth_settings/{oauth_settings_id}`) returns. Locally it is the descriptor in `.zitadel/`
-// that `zitadel deploy` publishes with the rest of the bundle.
+// (`GET /oauth_settings/{oauth_settings_id}`) returns.
 //
 // A release is the only writer: there is no operation that publishes OAuth settings on their own. A
 // release without `oauth` leaves the authorization server off.
@@ -66679,6 +67532,484 @@ func (s *OAuthSettings) SetSchema(val OptString) {
 
 // SetEnabled sets the value of Enabled.
 func (s *OAuthSettings) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// Merged schema.
+// Ref: #
+type OAuthSettingsCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category OAuthSettingsCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock, to the millisecond.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock, to the millisecond.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilOAuthSettingsCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptOAuthSettingsCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                  `json:"delegation_id"`
+	Grantor        OptString                                  `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString                `json:"flow_id"`
+	Metadata OptEventMetadata            `json:"metadata"`
+	Payload  OAuthSettingsCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *OAuthSettingsCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *OAuthSettingsCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *OAuthSettingsCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *OAuthSettingsCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *OAuthSettingsCreatedEvent) GetCategory() OAuthSettingsCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *OAuthSettingsCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *OAuthSettingsCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *OAuthSettingsCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *OAuthSettingsCreatedEvent) GetActorType() OptNilOAuthSettingsCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *OAuthSettingsCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *OAuthSettingsCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *OAuthSettingsCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *OAuthSettingsCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *OAuthSettingsCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *OAuthSettingsCreatedEvent) GetDelegationType() OptOAuthSettingsCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *OAuthSettingsCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *OAuthSettingsCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *OAuthSettingsCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *OAuthSettingsCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *OAuthSettingsCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *OAuthSettingsCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *OAuthSettingsCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *OAuthSettingsCreatedEvent) GetPayload() OAuthSettingsCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *OAuthSettingsCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *OAuthSettingsCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *OAuthSettingsCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *OAuthSettingsCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *OAuthSettingsCreatedEvent) SetCategory(val OAuthSettingsCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *OAuthSettingsCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *OAuthSettingsCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *OAuthSettingsCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *OAuthSettingsCreatedEvent) SetActorType(val OptNilOAuthSettingsCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *OAuthSettingsCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *OAuthSettingsCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *OAuthSettingsCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *OAuthSettingsCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *OAuthSettingsCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *OAuthSettingsCreatedEvent) SetDelegationType(val OptOAuthSettingsCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *OAuthSettingsCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *OAuthSettingsCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *OAuthSettingsCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *OAuthSettingsCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *OAuthSettingsCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *OAuthSettingsCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *OAuthSettingsCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *OAuthSettingsCreatedEvent) SetPayload(val OAuthSettingsCreatedPayload) {
+	s.Payload = val
+}
+
+type OAuthSettingsCreatedEventActorType string
+
+const (
+	OAuthSettingsCreatedEventActorTypeHuman   OAuthSettingsCreatedEventActorType = "human"
+	OAuthSettingsCreatedEventActorTypeService OAuthSettingsCreatedEventActorType = "service"
+	OAuthSettingsCreatedEventActorTypeSystem  OAuthSettingsCreatedEventActorType = "system"
+	OAuthSettingsCreatedEventActorTypeAgent   OAuthSettingsCreatedEventActorType = "agent"
+)
+
+// AllValues returns all OAuthSettingsCreatedEventActorType values.
+func (OAuthSettingsCreatedEventActorType) AllValues() []OAuthSettingsCreatedEventActorType {
+	return []OAuthSettingsCreatedEventActorType{
+		OAuthSettingsCreatedEventActorTypeHuman,
+		OAuthSettingsCreatedEventActorTypeService,
+		OAuthSettingsCreatedEventActorTypeSystem,
+		OAuthSettingsCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OAuthSettingsCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case OAuthSettingsCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventActorTypeService:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OAuthSettingsCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch OAuthSettingsCreatedEventActorType(data) {
+	case OAuthSettingsCreatedEventActorTypeHuman:
+		*s = OAuthSettingsCreatedEventActorTypeHuman
+		return nil
+	case OAuthSettingsCreatedEventActorTypeService:
+		*s = OAuthSettingsCreatedEventActorTypeService
+		return nil
+	case OAuthSettingsCreatedEventActorTypeSystem:
+		*s = OAuthSettingsCreatedEventActorTypeSystem
+		return nil
+	case OAuthSettingsCreatedEventActorTypeAgent:
+		*s = OAuthSettingsCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type OAuthSettingsCreatedEventCategory string
+
+const (
+	OAuthSettingsCreatedEventCategoryRequest OAuthSettingsCreatedEventCategory = "request"
+	OAuthSettingsCreatedEventCategoryAuth    OAuthSettingsCreatedEventCategory = "auth"
+	OAuthSettingsCreatedEventCategorySession OAuthSettingsCreatedEventCategory = "session"
+	OAuthSettingsCreatedEventCategoryAdmin   OAuthSettingsCreatedEventCategory = "admin"
+	OAuthSettingsCreatedEventCategoryEntity  OAuthSettingsCreatedEventCategory = "entity"
+	OAuthSettingsCreatedEventCategorySignal  OAuthSettingsCreatedEventCategory = "signal"
+)
+
+// AllValues returns all OAuthSettingsCreatedEventCategory values.
+func (OAuthSettingsCreatedEventCategory) AllValues() []OAuthSettingsCreatedEventCategory {
+	return []OAuthSettingsCreatedEventCategory{
+		OAuthSettingsCreatedEventCategoryRequest,
+		OAuthSettingsCreatedEventCategoryAuth,
+		OAuthSettingsCreatedEventCategorySession,
+		OAuthSettingsCreatedEventCategoryAdmin,
+		OAuthSettingsCreatedEventCategoryEntity,
+		OAuthSettingsCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OAuthSettingsCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case OAuthSettingsCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategorySession:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OAuthSettingsCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch OAuthSettingsCreatedEventCategory(data) {
+	case OAuthSettingsCreatedEventCategoryRequest:
+		*s = OAuthSettingsCreatedEventCategoryRequest
+		return nil
+	case OAuthSettingsCreatedEventCategoryAuth:
+		*s = OAuthSettingsCreatedEventCategoryAuth
+		return nil
+	case OAuthSettingsCreatedEventCategorySession:
+		*s = OAuthSettingsCreatedEventCategorySession
+		return nil
+	case OAuthSettingsCreatedEventCategoryAdmin:
+		*s = OAuthSettingsCreatedEventCategoryAdmin
+		return nil
+	case OAuthSettingsCreatedEventCategoryEntity:
+		*s = OAuthSettingsCreatedEventCategoryEntity
+		return nil
+	case OAuthSettingsCreatedEventCategorySignal:
+		*s = OAuthSettingsCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type OAuthSettingsCreatedEventDelegationType string
+
+const (
+	OAuthSettingsCreatedEventDelegationTypeDirect    OAuthSettingsCreatedEventDelegationType = "direct"
+	OAuthSettingsCreatedEventDelegationTypeDelegated OAuthSettingsCreatedEventDelegationType = "delegated"
+	OAuthSettingsCreatedEventDelegationTypePatShared OAuthSettingsCreatedEventDelegationType = "pat_shared"
+	OAuthSettingsCreatedEventDelegationTypeExchanged OAuthSettingsCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all OAuthSettingsCreatedEventDelegationType values.
+func (OAuthSettingsCreatedEventDelegationType) AllValues() []OAuthSettingsCreatedEventDelegationType {
+	return []OAuthSettingsCreatedEventDelegationType{
+		OAuthSettingsCreatedEventDelegationTypeDirect,
+		OAuthSettingsCreatedEventDelegationTypeDelegated,
+		OAuthSettingsCreatedEventDelegationTypePatShared,
+		OAuthSettingsCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OAuthSettingsCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case OAuthSettingsCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OAuthSettingsCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch OAuthSettingsCreatedEventDelegationType(data) {
+	case OAuthSettingsCreatedEventDelegationTypeDirect:
+		*s = OAuthSettingsCreatedEventDelegationTypeDirect
+		return nil
+	case OAuthSettingsCreatedEventDelegationTypeDelegated:
+		*s = OAuthSettingsCreatedEventDelegationTypeDelegated
+		return nil
+	case OAuthSettingsCreatedEventDelegationTypePatShared:
+		*s = OAuthSettingsCreatedEventDelegationTypePatShared
+		return nil
+	case OAuthSettingsCreatedEventDelegationTypeExchanged:
+		*s = OAuthSettingsCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `oauth_settings.created`: the settings the new revision holds. The revision id is the
+// event's `entity_id`.
+// Ref: #
+type OAuthSettingsCreatedPayload struct {
+	// Whether the project's OAuth authorization server answers.
+	Enabled bool `json:"enabled"`
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *OAuthSettingsCreatedPayload) GetEnabled() bool {
+	return s.Enabled
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *OAuthSettingsCreatedPayload) SetEnabled(val bool) {
 	s.Enabled = val
 }
 
@@ -66724,6 +68055,112 @@ func (s *OAuthSettingsRevisionResponse) SetOAuth(val OAuthSettings) {
 }
 
 func (*OAuthSettingsRevisionResponse) getOAuthSettingsRes() {}
+
+// Merged schema.
+// Ref: #
+type OauthsetNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOauthsetNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OauthsetNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OauthsetNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OauthsetNotFound) GetDetails() OptOauthsetNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OauthsetNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OauthsetNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OauthsetNotFound) SetDetails(val OptOauthsetNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OauthsetNotFoundDetails map[string]jx.Raw
+
+func (s *OauthsetNotFoundDetails) init() OauthsetNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type OauthsetPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOauthsetPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OauthsetPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OauthsetPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OauthsetPermissionDenied) GetDetails() OptOauthsetPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OauthsetPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OauthsetPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OauthsetPermissionDenied) SetDetails(val OptOauthsetPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OauthsetPermissionDeniedDetails map[string]jx.Raw
+
+func (s *OauthsetPermissionDeniedDetails) init() OauthsetPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // NewOptAppClientIDTakenDetails returns new OptAppClientIDTakenDetails with value set to v.
 func NewOptAppClientIDTakenDetails(v AppClientIDTakenDetails) OptAppClientIDTakenDetails {
@@ -67823,6 +69260,52 @@ func (o OptAuthMethod) Get() (v AuthMethod, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthMethod) Or(d AuthMethod) AuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAuthRequestCreatedEventDelegationType returns new OptAuthRequestCreatedEventDelegationType with value set to v.
+func NewOptAuthRequestCreatedEventDelegationType(v AuthRequestCreatedEventDelegationType) OptAuthRequestCreatedEventDelegationType {
+	return OptAuthRequestCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthRequestCreatedEventDelegationType is optional AuthRequestCreatedEventDelegationType.
+type OptAuthRequestCreatedEventDelegationType struct {
+	Value AuthRequestCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptAuthRequestCreatedEventDelegationType was set.
+func (o OptAuthRequestCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthRequestCreatedEventDelegationType) Reset() {
+	var v AuthRequestCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthRequestCreatedEventDelegationType) SetTo(v AuthRequestCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthRequestCreatedEventDelegationType) Get() (v AuthRequestCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthRequestCreatedEventDelegationType) Or(d AuthRequestCreatedEventDelegationType) AuthRequestCreatedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -75641,6 +77124,74 @@ func (o OptNilAuthFactorPasswordSetEventActorType) Or(d AuthFactorPasswordSetEve
 	return d
 }
 
+// NewOptNilAuthRequestCreatedEventActorType returns new OptNilAuthRequestCreatedEventActorType with value set to v.
+func NewOptNilAuthRequestCreatedEventActorType(v AuthRequestCreatedEventActorType) OptNilAuthRequestCreatedEventActorType {
+	return OptNilAuthRequestCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilAuthRequestCreatedEventActorType is optional nullable AuthRequestCreatedEventActorType.
+type OptNilAuthRequestCreatedEventActorType struct {
+	Value AuthRequestCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilAuthRequestCreatedEventActorType was set.
+func (o OptNilAuthRequestCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilAuthRequestCreatedEventActorType) Reset() {
+	var v AuthRequestCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilAuthRequestCreatedEventActorType) SetTo(v AuthRequestCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilAuthRequestCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilAuthRequestCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v AuthRequestCreatedEventActorType
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilAuthRequestCreatedEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilAuthRequestCreatedEventActorType) Get() (v AuthRequestCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilAuthRequestCreatedEventActorType) Or(d AuthRequestCreatedEventActorType) AuthRequestCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilAuthSSOAuthorizationFailedEventActorType returns new OptNilAuthSSOAuthorizationFailedEventActorType with value set to v.
 func NewOptNilAuthSSOAuthorizationFailedEventActorType(v AuthSSOAuthorizationFailedEventActorType) OptNilAuthSSOAuthorizationFailedEventActorType {
 	return OptNilAuthSSOAuthorizationFailedEventActorType{
@@ -77879,6 +79430,74 @@ func (o OptNilInvitationTeamMemberCreatedByType) Get() (v InvitationTeamMemberCr
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilInvitationTeamMemberCreatedByType) Or(d InvitationTeamMemberCreatedByType) InvitationTeamMemberCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilOAuthSettingsCreatedEventActorType returns new OptNilOAuthSettingsCreatedEventActorType with value set to v.
+func NewOptNilOAuthSettingsCreatedEventActorType(v OAuthSettingsCreatedEventActorType) OptNilOAuthSettingsCreatedEventActorType {
+	return OptNilOAuthSettingsCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilOAuthSettingsCreatedEventActorType is optional nullable OAuthSettingsCreatedEventActorType.
+type OptNilOAuthSettingsCreatedEventActorType struct {
+	Value OAuthSettingsCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilOAuthSettingsCreatedEventActorType was set.
+func (o OptNilOAuthSettingsCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilOAuthSettingsCreatedEventActorType) Reset() {
+	var v OAuthSettingsCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilOAuthSettingsCreatedEventActorType) SetTo(v OAuthSettingsCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilOAuthSettingsCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilOAuthSettingsCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v OAuthSettingsCreatedEventActorType
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilOAuthSettingsCreatedEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilOAuthSettingsCreatedEventActorType) Get() (v OAuthSettingsCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilOAuthSettingsCreatedEventActorType) Or(d OAuthSettingsCreatedEventActorType) OAuthSettingsCreatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -80351,6 +81970,144 @@ func (o OptOAuthSettings) Get() (v OAuthSettings, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptOAuthSettings) Or(d OAuthSettings) OAuthSettings {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOAuthSettingsCreatedEventDelegationType returns new OptOAuthSettingsCreatedEventDelegationType with value set to v.
+func NewOptOAuthSettingsCreatedEventDelegationType(v OAuthSettingsCreatedEventDelegationType) OptOAuthSettingsCreatedEventDelegationType {
+	return OptOAuthSettingsCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOAuthSettingsCreatedEventDelegationType is optional OAuthSettingsCreatedEventDelegationType.
+type OptOAuthSettingsCreatedEventDelegationType struct {
+	Value OAuthSettingsCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptOAuthSettingsCreatedEventDelegationType was set.
+func (o OptOAuthSettingsCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOAuthSettingsCreatedEventDelegationType) Reset() {
+	var v OAuthSettingsCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOAuthSettingsCreatedEventDelegationType) SetTo(v OAuthSettingsCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOAuthSettingsCreatedEventDelegationType) Get() (v OAuthSettingsCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOAuthSettingsCreatedEventDelegationType) Or(d OAuthSettingsCreatedEventDelegationType) OAuthSettingsCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOauthsetNotFoundDetails returns new OptOauthsetNotFoundDetails with value set to v.
+func NewOptOauthsetNotFoundDetails(v OauthsetNotFoundDetails) OptOauthsetNotFoundDetails {
+	return OptOauthsetNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOauthsetNotFoundDetails is optional OauthsetNotFoundDetails.
+type OptOauthsetNotFoundDetails struct {
+	Value OauthsetNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOauthsetNotFoundDetails was set.
+func (o OptOauthsetNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOauthsetNotFoundDetails) Reset() {
+	var v OauthsetNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOauthsetNotFoundDetails) SetTo(v OauthsetNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOauthsetNotFoundDetails) Get() (v OauthsetNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOauthsetNotFoundDetails) Or(d OauthsetNotFoundDetails) OauthsetNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOauthsetPermissionDeniedDetails returns new OptOauthsetPermissionDeniedDetails with value set to v.
+func NewOptOauthsetPermissionDeniedDetails(v OauthsetPermissionDeniedDetails) OptOauthsetPermissionDeniedDetails {
+	return OptOauthsetPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOauthsetPermissionDeniedDetails is optional OauthsetPermissionDeniedDetails.
+type OptOauthsetPermissionDeniedDetails struct {
+	Value OauthsetPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOauthsetPermissionDeniedDetails was set.
+func (o OptOauthsetPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOauthsetPermissionDeniedDetails) Reset() {
+	var v OauthsetPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOauthsetPermissionDeniedDetails) SetTo(v OauthsetPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOauthsetPermissionDeniedDetails) Get() (v OauthsetPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOauthsetPermissionDeniedDetails) Or(d OauthsetPermissionDeniedDetails) OauthsetPermissionDeniedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -122666,6 +124423,8 @@ type WebhookEvent struct {
 	WebhookEvent49 WebhookEvent49
 	WebhookEvent50 WebhookEvent50
 	WebhookEvent51 WebhookEvent51
+	WebhookEvent52 WebhookEvent52
+	WebhookEvent53 WebhookEvent53
 }
 
 // WebhookEventType is oneOf type of WebhookEvent.
@@ -122681,50 +124440,52 @@ const (
 	WebhookEvent5WebhookEvent  WebhookEventType = "auth.check.succeeded"
 	WebhookEvent6WebhookEvent  WebhookEventType = "auth.factor.passkey.enrolled"
 	WebhookEvent7WebhookEvent  WebhookEventType = "auth.factor.password.set"
-	WebhookEvent8WebhookEvent  WebhookEventType = "auth.sso.authorization.failed"
-	WebhookEvent9WebhookEvent  WebhookEventType = "auth.sso.exchange.failed"
-	WebhookEvent10WebhookEvent WebhookEventType = "auth.sso.exchange.succeeded"
-	WebhookEvent11WebhookEvent WebhookEventType = "auth.token.issued"
-	WebhookEvent12WebhookEvent WebhookEventType = "auth.token.revoked"
-	WebhookEvent13WebhookEvent WebhookEventType = "authz.granted"
-	WebhookEvent14WebhookEvent WebhookEventType = "authz.revoked"
-	WebhookEvent15WebhookEvent WebhookEventType = "branding.created"
-	WebhookEvent16WebhookEvent WebhookEventType = "deployment.created"
-	WebhookEvent17WebhookEvent WebhookEventType = "flow.signup_challenge.consumed"
-	WebhookEvent18WebhookEvent WebhookEventType = "flow.signup_challenge.issued"
-	WebhookEvent19WebhookEvent WebhookEventType = "flowdef.created"
-	WebhookEvent20WebhookEvent WebhookEventType = "flowdef.deleted"
-	WebhookEvent21WebhookEvent WebhookEventType = "flowdef.updated"
-	WebhookEvent22WebhookEvent WebhookEventType = "idp.created"
-	WebhookEvent23WebhookEvent WebhookEventType = "idp.identity_link.created"
-	WebhookEvent24WebhookEvent WebhookEventType = "idp.updated"
-	WebhookEvent25WebhookEvent WebhookEventType = "invitation.accepted"
-	WebhookEvent26WebhookEvent WebhookEventType = "invitation.cancelled"
-	WebhookEvent27WebhookEvent WebhookEventType = "invitation.created"
-	WebhookEvent28WebhookEvent WebhookEventType = "invitation.rejected"
-	WebhookEvent29WebhookEvent WebhookEventType = "origin.added"
-	WebhookEvent30WebhookEvent WebhookEventType = "origin.removed"
-	WebhookEvent31WebhookEvent WebhookEventType = "policy.created"
-	WebhookEvent32WebhookEvent WebhookEventType = "policy.updated"
-	WebhookEvent33WebhookEvent WebhookEventType = "preview.removed"
-	WebhookEvent34WebhookEvent WebhookEventType = "project.created"
-	WebhookEvent35WebhookEvent WebhookEventType = "project.deleted"
-	WebhookEvent36WebhookEvent WebhookEventType = "project.updated"
-	WebhookEvent37WebhookEvent WebhookEventType = "release.created"
-	WebhookEvent38WebhookEvent WebhookEventType = "release.revoked"
-	WebhookEvent39WebhookEvent WebhookEventType = "request.api"
-	WebhookEvent40WebhookEvent WebhookEventType = "schema.created"
-	WebhookEvent41WebhookEvent WebhookEventType = "session.deleted"
-	WebhookEvent42WebhookEvent WebhookEventType = "session.established"
-	WebhookEvent43WebhookEvent WebhookEventType = "team.created"
-	WebhookEvent44WebhookEvent WebhookEventType = "team.deactivated"
-	WebhookEvent45WebhookEvent WebhookEventType = "team.updated"
-	WebhookEvent46WebhookEvent WebhookEventType = "user.create.failed"
-	WebhookEvent47WebhookEvent WebhookEventType = "user.created"
-	WebhookEvent48WebhookEvent WebhookEventType = "user.deleted"
-	WebhookEvent49WebhookEvent WebhookEventType = "user.updated"
-	WebhookEvent50WebhookEvent WebhookEventType = "variable.removed"
-	WebhookEvent51WebhookEvent WebhookEventType = "variable.set"
+	WebhookEvent8WebhookEvent  WebhookEventType = "auth.request.created"
+	WebhookEvent9WebhookEvent  WebhookEventType = "auth.sso.authorization.failed"
+	WebhookEvent10WebhookEvent WebhookEventType = "auth.sso.exchange.failed"
+	WebhookEvent11WebhookEvent WebhookEventType = "auth.sso.exchange.succeeded"
+	WebhookEvent12WebhookEvent WebhookEventType = "auth.token.issued"
+	WebhookEvent13WebhookEvent WebhookEventType = "auth.token.revoked"
+	WebhookEvent14WebhookEvent WebhookEventType = "authz.granted"
+	WebhookEvent15WebhookEvent WebhookEventType = "authz.revoked"
+	WebhookEvent16WebhookEvent WebhookEventType = "branding.created"
+	WebhookEvent17WebhookEvent WebhookEventType = "deployment.created"
+	WebhookEvent18WebhookEvent WebhookEventType = "flow.signup_challenge.consumed"
+	WebhookEvent19WebhookEvent WebhookEventType = "flow.signup_challenge.issued"
+	WebhookEvent20WebhookEvent WebhookEventType = "flowdef.created"
+	WebhookEvent21WebhookEvent WebhookEventType = "flowdef.deleted"
+	WebhookEvent22WebhookEvent WebhookEventType = "flowdef.updated"
+	WebhookEvent23WebhookEvent WebhookEventType = "idp.created"
+	WebhookEvent24WebhookEvent WebhookEventType = "idp.identity_link.created"
+	WebhookEvent25WebhookEvent WebhookEventType = "idp.updated"
+	WebhookEvent26WebhookEvent WebhookEventType = "invitation.accepted"
+	WebhookEvent27WebhookEvent WebhookEventType = "invitation.cancelled"
+	WebhookEvent28WebhookEvent WebhookEventType = "invitation.created"
+	WebhookEvent29WebhookEvent WebhookEventType = "invitation.rejected"
+	WebhookEvent30WebhookEvent WebhookEventType = "oauth_settings.created"
+	WebhookEvent31WebhookEvent WebhookEventType = "origin.added"
+	WebhookEvent32WebhookEvent WebhookEventType = "origin.removed"
+	WebhookEvent33WebhookEvent WebhookEventType = "policy.created"
+	WebhookEvent34WebhookEvent WebhookEventType = "policy.updated"
+	WebhookEvent35WebhookEvent WebhookEventType = "preview.removed"
+	WebhookEvent36WebhookEvent WebhookEventType = "project.created"
+	WebhookEvent37WebhookEvent WebhookEventType = "project.deleted"
+	WebhookEvent38WebhookEvent WebhookEventType = "project.updated"
+	WebhookEvent39WebhookEvent WebhookEventType = "release.created"
+	WebhookEvent40WebhookEvent WebhookEventType = "release.revoked"
+	WebhookEvent41WebhookEvent WebhookEventType = "request.api"
+	WebhookEvent42WebhookEvent WebhookEventType = "schema.created"
+	WebhookEvent43WebhookEvent WebhookEventType = "session.deleted"
+	WebhookEvent44WebhookEvent WebhookEventType = "session.established"
+	WebhookEvent45WebhookEvent WebhookEventType = "team.created"
+	WebhookEvent46WebhookEvent WebhookEventType = "team.deactivated"
+	WebhookEvent47WebhookEvent WebhookEventType = "team.updated"
+	WebhookEvent48WebhookEvent WebhookEventType = "user.create.failed"
+	WebhookEvent49WebhookEvent WebhookEventType = "user.created"
+	WebhookEvent50WebhookEvent WebhookEventType = "user.deleted"
+	WebhookEvent51WebhookEvent WebhookEventType = "user.updated"
+	WebhookEvent52WebhookEvent WebhookEventType = "variable.removed"
+	WebhookEvent53WebhookEvent WebhookEventType = "variable.set"
 )
 
 // IsWebhookEvent0 reports whether WebhookEvent is WebhookEvent0.
@@ -122882,6 +124643,12 @@ func (s WebhookEvent) IsWebhookEvent50() bool { return s.Type == WebhookEvent50W
 
 // IsWebhookEvent51 reports whether WebhookEvent is WebhookEvent51.
 func (s WebhookEvent) IsWebhookEvent51() bool { return s.Type == WebhookEvent51WebhookEvent }
+
+// IsWebhookEvent52 reports whether WebhookEvent is WebhookEvent52.
+func (s WebhookEvent) IsWebhookEvent52() bool { return s.Type == WebhookEvent52WebhookEvent }
+
+// IsWebhookEvent53 reports whether WebhookEvent is WebhookEvent53.
+func (s WebhookEvent) IsWebhookEvent53() bool { return s.Type == WebhookEvent53WebhookEvent }
 
 // SetWebhookEvent0 sets WebhookEvent to WebhookEvent0.
 func (s *WebhookEvent) SetWebhookEvent0(v WebhookEvent0) {
@@ -123975,6 +125742,48 @@ func NewWebhookEvent51WebhookEvent(v WebhookEvent51) WebhookEvent {
 	return s
 }
 
+// SetWebhookEvent52 sets WebhookEvent to WebhookEvent52.
+func (s *WebhookEvent) SetWebhookEvent52(v WebhookEvent52) {
+	s.Type = WebhookEvent52WebhookEvent
+	s.WebhookEvent52 = v
+}
+
+// GetWebhookEvent52 returns WebhookEvent52 and true boolean if WebhookEvent is WebhookEvent52.
+func (s WebhookEvent) GetWebhookEvent52() (v WebhookEvent52, ok bool) {
+	if !s.IsWebhookEvent52() {
+		return v, false
+	}
+	return s.WebhookEvent52, true
+}
+
+// NewWebhookEvent52WebhookEvent returns new WebhookEvent from WebhookEvent52.
+func NewWebhookEvent52WebhookEvent(v WebhookEvent52) WebhookEvent {
+	var s WebhookEvent
+	s.SetWebhookEvent52(v)
+	return s
+}
+
+// SetWebhookEvent53 sets WebhookEvent to WebhookEvent53.
+func (s *WebhookEvent) SetWebhookEvent53(v WebhookEvent53) {
+	s.Type = WebhookEvent53WebhookEvent
+	s.WebhookEvent53 = v
+}
+
+// GetWebhookEvent53 returns WebhookEvent53 and true boolean if WebhookEvent is WebhookEvent53.
+func (s WebhookEvent) GetWebhookEvent53() (v WebhookEvent53, ok bool) {
+	if !s.IsWebhookEvent53() {
+		return v, false
+	}
+	return s.WebhookEvent53, true
+}
+
+// NewWebhookEvent53WebhookEvent returns new WebhookEvent from WebhookEvent53.
+func NewWebhookEvent53WebhookEvent(v WebhookEvent53) WebhookEvent {
+	var s WebhookEvent
+	s.SetWebhookEvent53(v)
+	return s
+}
+
 // Merged schema.
 type WebhookEvent0 struct {
 	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
@@ -124488,7 +126297,7 @@ type WebhookEvent11 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent11Entity `json:"entity"`
-	Data   AuthTokenIssuedPayload  `json:"data"`
+	Data   AuthCheckPayload        `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -124522,7 +126331,7 @@ func (s *WebhookEvent11) GetEntity() NilWebhookEvent11Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent11) GetData() AuthTokenIssuedPayload {
+func (s *WebhookEvent11) GetData() AuthCheckPayload {
 	return s.Data
 }
 
@@ -124557,7 +126366,7 @@ func (s *WebhookEvent11) SetEntity(val NilWebhookEvent11Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent11) SetData(val AuthTokenIssuedPayload) {
+func (s *WebhookEvent11) SetData(val AuthCheckPayload) {
 	s.Data = val
 }
 
@@ -124689,7 +126498,7 @@ type WebhookEvent12 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent12Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   AuthTokenIssuedPayload  `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -124723,7 +126532,7 @@ func (s *WebhookEvent12) GetEntity() NilWebhookEvent12Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent12) GetData() EmptyEventPayload {
+func (s *WebhookEvent12) GetData() AuthTokenIssuedPayload {
 	return s.Data
 }
 
@@ -124758,7 +126567,7 @@ func (s *WebhookEvent12) SetEntity(val NilWebhookEvent12Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent12) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent12) SetData(val AuthTokenIssuedPayload) {
 	s.Data = val
 }
 
@@ -124890,7 +126699,7 @@ type WebhookEvent13 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent13Entity `json:"entity"`
-	Data   AuthzGrantedPayload     `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -124924,7 +126733,7 @@ func (s *WebhookEvent13) GetEntity() NilWebhookEvent13Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent13) GetData() AuthzGrantedPayload {
+func (s *WebhookEvent13) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -124959,7 +126768,7 @@ func (s *WebhookEvent13) SetEntity(val NilWebhookEvent13Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent13) SetData(val AuthzGrantedPayload) {
+func (s *WebhookEvent13) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -125292,7 +127101,7 @@ type WebhookEvent15 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent15Entity `json:"entity"`
-	Data   BrandingCreatedPayload  `json:"data"`
+	Data   AuthzGrantedPayload     `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -125326,7 +127135,7 @@ func (s *WebhookEvent15) GetEntity() NilWebhookEvent15Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent15) GetData() BrandingCreatedPayload {
+func (s *WebhookEvent15) GetData() AuthzGrantedPayload {
 	return s.Data
 }
 
@@ -125361,7 +127170,7 @@ func (s *WebhookEvent15) SetEntity(val NilWebhookEvent15Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent15) SetData(val BrandingCreatedPayload) {
+func (s *WebhookEvent15) SetData(val AuthzGrantedPayload) {
 	s.Data = val
 }
 
@@ -125492,8 +127301,8 @@ type WebhookEvent16 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent16Entity  `json:"entity"`
-	Data   DeploymentCreatedPayload `json:"data"`
+	Entity NilWebhookEvent16Entity `json:"entity"`
+	Data   BrandingCreatedPayload  `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -125527,7 +127336,7 @@ func (s *WebhookEvent16) GetEntity() NilWebhookEvent16Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent16) GetData() DeploymentCreatedPayload {
+func (s *WebhookEvent16) GetData() BrandingCreatedPayload {
 	return s.Data
 }
 
@@ -125562,7 +127371,7 @@ func (s *WebhookEvent16) SetEntity(val NilWebhookEvent16Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent16) SetData(val DeploymentCreatedPayload) {
+func (s *WebhookEvent16) SetData(val BrandingCreatedPayload) {
 	s.Data = val
 }
 
@@ -125693,8 +127502,8 @@ type WebhookEvent17 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent17Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Entity NilWebhookEvent17Entity  `json:"entity"`
+	Data   DeploymentCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -125728,7 +127537,7 @@ func (s *WebhookEvent17) GetEntity() NilWebhookEvent17Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent17) GetData() EmptyEventPayload {
+func (s *WebhookEvent17) GetData() DeploymentCreatedPayload {
 	return s.Data
 }
 
@@ -125763,7 +127572,7 @@ func (s *WebhookEvent17) SetEntity(val NilWebhookEvent17Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent17) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent17) SetData(val DeploymentCreatedPayload) {
 	s.Data = val
 }
 
@@ -126096,7 +127905,7 @@ type WebhookEvent19 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent19Entity `json:"entity"`
-	Data   FlowdefPayload          `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -126130,7 +127939,7 @@ func (s *WebhookEvent19) GetEntity() NilWebhookEvent19Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent19) GetData() FlowdefPayload {
+func (s *WebhookEvent19) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -126165,7 +127974,7 @@ func (s *WebhookEvent19) SetEntity(val NilWebhookEvent19Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent19) SetData(val FlowdefPayload) {
+func (s *WebhookEvent19) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -126480,8 +128289,6 @@ func (s *WebhookEvent2) SetData(val EmptyEventPayload) {
 }
 
 // Merged schema.
-//
-// Deprecated: schema marks this type as deprecated.
 type WebhookEvent20 struct {
 	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
 	// `getEvent` (`GET /events/{event_id}`) takes.
@@ -126500,7 +128307,7 @@ type WebhookEvent20 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent20Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   FlowdefPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -126534,7 +128341,7 @@ func (s *WebhookEvent20) GetEntity() NilWebhookEvent20Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent20) GetData() EmptyEventPayload {
+func (s *WebhookEvent20) GetData() FlowdefPayload {
 	return s.Data
 }
 
@@ -126569,7 +128376,7 @@ func (s *WebhookEvent20) SetEntity(val NilWebhookEvent20Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent20) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent20) SetData(val FlowdefPayload) {
 	s.Data = val
 }
 
@@ -126703,7 +128510,7 @@ type WebhookEvent21 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent21Entity `json:"entity"`
-	Data   FlowdefPayload          `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -126737,7 +128544,7 @@ func (s *WebhookEvent21) GetEntity() NilWebhookEvent21Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent21) GetData() FlowdefPayload {
+func (s *WebhookEvent21) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -126772,7 +128579,7 @@ func (s *WebhookEvent21) SetEntity(val NilWebhookEvent21Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent21) SetData(val FlowdefPayload) {
+func (s *WebhookEvent21) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -126886,6 +128693,8 @@ func (s *WebhookEvent21Entity) SetID(val NilString) {
 }
 
 // Merged schema.
+//
+// Deprecated: schema marks this type as deprecated.
 type WebhookEvent22 struct {
 	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
 	// `getEvent` (`GET /events/{event_id}`) takes.
@@ -126904,7 +128713,7 @@ type WebhookEvent22 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent22Entity `json:"entity"`
-	Data   IdpPayload              `json:"data"`
+	Data   FlowdefPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -126938,7 +128747,7 @@ func (s *WebhookEvent22) GetEntity() NilWebhookEvent22Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent22) GetData() IdpPayload {
+func (s *WebhookEvent22) GetData() FlowdefPayload {
 	return s.Data
 }
 
@@ -126973,7 +128782,7 @@ func (s *WebhookEvent22) SetEntity(val NilWebhookEvent22Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent22) SetData(val IdpPayload) {
+func (s *WebhookEvent22) SetData(val FlowdefPayload) {
 	s.Data = val
 }
 
@@ -127104,8 +128913,8 @@ type WebhookEvent23 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent23Entity       `json:"entity"`
-	Data   IdpIdentityLinkCreatedPayload `json:"data"`
+	Entity NilWebhookEvent23Entity `json:"entity"`
+	Data   IdpPayload              `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -127139,7 +128948,7 @@ func (s *WebhookEvent23) GetEntity() NilWebhookEvent23Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent23) GetData() IdpIdentityLinkCreatedPayload {
+func (s *WebhookEvent23) GetData() IdpPayload {
 	return s.Data
 }
 
@@ -127174,7 +128983,7 @@ func (s *WebhookEvent23) SetEntity(val NilWebhookEvent23Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent23) SetData(val IdpIdentityLinkCreatedPayload) {
+func (s *WebhookEvent23) SetData(val IdpPayload) {
 	s.Data = val
 }
 
@@ -127305,8 +129114,8 @@ type WebhookEvent24 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent24Entity `json:"entity"`
-	Data   IdpPayload              `json:"data"`
+	Entity NilWebhookEvent24Entity       `json:"entity"`
+	Data   IdpIdentityLinkCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -127340,7 +129149,7 @@ func (s *WebhookEvent24) GetEntity() NilWebhookEvent24Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent24) GetData() IdpPayload {
+func (s *WebhookEvent24) GetData() IdpIdentityLinkCreatedPayload {
 	return s.Data
 }
 
@@ -127375,7 +129184,7 @@ func (s *WebhookEvent24) SetEntity(val NilWebhookEvent24Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent24) SetData(val IdpPayload) {
+func (s *WebhookEvent24) SetData(val IdpIdentityLinkCreatedPayload) {
 	s.Data = val
 }
 
@@ -127506,8 +129315,8 @@ type WebhookEvent25 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent25Entity   `json:"entity"`
-	Data   InvitationAcceptedPayload `json:"data"`
+	Entity NilWebhookEvent25Entity `json:"entity"`
+	Data   IdpPayload              `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -127541,7 +129350,7 @@ func (s *WebhookEvent25) GetEntity() NilWebhookEvent25Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent25) GetData() InvitationAcceptedPayload {
+func (s *WebhookEvent25) GetData() IdpPayload {
 	return s.Data
 }
 
@@ -127576,7 +129385,7 @@ func (s *WebhookEvent25) SetEntity(val NilWebhookEvent25Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent25) SetData(val InvitationAcceptedPayload) {
+func (s *WebhookEvent25) SetData(val IdpPayload) {
 	s.Data = val
 }
 
@@ -127707,8 +129516,8 @@ type WebhookEvent26 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent26Entity    `json:"entity"`
-	Data   InvitationCancelledPayload `json:"data"`
+	Entity NilWebhookEvent26Entity   `json:"entity"`
+	Data   InvitationAcceptedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -127742,7 +129551,7 @@ func (s *WebhookEvent26) GetEntity() NilWebhookEvent26Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent26) GetData() InvitationCancelledPayload {
+func (s *WebhookEvent26) GetData() InvitationAcceptedPayload {
 	return s.Data
 }
 
@@ -127777,7 +129586,7 @@ func (s *WebhookEvent26) SetEntity(val NilWebhookEvent26Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent26) SetData(val InvitationCancelledPayload) {
+func (s *WebhookEvent26) SetData(val InvitationAcceptedPayload) {
 	s.Data = val
 }
 
@@ -127908,8 +129717,8 @@ type WebhookEvent27 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent27Entity  `json:"entity"`
-	Data   InvitationCreatedPayload `json:"data"`
+	Entity NilWebhookEvent27Entity    `json:"entity"`
+	Data   InvitationCancelledPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -127943,7 +129752,7 @@ func (s *WebhookEvent27) GetEntity() NilWebhookEvent27Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent27) GetData() InvitationCreatedPayload {
+func (s *WebhookEvent27) GetData() InvitationCancelledPayload {
 	return s.Data
 }
 
@@ -127978,7 +129787,7 @@ func (s *WebhookEvent27) SetEntity(val NilWebhookEvent27Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent27) SetData(val InvitationCreatedPayload) {
+func (s *WebhookEvent27) SetData(val InvitationCancelledPayload) {
 	s.Data = val
 }
 
@@ -128109,8 +129918,8 @@ type WebhookEvent28 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent28Entity   `json:"entity"`
-	Data   InvitationRejectedPayload `json:"data"`
+	Entity NilWebhookEvent28Entity  `json:"entity"`
+	Data   InvitationCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -128144,7 +129953,7 @@ func (s *WebhookEvent28) GetEntity() NilWebhookEvent28Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent28) GetData() InvitationRejectedPayload {
+func (s *WebhookEvent28) GetData() InvitationCreatedPayload {
 	return s.Data
 }
 
@@ -128179,7 +129988,7 @@ func (s *WebhookEvent28) SetEntity(val NilWebhookEvent28Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent28) SetData(val InvitationRejectedPayload) {
+func (s *WebhookEvent28) SetData(val InvitationCreatedPayload) {
 	s.Data = val
 }
 
@@ -128310,8 +130119,8 @@ type WebhookEvent29 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent29Entity `json:"entity"`
-	Data   OriginPayload           `json:"data"`
+	Entity NilWebhookEvent29Entity   `json:"entity"`
+	Data   InvitationRejectedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -128345,7 +130154,7 @@ func (s *WebhookEvent29) GetEntity() NilWebhookEvent29Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent29) GetData() OriginPayload {
+func (s *WebhookEvent29) GetData() InvitationRejectedPayload {
 	return s.Data
 }
 
@@ -128380,7 +130189,7 @@ func (s *WebhookEvent29) SetEntity(val NilWebhookEvent29Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent29) SetData(val OriginPayload) {
+func (s *WebhookEvent29) SetData(val InvitationRejectedPayload) {
 	s.Data = val
 }
 
@@ -128712,8 +130521,8 @@ type WebhookEvent30 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent30Entity `json:"entity"`
-	Data   OriginPayload           `json:"data"`
+	Entity NilWebhookEvent30Entity     `json:"entity"`
+	Data   OAuthSettingsCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -128747,7 +130556,7 @@ func (s *WebhookEvent30) GetEntity() NilWebhookEvent30Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent30) GetData() OriginPayload {
+func (s *WebhookEvent30) GetData() OAuthSettingsCreatedPayload {
 	return s.Data
 }
 
@@ -128782,7 +130591,7 @@ func (s *WebhookEvent30) SetEntity(val NilWebhookEvent30Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent30) SetData(val OriginPayload) {
+func (s *WebhookEvent30) SetData(val OAuthSettingsCreatedPayload) {
 	s.Data = val
 }
 
@@ -128914,7 +130723,7 @@ type WebhookEvent31 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent31Entity `json:"entity"`
-	Data   PolicyPayload           `json:"data"`
+	Data   OriginPayload           `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -128948,7 +130757,7 @@ func (s *WebhookEvent31) GetEntity() NilWebhookEvent31Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent31) GetData() PolicyPayload {
+func (s *WebhookEvent31) GetData() OriginPayload {
 	return s.Data
 }
 
@@ -128983,7 +130792,7 @@ func (s *WebhookEvent31) SetEntity(val NilWebhookEvent31Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent31) SetData(val PolicyPayload) {
+func (s *WebhookEvent31) SetData(val OriginPayload) {
 	s.Data = val
 }
 
@@ -129115,7 +130924,7 @@ type WebhookEvent32 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent32Entity `json:"entity"`
-	Data   PolicyPayload           `json:"data"`
+	Data   OriginPayload           `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -129149,7 +130958,7 @@ func (s *WebhookEvent32) GetEntity() NilWebhookEvent32Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent32) GetData() PolicyPayload {
+func (s *WebhookEvent32) GetData() OriginPayload {
 	return s.Data
 }
 
@@ -129184,7 +130993,7 @@ func (s *WebhookEvent32) SetEntity(val NilWebhookEvent32Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent32) SetData(val PolicyPayload) {
+func (s *WebhookEvent32) SetData(val OriginPayload) {
 	s.Data = val
 }
 
@@ -129316,7 +131125,7 @@ type WebhookEvent33 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent33Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   PolicyPayload           `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -129350,7 +131159,7 @@ func (s *WebhookEvent33) GetEntity() NilWebhookEvent33Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent33) GetData() EmptyEventPayload {
+func (s *WebhookEvent33) GetData() PolicyPayload {
 	return s.Data
 }
 
@@ -129385,7 +131194,7 @@ func (s *WebhookEvent33) SetEntity(val NilWebhookEvent33Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent33) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent33) SetData(val PolicyPayload) {
 	s.Data = val
 }
 
@@ -129517,7 +131326,7 @@ type WebhookEvent34 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent34Entity `json:"entity"`
-	Data   ProjectPayload          `json:"data"`
+	Data   PolicyPayload           `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -129551,7 +131360,7 @@ func (s *WebhookEvent34) GetEntity() NilWebhookEvent34Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent34) GetData() ProjectPayload {
+func (s *WebhookEvent34) GetData() PolicyPayload {
 	return s.Data
 }
 
@@ -129586,7 +131395,7 @@ func (s *WebhookEvent34) SetEntity(val NilWebhookEvent34Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent34) SetData(val ProjectPayload) {
+func (s *WebhookEvent34) SetData(val PolicyPayload) {
 	s.Data = val
 }
 
@@ -130120,7 +131929,7 @@ type WebhookEvent37 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent37Entity `json:"entity"`
-	Data   ReleaseCreatedPayload   `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -130154,7 +131963,7 @@ func (s *WebhookEvent37) GetEntity() NilWebhookEvent37Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent37) GetData() ReleaseCreatedPayload {
+func (s *WebhookEvent37) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -130189,7 +131998,7 @@ func (s *WebhookEvent37) SetEntity(val NilWebhookEvent37Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent37) SetData(val ReleaseCreatedPayload) {
+func (s *WebhookEvent37) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -130321,7 +132130,7 @@ type WebhookEvent38 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent38Entity `json:"entity"`
-	Data   ReleaseRevokedPayload   `json:"data"`
+	Data   ProjectPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -130355,7 +132164,7 @@ func (s *WebhookEvent38) GetEntity() NilWebhookEvent38Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent38) GetData() ReleaseRevokedPayload {
+func (s *WebhookEvent38) GetData() ProjectPayload {
 	return s.Data
 }
 
@@ -130390,7 +132199,7 @@ func (s *WebhookEvent38) SetEntity(val NilWebhookEvent38Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent38) SetData(val ReleaseRevokedPayload) {
+func (s *WebhookEvent38) SetData(val ProjectPayload) {
 	s.Data = val
 }
 
@@ -130522,7 +132331,7 @@ type WebhookEvent39 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent39Entity `json:"entity"`
-	Data   RequestAPIPayload       `json:"data"`
+	Data   ReleaseCreatedPayload   `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -130556,7 +132365,7 @@ func (s *WebhookEvent39) GetEntity() NilWebhookEvent39Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent39) GetData() RequestAPIPayload {
+func (s *WebhookEvent39) GetData() ReleaseCreatedPayload {
 	return s.Data
 }
 
@@ -130591,7 +132400,7 @@ func (s *WebhookEvent39) SetEntity(val NilWebhookEvent39Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent39) SetData(val RequestAPIPayload) {
+func (s *WebhookEvent39) SetData(val ReleaseCreatedPayload) {
 	s.Data = val
 }
 
@@ -130924,7 +132733,7 @@ type WebhookEvent40 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent40Entity `json:"entity"`
-	Data   SchemaCreatedPayload    `json:"data"`
+	Data   ReleaseRevokedPayload   `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -130958,7 +132767,7 @@ func (s *WebhookEvent40) GetEntity() NilWebhookEvent40Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent40) GetData() SchemaCreatedPayload {
+func (s *WebhookEvent40) GetData() ReleaseRevokedPayload {
 	return s.Data
 }
 
@@ -130993,7 +132802,7 @@ func (s *WebhookEvent40) SetEntity(val NilWebhookEvent40Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent40) SetData(val SchemaCreatedPayload) {
+func (s *WebhookEvent40) SetData(val ReleaseRevokedPayload) {
 	s.Data = val
 }
 
@@ -131125,7 +132934,7 @@ type WebhookEvent41 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent41Entity `json:"entity"`
-	Data   SessionDeletedPayload   `json:"data"`
+	Data   RequestAPIPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -131159,7 +132968,7 @@ func (s *WebhookEvent41) GetEntity() NilWebhookEvent41Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent41) GetData() SessionDeletedPayload {
+func (s *WebhookEvent41) GetData() RequestAPIPayload {
 	return s.Data
 }
 
@@ -131194,7 +133003,7 @@ func (s *WebhookEvent41) SetEntity(val NilWebhookEvent41Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent41) SetData(val SessionDeletedPayload) {
+func (s *WebhookEvent41) SetData(val RequestAPIPayload) {
 	s.Data = val
 }
 
@@ -131325,8 +133134,8 @@ type WebhookEvent42 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent42Entity   `json:"entity"`
-	Data   SessionEstablishedPayload `json:"data"`
+	Entity NilWebhookEvent42Entity `json:"entity"`
+	Data   SchemaCreatedPayload    `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -131360,7 +133169,7 @@ func (s *WebhookEvent42) GetEntity() NilWebhookEvent42Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent42) GetData() SessionEstablishedPayload {
+func (s *WebhookEvent42) GetData() SchemaCreatedPayload {
 	return s.Data
 }
 
@@ -131395,7 +133204,7 @@ func (s *WebhookEvent42) SetEntity(val NilWebhookEvent42Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent42) SetData(val SessionEstablishedPayload) {
+func (s *WebhookEvent42) SetData(val SchemaCreatedPayload) {
 	s.Data = val
 }
 
@@ -131527,7 +133336,7 @@ type WebhookEvent43 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent43Entity `json:"entity"`
-	Data   TeamPayload             `json:"data"`
+	Data   SessionDeletedPayload   `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -131561,7 +133370,7 @@ func (s *WebhookEvent43) GetEntity() NilWebhookEvent43Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent43) GetData() TeamPayload {
+func (s *WebhookEvent43) GetData() SessionDeletedPayload {
 	return s.Data
 }
 
@@ -131596,7 +133405,7 @@ func (s *WebhookEvent43) SetEntity(val NilWebhookEvent43Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent43) SetData(val TeamPayload) {
+func (s *WebhookEvent43) SetData(val SessionDeletedPayload) {
 	s.Data = val
 }
 
@@ -131727,8 +133536,8 @@ type WebhookEvent44 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent44Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Entity NilWebhookEvent44Entity   `json:"entity"`
+	Data   SessionEstablishedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -131762,7 +133571,7 @@ func (s *WebhookEvent44) GetEntity() NilWebhookEvent44Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent44) GetData() EmptyEventPayload {
+func (s *WebhookEvent44) GetData() SessionEstablishedPayload {
 	return s.Data
 }
 
@@ -131797,7 +133606,7 @@ func (s *WebhookEvent44) SetEntity(val NilWebhookEvent44Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent44) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent44) SetData(val SessionEstablishedPayload) {
 	s.Data = val
 }
 
@@ -132130,7 +133939,7 @@ type WebhookEvent46 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent46Entity `json:"entity"`
-	Data   UserCreateFailedPayload `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132164,7 +133973,7 @@ func (s *WebhookEvent46) GetEntity() NilWebhookEvent46Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent46) GetData() UserCreateFailedPayload {
+func (s *WebhookEvent46) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -132199,7 +134008,7 @@ func (s *WebhookEvent46) SetEntity(val NilWebhookEvent46Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent46) SetData(val UserCreateFailedPayload) {
+func (s *WebhookEvent46) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -132331,7 +134140,7 @@ type WebhookEvent47 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent47Entity `json:"entity"`
-	Data   UserCreatedPayload      `json:"data"`
+	Data   TeamPayload             `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132365,7 +134174,7 @@ func (s *WebhookEvent47) GetEntity() NilWebhookEvent47Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent47) GetData() UserCreatedPayload {
+func (s *WebhookEvent47) GetData() TeamPayload {
 	return s.Data
 }
 
@@ -132400,7 +134209,7 @@ func (s *WebhookEvent47) SetEntity(val NilWebhookEvent47Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent47) SetData(val UserCreatedPayload) {
+func (s *WebhookEvent47) SetData(val TeamPayload) {
 	s.Data = val
 }
 
@@ -132532,7 +134341,7 @@ type WebhookEvent48 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent48Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   UserCreateFailedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132566,7 +134375,7 @@ func (s *WebhookEvent48) GetEntity() NilWebhookEvent48Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent48) GetData() EmptyEventPayload {
+func (s *WebhookEvent48) GetData() UserCreateFailedPayload {
 	return s.Data
 }
 
@@ -132601,7 +134410,7 @@ func (s *WebhookEvent48) SetEntity(val NilWebhookEvent48Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent48) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent48) SetData(val UserCreateFailedPayload) {
 	s.Data = val
 }
 
@@ -132733,7 +134542,7 @@ type WebhookEvent49 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent49Entity `json:"entity"`
-	Data   UserUpdatedPayload      `json:"data"`
+	Data   UserCreatedPayload      `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132767,7 +134576,7 @@ func (s *WebhookEvent49) GetEntity() NilWebhookEvent49Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent49) GetData() UserUpdatedPayload {
+func (s *WebhookEvent49) GetData() UserCreatedPayload {
 	return s.Data
 }
 
@@ -132802,7 +134611,7 @@ func (s *WebhookEvent49) SetEntity(val NilWebhookEvent49Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent49) SetData(val UserUpdatedPayload) {
+func (s *WebhookEvent49) SetData(val UserCreatedPayload) {
 	s.Data = val
 }
 
@@ -133135,7 +134944,7 @@ type WebhookEvent50 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent50Entity `json:"entity"`
-	Data   VariableRemovedPayload  `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -133169,7 +134978,7 @@ func (s *WebhookEvent50) GetEntity() NilWebhookEvent50Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent50) GetData() VariableRemovedPayload {
+func (s *WebhookEvent50) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -133204,7 +135013,7 @@ func (s *WebhookEvent50) SetEntity(val NilWebhookEvent50Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent50) SetData(val VariableRemovedPayload) {
+func (s *WebhookEvent50) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -133336,7 +135145,7 @@ type WebhookEvent51 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent51Entity `json:"entity"`
-	Data   VariableSetPayload      `json:"data"`
+	Data   UserUpdatedPayload      `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -133370,7 +135179,7 @@ func (s *WebhookEvent51) GetEntity() NilWebhookEvent51Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent51) GetData() VariableSetPayload {
+func (s *WebhookEvent51) GetData() UserUpdatedPayload {
 	return s.Data
 }
 
@@ -133405,7 +135214,7 @@ func (s *WebhookEvent51) SetEntity(val NilWebhookEvent51Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent51) SetData(val VariableSetPayload) {
+func (s *WebhookEvent51) SetData(val UserUpdatedPayload) {
 	s.Data = val
 }
 
@@ -133515,6 +135324,408 @@ func (s *WebhookEvent51Entity) SetType(val NilString) {
 
 // SetID sets the value of ID.
 func (s *WebhookEvent51Entity) SetID(val NilString) {
+	s.ID = val
+}
+
+// Merged schema.
+type WebhookEvent52 struct {
+	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
+	// `getEvent` (`GET /events/{event_id}`) takes.
+	ID string `json:"id"`
+	// Merged property.
+	Type string `json:"type"`
+	// When the event was stored, on the server's clock, in UTC.
+	CreatedAt time.Time `json:"created_at"`
+	ProjectID ProjectID `json:"project_id"`
+	// Who triggered the event: the event's `actor_type` and `actor_id`. `null` when the event has neither.
+	// When it has only one, the other is `null`: a project token acting for no user gives a `type` of
+	// `service` and an `id` of `null`.
+	Actor NilWebhookEvent52Actor `json:"actor"`
+	// The resource the event affected: the event's `entity_type` and `entity_id`. `null` when the event
+	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
+	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
+	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
+	Entity NilWebhookEvent52Entity `json:"entity"`
+	Data   VariableRemovedPayload  `json:"data"`
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent52) GetID() string {
+	return s.ID
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent52) GetType() string {
+	return s.Type
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *WebhookEvent52) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *WebhookEvent52) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetActor returns the value of Actor.
+func (s *WebhookEvent52) GetActor() NilWebhookEvent52Actor {
+	return s.Actor
+}
+
+// GetEntity returns the value of Entity.
+func (s *WebhookEvent52) GetEntity() NilWebhookEvent52Entity {
+	return s.Entity
+}
+
+// GetData returns the value of Data.
+func (s *WebhookEvent52) GetData() VariableRemovedPayload {
+	return s.Data
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent52) SetID(val string) {
+	s.ID = val
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent52) SetType(val string) {
+	s.Type = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *WebhookEvent52) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *WebhookEvent52) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetActor sets the value of Actor.
+func (s *WebhookEvent52) SetActor(val NilWebhookEvent52Actor) {
+	s.Actor = val
+}
+
+// SetEntity sets the value of Entity.
+func (s *WebhookEvent52) SetEntity(val NilWebhookEvent52Entity) {
+	s.Entity = val
+}
+
+// SetData sets the value of Data.
+func (s *WebhookEvent52) SetData(val VariableRemovedPayload) {
+	s.Data = val
+}
+
+type WebhookEvent52Actor struct {
+	// The kind of actor.
+	Type NilWebhookEvent52ActorType `json:"type"`
+	// The ID of the actor, a user's for a `human`.
+	ID NilString `json:"id"`
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent52Actor) GetType() NilWebhookEvent52ActorType {
+	return s.Type
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent52Actor) GetID() NilString {
+	return s.ID
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent52Actor) SetType(val NilWebhookEvent52ActorType) {
+	s.Type = val
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent52Actor) SetID(val NilString) {
+	s.ID = val
+}
+
+type WebhookEvent52ActorType string
+
+const (
+	WebhookEvent52ActorTypeHuman   WebhookEvent52ActorType = "human"
+	WebhookEvent52ActorTypeService WebhookEvent52ActorType = "service"
+	WebhookEvent52ActorTypeSystem  WebhookEvent52ActorType = "system"
+	WebhookEvent52ActorTypeAgent   WebhookEvent52ActorType = "agent"
+)
+
+// AllValues returns all WebhookEvent52ActorType values.
+func (WebhookEvent52ActorType) AllValues() []WebhookEvent52ActorType {
+	return []WebhookEvent52ActorType{
+		WebhookEvent52ActorTypeHuman,
+		WebhookEvent52ActorTypeService,
+		WebhookEvent52ActorTypeSystem,
+		WebhookEvent52ActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s WebhookEvent52ActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case WebhookEvent52ActorTypeHuman:
+		return []byte(s), nil
+	case WebhookEvent52ActorTypeService:
+		return []byte(s), nil
+	case WebhookEvent52ActorTypeSystem:
+		return []byte(s), nil
+	case WebhookEvent52ActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *WebhookEvent52ActorType) UnmarshalText(data []byte) error {
+	switch WebhookEvent52ActorType(data) {
+	case WebhookEvent52ActorTypeHuman:
+		*s = WebhookEvent52ActorTypeHuman
+		return nil
+	case WebhookEvent52ActorTypeService:
+		*s = WebhookEvent52ActorTypeService
+		return nil
+	case WebhookEvent52ActorTypeSystem:
+		*s = WebhookEvent52ActorTypeSystem
+		return nil
+	case WebhookEvent52ActorTypeAgent:
+		*s = WebhookEvent52ActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type WebhookEvent52Entity struct {
+	// The type of resource, for example `user`.
+	Type NilString `json:"type"`
+	// The ID of the resource.
+	ID NilString `json:"id"`
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent52Entity) GetType() NilString {
+	return s.Type
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent52Entity) GetID() NilString {
+	return s.ID
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent52Entity) SetType(val NilString) {
+	s.Type = val
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent52Entity) SetID(val NilString) {
+	s.ID = val
+}
+
+// Merged schema.
+type WebhookEvent53 struct {
+	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
+	// `getEvent` (`GET /events/{event_id}`) takes.
+	ID string `json:"id"`
+	// Merged property.
+	Type string `json:"type"`
+	// When the event was stored, on the server's clock, in UTC.
+	CreatedAt time.Time `json:"created_at"`
+	ProjectID ProjectID `json:"project_id"`
+	// Who triggered the event: the event's `actor_type` and `actor_id`. `null` when the event has neither.
+	// When it has only one, the other is `null`: a project token acting for no user gives a `type` of
+	// `service` and an `id` of `null`.
+	Actor NilWebhookEvent53Actor `json:"actor"`
+	// The resource the event affected: the event's `entity_type` and `entity_id`. `null` when the event
+	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
+	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
+	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
+	Entity NilWebhookEvent53Entity `json:"entity"`
+	Data   VariableSetPayload      `json:"data"`
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent53) GetID() string {
+	return s.ID
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent53) GetType() string {
+	return s.Type
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *WebhookEvent53) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *WebhookEvent53) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetActor returns the value of Actor.
+func (s *WebhookEvent53) GetActor() NilWebhookEvent53Actor {
+	return s.Actor
+}
+
+// GetEntity returns the value of Entity.
+func (s *WebhookEvent53) GetEntity() NilWebhookEvent53Entity {
+	return s.Entity
+}
+
+// GetData returns the value of Data.
+func (s *WebhookEvent53) GetData() VariableSetPayload {
+	return s.Data
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent53) SetID(val string) {
+	s.ID = val
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent53) SetType(val string) {
+	s.Type = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *WebhookEvent53) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *WebhookEvent53) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetActor sets the value of Actor.
+func (s *WebhookEvent53) SetActor(val NilWebhookEvent53Actor) {
+	s.Actor = val
+}
+
+// SetEntity sets the value of Entity.
+func (s *WebhookEvent53) SetEntity(val NilWebhookEvent53Entity) {
+	s.Entity = val
+}
+
+// SetData sets the value of Data.
+func (s *WebhookEvent53) SetData(val VariableSetPayload) {
+	s.Data = val
+}
+
+type WebhookEvent53Actor struct {
+	// The kind of actor.
+	Type NilWebhookEvent53ActorType `json:"type"`
+	// The ID of the actor, a user's for a `human`.
+	ID NilString `json:"id"`
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent53Actor) GetType() NilWebhookEvent53ActorType {
+	return s.Type
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent53Actor) GetID() NilString {
+	return s.ID
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent53Actor) SetType(val NilWebhookEvent53ActorType) {
+	s.Type = val
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent53Actor) SetID(val NilString) {
+	s.ID = val
+}
+
+type WebhookEvent53ActorType string
+
+const (
+	WebhookEvent53ActorTypeHuman   WebhookEvent53ActorType = "human"
+	WebhookEvent53ActorTypeService WebhookEvent53ActorType = "service"
+	WebhookEvent53ActorTypeSystem  WebhookEvent53ActorType = "system"
+	WebhookEvent53ActorTypeAgent   WebhookEvent53ActorType = "agent"
+)
+
+// AllValues returns all WebhookEvent53ActorType values.
+func (WebhookEvent53ActorType) AllValues() []WebhookEvent53ActorType {
+	return []WebhookEvent53ActorType{
+		WebhookEvent53ActorTypeHuman,
+		WebhookEvent53ActorTypeService,
+		WebhookEvent53ActorTypeSystem,
+		WebhookEvent53ActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s WebhookEvent53ActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case WebhookEvent53ActorTypeHuman:
+		return []byte(s), nil
+	case WebhookEvent53ActorTypeService:
+		return []byte(s), nil
+	case WebhookEvent53ActorTypeSystem:
+		return []byte(s), nil
+	case WebhookEvent53ActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *WebhookEvent53ActorType) UnmarshalText(data []byte) error {
+	switch WebhookEvent53ActorType(data) {
+	case WebhookEvent53ActorTypeHuman:
+		*s = WebhookEvent53ActorTypeHuman
+		return nil
+	case WebhookEvent53ActorTypeService:
+		*s = WebhookEvent53ActorTypeService
+		return nil
+	case WebhookEvent53ActorTypeSystem:
+		*s = WebhookEvent53ActorTypeSystem
+		return nil
+	case WebhookEvent53ActorTypeAgent:
+		*s = WebhookEvent53ActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type WebhookEvent53Entity struct {
+	// The type of resource, for example `user`.
+	Type NilString `json:"type"`
+	// The ID of the resource.
+	ID NilString `json:"id"`
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent53Entity) GetType() NilString {
+	return s.Type
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent53Entity) GetID() NilString {
+	return s.ID
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent53Entity) SetType(val NilString) {
+	s.Type = val
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent53Entity) SetID(val NilString) {
 	s.ID = val
 }
 
@@ -134047,8 +136258,8 @@ type WebhookEvent8 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent8Entity `json:"entity"`
-	Data   AuthCheckPayload       `json:"data"`
+	Entity NilWebhookEvent8Entity    `json:"entity"`
+	Data   AuthRequestCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -134082,7 +136293,7 @@ func (s *WebhookEvent8) GetEntity() NilWebhookEvent8Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent8) GetData() AuthCheckPayload {
+func (s *WebhookEvent8) GetData() AuthRequestCreatedPayload {
 	return s.Data
 }
 
@@ -134117,7 +136328,7 @@ func (s *WebhookEvent8) SetEntity(val NilWebhookEvent8Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent8) SetData(val AuthCheckPayload) {
+func (s *WebhookEvent8) SetData(val AuthRequestCreatedPayload) {
 	s.Data = val
 }
 

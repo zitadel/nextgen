@@ -1085,6 +1085,19 @@ export function acceptInvitation(invitationId: string): void {
   }
 }
 
+/**
+ * Marks an invitation declined, as the invitee's decline would: final, and it
+ * keeps its metadata. The mock serves no reject, so a test arranges it here.
+ */
+export function rejectInvitation(invitationId: string): void {
+  const invitation = store.invitations.get(invitationId);
+  if (invitation) {
+    invitation.status = "rejected";
+    invitation.respondedBy = `user_${shortId()}`;
+    invitation.respondedAt = nowIso();
+  }
+}
+
 /** Backdates the project past the claim window, for window-expiry tests. */
 export function expireClaimWindow(projectId: string): void {
   const project = store.projects.get(projectId);

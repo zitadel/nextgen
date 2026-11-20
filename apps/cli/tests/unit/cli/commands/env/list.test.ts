@@ -7,7 +7,7 @@ import { it } from "@tests/fixtures";
 import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/fixtures/terminal";
 
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = "https://preview.zitadel.com";
 
 /** A project directory with no `.env.<name>.local` beside it, so nothing is bound. */
 async function aProjectWithNothingBound(cwd: string): Promise<string> {

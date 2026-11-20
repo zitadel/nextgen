@@ -366,7 +366,7 @@ describe("Frame", () => {
       "Summary",
       [
         "name         source                  server                       resolved",
-        "development  .env.development.local  https://api.zitadel.cloud    yes",
+        "development  .env.development.local  https://preview.zitadel.com    yes",
       ],
       [],
     ).render();
@@ -440,11 +440,11 @@ describe("Facts", () => {
 
   it("aligns the values of a section's facts", () => {
     const [heading, first, second] = plain(
-      new Facts([section("Project", ["Id", "proj-1"], ["Server", "api.zitadel.cloud"])]).render(),
+      new Facts([section("Project", ["Id", "proj-1"], ["Server", "preview.zitadel.com"])]).render(),
     ).split("\n");
 
     expect(heading).toBe("Project");
-    expect(first?.indexOf("proj-1")).toBe(second?.indexOf("api.zitadel.cloud"));
+    expect(first?.indexOf("proj-1")).toBe(second?.indexOf("preview.zitadel.com"));
   });
 });
 

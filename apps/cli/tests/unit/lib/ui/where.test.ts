@@ -15,8 +15,8 @@ describe("Where", () => {
   });
 
   it("names the project and the server it ran against", () => {
-    expect(plain(new Where("proj-1", "api.zitadel.cloud").render())).toBe(
-      "Using project proj-1 on your Zitadel server at api.zitadel.cloud.",
+    expect(plain(new Where("proj-1", "preview.zitadel.com").render())).toBe(
+      "Using project proj-1 on your Zitadel server at preview.zitadel.com.",
     );
   });
 
@@ -27,8 +27,8 @@ describe("Where", () => {
   });
 
   it("leaves the project out when the command did not resolve one", () => {
-    expect(plain(new Where(undefined, "api.zitadel.cloud").render())).toBe(
-      "Using your Zitadel server at api.zitadel.cloud.",
+    expect(plain(new Where(undefined, "preview.zitadel.com").render())).toBe(
+      "Using your Zitadel server at preview.zitadel.com.",
     );
   });
 
@@ -38,15 +38,15 @@ describe("Where", () => {
 
   describe("as the place in a footer that has its own wording", () => {
     it("names the project and the server", () => {
-      expect(new Where("proj-1", "api.zitadel.cloud").plain).toBe(
-        "project proj-1 on api.zitadel.cloud",
+      expect(new Where("proj-1", "preview.zitadel.com").plain).toBe(
+        "project proj-1 on preview.zitadel.com",
       );
     });
 
     // `stop` and `doctor` resolve no project, and a bare host after the `·`
     // reads as a column rather than as where the command ran.
     it("still says where it ran when no project was resolved", () => {
-      expect(new Where(undefined, "api.zitadel.cloud").plain).toBe("on api.zitadel.cloud");
+      expect(new Where(undefined, "preview.zitadel.com").plain).toBe("on preview.zitadel.com");
     });
 
     // "project proj-1 on your Zitadel project" reads as two different places.

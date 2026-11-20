@@ -26,8 +26,8 @@ function ctxFor(
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
-    server: "https://api.zitadel.cloud",
-    defaultServer: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
     sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
@@ -238,7 +238,7 @@ describe("NextPatcher.plan", () => {
     );
     expect(op?.mode).toBe(0o600);
     expect(op?.entries).toEqual({
-      ZITADEL_URL: "https://api.zitadel.cloud",
+      ZITADEL_URL: "https://preview.zitadel.com",
       ZITADEL_PROJECT_ID: "proj-1",
       ZITADEL_PROJECT_SECRET: "sk_proj_full",
       ZITADEL_PREVIEW_TOKEN: "sk_proj_preview",

@@ -41,7 +41,7 @@ async function aProject(dir: string): Promise<void> {
   await write(dir, {
     "zitadel.json": JSON.stringify({
       project: "proj-001",
-      server: "https://api.zitadel.cloud",
+      server: "https://preview.zitadel.com",
       framework: { id: "next" },
     }),
     ".zitadel/secret": JSON.stringify({

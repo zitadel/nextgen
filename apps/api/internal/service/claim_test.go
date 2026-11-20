@@ -99,6 +99,8 @@ func TestClaimService_Init(t *testing.T) {
 				assert.Equal(t, domain.ClaimChallengeStatusPending, captured.Status)
 				assert.WithinDuration(t, time.Now().Add(domain.ClaimChallengeTTL), captured.ExpiresAt, 2*time.Second)
 				assert.Equal(t, captured.ExpiresAt, got.ExpiresAt)
+				// The clock, not a read, sets this one, so it stamps UTC itself.
+				assert.Equal(t, time.UTC, got.ExpiresAt.Location())
 				wantQuery := url.Values{"challenge_id": {got.ChallengeID}, "project_id": {"proj_1"}}.Encode()
 				assert.Equal(t, claimConsoleBase+"/claim?"+wantQuery, got.ClaimURL)
 			},

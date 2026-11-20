@@ -44,7 +44,7 @@ describe("Project.secret", () => {
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
       expect(zerr.hint).toContain("zitadel doctor --fix");
-      expect(zerr.nextCommands).toEqual([{ id: "setup" }, { id: "doctor", flags: { fix: true } }]);
+      expect(zerr.nextCommands).toEqual([{ id: "doctor", flags: { fix: true } }]);
     }
   });
 
@@ -92,7 +92,7 @@ describe("Project.secret", () => {
   });
 });
 
-describe("ProjectSecret.write", () => {
+describe("Project.writeSecret", () => {
   async function seed(cwd: string, extra: Record<string, unknown> = {}): Promise<void> {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...VALID_SECRET, ...extra }));
@@ -142,5 +142,13 @@ describe("ProjectSecret.write", () => {
 
     expect(first).toBe(second);
     expect(first.endsWith("\n")).toBe(true);
+  });
+});
+
+describe("ProjectSecret.write", () => {
+  it("creates .zitadel when it is gone", async ({ dir: cwd }) => {
+    await Project.at(cwd).writeSecret(VALID_SECRET);
+
+    expect((await Project.at(cwd).secret()).data).toEqual(VALID_SECRET);
   });
 });
