@@ -898,7 +898,7 @@ describe("ZitadelRuntime.parse", () => {
   });
 
   it("reports a URL with no scheme instead of throwing", () => {
-    expect(ZitadelRuntime.parse("api.zitadel.cloud")).toMatchObject({ ok: false });
+    expect(ZitadelRuntime.parse("preview.zitadel.com")).toMatchObject({ ok: false });
   });
 
   it("reports an empty answer", () => {
@@ -939,14 +939,11 @@ describe("Server.hostUnlessDefault", () => {
 });
 
 describe("Server.isCloud", () => {
-  it.for([ZitadelRuntime.DEFAULT, "https://acme.zitadel.cloud", "https://zitadel.cloud/path"])(
-    "accepts %s",
-    (url) => {
-      expect(ZitadelRuntime.fromUrl(url).isCloud()).toBe(true);
-    },
-  );
+  it.for([ZitadelRuntime.DEFAULT, "https://preview.zitadel.com/path"])("accepts %s", (url) => {
+    expect(ZitadelRuntime.fromUrl(url).isCloud()).toBe(true);
+  });
 
-  it.for(["https://auth.example.com", "http://localhost:8080", "https://evilzitadel.cloud", "x"])(
+  it.for(["https://auth.example.com", "http://localhost:8080", "https://acme.zitadel.com", "x"])(
     "rejects %s",
     (url) => {
       expect(ZitadelRuntime.fromUrl(url).isCloud()).toBe(false);
@@ -975,8 +972,8 @@ describe("Server.consoleUrl", () => {
 describe("Server.kind", () => {
   it("buckets a server without leaking its address", () => {
     expect(ZitadelRuntime.fromUrl("https://preview.zitadel.com").kind).toBe("cloud");
-    expect(ZitadelRuntime.fromUrl("https://api.zitadel.cloud").kind).toBe("cloud");
-    expect(ZitadelRuntime.fromUrl("https://acme.zitadel.cloud").kind).toBe("cloud");
+    expect(ZitadelRuntime.fromUrl("https://preview.zitadel.com").kind).toBe("cloud");
+    expect(ZitadelRuntime.fromUrl("https://acme.zitadel.com").kind).toBe("self_hosted");
     expect(ZitadelRuntime.fromUrl("http://localhost:8080").kind).toBe("local");
     expect(ZitadelRuntime.fromUrl("http://127.0.0.1:8080").kind).toBe("local");
     expect(ZitadelRuntime.fromUrl("http://127.0.0.2:8080").kind).toBe("local");
@@ -987,9 +984,10 @@ describe("Server.kind", () => {
   });
 
   it("does not classify lookalike domains as cloud", () => {
-    expect(ZitadelRuntime.fromUrl("https://foozitadel.cloud").kind).toBe("self_hosted");
-    expect(ZitadelRuntime.fromUrl("https://notzitadel.cloud").kind).toBe("self_hosted");
-    expect(ZitadelRuntime.fromUrl("https://zitadel.cloud").kind).toBe("cloud");
+    expect(ZitadelRuntime.fromUrl("https://foopreview.zitadel.com").kind).toBe("self_hosted");
+    expect(ZitadelRuntime.fromUrl("https://preview.zitadel.com.evil.example").kind).toBe(
+      "self_hosted",
+    );
     expect(ZitadelRuntime.fromUrl("https://notpreview.zitadel.com").kind).toBe("self_hosted");
     expect(ZitadelRuntime.fromUrl("https://zitadel.com").kind).toBe("self_hosted");
   });

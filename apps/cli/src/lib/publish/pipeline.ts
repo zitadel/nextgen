@@ -71,6 +71,13 @@ export type StepContext = {
   readonly store: ConfigStore;
 
   /**
+   * The project-relative files the bundle inlines from outside `.zitadel/`: a
+   * branding descriptor's `$file` templates. What a deploy diffs and what a
+   * dirty tree is judged by, along with the configuration's own directories.
+   */
+  readonly referenced: readonly string[];
+
+  /**
    * The configuration as the release carries it. Its connections sit in
    * `config.connections` order.
    */

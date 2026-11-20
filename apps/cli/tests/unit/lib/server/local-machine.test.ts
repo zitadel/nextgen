@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SystemMachine } from "@/lib/server";
+import { RealMachine } from "@/lib/server";
 
 /** A port probe that holds the ports it is given and remembers every port it was asked about. */
 class HeldPorts {
@@ -26,10 +26,10 @@ class HeldPorts {
   }
 }
 
-describe("SystemMachine", () => {
+describe("RealMachine", () => {
   describe("a free port in place of a taken one", () => {
     it("is the first free one after it", async () => {
-      const machine = new SystemMachine(new HeldPorts((port) => port !== 3003));
+      const machine = new RealMachine(new HeldPorts((port) => port !== 3003));
 
       await expect(machine.nextFreePort(3000)).resolves.toBe(3003);
     });
@@ -37,14 +37,14 @@ describe("SystemMachine", () => {
     it("is none when the next 20 are taken too", async () => {
       const ports = new HeldPorts(() => true);
 
-      await expect(new SystemMachine(ports).nextFreePort(3000)).resolves.toBeUndefined();
+      await expect(new RealMachine(ports).nextFreePort(3000)).resolves.toBeUndefined();
       expect(ports.asked).toHaveLength(20);
     });
 
     it("never looks past the last port", async () => {
       const ports = new HeldPorts(() => true);
 
-      await expect(new SystemMachine(ports).nextFreePort(65_530)).resolves.toBeUndefined();
+      await expect(new RealMachine(ports).nextFreePort(65_530)).resolves.toBeUndefined();
       expect(ports.asked.at(-1)).toBe(65_535);
     });
   });

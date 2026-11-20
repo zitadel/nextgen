@@ -40,8 +40,6 @@ func (s idpIdentityLinkStatements) CreateIDPIdentityLink(ctx context.Context, li
 	).Scan(&link.CreatedAt); err != nil {
 		return wrapError(err)
 	}
-	// pgx scans timestamptz in Local; reads normalize to UTC.
-	link.CreatedAt = link.CreatedAt.UTC()
 	return nil
 }
 
@@ -101,7 +99,6 @@ func scanIDPIdentityLink(row pgx.CollectableRow) (*domain.IDPIdentityLink, error
 	); err != nil {
 		return nil, err
 	}
-	link.CreatedAt = link.CreatedAt.UTC()
 	return link, nil
 }
 

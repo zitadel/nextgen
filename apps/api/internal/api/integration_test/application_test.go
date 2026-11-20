@@ -128,6 +128,25 @@ func TestApplicationAccess(t *testing.T) {
 		assert.Equal(t, api.ErrorCode(domain.ErrApplicationPermissionDenied().Code), denied.(*api.PublishApplicationForbidden).Code)
 	})
 
+	// The Console holds only its session cookie: the grant on the project is
+	// what admits it, and a session without one learns nothing.
+	t.Run("a signed-in project admin reads with their session", func(t *testing.T) {
+		adminID, _ := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+		harness.SeedProjectAdmin(t, owner.project.ID, adminID)
+		admin := applicationFixture{project: owner.project, client: sessionClientForUser(t, adminID)}
+
+		resp := admin.get(t, app.ID)
+		require.IsType(t, &api.ApplicationResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, app.ID, resp.(*api.ApplicationResponse).ID)
+	})
+
+	t.Run("a session without access to the project gets 404", func(t *testing.T) {
+		strangerID, _ := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+		stranger := applicationFixture{project: owner.project, client: sessionClientForUser(t, strangerID)}
+
+		assertAuthzError(t, stranger.get(t, app.ID), domain.ErrApplicationNotFound().Code)
+	})
+
 	t.Run("unauthenticated calls are rejected", func(t *testing.T) {
 		anonymous, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)

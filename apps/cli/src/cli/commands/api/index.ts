@@ -10,6 +10,7 @@ import {
   Operation,
   OperationService,
   type Target,
+  UnauthorizedError,
   type ZitadelClient,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
@@ -31,6 +32,7 @@ import { json, prose, type Rendering } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -220,7 +222,7 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Destructive(EnvironmentCommand) {
+export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override group = CommandGroups.apiAndEvents;
@@ -229,6 +231,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
     "<%= config.bin %> api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
+    "<%= config.bin %> api updateUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W -F attributes.age=1",
     "<%= config.bin %> api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json",
     "<%= config.bin %> api listEvents -F category=auth --paginate --json",
     "<%= config.bin %> api createTeam -F name=Support --dry-run",
@@ -409,9 +412,20 @@ export default class Api extends Destructive(EnvironmentCommand) {
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
-    const response = flags.paginate
-      ? await operationService.callAll(request)
-      : await operationService.call(request);
+    const response = await (flags.paginate
+      ? operationService.callAll(request)
+      : operationService.call(request)
+    ).catch((error: unknown) => {
+      if (error instanceof UnauthorizedError && operation.auth === "secret") {
+        throw new ZitadelError("E_AUTH", error.message, {
+          hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
+          details: {
+            server,
+          },
+        });
+      }
+      throw error;
+    });
 
     const answer = this.answered(operation.id, response);
 

@@ -8,6 +8,7 @@ import { BaseCommand } from "@/lib/oclif/base";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { printing, stripAnsi } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/fixtures/terminal";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {
@@ -50,10 +51,7 @@ class FailingCommand extends BaseCommand {
       return;
     }
     this.prepared = true;
-    await this.toMeta(
-      { "no-telemetry": true, ...this.flags },
-      { resolveServer: false, source: "mock" },
-    );
+    await this.toMeta({ "no-telemetry": true, ...this.flags }, { source: "mock" });
   }
 
   public async fail(error: Error): Promise<void> {
@@ -68,7 +66,7 @@ class FailingCommand extends BaseCommand {
 }
 
 /** The same, failing as a flag does while it parses: before any context was settled. */
-class FailingWhileParsing extends FailingCommand {
+class FailingWhileParsing extends ServerCommand(FailingCommand) {
   public async failParsing(error: Error): Promise<void> {
     try {
       await this.catch(error);

@@ -28,7 +28,7 @@ beforeEach(({ onTestFinished }) => {
 /**
  * The cloud platform the mock answers for.
  */
-const CLOUD = "https://api.zitadel.cloud";
+const CLOUD = "https://preview.zitadel.com";
 
 /**
  * The origin the app moves to.
@@ -180,7 +180,7 @@ describe("MoveAppPort", () => {
       });
 
       expect(asked).toEqual([
-        `Remove http://localhost:3000, the app's previous origin, from project ${project_id} on api.zitadel.cloud, now that http://localhost:3101 replaces it?`,
+        `Remove http://localhost:3000, the app's previous origin, from project ${project_id} on preview.zitadel.com, now that http://localhost:3101 replaces it?`,
       ]);
     });
   });

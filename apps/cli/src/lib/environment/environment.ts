@@ -1,3 +1,4 @@
+import { SERVER } from "@/constants";
 import { readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -347,7 +348,7 @@ export class Environment {
         "E_VALIDATION",
         `ZITADEL_URL from ${source} is not a valid server: ${value}`,
         {
-          hint: `Fix or remove ZITADEL_URL in ${source}; it must be a URL such as https://api.zitadel.cloud.`,
+          hint: `Fix or remove ZITADEL_URL in ${source}; it must be a URL such as ${SERVER}.`,
           ...(error instanceof Error ? { details: { cause: error.message } } : {}),
         },
       );

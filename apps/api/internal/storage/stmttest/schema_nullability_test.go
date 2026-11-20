@@ -18,6 +18,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/idpidentitylink"
 	"github.com/zitadel/nextgen/internal/storage/invitation"
+	"github.com/zitadel/nextgen/internal/storage/oauthsettings"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/preview"
 	"github.com/zitadel/nextgen/internal/storage/release"
@@ -41,6 +42,19 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "expires_at"})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "payload"})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "public"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "project_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "client_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "redirect_uri"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "state"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "scopes"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "code_challenge"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "issuer"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "deployment_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "release_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "binding_hash"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "created_at"})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "expires_at"})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "project_id"})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "flow_id"})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "window_start"})
@@ -54,6 +68,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("user_totp", usertotp.Schema)...)
 	cols = append(cols, schematest.Columns("team_memberships", teammembership.Schema)...)
 	cols = append(cols, schematest.Columns("branding", branding.Schema)...)
+	cols = append(cols, schematest.Columns("oauth_settings", oauthsettings.Schema)...)
 	cols = append(cols, schematest.Columns("releases", release.Schema)...)
 	cols = append(cols, schematest.Columns("invitations", invitation.Schema)...)
 	cols = append(cols, schematest.Columns("variables", variable.Schema)...)

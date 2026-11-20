@@ -16,10 +16,8 @@ import { cn } from "@/lib/utils";
  * The dot's colour is the status's tone (`statusTone`), never a colour chosen
  * per status: see "Status tones" in `docs/styling.md` for what each tone means.
  *
- * The label is the API's own value, title-cased (`statusLabel`). The Teams mock writes the
- * second state as `Inactive`, but the endpoint returns `deactivated` and the
- * team detail reads the same field — showing two words for one state would be
- * the console inventing vocabulary the API does not have.
+ * The label is the API's own value, title-cased (`statusLabel`), unless the
+ * resource names the state in its own word (`label`).
  */
 
 /**
@@ -100,7 +98,7 @@ export function statusOptions(statuses: readonly string[]): FilterOption[] {
   }));
 }
 
-export function StatusBadge({ status }: { status?: string }) {
+export function StatusBadge({ status, label }: { status?: string; label?: string }) {
   // A record the server has not stamped simply has no status, and an em dash is
   // honest where a pill would imply a state we do not know.
   if (!status) return <span className="text-muted-foreground">—</span>;
@@ -108,7 +106,7 @@ export function StatusBadge({ status }: { status?: string }) {
   return (
     <Badge variant="secondary">
       <StatusDot status={status} />
-      {statusLabel(status)}
+      {label ?? statusLabel(status)}
     </Badge>
   );
 }
