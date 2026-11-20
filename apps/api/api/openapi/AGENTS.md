@@ -21,7 +21,8 @@ bundling, the ogen `oneOf`-null workaround and pagination how-tos are in
   a pinned container (Docker required). The rules and their options are in
   [`vacuum-ruleset.yaml`](vacuum-ruleset.yaml). The findings that exist today are
   in [`vacuum-baseline.json`](vacuum-baseline.json), which may only shrink: fix a
-  finding, then delete its line (`UPDATE_LINT_BASELINE=1` rewrites the file).
+  finding, then delete its line (`UPDATE_LINT_BASELINE=1` deletes the fixed lines
+  and never adds one).
   Suppress one location in [`vacuum-ignore.yaml`](vacuum-ignore.yaml), never a
   whole rule.
 
