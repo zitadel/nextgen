@@ -35,6 +35,11 @@ export const GENERATED_GLOBS = [
   // The public Go client (go.zitadel.com/zitadel/v5/api), ogen output of
   // apps/api/api/.ogen-client.yaml, beside the package's hand-written files.
   "packages/go/api/*_gen.go",
+  // The Go login SDK: templ output beside each view/*.templ, and what
+  // scripts/generate-go-login-assets.ts exports from the rest of the repo:
+  // the components package's TS catalogs as JSON.
+  "packages/go/login/view/*_templ.go",
+  "packages/go/login/locales/*.json",
 ];
 
 /**
