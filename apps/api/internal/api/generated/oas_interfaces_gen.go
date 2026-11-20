@@ -41,6 +41,10 @@ type AuthFactorPasswordSetRes interface {
 	authFactorPasswordSetRes()
 }
 
+type AuthRequestCreatedRes interface {
+	authRequestCreatedRes()
+}
+
 type AuthSsoAuthorizationFailedRes interface {
 	authSsoAuthorizationFailedRes()
 }
@@ -431,6 +435,10 @@ type ListVariablesRes interface {
 
 type LookupInvitationRes interface {
 	lookupInvitationRes()
+}
+
+type OauthSettingsCreatedRes interface {
+	oauthSettingsCreatedRes()
 }
 
 type OriginAddedRes interface {

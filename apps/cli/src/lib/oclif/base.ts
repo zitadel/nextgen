@@ -6,7 +6,7 @@ import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { byName, type ByName } from "@/lib/names";
-import { nonBlankString, serverFlag } from "./flags";
+import { nonBlankString } from "./flags";
 import { Interruptible } from "./interruptible";
 import { log, style, warnings } from "@/lib/ui";
 
@@ -105,7 +105,6 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
 
 /** How a command resolves the context it runs in; see {@link BaseCommand.meta}. */
 export type MetaOptions = {
-  resolveServer?: boolean;
   source?: string;
   environment?: boolean;
 };
@@ -179,10 +178,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
-    server: serverFlag({
-      char: "s",
-      description: "Override the resolved server URL.",
-    }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -611,12 +606,33 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
+   * Send a product event the catalog lists for the CLI, with the header and
+   * context every CLI event carries. Only for an event an ADR names; a
+   * command's own facts are dimensions ({@link recordTelemetry}).
+   */
+  protected trackEvent(event: string, properties: Properties): void {
+    if (!this.telemetry?.enabled) {
+      return;
+    }
+    this.telemetry.track(
+      event,
+      commandEventProperties(
+        this.meta,
+        ZitadelRuntime.fromUrl(this.meta.source).kind,
+        this.telemetryInvocationId,
+        properties,
+      ),
+    );
+  }
+
+  /**
    * Builds {@link GlobalOptions} from parsed flags and stores the result on
    * `this.meta` so the error handler can render a complete envelope. The server
-   * `source` is `--server` or the cloud default, which is `setup`'s rule; a
-   * command that takes its server from the environment extends
-   * `EnvironmentCommand`, and one that never talks to a server passes
-   * `resolveServer: false`. The flags are read as code reads them, whether
+   * `source` is what the command's {@link sourceOf} names, or else what
+   * {@link resolveServer} makes of `--server`: nothing for a command that takes
+   * no server, the flag or the cloud default for one that does (`ServerCommand`),
+   * and the environment's for one that reads it (`EnvironmentCommand`). The
+   * flags are read as code reads them, whether
    * they arrive from {@link admit} or straight from `parse`.
    */
   protected async toMeta(
@@ -629,9 +645,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
       cwd: flags.cwd,
       env: flags.env,
       envFile: flags.envFile,
-      server: flags.server,
+      server: this.serverFlagOf(flags),
     });
-    const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
+    const serverFlag = this.serverFlagOf(flags);
     const source = await this.serverOf(cwd, serverFlag, options);
     const json = this.jsonEnabled();
     const isTTY = isTerminal();
@@ -691,17 +707,64 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   /**
    * The server a run is about, as {@link toMeta} and a failure that came before
-   * it both state it: `--server` or the cloud default, the one a command's own
-   * `source` names, or nothing for a command that never talks to a server.
+   * it both state it: the one a command's own `source` names, or else what
+   * {@link resolveServer} makes of `--server`.
    */
   private async serverOf(
     cwd: string,
     serverFlag: string | undefined,
     options: MetaOptions,
   ): Promise<{ value: string }> {
-    return options.resolveServer === false
-      ? { value: options.source ?? "" }
-      : await ZitadelRuntime.resolve({ cwd, serverFlag });
+    if (options.source === undefined) {
+      return { value: await this.resolveServer(cwd, serverFlag) };
+    } else {
+      return { value: options.source };
+    }
+  }
+
+  /**
+   * The server of a run whose command names none of its own: nothing, for a
+   * command that takes no server. A command that takes one resolves `--server`
+   * here (`ServerCommand`).
+   *
+   * @param _cwd - The directory the run addresses.
+   * @param _serverFlag - What `--server` was given, if it was.
+   * @returns The run's server.
+   */
+  protected async resolveServer(_cwd: string, _serverFlag: string | undefined): Promise<string> {
+    return "";
+  }
+
+  /**
+   * What `--server` was given as, read from the parsed flags: a command that
+   * takes the flag says (`ServerCommand`), and one that does not has none.
+   *
+   * @param flags - The parsed flags, by name.
+   * @returns The flag as it was typed, if it was.
+   */
+  protected serverFlagOf(_flags: Record<string, unknown>): string | undefined {
+    return undefined;
+  }
+
+  /**
+   * What `--server` was given as on the command line, for a failure that came
+   * before the flags were parsed.
+   *
+   * @returns The flag as it was typed, if it was.
+   */
+  protected serverFlagFromArgv(): string | undefined {
+    return undefined;
+  }
+
+  /**
+   * What an option has on the command line, as `--name value` or `--name=value`,
+   * for a command that reads one of its own flags before any is parsed.
+   *
+   * @param names - The spellings of the option.
+   * @returns The value, if it was typed.
+   */
+  protected argvFlag(...names: string[]): string | undefined {
+    return argvValue(this.argv, ...names);
   }
 
   /**
@@ -713,7 +776,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   private async metaFromArgv(meta: GlobalOptions): Promise<GlobalOptions> {
     const typed = argvValue(this.argv, "--cwd", "-c");
-    const serverFlag = argvValue(this.argv, "--server");
+    const serverFlag = this.serverFlagFromArgv();
     this.typedScope = typedScopeOf({
       cwd: typed,
       env: argvValue(this.argv, "--env", "-e"),

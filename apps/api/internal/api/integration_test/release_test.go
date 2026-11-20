@@ -17,6 +17,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -67,6 +68,20 @@ func publishBranding(t *testing.T, client *helpers.ApiClient, projectID, templat
 	require.NoError(t, err)
 	require.IsType(t, &api.BrandingRevisionResponse{}, resp, helpers.MustMarshal(t, resp))
 	return resp.(*api.BrandingRevisionResponse).ID
+}
+
+// oauthRevision stores an OAuth settings revision of projectID the only way
+// one is written, by building a release, and returns its id.
+func oauthRevision(t *testing.T, projectID string, enabled bool) string {
+	t.Helper()
+	built, err := harness.EnsureReleaseService(t).Build(t.Context(), service.BuildReleaseInput{
+		ProjectID: projectID,
+		OAuth:     &service.CreateOAuthSettingsInput{ProjectID: projectID, Enabled: enabled},
+	})
+	require.NoError(t, err)
+	pin, ok := built.Release.Pins(domain.ReleasePointerKindOauth)[domain.ReleaseOAuthHandle]
+	require.True(t, ok, "the build pins the OAuth settings")
+	return pin.RevisionID
 }
 
 func (f releaseFixture) pointers() []api.CreateReleasePointer {
@@ -213,6 +228,52 @@ func TestCreateRelease(t *testing.T) {
 		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, code)
+	})
+
+	// OAuth settings have no endpoint of their own, so pinning an existing
+	// revision is how a release reuses one; it is a singleton like branding.
+	t.Run("pinning OAuth settings", func(t *testing.T) {
+		on := oauthRevision(t, fixture.project, true)
+
+		// With branding, so the set is new: the build already made a release of
+		// the OAuth settings alone.
+		resp := fixture.create(t, &api.CreateReleaseRequest{
+			Pointers: []api.CreateReleasePointer{
+				{Kind: api.ReleasePointerKindOAuth, RevisionID: on},
+				{Kind: api.ReleasePointerKindBranding, RevisionID: fixture.brandingID},
+			},
+		})
+		require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, []api.ReleasePointer{
+			{Kind: api.ReleasePointerKindBranding, Handle: "default", RevisionID: fixture.brandingID},
+			{Kind: api.ReleasePointerKindOAuth, Handle: domain.ReleaseOAuthHandle, RevisionID: on},
+		}, resp.(*api.CreateReleaseCreated).Pointers)
+
+		t.Run("twice is rejected", func(t *testing.T) {
+			resp := fixture.create(t, &api.CreateReleaseRequest{
+				Pointers: []api.CreateReleasePointer{
+					{Kind: api.ReleasePointerKindOAuth, RevisionID: on},
+					{Kind: api.ReleasePointerKindOAuth, RevisionID: oauthRevision(t, fixture.project, false)},
+				},
+			})
+			status, code, _, ok := errorResponseParts(t, resp)
+			require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, code)
+		})
+
+		t.Run("another project's revision is not found", func(t *testing.T) {
+			other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+			require.NoError(t, err)
+
+			resp := fixture.create(t, &api.CreateReleaseRequest{
+				Pointers: []api.CreateReleasePointer{{Kind: api.ReleasePointerKindOAuth, RevisionID: oauthRevision(t, other.ID, true)}},
+			})
+			status, code, _, ok := errorResponseParts(t, resp)
+			require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, domain.ErrReleaseRevisionNotFound(nil).Code, code)
+		})
 	})
 
 	// Both size bounds are sent raw rather than through the generated client,

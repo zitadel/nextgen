@@ -27,7 +27,7 @@ type ReadInput = OperationInput<
  * headed by whatever identifies it; a pipe (and `--json`) gets the object
  * itself, because a script wants the record rather than a view of it.
  */
-export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadInput> {
+export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadInput> {
   static describe<Ctx>({
     topic,
     resource,
