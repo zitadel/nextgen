@@ -77,6 +77,7 @@ const (
 	ListPoliciesOperation                    OperationName = "ListPolicies"
 	ListPolicyRevisionsOperation             OperationName = "ListPolicyRevisions"
 	ListProjectAdminsOperation               OperationName = "ListProjectAdmins"
+	ListProjectMembersOperation              OperationName = "ListProjectMembers"
 	ListProjectPreviewsOperation             OperationName = "ListProjectPreviews"
 	ListReleasesOperation                    OperationName = "ListReleases"
 	ListSchemasOperation                     OperationName = "ListSchemas"

@@ -115,6 +115,8 @@ var reasonOnlyOperations = map[string]reasonOnly{
 
 	"PublishApplication": {classNotImplemented, "answers 501"},
 	"GetApplication":     {classNotImplemented, "answers 501"},
+	// Spec PR stub; the stacked impl moves this into gateRows (#2854).
+	"ListProjectMembers": {classNotImplemented, "answers 501"},
 }
 
 // ungatedClasses maps each ungated operation to the classes it is listed in.
