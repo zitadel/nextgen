@@ -1,6 +1,5 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "@/lib/public-cli";
 import { configCandidates } from "@/lib/orca/patchers/rule/config-paths";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
@@ -85,12 +84,12 @@ export class SolidStartPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }

@@ -19,7 +19,7 @@ import type {
  * nothing here writes.
  *
  * Orval names the same object once per operation; these alias the query's
- * names and let structural typing carry `GET /idps/{id}`'s.
+ * names and let structural typing carry `GET /idps/{idp_id}`'s.
  */
 
 /** One connection, at its newest revision. */

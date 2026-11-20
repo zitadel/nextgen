@@ -1,11 +1,14 @@
-import type { ListPreviews200PreviewsItem } from "@zitadel/api/generated/model";
+import type { ListProjectPreviews200PreviewsItem } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 
+/** The most previews the API returns in one page, so a search takes the fewest requests. */
+const PAGE_SIZE = 100;
+
 /** A live preview, as the list of them returns it. */
-export type LivePreview = ListPreviews200PreviewsItem;
+export type LivePreview = ListProjectPreviews200PreviewsItem;
 
 /** What pages a list of previews. */
 export type PreviewPageQuery = Readonly<{
@@ -43,7 +46,40 @@ export class PreviewService extends ApiService {
    * @returns The previews that are still being served.
    */
   async list(): Promise<readonly LivePreview[]> {
-    return this.client.listPreviews.all(this.projectId);
+    return this.client.listProjectPreviews.all(this.projectId);
+  }
+
+  /**
+   * Read when some previews expire, without reading more of the list than it
+   * takes. The API cannot filter previews by origin, so this walks the pages
+   * and stops at the first one that completes the answer. An origin with no
+   * live preview never completes it, so asking for one reads every page.
+   *
+   * @param origins - The preview origins to look for.
+   * @returns The expiry of each origin that still has a live preview, by
+   *   origin. An origin with no live preview is absent. No request is made
+   *   for an empty set.
+   */
+  async expiries(origins: ReadonlySet<string>): Promise<ReadonlyMap<string, string>> {
+    const found = new Map<string, string>();
+    if (origins.size === 0) {
+      return found;
+    }
+    const paging = new Paging(pagedFunctions.listProjectPreviews);
+    const pages = this.client.listProjectPreviews.pages(this.projectId, {
+      limit: PAGE_SIZE,
+    });
+    for await (const page of pages) {
+      for (const preview of paging.items(page)) {
+        if (origins.has(preview.origin)) {
+          found.set(preview.origin, preview.expires_at);
+        }
+      }
+      if (found.size === origins.size) {
+        break;
+      }
+    }
+    return found;
   }
 
   /**
@@ -54,8 +90,8 @@ export class PreviewService extends ApiService {
    * @returns The items read, and the cursor to the next page when one remains.
    */
   async page(query: PreviewPageQuery = {}, options: PageOptions = {}): Promise<Page<LivePreview>> {
-    const paging = new Paging(pagedFunctions.listPreviews);
-    const pages = this.client.listPreviews.pages(this.projectId, query);
+    const paging = new Paging(pagedFunctions.listProjectPreviews);
+    const pages = this.client.listProjectPreviews.pages(this.projectId, query);
     const collected = await paging.collect(pages, {
       all: options.all === true,
     });
@@ -71,7 +107,7 @@ export class PreviewService extends ApiService {
    * @param origin - The preview origin to stop serving.
    */
   async remove(origin: string): Promise<void> {
-    await this.client.removePreview(this.projectId, {
+    await this.client.removeProjectPreview(this.projectId, {
       origin,
     });
   }

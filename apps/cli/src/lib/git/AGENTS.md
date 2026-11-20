@@ -45,8 +45,9 @@ The reason for each rule is in the doc of the class named.
 - Refuse to commit while an operation is under way or HEAD is detached
   (`NoOperationUnderWay`, `HeadIsOnABranch`); ask before any work starts
   (`Repository.readyToCommit`).
-- Leave secrets out of a commit in any case (`isSecretPath`); exempt only
-  `.zitadel/local/` as written from setup's clean-tree check (`isLocalRuntimePath`).
+- Leave secrets out of a commit in any case (the caller passes `Project.isSecret` as
+  `except`); exempt only `.zitadel/local/` as written from setup's clean-tree check
+  (`Project.isLocalRuntime`).
 
 ## Docs and code
 

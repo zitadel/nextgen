@@ -35,7 +35,7 @@ class EnvelopeCommand extends BaseCommand {
   }
 
   public async finish(result: CommandResult): Promise<JsonEnvelope> {
-    await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
+    await this.toMeta({ "no-telemetry": true }, { source: "mock" });
     return this.emit(result);
   }
 }

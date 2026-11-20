@@ -4,16 +4,26 @@ import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Agent, type Dispatcher } from "undici";
 
-import { log } from "@/lib/log";
-import { userAgent } from "@/lib/user-agent";
-import type { JsonObject } from "@/lib/zitadel";
+import { log } from "@/lib/ui/log";
+import { Runtime } from "@/lib/runtime";
+import { isJsonObject, type JsonObject, type JsonValue } from "@/lib/zitadel";
 
 /**
  * Branding descriptor fields whose value is a URL the login page fetches as
- * an image. Both are optional and both fail the same invisible way when the
- * URL is well-formed but dead.
+ * an image, each as its dotted path. All are optional and all fail the same
+ * invisible way when the URL is well-formed but dead.
+ *
+ * @remarks
+ * The top-level `logo_url` is the fallback; `theme.light.logo_url` and
+ * `theme.dark.logo_url` are what each theme renders. `typography.font_url` is a
+ * stylesheet, not an image, so this probe does not check it.
  */
-const ASSET_FIELDS = ["logo_url", "hero_url"] as const;
+const ASSET_FIELDS = [
+  "logo_url",
+  "hero_url",
+  "theme.light.logo_url",
+  "theme.dark.logo_url",
+] as const;
 
 /**
  * One branding descriptor field that names an image.
@@ -419,7 +429,7 @@ async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse>
   // The global fetch takes undici's dispatcher, which its own type leaves out.
   const init: RequestInit & { readonly dispatcher: Dispatcher } = {
     method: "HEAD",
-    headers: { "user-agent": userAgent() },
+    headers: { "user-agent": Runtime.current().userAgent() },
     redirect: "manual",
     signal,
     dispatcher,
@@ -498,14 +508,20 @@ function describeVerdict(asset: AssetUrl, verdict: AssetProbeVerdict): string | 
 }
 
 /**
- * The `logo_url` / `hero_url` values a descriptor actually sets.
+ * The asset URLs a descriptor actually sets, top-level and per theme.
  *
  * @param body - A branding descriptor's wire body.
- * @returns Each field that holds a non-empty string, with its URL.
+ * @returns Each field that holds a non-empty string, named by its dotted path,
+ *   with its URL.
  */
 function assetUrlsOf(body: JsonObject): readonly AssetUrl[] {
   return ASSET_FIELDS.flatMap((field) => {
-    const value = body[field];
+    const value = field.split(".").reduce<JsonValue | undefined>((node, key) => {
+      if (!isJsonObject(node)) {
+        return undefined;
+      }
+      return node[key];
+    }, body);
     if (typeof value !== "string" || value === "") {
       return [];
     }

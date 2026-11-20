@@ -7,8 +7,9 @@ import type { Summary } from "@/lib/ui";
 
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
-import { painted, type Rendering, rows } from "./rendering";
+import { painted, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
+import type { CommandClass } from "./command-class";
 
 /**
  * The flags a paged list declares, which the command for its next page sets:
@@ -20,10 +21,6 @@ type PagingFlags = Readonly<{
   "page-token": Interfaces.OptionFlag<string | undefined>;
   all: Interfaces.BooleanFlag<boolean>;
 }>;
-
-/** A class that can be extended, abstract or not, whatever arguments it takes. */
-// biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
-type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 
 /** What a command draws a table with: its own `tabulate`, for code that formats around the table. */
 export type Tabulate = (columns: readonly string[], items: readonly unknown[]) => Promise<string>;
@@ -251,16 +248,15 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
             })),
         ...more,
       ];
-      let rendered: { pretty?: Rendering } = {};
-      if (plain) {
-        rendered = { pretty: rows(await this.renderList(plain, view)) };
-      } else if (this.jsonEnabled()) {
-        rendered = { pretty: painted(await this.renderList(plain, view)) };
-      }
+      const pretty = plain
+        ? rows(await this.renderList(plain, view))
+        : this.jsonEnabled()
+          ? painted(await this.renderList(plain, view))
+          : undefined;
       return {
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
-        ...rendered,
+        ...(pretty === undefined ? {} : { pretty }),
         ...(plain && !this.jsonEnabled() && aside.length > 0 ? { footer: aside.join("\n") } : {}),
         summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),

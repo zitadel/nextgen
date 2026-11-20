@@ -14,14 +14,18 @@ The detector requires `@qwik.dev/core` at `2.0.0-beta.45` or newer; older versio
 - `.env.example`, `.env.local` — `VITE_ZITADEL_PROJECT_ID` (client-exposed), plus
   the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`,
-  `ZITADEL_ENVIRONMENT`) — the dev proxy reads `ZITADEL_PROJECT_SECRET`
+  `ZITADEL_ENVIRONMENT`) — the dev proxy reads `ZITADEL_URL` and
+  `ZITADEL_PROJECT_SECRET`
 - `package.json` — adds `@zitadel/sdk-qwik`
 
 ## How the proxy works
 
 The SDK widgets call `/__nextgen/*` same-origin. In dev, the Vite proxy forwards
-those to the backend and attaches the project service-key secret (read from
-`ZITADEL_PROJECT_SECRET`) only to `POST /sessions/exchange`. It keeps the app's
+those to the backend at `ZITADEL_URL` and attaches the project service-key secret
+(`ZITADEL_PROJECT_SECRET`) only to `POST /sessions/exchange`. It reads both with
+Vite's `loadEnv`: the process environment first, then `.env.development.local`,
+`.env.development`, `.env.local` and `.env`. Without `ZITADEL_URL` it reaches the
+address setup ran against, which `vite.config.*` carries as the fallback. It keeps the app's
 session in a cookie named after its project (`ZITADEL_PROJECT_ID`), so the app
 and the Console of a local server don't sign each other out on `localhost`
 (`docs/adrs/073-session-cookie-per-project.md`,

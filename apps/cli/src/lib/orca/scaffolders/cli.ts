@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { execaSync } from "execa";
 
 import { ZitadelError } from "@/lib/errors";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 
 import {
   describeAcceptedNode,
@@ -114,7 +114,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     if (support === "warned") {
       const reason =
         engines.enforcement === "refuse" ? ", as odd-numbered Node versions never reach LTS" : "";
-      reportWarning(
+      warnings.report(
         `${engines.label} supports Node ${range}; it runs on Node v${this.nodeVersion} with a warning${reason}`,
       );
     }

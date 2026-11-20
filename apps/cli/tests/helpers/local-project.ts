@@ -38,7 +38,7 @@ export type ProjectFiles = Readonly<{
  * server, by project-relative path.
  */
 const LINK_FILES: Readonly<Record<string, string>> = {
-  ".env.local": "ZITADEL_URL=https://api.zitadel.cloud\nZITADEL_ISSUER=http://localhost:3000\n",
+  ".env.local": "ZITADEL_URL=https://preview.zitadel.com\nZITADEL_ISSUER=http://localhost:3000\n",
   ".zitadel/secret": `${JSON.stringify({
     project_id: "proj_01TEST",
     project_secret: "s",

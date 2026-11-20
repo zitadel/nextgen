@@ -5,19 +5,20 @@ import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import { CREDENTIALS } from "@/lib/oclif/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/lib/oclif/environment-command";
 import type { ConnectOptions } from "@/lib/oclif/types";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 /** Connects with the project secret, the default credential. */
-class ProjectProbe extends EnvironmentCommand {
+class ProjectProbe extends ServerCommand(EnvironmentCommand) {
   protected async execute(): Promise<never> {
     throw new Error("unused");
   }
@@ -30,7 +31,7 @@ class ProjectProbe extends EnvironmentCommand {
 }
 
 /** Connects with the options it is given, as a best-effort probe does. */
-class OptionedProbe extends EnvironmentCommand {
+class OptionedProbe extends ServerCommand(EnvironmentCommand) {
   protected async execute(): Promise<never> {
     throw new Error("unused");
   }
@@ -43,7 +44,7 @@ class OptionedProbe extends EnvironmentCommand {
 }
 
 /** Connects more than once, as a command that probes before it works does. */
-class RepeatedProbe extends EnvironmentCommand {
+class RepeatedProbe extends ServerCommand(EnvironmentCommand) {
   protected async execute(): Promise<never> {
     throw new Error("unused");
   }
@@ -60,7 +61,7 @@ class RepeatedProbe extends EnvironmentCommand {
 }
 
 /** Declares the preview token instead, as `zitadel preview` will. */
-class PreviewProbe extends EnvironmentCommand {
+class PreviewProbe extends ServerCommand(EnvironmentCommand) {
   static override credential = "preview" as const;
 
   protected async execute(): Promise<never> {
@@ -75,7 +76,7 @@ class PreviewProbe extends EnvironmentCommand {
 }
 
 /** A real preview command's base, connecting as `preview list` does. */
-class PreviewCommandProbe extends PreviewCommand {
+class PreviewCommandProbe extends ServerCommand(PreviewCommand) {
   protected async execute(): Promise<never> {
     throw new Error("unused");
   }
@@ -88,7 +89,7 @@ class PreviewCommandProbe extends PreviewCommand {
 }
 
 /** Exposes the scope the base class derives from the resolution. */
-class SelectorProbe extends EnvironmentCommand {
+class SelectorProbe extends ServerCommand(EnvironmentCommand) {
   protected async execute(): Promise<never> {
     throw new Error("unused");
   }
@@ -101,7 +102,7 @@ class SelectorProbe extends EnvironmentCommand {
 }
 
 /** A command that edits files only, so it resolves no environment. */
-class FilesOnlyProbe extends EnvironmentCommand {
+class FilesOnlyProbe extends ServerCommand(EnvironmentCommand) {
   protected async execute(): Promise<never> {
     throw new Error("unused");
   }

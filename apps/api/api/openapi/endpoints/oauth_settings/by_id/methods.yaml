@@ -1,10 +1,10 @@
 get:
-  operationId: getOAuthSettingsById
+  operationId: getOAuthSettings
   summary: Get an OAuth settings revision by ID
   description: |
     Returns one OAuth settings revision, including its stored settings. Pass
     the `revision_id` of the `kind: oauth` pointer on a release, which
-    `buildRelease` (`POST /releases/build`) and `getReleaseById`
+    `buildRelease` (`POST /releases/build`) and `getRelease`
     (`GET /releases/{release_id}`) return.
 
     A release is the only writer of OAuth settings, so there is no operation
@@ -32,4 +32,4 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: getOAuthSettingsById-error-response.yaml
+      $ref: getOAuthSettings-error-response.yaml

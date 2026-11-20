@@ -45,12 +45,14 @@ type AllStatements interface {
 	TokenStatements
 	SessionStatements
 	AuthAttemptStatements
+	AuthRequestStatements
 	UserStatements
 	UserPasswordStatements
 	UserTOTPStatements
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	OAuthSettingsStatements
 	VariableStatements
 	VariableSetStatements
 	ClaimStatements
@@ -382,7 +384,7 @@ type DeploymentStatements interface {
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
 	// ListDeployments lists deployments with every origin they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
-	// ListLiveDeployments lists, with deployment.LiveListOptions, the
+	// ListLiveDeployments lists, with deployment.ListOptions, the
 	// deployments some origin serves at now, each narrowed to those origins.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
@@ -744,6 +746,15 @@ type BrandingStatements interface {
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
 }
 
+// OAuthSettingsStatements persist the immutable OAuth settings revisions a
+// release pins. Revisions are create-only, like branding.
+type OAuthSettingsStatements interface {
+	Statements
+	CreateOAuthSettings(ctx context.Context, entity *domain.OAuthSettings) error
+	GetOAuthSettingsByID(ctx context.Context, projectID, id string) (*domain.OAuthSettings, error)
+	ListOAuthSettings(ctx context.Context, filter *database.ListOptions[domain.OAuthSettingsField]) (*database.ListResult[*domain.OAuthSettings], error)
+}
+
 // TODO(IAM-marco): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type ClaimPool interface {
 // 	Statementer[ClaimStatements]
@@ -802,6 +813,18 @@ type VariableSetStatements interface {
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 }
 
+// AuthRequestStatements persists the authorization requests the endpoint
+// hands to the login (ADR 081 §8). Rows are never updated.
+type AuthRequestStatements interface {
+	Statements
+	// CreateAuthRequest inserts request, generates its id when empty, and sets
+	// created_at.
+	CreateAuthRequest(ctx context.Context, request *domain.AuthRequest) error
+	// GetAuthRequest returns the request, expired or not, or a
+	// [database.NoRowFoundError].
+	GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error)
+}
+
 // InvitationStatements persists invitations (ADR 086). A pending invitation
 // past its expires_at reads as expired, so the guarded writes take now.
 type InvitationStatements interface {
@@ -817,16 +840,16 @@ type InvitationStatements interface {
 	// project, status and type filters.
 	ListInvitations(ctx context.Context, filter *database.ListOptions[domain.InvitationField]) (*database.ListResult[*domain.Invitation], error)
 	// ChangeInvitationStatus moves a pending, unexpired invitation to
-	// accepted, recording acceptedBy and now, or to rejected with a nil
-	// acceptedBy, and nulls its metadata. Any other invitation returns a
+	// accepted, nulling its metadata, or to rejected, recording respondedBy
+	// and now either way. Any other invitation returns a
 	// [database.NoRowFoundError].
-	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error)
+	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error)
 	// DeleteUnacceptedInvitation removes an invitation that was not accepted,
 	// as replace does. An accepted or absent one returns a [database.NoRowFoundError].
 	DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error
-	// DeletePendingInvitation removes a pending, unexpired invitation. Any
-	// other invitation returns a [database.NoRowFoundError].
-	DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error
+	// DeleteCancellableInvitation removes a pending, unexpired invitation or
+	// a rejected one. Any other invitation returns a [database.NoRowFoundError].
+	DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error
 	// CountPendingInvitations counts the project's pending, unexpired
 	// invitations. The cap holds only when the count and the create run in
 	// one transaction under LockProject.

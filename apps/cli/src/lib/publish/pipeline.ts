@@ -1,5 +1,5 @@
 import type { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
-import type { Suggest } from "@/lib/suggestion";
+import type { Suggestion } from "@/lib/suggestion";
 import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 
 /**
@@ -71,22 +71,36 @@ export type StepContext = {
   readonly store: ConfigStore;
 
   /**
+   * The project-relative files the bundle inlines from outside `.zitadel/`: a
+   * branding descriptor's `$file` templates. What a deploy diffs and what a
+   * dirty tree is judged by, along with the configuration's own directories.
+   */
+  readonly referenced: readonly string[];
+
+  /**
    * The configuration as the release carries it. Its connections sit in
    * `config.connections` order.
    */
   readonly bundle: ConfigurationBundle;
 
   /**
-   * A command against the project this run addresses, carrying its
-   * environment selector, for a step's error to suggest its own fix.
-   */
-  readonly suggest: Suggest;
-
-  /**
    * What the earlier steps of this publish learned, merged in the order they
    * ran. Left out where no step records it.
    */
   readonly learned?: Learned;
+};
+
+/**
+ * An existing user this publish would leave unable to sign in, as the person
+ * reads it.
+ *
+ * @remarks
+ * `fix` is the command that repairs it, left for the running command to
+ * render: only the command knows the scope it runs in.
+ */
+export type Lockout = {
+  readonly message: string;
+  readonly fix?: Suggestion;
 };
 
 /**
@@ -110,7 +124,7 @@ export type StepResult = {
   readonly data?: StepReport;
   readonly warnings?: readonly string[];
   readonly notices?: readonly string[];
-  readonly lockouts?: readonly string[];
+  readonly lockouts?: readonly Lockout[];
   readonly learned?: Learned;
 };
 
@@ -121,7 +135,7 @@ export type StepsOutcome = {
   readonly data: StepReport;
   readonly warnings: readonly string[];
   readonly notices: readonly string[];
-  readonly lockouts: readonly string[];
+  readonly lockouts: readonly Lockout[];
 };
 
 /**

@@ -128,6 +128,17 @@ var brandingAccess = resourceAccess{
 	configuration: true,
 }
 
+// oauthSettingsAccess gates the OAuth settings revision read. A revision's
+// own id resolves through RSI, like branding's; a release is the only writer,
+// so no write path reaches writeMiss.
+var oauthSettingsAccess = resourceAccess{
+	kind:          domain.ResourceKindOAuthSettings,
+	readMiss:      domain.ErrOAuthSettingsNotFound,
+	writeMiss:     domain.ErrOAuthSettingsNotFound,
+	denied:        domain.ErrOAuthSettingsPermissionDenied,
+	configuration: true,
+}
+
 // policyAccess gates operation policies (ADR 066). Publish and the revision
 // read are project-scoped like releases: a revision has no index row. A
 // policy's own id resolves through RSI in the named project, like an IdP
@@ -476,6 +487,41 @@ func mapCeilingError(err error, res resourceAccess, op accessOp, rsi *domain.Res
 	}
 }
 
+// InviterAdminCheck is the invitation service's accept-time check that the
+// creator still holds the admin createInvitation required (ADR 086). It reads
+// through the accept's transaction, so it resolves the user's home itself.
+func InviterAdminCheck(platformProjectID string) service.InviterCheck {
+	return func(ctx context.Context, stmts service.AllStatements, projectID, userID string) (bool, error) {
+		home, err := stmts.GetResourceScope(ctx, userID)
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return false, nil
+			}
+			return false, err
+		}
+		if home.ResourceKind != domain.ResourceKindUser {
+			return false, nil
+		}
+		req := resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   userID,
+			ProjectID:     projectID,
+			HomeProjectID: home.ProjectID,
+			ObjectType:    "project",
+			Relation:      projectRelation(opDelete),
+		}
+		// Set only for a user homed in the platform project (ADR 075).
+		if platformProjectID != "" && home.ProjectID == platformProjectID {
+			req.PlatformProjectID = platformProjectID
+		}
+		dec, err := resolver.New().Check(ctx, stmts, req)
+		if err != nil {
+			return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+		}
+		return dec == resolver.DecisionAllow, nil
+	}
+}
+
 func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi *domain.ResourceScope) resolver.Request {
 	req := resolver.Request{
 		PrincipalType: scope.PrincipalType,
@@ -781,9 +827,9 @@ func authzListFilterParams(ctx context.Context, r *resolver.Resolver, stmts serv
 	return params, nil
 }
 
-// requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are
+// requireTeamDelete gates deactivateTeam via the team's RSI. Unknown teams are
 // gone (204) for operators. Check denials (including foreign foothold misses)
-// stay permission_denied for the historical deleteTeam contract. Internal
+// stay permission_denied for the historical deactivateTeam contract. Internal
 // errors pass through unwrapped so operators see 500, not a false 403.
 func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
 	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)

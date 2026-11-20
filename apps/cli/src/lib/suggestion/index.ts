@@ -2,8 +2,8 @@ import type { Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
-import type { PackageCommand } from "@/lib/package-manager";
-import { CLI_BINARY, newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
+import type { PackageCommand } from "@/lib/pm";
+import { Spelling } from "./spelling";
 
 import type { RELATIONS } from "./relations";
 
@@ -341,13 +341,13 @@ export type Again = <const Id extends SuggestionId>(
 ) => Promise<SuggestedCommand>;
 
 /**
- * A suggestion of a generated resource command (`users:get`, `release:list`)
+ * A suggestion of a generated resource command (`user:get`, `release:list`)
  * whose id is only known at run time, so the compiler cannot check it against a
  * command. The flags and arguments are checked when the run renders it instead:
  * the renderer throws on one the target does not declare, and on an id that is
  * no command.
  *
- * @param topic - The resource's topic, as oclif names it (`users`).
+ * @param topic - The resource's topic, as oclif names it (`user`).
  * @param verb - The operation on it, under the verb its command is named by.
  * @param input - The target's arguments and flags, by the names code reads them.
  * @returns The suggestion, for the run that reports it to render.
@@ -363,7 +363,7 @@ export function resourceSuggestion(
 /**
  * The help of a command whose id is only known at run time, such as the one a
  * refused command line named or a generated resource command
- * (`users:create`). The renderer checks the id, and throws on one that is no
+ * (`user:create`). The renderer checks the id, and throws on one that is no
  * command, as it does for {@link resourceSuggestion}.
  *
  * @param id - The command's id, as oclif names it (`variable:get`).
@@ -483,13 +483,13 @@ export function shellCommand(program: Program, ...words: readonly string[]): Sug
  * project's own script, and `run` may not run this CLI's binary: that would run
  * the CLI where nothing checks it.
  *
- * @param command - The package manager's command, as `lib/package-manager`
+ * @param command - The package manager's command, as `lib/pm`
  *   builds it.
  * @returns The command.
  * @throws {Error} When it runs this CLI.
  */
 export function suggestedCommandOf(command: PackageCommand): SuggestedCommand {
-  if (command.verb === "run" && command.operands[0] === CLI_BINARY) {
+  if (command.verb === "run" && command.operands[0] === Spelling.BINARY) {
     throw new Error(`${command.display} runs the CLI: suggest it as { id, args, flags }`);
   }
 
@@ -553,12 +553,8 @@ export function andTheRest(command: SuggestedCommand): SuggestedCommand {
   return `${command} ...` as SuggestedCommand;
 }
 
-/**
- * The message a suggested `deploy` carries for the reader to fill in: a
- * non-interactive `deploy` with no message to fall back on refuses to run
- * without one.
- */
-export const WHAT_CHANGED = "<what changed>";
+import { WHAT_CHANGED } from "./what-changed";
+export { WHAT_CHANGED };
 
 /**
  * What the renderer needs to know of a suggestion's target, read from the
@@ -769,7 +765,7 @@ export function suggestionWords(
       continue;
     }
     for (const word of wordsOf(value)) {
-      options.push(...optionArgs(`--${flag}`, word));
+      options.push(...Cmd.optionArgs(`--${flag}`, word));
     }
   }
   refuseBroken(id, input, target);
@@ -778,7 +774,7 @@ export function suggestionWords(
     if (value !== undefined && target.flags.has(spelled(name))) {
       // The scope is the run's as it was typed, so a server named with its
       // credentials loses them here, on every suggestion that carries it.
-      options.push(...optionArgs(`--${spelled(name)}`, withoutCredentials(value)));
+      options.push(...Cmd.optionArgs(`--${spelled(name)}`, withoutCredentials(value)));
     }
   }
   // A positional argument is read by where it stands, so one given after one
@@ -829,7 +825,7 @@ export function commandOf(words: readonly string[], cliVersion: string): Suggest
   const isNewest = NEWEST.has(words[0] ?? "");
 
   return (
-    isNewest ? newestCliCommand(line, cliVersion) : publicCliCommand(line, cliVersion)
+    isNewest ? Spelling.at(cliVersion).newestCommand(line) : Spelling.at(cliVersion).command(line)
   ) as SuggestedCommand;
 }
 
@@ -906,3 +902,6 @@ export function renderSuggestion(
 ): SuggestedCommand {
   return commandOf(suggestionWords(next.id, next, target, scope), cliVersion);
 }
+
+export { Guidance } from "./guidance";
+export { Spelling } from "./spelling";

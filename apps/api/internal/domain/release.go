@@ -16,7 +16,7 @@ const (
 
 // ReleasePointerKind is the kind of resource a release pointer pins. The wire
 // value is flow_definition rather than flow: the API serves runtime flows at
-// /flow and their definitions at /flow_definitions, and a release pins the
+// /flows and their definitions at /flow_definitions, and a release pins the
 // latter (ADR 035, amended 2026-09-02).
 //
 //go:generate go tool enumer -type ReleasePointerKind -transform snake -trimprefix ReleasePointerKind -sql
@@ -28,6 +28,10 @@ const (
 	ReleasePointerKindBranding
 	ReleasePointerKindIDP
 	ReleasePointerKindPolicy
+	// ReleasePointerKindOauth pins a project's OAuth settings revision. It is
+	// spelled Oauth, not OAuth, so that enumer's snake transform gives the
+	// wire value oauth rather than o_auth.
+	ReleasePointerKindOauth
 )
 
 // ReleaseBrandingHandle is the handle every branding pointer carries. Branding
@@ -190,6 +194,7 @@ type ReleaseContent struct {
 	IDPConnections  []*IDPConnection
 	Policies        []*Policy
 	Branding        *Branding
+	OAuth           *OAuthSettings
 }
 
 // Pointers returns one pointer per revision, under the handle it declares,
@@ -224,6 +229,9 @@ func (c ReleaseContent) pointers() ([]ReleasePointer, error) {
 	}
 	if c.Branding != nil {
 		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindBranding, Handle: ReleaseBrandingHandle, RevisionID: c.Branding.ID})
+	}
+	if c.OAuth != nil {
+		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindOauth, Handle: ReleaseOAuthHandle, RevisionID: c.OAuth.ID})
 	}
 
 	for _, pointer := range pointers {

@@ -1,8 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Workflow } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
@@ -74,16 +72,12 @@ function FlowDefinitionDetail() {
   return (
     <Page>
       <DetailHeader
-        icon={Workflow}
         title={name}
-        // The design draws a third value, `EXPIRES AT`; nothing backs it.
-        meta={
-          <>
-            <MetaValue label="Flow ID" value={definitionId} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(createdAt)} />
-          </>
-        }
+        // The design draws a third value, `Expires at`; nothing backs it.
+        meta={[
+          { label: "Flow ID", value: definitionId, copyable: true },
+          { label: "Created", value: formatDate(createdAt) },
+        ]}
       />
 
       <DetailSection

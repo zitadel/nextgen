@@ -12,6 +12,7 @@ import {
   CommandItemText,
   CommandList,
   CommandSeparator,
+  ITEM_FILLED_DESCRIPTION,
 } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -33,8 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
  * - Trigger: default, multiple or invalid, each resting, active, focused or
  *   disabled. `h-9`, `gap-1.5`,
  *   `pl-2.5 pr-1 py-1`, `rounded-md`, `border-input`, `shadow-xs`,
- *   `bg-background dark:bg-input/30`; optional inline addon glyph at 50% opacity;
- *   trailing 24px box holding a 12px chevron.
+ *   `bg-background dark:bg-input/30`; trailing 24px box holding a 12px chevron.
  * - List: `rounded-md`, `bg-popover`,
  *   `shadow-md`, hairline in `foreground/10`.
  * - Menu item: one-line (32px) and two-line (48px, label over description).
@@ -61,8 +61,14 @@ const ITEM_CUSTOM = "gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 export const COMBOBOX_ROW = ITEM_CUSTOM;
 // cmdk marks an item active as soon as the list mounts, but every state of
 // the design's menu item renders transparent — a resting list must not paint a
-// filled row, so the fill is suppressed until the operator points or arrows.
-const ITEM_RESTING = "data-[selected=true]:bg-transparent";
+// filled row, so the fill is suppressed until the operator points or arrows,
+// and a description stays muted with it.
+const ITEM_RESTING =
+  "data-[selected=true]:bg-transparent data-[selected=true]:**:data-[slot=command-item-description]:text-muted-foreground";
+// A badge's tinted text is under 4.5:1 on the `accent` fill in the dark
+// theme, so a highlighted row draws it in the row's own foreground; the tint
+// keeps its colour.
+const BADGE_ON_HIGHLIGHT = "data-[selected=true]:**:data-[slot=badge]:text-accent-foreground";
 
 const CHIP =
   "flex h-[21px] shrink-0 items-center gap-1 rounded-sm bg-muted pl-1.5 text-xs leading-none font-medium text-foreground";
@@ -87,7 +93,6 @@ export function ComboboxTrigger({
   open,
   disabled,
   invalid,
-  addon,
   className,
   children,
   onOpen,
@@ -99,8 +104,6 @@ export function ComboboxTrigger({
   open: boolean;
   disabled?: boolean;
   invalid?: boolean;
-  /** Optional inline glyph, rendered at 50% opacity per the addon slot. */
-  addon?: ReactNode;
   onOpen: () => void;
 }) {
   return (
@@ -136,11 +139,6 @@ export function ComboboxTrigger({
         }
       }}
     >
-      {addon && (
-        <span className="flex shrink-0 items-center opacity-50" aria-hidden>
-          {addon}
-        </span>
-      )}
       {children}
       <ComboboxChevron />
     </div>
@@ -200,6 +198,8 @@ export interface ComboboxOption {
    * under it, so it is not read as one more of them.
    */
   chip?: "destructive" | "warning" | "secondary";
+  /** More words search matches the row by, which the row does not draw. */
+  keywords?: string[];
 }
 
 /** A run of rows under a caption, as the design's menu label draws it. */
@@ -225,8 +225,7 @@ const FOOTER_VALUE = "combobox:footer";
 /**
  * The popover list: search field, empty state, and rows, in captioned groups
  * when asked, over an optional footer action. `selected` drives the chosen
- * affordance, which differs by usage — the project list fills the chosen row
- * (`Row · River`), while schema and role lists mark it with a Check.
+ * affordance: a Check by default, or a filled row with `indicator="fill"`.
  */
 export function ComboboxContent({
   options,
@@ -291,7 +290,15 @@ export function ComboboxContent({
   }, [search, rowsKey, rowValues, highlight]);
 
   return (
-    <PopoverContent align="start" className={cn(LIST, className)}>
+    <PopoverContent
+      align="start"
+      // Radix makes the popover a dialog, which needs a name of its own.
+      aria-label={label ?? searchPlaceholder}
+      // This stays mounted while the popover is closed, so a reopened list
+      // rests again until the operator points or arrows.
+      onCloseAutoFocus={() => setNavigating(false)}
+      className={cn(LIST, className)}
+    >
       <Command
         // The field's name: cmdk labels its input with this (`aria-labelledby`),
         // which an `aria-label` on the input would not outrank.
@@ -337,16 +344,20 @@ export function ComboboxContent({
                       key={option.value}
                       // The value is cmdk's name for the row, so it must be unique:
                       // two schemas or projects may share a label. Search matches
-                      // the label and the description, so typing a property name
-                      // finds the schemas that collect it.
+                      // the label, the description and the option's keywords.
                       value={option.value}
-                      keywords={
-                        option.description ? [option.label, option.description] : [option.label]
-                      }
+                      keywords={[
+                        option.label,
+                        ...(option.description ? [option.description] : []),
+                        ...(option.keywords ?? []),
+                      ]}
                       className={cn(
                         option.description && !option.chip ? ITEM_CUSTOM : ITEM_SIMPLE,
                         !navigating && ITEM_RESTING,
-                        isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
+                        navigating && BADGE_ON_HIGHLIGHT,
+                        isSelected &&
+                          indicator === "fill" &&
+                          `bg-accent text-accent-foreground ${ITEM_FILLED_DESCRIPTION}`,
                       )}
                       onSelect={() => {
                         onSelect(option.value);
@@ -358,7 +369,10 @@ export function ComboboxContent({
                         <span className="flex min-w-0 flex-1 items-center gap-2">
                           <Badge variant={option.chip}>{option.label}</Badge>
                           {option.description && (
-                            <span className="truncate text-xs text-muted-foreground">
+                            <span
+                              data-slot="command-item-description"
+                              className="truncate text-xs text-muted-foreground"
+                            >
                               {option.description}
                             </span>
                           )}

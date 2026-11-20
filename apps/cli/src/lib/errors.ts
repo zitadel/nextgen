@@ -14,6 +14,7 @@ import type { Suggested } from "./suggestion";
 import {
   ConflictError as ConfigConflictError,
   ConfigError,
+  BrokenFlowsError,
   NotFoundError as ConfigNotFoundError,
 } from "./zitadel";
 
@@ -273,6 +274,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
+      ...(error instanceof BrokenFlowsError && error.hint?.includes("deploy --dry-run")
+        ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
+        : {}),
     });
   }
 
@@ -470,24 +474,17 @@ function listedInDetails(
  * `idp.field_immutable` blames, or the endpoints an `idp.endpoints_partial`
  * reports missing. Those are appended the same way.
  */
-function rejectedResources(body: unknown): string[] {
-  const lines: string[] = [];
-  let node: unknown = body;
-  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>).resources;
-    if (Array.isArray(listed)) {
-      for (const item of listed) {
-        const line = resourceLine(item);
-        if (line !== undefined) {
-          lines.push(line);
-        }
-      }
-      break;
-    }
-    node = (node as { details?: unknown }).details;
+function rejectedResources(body: unknown, depth = 0): readonly string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [];
   }
-
-  return lines;
+  const listed = (body as Record<string, unknown>).resources;
+  if (Array.isArray(listed)) {
+    return listed.flatMap((item) => {
+      return resourceLine(item) ?? [];
+    });
+  }
+  return rejectedResources((body as { details?: unknown }).details, depth + 1);
 }
 
 function resourceLine(item: unknown): string | undefined {
@@ -541,11 +538,6 @@ function isZodLikeError(error: unknown): boolean {
     "issues" in error &&
     Array.isArray((error as { issues: unknown }).issues)
   );
-}
-
-/** Whether a caught error is the given `errno` code. */
-export function isErrno(error: unknown, code: string): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
 /** The message of a caught value, whatever it is. */

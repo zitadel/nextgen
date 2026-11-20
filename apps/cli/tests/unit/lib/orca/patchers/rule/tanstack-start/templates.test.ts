@@ -7,6 +7,7 @@ import {
   startTemplate,
 } from "@/lib/orca/patchers/rule/tanstack-start/templates";
 import type { PatchContext } from "@/lib/orca/patchers/types";
+import { CliPackage } from "@/lib/upgrade";
 
 /** What `@tanstack/react-start` 1.168.10, the detector floor, exports and the templates may import. */
 const FLOOR_EXPORTS = [
@@ -30,8 +31,10 @@ const context: PatchContext = {
     created_at: "2026-01-01T00:00:00.000Z",
   },
   issuer: "http://localhost:3000",
-  server: "https://api.zitadel.cloud",
+  server: "https://preview.zitadel.com",
+  defaultServer: "https://preview.zitadel.com",
   cliVersion: "0.1.0-alpha.0",
+  sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
 };
 
 function reactStartImports(source: string): string[] {

@@ -67,7 +67,7 @@ function envelope(id: string, doc: object, createdAt = CREATED_AT) {
 
 /**
  * `GET /schemas` only: the list carries the documents, so the directory must
- * not fetch anything else — a reintroduced per-row `GET /schemas/{id}` has no
+ * not fetch anything else — a reintroduced per-row `GET /schemas/{schema_id}` has no
  * handler here and fails the spec.
  */
 function serveList(...rows: Array<{ id: string; schema: object; metadata: object }>) {
@@ -148,7 +148,7 @@ describe("user schemas list", () => {
     // Derived rather than hardcoded: the row renders the viewer's locale, so
     // asserting one locale's output would pass only on machines set to it.
     expect(table.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
-    // The id moved to the detail header card; the row no longer repeats it.
+    // The id lives on the detail header's identity line; the row does not repeat it.
     expect(table.queryByText("sch_business")).not.toBeInTheDocument();
   });
 
@@ -427,7 +427,7 @@ describe("user schema detail", () => {
 
   it("offers no revision picker for a schema the history leaves out", async () => {
     // The list reads `kind` from the document and leaves out one stored
-    // without it; `GET /schemas/{id}` does not. A schema absent from its own
+    // without it; `GET /schemas/{schema_id}` does not. A schema absent from its own
     // history is not on the picker.
     const newer = envelope("sch_business_2", BUSINESS, "2026-08-01T09:30:00Z");
     server.use(

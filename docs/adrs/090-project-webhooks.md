@@ -127,7 +127,7 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 - `data` is the event's payload as stored, already redacted
   ([ADR 048](048-wide-events-internal-audit-primitive.md)), `{}` when empty.
   It is not the resource. A receiver that needs more reads the resource by
-  `entity.id`, or the whole event with `GET /events/{id}`.
+  `entity.id`, or the whole event with `GET /events/{event_id}`.
 - The spec describes the envelope once and types `data` per event type from
   the payload schemas `GET /events` uses.
 - The operator's sinks are not this: they keep receiving the event as
@@ -192,7 +192,9 @@ What changes for a project's webhook:
 - **Order.** Events arrive in `(created_at, id)` order. A failed delivery
   holds back the events after it, for that webhook only.
 - **Retry.** After a failure the next attempt waits, from 5 seconds doubling
-  to at most 1 hour. A success resets it.
+  to at most 1 hour. An endpoint that answers `429` or `503` with a
+  `Retry-After` header is not tried again before the time it names, up to the
+  same hour. A success resets it.
 - **Giving up.** A webhook that has failed for 3 days without a success, or
   that answers `410`, is disabled and a `webhook.disabled` event is written.
 - **Enabling** a disabled webhook sets its cursor to now: what happened while
@@ -231,11 +233,11 @@ may be added, and a receiver ignores what it does not know.
 | Operation | Request | Permission |
 |---|---|---|
 | List | `GET /webhooks` | `webhook.read` |
-| Get | `GET /webhooks/{id}` | `webhook.read` |
+| Get | `GET /webhooks/{webhook_id}` | `webhook.read` |
 | Create | `POST /webhooks` | `webhook.write` |
-| Update | `PATCH /webhooks/{id}` | `webhook.write` |
-| Delete | `DELETE /webhooks/{id}` | `webhook.delete` |
-| Rotate the secret | `POST /webhooks/{id}/rotate_secret` | `webhook.write` |
+| Update | `PATCH /webhooks/{webhook_id}` | `webhook.write` |
+| Delete | `DELETE /webhooks/{webhook_id}` | `webhook.delete` |
+| Rotate the secret | `POST /webhooks/{webhook_id}/rotate_secret` | `webhook.write` |
 
 - The paths are flat and name the project as `/invitations`, `/idps`,
   `/policies` and `/variables` do. `/projects/{project_id}/…` holds only a
@@ -313,6 +315,9 @@ machine is neither.
   still uses, so its deliveries fail until it has the newest one. An
   `Idempotency-Key` would let the caller repeat the request and get the same
   secret, and needs an idempotency store the server does not have.
+- **Throttling.** A webhook's events go out in order, one request at a time,
+  and a `429` slows them (§4). A rate its owner sets on the webhook is not
+  decided.
 - **`http` to a public address.** `allow_http` permits `http` to every
   address the server may reach, the public ones included, where the event is
   readable on the way. Limiting `http` to what `events.webhooks.allow_list`
@@ -340,6 +345,11 @@ machine is neither.
 - **Stripe's `t=…,v1=…` header.** It carries the same HMAC. Standard Webhooks
   has verification libraries in most languages, so the SDKs need not ship one
   each.
+- **A [CloudEvents](https://cloudevents.io/) body.** It names the same
+  things otherwise (`specversion`, `source`, `time`), has no attribute for
+  `actor` or `entity` but an extension, and signs nothing, so the Standard
+  Webhooks headers would stay beside it. The fields map one to one, so a
+  webhook could choose that body later.
 - **Paths under `/projects/{project_id}/webhooks`**, as the resource map
   sketched. Every project-scoped resource added since is flat.
 - **A `status` field, a failure counter and a nested `last_error`.** Each

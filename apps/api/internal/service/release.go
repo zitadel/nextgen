@@ -66,6 +66,7 @@ type releaseService struct {
 	branding *BrandingService
 	idps     *idpConnectionService
 	policies *PolicyService
+	oauth    *OAuthSettingsService
 	// builtinBases resolves a schema given as a built-in schema's `$id` under
 	// whichever base the project stores it; the release pins the row found.
 	builtinBases domain.BuiltinSchemaBases
@@ -80,6 +81,7 @@ func NewReleaseService(
 	branding *BrandingService,
 	idps *idpConnectionService,
 	policies *PolicyService,
+	oauth *OAuthSettingsService,
 	builtinBases domain.BuiltinSchemaBases,
 ) ReleaseService {
 	return &releaseService{
@@ -89,6 +91,7 @@ func NewReleaseService(
 		branding:     branding,
 		idps:         idps,
 		policies:     policies,
+		oauth:        oauth,
 		builtinBases: builtinBases,
 	}
 }
@@ -295,7 +298,7 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 // servedOrigins returns the origins still serving the release, each with the
 // deployment that serves it.
 func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
-	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.LiveListOptions(projectID, &releaseID, 0))
+	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.ListOptions(projectID, nil, &releaseID, 0))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list the live deployments")
 	}
@@ -386,6 +389,17 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 					domain.ReleasePointerKindBranding, domain.ReleaseBrandingHandle), nil)
 			}
 			content.Branding = branding
+
+		case domain.ReleasePointerKindOauth:
+			settings, err := stmts.GetOAuthSettingsByID(ctx, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			if content.OAuth != nil {
+				return content, domain.ErrReleaseInvalid(fmt.Sprintf("%s %q is referenced twice",
+					domain.ReleasePointerKindOauth, domain.ReleaseOAuthHandle), nil)
+			}
+			content.OAuth = settings
 
 		default:
 			// Unreachable over HTTP: the wire enum admits only the kinds above.
