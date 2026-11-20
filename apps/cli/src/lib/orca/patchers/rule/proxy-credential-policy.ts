@@ -12,9 +12,17 @@ export const PROXY_CREDENTIAL_POLICY_MARKER = "zitadel:proxy:v3";
 /** The marker of the exchange-only policy as it was before it knew the API prefix. */
 export const PROXY_CREDENTIAL_POLICY_V2_MARKER = "zitadel:proxy:v2";
 
-/** Whether `source` carries the credential-policy marker of either version. */
+/**
+ * The marker of a Vite `/__nextgen` entry whose target reads `ZITADEL_URL`,
+ * falling back to the address setup wrote: v3's credential policy, plus the
+ * address from the environment. Angular's proxy stays on v3.
+ */
+export const PROXY_ADDRESS_MARKER = "zitadel:proxy:v4";
+
+/** Whether `source` carries the credential-policy marker of any version. */
 export function hasProxyCredentialPolicyMarker(source: string): boolean {
   return (
+    source.includes(PROXY_ADDRESS_MARKER) ||
     source.includes(PROXY_CREDENTIAL_POLICY_MARKER) ||
     source.includes(PROXY_CREDENTIAL_POLICY_V2_MARKER)
   );

@@ -15,6 +15,7 @@ test("splits one export between concurrent requests", async () => {
   const router = new SpanRouter();
   const a = router.open("aaaa", "a0");
   const b = router.open("bbbb", "b0");
+  assert.equal(router.exports, 0, "the server has not exported yet");
 
   router.ingest(
     exportOf(
@@ -25,6 +26,7 @@ test("splits one export between concurrent requests", async () => {
     ),
   );
 
+  assert.equal(router.exports, 1);
   const spansA = await router.close(a, 1000);
   const spansB = await router.close(b, 1000);
   assert.deepEqual(

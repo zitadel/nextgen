@@ -4,7 +4,8 @@ import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { NuxtPatcher } from "@/lib/orca/patchers/rule/nuxt";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctx(appDir = "app", scaffoldedFramework = true): PatchContext {
   return {
@@ -18,8 +19,10 @@ function ctx(appDir = "app", scaffoldedFramework = true): PatchContext {
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
   };
 }
@@ -35,8 +38,8 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
 describe("NuxtPatcher.plan", () => {
   it("writes the managed app + pages under the Nuxt 4 app/ srcDir", () => {
     const plan = new NuxtPatcher().plan(ctx("app"));
-    expect(writeContents(plan, "app/app.vue")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "app/pages/login.vue")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "app/app.vue")).toContain(ManagedFile.MARKER);
+    expect(writeContents(plan, "app/pages/login.vue")).toContain(ManagedFile.MARKER);
     // Page chrome comes from the widget itself now — the wrapper only pins
     // the color scheme, and no token hex is duplicated into generated code.
     expect(writeContents(plan, "app/pages/login.vue")).toContain('variant="page"');
@@ -100,13 +103,13 @@ describe("NuxtPatcher.plan", () => {
 
   it("writes at the root for a Nuxt 4 root-layout project (appDir '.')", () => {
     const plan = new NuxtPatcher().plan(ctx("."));
-    expect(writeContents(plan, "app.vue")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "pages/login.vue")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "app.vue")).toContain(ManagedFile.MARKER);
+    expect(writeContents(plan, "pages/login.vue")).toContain(ManagedFile.MARKER);
   });
 
   it("gives the redirecting home page a template so Vue does not warn in dev", () => {
     const page = writeContents(new NuxtPatcher().plan(ctx("app")), "app/pages/index.vue");
-    expect(page).toContain(MANAGED_MARKER);
+    expect(page).toContain(ManagedFile.MARKER);
     expect(page).toContain('await navigateTo("/login", { replace: true });');
     expect(page).toMatch(/<template>[\s\S]*<\/template>/);
   });
@@ -118,7 +121,7 @@ describe("NuxtPatcher.plan", () => {
     const plan = new NuxtPatcher().plan(ctx("app", false));
     expect(writeContents(plan, "app/app.vue")).toBeUndefined();
     expect(writeContents(plan, "app/pages/index.vue")).toBeUndefined();
-    expect(writeContents(plan, "app/pages/login.vue")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "app/pages/login.vue")).toContain(ManagedFile.MARKER);
   });
 
   it("embeds widget cards with theme=auto for the widget posture (ADR 044)", () => {

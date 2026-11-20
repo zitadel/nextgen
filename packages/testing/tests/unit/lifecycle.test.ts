@@ -46,6 +46,32 @@ describe("bootLocalServer", () => {
     await server.stop();
   });
 
+  it("retries on a fresh port when another process took the one it picked", async () => {
+    const fake = await fakeCliBin({ startPortInUseBeforeSuccess: 2 });
+    const server = await bootLocalServer({ cliBin: fake.binPath });
+
+    const starts = (await fake.calls()).filter((call) => call[0] === "start");
+    expect(starts).toHaveLength(3);
+
+    await server.stop();
+  });
+
+  it("does not retry a port that was asked for", async () => {
+    const fake = await fakeCliBin({ startPortInUseBeforeSuccess: 1 });
+
+    await expect(bootLocalServer({ cliBin: fake.binPath, port: 18093 })).rejects.toThrow(
+      "E_PORT_IN_USE",
+    );
+    expect((await fake.calls()).filter((call) => call[0] === "start")).toHaveLength(1);
+  });
+
+  it("gives up after five busy ports", async () => {
+    const fake = await fakeCliBin({ startPortInUseBeforeSuccess: 99 });
+
+    await expect(bootLocalServer({ cliBin: fake.binPath })).rejects.toThrow("E_PORT_IN_USE");
+    expect((await fake.calls()).filter((call) => call[0] === "start")).toHaveLength(5);
+  });
+
   it("surfaces stderr and keeps the state dir when start fails", async () => {
     const fake = await fakeCliBin({ startExitCode: 1, startStderr: "boom: port taken" });
     let error: Error | undefined;

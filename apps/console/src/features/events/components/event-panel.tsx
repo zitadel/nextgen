@@ -3,10 +3,10 @@ import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect, useMemo } from "react";
 
 import { DocumentViewer } from "@/components/document-viewer";
-import { FormSheetHeader } from "@/components/form-sheet";
-import { SECTION_HEADING } from "@/components/typography";
+import { FormSheetHeader, SHEET_LEGEND } from "@/components/form-sheet";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription } from "@/components/ui/sheet";
 import { formatClockTime, formatEventTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -40,11 +40,21 @@ export const EventRowsContext = createContext<{ rows: ProjectEvent[]; search: Ev
 });
 
 /**
- * The drawer an event opens in, over the right of the Events list, as Vercel's
- * Events opens a request: the list stays where it was, scrolled and paged, and
+ * The drawer's width in pixels (`sm:max-w-130`), for what must keep clear of
+ * it while it covers the list's right: the list under the search field.
+ */
+export const EVENT_SHEET_WIDTH = 520;
+
+/**
+ * The drawer an event opens in, at the right of the Events list, as Vercel's
+ * Logs opens a request: the list stays where it was, scrolled and paged, and
  * a click on another row opens that one in the same drawer. So it is not
  * modal, no overlay dims the list, and a click outside it does not close it;
  * the close button and Escape do.
+ *
+ * From `xl` the list's page ends where the drawer starts (`Page`'s
+ * `besideSheet`), so its search, its toolbar and its last columns stay in
+ * reach beside an open event. Narrower, the drawer covers the list's right.
  *
  * It stays mounted while one event gives way to the next, so stepping through
  * the list does not slide it in again.
@@ -195,7 +205,8 @@ export function EventPanel({
         The event {event.id}, recorded {formatEventTime(event.occurred_at)}.
       </SheetDescription>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
+      {/* The sheets' body: inset 24px, its parts 16px either side of a rule. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
         <dl className={FIELD_GRID}>
           <dt className={FIELD_LABEL}>Event ID</dt>
           <dd className={FIELD_VALUE}>
@@ -302,13 +313,20 @@ function FieldRow({ label, value, id }: { label: string; value: string; id?: boo
   );
 }
 
-/** A titled part of the drawer's body. */
+/**
+ * A titled part of the drawer's body, ruled off from the part above it as a
+ * form sheet's sections are, under the sheets' own 14/20 heading: a page
+ * card's 16/20 title is a size too large at the drawer's width.
+ */
 function PanelSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3">
-      <h3 className={SECTION_HEADING}>{title}</h3>
-      {children}
-    </section>
+    <>
+      <Separator />
+      <section className="flex flex-col gap-3">
+        <h3 className={SHEET_LEGEND}>{title}</h3>
+        {children}
+      </section>
+    </>
   );
 }
 

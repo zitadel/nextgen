@@ -539,11 +539,11 @@ func TestDeleteTeam(t *testing.T) {
 
 	deleteTeam := func(t *testing.T, teamID string) {
 		t.Helper()
-		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
+		resp, err := client.DeactivateTeam(t.Context(), api.DeactivateTeamParams{
 			TeamID: api.TeamID(teamID),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.DeleteTeamNoContent{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.DeactivateTeamNoContent{}, resp, helpers.MustMarshal(t, resp))
 	}
 
 	teamStatus := func(t *testing.T, teamID string) api.TeamStatus {
@@ -643,13 +643,13 @@ func TestDeleteTeam(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
+		resp, err := client.DeactivateTeam(t.Context(), api.DeactivateTeamParams{
 			TeamID: api.TeamID(foreignTeam.ID),
 		})
 		require.NoError(t, err)
 
-		require.IsType(t, &api.DeleteTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("team.permission_denied"), resp.(*api.DeleteTeamForbidden).Code)
+		require.IsType(t, &api.DeactivateTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("team.permission_denied"), resp.(*api.DeactivateTeamForbidden).Code)
 	})
 
 	// The cascade itself is proven per dialect by the storage suite; this only
@@ -701,9 +701,9 @@ func TestDeleteTeam(t *testing.T) {
 		asgn := domain.NewClaimTeamAssignment(owned.ID, team.ID)
 		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), asgn))
 
-		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{TeamID: api.TeamID(team.ID)})
+		resp, err := client.DeactivateTeam(t.Context(), api.DeactivateTeamParams{TeamID: api.TeamID(team.ID)})
 		require.NoError(t, err)
-		conflict, ok := resp.(*api.DeleteTeamConflict)
+		conflict, ok := resp.(*api.DeactivateTeamConflict)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("team.owns_project"), conflict.Code)
 

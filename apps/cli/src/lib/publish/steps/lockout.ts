@@ -2,8 +2,9 @@ import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
-import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
-import { reportWarning } from "@/lib/warnings";
+import type { Lockout, Step, StepContext, StepResult } from "@/lib/publish/pipeline";
+import type { Suggestion } from "@/lib/suggestion";
+import { warnings } from "@/lib/ui";
 import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -57,7 +58,7 @@ type Served = {
  * and whether a request failed.
  */
 type Scan = {
-  readonly warnings: readonly string[];
+  readonly warnings: readonly Lockout[];
   readonly partial: readonly string[];
   readonly failed: boolean;
 };
@@ -216,7 +217,7 @@ export const lockoutStep: Step = {
     try {
       const found = await findLockouts(ctx);
       for (const note of found.notes) {
-        reportWarning(note);
+        warnings.report(note);
       }
       if (found.lockouts.length === 0) {
         return undefined;
@@ -228,7 +229,7 @@ export const lockoutStep: Step = {
         throw error;
       }
       // Never a failed deploy, but never a silent pass either.
-      reportWarning(
+      warnings.report(
         "Could not finish checking existing users for sign-in lockouts: an unexpected error stopped the check.",
       );
     }
@@ -268,7 +269,7 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // The one piece of state the check keeps: the read, once it is started.
+  // biome-ignore lint/plugin: the memoised read, started on first use
   let listed: Promise<Listing | undefined> | undefined;
   return () => {
     listed ??= objectTypes(ctx).catch(() => {
@@ -306,7 +307,7 @@ type Found = {
   /**
    * Each group of existing users the deploy leaves unable to sign in.
    */
-  readonly lockouts: readonly string[];
+  readonly lockouts: readonly Lockout[];
 
   /**
    * What the check could not finish, so a clean result is not proof.
@@ -488,14 +489,17 @@ async function lookupWarnings(
       const missingCount = count(missing.length, read.truncated);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const fix = ctx.suggest({
-        id: "users:update",
+      const fix: Suggestion = {
+        id: "user:update",
         args: { id: "<user_id>" },
         flags: { schema: "<revision_id>", set: `attributes.${identifier}=<value>` },
-      });
+      };
       return {
         warnings: [
-          `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${new Intl.PluralRules("en").select(missing.length) === "one" ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,
+          {
+            fix,
+            message: `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${new Intl.PluralRules("en").select(missing.length) === "one" ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update`,
+          },
         ],
         partial: [],
         failed: false,
@@ -574,8 +578,8 @@ async function unservedWarnings(
     });
     return { name, users: indexes.length, linked: linked.length };
   });
-  const warnings = counted.map((entry) => {
-    return strandedWarning(entry, read.truncated, linksUnsure);
+  const warnings = counted.map((entry): Lockout => {
+    return { message: strandedWarning(entry, read.truncated, linksUnsure) };
   });
   const partial = read.truncated && warnings.length === 0 ? ["the schemas no flow serves"] : [];
   return { warnings, partial, failed };
@@ -813,7 +817,9 @@ async function credentialWarnings(
       const users = plural(read.users.length, "user");
       return {
         warnings: [
-          `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${new Intl.PluralRules("en").select(disabled.length) === "one" ? methods : "them"} enabled until they have another way in.`,
+          {
+            message: `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${new Intl.PluralRules("en").select(disabled.length) === "one" ? methods : "them"} enabled until they have another way in.`,
+          },
         ],
         partial: [],
         failed,

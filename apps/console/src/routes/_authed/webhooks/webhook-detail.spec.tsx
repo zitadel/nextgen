@@ -262,7 +262,7 @@ describe("webhook detail", () => {
         deleted += 1;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.get(WEBHOOKS_URL, () => HttpResponse.json({ data: [] })),
+      http.get(WEBHOOKS_URL, () => HttpResponse.json({ webhooks: [] })),
     );
     const router = await renderDetail();
 

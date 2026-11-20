@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@oclif/table", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@oclif/table")>();
@@ -11,7 +11,8 @@ vi.mock("@oclif/table", async (importOriginal) => {
 
 import { makeTable } from "@oclif/table";
 
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { it } from "@tests/fixtures";
+import { asTerminal, offTerminal, type TerminalFixture } from "@tests/fixtures/terminal";
 import { aTableDrawnByARun, aTabulatingCommand } from "@tests/helpers/tabulate";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);
@@ -136,34 +137,31 @@ describe("tabulate", () => {
     const id = `usr_${"a".repeat(40)}`;
     const url = `https://example.com/${"b".repeat(60)}`;
 
-    const render = async (tty: boolean): Promise<string> => {
-      const isTTY = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
-      const columns = Object.getOwnPropertyDescriptor(process.stdout, "columns");
-      Object.defineProperty(process.stdout, "isTTY", { value: tty, configurable: true });
-      Object.defineProperty(process.stdout, "columns", { value: 30, configurable: true });
-      try {
-        return await draw().draw(["id", "url"], [{ id, url }]);
-      } finally {
-        for (const [key, saved] of [
-          ["isTTY", isTTY],
-          ["columns", columns],
-        ] as const) {
-          if (saved) Object.defineProperty(process.stdout, key, saved);
-          else delete (process.stdout as unknown as Record<string, unknown>)[key];
-        }
-      }
+    /**
+     * Draws the table for a stdout of the given kind, thirty columns wide.
+     *
+     * @param terminal - The terminal fixture whose stdout is set.
+     * @param tty - Whether stdout reports being a terminal.
+     * @returns The drawn table.
+     */
+    const render = async (terminal: TerminalFixture, tty: boolean): Promise<string> => {
+      terminal.tty(tty);
+      terminal.columns(30);
+      return draw().draw(["id", "url"], [{ id, url }]);
     };
 
-    it("keeps a long id and url whole on one row instead of breaking them across lines", async () => {
-      const table = (await render(true)).split("\n");
+    it("keeps a long id and url whole on one row instead of breaking them across lines", async ({
+      terminal,
+    }) => {
+      const table = (await render(terminal, true)).split("\n");
 
       expect(table).toHaveLength(3);
       expect(table[2]).toContain(id);
       expect(table[2]).toContain(url);
     });
 
-    it("prints the same table as a pipe does", async () => {
-      expect(await render(true)).toBe(await render(false));
+    it("prints the same table as a pipe does", async ({ terminal }) => {
+      expect(await render(terminal, true)).toBe(await render(terminal, false));
     });
   });
 });
@@ -617,7 +615,7 @@ describe("Tabulatable", () => {
   });
 
   it("is given its columns by a COLUMNS constant in every list command", async () => {
-    const root = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
+    const root = fileURLToPath(new URL("../../../../src/cli/commands", import.meta.url));
     const without: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {

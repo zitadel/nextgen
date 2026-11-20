@@ -58,7 +58,7 @@ post:
           bundle:
             summary: Built from the files on disk
             description: |
-              The CLI's form: the schemas, flow definitions, branding and
+              A whole bundle: the schemas, flow definitions, branding and
               OAuth settings as authored, the flow naming its schema by
               `objectType`. The
               schema's `metaSchema` is the one the server publishes at

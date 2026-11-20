@@ -129,6 +129,22 @@ oneOf:
             const: auth.factor.password.set
           data:
             $ref: payloads/auth-factor-payload.yaml
+  - title: auth.request.created
+    description: |
+      An app started a sign-in at the OAuth authorization endpoint. `data`
+      names the app by its `client_id`.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: auth.request.created
+          data:
+            $ref: payloads/auth-request-created-payload.yaml
   - title: auth.sso.authorization.failed
     description: |
       A sign-in through an identity provider (SSO) failed at the provider.
@@ -199,7 +215,7 @@ oneOf:
     description: |
       A token was revoked. Deleting a session revokes its tokens too. Those
       events have an `entity.id` of `null`; the session's ID is `session_id`
-      of the event that `getEvent` (`GET /events/{id}`) returns.
+      of the event that `getEvent` (`GET /events/{event_id}`) returns.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object
@@ -410,11 +426,8 @@ oneOf:
     description: |
       An invitation was accepted. The grant events the acceptance writes
       share its `request_id`, which is on the event that `getEvent` (`GET
-      /events/{id}`) returns; there are none when the user already holds an
-      identical active grant.
-
-      Not sent yet: the contract is published ahead of the code that sends
-      it.
+      /events/{event_id}`) returns; there are none when the user already
+      holds an identical active grant.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object
@@ -461,9 +474,6 @@ oneOf:
   - title: invitation.rejected
     description: |
       An invitation was declined.
-
-      Not sent yet: the contract is published ahead of the code that sends
-      it.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object
@@ -476,6 +486,24 @@ oneOf:
             const: invitation.rejected
           data:
             $ref: payloads/invitation-rejected-payload.yaml
+  - title: oauth_settings.created
+    description: |
+      A project published a new revision of its OAuth settings, which say
+      whether its OAuth authorization server answers. A release build
+      publishes one when the bundle's `oauth` resource differs from every
+      earlier revision.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: oauth_settings.created
+          data:
+            $ref: payloads/oauth-settings-created-payload.yaml
   - title: origin.added
     description: |
       An origin was added to a project. `data` holds its `pattern` and its
@@ -638,8 +666,8 @@ oneOf:
       An API request in the project completed. One event per request; the
       health, liveness, and readiness probes send none. The requester's IP,
       user agent and origin are in `metadata.client` of the event that
-      `getEvent` (`GET /events/{id}`) returns, and its `request_id` joins
-      the other events of the same request to it.
+      `getEvent` (`GET /events/{event_id}`) returns, and its `request_id`
+      joins the other events of the same request to it.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object

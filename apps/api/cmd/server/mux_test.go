@@ -17,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api"
 	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/securityheaders"
@@ -130,8 +131,10 @@ func TestBuildHTTPMuxServesTheConsoleBesideTheAPI(t *testing.T) {
 
 // The API answers under /api/v1, and until 1.0.0 at the root, where a
 // response for an operation says it is deprecated (ADR 077). The probes
-// answer at the root for good. `/api/flow` is the base the embedded console
-// once called: under no prefix the API serves, it is no operation of the root
+// answer at the root for good. The flow operations' old `/flow` path reaches
+// its mount as `/flows`, deprecated on both mounts, and no other path is
+// rewritten on the way. `/api/flow` is the base the embedded console once
+// called: under no prefix the API serves, it is no operation of the root
 // alias either, and stays a 404.
 func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 	requireEmbeddedUI(t)
@@ -140,9 +143,12 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 	for _, tt := range []struct {
 		method, path, mount string
 		deprecated          bool
+		reaches             string // the path the mount receives, when not path
 	}{
 		{method: http.MethodGet, path: "/api/v1/users/me", mount: "api"},
-		{method: http.MethodPost, path: "/api/v1/flow", mount: "api"},
+		{method: http.MethodPost, path: "/api/v1/flows", mount: "api"},
+		{method: http.MethodPost, path: "/api/v1/flow", mount: "api", deprecated: true, reaches: "/api/v1/flows"},
+		{method: http.MethodGet, path: "/api/v1/flow_definitions", mount: "api"},
 		{method: http.MethodGet, path: "/api/v1/livez", mount: "api"},
 		{method: http.MethodGet, path: "/api/v1", mount: "api"},
 		{method: http.MethodGet, path: "/api/v1/", mount: "api"},
@@ -154,7 +160,8 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 		{method: http.MethodPost, path: "/livez", mount: "probes"},
 
 		{method: http.MethodGet, path: "/users/me", mount: "root", deprecated: true},
-		{method: http.MethodPost, path: "/flow", mount: "root", deprecated: true},
+		{method: http.MethodPost, path: "/flows", mount: "root", deprecated: true},
+		{method: http.MethodPost, path: "/flow", mount: "root", deprecated: true, reaches: "/flows"},
 		{method: http.MethodGet, path: "/sessions/me", mount: "root", deprecated: true},
 		{method: http.MethodOptions, path: "/users/me", mount: "root"},
 		{method: http.MethodPost, path: "/sessions/me/csrf", mount: "root"},
@@ -170,9 +177,25 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 		name := tt.method + " " + tt.path
 		rec := serve(t, mux, tt.method, tt.path)
 		assert.Equal(t, tt.mount, rec.Header().Get("X-Test-Handler"), name)
-		assert.Equal(t, tt.path, rec.Header().Get("X-Test-Path"), "%s must reach its mount unrewritten", name)
+		if tt.reaches == "" {
+			assert.Equal(t, tt.path, rec.Header().Get("X-Test-Path"), "%s must reach its mount unrewritten", name)
+		} else {
+			assert.Equal(t, tt.reaches, rec.Header().Get("X-Test-Path"), name)
+		}
 		assert.Equal(t, tt.deprecated, rec.Header().Get("Deprecation") != "", "%s: Deprecation", name)
 	}
+}
+
+// denyAll admits no origin as an issuer and notEnabled has OAuth off for
+// every project: the OAuth server with nothing behind it.
+type (
+	denyAll    struct{}
+	notEnabled struct{}
+)
+
+func (denyAll) Admit(context.Context, string, string) error { return domain.ErrOriginNotFound() }
+func (notEnabled) Get(context.Context, oauth.Issuer) (oauth.Settings, error) {
+	return oauth.Settings{}, nil
 }
 
 // With oauth.enabled, the OAuth server takes the well-known metadata paths
@@ -182,7 +205,7 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 func TestBuildHTTPMuxMountsTheOAuthServer(t *testing.T) {
 	publicBase, err := url.Parse("https://api.example.com")
 	require.NoError(t, err)
-	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: oauth.DenyAll{}, Settings: oauth.NotEnabled{}})
+	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: denyAll{}, Settings: notEnabled{}})
 	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
 		nil, nil, handlers)

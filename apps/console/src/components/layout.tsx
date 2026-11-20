@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 export function Page({
   children,
   fill = false,
+  besideSheet = false,
 }: {
   children: ReactNode;
   /**
@@ -24,12 +25,23 @@ export function Page({
    * and the page scrolls, so a short window keeps its minimum heights.
    */
   fill?: boolean;
+  /**
+   * A sheet that is not modal stands open at the right (Events' event
+   * drawer): from `xl`, where the two fit side by side, the page ends a
+   * gutter before it, so none of the screen sits under the sheet. Narrower,
+   * the sheet covers the page's right.
+   */
+  besideSheet?: boolean;
 }) {
-  return <div className={cn(PAGE, fill && PAGE_FILL)}>{children}</div>;
+  return (
+    <div className={cn(PAGE, fill && PAGE_FILL, besideSheet && PAGE_BESIDE_SHEET)}>{children}</div>
+  );
 }
 
 const PAGE = "px-4 pt-4 pb-8 lg:pt-5";
 const PAGE_FILL = "lg:flex lg:h-[calc(100svh-3.5rem)] lg:flex-col";
+/** The sheets' 520px (`sm:max-w-130`) and the page's 16px gutter. */
+const PAGE_BESIDE_SHEET = "xl:pr-134";
 
 /** The fixed column every settings screen renders in, centred in the main area. */
 export function SettingsColumn({ children }: { children: ReactNode }) {

@@ -1,6 +1,6 @@
 get:
   operationId: getEvent
-  x-zitadel-cli: events get
+  x-zitadel-cli: event get
   summary: Get an event by ID
   # Events are not registered in resource_scope_index, so the query must carry
   # the project scope (ADR 049).

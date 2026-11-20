@@ -8,7 +8,7 @@ get:
     Each webhook carries the time of its last delivery and of its last
     failed attempt. None carries its signing secret: only `createWebhook`
     (`POST /webhooks`) and `rotateWebhookSecret`
-    (`POST /webhooks/{id}/rotate_secret`) return it.
+    (`POST /webhooks/{webhook_id}/rotate_secret`) return it.
 
     Authenticate with a project secret (`oauth2`), or with the session cookie
     (`sessionCookie`) of a signed-in person who can read the project.
@@ -37,7 +37,7 @@ get:
                 `last_error_at` is later than its `last_delivered_at` and its
                 `last_error_status` is `null`.
               value:
-                data:
+                webhooks:
                   - id: hook_01KWH3B7K2M9P4R6T8V0X2Z4C6
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
                     url: https://api.acme.com/hooks/zitadel
@@ -115,7 +115,7 @@ post:
       is an event type the server writes, or `*`, and `*` stands alone.
     - A project holds at most 10 webhooks. One more answers `409`
       `webhook.limit_reached`: delete one with `deleteWebhook`
-      (`DELETE /webhooks/{id}`) first. Two webhooks may name the
+      (`DELETE /webhooks/{webhook_id}`) first. Two webhooks may name the
       same `url`.
 
     The `secret` appears only in this response. Store it where the endpoint
@@ -124,7 +124,7 @@ post:
     A repeated request creates a second webhook. To recover from a lost
     response, find the webhook with `listWebhooks` (`GET /webhooks`) and
     issue a secret for it with `rotateWebhookSecret`
-    (`POST /webhooks/{id}/rotate_secret`), or delete it and create it again.
+    (`POST /webhooks/{webhook_id}/rotate_secret`), or delete it and create it again.
 
     Authenticate with a project secret (`oauth2`), or with the session cookie
     (`sessionCookie`) of a signed-in person who can change the project.

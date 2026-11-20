@@ -41,7 +41,7 @@ redirect: a `3xx` status is a failure too.
   server sets `enabled` to `false`, stops sending and records a
   `webhook.disabled` event whose `reason` is `failing` or `gone`.
 - To start again, fix the endpoint and set `enabled` to `true` with
-  `updateWebhook` (`PATCH /webhooks/{id}`). Delivery resumes with the events
+  `updateWebhook` (`PATCH /webhooks/{webhook_id}`). Delivery resumes with the events
   stored from then on. The events from while it was disabled are not sent:
   read them with `GET /events`.
 - Events are deleted by age, 30 days by default, whether they were delivered

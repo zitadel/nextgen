@@ -1,14 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { useLocalServers } from "@tests/helpers/local-server";
+import { it } from "@tests/fixtures";
 import { usePlatformMock } from "@tests/helpers/platform";
-import { nextPort } from "@tests/helpers/ports";
 import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
 
@@ -90,9 +88,8 @@ describe("start", () => {
     });
 
     describe("--json", () => {
-      it("starts the server and reports where it listens", async () => {
+      it("starts the server and reports where it listens", async ({ port }) => {
         const app = await aSetUpApp();
-        const port = nextPort();
 
         const result = await app.startLocalServer({ port });
 

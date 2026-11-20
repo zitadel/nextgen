@@ -219,11 +219,10 @@ func contentToDomain(
 		ID:            id,
 		Name:          name,
 		SchemaVersion: schemaVersion,
-		// Spanner returns UTC while pgx defaults to local; normalize to UTC.
-		CreatedAt:  createdAt.UTC(),
-		UpdatedAt:  updatedAt.UTC(),
-		UserSchema: content.UserSchema,
-		Purposes:   purposes,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
+		UserSchema:    content.UserSchema,
+		Purposes:      purposes,
 		Audience: domain.FlowDefinitionAudience{
 			AppIDs:  content.Audience.AppIDs,
 			TeamIDs: content.Audience.TeamIDs,

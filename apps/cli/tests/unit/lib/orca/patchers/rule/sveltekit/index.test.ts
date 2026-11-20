@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { SvelteKitPatcher } from "@/lib/orca/patchers/rule/sveltekit";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
@@ -17,8 +18,10 @@ function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:5173",
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
   };
 }
@@ -35,7 +38,7 @@ describe("SvelteKitPatcher.plan", () => {
   it("writes the server hook and file-based routes under src/", () => {
     const plan = new SvelteKitPatcher().plan(ctx());
 
-    expect(writeContents(plan, "src/hooks.server.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/hooks.server.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/hooks.server.ts")).toContain("@zitadel/sdk-sveltekit/server");
     expect(writeContents(plan, "src/hooks.server.ts")).toContain("createNextgenHandle");
     const envEdit = plan.ops.find(
@@ -46,8 +49,8 @@ describe("SvelteKitPatcher.plan", () => {
     expect(envEdit?.wiring).toBe("infrastructure");
     expect(envEdit?.edit(undefined)).toContain("defineEnvVars");
 
-    expect(writeContents(plan, "src/routes/+layout.svelte")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "src/routes/+page.svelte")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/+layout.svelte")).toContain(ManagedFile.MARKER);
+    expect(writeContents(plan, "src/routes/+page.svelte")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/+page.svelte")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("ZitadelSession");
@@ -64,7 +67,7 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/+layout.svelte")).toBeUndefined();
     expect(writeContents(plan, "src/routes/+page.svelte")).toBeUndefined();
     // The auth boundary and the auth routes are still written.
-    expect(writeContents(plan, "src/hooks.server.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/hooks.server.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/+page.svelte")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("ZitadelSession");

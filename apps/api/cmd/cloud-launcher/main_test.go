@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,11 +19,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
 
 	"github.com/zitadel/nextgen/api/client"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 )
 
@@ -144,6 +149,10 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	} {
 		t.Setenv(key, "")
 	}
+	// The launcher clears these behind the wrapper; t.Setenv restores them.
+	for _, key := range otlpBackendEnv {
+		t.Setenv(key, "")
+	}
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 	t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte(testPEM)))
 	t.Setenv("MASTER_KEY_ID", "cloud-2026-10")
@@ -201,7 +210,7 @@ func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
 		"      private_key: "+strconv.Quote(testPEM), string(config))
 	info, err := os.Stat(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	assertOwnerOnly(t, info)
 
 	assert.Equal(t, ":9090", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "the listen address follows Vercel's PORT")
 	assert.Empty(t, os.Getenv("MASTER_KEY_PEM_B64"), "the secret leaves the environment once it is on disk")
@@ -506,10 +515,11 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))
 }
 
-// Behind the Node.js wrapper the server listens on loopback only and sends
-// its spans and metrics to the wrapper, which hands them to Vercel; it trusts
-// traceparent because only the wrapper can reach it and the wrapper sets it.
-// An OTLP backend named on the environment does not move either.
+// Behind the Node.js wrapper's collector the server listens on loopback only
+// and sends its spans and metrics to the wrapper, which hands them to Vercel;
+// it trusts traceparent because only the wrapper can reach it and the wrapper
+// sets it. Vercel is the only sink then: what names an OTLP backend is
+// cleared, so the server exports nothing to it, logs included.
 func TestPrepareServerExportsToTheWrapper(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
@@ -520,6 +530,8 @@ func TestPrepareServerExportsToTheWrapper(t *testing.T) {
 	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION", "1")
 	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE", "grpc")
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otlp.example.com/otlp")
+	t.Setenv("OTEL_EXPORTER_OTLP_HEADERS", "Authorization=Basic backend")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://otlp.example.com/otlp/v1/traces")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
@@ -536,6 +548,63 @@ func TestPrepareServerExportsToTheWrapper(t *testing.T) {
 	assert.Equal(t, "100ms", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION"))
 	assert.Equal(t, "0", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION"), "Vercel's sampling decides")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS"))
+	for _, key := range otlpBackendEnv {
+		assert.Empty(t, os.Getenv(key), key)
+	}
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE"), "the logs are Vercel's too")
+}
+
+// The settings the launcher writes must put the server's exports on the paths
+// the wrapper's collector serves, whatever the environment named before. An
+// exporter given only a host takes its path from OTEL_EXPORTER_OTLP_ENDPOINT:
+// beside Grafana Cloud's https://…/otlp, production sent every export to
+// /otlp/v1/traces and /otlp/v1/metrics, and the collector answered 404.
+func TestPrepareServerExportsReachTheWrappersCollector(t *testing.T) {
+	paths := make(chan string, 16)
+	collector := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		paths <- r.URL.Path
+	}))
+	t.Cleanup(collector.Close)
+
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+	t.Setenv(otlpCollectorEnv, strings.TrimPrefix(collector.URL, "http://"))
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otlp.example.com/otlp")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	// The exporters the server builds from the settings the launcher wrote.
+	exporter := func(signal string) zotel.ExporterConfig {
+		prefix := "NEXTGEN_INSTRUMENTATION_" + signal + "_EXPORTER_"
+		return zotel.ExporterConfig{
+			Type:          zotel.ExporterTypeHTTP,
+			Endpoint:      os.Getenv(prefix + "ENDPOINT"),
+			Insecure:      os.Getenv(prefix+"INSECURE") == "true",
+			BatchDuration: time.Hour,
+		}
+	}
+	ctx := t.Context()
+	tracerProvider, err := zotel.NewTracerProvider(ctx, exporter("TRACE"), 1, resource.Empty())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tracerProvider.Shutdown(context.Background()) })
+	_, span := tracerProvider.Tracer("test").Start(ctx, "request", trace.WithSpanKind(trace.SpanKindServer))
+	span.End()
+	require.NoError(t, tracerProvider.ForceFlush(ctx))
+
+	meterProvider, err := zotel.NewMeterProvider(ctx, exporter("METRIC"), resource.Empty())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = meterProvider.Shutdown(context.Background()) })
+	counter, err := meterProvider.Meter("test").Int64Counter("requests")
+	require.NoError(t, err)
+	counter.Add(ctx, 1)
+	require.NoError(t, meterProvider.ForceFlush(ctx))
+
+	// Each flush waited for its answer, so both requests are in.
+	got := []string{<-paths, <-paths}
+	assert.ElementsMatch(t, []string{"/v1/traces", "/v1/metrics"}, got)
 }
 
 func TestPrepareServerWithoutTheWrapperLeavesTelemetryAlone(t *testing.T) {
@@ -763,7 +832,8 @@ func TestVercelJSONSchedulesTheServersTriggers(t *testing.T) {
 // its prefix, the few paths the server answers at the root and, until 1.0.0,
 // the root paths of the API's resources, which clients released before the
 // prefix call (ADR 077 §4). Their names are fixed: a client can only call an
-// operation it knows, so a resource added since needs no root rule. Every
+// operation it knows, so a resource added since needs no root rule, and
+// neither does `/flows`, which no client calls without the prefix. Every
 // other path is the website's, whose 404 answers what nothing serves
 // (ADR 076, as amended). A missed rule shows here, not in production.
 func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
@@ -829,7 +899,7 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 		"/schemas/v1/user-schema.json": "schemas",
 		"/console/users":               "console",
 		"/docs/reference/api":          "docs",
-		"/cloud/zitadel/flow":          "cloud-functions",
+		"/cloud/zitadel/api/v1/flows":  "cloud-functions",
 		webhookWakePath:                "cloud-functions",
 		// The queue's consumer is the queue's alone: no path leads to it.
 		"/queues/webhook-wake":      "website",
@@ -1184,6 +1254,233 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 	}
 }
 
+// A deployment's build seeded its database, so its function starts with
+// --seed=false and gets no copy of the admin document. A local run has no
+// build step and seeds when it starts.
+func TestPrepareServerSeedsOnlyALocalRun(t *testing.T) {
+	for _, tc := range []struct {
+		name, env, databaseURL string
+		seeds                  bool
+	}{
+		{name: "by hand", env: "", seeds: true},
+		{name: "vercel dev", env: "development", seeds: true},
+		{name: "local against a cloud database", env: "", databaseURL: pooledURL, seeds: true},
+		{name: "preview", env: "preview", databaseURL: pooledURL},
+		{name: "production", env: "production", databaseURL: pooledURL},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dataDir := t.TempDir()
+			setLauncherEnv(t, dataDir)
+			t.Setenv("VERCEL_ENV", tc.env)
+			t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+			t.Setenv("CLOUD_DATABASE_URL", tc.databaseURL)
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(testAdminDocument)))
+
+			args, err := prepareServer(nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, !tc.seeds, slices.Contains(args, "--seed=false"), "args: %q", args)
+			assert.Equal(t, tc.seeds, slices.Contains(args, "--user-file"), "args: %q", args)
+			adminPath := filepath.Join(dataDir, adminFile)
+			if tc.seeds {
+				assert.FileExists(t, adminPath)
+			} else {
+				assert.NoFileExists(t, adminPath)
+			}
+			assert.Empty(t, os.Getenv("BOOTSTRAP_ADMIN_USER_JSON_B64"), "the server process never carries the document")
+			assert.Equal(t, "user_platformadmin", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+		})
+	}
+}
+
+const testAdminDocument = `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":{}}`
+
+// stubSeedLock records the databases the launcher locks to seed and runs the
+// seeding without connecting anywhere.
+func stubSeedLock(t *testing.T) *[]string {
+	t.Helper()
+	locked := &[]string{}
+	previous := withSeedLock
+	withSeedLock = func(_ context.Context, dsn string, seed func() error) error {
+		*locked = append(*locked, dsn)
+		return seed()
+	}
+	t.Cleanup(func() { withSeedLock = previous })
+	return locked
+}
+
+// stubExecuteServer records the server commands the launcher runs.
+func stubExecuteServer(t *testing.T, run func(args []string) error) *[][]string {
+	t.Helper()
+	executed := &[][]string{}
+	previous := executeServer
+	executeServer = func(args []string) error {
+		*executed = append(*executed, args)
+		if run == nil {
+			return nil
+		}
+		return run(args)
+	}
+	t.Cleanup(func() { executeServer = previous })
+	return executed
+}
+
+// The build seeds with the function's own configuration: the same master key,
+// admin and public base, through the pooled URL the function serves from, so
+// what it seeds is what the function then serves. Only the lock needs the
+// direct URL.
+func TestRunSeedSeedsAPreviewWithTheFunctionsConfiguration(t *testing.T) {
+	dataDir := t.TempDir()
+	configPath, adminPath := filepath.Join(dataDir, configFile), filepath.Join(dataDir, adminFile)
+	locked := stubSeedLock(t)
+	var seeded string
+	executed := stubExecuteServer(t, func([]string) error {
+		seeded = os.Getenv("NEXTGEN_DATABASE_POSTGRES")
+		assert.FileExists(t, configPath, "the seeding reads the master key from the config file")
+		assert.FileExists(t, adminPath)
+		return nil
+	})
+	setLauncherEnv(t, dataDir)
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("VERCEL_BRANCH_URL", "cloud-git-feature-zitadel.vercel.app")
+	t.Setenv("VERCEL_URL", "cloud-abc1234de-zitadel.vercel.app")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(testAdminDocument)))
+
+	require.NoError(t, runSeed())
+
+	assert.Equal(t, [][]string{{"seed", "--config", configPath, "--user-file", adminPath}}, *executed)
+	require.Len(t, *locked, 1)
+	lockedURL, err := url.Parse((*locked)[0])
+	require.NoError(t, err)
+	assert.Equal(t, "eu-central.pg.psdb.cloud:5432", lockedURL.Host, "the lock is a session's, which the pooler cannot hold")
+	assert.Equal(t, "/"+previewName(t), lockedURL.Path)
+	seededURL, err := url.Parse(seeded)
+	require.NoError(t, err)
+	assert.Equal(t, "eu-central.pg.psdb.cloud:6432", seededURL.Host, "seeded the way the function serves")
+	assert.Equal(t, "/"+previewName(t), seededURL.Path)
+	assert.Equal(t, "https://cloud-git-feature-zitadel.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"),
+		"the platform project's primary origin is where the function will be reached")
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
+	assert.Equal(t, "user_platformadmin", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+	assert.NoFileExists(t, configPath, "the build machine keeps no copy of the master key")
+	assert.NoFileExists(t, adminPath)
+}
+
+func TestRunSeedSeedsProductionInPlace(t *testing.T) {
+	dataDir := t.TempDir()
+	locked := stubSeedLock(t)
+	executed := stubExecuteServer(t, nil)
+	setLauncherEnv(t, dataDir)
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "zitadel.example")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	require.NoError(t, runSeed())
+
+	assert.Equal(t, [][]string{{"seed", "--config", filepath.Join(dataDir, configFile)}}, *executed)
+	assert.Equal(t, []string{migratorURL}, *locked)
+	assert.Equal(t, "https://zitadel.example", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+}
+
+// The seeding runs on a build machine. With an OTLP backend named, the server
+// exports to it; the seeding, like the migration, sends it nothing, and so
+// cannot fail or stall a build on a backend that does not answer.
+func TestRunSeedExportsNoTelemetry(t *testing.T) {
+	stubSeedLock(t)
+	stubExecuteServer(t, nil)
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "zitadel.example")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otlp.example/otlp")
+
+	require.NoError(t, runSeed())
+
+	for _, key := range []string{
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE",
+	} {
+		assert.Empty(t, os.Getenv(key), key)
+	}
+}
+
+// A failed seeding fails the build, so the deployment that serves keeps
+// serving; the files are removed all the same.
+func TestRunSeedFailsTheBuildWhenTheSeedingFails(t *testing.T) {
+	dataDir := t.TempDir()
+	stubSeedLock(t)
+	stubExecuteServer(t, func([]string) error { return fmt.Errorf("failed to deploy the platform project") })
+	setLauncherEnv(t, dataDir)
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "zitadel.example")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	err := runSeed()
+	require.ErrorContains(t, err, "failed to deploy the platform project")
+	assert.NotErrorIs(t, err, errPrepareFailed)
+	assert.NoFileExists(t, filepath.Join(dataDir, configFile))
+}
+
+// The seeding makes the public base the platform project's primary origin. A
+// build that cannot tell where the deployment is served would seed the
+// server's built-in default, and the console could not sign anyone in.
+func TestRunSeedRefusesABuildThatDoesNotKnowItsURL(t *testing.T) {
+	dataDir := t.TempDir()
+	locked := stubSeedLock(t)
+	executed := stubExecuteServer(t, nil)
+	setLauncherEnv(t, dataDir)
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	err := runSeed()
+	require.ErrorIs(t, err, errPrepareFailed)
+	assert.ErrorContains(t, err, "does not know the deployment's URL")
+	assert.Empty(t, *executed)
+	assert.Empty(t, *locked)
+	assert.NoFileExists(t, filepath.Join(dataDir, configFile))
+}
+
+func TestRunSeedSeedsProductionOnlyFromItsBranch(t *testing.T) {
+	locked := stubSeedLock(t)
+	executed := stubExecuteServer(t, nil)
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "zitadel.example")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	err := runSeed()
+	require.ErrorIs(t, err, errPrepareFailed)
+	assert.ErrorContains(t, err, "refusing to change production")
+	assert.Empty(t, *executed)
+	assert.Empty(t, *locked)
+}
+
+// A local run has no build step: its server seeds when it starts
+// (TestPrepareServerSeedsOnlyALocalRun).
+func TestRunSeedLeavesALocalRunToItsStart(t *testing.T) {
+	locked := stubSeedLock(t)
+	executed := stubExecuteServer(t, nil)
+	setLauncherEnv(t, t.TempDir())
+
+	require.NoError(t, runSeed())
+	assert.Empty(t, *executed)
+	assert.Empty(t, *locked)
+}
+
 func TestPrepareMigrationCreatesAndMigratesAPreviewDatabase(t *testing.T) {
 	calls := stubEnsureDatabase(t)
 	setLauncherEnv(t, "")
@@ -1491,11 +1788,11 @@ func TestPrepareMigrationMigratesProductionOnlyFromItsBranch(t *testing.T) {
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
 	_, err := prepareMigration(nil)
-	assert.ErrorContains(t, err, `refusing to migrate production from "feature": production deploys from "main"`)
+	assert.ErrorContains(t, err, `refusing to change production from "feature": production deploys from "main"`)
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "")
 	_, err = prepareMigration(nil)
-	assert.ErrorContains(t, err, "refusing to migrate production", "a CLI deploy carries no branch")
+	assert.ErrorContains(t, err, "refusing to change production", "a CLI deploy carries no branch")
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
 	_, err = prepareMigration(nil)

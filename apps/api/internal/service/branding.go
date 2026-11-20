@@ -178,21 +178,32 @@ func ResolveFlowBranding(ctx context.Context, reader flowBrandingReader, project
 	return reader.Get(ctx, projectID, pin.RevisionID)
 }
 
-// maxBrandingListRevisions caps the list response: revisions accumulate
-// forever by design, so an unbounded fetch would grow without limit. The cap
-// generously covers the audit/rollback use case; full history querying
-// arrives with ADR 031's list-endpoint query language.
-const maxBrandingListRevisions = 100
+type ListBrandingInput struct {
+	ProjectID string
+	PageToken string
+	Limit     int
+}
 
-// List returns the newest revisions for the project, newest first, capped at
-// maxBrandingListRevisions.
-func (s *BrandingService) List(ctx context.Context, projectID string) (_ []*domain.Branding, err error) {
+type ListBrandingOutput struct {
+	Items         []*domain.Branding
+	NextPageToken string
+}
+
+// List returns a page of the project's revisions, newest first. Revisions
+// accumulate forever by design, so the list is read a page at a time.
+func (s *BrandingService) List(ctx context.Context, input ListBrandingInput) (_ *ListBrandingOutput, err error) {
 	ctx, end := startSpan(ctx, "BrandingService.List")
 	defer end(&err)
 
-	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, maxBrandingListRevisions))
+	opts := branding.ListOptions(input.ProjectID, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+
+	result, err := s.v2Pool.Statements().ListBrandings(ctx, opts)
 	if err != nil {
 		return nil, mapListError(err, "failed to list branding revisions")
 	}
-	return result.Items, nil
+	return &ListBrandingOutput{
+		Items:         result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
 }

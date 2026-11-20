@@ -204,7 +204,7 @@ func TestWebhookDelivery(t *testing.T) {
 	})
 
 	t.Run("during a rotation a delivery is signed with both secrets", func(t *testing.T) {
-		res, err := client.RotateWebhookSecret(t.Context(), api.RotateWebhookSecretParams{ID: created.ID, ProjectID: projectID})
+		res, err := client.RotateWebhookSecret(t.Context(), api.RotateWebhookSecretParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.WebhookWithSecret{}, res, helpers.MustMarshal(t, res))
 		rotated := res.(*api.WebhookWithSecret)
@@ -220,7 +220,7 @@ func TestWebhookDelivery(t *testing.T) {
 	t.Run("an endpoint that answers 410 is disabled, with its event", func(t *testing.T) {
 		upd, err := client.UpdateWebhook(t.Context(), &api.UpdateWebhookRequest{
 			Description: api.NewOptString("Gone"),
-		}, api.UpdateWebhookParams{ID: created.ID, ProjectID: projectID})
+		}, api.UpdateWebhookParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Webhook{}, upd, helpers.MustMarshal(t, upd))
 		mu.Lock()
@@ -231,7 +231,7 @@ func TestWebhookDelivery(t *testing.T) {
 		require.Len(t, got, 1)
 		assert.Equal(t, []string{"webhook.updated"}, eventTypes(t, got))
 
-		res, err := client.GetWebhook(t.Context(), api.GetWebhookParams{ID: created.ID, ProjectID: projectID})
+		res, err := client.GetWebhook(t.Context(), api.GetWebhookParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Webhook{}, res, helpers.MustMarshal(t, res))
 		hook := res.(*api.Webhook)

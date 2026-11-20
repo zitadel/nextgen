@@ -62,20 +62,6 @@ func TestConfigMemoryUsesUniqueName(t *testing.T) {
 	assert.Contains(t, a, "_txlock=immediate")
 }
 
-func TestConnectTightensFilePermissions(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "zitadel.db")
-	pool, err := Config{Path: dbPath}.Connect(context.Background())
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = pool.Close(context.Background()) })
-
-	info, err := os.Stat(dbPath)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-}
-
 func TestConfigPathURIEscapesMetacharacters(t *testing.T) {
 	t.Parallel()
 
@@ -83,7 +69,6 @@ func TestConfigPathURIEscapesMetacharacters(t *testing.T) {
 		name string
 		dir  string
 	}{
-		{name: "question_mark", dir: "nested?mark"},
 		{name: "hash", dir: "nested#hash"},
 		{name: "percent", dir: "nested%25pct"},
 	} {

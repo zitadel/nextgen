@@ -10,7 +10,7 @@ The headers and the signature follow [Standard Webhooks](https://www.standardweb
 ## Before you start
 
 - **A webhook.** Create one with `createWebhook` (`POST /webhooks`). The [webhooks reference](/docs/reference/api/webhooks) describes what it receives.
-- **Its signing secret.** The response to `createWebhook` holds it in `secret`, as `whsec_` followed by base64. No later response shows it again. Store it where your endpoint reads its secrets, here the `ZITADEL_WEBHOOK_SECRET` environment variable. If you lose it, issue a new one with `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+- **Its signing secret.** The response to `createWebhook` holds it in `secret`, as `whsec_` followed by base64. No later response shows it again. Store it where your endpoint reads its secrets, here the `ZITADEL_WEBHOOK_SECRET` environment variable. If you lose it, issue a new one with `rotateWebhookSecret` (`POST /webhooks/{webhook_id}/rotate_secret`).
 
 ## What a request carries
 
@@ -24,7 +24,7 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 {"id":"evt_01KWH3B7K2M9P4R6T8V0X2Z4C6","type":"user.created","created_at":"2026-11-11T10:00:00Z","project_id":"proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A","actor":{"type":"human","id":"user_01JD2Q7C4T9N6M8P0R2V5X7Z9B"},"entity":{"type":"user","id":"user_01KWH3B7JZ5N7Q9S1U3W5Y7A9C"},"data":{"schema_id":"sch_01JD2Q6W8K3M5P7R9T1V3X5Z7B","attribute_keys":["email","name"]}}
 ```
 
-The body always has these seven fields. `actor` and `entity` are `null` when the event has none. `data` is the event's payload, not the resource. To get more, read the resource by `entity.id`, or the whole event with `getEvent` (`GET /events/{id}`).
+The body always has these seven fields. `actor` and `entity` are `null` when the event has none. `data` is the event's payload, not the resource. To get more, read the resource by `entity.id`, or the whole event with `getEvent` (`GET /events/{event_id}`).
 
 | Header | Value |
 | --- | --- |
@@ -145,7 +145,7 @@ Delivery is at least once. The same event arrives again when your endpoint answe
 
 ## Rotate the secret
 
-`rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`) returns a new secret. The previous one stays valid for 24 hours.
+`rotateWebhookSecret` (`POST /webhooks/{webhook_id}/rotate_secret`) returns a new secret. The previous one stays valid for 24 hours.
 
 - During those 24 hours every request carries two signatures, one per secret. Verification with either secret passes, so your endpoint keeps working while it still holds the previous one.
 - Deploy the new secret to your endpoint within the 24 hours. After that, requests carry only the new secret's signature.
@@ -161,8 +161,8 @@ Delivery is at least once. The same event arrives again when your endpoint answe
 ## Check that it works
 
 1. Start your endpoint and create a webhook for its URL with `event_types` set to `["*"]`.
-2. Change something in the project, for example update the webhook's `description` with `updateWebhook` (`PATCH /webhooks/{id}`). The server sends a `webhook.updated` event within a few seconds.
-3. Read the webhook with `getWebhook` (`GET /webhooks/{id}`). `last_delivered_at` holds the time of the delivery. If `last_error_at` is later instead, `last_error_status` holds the status your endpoint answered, or `null` when it gave no answer.
+2. Change something in the project, for example update the webhook's `description` with `updateWebhook` (`PATCH /webhooks/{webhook_id}`). The server sends a `webhook.updated` event within a few seconds.
+3. Read the webhook with `getWebhook` (`GET /webhooks/{webhook_id}`). `last_delivered_at` holds the time of the delivery. If `last_error_at` is later instead, `last_error_status` holds the status your endpoint answered, or `null` when it gave no answer.
 4. Send your endpoint the same request with one character of the body changed. It must refuse it.
 
 The server only sends to `https` URLs on public addresses. To receive events on your machine during development, expose the endpoint through an `https` tunnel.

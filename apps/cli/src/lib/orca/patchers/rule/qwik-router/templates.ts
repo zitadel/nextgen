@@ -1,4 +1,4 @@
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
@@ -17,7 +17,7 @@ const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;col
  * managed marker sits in a JS comment.
  */
 export function pluginTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
 
 export const onRequest = createNextgenOnRequest({
@@ -29,7 +29,7 @@ export const onRequest = createNextgenOnRequest({
 
 /** `src/routes/index.tsx` — the landing chooser linking to login/register/profile. */
 export function indexPageTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { component$ } from "@qwik.dev/core";
 
 export default component$(() => (
@@ -71,7 +71,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
 // fall back to the neutral wording.`
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { component$ } from "@qwik.dev/core";
 import { ${importNames} } from "@zitadel/sdk-qwik";${localesComment}
 
@@ -100,7 +100,7 @@ export function registerPageTemplate(ctx: PatchContext): string {
 
 /** `src/routes/profile/index.tsx` — the signed-in view: the "signed in as" session card, with sign-out. */
 export function profilePageTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { component$ } from "@qwik.dev/core";
 import { ZitadelSession, configureZitadel } from "@zitadel/sdk-qwik";
 

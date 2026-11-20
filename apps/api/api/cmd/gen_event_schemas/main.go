@@ -52,6 +52,7 @@ var payloadByEventType = map[string]string{
 	"auth.attempt.handed_off":        "empty-event-payload.yaml",
 	"auth.check.failed":              "auth-check-payload.yaml",
 	"auth.check.succeeded":           "auth-check-payload.yaml",
+	"auth.request.created":           "auth-request-created-payload.yaml",
 
 	"auth.sso.authorization.failed": "auth-check-payload.yaml",
 	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
@@ -64,6 +65,8 @@ var payloadByEventType = map[string]string{
 	"schema.created": "schema-created-payload.yaml",
 
 	"branding.created": "branding-created-payload.yaml",
+
+	"oauth_settings.created": "oauth-settings-created-payload.yaml",
 
 	"policy.created": "policy-payload.yaml",
 	"policy.updated": "policy-payload.yaml",
@@ -132,7 +135,7 @@ type webhookDoc struct {
 var webhookByEventType = map[string]webhookDoc{
 	"request.api": {description: "An API request in the project completed. One event per request; " +
 		"the health, liveness, and readiness probes send none. The requester's IP, user agent and origin " +
-		"are in `metadata.client` of the event that `getEvent` (`GET /events/{id}`) returns, and its " +
+		"are in `metadata.client` of the event that `getEvent` (`GET /events/{event_id}`) returns, and its " +
 		"`request_id` joins the other events of the same request to it."},
 
 	"project.created": {description: "A project was created."},
@@ -156,7 +159,7 @@ var webhookByEventType = map[string]webhookDoc{
 	"auth.token.issued": {description: "A token was issued."},
 	"auth.token.revoked": {description: "A token was revoked. Deleting a session revokes its tokens too. " +
 		"Those events have an `entity.id` of `null`; the session's ID is `session_id` of the event that " +
-		"`getEvent` (`GET /events/{id}`) returns."},
+		"`getEvent` (`GET /events/{event_id}`) returns."},
 
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
@@ -171,6 +174,8 @@ var webhookByEventType = map[string]webhookDoc{
 		"password."},
 	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. The event is also sent " +
 		"when a factor is recorded without a challenge, as on sign-up."},
+	"auth.request.created": {description: "An app started a sign-in at the OAuth authorization endpoint. " +
+		"`data` names the app by its `client_id`."},
 
 	"auth.sso.authorization.failed": {description: "A sign-in through an identity provider (SSO) failed at the provider. " +
 		"It answered with an error, `access_denied` included, or the callback carried no code."},
@@ -188,6 +193,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"schema.created": {description: "A schema was created."},
 
 	"branding.created": {description: "A branding revision was created."},
+
+	"oauth_settings.created": {description: "A project published a new revision of its OAuth settings, " +
+		"which say whether its OAuth authorization server answers. A release build publishes one when the " +
+		"bundle's `oauth` resource differs from every earlier revision."},
 
 	"policy.created": {description: "A project published the first revision of its policy for an operation. " +
 		"A policy guards an operation, such as setting a password."},
@@ -228,10 +237,9 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"invitation.created": {description: "An invitation was created, new or as the replacement of another."},
 	"invitation.accepted": {description: "An invitation was accepted. The grant events the acceptance writes " +
-		"share its `request_id`, which is on the event that `getEvent` (`GET /events/{id}`) returns; there are " +
-		"none when the user already holds an identical active grant.",
-		status: statusContracted},
-	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
+		"share its `request_id`, which is on the event that `getEvent` (`GET /events/{event_id}`) returns; there are " +
+		"none when the user already holds an identical active grant."},
+	"invitation.rejected": {description: "An invitation was declined."},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +
 		"or an unaccepted one was deleted by its replacement."},
 

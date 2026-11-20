@@ -67,7 +67,7 @@ properties:
     description: |
       The page hosting the login component, where the flow resumes after an
       external sign-in: the callback sends the browser here unchanged, and
-      the page loads `GET /flow/{id}` to render the next step. The client
+      the page loads `GET /flows/{flow_id}` to render the next step. The client
       puts the flow ID in it; the login component reads `?flow=<id>` on the
       reload. Required when `action` is "sso". An absolute URL; the server
       parses it and keeps a fragment, so a hash-routed page returns to its

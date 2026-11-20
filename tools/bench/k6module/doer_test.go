@@ -49,7 +49,7 @@ func testVU(t *testing.T) (*modulestest.VU, chan metrics.SampleContainer) {
 }
 
 // TestDoerBoundsTagsByOperation is the #1104 cardinality property at the
-// request layer: a hundred requests to a hundred distinct /flow/{id}/submit
+// request layer: a hundred requests to a hundred distinct /flows/{flow_id}/submit
 // paths produce samples whose name and url tags are all the operation id,
 // so the time-series count does not grow with the ids.
 func TestDoerBoundsTagsByOperation(t *testing.T) {
@@ -58,7 +58,7 @@ func TestDoerBoundsTagsByOperation(t *testing.T) {
 			http.Error(w, "missing origin", http.StatusBadRequest)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "_zflow", Value: "sealed-" + strings.TrimPrefix(r.URL.Path, "/flow/"), Path: "/"})
+		http.SetCookie(w, &http.Cookie{Name: "_zflow", Value: "sealed-" + strings.TrimPrefix(r.URL.Path, "/flows/"), Path: "/"})
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
@@ -70,7 +70,7 @@ func TestDoerBoundsTagsByOperation(t *testing.T) {
 	const n = 100
 	for i := range n {
 		req, err := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpSubmitIdent), http.MethodPost,
-			fmt.Sprintf("%s/flow/flow_%04d/submit", srv.URL, i), strings.NewReader(`{"action":"submit"}`))
+			fmt.Sprintf("%s/flows/flow_%04d/submit", srv.URL, i), strings.NewReader(`{"action":"submit"}`))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,7 +124,7 @@ func TestDoerStoresCookiesInTheJar(t *testing.T) {
 	defer srv.Close()
 	vu, _ := testVU(t)
 	d := &doer{st: vu.State(), ctx: vu.Context, origin: "http://origin.test", lane: "test"}
-	req, _ := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpCreateFlow), http.MethodPost, srv.URL+"/flow", strings.NewReader("{}"))
+	req, _ := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpCreateFlow), http.MethodPost, srv.URL+"/flows", strings.NewReader("{}"))
 	if _, err := d.Do(req); err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestDoerSendsJarCookiesOnTheNextRequest(t *testing.T) {
 	d := &doer{st: vu.State(), ctx: vu.Context, origin: "http://origin.test", lane: "test"}
 	do := func(cookie string) {
 		t.Helper()
-		req, _ := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpSubmitIdent), http.MethodPost, srv.URL+"/flow/1/submit", strings.NewReader("{}"))
+		req, _ := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpSubmitIdent), http.MethodPost, srv.URL+"/flows/1/submit", strings.NewReader("{}"))
 		if cookie != "" {
 			req.AddCookie(&http.Cookie{Name: "_zflow", Value: cookie})
 		}

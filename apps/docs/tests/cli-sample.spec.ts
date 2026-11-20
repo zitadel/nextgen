@@ -25,8 +25,7 @@ function request(options: { kind?: string; name?: string; body?: unknown }): Req
 
 function update(options: { kind?: string; body: unknown }): string {
   return (
-    cliSample(operation("updateVariables", "variable set"), "/variables", {}, request(options)) ??
-    ""
+    cliSample(operation("setVariables", "variable set"), "/variables", {}, request(options)) ?? ""
   );
 }
 
@@ -43,7 +42,8 @@ function remove(kind?: string): string {
 
 function list(kind?: string): string {
   return (
-    cliSample(operation("getVariables", "variable list"), "/variables", {}, request({ kind })) ?? ""
+    cliSample(operation("listVariables", "variable list"), "/variables", {}, request({ kind })) ??
+    ""
   );
 }
 
@@ -73,9 +73,7 @@ test("a preview delete adds --preview", () => {
 });
 
 test("a primary-only update is the api call, which the variable command cannot say", () => {
-  expect(update({ kind: "primary", body: { API_URL: "x" } })).toContain(
-    `${cli} api updateVariables`,
-  );
+  expect(update({ kind: "primary", body: { API_URL: "x" } })).toContain(`${cli} api setVariables`);
 });
 
 test("a primary-only delete is the api call", () => {
@@ -83,11 +81,87 @@ test("a primary-only delete is the api call", () => {
 });
 
 test("a primary-only list is the api call", () => {
-  expect(list("primary")).toContain(`${cli} api getVariables`);
+  expect(list("primary")).toContain(`${cli} api listVariables`);
 });
 
 test("a numeric secret is the api call, which variable set rejects", () => {
   expect(update({ body: { TOKEN: { value: 42, secret: true } } })).toContain(
-    `${cli} api updateVariables`,
+    `${cli} api setVariables`,
+  );
+});
+
+function invitationRequest(options: {
+  query?: Record<string, string>;
+  body?: unknown;
+}): RequestData {
+  return {
+    method: "post",
+    path: {},
+    query: Object.fromEntries(
+      Object.entries(options.query ?? {}).map(([name, value]) => [name, { values: [value] }]),
+    ),
+    header: {},
+    cookie: {},
+    body: options.body,
+  } as unknown as RequestData;
+}
+
+function createInvitation(body: unknown): string {
+  return (
+    cliSample(
+      operation("createInvitation", "invitation create"),
+      "/invitations",
+      {},
+      invitationRequest({ body }),
+    ) ?? ""
+  );
+}
+
+test("a project invitation is created with flags, not --data", () => {
+  const sample = createInvitation({
+    type: "project_member",
+    project_member: { relation: "editor" },
+    metadata: { name: "John Doe" },
+    replaces_invitation_id: "inv_1",
+  });
+
+  expect(sample).toContain(
+    `${cli} invitation create --relation editor --name 'John Doe' --replaces inv_1`,
+  );
+});
+
+test("a team invitation is the api call, which invitation create cannot say", () => {
+  const sample = createInvitation({
+    type: "team_member",
+    team_member: { team_id: "team_1", role: "member" },
+  });
+
+  expect(sample).toContain(`${cli} api createInvitation`);
+});
+
+test("an invitation list keeps its status and type filters", () => {
+  const sample =
+    cliSample(
+      operation("listInvitations", "invitation list"),
+      "/invitations",
+      {},
+      invitationRequest({ query: { status: "pending", type: "project_member" } }),
+    ) ?? "";
+
+  expect(sample).toContain(`${cli} invitation list --status pending --type project_member`);
+});
+
+test("an unfiltered invitation list names every status, as the request lists them", () => {
+  const sample =
+    cliSample(
+      operation("listInvitations", "invitation list"),
+      "/invitations",
+      {},
+      invitationRequest({}),
+    ) ?? "";
+
+  // A long command wraps one flag per line; join them to read it as typed.
+  expect(sample.replace(/ \\\n\s+/g, " ")).toContain(
+    `${cli} invitation list --status pending --status accepted --status rejected --status expired`,
   );
 });

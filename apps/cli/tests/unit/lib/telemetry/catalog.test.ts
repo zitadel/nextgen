@@ -30,7 +30,7 @@ const catalogPath = join(
   "../../../../../../docs/product-analytics-events.yaml",
 );
 const srcDir = join(import.meta.dirname, "../../../../src");
-const commandsDir = join(srcDir, "commands");
+const commandsDir = join(srcDir, "cli", "commands");
 const baseCommand = join(srcDir, "lib/oclif/base.ts");
 
 type PropertyDef = {
@@ -122,11 +122,17 @@ function calls(name: string): (call: ts.CallExpression) => boolean {
     ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === name;
 }
 
-/** The command id oclif gives a file under `src/commands`, such as `variables:set`. */
+/**
+ * The command id oclif gives a file under `src/cli/commands`, such as `variables:set`.
+ * The `server` folder only groups its commands, so it adds nothing to their ids.
+ */
 function commandId(file: string): string {
   const segments = file.replace(/\.ts$/, "").split(sep);
   if (segments.at(-1) === "index") {
     segments.pop();
+  }
+  if (segments[0] === "server") {
+    segments.shift();
   }
   return segments.join(":");
 }
@@ -149,6 +155,53 @@ async function recordedDimensions(): Promise<Map<string, Set<string>>> {
   return recorded;
 }
 
+/** A product event a command sends with `trackEvent`, and the keys it names. */
+type TrackedEvent = Readonly<{ command: string; event: string; keys: string[] }>;
+
+/**
+ * The event a `trackEvent` call names: a string literal, or a `const` in the
+ * same file that holds one.
+ */
+function eventName(node: ts.Expression | undefined, source: ts.SourceFile): string | undefined {
+  if (node && ts.isStringLiteral(node)) {
+    return node.text;
+  }
+  if (!node || !ts.isIdentifier(node)) {
+    return undefined;
+  }
+  const find = (child: ts.Node): string | undefined => {
+    if (
+      ts.isVariableDeclaration(child) &&
+      ts.isIdentifier(child.name) &&
+      child.name.text === node.text &&
+      child.initializer &&
+      ts.isStringLiteral(child.initializer)
+    ) {
+      return child.initializer.text;
+    }
+    return ts.forEachChild(child, find);
+  };
+  return find(source);
+}
+
+/** Every product event the commands send, by the command that sends it. */
+async function trackedEvents(): Promise<TrackedEvent[]> {
+  const files = (await readdir(commandsDir, { recursive: true })).filter((file) =>
+    file.endsWith(".ts"),
+  );
+  const tracked: TrackedEvent[] = [];
+  for (const file of files) {
+    for (const call of await callsIn(join(commandsDir, file), calls("trackEvent"))) {
+      const event = eventName(call.arguments[0], call.getSourceFile());
+      if (event === undefined) {
+        throw new Error(`${file}: trackEvent names its event with neither a literal nor a const`);
+      }
+      tracked.push({ command: commandId(file), event, keys: keysOf(call.arguments[1]) });
+    }
+  }
+  return tracked;
+}
+
 /** Each lifecycle event, by the constant `BaseCommand` tracks it with. */
 const LIFECYCLE_EVENTS = [
   ["CLI_COMMAND_STARTED", CLI_COMMAND_STARTED],
@@ -168,7 +221,10 @@ async function lifecycleExtras(constant: string): Promise<string[]> {
   );
   return tracks.flatMap((track) => {
     const bag = track.arguments[1];
-    return bag && ts.isCallExpression(bag) ? keysOf(bag.arguments[2]) : [];
+    if (bag && ts.isCallExpression(bag)) {
+      return keysOf(bag.arguments[3]);
+    }
+    return [];
   });
 }
 
@@ -182,7 +238,7 @@ function meta(): GlobalOptions {
     force: false,
     command: "setup",
     cliVersion: "0.1.0",
-    source: "https://api.zitadel.cloud",
+    source: "https://preview.zitadel.com",
     verbose: false,
     debug: false,
     env: {},
@@ -318,6 +374,27 @@ describe("product analytics catalog", () => {
 });
 
 describe("CLI telemetry against the catalog", () => {
+  it("sends exactly the properties the catalog lists on each product event", async () => {
+    const catalog = await loadCatalog();
+    const { events } = cliOf(catalog);
+    const base = [
+      ...Object.keys(commandEventProperties(meta(), "cloud", "invocation-1")),
+      ...STAMPED,
+    ];
+    for (const { command, event, keys } of await trackedEvents()) {
+      const definition = events[event];
+      expect(definition?.status, `${command} sends ${event}, not in the catalog as emitted`).toBe(
+        "emitted",
+      );
+      if (!definition) {
+        continue;
+      }
+      expect(new Set(eventProperties(catalog, "cli", definition)), event).toEqual(
+        new Set([...base, ...keys]),
+      );
+    }
+  });
+
   it("emits only lifecycle events the catalog lists as emitted", async () => {
     const { events } = cliOf(await loadCatalog());
     for (const [, event] of LIFECYCLE_EVENTS) {
@@ -327,7 +404,7 @@ describe("CLI telemetry against the catalog", () => {
 
   it("sends the header on every lifecycle event, with cli as its surface", async () => {
     const header = headerOf(await loadCatalog(), "cli");
-    const sent = commandEventProperties(meta(), "invocation-1");
+    const sent = commandEventProperties(meta(), "cloud", "invocation-1");
     expect(Object.keys(sent)).toEqual(expect.arrayContaining(header));
     expect(sent.surface).toBe("cli");
   });
@@ -335,7 +412,10 @@ describe("CLI telemetry against the catalog", () => {
   it("sends exactly the properties the catalog lists on each lifecycle event", async () => {
     const catalog = await loadCatalog();
     const { events } = cliOf(catalog);
-    const base = [...Object.keys(commandEventProperties(meta(), "invocation-1")), ...STAMPED];
+    const base = [
+      ...Object.keys(commandEventProperties(meta(), "cloud", "invocation-1")),
+      ...STAMPED,
+    ];
     for (const [constant, event] of LIFECYCLE_EVENTS) {
       const definition = events[event];
       if (!definition) {

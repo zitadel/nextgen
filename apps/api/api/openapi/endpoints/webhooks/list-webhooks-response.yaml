@@ -3,9 +3,9 @@ type: object
 # Pagination follows ADR 027.
 description: A page of a project's webhooks, newest first.
 required:
-  - data
+  - webhooks
 properties:
-  data:
+  webhooks:
     description: The webhooks of this page.
     type: array
     items:

@@ -193,8 +193,6 @@ export interface UserRow {
    * leads, since the identifier is `name` itself otherwise.
    */
   secondary?: string;
-  /** The schema property the identifier came from (e.g. "email"), as its chip. */
-  identifierProperty?: string;
   /** The user's whole `attributes` tree, as the Attributes popover shows it. */
   attributes: Record<string, unknown>;
   /**
@@ -251,7 +249,6 @@ export function toUserRow(
     name: userIdentity(user) ?? id,
     identifier: userIdentifier(user),
     secondary: userIdentitySecondary(user),
-    identifierProperty: field(user, "identifier_property"),
     status: metadata.status,
     createdAt: metadata.createdAt,
     lifecycleOwnerTeamId: metadata.lifecycleOwnerTeamId,

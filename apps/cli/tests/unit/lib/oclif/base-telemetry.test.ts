@@ -7,12 +7,14 @@ import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 /** Minimal recording stand-in for the generic Telemetry client. */
 class RecordingTelemetry {
   public readonly events: string[] = [];
+  public readonly properties: Record<string, unknown>[] = [];
   public enabled = true;
   public readonly isFirstRun = false;
   public readonly distinctId = "did-test";
 
-  public track(event: string): void {
+  public track(event: string, properties: Record<string, unknown> = {}): void {
     this.events.push(event);
+    this.properties.push(properties);
   }
 
   public profile(): void {
@@ -52,7 +54,10 @@ class TestCommand extends BaseCommand {
   }
 
   public async open(): Promise<void> {
-    await this.toMeta({}, { resolveServer: false, source: "mock" });
+    await this.toMeta({}, { source: "mock" });
+  }
+  public send(event: string, properties: Record<string, string>): void {
+    this.trackEvent(event, properties);
   }
   public complete(): void {
     this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
@@ -83,6 +88,31 @@ describe("BaseCommand telemetry lifecycle", () => {
     await cmd.open();
     await cmd.failWith(new Error("boom"));
     expect(cmd.recorder.events).toEqual(["cli_command_started", "cli_command_failed"]);
+  });
+
+  it("sends a product event with its properties and the command's context", async () => {
+    const cmd = makeCommand();
+    await cmd.open();
+    cmd.send("invitation_created", { role: "project_viewer", invitation_journey_id: "journey_1" });
+
+    expect(cmd.recorder.events).toEqual(["cli_command_started", "invitation_created"]);
+    expect(cmd.recorder.properties[1]).toMatchObject({
+      role: "project_viewer",
+      invitation_journey_id: "journey_1",
+      command: "telemetry-test",
+    });
+    expect(cmd.recorder.properties[1]).toMatchObject({
+      invocation_id: cmd.recorder.properties[0]?.invocation_id,
+    });
+  });
+
+  it("sends no product event when telemetry is opted out", async () => {
+    const cmd = makeCommand();
+    cmd.optOut = true;
+    await cmd.open();
+    cmd.send("invitation_created", { role: "project_viewer", invitation_journey_id: "journey_1" });
+
+    expect(cmd.recorder.events).toEqual([]);
   });
 
   it("records nothing when telemetry is opted out (inert)", async () => {

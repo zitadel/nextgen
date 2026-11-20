@@ -236,7 +236,7 @@ describe("validateStep", () => {
       });
     });
 
-    it("tells a literal client_secret how to publish it, in the deploy's environment", async () => {
+    it("tells a literal client_secret how to publish it", async () => {
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
 
       const error = await rejectionOf(() => {
@@ -245,7 +245,8 @@ describe("validateStep", () => {
 
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
-        hint: expect.stringContaining("variable set NAME --secret --env staging"),
+        hint: expect.stringContaining("Publish a secret with the command below"),
+        nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
       });
     });
 
@@ -306,16 +307,16 @@ describe("validateStep", () => {
     });
 
     it("refuses a literal client_secret before the project's variables are read", async () => {
-      const getVariables = vi.fn(async () => {
+      const listVariables = vi.fn(async () => {
         return {};
       });
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
 
       await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, client: { getVariables } }));
+        return validateStep.run(aStepContext({ config, client: { listVariables } }));
       });
 
-      expect(getVariables).not.toHaveBeenCalled();
+      expect(listVariables).not.toHaveBeenCalled();
     });
 
     it("never echoes a literal client_secret in the refusal", async () => {
