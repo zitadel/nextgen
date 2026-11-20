@@ -8,6 +8,7 @@ description: |
 properties:
   team_ids:
     type: array
+    maxItems: 1000
     items:
       type: string
     description: Restrict to specific teams (organizations). Empty means no team restriction.
@@ -15,6 +16,7 @@ properties:
     example: ["team_acme"]
   app_ids:
     type: array
+    maxItems: 1000
     items:
       type: string
     description: Restrict to specific applications. Empty means no app restriction.

@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: grant.invalid
+        description: The error code, always `grant.invalid` for this error.
     required:
       - code

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: session.deleted
+        description: The event type, always `session.deleted` for this event.
       payload:
         $ref: ../payloads/session-deleted-payload.yaml

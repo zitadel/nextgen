@@ -3,4 +3,55 @@
 #
 # The format is a map from a rule id to a list of exact JSONPaths, as the linter prints them.
 # Inline `x-lint-ignore` does not work inside `$ref`'d files, and the spec is split over many of them.
-{}
+
+extra-composition-branches-same-type:
+  # Deliberate unions of scalar types: a filter value, a radius preset or pixel size, and a variable
+  # value, each accepted as the JSON type the caller means.
+  - "$.components.schemas.variable"
+  - "$.components.schemas['branding-shape'].properties.radius"
+  - "$.components.schemas['filter-value']"
+  - "$.components.schemas['variable-input']"
+  - "$.components.schemas['variable-scalar']"
+
+extra-consistent-property-name-and-type:
+  # Homonyms with different meanings, not one property with two types: a flow carries one `branding`
+  # revision where a list response carries many, an event records the connecting client's details as
+  # `client` where an application client secret names the client, and `secret` is a flag in the
+  # variables where an application client secret holds the value.
+  - "$.components.schemas['event-metadata'].properties.client"
+  - "$.components.schemas['list-branding-response'].properties.branding"
+  - "$.components.schemas['secret-variable'].properties.secret"
+  - "$.components.schemas['secret-variable-input'].properties.secret"
+  - "$.components.schemas['variable-set-payload'].properties.secret"
+
+extra-enum-value-case:
+  # The values are dotted operation identifiers that policy documents name, such as `user.create`,
+  # not enum keywords in snake_case.
+  - "$.components.schemas['policy-operation'].enum[1]"
+  - "$.components.schemas['user-create-evaluate-request'].properties.operation.enum[0]"
+  - "$.components.schemas['user-create-policy'].properties.operation.enum[0]"
+  - "$.components.schemas['user-create-policy-input'].properties.operation.enum[0]"
+
+extra-error-response-content-type:
+  # The readiness probe answers a plain-text `fail` on 503, as orchestrators expect, not a JSON
+  # error.
+  - "$.paths['/readyz'].get.responses['503'].content"
+
+extra-response-status-code-semantics:
+  # `POST /auth_attempts/{attempt_id}/handoff` returns the one-time handoff token, not a stored
+  # resource, so it answers 200. `POST /grants` answers 201 when the grant is created and 202 when
+  # it is accepted for an identifier the server cannot resolve yet.
+  - "$.paths['/auth_attempts/{attempt_id}/handoff'].post.responses"
+  - "$.paths['/grants'].post.responses"
+
+extra-well-defined-dictionaries:
+  # `payload` is the method's own challenge data: the identifier and password methods carry none, so
+  # there is no fixed shape or value type to declare.
+  - "$.components.schemas['challenge-response'].properties.payload"
+
+extra-write-operation-requires-request-body:
+  # Action endpoints that name everything in the path: handing off an attempt, starting a project
+  # claim and revoking a release have nothing to send.
+  - "$.paths['/auth_attempts/{attempt_id}/handoff'].post"
+  - "$.paths['/projects/{project_id}/claim/init'].post"
+  - "$.paths['/releases/{release_id}/revoke'].post"

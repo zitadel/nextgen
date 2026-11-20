@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: variable.set
+        description: The event type, always `variable.set` for this event.
       payload:
         $ref: ../payloads/variable-set-payload.yaml

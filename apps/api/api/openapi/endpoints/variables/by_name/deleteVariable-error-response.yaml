@@ -7,22 +7,22 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
-        - $ref: '../../../components/schemas/errors/var-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/var-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/var-not-found.yaml'
+        - $ref: '../../../components/schemas/errors/var-permission-denied.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          not_implemented: '../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
-          var.not_found: '../../../components/schemas/errors/var-not_found.yaml'
-          var.permission_denied: '../../../components/schemas/errors/var-permission_denied.yaml'
+          var.not_found: '../../../components/schemas/errors/var-not-found.yaml'
+          var.permission_denied: '../../../components/schemas/errors/var-permission-denied.yaml'
     examples:
       auth.unauthorized:
         $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
@@ -31,12 +31,12 @@ content:
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
       not_implemented:
-        $ref: '../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:
         $ref: '../../../components/examples/errors/unavailable.yaml'
       var.not_found:
-        $ref: '../../../components/examples/errors/var-not_found.yaml'
+        $ref: '../../../components/examples/errors/var-not-found.yaml'
       var.permission_denied:
-        $ref: '../../../components/examples/errors/var-permission_denied.yaml'
+        $ref: '../../../components/examples/errors/var-permission-denied.yaml'

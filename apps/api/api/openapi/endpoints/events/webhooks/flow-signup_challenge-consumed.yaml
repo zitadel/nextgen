@@ -14,7 +14,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: ../types/flow-signup_challenge-consumed-event.yaml
+          $ref: ../types/flow-signup-challenge-consumed-event.yaml
   responses:
     '2XX':
       $ref: ../webhook-delivered.yaml

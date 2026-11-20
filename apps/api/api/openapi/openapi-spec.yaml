@@ -167,6 +167,13 @@ tags:
       names, same references, same endpoints. They are write-only — a read says
       that a secret is held, never what it is.
 
+# Every operation names its own security, and the ones that are public say
+# `security: []`. This is what an operation that names none falls back to: it
+# requires a project secret or a session, never nothing.
+security:
+  - oauth2: []
+  - sessionCookie: []
+
 paths:
   /livez:
     $ref: endpoints/livez/methods.yaml

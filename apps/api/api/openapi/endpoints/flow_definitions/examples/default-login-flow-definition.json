@@ -1,5 +1,5 @@
 {
-  "project_id": "${PROJECT_ID}",
+  "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
   "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
   "flow_definition": {
     "name": "default-login",

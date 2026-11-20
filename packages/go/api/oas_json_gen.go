@@ -87475,9 +87475,9 @@ func (s *IssueChallengeRequestPasskeyOptionsUserVerification) UnmarshalJSON(data
 
 // Encode encodes Limit as json.
 func (s Limit) Encode(e *jx.Encoder) {
-	unwrapped := int(s)
+	unwrapped := int64(s)
 
-	e.Int(unwrapped)
+	e.Int64(unwrapped)
 }
 
 // Decode decodes Limit from json.
@@ -87485,10 +87485,10 @@ func (s *Limit) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode Limit to nil")
 	}
-	var unwrapped int
+	var unwrapped int64
 	if err := func() error {
-		v, err := d.Int()
-		unwrapped = int(v)
+		v, err := d.Int64()
+		unwrapped = int64(v)
 		if err != nil {
 			return err
 		}

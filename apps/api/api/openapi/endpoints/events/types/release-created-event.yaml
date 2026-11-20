@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: release.created
+        description: The event type, always `release.created` for this event.
       payload:
         $ref: ../payloads/release-created-payload.yaml

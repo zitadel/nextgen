@@ -40,5 +40,8 @@ post:
         application/json:
           schema:
             $ref: add-origin-response.yaml
+          example:
+            pattern: example
+            kind: primary
     default:
       $ref: addProjectOrigin-error-response.yaml

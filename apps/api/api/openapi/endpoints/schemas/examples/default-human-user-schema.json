@@ -2,7 +2,7 @@
   "title": "DefaultHumanUserSchema",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "metaSchema": "${SERVER_URL}/user-schema.json",
-  "$id": "${USER_SCHEMA_URL}",
+  "$id": "https://auth.acme.com/schemas/default-human-user.json",
   "objectType": "human-user",
   "kind": "user-schema",
   "type": "object",

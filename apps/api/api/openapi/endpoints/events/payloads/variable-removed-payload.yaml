@@ -4,6 +4,7 @@ description: Payload for `variable.removed` events, one value of the variable re
 properties:
   kind:
     type: string
+    description: 'The kind of the variable that was removed: `primary` or `preview`.'
     enum:
       - primary
       - preview

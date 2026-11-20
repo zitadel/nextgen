@@ -59,7 +59,7 @@ func TestIdPConnectionMirrorMatchesSchema(t *testing.T) {
 	verifiedClaims := schemaProperties["verified_claims"].(map[string]any)
 	require.Equal(t, map[string]any{"anyOf": []any{
 		map[string]any{"const": true},
-		map[string]any{"pattern": "^[^$]", "type": "string"},
+		map[string]any{"pattern": "^[^$][\\s\\S]*$", "type": "string"},
 	}}, verifiedClaims["additionalProperties"],
 		"the verified_claims value classes changed; widen the mirror's oneOf to match")
 	verifiedClaims["additionalProperties"] = map[string]any{"oneOf": []any{

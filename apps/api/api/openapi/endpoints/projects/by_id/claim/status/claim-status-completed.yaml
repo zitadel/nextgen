@@ -16,6 +16,7 @@ properties:
     description: The claim has completed.
   team_id:
     $ref: ../../../../../components/schemas/team-id.yaml
+    description: 'The team that claimed the project.'
   claimed_at:
     type: string
     format: date-time

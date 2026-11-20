@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: dep.conflict
+        description: The error code, always `dep.conflict` for this error.
     required:
       - code

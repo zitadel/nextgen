@@ -3,6 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "PropertyName",
   "type": "string",
+  "minLength": 1,
   "pattern": "^[^.]+$",
   "x-zitadel-pattern-message": "must not be empty or contain a .",
   "description": "The name of a single user attribute."

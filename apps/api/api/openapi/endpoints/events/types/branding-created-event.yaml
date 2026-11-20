@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: branding.created
+        description: The event type, always `branding.created` for this event.
       payload:
         $ref: ../payloads/branding-created-payload.yaml

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: user.deleted
+        description: The event type, always `user.deleted` for this event.
       payload:
         $ref: ../payloads/empty-event-payload.yaml

@@ -37,8 +37,11 @@ get:
         Extra principal fields to add onto `user` or `team`. It takes the same
         values and needs the same `user.read` and `team.read` scopes as
         `POST /grants/query`.
+      style: form
+      explode: true
       schema:
         type: array
+        maxItems: 20
         uniqueItems: true
         items:
           $ref: ../query/grant-expand.yaml
@@ -49,6 +52,37 @@ get:
         application/json:
           schema:
             $ref: ../grant.yaml
+          example:
+            id: grant_01KWH3B72K7M7F0N9WD3P2E4YM
+            project_id: proj_01KWH3B72K7M7F0N9WD3P2E4YM
+            object_type: project
+            relation: viewer
+            created_at: '2026-01-15T09:30:00Z'
+            expires_at: '2026-01-15T09:30:00Z'
+            user:
+              user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+              identifier: ada@example.com
+              identifier_property: email
+              display: Ada Lovelace
+              schema: example
+              attributes: {}
+              metadata:
+                created_at: '2026-01-15T09:30:00Z'
+                updated_at: '2026-01-15T09:30:00Z'
+                status: active
+                lifecycle_owner_team_id: team_01KWH3B72K7M7F0N9WD3P2E4YM
+                lifecycle_owner_team:
+                  id: team_01KWH3B72K7M7F0N9WD3P2E4YM
+                  name: Acme
+                  status: active
+                  created_at: '2026-01-15T09:30:00Z'
+                  updated_at: '2026-01-15T09:30:00Z'
+            team:
+              team_id: team_01KZZY8PX8K8ATNVDSMRCZY4N1
+              name: Platform admins
+              status: active
+              created_at: '2026-01-15T09:30:00Z'
+              updated_at: '2026-01-15T09:30:00Z'
     '401':
       description: Missing or invalid credentials.
       content:

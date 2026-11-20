@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: rel.revoked
+        description: The error code, always `rel.revoked` for this error.
     required:
       - code

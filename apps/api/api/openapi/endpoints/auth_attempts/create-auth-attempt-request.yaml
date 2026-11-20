@@ -5,6 +5,7 @@ required:
 properties:
   project_id:
     $ref: "../../components/schemas/project-id.yaml"
+    description: 'The ID of the project, as `createProject` (`POST /projects`) returns it.'
   challenge_nonce:
     $ref: "../../components/schemas/challenge-nonce.yaml"
   session_id:
@@ -17,4 +18,5 @@ properties:
       - type: 'null'
   session_token:
     $ref: "../../components/schemas/session-proof-token.yaml"
+    writeOnly: true
 

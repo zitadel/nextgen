@@ -18,6 +18,7 @@
     },
     "slug": {
       "type": "string",
+      "minLength": 1,
       "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "maxLength": 64,
       "description": "Stable identifier of the application, unique within the project and\nfixed for its life. Flows and other documents reference it.\n",
@@ -58,6 +59,7 @@
       "properties": {
         "slug": {
           "type": "string",
+          "minLength": 1,
           "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "maxLength": 64,
           "description": "Stable identifier of the client, unique among the application's clients\nand fixed for the client's life. A revision matches each client to the\nstored one by its slug, which is how a client keeps its `client_id`.\nOther documents refer to it as `<application>/<client>`.\n",
@@ -92,6 +94,7 @@
         "grant_types": {
           "type": "array",
           "minItems": 1,
+          "maxItems": 20,
           "uniqueItems": true,
           "items": {
             "type": "string",

@@ -4,64 +4,64 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../../../../../components/schemas/errors/att-already_handed_off.yaml'
-        - $ref: '../../../../../../components/schemas/errors/att-invalid_proof.yaml'
-        - $ref: '../../../../../../components/schemas/errors/att-invalid_request.yaml'
-        - $ref: '../../../../../../components/schemas/errors/att-invalid_state.yaml'
-        - $ref: '../../../../../../components/schemas/errors/att-not_found.yaml'
-        - $ref: '../../../../../../components/schemas/errors/att-proof_rejected.yaml'
-        - $ref: '../../../../../../components/schemas/errors/att-stale_challenge.yaml'
+        - $ref: '../../../../../../components/schemas/errors/att-already-handed-off.yaml'
+        - $ref: '../../../../../../components/schemas/errors/att-invalid-proof.yaml'
+        - $ref: '../../../../../../components/schemas/errors/att-invalid-request.yaml'
+        - $ref: '../../../../../../components/schemas/errors/att-invalid-state.yaml'
+        - $ref: '../../../../../../components/schemas/errors/att-not-found.yaml'
+        - $ref: '../../../../../../components/schemas/errors/att-proof-rejected.yaml'
+        - $ref: '../../../../../../components/schemas/errors/att-stale-challenge.yaml'
         - $ref: '../../../../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../../../../components/schemas/errors/user-invalid.yaml'
-        - $ref: '../../../../../../components/schemas/errors/user-not_found.yaml'
-        - $ref: '../../../../../../components/schemas/errors/user-password_empty.yaml'
-        - $ref: '../../../../../../components/schemas/errors/user-password_hashing_busy.yaml'
-        - $ref: '../../../../../../components/schemas/errors/user-password_policy_violation.yaml'
-        - $ref: '../../../../../../components/schemas/errors/user-password_too_long.yaml'
-        - $ref: '../../../../../../components/schemas/errors/user-permission_denied.yaml'
+        - $ref: '../../../../../../components/schemas/errors/user-not-found.yaml'
+        - $ref: '../../../../../../components/schemas/errors/user-password-empty.yaml'
+        - $ref: '../../../../../../components/schemas/errors/user-password-hashing-busy.yaml'
+        - $ref: '../../../../../../components/schemas/errors/user-password-policy-violation.yaml'
+        - $ref: '../../../../../../components/schemas/errors/user-password-too-long.yaml'
+        - $ref: '../../../../../../components/schemas/errors/user-permission-denied.yaml'
       discriminator:
         propertyName: code
         mapping:
-          att.already_handed_off: '../../../../../../components/schemas/errors/att-already_handed_off.yaml'
-          att.invalid_proof: '../../../../../../components/schemas/errors/att-invalid_proof.yaml'
-          att.invalid_request: '../../../../../../components/schemas/errors/att-invalid_request.yaml'
-          att.invalid_state: '../../../../../../components/schemas/errors/att-invalid_state.yaml'
-          att.not_found: '../../../../../../components/schemas/errors/att-not_found.yaml'
-          att.proof_rejected: '../../../../../../components/schemas/errors/att-proof_rejected.yaml'
-          att.stale_challenge: '../../../../../../components/schemas/errors/att-stale_challenge.yaml'
+          att.already_handed_off: '../../../../../../components/schemas/errors/att-already-handed-off.yaml'
+          att.invalid_proof: '../../../../../../components/schemas/errors/att-invalid-proof.yaml'
+          att.invalid_request: '../../../../../../components/schemas/errors/att-invalid-request.yaml'
+          att.invalid_state: '../../../../../../components/schemas/errors/att-invalid-state.yaml'
+          att.not_found: '../../../../../../components/schemas/errors/att-not-found.yaml'
+          att.proof_rejected: '../../../../../../components/schemas/errors/att-proof-rejected.yaml'
+          att.stale_challenge: '../../../../../../components/schemas/errors/att-stale-challenge.yaml'
           auth.unauthorized: '../../../../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../../../components/schemas/errors/internal.yaml'
-          not_implemented: '../../../../../../components/schemas/errors/not_implemented.yaml'
+          not_implemented: '../../../../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../../../../components/schemas/errors/unavailable.yaml'
           user.invalid: '../../../../../../components/schemas/errors/user-invalid.yaml'
-          user.not_found: '../../../../../../components/schemas/errors/user-not_found.yaml'
-          user.password_empty: '../../../../../../components/schemas/errors/user-password_empty.yaml'
-          user.password_hashing_busy: '../../../../../../components/schemas/errors/user-password_hashing_busy.yaml'
-          user.password_policy_violation: '../../../../../../components/schemas/errors/user-password_policy_violation.yaml'
-          user.password_too_long: '../../../../../../components/schemas/errors/user-password_too_long.yaml'
-          user.permission_denied: '../../../../../../components/schemas/errors/user-permission_denied.yaml'
+          user.not_found: '../../../../../../components/schemas/errors/user-not-found.yaml'
+          user.password_empty: '../../../../../../components/schemas/errors/user-password-empty.yaml'
+          user.password_hashing_busy: '../../../../../../components/schemas/errors/user-password-hashing-busy.yaml'
+          user.password_policy_violation: '../../../../../../components/schemas/errors/user-password-policy-violation.yaml'
+          user.password_too_long: '../../../../../../components/schemas/errors/user-password-too-long.yaml'
+          user.permission_denied: '../../../../../../components/schemas/errors/user-permission-denied.yaml'
     examples:
       att.already_handed_off:
-        $ref: '../../../../../../components/examples/errors/att-already_handed_off.yaml'
+        $ref: '../../../../../../components/examples/errors/att-already-handed-off.yaml'
       att.invalid_proof:
-        $ref: '../../../../../../components/examples/errors/att-invalid_proof.yaml'
+        $ref: '../../../../../../components/examples/errors/att-invalid-proof.yaml'
       att.invalid_request:
-        $ref: '../../../../../../components/examples/errors/att-invalid_request.yaml'
+        $ref: '../../../../../../components/examples/errors/att-invalid-request.yaml'
       att.invalid_state:
-        $ref: '../../../../../../components/examples/errors/att-invalid_state.yaml'
+        $ref: '../../../../../../components/examples/errors/att-invalid-state.yaml'
       att.not_found:
-        $ref: '../../../../../../components/examples/errors/att-not_found.yaml'
+        $ref: '../../../../../../components/examples/errors/att-not-found.yaml'
       att.proof_rejected:
-        $ref: '../../../../../../components/examples/errors/att-proof_rejected.yaml'
+        $ref: '../../../../../../components/examples/errors/att-proof-rejected.yaml'
       att.stale_challenge:
-        $ref: '../../../../../../components/examples/errors/att-stale_challenge.yaml'
+        $ref: '../../../../../../components/examples/errors/att-stale-challenge.yaml'
       auth.unauthorized:
         $ref: '../../../../../../components/examples/errors/auth-unauthorized.yaml'
       evt.invalid:
@@ -69,7 +69,7 @@ content:
       internal:
         $ref: '../../../../../../components/examples/errors/internal.yaml'
       not_implemented:
-        $ref: '../../../../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../../../../components/examples/errors/req-invalid.yaml'
       unavailable:
@@ -77,14 +77,14 @@ content:
       user.invalid:
         $ref: '../../../../../../components/examples/errors/user-invalid.yaml'
       user.not_found:
-        $ref: '../../../../../../components/examples/errors/user-not_found.yaml'
+        $ref: '../../../../../../components/examples/errors/user-not-found.yaml'
       user.password_empty:
-        $ref: '../../../../../../components/examples/errors/user-password_empty.yaml'
+        $ref: '../../../../../../components/examples/errors/user-password-empty.yaml'
       user.password_hashing_busy:
-        $ref: '../../../../../../components/examples/errors/user-password_hashing_busy.yaml'
+        $ref: '../../../../../../components/examples/errors/user-password-hashing-busy.yaml'
       user.password_policy_violation:
-        $ref: '../../../../../../components/examples/errors/user-password_policy_violation.yaml'
+        $ref: '../../../../../../components/examples/errors/user-password-policy-violation.yaml'
       user.password_too_long:
-        $ref: '../../../../../../components/examples/errors/user-password_too_long.yaml'
+        $ref: '../../../../../../components/examples/errors/user-password-too-long.yaml'
       user.permission_denied:
-        $ref: '../../../../../../components/examples/errors/user-permission_denied.yaml'
+        $ref: '../../../../../../components/examples/errors/user-permission-denied.yaml'

@@ -20,6 +20,60 @@ get:
         application/json:
           schema:
             $ref: ../../../components/flows/flow-definition-response.yaml
+          example:
+            id: fd_123abc456def
+            project_id: proj_789ghi012jkl
+            flow_definition:
+              $schema: example
+              name: standard-login
+              user_schema: human-user
+              purposes:
+                login: identify
+              audience:
+                app_ids:
+                  - app_saas
+              steps:
+                - name: identify
+                  fields:
+                    - email
+                  actions:
+                    - name: submit
+                      kind: submit
+                      primary: true
+                  transitions:
+                    submit:
+                      target: authenticate
+                - name: authenticate
+                  fields:
+                    - x-auth-methods#password
+                  actions:
+                    - name: submit
+                      kind: submit
+                      primary: true
+                  transitions:
+                    submit:
+                      target: done
+                - name: done
+                  complete: redirect
+            user_schema:
+              id: sch_01H455VB4213EF62K49QF6M73F
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                objectType: human-user
+                kind: user-schema
+                metaSchema: https://example.com/path
+                x-auth-methods:
+                  password:
+                    enabled: true
+                x-identifier: email
+                x-display:
+                  - example
+                properties: {}
+              metadata:
+                created_at: '2026-01-15T09:30:00Z'
+                in_use: true
+            created_at: '2020-01-28T14:25:39.123456Z'
+            updated_at: '2020-01-28T14:25:39.123456Z'
     default:
       $ref: getFlowDefinition-error-response.yaml
 

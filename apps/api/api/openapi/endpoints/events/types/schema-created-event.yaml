@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: schema.created
+        description: The event type, always `schema.created` for this event.
       payload:
         $ref: ../payloads/schema-created-payload.yaml

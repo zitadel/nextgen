@@ -9,12 +9,165 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
+func (s *AcceptInvitationBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *AcceptInvitationConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s AcceptInvitationErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidAcceptInvitationErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedAcceptInvitationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidAcceptInvitationErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalAcceptInvitationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvInviterNotAdminAcceptInvitationErrorResponse:
+		if err := s.InvInviterNotAdmin.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvNotFoundAcceptInvitationErrorResponse:
+		if err := s.InvNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvPlatformRequiredAcceptInvitationErrorResponse:
+		if err := s.InvPlatformRequired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvProjectUnclaimedAcceptInvitationErrorResponse:
+		if err := s.InvProjectUnclaimed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvSelfAcceptAcceptInvitationErrorResponse:
+		if err := s.InvSelfAccept.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedAcceptInvitationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidAcceptInvitationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableAcceptInvitationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *AcceptInvitationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AcceptInvitationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *AcceptInvitationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *AcceptInvitationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *AddOriginResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Pattern)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "pattern",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Kind.Validate(); err != nil {
 			return err
@@ -43,12 +196,135 @@ func (s AddOriginResponseKind) Validate() error {
 	}
 }
 
+func (s AddProjectOriginErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidAddProjectOriginErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedAddProjectOriginErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidAddProjectOriginErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalAddProjectOriginErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedAddProjectOriginErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginInvalidAddProjectOriginErrorResponse:
+		if err := s.OriginInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginKindConflictAddProjectOriginErrorResponse:
+		if err := s.OriginKindConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginNotFoundAddProjectOriginErrorResponse:
+		if err := s.OriginNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginPermissionDeniedAddProjectOriginErrorResponse:
+		if err := s.OriginPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginPrimaryNotExactAddProjectOriginErrorResponse:
+		if err := s.OriginPrimaryNotExact.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMissingIDAddProjectOriginErrorResponse:
+		if err := s.ProjMissingID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundAddProjectOriginErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidAddProjectOriginErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableAddProjectOriginErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *AddProjectOriginErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *AlreadyClaimedResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Details.Validate(); err != nil {
 			return err
@@ -80,6 +356,216 @@ func (s *AlreadyClaimedResponseDetails) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "team_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AppClientIDTaken) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AppFieldImmutable) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AppInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AppNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AppPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AppRevisionConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
 			Error: err,
 		})
 	}
@@ -127,8 +613,8 @@ func (s *Application) Validate() error {
 	}
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     64,
 			MaxLengthSet:  true,
 			Email:         false,
@@ -221,8 +707,8 @@ func (s *ApplicationClient) Validate() error {
 	var failures []validate.FieldError
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     64,
 			MaxLengthSet:  true,
 			Email:         false,
@@ -320,8 +806,8 @@ func (s *ApplicationClient) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.GrantTypes)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -436,6 +922,29 @@ func (s *ApplicationCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -443,6 +952,29 @@ func (s *ApplicationCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -508,6 +1040,17 @@ func (s *ApplicationCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "metadata",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
 			Error: err,
 		})
 	}
@@ -566,6 +1109,37 @@ func (s ApplicationCreatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *ApplicationPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.ClientIds == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.ClientIds)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "client_ids",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ApplicationResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -596,6 +1170,29 @@ func (s *ApplicationUpdatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -603,6 +1200,29 @@ func (s *ApplicationUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -671,6 +1291,17 @@ func (s *ApplicationUpdatedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -726,11 +1357,291 @@ func (s ApplicationUpdatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *AttAlreadyHandedOff) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AttInvalidProof) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AttInvalidRequest) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AttInvalidState) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AttNotCompleted) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AttNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AttProofRejected) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AttStaleChallenge) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s AttemptID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -753,6 +1664,29 @@ func (s *AuthAttemptCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -760,6 +1694,29 @@ func (s *AuthAttemptCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -890,6 +1847,29 @@ func (s *AuthAttemptHandedOffEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -897,6 +1877,29 @@ func (s *AuthAttemptHandedOffEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -1096,6 +2099,17 @@ func (s *AuthAttemptResponse) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.RequiredFactors == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.RequiredFactors)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.RequiredFactors {
 			if err := func() error {
@@ -1121,6 +2135,17 @@ func (s *AuthAttemptResponse) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.CompletedFactors == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.CompletedFactors)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.CompletedFactors {
 			if err := func() error {
@@ -1146,6 +2171,17 @@ func (s *AuthAttemptResponse) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Challenges == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Challenges)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Challenges {
 			if err := func() error {
@@ -1198,6 +2234,29 @@ func (s *AuthCheckFailedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -1205,6 +2264,29 @@ func (s *AuthCheckFailedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -1335,6 +2417,29 @@ func (s *AuthCheckSucceededEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -1342,6 +2447,29 @@ func (s *AuthCheckSucceededEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -1465,12 +2593,70 @@ func (s AuthCheckSucceededEventDelegationType) Validate() error {
 	}
 }
 
+func (s *AuthCsrfInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *AuthFactorPasskeyEnrolledEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -1479,6 +2665,29 @@ func (s *AuthFactorPasskeyEnrolledEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -1609,6 +2818,29 @@ func (s *AuthFactorPasswordSetEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -1616,6 +2848,29 @@ func (s *AuthFactorPasswordSetEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -1776,6 +3031,29 @@ func (s *AuthRequestCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -1783,6 +3061,29 @@ func (s *AuthRequestCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -1913,6 +3214,29 @@ func (s *AuthSSOAuthorizationFailedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -1920,6 +3244,29 @@ func (s *AuthSSOAuthorizationFailedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -2050,6 +3397,29 @@ func (s *AuthSSOExchangeFailedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -2057,6 +3427,29 @@ func (s *AuthSSOExchangeFailedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -2187,6 +3580,29 @@ func (s *AuthSSOExchangeSucceededEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -2194,6 +3610,29 @@ func (s *AuthSSOExchangeSucceededEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -2324,6 +3763,29 @@ func (s *AuthTokenIssuedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -2331,6 +3793,29 @@ func (s *AuthTokenIssuedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -2399,6 +3884,17 @@ func (s *AuthTokenIssuedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -2454,12 +3950,66 @@ func (s AuthTokenIssuedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *AuthTokenIssuedPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Scopes == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Scopes)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "scopes",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *AuthTokenRevokedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -2468,6 +4018,29 @@ func (s *AuthTokenRevokedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -2591,12 +4164,93 @@ func (s AuthTokenRevokedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *AuthUnauthorized) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *AuthUnauthorizedHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *AuthzGrantedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -2605,6 +4259,29 @@ func (s *AuthzGrantedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -2735,6 +4412,29 @@ func (s *AuthzRevokedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -2742,6 +4442,29 @@ func (s *AuthzRevokedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -2901,8 +4624,8 @@ func (s *BeginUserPasskeyRegistrationRequest) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.RpOrigins)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -2910,6 +4633,41 @@ func (s *BeginUserPasskeyRegistrationRequest) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "rp_origins",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *BeginUserPasskeyRegistrationResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.RegistrationID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "registration_id",
 			Error: err,
 		})
 	}
@@ -3060,6 +4818,29 @@ func (s *BrandingCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -3067,6 +4848,29 @@ func (s *BrandingCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -3453,6 +5257,29 @@ func (s *BrandingRevisionResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Branding.Validate(); err != nil {
 			return err
 		}
@@ -3764,12 +5591,175 @@ func (s *BrandingTypography) Validate() error {
 	return nil
 }
 
+func (s *BrndInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *BrndMissingProjectID) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *BrndNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *BrndPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *BuildReleaseBadRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if value, ok := s.Details.Get(); ok {
 			if err := func() error {
@@ -3801,6 +5791,17 @@ func (s *BuildReleaseBadRequestDetails) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if s.Resources == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Resources)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Resources {
 			if err := func() error {
@@ -3835,6 +5836,156 @@ func (s *BuildReleaseCreated) Validate() error {
 	alias := (*Release)(s)
 	if err := alias.Validate(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s BuildReleaseErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedBuildReleaseErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidBuildReleaseErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefInvalidBuildReleaseErrorResponse:
+		if err := s.FlowdefInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpFieldImmutableBuildReleaseErrorResponse:
+		if err := s.IdpFieldImmutable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpNotFoundBuildReleaseErrorResponse:
+		if err := s.IdpNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalBuildReleaseErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchDeniedBuildReleaseErrorResponse:
+		if err := s.SchFetchDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchDowngradeBuildReleaseErrorResponse:
+		if err := s.SchFetchDowngrade.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchTimeoutBuildReleaseErrorResponse:
+		if err := s.SchFetchTimeout.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchTooLargeBuildReleaseErrorResponse:
+		if err := s.SchFetchTooLarge.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchTooManyRedirectsBuildReleaseErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchNotFoundBuildReleaseErrorResponse:
+		if err := s.SchNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedBuildReleaseErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolInvalidBuildReleaseErrorResponse:
+		if err := s.PolInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolRevisionConflictBuildReleaseErrorResponse:
+		if err := s.PolRevisionConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelInvalidBuildReleaseErrorResponse:
+		if err := s.RelInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundBuildReleaseErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelPermissionDeniedBuildReleaseErrorResponse:
+		if err := s.RelPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelProjectNotFoundBuildReleaseErrorResponse:
+		if err := s.RelProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevisionUnpinnableBuildReleaseErrorResponse:
+		if err := s.RelRevisionUnpinnable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelUnresolvedReferenceBuildReleaseErrorResponse:
+		if err := s.RelUnresolvedReference.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidBuildReleaseErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefSchemaFetchFailedBuildReleaseErrorResponse:
+		if err := s.FlowdefSchemaFetchFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableBuildReleaseErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *BuildReleaseErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -3937,6 +6088,29 @@ func (s *BundleResourceError) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Kind.Validate(); err != nil {
 			return err
 		}
@@ -3974,11 +6148,110 @@ func (s *BundleResourceError) Validate() error {
 	return nil
 }
 
+func (s CancelInvitationErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidCancelInvitationErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCancelInvitationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCancelInvitationErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCancelInvitationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvNotFoundCancelInvitationErrorResponse:
+		if err := s.InvNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvPermissionDeniedCancelInvitationErrorResponse:
+		if err := s.InvPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCancelInvitationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCancelInvitationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCancelInvitationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CancelInvitationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CancelInvitationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CancelInvitationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CancelInvitationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s ChallengeID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -4097,6 +6370,146 @@ func (s ChallengeResponseState) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *ClaimChallengeInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ClaimChallengeNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ClaimNoPersonalTeam) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ClaimPersonalTeamNotActive) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s *ClaimStatusCompleted) Validate() error {
@@ -4244,6 +6657,344 @@ func (s *CompleteClaimResponse) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CompleteProjectClaimBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CompleteProjectClaimErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidCompleteProjectClaimErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCompleteProjectClaimErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimChallengeNotFoundCompleteProjectClaimErrorResponse:
+		if err := s.ClaimChallengeNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimNoPersonalTeamCompleteProjectClaimErrorResponse:
+		if err := s.ClaimNoPersonalTeam.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCompleteProjectClaimErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCompleteProjectClaimErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCompleteProjectClaimErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimPersonalTeamNotActiveCompleteProjectClaimErrorResponse:
+		if err := s.ClaimPersonalTeamNotActive.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjAlreadyClaimedCompleteProjectClaimErrorResponse:
+		if err := s.ProjAlreadyClaimed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjClaimExpiredCompleteProjectClaimErrorResponse:
+		if err := s.ProjClaimExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjClaimWindowExpiredCompleteProjectClaimErrorResponse:
+		if err := s.ProjClaimWindowExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundCompleteProjectClaimErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCompleteProjectClaimErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundCompleteProjectClaimErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCompleteProjectClaimErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CompleteProjectClaimErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s CompleteProjectClaimForbidden) Validate() error {
+	switch s.Type {
+	case ClaimNoPersonalTeamCompleteProjectClaimForbidden:
+		if err := s.ClaimNoPersonalTeam.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimPersonalTeamNotActiveCompleteProjectClaimForbidden:
+		if err := s.ClaimPersonalTeamNotActive.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthCsrfInvalidCompleteProjectClaimForbidden:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s CompleteProjectClaimGone) Validate() error {
+	switch s.Type {
+	case ProjClaimExpiredCompleteProjectClaimGone:
+		if err := s.ProjClaimExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjClaimWindowExpiredCompleteProjectClaimGone:
+		if err := s.ProjClaimWindowExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CompleteProjectClaimNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CompleteProjectClaimTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CompleteUserPasskeyRegistrationBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CompleteUserPasskeyRegistrationErrorResponse) Validate() error {
+	switch s.Type {
+	case AttAlreadyHandedOffCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttAlreadyHandedOff.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidProofCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidProof.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidRequestCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidStateCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidState.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotFoundCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttProofRejectedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttProofRejected.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttStaleChallengeCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttStaleChallenge.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordEmptyCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordEmpty.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordHashingBusyCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordHashingBusy.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordPolicyViolationCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordPolicyViolation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordTooLongCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordTooLong.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CompleteUserPasskeyRegistrationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CompleteUserPasskeyRegistrationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CompleteUserPasskeyRegistrationInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CompleteUserPasskeyRegistrationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CompleteUserPasskeyRegistrationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -4539,6 +7290,295 @@ func (s *CreateApplicationResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if s.ClientSecrets == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.ClientSecrets)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "client_secrets",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s CreateAuthAttemptChallengeErrorResponse) Validate() error {
+	switch s.Type {
+	case AttAlreadyHandedOffCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttAlreadyHandedOff.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidRequestCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidStateCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttInvalidState.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotFoundCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateAuthAttemptChallengeErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateAuthAttemptChallengeErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateAuthAttemptChallengeErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateAuthAttemptChallengeErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateAuthAttemptChallengeErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s CreateAuthAttemptErrorResponse) Validate() error {
+	switch s.Type {
+	case AttInvalidRequestCreateAuthAttemptErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateAuthAttemptErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedCreateAuthAttemptErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateAuthAttemptErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateAuthAttemptErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateAuthAttemptErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMismatchCreateAuthAttemptErrorResponse:
+		if err := s.ProjMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundCreateAuthAttemptErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjOriginNotAllowedCreateAuthAttemptErrorResponse:
+		if err := s.ProjOriginNotAllowed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPreviewNotLiveCreateAuthAttemptErrorResponse:
+		if err := s.ProjPreviewNotLive.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNoDefaultCreateAuthAttemptErrorResponse:
+		if err := s.RelNoDefault.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotDeployedCreateAuthAttemptErrorResponse:
+		if err := s.RelNotDeployed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundCreateAuthAttemptErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedCreateAuthAttemptErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateAuthAttemptErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgCreateAuthAttemptErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateAuthAttemptErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateAuthAttemptErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s CreateAuthAttemptHandoffErrorResponse) Validate() error {
+	switch s.Type {
+	case AttAlreadyHandedOffCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttAlreadyHandedOff.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidStateCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttInvalidState.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotCompletedCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttNotCompleted.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotFoundCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateAuthAttemptHandoffErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateAuthAttemptHandoffErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateAuthAttemptHandoffErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateAuthAttemptHandoffErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateAuthAttemptHandoffErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateAuthAttemptHandoffErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -4589,14 +7629,20 @@ func (s *CreateAuthAttemptRequest) Validate() error {
 func (s CreateDeploymentBadRequest) Validate() error {
 	switch s.Type {
 	case DepInvalidCreateDeploymentBadRequest:
-		return nil // no validation needed
+		if err := s.DepInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
 	case DeploymentVariablesMissingCreateDeploymentBadRequest:
 		if err := s.DeploymentVariablesMissing.Validate(); err != nil {
 			return err
 		}
 		return nil
 	case ReqInvalidCreateDeploymentBadRequest:
-		return nil // no validation needed
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
@@ -4604,6 +7650,142 @@ func (s CreateDeploymentBadRequest) Validate() error {
 
 func (s *CreateDeploymentCreated) Validate() error {
 	alias := (*Deployment)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CreateDeploymentErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidCreateDeploymentErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateDeploymentErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepConflictCreateDeploymentErrorResponse:
+		if err := s.DepConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepInvalidCreateDeploymentErrorResponse:
+		if err := s.DepInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepNotFoundCreateDeploymentErrorResponse:
+		if err := s.DepNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepPermissionDeniedCreateDeploymentErrorResponse:
+		if err := s.DepPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepVariablesMissingCreateDeploymentErrorResponse:
+		if err := s.DepVariablesMissing.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EnvProjectNotFoundCreateDeploymentErrorResponse:
+		if err := s.EnvProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateDeploymentErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateDeploymentErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateDeploymentErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundCreateDeploymentErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjOriginNotAllowedCreateDeploymentErrorResponse:
+		if err := s.ProjOriginNotAllowed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundCreateDeploymentErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedCreateDeploymentErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateDeploymentErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateDeploymentErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarDocumentTooDeepCreateDeploymentErrorResponse:
+		if err := s.VarDocumentTooDeep.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateDeploymentErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateDeploymentForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateDeploymentNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
 	if err := alias.Validate(); err != nil {
 		return err
 	}
@@ -4743,6 +7925,22 @@ func (s *CreateDeploymentRequest) Validate() error {
 	return nil
 }
 
+func (s *CreateFlowBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateFlowConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *CreateFlowDefinitionRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -4773,6 +7971,159 @@ func (s *CreateFlowDefinitionRequest) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s CreateFlowErrorResponse) Validate() error {
+	switch s.Type {
+	case AttInvalidRequestCreateFlowErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedCreateFlowErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyEncryptFailedCreateFlowErrorResponse:
+		if err := s.EncKeyEncryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundCreateFlowErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateFlowErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefNotFoundCreateFlowErrorResponse:
+		if err := s.FlowdefNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefPurposeMismatchCreateFlowErrorResponse:
+		if err := s.FlowdefPurposeMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowIntegrityCreateFlowErrorResponse:
+		if err := s.FlowIntegrity.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowInvalidPurposeCreateFlowErrorResponse:
+		if err := s.FlowInvalidPurpose.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateFlowErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidCreateFlowErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidTknidCreateFlowErrorResponse:
+		if err := s.TknInvalidTknid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateFlowErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundCreateFlowErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjOriginNotAllowedCreateFlowErrorResponse:
+		if err := s.ProjOriginNotAllowed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPreviewNotLiveCreateFlowErrorResponse:
+		if err := s.ProjPreviewNotLive.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNoDefaultCreateFlowErrorResponse:
+		if err := s.RelNoDefault.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotDeployedCreateFlowErrorResponse:
+		if err := s.RelNotDeployed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundCreateFlowErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedCreateFlowErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateFlowErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgCreateFlowErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateFlowErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateFlowErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateFlowForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -4809,8 +8160,8 @@ func (s *CreateFlowRequest) Validate() error {
 		if value, ok := s.FlowDefinitionName.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
+					MinLength:     1,
+					MinLengthSet:  true,
 					MaxLength:     0,
 					MaxLengthSet:  false,
 					Email:         false,
@@ -4839,8 +8190,8 @@ func (s *CreateFlowRequest) Validate() error {
 		if value, ok := s.SchemaVersion.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
+					MinLength:     1,
+					MinLengthSet:  true,
 					MaxLength:     0,
 					MaxLengthSet:  false,
 					Email:         false,
@@ -4888,6 +8239,133 @@ func (s CreateFlowRequestPurpose) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *CreateGrantBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateGrantConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CreateGrantErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidCreateGrantErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateGrantErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateGrantErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantAlreadyExistsCreateGrantErrorResponse:
+		if err := s.GrantAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantInvalidCreateGrantErrorResponse:
+		if err := s.GrantInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantNotFoundCreateGrantErrorResponse:
+		if err := s.GrantNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantPermissionDeniedCreateGrantErrorResponse:
+		if err := s.GrantPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantPrincipalNotFoundCreateGrantErrorResponse:
+		if err := s.GrantPrincipalNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantProjectUnclaimedCreateGrantErrorResponse:
+		if err := s.GrantProjectUnclaimed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateGrantErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateGrantErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateGrantErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateGrantErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateGrantErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateGrantForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateGrantNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *CreateGrantRequest) Validate() error {
@@ -4962,6 +8440,22 @@ func (s CreateGrantRequestRelation) Validate() error {
 	}
 }
 
+func (s *CreateGrantTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateGrantUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *CreateIdpRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -4981,6 +8475,158 @@ func (s *CreateIdpRequest) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateInvitationBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateInvitationConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CreateInvitationErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidCreateInvitationErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateInvitationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedCreateInvitationErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyEncryptFailedCreateInvitationErrorResponse:
+		if err := s.EncKeyEncryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundCreateInvitationErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateInvitationErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateInvitationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidCreateInvitationErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvInvalidCreateInvitationErrorResponse:
+		if err := s.InvInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvNotFoundCreateInvitationErrorResponse:
+		if err := s.InvNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvPendingLimitCreateInvitationErrorResponse:
+		if err := s.InvPendingLimit.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvPermissionDeniedCreateInvitationErrorResponse:
+		if err := s.InvPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvPlatformRequiredCreateInvitationErrorResponse:
+		if err := s.InvPlatformRequired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvProjectUnclaimedCreateInvitationErrorResponse:
+		if err := s.InvProjectUnclaimed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateInvitationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateInvitationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgCreateInvitationErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateInvitationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateInvitationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateInvitationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateInvitationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -5513,6 +9159,199 @@ func (s CreateInvitationTeamMemberResponseType) Validate() error {
 	}
 }
 
+func (s *CreateInvitationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CreateProjectClaimErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedCreateProjectClaimErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimChallengeInvalidCreateProjectClaimErrorResponse:
+		if err := s.ClaimChallengeInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateProjectClaimErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateProjectClaimErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjAlreadyClaimedCreateProjectClaimErrorResponse:
+		if err := s.ProjAlreadyClaimed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjClaimWindowExpiredCreateProjectClaimErrorResponse:
+		if err := s.ProjClaimWindowExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundCreateProjectClaimErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPermissionDeniedCreateProjectClaimErrorResponse:
+		if err := s.ProjPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateProjectClaimErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateProjectClaimErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateProjectClaimErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s CreateProjectErrorResponse) Validate() error {
+	switch s.Type {
+	case EncKeyDecryptFailedCreateProjectErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundCreateProjectErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateProjectErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateProjectErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidCreateProjectErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidTknidCreateProjectErrorResponse:
+		if err := s.TknInvalidTknid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchInvalidRequestCreateProjectErrorResponse:
+		if err := s.SchInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateProjectErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginInvalidCreateProjectErrorResponse:
+		if err := s.OriginInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginKindConflictCreateProjectErrorResponse:
+		if err := s.OriginKindConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginPrimaryNotExactCreateProjectErrorResponse:
+		if err := s.OriginPrimaryNotExact.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNameInvalidCreateProjectErrorResponse:
+		if err := s.ProjNameInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateProjectErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgCreateProjectErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateProjectErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateProjectErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *CreateProjectRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -5520,6 +9359,17 @@ func (s *CreateProjectRequest) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if s.Origins == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Origins)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Origins {
 			if err := func() error {
@@ -5557,8 +9407,108 @@ func (s *CreateProjectResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ProjectSecret)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_secret",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.PreviewSecret)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "preview_secret",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Origins == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Origins)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Origins {
@@ -5594,6 +9544,101 @@ func (s *CreateReleaseCreated) Validate() error {
 	alias := (*Release)(s)
 	if err := alias.Validate(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s CreateReleaseErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedCreateReleaseErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateReleaseErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateReleaseErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateReleaseErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelInvalidCreateReleaseErrorResponse:
+		if err := s.RelInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundCreateReleaseErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelPermissionDeniedCreateReleaseErrorResponse:
+		if err := s.RelPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelProjectNotFoundCreateReleaseErrorResponse:
+		if err := s.RelProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevisionNotFoundCreateReleaseErrorResponse:
+		if err := s.RelRevisionNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevisionUnpinnableCreateReleaseErrorResponse:
+		if err := s.RelRevisionUnpinnable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelUnresolvedReferenceCreateReleaseErrorResponse:
+		if err := s.RelUnresolvedReference.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateReleaseErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateReleaseErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateReleaseErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -5760,6 +9805,101 @@ func (s *CreateReleaseRequest) Validate() error {
 	return nil
 }
 
+func (s CreateSessionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedCreateSessionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedCreateSessionErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundCreateSessionErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateSessionErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateSessionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidCreateSessionErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidTknidCreateSessionErrorResponse:
+		if err := s.TknInvalidTknid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateSessionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMismatchCreateSessionErrorResponse:
+		if err := s.ProjMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateSessionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessTokenCreationFailedCreateSessionErrorResponse:
+		if err := s.SessTokenCreationFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgCreateSessionErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateSessionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateSessionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *CreateSessionRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -5779,6 +9919,128 @@ func (s *CreateSessionRequest) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateTeamBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateTeamConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CreateTeamErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidCreateTeamErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateTeamErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateTeamErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateTeamErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateTeamErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateTeamErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamAlreadyExistsCreateTeamErrorResponse:
+		if err := s.TeamAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamNameInvalidCreateTeamErrorResponse:
+		if err := s.TeamNameInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamTeamNotFoundCreateTeamErrorResponse:
+		if err := s.TeamTeamNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamPermissionDeniedCreateTeamErrorResponse:
+		if err := s.TeamPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamProjectNotFoundCreateTeamErrorResponse:
+		if err := s.TeamProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateTeamErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateTeamErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateTeamForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateTeamNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -5818,6 +10080,274 @@ func (s *CreateTeamRequest) Validate() error {
 	return nil
 }
 
+func (s *CreateTeamTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateTeamUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateUserBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateUserConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CreateUserErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidCreateUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateUserErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateUserErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateUserErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateUserErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateUserErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateUserErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserAlreadyExistsCreateUserErrorResponse:
+		if err := s.UserAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidCreateUserErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundCreateUserErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedCreateUserErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateUserErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateUserForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateUserInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateUserPasskeyRegistrationBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s CreateUserPasskeyRegistrationErrorResponse) Validate() error {
+	switch s.Type {
+	case AttAlreadyHandedOffCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttAlreadyHandedOff.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidRequestCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidStateCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidState.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotFoundCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *CreateUserPasskeyRegistrationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateUserPasskeyRegistrationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateUserPasskeyRegistrationInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateUserPasskeyRegistrationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateUserPasskeyRegistrationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *CreateUserRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -5844,6 +10374,627 @@ func (s *CreateUserRequest) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "schema",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateUserUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CsrfTokenResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.CsrfToken)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "csrf_token",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CsrfTokenResponseHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeactivateTeamBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *DeactivateTeamConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s DeactivateTeamErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedDeactivateTeamErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidDeactivateTeamErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalDeactivateTeamErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedDeactivateTeamErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidDeactivateTeamErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamTeamNotFoundDeactivateTeamErrorResponse:
+		if err := s.TeamTeamNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamOwnsProjectDeactivateTeamErrorResponse:
+		if err := s.TeamOwnsProject.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamPermissionDeniedDeactivateTeamErrorResponse:
+		if err := s.TeamPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableDeactivateTeamErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *DeactivateTeamErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeactivateTeamForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *DeactivateTeamUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s DeleteGrantErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidDeleteGrantErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedDeleteGrantErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidDeleteGrantErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantNotFoundDeleteGrantErrorResponse:
+		if err := s.GrantNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantPermissionDeniedDeleteGrantErrorResponse:
+		if err := s.GrantPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalDeleteGrantErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedDeleteGrantErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidDeleteGrantErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableDeleteGrantErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *DeleteGrantErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeleteGrantForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *DeleteGrantNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *DeleteGrantUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *DeleteUserConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s DeleteUserErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidDeleteUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedDeleteUserErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidDeleteUserErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalDeleteUserErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedDeleteUserErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjLastOwnerDeleteUserErrorResponse:
+		if err := s.ProjLastOwner.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidDeleteUserErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableDeleteUserErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundDeleteUserErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedDeleteUserErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *DeleteUserErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeleteUserNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *DeleteUserUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s DeleteVariableErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedDeleteVariableErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidDeleteVariableErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalDeleteVariableErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedDeleteVariableErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidDeleteVariableErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableDeleteVariableErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarNotFoundDeleteVariableErrorResponse:
+		if err := s.VarNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarPermissionDeniedDeleteVariableErrorResponse:
+		if err := s.VarPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *DeleteVariableErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DepConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DepInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DepNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DepPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DepVariablesMissing) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
 			Error: err,
 		})
 	}
@@ -5910,8 +11061,8 @@ func (s *Deployment) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Targets)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -5993,7 +11144,10 @@ func (s DeploymentConflict) Validate() error {
 		}
 		return nil
 	case ReleaseRevokedConflictDeploymentConflict:
-		return nil // no validation needed
+		if err := s.ReleaseRevokedConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
@@ -6006,6 +11160,29 @@ func (s *DeploymentCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -6013,6 +11190,29 @@ func (s *DeploymentCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -6081,6 +11281,17 @@ func (s *DeploymentCreatedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -6136,6 +11347,37 @@ func (s DeploymentCreatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *DeploymentCreatedPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Targets == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Targets)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "targets",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s DeploymentExpand) Validate() error {
 	switch s {
 	case "release":
@@ -6151,6 +11393,29 @@ func (s *DeploymentGuardConflict) Validate() error {
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Details.Validate(); err != nil {
 			return err
@@ -6201,8 +11466,8 @@ func (s *DeploymentGuardConflictDetails) Validate() error {
 func (s DeploymentID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -6353,8 +11618,8 @@ func (s DeploymentPreviewUrls) Validate() error {
 	for i, elem := range alias {
 		if err := func() error {
 			if err := (validate.String{
-				MinLength:     0,
-				MinLengthSet:  false,
+				MinLength:     1,
+				MinLengthSet:  true,
 				MaxLength:     2048,
 				MaxLengthSet:  true,
 				Email:         false,
@@ -6459,6 +11724,29 @@ func (s *DeploymentVariablesMissing) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Details.Validate(); err != nil {
 			return err
 		}
@@ -6499,8 +11787,8 @@ func (s *DeploymentVariablesMissingDetails) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Names)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -6508,6 +11796,314 @@ func (s *DeploymentVariablesMissingDetails) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "names",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *EncKeyDecryptFailed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *EncKeyEncryptFailed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *EncKeyNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *EncKeyUnknownAlg) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *EnvProjectNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ErrorDetails) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ErrorDetailsStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s EvaluatePolicyErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidEvaluatePolicyErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedEvaluatePolicyErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalEvaluatePolicyErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedEvaluatePolicyErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolInvalidEvaluatePolicyErrorResponse:
+		if err := s.PolInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolNotFoundEvaluatePolicyErrorResponse:
+		if err := s.PolNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolPermissionDeniedEvaluatePolicyErrorResponse:
+		if err := s.PolPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidEvaluatePolicyErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableEvaluatePolicyErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *EvaluatePolicyErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
 			Error: err,
 		})
 	}
@@ -6873,6 +12469,303 @@ func (s EventMetadataAuthorizationPath) Validate() error {
 	}
 }
 
+func (s *EvtInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *EvtNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *EvtPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ExchangeHandoffBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ExchangeHandoffConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ExchangeHandoffErrorResponse) Validate() error {
+	switch s.Type {
+	case AttNotFoundExchangeHandoffErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedExchangeHandoffErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedExchangeHandoffErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundExchangeHandoffErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidExchangeHandoffErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalExchangeHandoffErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidExchangeHandoffErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidTknidExchangeHandoffErrorResponse:
+		if err := s.TknInvalidTknid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedExchangeHandoffErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMismatchExchangeHandoffErrorResponse:
+		if err := s.ProjMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedExchangeHandoffErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidExchangeHandoffErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessExchangeConflictExchangeHandoffErrorResponse:
+		if err := s.SessExchangeConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessInvalidHandoffTokenExchangeHandoffErrorResponse:
+		if err := s.SessInvalidHandoffToken.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessInvalidTTLExchangeHandoffErrorResponse:
+		if err := s.SessInvalidTTL.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundExchangeHandoffErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessTokenCreationFailedExchangeHandoffErrorResponse:
+		if err := s.SessTokenCreationFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgExchangeHandoffErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableExchangeHandoffErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ExchangeHandoffErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ExchangeHandoffForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ExchangeHandoffUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ExchangeRequest) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.HandoffToken)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "handoff_token",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s FactorMethod) Validate() error {
 	switch s {
 	case "identifier":
@@ -6895,6 +12788,29 @@ func (s *Field) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Type.Validate(); err != nil {
 			return err
 		}
@@ -6902,6 +12818,29 @@ func (s *Field) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.TextKey)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "text_key",
 			Error: err,
 		})
 	}
@@ -7038,6 +12977,25 @@ func (s *FieldValidation) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if s.Enum == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Enum)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "enum",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -7111,6 +13069,64 @@ func (s FilterValue) Validate() error {
 	}
 }
 
+func (s *FinishUserPasskeyRegistrationResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *FlowAudience) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -7124,8 +13140,8 @@ func (s *FlowAudience) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.TeamIds)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -7146,8 +13162,8 @@ func (s *FlowAudience) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.AppIds)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -7167,6 +13183,111 @@ func (s *FlowAudience) Validate() error {
 	return nil
 }
 
+func (s *FlowCompleted) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowCookieExpired) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowCookieInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *FlowDefinition) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -7175,8 +13296,8 @@ func (s *FlowDefinition) Validate() error {
 	var failures []validate.FieldError
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     0,
 			MaxLengthSet:  false,
 			Email:         false,
@@ -7232,8 +13353,8 @@ func (s *FlowDefinition) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Steps)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -7286,6 +13407,14 @@ func (s *FlowDefinitionListResponse) Validate() error {
 		if s.FlowDefinitions == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.FlowDefinitions)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.FlowDefinitions {
 			if err := func() error {
@@ -7332,6 +13461,52 @@ func (s *FlowDefinitionResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ProjectID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.FlowDefinition.Validate(); err != nil {
 			return err
 		}
@@ -7374,8 +13549,8 @@ func (s *FlowDefinitionStep) Validate() error {
 	var failures []validate.FieldError
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     0,
 			MaxLengthSet:  false,
 			Email:         false,
@@ -7402,8 +13577,8 @@ func (s *FlowDefinitionStep) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Fields)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -7418,6 +13593,17 @@ func (s *FlowDefinitionStep) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Actions == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Actions)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Actions {
 			if err := func() error {
@@ -7479,8 +13665,8 @@ func (s *FlowDefinitionStep) Validate() error {
 		for i, elem := range s.SSOProviders {
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
+					MinLength:     1,
+					MinLengthSet:  true,
 					MaxLength:     64,
 					MaxLengthSet:  true,
 					Email:         false,
@@ -7745,12 +13931,245 @@ func (s FlowDefinitionStepTransitionsItemPurpose) Validate() error {
 	}
 }
 
+func (s *FlowIntegrity) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowInvalidAction) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowInvalidPurpose) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowProofInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowRateLimited) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *FlowResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Step.Validate(); err != nil {
 			return err
@@ -7793,6 +14212,25 @@ func (s *FlowResponseHeaders) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if s.SetCookie == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    10,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.SetCookie)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "SetCookie",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Response.Validate(); err != nil {
 			return err
 		}
@@ -7809,12 +14247,105 @@ func (s *FlowResponseHeaders) Validate() error {
 	return nil
 }
 
+func (s *FlowRestartRequired) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowSSOUserSchemaMismatch) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *FlowSignupChallengeConsumedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -7823,6 +14354,29 @@ func (s *FlowSignupChallengeConsumedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -7953,6 +14507,29 @@ func (s *FlowSignupChallengeIssuedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -7960,6 +14537,29 @@ func (s *FlowSignupChallengeIssuedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -8090,6 +14690,29 @@ func (s *FlowStep) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.Purpose.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -8129,6 +14752,14 @@ func (s *FlowStep) Validate() error {
 		if s.Fields == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Fields)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Fields {
 			if err := func() error {
@@ -8154,8 +14785,34 @@ func (s *FlowStep) Validate() error {
 		})
 	}
 	if err := func() error {
+		if value, ok := s.Identifier.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "identifier",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Actions == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Actions)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Actions {
@@ -8189,6 +14846,42 @@ func (s *FlowStep) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "gates",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.SSOProviders == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.SSOProviders)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.SSOProviders {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "sso_providers",
 			Error: err,
 		})
 	}
@@ -8353,6 +15046,64 @@ func (s FlowStepGates) Validate() error {
 	return nil
 }
 
+func (s *FlowStepIdentifier) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Value)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "value",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Autocomplete)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "autocomplete",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s FlowStepPurpose) Validate() error {
 	switch s {
 	case "login":
@@ -8414,12 +15165,70 @@ func (s *FlowSubmitRequest) Validate() error {
 	return nil
 }
 
+func (s *FlowUnsupported) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *FlowdefCreatedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -8428,6 +15237,29 @@ func (s *FlowdefCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -8496,6 +15328,17 @@ func (s *FlowdefCreatedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -8558,6 +15401,29 @@ func (s *FlowdefDeletedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -8565,6 +15431,29 @@ func (s *FlowdefDeletedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -8688,12 +15577,395 @@ func (s FlowdefDeletedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *FlowdefInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefMissingID) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefMissingProjectID) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.Audience.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "audience",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefPayloadAudience) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.AppIds == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.AppIds)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "app_ids",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.TeamIds == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.TeamIds)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_ids",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefPurposeMismatch) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefRevisionConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowdefSchemaFetchFailed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *FlowdefUpdatedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -8702,6 +15974,29 @@ func (s *FlowdefUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -8767,6 +16062,17 @@ func (s *FlowdefUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "metadata",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
 			Error: err,
 		})
 	}
@@ -8857,12 +16163,2537 @@ func (s GateKind) Validate() error {
 	}
 }
 
+func (s GetApplicationErrorResponse) Validate() error {
+	switch s.Type {
+	case AppNotFoundGetApplicationErrorResponse:
+		if err := s.AppNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AppPermissionDeniedGetApplicationErrorResponse:
+		if err := s.AppPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedGetApplicationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetApplicationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetApplicationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetApplicationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetApplicationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetApplicationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetApplicationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetApplicationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetApplicationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetAuthAttemptErrorResponse) Validate() error {
+	switch s.Type {
+	case AttNotFoundGetAuthAttemptErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedGetAuthAttemptErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetAuthAttemptErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetAuthAttemptErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetAuthAttemptErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetAuthAttemptErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetAuthAttemptErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetBrandingErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetBrandingErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndNotFoundGetBrandingErrorResponse:
+		if err := s.BrndNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndPermissionDeniedGetBrandingErrorResponse:
+		if err := s.BrndPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetBrandingErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetBrandingErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetBrandingErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetBrandingErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetBrandingErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetDeploymentErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetDeploymentErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepNotFoundGetDeploymentErrorResponse:
+		if err := s.DepNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepPermissionDeniedGetDeploymentErrorResponse:
+		if err := s.DepPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetDeploymentErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetDeploymentErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetDeploymentErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetDeploymentErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetDeploymentErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetEventErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetEventErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidGetEventErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtNotFoundGetEventErrorResponse:
+		if err := s.EvtNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtPermissionDeniedGetEventErrorResponse:
+		if err := s.EvtPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetEventErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetEventErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetEventErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetEventErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetEventErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetEventForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetEventNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetEventUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetFlowDefinitionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetFlowDefinitionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefNotFoundGetFlowDefinitionErrorResponse:
+		if err := s.FlowdefNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefPermissionDeniedGetFlowDefinitionErrorResponse:
+		if err := s.FlowdefPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetFlowDefinitionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefMissingIDGetFlowDefinitionErrorResponse:
+		if err := s.FlowdefMissingID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefMissingProjectIDGetFlowDefinitionErrorResponse:
+		if err := s.FlowdefMissingProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetFlowDefinitionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetFlowDefinitionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetFlowDefinitionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetFlowDefinitionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetFlowStepConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetFlowStepErrorResponse) Validate() error {
+	switch s.Type {
+	case AttAlreadyHandedOffGetFlowStepErrorResponse:
+		if err := s.AttAlreadyHandedOff.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidRequestGetFlowStepErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidStateGetFlowStepErrorResponse:
+		if err := s.AttInvalidState.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotCompletedGetFlowStepErrorResponse:
+		if err := s.AttNotCompleted.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotFoundGetFlowStepErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedGetFlowStepErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyEncryptFailedGetFlowStepErrorResponse:
+		if err := s.EncKeyEncryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundGetFlowStepErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidGetFlowStepErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowCompletedGetFlowStepErrorResponse:
+		if err := s.FlowCompleted.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowCookieExpiredGetFlowStepErrorResponse:
+		if err := s.FlowCookieExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowCookieInvalidGetFlowStepErrorResponse:
+		if err := s.FlowCookieInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowIntegrityGetFlowStepErrorResponse:
+		if err := s.FlowIntegrity.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowInvalidActionGetFlowStepErrorResponse:
+		if err := s.FlowInvalidAction.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowNotFoundGetFlowStepErrorResponse:
+		if err := s.FlowNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowRateLimitedGetFlowStepErrorResponse:
+		if err := s.FlowRateLimited.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowRestartRequiredGetFlowStepErrorResponse:
+		if err := s.FlowRestartRequired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowSSOUserSchemaMismatchGetFlowStepErrorResponse:
+		if err := s.FlowSSOUserSchemaMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowUnsupportedGetFlowStepErrorResponse:
+		if err := s.FlowUnsupported.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpNotFoundGetFlowStepErrorResponse:
+		if err := s.IdpNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpEndpointCleartextGetFlowStepErrorResponse:
+		if err := s.IdpEndpointCleartext.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpEndpointsPartialGetFlowStepErrorResponse:
+		if err := s.IdpEndpointsPartial.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpProtocolBlockMissingGetFlowStepErrorResponse:
+		if err := s.IdpProtocolBlockMissing.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpScopesMissingOpenidGetFlowStepErrorResponse:
+		if err := s.IdpScopesMissingOpenid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetFlowStepErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidGetFlowStepErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetFlowStepErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjLastOwnerGetFlowStepErrorResponse:
+		if err := s.ProjLastOwner.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotDeployedGetFlowStepErrorResponse:
+		if err := s.RelNotDeployed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundGetFlowStepErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedGetFlowStepErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetFlowStepErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgGetFlowStepErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetFlowStepErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserAlreadyExistsGetFlowStepErrorResponse:
+		if err := s.UserAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserConflictGetFlowStepErrorResponse:
+		if err := s.UserConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidGetFlowStepErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundGetFlowStepErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordEmptyGetFlowStepErrorResponse:
+		if err := s.UserPasswordEmpty.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordHashingBusyGetFlowStepErrorResponse:
+		if err := s.UserPasswordHashingBusy.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordPolicyViolationGetFlowStepErrorResponse:
+		if err := s.UserPasswordPolicyViolation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordTooLongGetFlowStepErrorResponse:
+		if err := s.UserPasswordTooLong.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetFlowStepErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetFlowStepGone) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetFlowStepNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetGrantErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetGrantErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantNotFoundGetGrantErrorResponse:
+		if err := s.GrantNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantPermissionDeniedGetGrantErrorResponse:
+		if err := s.GrantPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetGrantErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetGrantErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetGrantErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetGrantErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedGetGrantErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetGrantErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetGrantForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetGrantNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetGrantUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetIdpErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetIdpErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpNotFoundGetIdpErrorResponse:
+		if err := s.IdpNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpPermissionDeniedGetIdpErrorResponse:
+		if err := s.IdpPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetIdpErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetIdpErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetIdpErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetIdpErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetIdpErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetIdpForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetIdpNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetIdpRevisionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetIdpRevisionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpNotFoundGetIdpRevisionErrorResponse:
+		if err := s.IdpNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpPermissionDeniedGetIdpRevisionErrorResponse:
+		if err := s.IdpPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetIdpRevisionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetIdpRevisionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetIdpRevisionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetIdpRevisionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetIdpRevisionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetIdpRevisionForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetIdpRevisionNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetIdpRevisionUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetIdpUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetInvitationErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetInvitationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetInvitationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvNotFoundGetInvitationErrorResponse:
+		if err := s.InvNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvPermissionDeniedGetInvitationErrorResponse:
+		if err := s.InvPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetInvitationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetInvitationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetInvitationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetInvitationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetInvitationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetInvitationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetInvitationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetLiveErrorResponse) Validate() error {
+	switch s.Type {
+	case InternalGetLiveErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetLiveErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetLiveErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetMyPasswordStateErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetMyPasswordStateErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetMyPasswordStateErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetMyPasswordStateErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetMyPasswordStateErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchGetMyPasswordStateErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetMyPasswordStateErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundGetMyPasswordStateErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetMyPasswordStateErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetMySessionCsrfTokenErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetMySessionCsrfTokenErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetMySessionCsrfTokenErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetMySessionCsrfTokenErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetMySessionCsrfTokenErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundGetMySessionCsrfTokenErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchGetMySessionCsrfTokenErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetMySessionCsrfTokenErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetMySessionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetMySessionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetMySessionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetMySessionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetMySessionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundGetMySessionErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchGetMySessionErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetMySessionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetMySessionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetMyUserErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetMyUserErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetMyUserErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetMyUserErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetMyUserErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchGetMyUserErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetMyUserErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundGetMyUserErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetMyUserErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetMyUserSchemaErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetMyUserSchemaErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetMyUserSchemaErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetMyUserSchemaErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetMyUserSchemaErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchGetMyUserSchemaErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetMyUserSchemaErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundGetMyUserSchemaErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetMyUserSchemaErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetOAuthSettingsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetOAuthSettingsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetOAuthSettingsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetOAuthSettingsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OauthsetNotFoundGetOAuthSettingsErrorResponse:
+		if err := s.OauthsetNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OauthsetPermissionDeniedGetOAuthSettingsErrorResponse:
+		if err := s.OauthsetPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetOAuthSettingsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetOAuthSettingsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetOAuthSettingsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetPolicyErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetPolicyErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetPolicyErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetPolicyErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolNotFoundGetPolicyErrorResponse:
+		if err := s.PolNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolPermissionDeniedGetPolicyErrorResponse:
+		if err := s.PolPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetPolicyErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetPolicyErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetPolicyErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetPolicyRevisionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetPolicyRevisionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetPolicyRevisionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetPolicyRevisionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolNotFoundGetPolicyRevisionErrorResponse:
+		if err := s.PolNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolPermissionDeniedGetPolicyRevisionErrorResponse:
+		if err := s.PolPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetPolicyRevisionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetPolicyRevisionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetPolicyRevisionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetProjectClaimStatusErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetProjectClaimStatusErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimChallengeNotFoundGetProjectClaimStatusErrorResponse:
+		if err := s.ClaimChallengeNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetProjectClaimStatusErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetProjectClaimStatusErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjClaimExpiredGetProjectClaimStatusErrorResponse:
+		if err := s.ProjClaimExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjClaimWindowExpiredGetProjectClaimStatusErrorResponse:
+		if err := s.ProjClaimWindowExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundGetProjectClaimStatusErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPermissionDeniedGetProjectClaimStatusErrorResponse:
+		if err := s.ProjPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetProjectClaimStatusErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetProjectClaimStatusErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetProjectClaimStatusErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetProjectClaimStatusGone) Validate() error {
+	switch s.Type {
+	case ProjClaimExpiredGetProjectClaimStatusGone:
+		if err := s.ProjClaimExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjClaimWindowExpiredGetProjectClaimStatusGone:
+		if err := s.ProjClaimWindowExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetProjectClaimStatusNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetProjectClaimStatusTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetProjectClaimStatusUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetProjectClaimWindowErrorResponse) Validate() error {
+	switch s.Type {
+	case ClaimChallengeNotFoundGetProjectClaimWindowErrorResponse:
+		if err := s.ClaimChallengeNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetProjectClaimWindowErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetProjectClaimWindowErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetProjectClaimWindowErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetProjectClaimWindowNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetProjectClaimWindowTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetProjectErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetProjectErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetProjectErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetProjectErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundGetProjectErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPermissionDeniedGetProjectErrorResponse:
+		if err := s.ProjPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetProjectErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetProjectErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetProjectErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetProjectNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetProjectUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetReadyErrorResponse) Validate() error {
+	switch s.Type {
+	case InternalGetReadyErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetReadyErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetReadyErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetReleaseErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetReleaseErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetReleaseErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetReleaseErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundGetReleaseErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelPermissionDeniedGetReleaseErrorResponse:
+		if err := s.RelPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetReleaseErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetReleaseErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetReleaseErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetSchemaErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetSchemaErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetSchemaErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchNotFoundGetSchemaErrorResponse:
+		if err := s.SchNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchPermissionDeniedGetSchemaErrorResponse:
+		if err := s.SchPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetSchemaErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetSchemaErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetSchemaErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetSchemaErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s GetSessionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetSessionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetSessionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetSessionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetSessionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundGetSessionErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessPermissionDeniedGetSessionErrorResponse:
+		if err := s.SessPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetSessionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetSessionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetSessionForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetSessionNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetSessionUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetTeamErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetTeamErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetTeamErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetTeamErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetTeamErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamTeamNotFoundGetTeamErrorResponse:
+		if err := s.TeamTeamNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamPermissionDeniedGetTeamErrorResponse:
+		if err := s.TeamPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetTeamErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetTeamErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetTeamNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetTeamUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetUserErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetUserErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetUserErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetUserErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetUserErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetUserErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundGetUserErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedGetUserErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetUserErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetUserNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetUserPasswordStateErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetUserPasswordStateErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetUserPasswordStateErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetUserPasswordStateErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetUserPasswordStateErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetUserPasswordStateErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundGetUserPasswordStateErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedGetUserPasswordStateErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetUserPasswordStateErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GetUserPasswordStateForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetUserPasswordStateInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetUserPasswordStateNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetUserPasswordStateUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetUserUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s GetVariableErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedGetVariableErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalGetVariableErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedGetVariableErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidGetVariableErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableGetVariableErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarNotFoundGetVariableErrorResponse:
+		if err := s.VarNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarPermissionDeniedGetVariableErrorResponse:
+		if err := s.VarPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *GetVariableErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *Grant) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ProjectID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ObjectType.Validate(); err != nil {
 			return err
@@ -8927,6 +18758,41 @@ func (s *Grant) Validate() error {
 	return nil
 }
 
+func (s *GrantAlreadyExists) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s GrantExpand) Validate() error {
 	switch s {
 	case "principal":
@@ -8953,6 +18819,76 @@ func (s GrantFilterField) Validate() error {
 	}
 }
 
+func (s *GrantInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GrantNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s GrantObjectType) Validate() error {
 	switch s {
 	case "project":
@@ -8960,6 +18896,111 @@ func (s GrantObjectType) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *GrantPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GrantPrincipalNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *GrantProjectUnclaimed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s GrantRelation) Validate() error {
@@ -8994,6 +19035,29 @@ func (s *GrantTeam) Validate() error {
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.TeamID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if value, ok := s.Status.Get(); ok {
 			if err := func() error {
@@ -9050,6 +19114,41 @@ func (s *GrantUser) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "metadata",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *HandoffResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.HandoffToken)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "handoff_token",
 			Error: err,
 		})
 	}
@@ -9140,8 +19239,8 @@ func (s *IdpConnection) Validate() error {
 	}
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     64,
 			MaxLengthSet:  true,
 			Email:         false,
@@ -9290,13 +19389,13 @@ func (s IdpConnectionClaimMapping) Validate() error {
 	for key, elem := range s {
 		if err := func() error {
 			if err := (validate.String{
-				MinLength:     0,
-				MinLengthSet:  false,
+				MinLength:     1,
+				MinLengthSet:  true,
 				MaxLength:     0,
 				MaxLengthSet:  false,
 				Email:         false,
 				Hostname:      false,
-				Regex:         regexMap["^[^$]"],
+				Regex:         regexMap["^[^$][\\s\\S]*$"],
 				MinNumeric:    0,
 				MinNumericSet: false,
 				MaxNumeric:    0,
@@ -9327,8 +19426,8 @@ func (s *IdpConnectionOidc) Validate() error {
 	var failures []validate.FieldError
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     0,
 			MaxLengthSet:  false,
 			Email:         false,
@@ -9352,8 +19451,8 @@ func (s *IdpConnectionOidc) Validate() error {
 		if value, ok := s.JwksURI.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
+					MinLength:     1,
+					MinLengthSet:  true,
 					MaxLength:     0,
 					MaxLengthSet:  false,
 					Email:         false,
@@ -9382,8 +19481,8 @@ func (s *IdpConnectionOidc) Validate() error {
 		if value, ok := s.AuthorizationEndpoint.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
+					MinLength:     1,
+					MinLengthSet:  true,
 					MaxLength:     0,
 					MaxLengthSet:  false,
 					Email:         false,
@@ -9412,8 +19511,8 @@ func (s *IdpConnectionOidc) Validate() error {
 		if value, ok := s.TokenEndpoint.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
+					MinLength:     1,
+					MinLengthSet:  true,
 					MaxLength:     0,
 					MaxLengthSet:  false,
 					Email:         false,
@@ -9442,8 +19541,8 @@ func (s *IdpConnectionOidc) Validate() error {
 		if value, ok := s.UserinfoEndpoint.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
+					MinLength:     1,
+					MinLengthSet:  true,
 					MaxLength:     0,
 					MaxLengthSet:  false,
 					Email:         false,
@@ -9493,8 +19592,8 @@ func (s *IdpConnectionOidc) Validate() error {
 	}
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     0,
 			MaxLengthSet:  false,
 			Email:         false,
@@ -9539,8 +19638,8 @@ func (s *IdpConnectionOidc) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Scopes)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -9648,6 +19747,29 @@ func (s *IdpCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -9655,6 +19777,29 @@ func (s *IdpCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -9778,6 +19923,111 @@ func (s IdpCreatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *IdpEndpointCleartext) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *IdpEndpointsPartial) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *IdpFieldImmutable) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s IdpFilterField) Validate() error {
 	switch s {
 	case "slug":
@@ -9796,6 +20046,29 @@ func (s *IdpIdentityLinkCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -9803,6 +20076,29 @@ func (s *IdpIdentityLinkCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -9926,6 +20222,76 @@ func (s IdpIdentityLinkCreatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *IdpNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *IdpPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s IdpProtocol) Validate() error {
 	switch s {
 	case "oidc":
@@ -9935,12 +20301,116 @@ func (s IdpProtocol) Validate() error {
 	}
 }
 
+func (s *IdpProtocolBlockMissing) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *IdpResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.RevisionID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "revision_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Slug)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "slug",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Definition.Validate(); err != nil {
 			return err
@@ -9958,12 +20428,105 @@ func (s *IdpResponse) Validate() error {
 	return nil
 }
 
+func (s *IdpRevisionConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *IdpScopesMissingOpenid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *IdpUpdatedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -9972,6 +20535,29 @@ func (s *IdpUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -10118,6 +20704,356 @@ func (s *InitClaimResponse) Validate() error {
 	return nil
 }
 
+func (s *Internal) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvInviterNotAdmin) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvPendingLimit) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvPlatformRequired) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvProjectUnclaimed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvSelfAccept) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *InvSelfReject) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s Invitation) Validate() error {
 	switch s.Type {
 	case InvitationProjectMemberInvitation:
@@ -10142,6 +21078,29 @@ func (s *InvitationAcceptedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -10149,6 +21108,29 @@ func (s *InvitationAcceptedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -10457,6 +21439,29 @@ func (s *InvitationCancelledEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -10464,6 +21469,29 @@ func (s *InvitationCancelledEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -10622,6 +21650,29 @@ func (s *InvitationCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -10629,6 +21680,29 @@ func (s *InvitationCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -10878,8 +21952,8 @@ func (s InvitationExpand) Validate() error {
 func (s InvitationID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -11390,6 +22464,29 @@ func (s *InvitationRejectedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -11397,6 +22494,29 @@ func (s *InvitationRejectedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -11829,6 +22949,25 @@ func (s *IssueChallengeRequestPasskeyOptions) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if s.RpOrigins == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.RpOrigins)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "rp_origins",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.UserVerification.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -11866,7 +23005,7 @@ func (s IssueChallengeRequestPasskeyOptionsUserVerification) Validate() error {
 }
 
 func (s Limit) Validate() error {
-	alias := (int)(s)
+	alias := (int64)(s)
 	if err := (validate.Int{
 		MinSet:        true,
 		Min:           1,
@@ -11883,6 +23022,71 @@ func (s Limit) Validate() error {
 	return nil
 }
 
+func (s ListBrandingErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListBrandingErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndNotFoundListBrandingErrorResponse:
+		if err := s.BrndNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndPermissionDeniedListBrandingErrorResponse:
+		if err := s.BrndPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListBrandingErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListBrandingErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListBrandingErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListBrandingErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListBrandingErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ListBrandingResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -11893,10 +23097,158 @@ func (s *ListBrandingResponse) Validate() error {
 		if s.Branding == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Branding)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "branding",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ListDeploymentVariablesErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListDeploymentVariablesErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepNotFoundListDeploymentVariablesErrorResponse:
+		if err := s.DepNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepPermissionDeniedListDeploymentVariablesErrorResponse:
+		if err := s.DepPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListDeploymentVariablesErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListDeploymentVariablesErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListDeploymentVariablesErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListDeploymentVariablesErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarNotFoundListDeploymentVariablesErrorResponse:
+		if err := s.VarNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarPermissionDeniedListDeploymentVariablesErrorResponse:
+		if err := s.VarPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListDeploymentVariablesErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ListDeploymentsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListDeploymentsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepNotFoundListDeploymentsErrorResponse:
+		if err := s.DepNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepPermissionDeniedListDeploymentsErrorResponse:
+		if err := s.DepPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListDeploymentsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListDeploymentsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListDeploymentsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListDeploymentsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListDeploymentsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
 			Error: err,
 		})
 	}
@@ -11915,6 +23267,14 @@ func (s *ListDeploymentsResponse) Validate() error {
 	if err := func() error {
 		if s.Deployments == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Deployments)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Deployments {
@@ -11946,6 +23306,14 @@ func (s *ListDeploymentsResponse) Validate() error {
 	return nil
 }
 
+func (s *ListEventsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s ListEventsCategoryItem) Validate() error {
 	switch s {
 	case "request":
@@ -11963,6 +23331,84 @@ func (s ListEventsCategoryItem) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s ListEventsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListEventsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidListEventsErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtNotFoundListEventsErrorResponse:
+		if err := s.EvtNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtPermissionDeniedListEventsErrorResponse:
+		if err := s.EvtPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListEventsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListEventsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListEventsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListEventsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListEventsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListEventsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s ListEventsOrder) Validate() error {
@@ -11985,6 +23431,14 @@ func (s *ListEventsResponse) Validate() error {
 	if err := func() error {
 		if s.Events == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Events)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Events {
@@ -12033,6 +23487,99 @@ func (s ListEventsStatusClassItem) Validate() error {
 	}
 }
 
+func (s *ListEventsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListFlowDefinitionsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListFlowDefinitionsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefInvalidListFlowDefinitionsErrorResponse:
+		if err := s.FlowdefInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefNotFoundListFlowDefinitionsErrorResponse:
+		if err := s.FlowdefNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefPermissionDeniedListFlowDefinitionsErrorResponse:
+		if err := s.FlowdefPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListFlowDefinitionsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchNotFoundListFlowDefinitionsErrorResponse:
+		if err := s.SchNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchPermissionDeniedListFlowDefinitionsErrorResponse:
+		if err := s.SchPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefMissingProjectIDListFlowDefinitionsErrorResponse:
+		if err := s.FlowdefMissingProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListFlowDefinitionsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListFlowDefinitionsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListFlowDefinitionsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListFlowDefinitionsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s ListFlowDefinitionsPurpose) Validate() error {
 	switch s {
 	case "login":
@@ -12063,6 +23610,87 @@ func (s ListFlowDefinitionsRevisions) Validate() error {
 	}
 }
 
+func (s ListIdpRevisionsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListIdpRevisionsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpNotFoundListIdpRevisionsErrorResponse:
+		if err := s.IdpNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpPermissionDeniedListIdpRevisionsErrorResponse:
+		if err := s.IdpPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListIdpRevisionsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListIdpRevisionsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListIdpRevisionsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListIdpRevisionsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListIdpRevisionsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListIdpRevisionsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListIdpRevisionsNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ListIdpRevisionsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12072,6 +23700,14 @@ func (s *ListIdpRevisionsResponse) Validate() error {
 	if err := func() error {
 		if s.Revisions == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Revisions)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Revisions {
@@ -12103,6 +23739,103 @@ func (s *ListIdpRevisionsResponse) Validate() error {
 	return nil
 }
 
+func (s *ListIdpRevisionsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListInvitationsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListInvitationsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListInvitationsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListInvitationsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvNotFoundListInvitationsErrorResponse:
+		if err := s.InvNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvPermissionDeniedListInvitationsErrorResponse:
+		if err := s.InvPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListInvitationsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListInvitationsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListInvitationsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListInvitationsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListInvitationsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListInvitationsNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ListInvitationsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12112,6 +23845,14 @@ func (s *ListInvitationsResponse) Validate() error {
 	if err := func() error {
 		if s.Invitations == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Invitations)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Invitations {
@@ -12154,6 +23895,220 @@ func (s ListInvitationsType) Validate() error {
 	}
 }
 
+func (s *ListInvitationsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListMyIdentityLinksErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListMyIdentityLinksErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListMyIdentityLinksErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListMyIdentityLinksErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListMyIdentityLinksErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchListMyIdentityLinksErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListMyIdentityLinksErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundListMyIdentityLinksErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListMyIdentityLinksErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ListMyPasskeysErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListMyPasskeysErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListMyPasskeysErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListMyPasskeysErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListMyPasskeysErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchListMyPasskeysErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListMyPasskeysErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundListMyPasskeysErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListMyPasskeysErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListMyProjectsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListMyProjectsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListMyProjectsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListMyProjectsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListMyProjectsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListMyProjectsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchListMyProjectsErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListMyProjectsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListMyProjectsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListMyProjectsInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ListMyProjectsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12163,6 +24118,14 @@ func (s *ListMyProjectsResponse) Validate() error {
 	if err := func() error {
 		if s.Projects == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Projects)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Projects {
@@ -12217,6 +24180,136 @@ func (s *ListMyProjectsResponseHeaders) Validate() error {
 	return nil
 }
 
+func (s ListMyTeamsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListMyTeamsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListMyTeamsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListMyTeamsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListMyTeamsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchListMyTeamsErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListMyTeamsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundListMyTeamsErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListMyTeamsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ListPoliciesErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListPoliciesErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListPoliciesErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListPoliciesErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolNotFoundListPoliciesErrorResponse:
+		if err := s.PolNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolPermissionDeniedListPoliciesErrorResponse:
+		if err := s.PolPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListPoliciesErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListPoliciesErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListPoliciesErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ListPoliciesResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12226,6 +24319,14 @@ func (s *ListPoliciesResponse) Validate() error {
 	if err := func() error {
 		if s.Policies == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Policies)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Policies {
@@ -12257,6 +24358,71 @@ func (s *ListPoliciesResponse) Validate() error {
 	return nil
 }
 
+func (s ListPolicyRevisionsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListPolicyRevisionsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListPolicyRevisionsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListPolicyRevisionsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolNotFoundListPolicyRevisionsErrorResponse:
+		if err := s.PolNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolPermissionDeniedListPolicyRevisionsErrorResponse:
+		if err := s.PolPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListPolicyRevisionsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListPolicyRevisionsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListPolicyRevisionsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ListPolicyRevisionsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12266,6 +24432,14 @@ func (s *ListPolicyRevisionsResponse) Validate() error {
 	if err := func() error {
 		if s.Revisions == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Revisions)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Revisions {
@@ -12307,6 +24481,14 @@ func (s *ListPreviewsResponse) Validate() error {
 		if s.Previews == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Previews)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Previews {
 			if err := func() error {
@@ -12337,6 +24519,100 @@ func (s *ListPreviewsResponse) Validate() error {
 	return nil
 }
 
+func (s *ListProjectAdminsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListProjectAdminsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListProjectAdminsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListProjectAdminsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListProjectAdminsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMissingIDListProjectAdminsErrorResponse:
+		if err := s.ProjMissingID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundListProjectAdminsErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPermissionDeniedListProjectAdminsErrorResponse:
+		if err := s.ProjPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListProjectAdminsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListProjectAdminsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListProjectAdminsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListProjectAdminsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListProjectAdminsNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ListProjectAdminsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12346,6 +24622,14 @@ func (s *ListProjectAdminsResponse) Validate() error {
 	if err := func() error {
 		if s.Admins == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Admins)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Admins {
@@ -12377,6 +24661,144 @@ func (s *ListProjectAdminsResponse) Validate() error {
 	return nil
 }
 
+func (s *ListProjectAdminsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListProjectPreviewsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListProjectPreviewsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepNotFoundListProjectPreviewsErrorResponse:
+		if err := s.DepNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepPermissionDeniedListProjectPreviewsErrorResponse:
+		if err := s.DepPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListProjectPreviewsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListProjectPreviewsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListProjectPreviewsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListProjectPreviewsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListProjectPreviewsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ListReleasesErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListReleasesErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListReleasesErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListReleasesErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundListReleasesErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelPermissionDeniedListReleasesErrorResponse:
+		if err := s.RelPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListReleasesErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListReleasesErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListReleasesErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ListReleasesResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12386,6 +24808,14 @@ func (s *ListReleasesResponse) Validate() error {
 	if err := func() error {
 		if s.Releases == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Releases)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Releases {
@@ -12417,6 +24847,71 @@ func (s *ListReleasesResponse) Validate() error {
 	return nil
 }
 
+func (s ListSchemasErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListSchemasErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListSchemasErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchNotFoundListSchemasErrorResponse:
+		if err := s.SchNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchPermissionDeniedListSchemasErrorResponse:
+		if err := s.SchPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListSchemasErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListSchemasErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListSchemasErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListSchemasErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s ListSchemasKind) Validate() error {
 	switch s {
 	case "user-schema":
@@ -12435,6 +24930,14 @@ func (s *ListSchemasResponse) Validate() error {
 	if err := func() error {
 		if s.Schemas == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Schemas)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Schemas {
@@ -12477,6 +24980,103 @@ func (s ListSchemasRevisions) Validate() error {
 	}
 }
 
+func (s *ListUserIdentityLinksBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListUserIdentityLinksErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListUserIdentityLinksErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListUserIdentityLinksErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListUserIdentityLinksErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListUserIdentityLinksErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListUserIdentityLinksErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundListUserIdentityLinksErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedListUserIdentityLinksErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListUserIdentityLinksErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListUserIdentityLinksForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserIdentityLinksInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserIdentityLinksNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ListUserIdentityLinksResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12486,6 +25086,31 @@ func (s *ListUserIdentityLinksResponse) Validate() error {
 	if err := func() error {
 		if s.IdentityLinks == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.IdentityLinks)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.IdentityLinks {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
 		}
 		return nil
 	}(); err != nil {
@@ -12523,6 +25148,111 @@ func (s *ListUserIdentityLinksResponseHeaders) Validate() error {
 	return nil
 }
 
+func (s *ListUserIdentityLinksUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserPasskeysBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListUserPasskeysErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListUserPasskeysErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListUserPasskeysErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListUserPasskeysErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListUserPasskeysErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListUserPasskeysErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundListUserPasskeysErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedListUserPasskeysErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListUserPasskeysErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListUserPasskeysForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserPasskeysInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserPasskeysNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ListUserPasskeysResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12532,6 +25262,31 @@ func (s *ListUserPasskeysResponse) Validate() error {
 	if err := func() error {
 		if s.Passkeys == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Passkeys)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Passkeys {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
 		}
 		return nil
 	}(); err != nil {
@@ -12569,6 +25324,146 @@ func (s *ListUserPasskeysResponseHeaders) Validate() error {
 	return nil
 }
 
+func (s *ListUserPasskeysResponsePasskeysItem) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListUserPasskeysUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserTeamsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListUserTeamsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListUserTeamsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListUserTeamsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListUserTeamsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListUserTeamsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListUserTeamsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundListUserTeamsErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedListUserTeamsErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListUserTeamsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListUserTeamsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserTeamsInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUserTeamsNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ListUserTeamsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -12578,6 +25473,14 @@ func (s *ListUserTeamsResponse) Validate() error {
 	if err := func() error {
 		if s.Teams == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Teams)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Teams {
@@ -12632,12 +25535,232 @@ func (s *ListUserTeamsResponseHeaders) Validate() error {
 	return nil
 }
 
+func (s *ListUserTeamsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s ListVariablesErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedListVariablesErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalListVariablesErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedListVariablesErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidListVariablesErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableListVariablesErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarNotFoundListVariablesErrorResponse:
+		if err := s.VarNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarPermissionDeniedListVariablesErrorResponse:
+		if err := s.VarPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ListVariablesErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *LookupInvitationBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s LookupInvitationErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidLookupInvitationErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedLookupInvitationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalLookupInvitationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvNotFoundLookupInvitationErrorResponse:
+		if err := s.InvNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedLookupInvitationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidLookupInvitationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableLookupInvitationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *LookupInvitationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *LookupInvitationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *LookupInvitationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *NotImplemented) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *OAuthSettingsCreatedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -12646,6 +25769,29 @@ func (s *OAuthSettingsCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -12769,11 +25915,81 @@ func (s OAuthSettingsCreatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *OauthsetNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *OauthsetPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s Origin) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     2048,
 		MaxLengthSet:  true,
 		Email:         false,
@@ -12796,6 +26012,29 @@ func (s *OriginAddedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -12803,6 +26042,29 @@ func (s *OriginAddedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -12937,12 +26199,140 @@ func (s OriginAddedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *OriginInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *OriginKindConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *OriginNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *OriginPayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Pattern)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "pattern",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Kind.Validate(); err != nil {
 			return err
@@ -12971,12 +26361,105 @@ func (s OriginPayloadKind) Validate() error {
 	}
 }
 
+func (s *OriginPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *OriginPrimaryNotExact) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *OriginRemovedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -12985,6 +26468,29 @@ func (s *OriginRemovedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -13149,6 +26655,40 @@ func (s *PasskeyChallengePayloadPublicKey) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Challenge)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "challenge",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.AllowedCredentials == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.AllowedCredentials)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.AllowedCredentials {
 			if err := func() error {
@@ -13204,6 +26744,29 @@ func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) Validate() erro
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Type.Validate(); err != nil {
 			return err
 		}
@@ -13256,6 +26819,29 @@ func (s *PasskeyFactorPayload) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "method",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.CredentialID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "credential_id",
 			Error: err,
 		})
 	}
@@ -13919,6 +27505,146 @@ func (s PatchUserRequestAttributes) Validate() error {
 	return nil
 }
 
+func (s *PolInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PolNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PolPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PolRevisionConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s Policy) Validate() error {
 	switch s.Type {
 	case PasswordSetPolicyPolicy:
@@ -13943,6 +27669,29 @@ func (s *PolicyCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -13950,6 +27699,29 @@ func (s *PolicyCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -14076,8 +27848,8 @@ func (s PolicyCreatedEventDelegationType) Validate() error {
 func (s PolicyID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -14107,8 +27879,8 @@ func (s PolicyOperation) Validate() error {
 func (s PolicyRevisionID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -14131,6 +27903,29 @@ func (s *PolicyUpdatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -14138,6 +27933,29 @@ func (s *PolicyUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -14269,8 +28087,8 @@ func (s *PowChallenge) Validate() error {
 	var failures []validate.FieldError
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     0,
 			MaxLengthSet:  false,
 			Email:         false,
@@ -14292,8 +28110,8 @@ func (s *PowChallenge) Validate() error {
 	}
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     0,
 			MaxLengthSet:  false,
 			Email:         false,
@@ -14315,8 +28133,8 @@ func (s *PowChallenge) Validate() error {
 	}
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
+			MinLength:     1,
+			MinLengthSet:  true,
 			MaxLength:     0,
 			MaxLengthSet:  false,
 			Email:         false,
@@ -14372,6 +28190,29 @@ func (s *PreviewRemovedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -14379,6 +28220,29 @@ func (s *PreviewRemovedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -14502,6 +28366,426 @@ func (s PreviewRemovedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *ProjAlreadyClaimed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjClaimExpired) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjClaimWindowExpired) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjLastOwner) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjMismatch) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjMissingID) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjNameInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjOriginNotAllowed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjPasswordHashInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjPreviewNotLive) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ProjectAdmin) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -14526,8 +28810,8 @@ func (s *ProjectAdmin) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Sources)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -14578,6 +28862,47 @@ func (s *ProjectAdminGrantSource) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.GrantID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "grant_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Team.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -14607,6 +28932,17 @@ func (s *ProjectAdminOwningTeamSource) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Team.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team",
 			Error: err,
 		})
 	}
@@ -14649,6 +28985,29 @@ func (s *ProjectCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -14656,6 +29015,29 @@ func (s *ProjectCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -14797,6 +29179,29 @@ func (s *ProjectDeletedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -14804,6 +29209,29 @@ func (s *ProjectDeletedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -14934,8 +29362,62 @@ func (s *ProjectDetailResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Origins == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Origins)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Origins {
@@ -15006,8 +29488,8 @@ func (s *ProjectDetailResponse) Validate() error {
 func (s ProjectID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -15064,6 +29546,17 @@ func (s *ProjectPayload) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if s.Origins == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Origins)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Origins {
 			if err := func() error {
@@ -15101,8 +29594,62 @@ func (s *ProjectResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Origins == nil {
 			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Origins)); err != nil {
+			return errors.Wrap(err, "array")
 		}
 		var failures []validate.FieldError
 		for i, elem := range s.Origins {
@@ -15159,6 +29706,29 @@ func (s *ProjectUpdatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -15166,6 +29736,29 @@ func (s *ProjectUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -15300,8 +29893,130 @@ func (s ProjectUpdatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *PublishApplicationBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishApplicationConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *PublishApplicationCreated) Validate() error {
 	alias := (*CreateApplicationResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s PublishApplicationErrorResponse) Validate() error {
+	switch s.Type {
+	case AppClientIDTakenPublishApplicationErrorResponse:
+		if err := s.AppClientIDTaken.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AppFieldImmutablePublishApplicationErrorResponse:
+		if err := s.AppFieldImmutable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AppInvalidPublishApplicationErrorResponse:
+		if err := s.AppInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AppNotFoundPublishApplicationErrorResponse:
+		if err := s.AppNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AppPermissionDeniedPublishApplicationErrorResponse:
+		if err := s.AppPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AppRevisionConflictPublishApplicationErrorResponse:
+		if err := s.AppRevisionConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedPublishApplicationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidPublishApplicationErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalPublishApplicationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedPublishApplicationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidPublishApplicationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailablePublishApplicationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *PublishApplicationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PublishApplicationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishApplicationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
 	if err := alias.Validate(); err != nil {
 		return err
 	}
@@ -15316,8 +30031,295 @@ func (s *PublishApplicationOK) Validate() error {
 	return nil
 }
 
+func (s *PublishApplicationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s PublishBrandingErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedPublishBrandingErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndInvalidPublishBrandingErrorResponse:
+		if err := s.BrndInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndMissingProjectIDPublishBrandingErrorResponse:
+		if err := s.BrndMissingProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndNotFoundPublishBrandingErrorResponse:
+		if err := s.BrndNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case BrndPermissionDeniedPublishBrandingErrorResponse:
+		if err := s.BrndPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidPublishBrandingErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalPublishBrandingErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedPublishBrandingErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidPublishBrandingErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailablePublishBrandingErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *PublishBrandingErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s PublishFlowDefinitionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedPublishFlowDefinitionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidPublishFlowDefinitionErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefInvalidPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefNotFoundPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefPermissionDeniedPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefRevisionConflictPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefRevisionConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalPublishFlowDefinitionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchNotFoundPublishFlowDefinitionErrorResponse:
+		if err := s.SchNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedPublishFlowDefinitionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidPublishFlowDefinitionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefSchemaFetchFailedPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefSchemaFetchFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailablePublishFlowDefinitionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *PublishFlowDefinitionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PublishIdpBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *PublishIdpCreated) Validate() error {
 	alias := (*IdpResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s PublishIdpErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedPublishIdpErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidPublishIdpErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpFieldImmutablePublishIdpErrorResponse:
+		if err := s.IdpFieldImmutable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpNotFoundPublishIdpErrorResponse:
+		if err := s.IdpNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpPermissionDeniedPublishIdpErrorResponse:
+		if err := s.IdpPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpRevisionConflictPublishIdpErrorResponse:
+		if err := s.IdpRevisionConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpEndpointsPartialPublishIdpErrorResponse:
+		if err := s.IdpEndpointsPartial.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalPublishIdpErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedPublishIdpErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidPublishIdpErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailablePublishIdpErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *PublishIdpErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PublishIdpForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishIdpNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
 	if err := alias.Validate(); err != nil {
 		return err
 	}
@@ -15328,6 +30330,94 @@ func (s *PublishIdpOK) Validate() error {
 	alias := (*IdpResponse)(s)
 	if err := alias.Validate(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s *PublishIdpUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s PublishPolicyErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedPublishPolicyErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidPublishPolicyErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalPublishPolicyErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedPublishPolicyErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolInvalidPublishPolicyErrorResponse:
+		if err := s.PolInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolNotFoundPublishPolicyErrorResponse:
+		if err := s.PolNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolPermissionDeniedPublishPolicyErrorResponse:
+		if err := s.PolPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolRevisionConflictPublishPolicyErrorResponse:
+		if err := s.PolRevisionConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidPublishPolicyErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailablePublishPolicyErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *PublishPolicyErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -15349,6 +30439,116 @@ func (s PublishPolicyRequest) Validate() error {
 	}
 }
 
+func (s PublishSchemaErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedPublishSchemaErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidPublishSchemaErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalPublishSchemaErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchAlreadyExistsPublishSchemaErrorResponse:
+		if err := s.SchAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchDeniedPublishSchemaErrorResponse:
+		if err := s.SchFetchDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchDowngradePublishSchemaErrorResponse:
+		if err := s.SchFetchDowngrade.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchTimeoutPublishSchemaErrorResponse:
+		if err := s.SchFetchTimeout.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchTooLargePublishSchemaErrorResponse:
+		if err := s.SchFetchTooLarge.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchFetchTooManyRedirectsPublishSchemaErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchInvalidRequestPublishSchemaErrorResponse:
+		if err := s.SchInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchNotFoundPublishSchemaErrorResponse:
+		if err := s.SchNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchPermissionDeniedPublishSchemaErrorResponse:
+		if err := s.SchPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchRevisionConflictPublishSchemaErrorResponse:
+		if err := s.SchRevisionConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedPublishSchemaErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidPublishSchemaErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailablePublishSchemaErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *PublishSchemaErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s PublishSchemaReq) Validate() error {
 	switch s.Type {
 	case UserSchemaPublishSchemaReq:
@@ -15361,6 +30561,102 @@ func (s PublishSchemaReq) Validate() error {
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
+}
+
+func (s *QueryGrantsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s QueryGrantsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidQueryGrantsErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedQueryGrantsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantInvalidQueryGrantsErrorResponse:
+		if err := s.GrantInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantNotFoundQueryGrantsErrorResponse:
+		if err := s.GrantNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case GrantPermissionDeniedQueryGrantsErrorResponse:
+		if err := s.GrantPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalQueryGrantsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedQueryGrantsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidQueryGrantsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableQueryGrantsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedQueryGrantsErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *QueryGrantsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryGrantsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *QueryGrantsRequest) Validate() error {
@@ -15394,8 +30690,8 @@ func (s *QueryGrantsRequest) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Expand)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -15445,6 +30741,17 @@ func (s *QueryGrantsRequest) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Filter == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Filter)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Filter {
 			if err := func() error {
@@ -15571,6 +30878,14 @@ func (s *QueryGrantsResponse) Validate() error {
 		if s.Grants == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Grants)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Grants {
 			if err := func() error {
@@ -15597,6 +30912,108 @@ func (s *QueryGrantsResponse) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryGrantsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryIdpsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s QueryIdpsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidQueryIdpsErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedQueryIdpsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpNotFoundQueryIdpsErrorResponse:
+		if err := s.IdpNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpPermissionDeniedQueryIdpsErrorResponse:
+		if err := s.IdpPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalQueryIdpsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedQueryIdpsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidQueryIdpsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableQueryIdpsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *QueryIdpsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryIdpsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryIdpsNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -15644,6 +31061,17 @@ func (s *QueryIdpsRequest) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Filter == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Filter)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Filter {
 			if err := func() error {
@@ -15770,6 +31198,14 @@ func (s *QueryIdpsResponse) Validate() error {
 		if s.Idps == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Idps)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Idps {
 			if err := func() error {
@@ -15796,6 +31232,100 @@ func (s *QueryIdpsResponse) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryIdpsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryProjectsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s QueryProjectsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedQueryProjectsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalQueryProjectsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedQueryProjectsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMissingIDQueryProjectsErrorResponse:
+		if err := s.ProjMissingID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundQueryProjectsErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPermissionDeniedQueryProjectsErrorResponse:
+		if err := s.ProjPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidQueryProjectsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableQueryProjectsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *QueryProjectsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryProjectsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -15843,6 +31373,17 @@ func (s *QueryProjectsRequest) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Filter == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Filter)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Filter {
 			if err := func() error {
@@ -15969,6 +31510,14 @@ func (s *QueryProjectsResponse) Validate() error {
 		if s.Projects == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Projects)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Projects {
 			if err := func() error {
@@ -15995,6 +31544,108 @@ func (s *QueryProjectsResponse) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryProjectsTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryProjectsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QuerySessionsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s QuerySessionsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedQuerySessionsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalQuerySessionsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedQuerySessionsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMissingIDQuerySessionsErrorResponse:
+		if err := s.ProjMissingID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidQuerySessionsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundQuerySessionsErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessPermissionDeniedQuerySessionsErrorResponse:
+		if err := s.SessPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableQuerySessionsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *QuerySessionsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QuerySessionsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -16042,6 +31693,17 @@ func (s *QuerySessionsRequest) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Filter == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Filter)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Filter {
 			if err := func() error {
@@ -16168,6 +31830,14 @@ func (s *QuerySessionsResponse) Validate() error {
 		if s.Sessions == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Sessions)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Sessions {
 			if err := func() error {
@@ -16194,6 +31864,113 @@ func (s *QuerySessionsResponse) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QuerySessionsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryTeamsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s QueryTeamsErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidQueryTeamsErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedQueryTeamsErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalQueryTeamsErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedQueryTeamsErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidQueryTeamsErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamTeamNotFoundQueryTeamsErrorResponse:
+		if err := s.TeamTeamNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamPermissionDeniedQueryTeamsErrorResponse:
+		if err := s.TeamPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamProjectNotFoundQueryTeamsErrorResponse:
+		if err := s.TeamProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableQueryTeamsErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *QueryTeamsErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryTeamsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryTeamsNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -16241,6 +32018,17 @@ func (s *QueryTeamsRequest) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Filter == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Filter)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Filter {
 			if err := func() error {
@@ -16367,6 +32155,14 @@ func (s *QueryTeamsResponse) Validate() error {
 		if s.Teams == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Teams)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Teams {
 			if err := func() error {
@@ -16393,6 +32189,108 @@ func (s *QueryTeamsResponse) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryTeamsTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryTeamsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *QueryUsersBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s QueryUsersErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidQueryUsersErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedQueryUsersErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalQueryUsersErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedQueryUsersErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidQueryUsersErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableQueryUsersErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundQueryUsersErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedQueryUsersErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *QueryUsersErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryUsersForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -16428,8 +32326,8 @@ func (s *QueryUsersRequest) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Expand)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -16479,6 +32377,17 @@ func (s *QueryUsersRequest) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Filter == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Filter)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Filter {
 			if err := func() error {
@@ -16605,6 +32514,14 @@ func (s *QueryUsersResponse) Validate() error {
 		if s.Users == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Users)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Users {
 			if err := func() error {
@@ -16626,6 +32543,506 @@ func (s *QueryUsersResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "users",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *QueryUsersUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RejectInvitationBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s RejectInvitationErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidRejectInvitationErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedRejectInvitationErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidRejectInvitationErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalRejectInvitationErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvNotFoundRejectInvitationErrorResponse:
+		if err := s.InvNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InvSelfRejectRejectInvitationErrorResponse:
+		if err := s.InvSelfReject.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedRejectInvitationErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidRejectInvitationErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableRejectInvitationErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *RejectInvitationErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RejectInvitationForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RejectInvitationNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RejectInvitationUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RelInUse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelNoDefault) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelNotDeployed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelProjectNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelRevisionNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelRevisionUnpinnable) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelRevoked) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RelUnresolvedReference) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
 			Error: err,
 		})
 	}
@@ -16754,6 +33171,29 @@ func (s *ReleaseCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -16761,6 +33201,29 @@ func (s *ReleaseCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -16829,6 +33292,17 @@ func (s *ReleaseCreatedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -16884,11 +33358,42 @@ func (s ReleaseCreatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *ReleaseCreatedPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Pointers == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Pointers)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "pointers",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s ReleaseID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -17097,12 +33602,70 @@ func (s ReleasePointerKind) Validate() error {
 	}
 }
 
+func (s *ReleaseRevokedConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ReleaseRevokedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -17111,6 +33674,29 @@ func (s *ReleaseRevokedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -17347,12 +33933,230 @@ func (s *RemovePreviewRequest) Validate() error {
 	return nil
 }
 
+func (s RemoveProjectOriginErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidRemoveProjectOriginErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedRemoveProjectOriginErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidRemoveProjectOriginErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalRemoveProjectOriginErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedRemoveProjectOriginErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginInvalidRemoveProjectOriginErrorResponse:
+		if err := s.OriginInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginNotFoundRemoveProjectOriginErrorResponse:
+		if err := s.OriginNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case OriginPermissionDeniedRemoveProjectOriginErrorResponse:
+		if err := s.OriginPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMissingIDRemoveProjectOriginErrorResponse:
+		if err := s.ProjMissingID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidRemoveProjectOriginErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableRemoveProjectOriginErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *RemoveProjectOriginErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s RemoveProjectPreviewErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedRemoveProjectPreviewErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepNotFoundRemoveProjectPreviewErrorResponse:
+		if err := s.DepNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepPermissionDeniedRemoveProjectPreviewErrorResponse:
+		if err := s.DepPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EnvProjectNotFoundRemoveProjectPreviewErrorResponse:
+		if err := s.EnvProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidRemoveProjectPreviewErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalRemoveProjectPreviewErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedRemoveProjectPreviewErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidRemoveProjectPreviewErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableRemoveProjectPreviewErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *RemoveProjectPreviewErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ReqInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *RequestAPIEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -17361,6 +34165,29 @@ func (s *RequestAPIEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -17581,12 +34408,110 @@ func (s RequestAPIPayloadMethod) Validate() error {
 	}
 }
 
+func (s RevokeMySessionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidRevokeMySessionErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedRevokeMySessionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidRevokeMySessionErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalRevokeMySessionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedRevokeMySessionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidRevokeMySessionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundRevokeMySessionErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchRevokeMySessionErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableRevokeMySessionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *RevokeMySessionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *RevokeReleaseConflict) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Details.Validate(); err != nil {
 			return err
@@ -17617,8 +34542,8 @@ func (s *RevokeReleaseConflictDetails) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Origins)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -17697,10 +34622,296 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Validate() error {
 	return nil
 }
 
+func (s RevokeReleaseErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidRevokeReleaseErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedRevokeReleaseErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidRevokeReleaseErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalRevokeReleaseErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedRevokeReleaseErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelInUseRevokeReleaseErrorResponse:
+		if err := s.RelInUse.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundRevokeReleaseErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelPermissionDeniedRevokeReleaseErrorResponse:
+		if err := s.RelPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelProjectNotFoundRevokeReleaseErrorResponse:
+		if err := s.RelProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidRevokeReleaseErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableRevokeReleaseErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *RevokeReleaseErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s RevokeSessionErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedRevokeSessionErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidRevokeSessionErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalRevokeSessionErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedRevokeSessionErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidRevokeSessionErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessNotFoundRevokeSessionErrorResponse:
+		if err := s.SessNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessPermissionDeniedRevokeSessionErrorResponse:
+		if err := s.SessPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableRevokeSessionErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *RevokeSessionErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *RevokeSessionForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RevokeSessionUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *RollbackDeploymentCreated) Validate() error {
 	alias := (*Deployment)(s)
 	if err := alias.Validate(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s RollbackDeploymentErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidRollbackDeploymentErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedRollbackDeploymentErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepConflictRollbackDeploymentErrorResponse:
+		if err := s.DepConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepInvalidRollbackDeploymentErrorResponse:
+		if err := s.DepInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepNotFoundRollbackDeploymentErrorResponse:
+		if err := s.DepNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepPermissionDeniedRollbackDeploymentErrorResponse:
+		if err := s.DepPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DepVariablesMissingRollbackDeploymentErrorResponse:
+		if err := s.DepVariablesMissing.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EnvProjectNotFoundRollbackDeploymentErrorResponse:
+		if err := s.EnvProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidRollbackDeploymentErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalRollbackDeploymentErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedRollbackDeploymentErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundRollbackDeploymentErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundRollbackDeploymentErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedRollbackDeploymentErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidRollbackDeploymentErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableRollbackDeploymentErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarDocumentTooDeepRollbackDeploymentErrorResponse:
+		if err := s.VarDocumentTooDeep.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *RollbackDeploymentErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -17886,12 +35097,443 @@ func (s *SSOAuthMethod) Validate() error {
 	return nil
 }
 
+func (s *SSOProvider) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchAlreadyExists) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchFetchDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchFetchDowngrade) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchFetchTimeout) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchFetchTooLarge) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchFetchTooManyRedirects) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchInvalidRequest) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SchRevisionConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *Schema) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Schema.Validate(); err != nil {
 			return err
@@ -17916,6 +35558,29 @@ func (s *SchemaCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -17923,6 +35588,29 @@ func (s *SchemaCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -18090,6 +35778,125 @@ func (s *SchemaHeaders) Validate() error {
 	return nil
 }
 
+func (s *SearchBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s SearchErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidSearchErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedSearchErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefInvalidSearchErrorResponse:
+		if err := s.FlowdefInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalSearchErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowdefMissingProjectIDSearchErrorResponse:
+		if err := s.FlowdefMissingProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedSearchErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundSearchErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPermissionDeniedSearchErrorResponse:
+		if err := s.ProjPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidSearchErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchSearchErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessTokenInvalidSearchErrorResponse:
+		if err := s.SessTokenInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamProjectNotFoundSearchErrorResponse:
+		if err := s.TeamProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableSearchErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *SearchErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SearchForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *SearchNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *SearchRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -18126,8 +35933,8 @@ func (s *SearchRequest) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.Types)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -18202,6 +36009,14 @@ func (s *SearchResponse) Validate() error {
 		if s.Results == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    400,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Results)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Results {
 			if err := func() error {
@@ -18233,8 +36048,8 @@ func (s *SearchResponse) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.IncompleteTypes)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -18322,6 +36137,14 @@ func (s SearchResultType) Validate() error {
 	}
 }
 
+func (s *SearchUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *SecretVariableInput) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -18345,12 +36168,361 @@ func (s *SecretVariableInput) Validate() error {
 	return nil
 }
 
+func (s *SessExchangeConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessInvalidHandoffToken) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessInvalidTTL) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessNotFoundHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessProjectMismatch) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessProjectMismatchHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessTokenCreationFailed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SessTokenInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *SessionDeletedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -18359,6 +36531,29 @@ func (s *SessionDeletedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -18489,6 +36684,29 @@ func (s *SessionEstablishedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -18496,6 +36714,29 @@ func (s *SessionEstablishedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -18637,8 +36878,8 @@ func (s SessionFilterField) Validate() error {
 func (s SessionID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -18733,6 +36974,14 @@ func (s *SessionResponse) Validate() error {
 		if s.Factors == nil {
 			return errors.New("nil is invalid value")
 		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Factors)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Factors {
 			if err := func() error {
@@ -18754,6 +37003,25 @@ func (s *SessionResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "factors",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.AssuranceLevels == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.AssuranceLevels)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "assurance_levels",
 			Error: err,
 		})
 	}
@@ -18827,6 +37095,29 @@ func (s *SessionWithTokenResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.SessionToken)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "session_token",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -18834,6 +37125,280 @@ func (s *SessionWithTokenResponse) Validate() error {
 }
 
 func (s *SessionWithTokenResponseHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SetUserPasswordBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s SetUserPasswordErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedSetUserPasswordErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidSetUserPasswordErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalSetUserPasswordErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedSetUserPasswordErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundSetUserPasswordErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjOriginNotAllowedSetUserPasswordErrorResponse:
+		if err := s.ProjOriginNotAllowed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPreviewNotLiveSetUserPasswordErrorResponse:
+		if err := s.ProjPreviewNotLive.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNoDefaultSetUserPasswordErrorResponse:
+		if err := s.RelNoDefault.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotDeployedSetUserPasswordErrorResponse:
+		if err := s.RelNotDeployed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundSetUserPasswordErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedSetUserPasswordErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidSetUserPasswordErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableSetUserPasswordErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserConflictSetUserPasswordErrorResponse:
+		if err := s.UserConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidSetUserPasswordErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundSetUserPasswordErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordEmptySetUserPasswordErrorResponse:
+		if err := s.UserPasswordEmpty.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordHashingBusySetUserPasswordErrorResponse:
+		if err := s.UserPasswordHashingBusy.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordPolicyViolationSetUserPasswordErrorResponse:
+		if err := s.UserPasswordPolicyViolation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordTooLongSetUserPasswordErrorResponse:
+		if err := s.UserPasswordTooLong.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedSetUserPasswordErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *SetUserPasswordErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *SetUserPasswordInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *SetUserPasswordNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s SetVariablesErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthUnauthorizedSetVariablesErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedSetVariablesErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundSetVariablesErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidSetVariablesErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalSetVariablesErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidSetVariablesErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarInvalidNameSetVariablesErrorResponse:
+		if err := s.VarInvalidName.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarInvalidValueSetVariablesErrorResponse:
+		if err := s.VarInvalidValue.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarNoProjectIDSetVariablesErrorResponse:
+		if err := s.VarNoProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedSetVariablesErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundSetVariablesErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidSetVariablesErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgSetVariablesErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableSetVariablesErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarLimitExceededSetVariablesErrorResponse:
+		if err := s.VarLimitExceeded.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarNotFoundSetVariablesErrorResponse:
+		if err := s.VarNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case VarPermissionDeniedSetVariablesErrorResponse:
+		if err := s.VarPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *SetVariablesErrorResponseStatusCode) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -18936,13 +37501,290 @@ func (s SubmitFlowStepBadRequest) Validate() error {
 		}
 		return nil
 	case ErrorDetailsSubmitFlowStepBadRequest:
-		return nil // no validation needed
+		if err := s.ErrorDetails.Validate(); err != nil {
+			return err
+		}
+		return nil
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
 }
 
 func (s *SubmitFlowStepBadRequestHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.SetCookie == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    10,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.SetCookie)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "SetCookie",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s SubmitFlowStepErrorResponse) Validate() error {
+	switch s.Type {
+	case AttAlreadyHandedOffSubmitFlowStepErrorResponse:
+		if err := s.AttAlreadyHandedOff.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidRequestSubmitFlowStepErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidStateSubmitFlowStepErrorResponse:
+		if err := s.AttInvalidState.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotCompletedSubmitFlowStepErrorResponse:
+		if err := s.AttNotCompleted.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotFoundSubmitFlowStepErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttProofRejectedSubmitFlowStepErrorResponse:
+		if err := s.AttProofRejected.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttStaleChallengeSubmitFlowStepErrorResponse:
+		if err := s.AttStaleChallenge.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyDecryptFailedSubmitFlowStepErrorResponse:
+		if err := s.EncKeyDecryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyEncryptFailedSubmitFlowStepErrorResponse:
+		if err := s.EncKeyEncryptFailed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyNotFoundSubmitFlowStepErrorResponse:
+		if err := s.EncKeyNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidSubmitFlowStepErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowCookieExpiredSubmitFlowStepErrorResponse:
+		if err := s.FlowCookieExpired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowCookieInvalidSubmitFlowStepErrorResponse:
+		if err := s.FlowCookieInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowIntegritySubmitFlowStepErrorResponse:
+		if err := s.FlowIntegrity.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowInvalidActionSubmitFlowStepErrorResponse:
+		if err := s.FlowInvalidAction.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowNotFoundSubmitFlowStepErrorResponse:
+		if err := s.FlowNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowProofInvalidSubmitFlowStepErrorResponse:
+		if err := s.FlowProofInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowRateLimitedSubmitFlowStepErrorResponse:
+		if err := s.FlowRateLimited.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowRestartRequiredSubmitFlowStepErrorResponse:
+		if err := s.FlowRestartRequired.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse:
+		if err := s.FlowSSOUserSchemaMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case FlowUnsupportedSubmitFlowStepErrorResponse:
+		if err := s.FlowUnsupported.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpEndpointCleartextSubmitFlowStepErrorResponse:
+		if err := s.IdpEndpointCleartext.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpEndpointsPartialSubmitFlowStepErrorResponse:
+		if err := s.IdpEndpointsPartial.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpProtocolBlockMissingSubmitFlowStepErrorResponse:
+		if err := s.IdpProtocolBlockMissing.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpScopesMissingOpenidSubmitFlowStepErrorResponse:
+		if err := s.IdpScopesMissingOpenid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalSubmitFlowStepErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TknInvalidSubmitFlowStepErrorResponse:
+		if err := s.TknInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedSubmitFlowStepErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjLastOwnerSubmitFlowStepErrorResponse:
+		if err := s.ProjLastOwner.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:
+		if err := s.ProjOriginNotAllowed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPreviewNotLiveSubmitFlowStepErrorResponse:
+		if err := s.ProjPreviewNotLive.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotDeployedSubmitFlowStepErrorResponse:
+		if err := s.RelNotDeployed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelNotFoundSubmitFlowStepErrorResponse:
+		if err := s.RelNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case RelRevokedSubmitFlowStepErrorResponse:
+		if err := s.RelRevoked.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidSubmitFlowStepErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EncKeyUnknownAlgSubmitFlowStepErrorResponse:
+		if err := s.EncKeyUnknownAlg.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableSubmitFlowStepErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserAlreadyExistsSubmitFlowStepErrorResponse:
+		if err := s.UserAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserConflictSubmitFlowStepErrorResponse:
+		if err := s.UserConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidSubmitFlowStepErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundSubmitFlowStepErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordEmptySubmitFlowStepErrorResponse:
+		if err := s.UserPasswordEmpty.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordHashingBusySubmitFlowStepErrorResponse:
+		if err := s.UserPasswordHashingBusy.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordPolicyViolationSubmitFlowStepErrorResponse:
+		if err := s.UserPasswordPolicyViolation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordTooLongSubmitFlowStepErrorResponse:
+		if err := s.UserPasswordTooLong.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *SubmitFlowStepErrorResponseStatusCode) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -18965,12 +37807,70 @@ func (s *SubmitFlowStepBadRequestHeaders) Validate() error {
 	return nil
 }
 
+func (s *TeamAlreadyExists) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *TeamCreatedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -18979,6 +37879,29 @@ func (s *TeamCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -19109,6 +38032,29 @@ func (s *TeamDeactivatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -19116,6 +38062,29 @@ func (s *TeamDeactivatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -19255,8 +38224,8 @@ func (s TeamFilterField) Validate() error {
 func (s TeamID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -19332,12 +38301,233 @@ func (s *TeamLocator) Validate() error {
 	return nil
 }
 
+func (s *TeamNameInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *TeamOwnsProject) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *TeamPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *TeamProjectNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *TeamRef) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.TeamID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *TeamResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.Status.Validate(); err != nil {
 			return err
@@ -19366,12 +38556,70 @@ func (s TeamStatus) Validate() error {
 	}
 }
 
+func (s *TeamTeamNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *TeamUpdatedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -19380,6 +38628,29 @@ func (s *TeamUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -19503,6 +38774,88 @@ func (s TeamUpdatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *TknInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *TknInvalidTknid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s TooManyRequests) Validate() error {
+	switch s.Type {
+	case UserPasswordHashingBusyTooManyRequests:
+		if err := s.UserPasswordHashingBusy.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s *TooManyRequestsHeaders) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -19537,8 +38890,412 @@ func (s *TooManyRequestsHeaders) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *Unavailable) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UpdateMyUserBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateMyUserConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s UpdateMyUserErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidUpdateMyUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedUpdateMyUserErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidUpdateMyUserErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalUpdateMyUserErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedUpdateMyUserErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidUpdateMyUserErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SessProjectMismatchUpdateMyUserErrorResponse:
+		if err := s.SessProjectMismatch.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableUpdateMyUserErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserAlreadyExistsUpdateMyUserErrorResponse:
+		if err := s.UserAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserConflictUpdateMyUserErrorResponse:
+		if err := s.UserConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidUpdateMyUserErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundUpdateMyUserErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *UpdateMyUserErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UpdateMyUserForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateMyUserUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateProjectBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s UpdateProjectErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidUpdateProjectErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedUpdateProjectErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidUpdateProjectErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalUpdateProjectErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedUpdateProjectErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjMissingIDUpdateProjectErrorResponse:
+		if err := s.ProjMissingID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNameInvalidUpdateProjectErrorResponse:
+		if err := s.ProjNameInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjNotFoundUpdateProjectErrorResponse:
+		if err := s.ProjNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPasswordHashInvalidUpdateProjectErrorResponse:
+		if err := s.ProjPasswordHashInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjPermissionDeniedUpdateProjectErrorResponse:
+		if err := s.ProjPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidUpdateProjectErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableUpdateProjectErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *UpdateProjectErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UpdateProjectNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateProjectUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateTeamBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateTeamConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s UpdateTeamErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidUpdateTeamErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedUpdateTeamErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidUpdateTeamErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalUpdateTeamErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedUpdateTeamErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidUpdateTeamErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamAlreadyExistsUpdateTeamErrorResponse:
+		if err := s.TeamAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamNameInvalidUpdateTeamErrorResponse:
+		if err := s.TeamNameInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamTeamNotFoundUpdateTeamErrorResponse:
+		if err := s.TeamTeamNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamPermissionDeniedUpdateTeamErrorResponse:
+		if err := s.TeamPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case TeamProjectNotFoundUpdateTeamErrorResponse:
+		if err := s.TeamProjectNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableUpdateTeamErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *UpdateTeamErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UpdateTeamForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateTeamNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -19585,6 +39342,144 @@ func (s *UpdateTeamRequest) Validate() error {
 	return nil
 }
 
+func (s *UpdateTeamUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateUserBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateUserConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s UpdateUserErrorResponse) Validate() error {
+	switch s.Type {
+	case AuthCsrfInvalidUpdateUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedUpdateUserErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidUpdateUserErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalUpdateUserErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedUpdateUserErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidUpdateUserErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableUpdateUserErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserAlreadyExistsUpdateUserErrorResponse:
+		if err := s.UserAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserConflictUpdateUserErrorResponse:
+		if err := s.UserConflict.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidUpdateUserErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundUpdateUserErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPermissionDeniedUpdateUserErrorResponse:
+		if err := s.UserPermissionDenied.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *UpdateUserErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UpdateUserForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateUserNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *UpdateUserUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s UpdateVariablesRequest) Validate() error {
 	var failures []validate.FieldError
 	for key, elem := range s {
@@ -19625,6 +39520,29 @@ func (s *User) Validate() error {
 		})
 	}
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Schema)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "schema",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Metadata.Validate(); err != nil {
 			return err
 		}
@@ -19636,6 +39554,17 @@ func (s *User) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Teams == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Teams)); err != nil {
+			return errors.Wrap(err, "array")
+		}
 		var failures []validate.FieldError
 		for i, elem := range s.Teams {
 			if err := func() error {
@@ -19657,6 +39586,76 @@ func (s *User) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "teams",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserAlreadyExists) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserConflict) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
 			Error: err,
 		})
 	}
@@ -19798,6 +39797,29 @@ func (s *UserCreateFailedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -19805,6 +39827,29 @@ func (s *UserCreateFailedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -20054,6 +40099,29 @@ func (s *UserCreatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -20061,6 +40129,29 @@ func (s *UserCreatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -20129,6 +40220,17 @@ func (s *UserCreatedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -20184,12 +40286,66 @@ func (s UserCreatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *UserCreatedPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.AttributeKeys == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.AttributeKeys)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "attribute_keys",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *UserDeletedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -20198,6 +40354,29 @@ func (s *UserDeletedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -20358,8 +40537,8 @@ func (s UserFilterField) Validate() error {
 func (s UserID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
+		MinLength:     1,
+		MinLengthSet:  true,
 		MaxLength:     0,
 		MaxLengthSet:  false,
 		Email:         false,
@@ -20371,6 +40550,99 @@ func (s UserID) Validate() error {
 		MaxNumericSet: false,
 	}).Validate(string(alias)); err != nil {
 		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *UserIdentityLink) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ConnectionID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "connection_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserInvalid) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -20489,6 +40761,216 @@ func (s UserMetadataStatus) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *UserNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserPasswordEmpty) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserPasswordHashingBusy) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserPasswordPolicyViolation) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserPasswordTooLong) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s *UserProperty) Validate() error {
@@ -20674,8 +41156,8 @@ func (s *UserSchema) Validate() error {
 		if err := (validate.Array{
 			MinLength:    1,
 			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.XMinusDisplay)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -20785,6 +41267,52 @@ func (s *UserTeam) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Name)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "name",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.MembershipStatus.Validate(); err != nil {
 			return err
 		}
@@ -20821,6 +41349,29 @@ func (s *UserUpdatedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -20828,6 +41379,29 @@ func (s *UserUpdatedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -20896,6 +41470,17 @@ func (s *UserUpdatedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -20949,6 +41534,282 @@ func (s UserUpdatedEventDelegationType) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *UserUpdatedPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.AttributeKeys == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    1000,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.AttributeKeys)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "attribute_keys",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *VarDocumentTooDeep) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *VarInvalidName) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *VarInvalidValue) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *VarLimitExceeded) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *VarNoProjectID) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *VarNotFound) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *VarPermissionDenied) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Message)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "message",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s Variable) Validate() error {
@@ -21070,6 +41931,29 @@ func (s *VariableRemovedEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -21077,6 +41961,29 @@ func (s *VariableRemovedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -21290,6 +42197,29 @@ func (s *VariableSetEvent) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.ID)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
 		}
@@ -21297,6 +42227,29 @@ func (s *VariableSetEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.EventType)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
 			Error: err,
 		})
 	}
@@ -21510,6 +42463,136 @@ func (s VariablesByKind) Validate() error {
 		}
 	}
 
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s VerifyAuthAttemptChallengeErrorResponse) Validate() error {
+	switch s.Type {
+	case AttAlreadyHandedOffVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AttAlreadyHandedOff.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidProofVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AttInvalidProof.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidRequestVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AttInvalidRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttInvalidStateVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AttInvalidState.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttNotFoundVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AttNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttProofRejectedVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AttProofRejected.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AttStaleChallengeVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AttStaleChallenge.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthUnauthorizedVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.AuthUnauthorized.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case EvtInvalidVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.EvtInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case InternalVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.Internal.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case NotImplementedVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.NotImplemented.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ReqInvalidVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.ReqInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UnavailableVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.Unavailable.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserAlreadyExistsVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.UserAlreadyExists.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserInvalidVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.UserInvalid.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserNotFoundVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.UserNotFound.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordEmptyVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.UserPasswordEmpty.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordHashingBusyVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.UserPasswordHashingBusy.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordPolicyViolationVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.UserPasswordPolicyViolation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case UserPasswordTooLongVerifyAuthAttemptChallengeErrorResponse:
+		if err := s.UserPasswordTooLong.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *VerifyAuthAttemptChallengeErrorResponseStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}

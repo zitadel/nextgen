@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: request.api
+        description: The event type, always `request.api` for this event.
       payload:
         $ref: ../payloads/request-api-payload.yaml

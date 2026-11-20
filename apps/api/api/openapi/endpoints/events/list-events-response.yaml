@@ -10,6 +10,7 @@ properties:
       leave it shorter than `limit`, or empty, while more events remain:
       `next_page_token` says whether they do.
     type: array
+    maxItems: 100
     items:
       $ref: event.yaml
   next_page_token:

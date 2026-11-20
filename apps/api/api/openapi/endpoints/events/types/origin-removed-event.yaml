@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: origin.removed
+        description: The event type, always `origin.removed` for this event.
       payload:
         $ref: ../payloads/origin-payload.yaml

@@ -1,4 +1,5 @@
 type: string
+minLength: 1
 pattern: '^[a-zA-Z0-9_-]+$'
 x-zitadel-pattern-message: "must be one or more letters, digits, _ or -"
 example: team_01KZZY8PX8K8ATNVDSMRCZY4N1

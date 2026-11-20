@@ -18,6 +18,7 @@
     },
     "name": {
       "type": "string",
+      "minLength": 1,
       "pattern": "^[a-z][a-z0-9-]*$",
       "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
       "examples": [
@@ -73,6 +74,7 @@
         "$ref": "#/$defs/FlowDefinitionStep"
       },
       "minItems": 1,
+      "maxItems": 1000,
       "description": "The steps of this flow. The order is for human readability: transitions\ndetermine the actual step sequencing.\n",
       "examples": [
         [
@@ -128,6 +130,7 @@
       "properties": {
         "team_ids": {
           "type": "array",
+          "maxItems": 1000,
           "items": {
             "type": "string"
           },
@@ -141,6 +144,7 @@
         },
         "app_ids": {
           "type": "array",
+          "maxItems": 1000,
           "items": {
             "type": "string"
           },
@@ -163,6 +167,7 @@
       "not": {
         "anyOf": [
           {
+            "type": "object",
             "required": [
               "sso_providers"
             ],
@@ -180,6 +185,7 @@
                 }
               },
               {
+                "type": "object",
                 "properties": {
                   "transitions": {
                     "not": {
@@ -193,11 +199,13 @@
             ]
           },
           {
+            "type": "object",
             "required": [
               "complete"
             ],
             "anyOf": [
               {
+                "type": "object",
                 "required": [
                   "fields"
                 ],
@@ -208,6 +216,7 @@
                 }
               },
               {
+                "type": "object",
                 "required": [
                   "actions"
                 ],
@@ -218,6 +227,7 @@
                 }
               },
               {
+                "type": "object",
                 "required": [
                   "sso_providers"
                 ],
@@ -228,6 +238,7 @@
                 }
               },
               {
+                "type": "object",
                 "required": [
                   "gates"
                 ],
@@ -238,6 +249,7 @@
                 }
               },
               {
+                "type": "object",
                 "required": [
                   "transitions"
                 ],
@@ -250,6 +262,7 @@
             ]
           },
           {
+            "type": "object",
             "not": {
               "required": [
                 "complete"
@@ -278,6 +291,7 @@
             }
           },
           {
+            "type": "object",
             "required": [
               "transitions"
             ],
@@ -285,6 +299,7 @@
               "transitions": {
                 "anyOf": [
                   {
+                    "type": "object",
                     "required": [
                       "sso_authenticated"
                     ],
@@ -292,6 +307,7 @@
                       "sso_authenticated": {
                         "anyOf": [
                           {
+                            "type": "object",
                             "required": [
                               "purpose"
                             ],
@@ -302,6 +318,7 @@
                             }
                           },
                           {
+                            "type": "object",
                             "required": [
                               "action"
                             ],
@@ -316,6 +333,7 @@
                     }
                   },
                   {
+                    "type": "object",
                     "required": [
                       "sso_user_not_found"
                     ],
@@ -323,6 +341,7 @@
                       "sso_user_not_found": {
                         "anyOf": [
                           {
+                            "type": "object",
                             "required": [
                               "purpose"
                             ],
@@ -333,6 +352,7 @@
                             }
                           },
                           {
+                            "type": "object",
                             "required": [
                               "action"
                             ],
@@ -356,6 +376,7 @@
       "properties": {
         "name": {
           "type": "string",
+          "minLength": 1,
           "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`.\n",
           "pattern": "^[a-z][a-z0-9_-]*$",
           "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits, _ and -",
@@ -365,6 +386,7 @@
         },
         "fields": {
           "type": "array",
+          "maxItems": 100,
           "description": "The fields to collect from the user. A field is one input of the step,\nnamed after a property in the flow's user schema. The server resolves\nfield type, validation rules, and implicit outcomes from schema\nannotations (for example, a property with `x-unique` set implies a\n`user_not_found` transition outcome).\n",
           "items": {
             "type": "string"
@@ -380,6 +402,7 @@
         },
         "actions": {
           "type": "array",
+          "maxItems": 100,
           "description": "The actions the user can take, in order. An action is something the user\ndoes on the step, such as submitting the form or following a link. The\naction name is what the frontend sends back in the submit request. If\nomitted, the server provides a default `submit` action.\n",
           "items": {
             "$ref": "#/$defs/StepAction"
@@ -422,6 +445,7 @@
           "maxItems": 20,
           "items": {
             "type": "string",
+            "minLength": 1,
             "pattern": "^[a-z0-9][a-z0-9_-]*$",
             "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
             "maxLength": 64
@@ -509,6 +533,7 @@
             "not": {
               "anyOf": [
                 {
+                  "type": "object",
                   "required": [
                     "purpose",
                     "action"
@@ -523,6 +548,7 @@
                   }
                 },
                 {
+                  "type": "object",
                   "not": {
                     "required": [
                       "target"

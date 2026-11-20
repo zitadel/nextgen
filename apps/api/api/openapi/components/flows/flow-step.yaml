@@ -52,6 +52,7 @@ example:
 properties:
   name:
     type: string
+    minLength: 1
     description: Step name from the flow definition.
   texts:
     $ref: step-texts.yaml
@@ -107,6 +108,7 @@ properties:
     description: URL to navigate to, for example an SSO provider redirect.
   fields:
     type: array
+    maxItems: 100
     description: |
       Ordered list of input fields to collect. Field metadata (type, validation)
       is resolved by the server from the flow's user schema. The LiquidJS
@@ -154,6 +156,7 @@ properties:
     properties:
       value:
         type: string
+        minLength: 1
         description: |
           The identifier the user supplied. Use it as the input's
           `value`, verbatim. After an identity provider's sign-in
@@ -163,6 +166,7 @@ properties:
         example: alice@acme.com
       autocomplete:
         type: string
+        minLength: 1
         description: |
           Value for the input's HTML `autocomplete` attribute, used
           verbatim. `username` is the token that pairs an identifier
@@ -170,6 +174,7 @@ properties:
         example: username
   actions:
     type: array
+    maxItems: 100
     description: |
       Ordered list of available user actions. The LiquidJS template iterates
       this array and builds a name-indexed map locally for keyed lookup.
@@ -188,6 +193,7 @@ properties:
     default: {}
   sso_providers:
     type: array
+    maxItems: 20
     description: Available SSO identity providers for this step.
     items:
       $ref: sso-provider.yaml

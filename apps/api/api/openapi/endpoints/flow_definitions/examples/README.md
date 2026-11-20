@@ -4,9 +4,8 @@ Working examples of flow definitions accepted by `POST /flow_definitions`. Each
 example exercises a different slice of the engine's currently supported
 capabilities, ordered from minimal to combined.
 
-Examples are templates: `${PROJECT_ID}` is substituted at the point of use (see
-`embed.go` for the in-tree substitution helper). Each names its user schema by
-`objectType`, `human-user`.
+Each example names a placeholder project in `project_id`; replace it with your
+project's ID. Each names its user schema by `objectType`, `human-user`.
 
 For the engine's capability surface, see
 [`docs/design/flowengine/capabilities.md`](../../../../../../../docs/design/flowengine/capabilities.md).

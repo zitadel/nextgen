@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: policy.updated
+        description: The event type, always `policy.updated` for this event.
       payload:
         $ref: ../payloads/policy-payload.yaml

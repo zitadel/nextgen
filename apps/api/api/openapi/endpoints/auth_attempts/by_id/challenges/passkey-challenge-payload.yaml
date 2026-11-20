@@ -14,10 +14,12 @@ properties:
     properties:
       challenge:
         type: string
+        minLength: 1
         description: Base64-encoded WebAuthn challenge
         example: 'dGVzdGNoYWxsZW5nZQ=='
       allowed_credentials:
         type: array
+        maxItems: 1000
         description: List of credential IDs that can be used for this authentication
         items:
           type: object
@@ -27,9 +29,11 @@ properties:
           properties:
             id:
               type: string
+              minLength: 1
               description: Base64-encoded credential ID
             type:
               type: string
+              description: 'The credential type: always `public-key`.'
               enum: [public-key]
         example:
           - id: 'Y3JlZGVudGlhbDE='

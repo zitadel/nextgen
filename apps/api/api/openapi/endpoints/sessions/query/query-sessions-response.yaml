@@ -5,6 +5,8 @@ required:
 properties:
   sessions:
     type: array
+    maxItems: 100
+    description: 'The page of sessions, in the requested order.'
     items:
       $ref: ../session-response.yaml
   next_page_token:

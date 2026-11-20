@@ -4,56 +4,56 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../components/schemas/errors/auth-csrf_invalid.yaml'
+        - $ref: '../../components/schemas/errors/auth-csrf-invalid.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
-        - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
-        - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
-        - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/enc-key-decrypt-failed.yaml'
+        - $ref: '../../components/schemas/errors/enc-key-encrypt-failed.yaml'
+        - $ref: '../../components/schemas/errors/enc-key-not-found.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/inv-invalid.yaml'
-        - $ref: '../../components/schemas/errors/inv-not_found.yaml'
-        - $ref: '../../components/schemas/errors/inv-pending_limit.yaml'
-        - $ref: '../../components/schemas/errors/inv-permission_denied.yaml'
-        - $ref: '../../components/schemas/errors/inv-platform_required.yaml'
-        - $ref: '../../components/schemas/errors/inv-project_unclaimed.yaml'
-        - $ref: '../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../components/schemas/errors/inv-not-found.yaml'
+        - $ref: '../../components/schemas/errors/inv-pending-limit.yaml'
+        - $ref: '../../components/schemas/errors/inv-permission-denied.yaml'
+        - $ref: '../../components/schemas/errors/inv-platform-required.yaml'
+        - $ref: '../../components/schemas/errors/inv-project-unclaimed.yaml'
+        - $ref: '../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
-        - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/enc-key-unknown-alg.yaml'
         - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
-          auth.csrf_invalid: '../../components/schemas/errors/auth-csrf_invalid.yaml'
+          auth.csrf_invalid: '../../components/schemas/errors/auth-csrf-invalid.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
-          enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
-          enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
-          enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          enc_key.decrypt_failed: '../../components/schemas/errors/enc-key-decrypt-failed.yaml'
+          enc_key.encrypt_failed: '../../components/schemas/errors/enc-key-encrypt-failed.yaml'
+          enc_key.not_found: '../../components/schemas/errors/enc-key-not-found.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           inv.invalid: '../../components/schemas/errors/inv-invalid.yaml'
-          inv.not_found: '../../components/schemas/errors/inv-not_found.yaml'
-          inv.pending_limit: '../../components/schemas/errors/inv-pending_limit.yaml'
-          inv.permission_denied: '../../components/schemas/errors/inv-permission_denied.yaml'
-          inv.platform_required: '../../components/schemas/errors/inv-platform_required.yaml'
-          inv.project_unclaimed: '../../components/schemas/errors/inv-project_unclaimed.yaml'
-          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
+          inv.not_found: '../../components/schemas/errors/inv-not-found.yaml'
+          inv.pending_limit: '../../components/schemas/errors/inv-pending-limit.yaml'
+          inv.permission_denied: '../../components/schemas/errors/inv-permission-denied.yaml'
+          inv.platform_required: '../../components/schemas/errors/inv-platform-required.yaml'
+          inv.project_unclaimed: '../../components/schemas/errors/inv-project-unclaimed.yaml'
+          not_implemented: '../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
-          enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          enc_key.unknown_alg: '../../components/schemas/errors/enc-key-unknown-alg.yaml'
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.csrf_invalid:
-        $ref: '../../components/examples/errors/auth-csrf_invalid.yaml'
+        $ref: '../../components/examples/errors/auth-csrf-invalid.yaml'
       auth.unauthorized:
         $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       enc_key.decrypt_failed:
-        $ref: '../../components/examples/errors/enc_key-decrypt_failed.yaml'
+        $ref: '../../components/examples/errors/enc-key-decrypt-failed.yaml'
       enc_key.encrypt_failed:
-        $ref: '../../components/examples/errors/enc_key-encrypt_failed.yaml'
+        $ref: '../../components/examples/errors/enc-key-encrypt-failed.yaml'
       enc_key.not_found:
-        $ref: '../../components/examples/errors/enc_key-not_found.yaml'
+        $ref: '../../components/examples/errors/enc-key-not-found.yaml'
       evt.invalid:
         $ref: '../../components/examples/errors/evt-invalid.yaml'
       internal:
@@ -63,20 +63,20 @@ content:
       inv.invalid:
         $ref: '../../components/examples/errors/inv-invalid.yaml'
       inv.not_found:
-        $ref: '../../components/examples/errors/inv-not_found.yaml'
+        $ref: '../../components/examples/errors/inv-not-found.yaml'
       inv.pending_limit:
-        $ref: '../../components/examples/errors/inv-pending_limit.yaml'
+        $ref: '../../components/examples/errors/inv-pending-limit.yaml'
       inv.permission_denied:
-        $ref: '../../components/examples/errors/inv-permission_denied.yaml'
+        $ref: '../../components/examples/errors/inv-permission-denied.yaml'
       inv.platform_required:
-        $ref: '../../components/examples/errors/inv-platform_required.yaml'
+        $ref: '../../components/examples/errors/inv-platform-required.yaml'
       inv.project_unclaimed:
-        $ref: '../../components/examples/errors/inv-project_unclaimed.yaml'
+        $ref: '../../components/examples/errors/inv-project-unclaimed.yaml'
       not_implemented:
-        $ref: '../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../components/examples/errors/req-invalid.yaml'
       enc_key.unknown_alg:
-        $ref: '../../components/examples/errors/enc_key-unknown_alg.yaml'
+        $ref: '../../components/examples/errors/enc-key-unknown-alg.yaml'
       unavailable:
         $ref: '../../components/examples/errors/unavailable.yaml'

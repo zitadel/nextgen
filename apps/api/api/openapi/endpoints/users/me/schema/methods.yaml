@@ -22,6 +22,23 @@ get:
         application/json:
           schema:
             $ref: ../../../schemas/schema.yaml
+          example:
+            id: sch_01H455VB4213EF62K49QF6M73F
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              objectType: human-user
+              kind: user-schema
+              metaSchema: https://example.com/path
+              x-auth-methods:
+                password:
+                  enabled: true
+              x-identifier: email
+              x-display:
+                - example
+              properties: {}
+            metadata:
+              created_at: '2026-01-15T09:30:00Z'
+              in_use: true
     '401':
       description: Missing or invalid session token.
       content:
@@ -33,12 +50,12 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
+            $ref: ../../../../components/schemas/errors/sess-project-mismatch.yaml
     '404':
       description: User referenced by the current session was not found.
       content:
         application/json:
           schema:
-            $ref: ../../../../components/schemas/errors/user-not_found.yaml
+            $ref: ../../../../components/schemas/errors/user-not-found.yaml
     default:
       $ref: getMyUserSchema-error-response.yaml

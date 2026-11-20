@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: auth.sso.exchange.succeeded
+        description: The event type, always `auth.sso.exchange.succeeded` for this event.
       payload:
         $ref: ../payloads/auth-check-payload.yaml

@@ -14,9 +14,11 @@ required:
 properties:
   id:
     type: string
+    minLength: 1
     description: Managed assignment id (`asgn_<opaque>`).
   project_id:
     type: string
+    minLength: 1
     description: The project this grant is scoped to.
   object_type:
     type: string

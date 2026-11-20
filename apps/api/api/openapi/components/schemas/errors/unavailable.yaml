@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: unavailable
+        description: The error code, always `unavailable` for this error.
     required:
       - code

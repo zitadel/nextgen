@@ -7,8 +7,10 @@ required:
 properties:
   project_id:
     $ref: ../../../../../components/schemas/project-id.yaml
+    description: 'The ID of the project, as `createProject` (`POST /projects`) returns it.'
   team_id:
     $ref: ../../../../../components/schemas/team-id.yaml
+    description: 'The ID of the team, as `createTeam` (`POST /teams`) returns it.'
   claimed_at:
     type: string
     format: date-time

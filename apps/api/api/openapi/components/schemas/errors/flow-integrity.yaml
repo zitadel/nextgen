@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: flow.integrity
+        description: The error code, always `flow.integrity` for this error.
     required:
       - code

@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: flow.completed
+        description: The error code, always `flow.completed` for this error.
     required:
       - code

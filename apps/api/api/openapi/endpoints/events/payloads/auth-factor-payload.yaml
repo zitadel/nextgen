@@ -6,5 +6,7 @@ required:
 properties:
   user_id:
     type: string
+    description: 'The ID of the user the factor belongs to.'
   factor_id:
     type: string
+    description: 'The ID of the factor.'

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: auth.factor.passkey.enrolled
+        description: The event type, always `auth.factor.passkey.enrolled` for this event.
       payload:
         $ref: ../payloads/auth-factor-payload.yaml

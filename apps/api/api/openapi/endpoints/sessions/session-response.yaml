@@ -18,6 +18,7 @@ properties:
     $ref: ../../components/schemas/session-id.yaml
   project_id:
     $ref: ../../components/schemas/project-id.yaml
+    description: 'The ID of the project, as `createProject` (`POST /projects`) returns it.'
   state:
     type: string
     description: |
@@ -49,6 +50,7 @@ properties:
       `identifier`, then `user_id`.
   factors:
     type: array
+    maxItems: 100
     description: |
       Verified authentication factors accumulated by this session.
       Each key is a factor type, for example `password`, `totp` or `passkey`.
@@ -58,6 +60,7 @@ properties:
       $ref: ../../components/checks/completed-factor.yaml
   assurance_levels:
     type: array
+    maxItems: 100
     description: |
       All assurance levels whose schemas the current session factors satisfy.
       This list shrinks as factor freshness windows expire and grows when step-up

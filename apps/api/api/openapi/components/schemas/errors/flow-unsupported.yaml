@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: flow.unsupported
+        description: The error code, always `flow.unsupported` for this error.
     required:
       - code

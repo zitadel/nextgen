@@ -4,38 +4,38 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../components/schemas/errors/auth-csrf_invalid.yaml'
+        - $ref: '../../components/schemas/errors/auth-csrf-invalid.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/flowdef-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
-        - $ref: '../../components/schemas/errors/flowdef-missing_project_id.yaml'
-        - $ref: '../../components/schemas/errors/not_implemented.yaml'
-        - $ref: '../../components/schemas/errors/proj-not_found.yaml'
-        - $ref: '../../components/schemas/errors/proj-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/flowdef-missing-project-id.yaml'
+        - $ref: '../../components/schemas/errors/not-implemented.yaml'
+        - $ref: '../../components/schemas/errors/proj-not-found.yaml'
+        - $ref: '../../components/schemas/errors/proj-permission-denied.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
-        - $ref: '../../components/schemas/errors/sess-project_mismatch.yaml'
-        - $ref: '../../components/schemas/errors/sess-token_invalid.yaml'
-        - $ref: '../../components/schemas/errors/team-project_not_found.yaml'
+        - $ref: '../../components/schemas/errors/sess-project-mismatch.yaml'
+        - $ref: '../../components/schemas/errors/sess-token-invalid.yaml'
+        - $ref: '../../components/schemas/errors/team-project-not-found.yaml'
         - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
-          auth.csrf_invalid: '../../components/schemas/errors/auth-csrf_invalid.yaml'
+          auth.csrf_invalid: '../../components/schemas/errors/auth-csrf-invalid.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           flowdef.invalid: '../../components/schemas/errors/flowdef-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
-          flowdef.missing_project_id: '../../components/schemas/errors/flowdef-missing_project_id.yaml'
-          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
-          proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
-          proj.permission_denied: '../../components/schemas/errors/proj-permission_denied.yaml'
+          flowdef.missing_project_id: '../../components/schemas/errors/flowdef-missing-project-id.yaml'
+          not_implemented: '../../components/schemas/errors/not-implemented.yaml'
+          proj.not_found: '../../components/schemas/errors/proj-not-found.yaml'
+          proj.permission_denied: '../../components/schemas/errors/proj-permission-denied.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
-          sess.project_mismatch: '../../components/schemas/errors/sess-project_mismatch.yaml'
-          sess.token_invalid: '../../components/schemas/errors/sess-token_invalid.yaml'
-          team.project_not_found: '../../components/schemas/errors/team-project_not_found.yaml'
+          sess.project_mismatch: '../../components/schemas/errors/sess-project-mismatch.yaml'
+          sess.token_invalid: '../../components/schemas/errors/sess-token-invalid.yaml'
+          team.project_not_found: '../../components/schemas/errors/team-project-not-found.yaml'
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.csrf_invalid:
-        $ref: '../../components/examples/errors/auth-csrf_invalid.yaml'
+        $ref: '../../components/examples/errors/auth-csrf-invalid.yaml'
       auth.unauthorized:
         $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       flowdef.invalid:
@@ -43,20 +43,20 @@ content:
       internal:
         $ref: '../../components/examples/errors/internal.yaml'
       flowdef.missing_project_id:
-        $ref: '../../components/examples/errors/flowdef-missing_project_id.yaml'
+        $ref: '../../components/examples/errors/flowdef-missing-project-id.yaml'
       not_implemented:
-        $ref: '../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../components/examples/errors/not-implemented.yaml'
       proj.not_found:
-        $ref: '../../components/examples/errors/proj-not_found.yaml'
+        $ref: '../../components/examples/errors/proj-not-found.yaml'
       proj.permission_denied:
-        $ref: '../../components/examples/errors/proj-permission_denied.yaml'
+        $ref: '../../components/examples/errors/proj-permission-denied.yaml'
       req.invalid:
         $ref: '../../components/examples/errors/req-invalid.yaml'
       sess.project_mismatch:
-        $ref: '../../components/examples/errors/sess-project_mismatch.yaml'
+        $ref: '../../components/examples/errors/sess-project-mismatch.yaml'
       sess.token_invalid:
-        $ref: '../../components/examples/errors/sess-token_invalid.yaml'
+        $ref: '../../components/examples/errors/sess-token-invalid.yaml'
       team.project_not_found:
-        $ref: '../../components/examples/errors/team-project_not_found.yaml'
+        $ref: '../../components/examples/errors/team-project-not-found.yaml'
       unavailable:
         $ref: '../../components/examples/errors/unavailable.yaml'

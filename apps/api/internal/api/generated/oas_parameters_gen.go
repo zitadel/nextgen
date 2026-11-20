@@ -3138,8 +3138,8 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 				if err := (validate.Array{
 					MinLength:    0,
 					MinLengthSet: false,
-					MaxLength:    0,
-					MaxLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
 				}).ValidateLength(len(params.Expand)); err != nil {
 					return errors.Wrap(err, "array")
 				}
@@ -5318,6 +5318,9 @@ func decodeGetTeamParams(args [1]string, argsEscaped bool, r *http.Request) (par
 
 // GetUserParams is parameters of getUser operation.
 type GetUserParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Serves the user only when they hold an active membership in this team, and answers `404` otherwise.
 	// Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
 	//
@@ -5332,12 +5335,16 @@ type GetUserParams struct {
 	// `POST /users/query`: `team_membership.read` for a project secret, read on the whole project for a
 	// console session. Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 func unpackGetUserParams(packed middleware.Parameters) (params GetUserParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
 	{
 		key := middleware.ParameterKey{
 			Name: "team_id",
@@ -5347,18 +5354,71 @@ func unpackGetUserParams(packed middleware.Parameters) (params GetUserParams) {
 			params.TeamID = v.(OptTeamID)
 		}
 	}
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
 	return params
 }
 
 func decodeGetUserParams(args [1]string, argsEscaped bool, r *http.Request) (params GetUserParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
 	// Decode query: team_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
@@ -5419,66 +5479,6 @@ func decodeGetUserParams(args [1]string, argsEscaped bool, r *http.Request) (par
 		return params, &ogenerrors.DecodeParamError{
 			Name: "team_id",
 			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode path: user_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotUserIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotUserIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.UserID = UserID(paramsDotUserIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "path",
 			Err:  err,
 		}
 	}
@@ -5874,7 +5874,7 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -5889,14 +5889,14 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -6494,8 +6494,8 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 				if err := (validate.Array{
 					MinLength:    0,
 					MinLengthSet: false,
-					MaxLength:    0,
-					MaxLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
 				}).ValidateLength(len(params.Expand)); err != nil {
 					return errors.Wrap(err, "array")
 				}
@@ -6534,7 +6534,7 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -6549,14 +6549,14 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -6979,6 +6979,17 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 				return err
 			}
 			if err := func() error {
+				if params.Category == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
+				}).ValidateLength(len(params.Category)); err != nil {
+					return errors.Wrap(err, "array")
+				}
 				var failures []validate.FieldError
 				for i, elem := range params.Category {
 					if err := func() error {
@@ -7042,6 +7053,22 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 					return nil
 				})
 			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if params.EventType == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    100,
+					MaxLengthSet: true,
+				}).ValidateLength(len(params.EventType)); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				return nil
+			}(); err != nil {
 				return err
 			}
 		}
@@ -7559,6 +7586,17 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 				return err
 			}
 			if err := func() error {
+				if params.StatusClass == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
+				}).ValidateLength(len(params.StatusClass)); err != nil {
+					return errors.Wrap(err, "array")
+				}
 				var failures []validate.FieldError
 				for i, elem := range params.StatusClass {
 					if err := func() error {
@@ -7782,7 +7820,7 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -7797,14 +7835,14 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -7853,16 +7891,16 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // ListFlowDefinitionsParams is parameters of listFlowDefinitions operation.
 type ListFlowDefinitionsParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
-	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
-	// `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
 	// Only flow definitions with this purpose, for example `login`.
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
 	// The flow name to filter by. Every revision of a flow shares its `name`, so the result is that flow's
@@ -7883,6 +7921,13 @@ type ListFlowDefinitionsParams struct {
 func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListFlowDefinitionsParams) {
 	{
 		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
 			Name: "limit",
 			In:   "query",
 		}
@@ -7898,13 +7943,6 @@ func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListF
 		if v, ok := packed[key]; ok {
 			params.PageToken = v.(OptPageToken)
 		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -7947,9 +7985,60 @@ func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListF
 
 func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.Request) (params ListFlowDefinitionsParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -7964,14 +8053,14 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -8059,57 +8148,6 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -8206,8 +8244,8 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 				if value, ok := params.Name.Get(); ok {
 					if err := func() error {
 						if err := (validate.String{
-							MinLength:     0,
-							MinLengthSet:  false,
+							MinLength:     1,
+							MinLengthSet:  true,
 							MaxLength:     0,
 							MaxLengthSet:  false,
 							Email:         false,
@@ -8335,6 +8373,17 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 				return err
 			}
 			if err := func() error {
+				if params.Expand == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
+				}).ValidateLength(len(params.Expand)); err != nil {
+					return errors.Wrap(err, "array")
+				}
 				var failures []validate.FieldError
 				for i, elem := range params.Expand {
 					if err := func() error {
@@ -8521,7 +8570,7 @@ func decodeListIdpRevisionsParams(args [1]string, argsEscaped bool, r *http.Requ
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -8536,14 +8585,14 @@ func decodeListIdpRevisionsParams(args [1]string, argsEscaped bool, r *http.Requ
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -8769,7 +8818,7 @@ func decodeListInvitationsParams(args [0]string, argsEscaped bool, r *http.Reque
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -8784,14 +8833,14 @@ func decodeListInvitationsParams(args [0]string, argsEscaped bool, r *http.Reque
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -8925,8 +8974,8 @@ func decodeListInvitationsParams(args [0]string, argsEscaped bool, r *http.Reque
 				if err := (validate.Array{
 					MinLength:    0,
 					MinLengthSet: false,
-					MaxLength:    0,
-					MaxLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
 				}).ValidateLength(len(params.Status)); err != nil {
 					return errors.Wrap(err, "array")
 				}
@@ -9061,8 +9110,8 @@ func decodeListInvitationsParams(args [0]string, argsEscaped bool, r *http.Reque
 				if err := (validate.Array{
 					MinLength:    0,
 					MinLengthSet: false,
-					MaxLength:    0,
-					MaxLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
 				}).ValidateLength(len(params.Expand)); err != nil {
 					return errors.Wrap(err, "array")
 				}
@@ -9158,7 +9207,7 @@ func decodeListMyIdentityLinksParams(args [0]string, argsEscaped bool, r *http.R
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -9173,14 +9222,14 @@ func decodeListMyIdentityLinksParams(args [0]string, argsEscaped bool, r *http.R
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -9394,7 +9443,7 @@ func decodeListMyPasskeysParams(args [0]string, argsEscaped bool, r *http.Reques
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -9409,14 +9458,14 @@ func decodeListMyPasskeysParams(args [0]string, argsEscaped bool, r *http.Reques
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -9669,7 +9718,7 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -9684,14 +9733,14 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -10043,7 +10092,7 @@ func decodeListMyTeamsParams(args [0]string, argsEscaped bool, r *http.Request) 
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -10058,14 +10107,14 @@ func decodeListMyTeamsParams(args [0]string, argsEscaped bool, r *http.Request) 
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -10332,7 +10381,7 @@ func decodeListPoliciesParams(args [0]string, argsEscaped bool, r *http.Request)
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -10347,14 +10396,14 @@ func decodeListPoliciesParams(args [0]string, argsEscaped bool, r *http.Request)
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -10672,7 +10721,7 @@ func decodeListPolicyRevisionsParams(args [1]string, argsEscaped bool, r *http.R
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -10687,14 +10736,14 @@ func decodeListPolicyRevisionsParams(args [1]string, argsEscaped bool, r *http.R
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -10791,16 +10840,23 @@ func decodeListPolicyRevisionsParams(args [1]string, argsEscaped bool, r *http.R
 
 // ListProjectAdminsParams is parameters of listProjectAdmins operation.
 type ListProjectAdminsParams struct {
+	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	ProjectID ProjectID
 }
 
 func unpackListProjectAdminsParams(packed middleware.Parameters) (params ListProjectAdminsParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "path",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
 	{
 		key := middleware.ParameterKey{
 			Name: "limit",
@@ -10819,21 +10875,74 @@ func unpackListProjectAdminsParams(packed middleware.Parameters) (params ListPro
 			params.PageToken = v.(OptPageToken)
 		}
 	}
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "path",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
 	return params
 }
 
 func decodeListProjectAdminsParams(args [1]string, argsEscaped bool, r *http.Request) (params ListProjectAdminsParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: project_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -10848,14 +10957,14 @@ func decodeListProjectAdminsParams(args [1]string, argsEscaped bool, r *http.Req
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -10944,66 +11053,6 @@ func decodeListProjectAdminsParams(args [1]string, argsEscaped bool, r *http.Req
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
 			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode path: project_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "project_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "path",
 			Err:  err,
 		}
 	}
@@ -11116,7 +11165,7 @@ func decodeListProjectPreviewsParams(args [1]string, argsEscaped bool, r *http.R
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -11131,14 +11180,14 @@ func decodeListProjectPreviewsParams(args [1]string, argsEscaped bool, r *http.R
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -11410,7 +11459,7 @@ func decodeListReleasesParams(args [0]string, argsEscaped bool, r *http.Request)
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -11425,14 +11474,14 @@ func decodeListReleasesParams(args [0]string, argsEscaped bool, r *http.Request)
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -11683,7 +11732,7 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -11698,14 +11747,14 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -12024,8 +12073,8 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 				if err := (validate.Array{
 					MinLength:    0,
 					MinLengthSet: false,
-					MaxLength:    0,
-					MaxLengthSet: false,
+					MaxLength:    20,
+					MaxLengthSet: true,
 				}).ValidateLength(len(params.Expand)); err != nil {
 					return errors.Wrap(err, "array")
 				}
@@ -12067,18 +12116,25 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 // ListUserIdentityLinksParams is parameters of listUserIdentityLinks operation.
 type ListUserIdentityLinksParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 func unpackListUserIdentityLinksParams(packed middleware.Parameters) (params ListUserIdentityLinksParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
 	{
 		key := middleware.ParameterKey{
 			Name: "limit",
@@ -12097,21 +12153,74 @@ func unpackListUserIdentityLinksParams(packed middleware.Parameters) (params Lis
 			params.PageToken = v.(OptPageToken)
 		}
 	}
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
 	return params
 }
 
 func decodeListUserIdentityLinksParams(args [1]string, argsEscaped bool, r *http.Request) (params ListUserIdentityLinksParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -12126,14 +12235,14 @@ func decodeListUserIdentityLinksParams(args [1]string, argsEscaped bool, r *http
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -12222,66 +12331,6 @@ func decodeListUserIdentityLinksParams(args [1]string, argsEscaped bool, r *http
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
 			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode path: user_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotUserIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotUserIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.UserID = UserID(paramsDotUserIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "path",
 			Err:  err,
 		}
 	}
@@ -12290,18 +12339,25 @@ func decodeListUserIdentityLinksParams(args [1]string, argsEscaped bool, r *http
 
 // ListUserPasskeysParams is parameters of listUserPasskeys operation.
 type ListUserPasskeysParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 func unpackListUserPasskeysParams(packed middleware.Parameters) (params ListUserPasskeysParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
 	{
 		key := middleware.ParameterKey{
 			Name: "limit",
@@ -12320,21 +12376,74 @@ func unpackListUserPasskeysParams(packed middleware.Parameters) (params ListUser
 			params.PageToken = v.(OptPageToken)
 		}
 	}
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
 	return params
 }
 
 func decodeListUserPasskeysParams(args [1]string, argsEscaped bool, r *http.Request) (params ListUserPasskeysParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -12349,14 +12458,14 @@ func decodeListUserPasskeysParams(args [1]string, argsEscaped bool, r *http.Requ
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -12445,66 +12554,6 @@ func decodeListUserPasskeysParams(args [1]string, argsEscaped bool, r *http.Requ
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
 			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode path: user_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotUserIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotUserIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.UserID = UserID(paramsDotUserIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "path",
 			Err:  err,
 		}
 	}
@@ -12513,18 +12562,25 @@ func decodeListUserPasskeysParams(args [1]string, argsEscaped bool, r *http.Requ
 
 // ListUserTeamsParams is parameters of listUserTeams operation.
 type ListUserTeamsParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
 }
 
 func unpackListUserTeamsParams(packed middleware.Parameters) (params ListUserTeamsParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
 	{
 		key := middleware.ParameterKey{
 			Name: "limit",
@@ -12543,21 +12599,74 @@ func unpackListUserTeamsParams(packed middleware.Parameters) (params ListUserTea
 			params.PageToken = v.(OptPageToken)
 		}
 	}
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
 	return params
 }
 
 func decodeListUserTeamsParams(args [1]string, argsEscaped bool, r *http.Request) (params ListUserTeamsParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
 	// Set default value for query: limit.
 	{
-		val := int(20)
+		val := int64(20)
 		params.Limit.SetTo(Limit(val))
 	}
 	// Decode query: limit.
@@ -12572,14 +12681,14 @@ func decodeListUserTeamsParams(args [1]string, argsEscaped bool, r *http.Request
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
 				var paramsDotLimitVal Limit
 				if err := func() error {
-					var paramsDotLimitValVal int
+					var paramsDotLimitValVal int64
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
 							return err
 						}
 
-						c, err := conv.ToInt(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -12668,66 +12777,6 @@ func decodeListUserTeamsParams(args [1]string, argsEscaped bool, r *http.Request
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
 			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode path: user_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotUserIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotUserIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.UserID = UserID(paramsDotUserIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "path",
 			Err:  err,
 		}
 	}

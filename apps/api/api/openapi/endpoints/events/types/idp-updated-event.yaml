@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: idp.updated
+        description: The event type, always `idp.updated` for this event.
       payload:
         $ref: ../payloads/idp-payload.yaml

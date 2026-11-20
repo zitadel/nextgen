@@ -9,22 +9,27 @@ required:
 properties:
   id:
     type: string
+    minLength: 1
     description: The unique identifier of the project.
   name:
     type: string
+    minLength: 1
     description: The name of the project.
   project_secret:
     type: string
+    minLength: 1
     description: |
       The secret that authenticates requests that change the project. Only
       this response returns it.
   preview_secret:
     type: string
+    minLength: 1
     description: |
       The secret that authenticates previewing and testing the project. Only
       this response returns it.
   origins:
     type: array
+    maxItems: 1000
     items:
       $ref: project-origin.yaml
     description: |

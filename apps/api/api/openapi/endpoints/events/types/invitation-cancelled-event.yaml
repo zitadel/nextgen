@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: invitation.cancelled
+        description: The event type, always `invitation.cancelled` for this event.
       payload:
         $ref: ../payloads/invitation-cancelled-payload.yaml

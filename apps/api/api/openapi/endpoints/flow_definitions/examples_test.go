@@ -4,7 +4,6 @@ import (
 	"embed"
 	"encoding/json"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -53,8 +52,6 @@ func TestExampleFlowDefinitions(t *testing.T) {
 	var userSchema jsonschema.Schema
 	require.NoError(t, json.Unmarshal(exampleUserSchema, &userSchema))
 
-	const projectID = "proj_example_round_trip"
-
 	examples := []struct {
 		name string
 		path string
@@ -74,12 +71,11 @@ func TestExampleFlowDefinitions(t *testing.T) {
 			raw, err := exampleFlowDefinitions.ReadFile(ex.path)
 			require.NoError(t, err)
 
-			content := string(raw)
-			content = strings.ReplaceAll(content, "${PROJECT_ID}", projectID)
-
 			req := &api.CreateFlowDefinitionRequest{}
-			require.NoError(t, req.UnmarshalJSON([]byte(content)), "decode")
+			require.NoError(t, req.UnmarshalJSON(raw), "decode")
 			require.NoError(t, req.Validate(), "api validate")
+
+			projectID := string(req.GetProjectID())
 
 			purposes, err := convertPurposes(req.FlowDefinition.GetPurposes())
 			require.NoError(t, err)

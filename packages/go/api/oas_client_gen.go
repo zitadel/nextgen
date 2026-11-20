@@ -5934,6 +5934,15 @@ func (c *Client) ExchangeHandoff(ctx context.Context, request *ExchangeRequest, 
 }
 
 func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (res ExchangeHandoffRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("exchangeHandoff"),
 		semconv.HTTPRequestMethodKey.String("POST"),
@@ -10943,8 +10952,8 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -11393,8 +11402,8 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -11944,8 +11953,8 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -12089,6 +12098,23 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
 		// Encode "limit" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "limit",
@@ -12098,8 +12124,8 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -12122,23 +12148,6 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -12400,8 +12409,8 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -12580,8 +12589,8 @@ func (c *Client) sendListInvitations(ctx context.Context, params ListInvitations
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -12821,8 +12830,8 @@ func (c *Client) sendListMyIdentityLinks(ctx context.Context, params ListMyIdent
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -13002,8 +13011,8 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -13197,8 +13206,8 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -13427,8 +13436,8 @@ func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) 
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -13627,8 +13636,8 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -13859,8 +13868,8 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -14073,8 +14082,8 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -14267,8 +14276,8 @@ func (c *Client) sendListProjectPreviews(ctx context.Context, params ListProject
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -14472,8 +14481,8 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -14661,8 +14670,8 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -14930,8 +14939,8 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -15124,8 +15133,8 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}
@@ -15320,8 +15329,8 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
+				if unwrapped := int64(val); true {
+					return e.EncodeValue(conv.Int64ToString(unwrapped))
 				}
 				return nil
 			}

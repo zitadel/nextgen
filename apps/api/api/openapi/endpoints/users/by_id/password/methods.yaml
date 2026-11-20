@@ -24,6 +24,8 @@ get:
         application/json:
           schema:
             $ref: user-password-state.yaml
+          example:
+            set_at: '2026-01-15T09:30:00Z'
     '401':
       description: Client was not authorized or the session is anonymous.
       content:

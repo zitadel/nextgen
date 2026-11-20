@@ -6,8 +6,10 @@ description: |
 properties:
   kind:
     type: string
+    description: 'The kind of the variable that was set: `primary` or `preview`.'
     enum:
       - primary
       - preview
   secret:
     type: boolean
+    description: 'Whether the variable is a secret. A secret''s value is never returned.'

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: team.updated
+        description: The event type, always `team.updated` for this event.
       payload:
         $ref: ../payloads/team-payload.yaml

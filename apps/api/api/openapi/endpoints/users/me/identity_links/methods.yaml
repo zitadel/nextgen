@@ -26,6 +26,12 @@ get:
         application/json:
           schema:
             $ref: ../../by_id/identity_links/list-user-identity-links-response.yaml
+          example:
+            identity_links:
+              - id: idplink_01KWH3B5Q8Z6V4N2M0X9C7R1TD
+                connection_id: idp_01KWH3A9F2J7K5P3Q1W8E6Y4UB
+                created_at: '2026-01-15T09:30:00Z'
+            next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
     '400':
       description: The page token or limit was not valid.
       content:
@@ -43,6 +49,6 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
+            $ref: ../../../../components/schemas/errors/sess-project-mismatch.yaml
     default:
       $ref: listMyIdentityLinks-error-response.yaml

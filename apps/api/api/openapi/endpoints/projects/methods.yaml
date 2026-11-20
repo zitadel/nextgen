@@ -27,6 +27,15 @@ post:
         application/json:
           schema:
             $ref: create-project-response.yaml
+          example:
+            id: proj_01KWH3B72K7M7F0N9WD3P2E4YM
+            name: Acme
+            project_secret: example
+            preview_secret: example
+            origins:
+              - pattern: https://*-acmeinc.vercel.app
+                kind: preview
+            created_at: '2026-01-15T09:30:00Z'
     '429':
       description: |
         Too many requests: the client sent too many in a given amount of time.

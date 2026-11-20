@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: internal
+        description: The error code, always `internal` for this error.
     required:
       - code

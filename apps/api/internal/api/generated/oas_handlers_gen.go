@@ -11362,13 +11362,13 @@ func (s *Server) handleGetUserRequest(args [1]string, argsEscaped bool, w http.R
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "team_id",
-					In:   "query",
-				}: params.TeamID,
-				{
 					Name: "user_id",
 					In:   "path",
 				}: params.UserID,
+				{
+					Name: "team_id",
+					In:   "query",
+				}: params.TeamID,
 			},
 			Raw: r,
 		}
@@ -12966,6 +12966,10 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
 					Name: "limit",
 					In:   "query",
 				}: params.Limit,
@@ -12973,10 +12977,6 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 				{
 					Name: "purpose",
 					In:   "query",
@@ -14917,6 +14917,10 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+				{
 					Name: "limit",
 					In:   "query",
 				}: params.Limit,
@@ -14924,10 +14928,6 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
-				{
-					Name: "project_id",
-					In:   "path",
-				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -15789,6 +15789,10 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "user_id",
+					In:   "path",
+				}: params.UserID,
+				{
 					Name: "limit",
 					In:   "query",
 				}: params.Limit,
@@ -15796,10 +15800,6 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
-				{
-					Name: "user_id",
-					In:   "path",
-				}: params.UserID,
 			},
 			Raw: r,
 		}
@@ -16005,6 +16005,10 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "user_id",
+					In:   "path",
+				}: params.UserID,
+				{
 					Name: "limit",
 					In:   "query",
 				}: params.Limit,
@@ -16012,10 +16016,6 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
-				{
-					Name: "user_id",
-					In:   "path",
-				}: params.UserID,
 			},
 			Raw: r,
 		}
@@ -16223,6 +16223,10 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "user_id",
+					In:   "path",
+				}: params.UserID,
+				{
 					Name: "limit",
 					In:   "query",
 				}: params.Limit,
@@ -16230,10 +16234,6 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
-				{
-					Name: "user_id",
-					In:   "path",
-				}: params.UserID,
 			},
 			Raw: r,
 		}

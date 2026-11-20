@@ -12,6 +12,7 @@ properties:
   # The token is consumed atomically on exchange (`GETDEL`).
   handoff_token:
     type: string
+    minLength: 1
     description: |
       The short-lived handoff token for session exchange.
 

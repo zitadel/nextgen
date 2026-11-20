@@ -5,6 +5,8 @@ required:
 properties:
   passkeys:
     type: array
+    maxItems: 100
+    description: 'The page of passkeys the user has registered.'
     items:
       type: object
       required:
@@ -14,6 +16,7 @@ properties:
       properties:
         id:
           type: string
+          minLength: 1
           description: The unique identifier of the passkey.
         name:
           type: string

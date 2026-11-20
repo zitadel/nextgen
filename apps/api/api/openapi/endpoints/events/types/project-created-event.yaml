@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: project.created
+        description: The event type, always `project.created` for this event.
       payload:
         $ref: ../payloads/project-payload.yaml

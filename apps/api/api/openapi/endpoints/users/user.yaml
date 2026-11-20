@@ -20,8 +20,10 @@ properties:
   id:
     readOnly: true
     $ref: ../../components/schemas/user-id.yaml
+    description: 'The unique ID of the user.'
   schema:
     type: string
+    minLength: 1
     description: |
       The ID of the schema that defines the content of `attributes`.
       `getSchema` (`GET /schemas/{schema_id}`) returns it, and `publishSchema` (`POST /schemas`) creates one.
@@ -30,6 +32,7 @@ properties:
   metadata:
     readOnly: true
     $ref: user-metadata.yaml
+    description: 'Details about the user that the server sets, such as when it was created.'
   # The derived identity fields of ADR 058 §3a: the same resolution that
   # produces the `user-ref` component (components/schemas/user-ref.yaml),
   # inlined on the envelope — `user_id` is omitted since the envelope has
@@ -64,6 +67,7 @@ properties:
   teams:
     readOnly: true
     type: array
+    maxItems: 1000
     description: |
       The user's team memberships, present only when the request asked for them
       with `expand: ["teams"]`. Absent means it was not requested; `[]` means

@@ -4,30 +4,30 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
+        - $ref: '../../../components/schemas/errors/auth-csrf-invalid.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/inv-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/inv-self_reject.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/inv-not-found.yaml'
+        - $ref: '../../../components/schemas/errors/inv-self-reject.yaml'
+        - $ref: '../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
-          auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
+          auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf-invalid.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          inv.not_found: '../../../components/schemas/errors/inv-not_found.yaml'
-          inv.self_reject: '../../../components/schemas/errors/inv-self_reject.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          inv.not_found: '../../../components/schemas/errors/inv-not-found.yaml'
+          inv.self_reject: '../../../components/schemas/errors/inv-self-reject.yaml'
+          not_implemented: '../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.csrf_invalid:
-        $ref: '../../../components/examples/errors/auth-csrf_invalid.yaml'
+        $ref: '../../../components/examples/errors/auth-csrf-invalid.yaml'
       auth.unauthorized:
         $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
       evt.invalid:
@@ -35,11 +35,11 @@ content:
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
       inv.not_found:
-        $ref: '../../../components/examples/errors/inv-not_found.yaml'
+        $ref: '../../../components/examples/errors/inv-not-found.yaml'
       inv.self_reject:
-        $ref: '../../../components/examples/errors/inv-self_reject.yaml'
+        $ref: '../../../components/examples/errors/inv-self-reject.yaml'
       not_implemented:
-        $ref: '../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:

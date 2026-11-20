@@ -15,7 +15,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: ../types/auth-attempt-handed_off-event.yaml
+          $ref: ../types/auth-attempt-handed-off-event.yaml
   responses:
     '2XX':
       $ref: ../webhook-delivered.yaml

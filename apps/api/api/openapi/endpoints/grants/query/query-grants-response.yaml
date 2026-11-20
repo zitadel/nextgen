@@ -5,6 +5,8 @@ required:
 properties:
   grants:
     type: array
+    maxItems: 100
+    description: 'The page of grants, in the requested order.'
     items:
       $ref: ../grant.yaml
   next_page_token:

@@ -316,7 +316,7 @@ func writeErrorResponses(
 			if errInfo, ok := errorMapping[errFunc]; ok {
 				errorCodes = append(errorCodes, ErrorCode{
 					Code:     errInfo.code,
-					Filename: strings.ReplaceAll(errInfo.code, ".", "-"),
+					Filename: errorFileStem(errInfo.code),
 					Message:  errInfo.message,
 				})
 			} else {
@@ -393,7 +393,7 @@ func writeErrorExamples(errorMapping map[string]errorInfo, openapiBasePath strin
 		if err := tmpl.Execute(&buf, ErrorCode{Code: code, Message: messageByCode[code]}); err != nil {
 			return err
 		}
-		path := filepath.Join(outDir, strings.ReplaceAll(code, ".", "-")+".yaml")
+		path := filepath.Join(outDir, errorFileStem(code)+".yaml")
 		if err := os.WriteFile(path, []byte(buf.String()), 0o644); err != nil {
 			return err
 		}
@@ -1220,4 +1220,11 @@ func parseAllServiceFiles(servicePath string) map[string]serviceMethod {
 	}
 
 	return allMethods
+}
+
+// errorFileStem is the file name, and so the kebab-case schema name, of an error
+// code: dots and underscores both become hyphens (`att.invalid_proof` is
+// `att-invalid-proof`). The wire code keeps its dots and underscores.
+func errorFileStem(code string) string {
+	return strings.NewReplacer(".", "-", "_", "-").Replace(code)
 }

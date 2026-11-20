@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: evt.invalid
+        description: The error code, always `evt.invalid` for this error.
     required:
       - code

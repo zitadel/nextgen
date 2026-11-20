@@ -17,7 +17,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: ../types/oauth_settings-created-event.yaml
+          $ref: ../types/oauth-settings-created-event.yaml
   responses:
     '2XX':
       $ref: ../webhook-delivered.yaml

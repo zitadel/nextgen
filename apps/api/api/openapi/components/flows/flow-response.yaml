@@ -4,6 +4,7 @@ required: [id, session_id, step]
 properties:
   id:
     type: string
+    minLength: 1
     description: |
       Flow handle. Use this as the path parameter for subsequent
       submit/event calls. May change between responses when a

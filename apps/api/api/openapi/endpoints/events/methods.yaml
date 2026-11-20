@@ -44,6 +44,7 @@ get:
       explode: true
       schema:
         type: array
+        maxItems: 20
         items:
           type: string
           enum:
@@ -62,6 +63,7 @@ get:
       explode: true
       schema:
         type: array
+        maxItems: 100
         items:
           type: string
     - name: actor_id
@@ -147,6 +149,7 @@ get:
       explode: true
       schema:
         type: array
+        maxItems: 20
         items:
           type: string
           enum:
@@ -187,6 +190,40 @@ get:
         application/json:
           schema:
             $ref: list-events-response.yaml
+          example:
+            events:
+              - id: evt_01HZYABCDEFGHJKMNPQRSTVWXY
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                team_id: team_01KWH3B72K7M7F0N9WD3P2E4YM
+                event_type: application.created
+                category: entity
+                occurred_at: '2026-01-15T09:30:00Z'
+                created_at: '2026-01-15T09:30:00Z'
+                actor_id: example
+                actor_type: human
+                entity_type: example
+                entity_id: example
+                user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                client_id: example
+                token_id: example
+                delegation_type: direct
+                delegation_id: example
+                grantor: example
+                fingerprint: example
+                request_id: example
+                session_id: sess_01KWH3B72K7M7F0N9WD3P2E4YM
+                flow_id: flow_01KWH3B72K7M7F0N9WD3P2E4YM
+                metadata:
+                  authorization:
+                    path: platform_operator
+                  client: {}
+                payload:
+                  slug: acme
+                  name: Acme
+                  client_ids:
+                    - example
+                  revision_id: rev_01KWH3B72K7M7F0N9WD3P2E4YM
+            next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
     '400':
       description: A query parameter or the page token is invalid.
       content:

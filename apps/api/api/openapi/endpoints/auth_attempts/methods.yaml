@@ -52,6 +52,33 @@ post:
         application/json:
           schema:
             $ref: auth-attempt-response.yaml
+          example:
+            attempt_id: att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
+            project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+            state: in_progress
+            session_id: sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
+            user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
+            required_factors:
+              - identifier
+              - password
+            completed_factors:
+              - method: passkey
+                verified_at: '2026-04-28T15:32:00Z'
+                payload:
+                  method: passkey
+                  credential_id: Y3JlZGVudGlhbDE=
+                  user_verified: true
+                  backup_eligible: true
+                  backup_state: true
+                  authenticator_attachment: platform
+            challenges:
+              - challenge_id: ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
+                method: password
+                state: pending
+                created_at: '2026-04-28T15:31:00Z'
+                expires_at: '2026-04-28T15:41:00Z'
+            expires_at: '2026-04-28T15:45:00Z'
+            created_at: '2026-04-28T15:30:00Z'
     '403':
       description: |
         The body `project_id` does not match the project the credential

@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: origin.invalid
+        description: The error code, always `origin.invalid` for this error.
     required:
       - code

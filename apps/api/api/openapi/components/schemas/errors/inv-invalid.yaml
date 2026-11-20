@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: inv.invalid
+        description: The error code, always `inv.invalid` for this error.
     required:
       - code

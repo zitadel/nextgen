@@ -13,25 +13,35 @@ description: |
 properties:
   protocol:
     type: string
+    description: 'The proof-of-work protocol the client solves, such as `zitadel_pow_poc_v1`.'
     example: zitadel_pow_poc_v1
   challenge_id:
     type: string
+    description: 'The unique ID of this challenge, which the client sends back with its proof.'
     example: ch_example
   profile_id:
     type: string
+    description: 'The work profile that fixes the hash and the cost of solving the challenge, such as `pbkdf2_sha256_5000_l1`.'
     example: pbkdf2_sha256_5000_l1
   salt:
     type: string
+    minLength: 1
+    description: 'The salt, as 32 lowercase hex digits, that the client derives the key with.'
     pattern: '^[0-9a-f]{32}$'
     x-zitadel-pattern-message: "must be 32 lowercase hex digits"
   nonce:
     type: string
+    minLength: 1
+    description: 'The nonce, as 32 lowercase hex digits, that the client derives the key with.'
     pattern: '^[0-9a-f]{32}$'
     x-zitadel-pattern-message: "must be 32 lowercase hex digits"
   key_prefix:
     type: string
+    minLength: 1
+    description: 'The first 16 bytes of the derived key, as 32 lowercase hex digits, that the client matches.'
     pattern: '^[0-9a-f]{32}$'
     x-zitadel-pattern-message: "must be 32 lowercase hex digits"
   expires_at:
     type: string
+    description: 'When the challenge expires. A proof sent after this is refused.'
     format: date-time

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: origin.added
+        description: The event type, always `origin.added` for this event.
       payload:
         $ref: ../payloads/origin-payload.yaml

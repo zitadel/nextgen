@@ -5,6 +5,8 @@ required:
 properties:
   admins:
     type: array
+    maxItems: 100
+    description: 'The page of admins of the project.'
     items:
       $ref: project-admin.yaml
   next_page_token:

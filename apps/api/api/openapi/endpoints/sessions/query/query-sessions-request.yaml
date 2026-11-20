@@ -3,6 +3,7 @@ description: Request to query the sessions of a project.
 properties:
   limit:
     $ref: ../../../components/schemas/limit.yaml
+    description: 'The most results to return in one page, from 1 to 100. The default is 20; `next_page_token` continues a longer list.'
   page_token:
     description: Token to retrieve the next page of results.
     oneOf:
@@ -10,6 +11,7 @@ properties:
       - type: 'null'
   sorting:
     type: object
+    description: 'How to order the results: the field to sort by and the direction.'
     required:
       - field
       - direction
@@ -22,6 +24,7 @@ properties:
         description: The direction to sort by.
   filter:
     type: array
+    maxItems: 50
     description: Filter criteria for querying sessions.
     items:
       type: object

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: invitation.created
+        description: The event type, always `invitation.created` for this event.
       payload:
         $ref: ../payloads/invitation-created-payload.yaml

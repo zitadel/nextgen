@@ -9,10 +9,12 @@ required:
 properties:
   type:
     type: string
+    description: 'Where the admin role comes from: always `grant`, a grant on the project.'
     enum:
       - grant
   grant_id:
     type: string
+    minLength: 1
     description: The grant (`asgn_<opaque>`), as served by `GET /grants/{grant_id}`.
   team:
     description: |

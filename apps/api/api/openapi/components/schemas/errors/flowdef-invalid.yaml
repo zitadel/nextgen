@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: flowdef.invalid
+        description: The error code, always `flowdef.invalid` for this error.
     required:
       - code

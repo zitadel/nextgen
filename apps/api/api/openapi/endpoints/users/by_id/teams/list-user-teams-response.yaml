@@ -5,6 +5,8 @@ required:
 properties:
   teams:
     type: array
+    maxItems: 100
+    description: 'The page of teams the user belongs to.'
     items:
       $ref: user-team.yaml
   next_page_token:

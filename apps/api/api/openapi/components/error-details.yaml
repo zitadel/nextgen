@@ -8,6 +8,7 @@ properties:
     $ref: schemas/error-code.yaml
   message:
     type: string
+    minLength: 1
     description: Human-readable explanation of the error.
   details:
     type: object

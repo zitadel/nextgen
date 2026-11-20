@@ -28,11 +28,21 @@ const methods: HttpMethods[] = [
 const document = withRefValues(bundled);
 
 // lib/sdk-sample.ts picks the credential from an operation's own security and
-// knows the spec's schemes by name; a new scheme or a default for every
-// operation needs teaching it first.
-if (document.security?.length) {
+// knows the spec's schemes by name; a new scheme, or an operation that leans on
+// the spec's default security, needs teaching it first. The default only backs
+// an operation that names none, so every operation must name its own.
+const unsecured = Object.entries(document.paths ?? {}).flatMap(([path, item]) => {
+  const pathItem = item as PathItemObject;
+  return methods
+    .filter((method) => {
+      const operation = pathItem[method] as OperationObject | undefined;
+      return operation !== undefined && operation.security === undefined;
+    })
+    .map((method) => `${method.toUpperCase()} ${path}`);
+});
+if (unsecured.length > 0) {
   throw new Error(
-    "the spec sets a default security requirement, which lib/sdk-sample.ts does not read",
+    `${unsecured.join(", ")} name no security, and lib/sdk-sample.ts does not read the spec's default security`,
   );
 }
 const declared = Object.keys(document.components?.securitySchemes ?? {}).sort();

@@ -10,6 +10,7 @@ required:
 properties:
   operation_id:
     type: string
+    description: 'The `operationId` of the operation the request called.'
   method:
     type: string
     description: HTTP method.
@@ -23,11 +24,14 @@ properties:
       - OPTIONS
   route_template:
     type: string
+    description: 'The route template of the request, such as `/users/{user_id}`.'
   status:
     type: integer
+    description: 'The HTTP status code of the response.'
     minimum: 100
     maximum: 599
   duration_ms:
     type: integer
+    description: 'How long the request took to answer, in milliseconds.'
     format: int64
     minimum: 0

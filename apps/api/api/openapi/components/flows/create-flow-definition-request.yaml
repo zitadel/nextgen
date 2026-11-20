@@ -7,6 +7,7 @@ required:
 properties:
   project_id:
     $ref: ../../components/schemas/project-id.yaml
+    description: 'The ID of the project, as `createProject` (`POST /projects`) returns it.'
   schema_uri:
     $ref: ../../components/schemas/schema-uri.yaml
   flow_definition:

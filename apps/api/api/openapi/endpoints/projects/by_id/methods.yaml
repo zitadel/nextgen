@@ -30,6 +30,24 @@ get:
         application/json:
           schema:
             $ref: ../project-detail-response.yaml
+          example:
+            id: proj_01KWH3B72K7M7F0N9WD3P2E4YM
+            name: Acme
+            origins:
+              - pattern: https://*-acmeinc.vercel.app
+                kind: preview
+            created_at: '2026-01-15T09:30:00Z'
+            updated_at: '2026-01-15T09:30:00Z'
+            password_hash:
+              algorithm: argon2id
+              params:
+                time: 3
+                memory: 65536
+                threads: 4
+                cost: 12
+                rounds: 210000
+                hash: sha256
+            owning_team_id: team_01KZZY8PX8K8ATNVDSMRCZY4N1
     '401':
       description: Missing or invalid credentials.
       content:
@@ -83,6 +101,24 @@ patch:
         application/json:
           schema:
             $ref: ../project-detail-response.yaml
+          example:
+            id: proj_01KWH3B72K7M7F0N9WD3P2E4YM
+            name: Acme
+            origins:
+              - pattern: https://*-acmeinc.vercel.app
+                kind: preview
+            created_at: '2026-01-15T09:30:00Z'
+            updated_at: '2026-01-15T09:30:00Z'
+            password_hash:
+              algorithm: argon2id
+              params:
+                time: 3
+                memory: 65536
+                threads: 4
+                cost: 12
+                rounds: 210000
+                hash: sha256
+            owning_team_id: team_01KZZY8PX8K8ATNVDSMRCZY4N1
     '400':
       description: Invalid request body.
       content:

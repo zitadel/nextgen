@@ -10,6 +10,7 @@ required:
 properties:
   project_id:
     $ref: ../../../components/schemas/project-id.yaml
+    description: 'The ID of the project, as `createProject` (`POST /projects`) returns it.'
   project_name:
     type: string
     description: The project's display name.

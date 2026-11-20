@@ -6,8 +6,11 @@ description: |
 properties:
   name:
     type: string
+    description: 'The name of the project.'
   origins:
     type: array
+    maxItems: 1000
+    description: 'The origins of the project.'
     items:
       $ref: ../../projects/project-origin.yaml
   password_hash_algorithm:

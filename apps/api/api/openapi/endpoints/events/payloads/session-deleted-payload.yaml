@@ -4,3 +4,4 @@ description: Payload for `session.deleted` events.
 properties:
   reason:
     type: string
+    description: 'Why the session was deleted.'

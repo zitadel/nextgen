@@ -6,9 +6,9 @@ content:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/inv-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/inv-permission_denied.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/inv-not-found.yaml'
+        - $ref: '../../../components/schemas/errors/inv-permission-denied.yaml'
+        - $ref: '../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
@@ -16,9 +16,9 @@ content:
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          inv.not_found: '../../../components/schemas/errors/inv-not_found.yaml'
-          inv.permission_denied: '../../../components/schemas/errors/inv-permission_denied.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          inv.not_found: '../../../components/schemas/errors/inv-not-found.yaml'
+          inv.permission_denied: '../../../components/schemas/errors/inv-permission-denied.yaml'
+          not_implemented: '../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
@@ -27,11 +27,11 @@ content:
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
       inv.not_found:
-        $ref: '../../../components/examples/errors/inv-not_found.yaml'
+        $ref: '../../../components/examples/errors/inv-not-found.yaml'
       inv.permission_denied:
-        $ref: '../../../components/examples/errors/inv-permission_denied.yaml'
+        $ref: '../../../components/examples/errors/inv-permission-denied.yaml'
       not_implemented:
-        $ref: '../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:

@@ -23,6 +23,7 @@ properties:
     description: "Editor affordance: path or URL of this schema so editors validate and autocomplete the file (scaffolded connection files point at `.zitadel/meta/idp-connection.json`). Ignored by the platform."
   slug:
     type: string
+    minLength: 1
     pattern: '^[a-z0-9][a-z0-9_-]*$'
     x-zitadel-pattern-message: "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -"
     maxLength: 64
@@ -51,7 +52,8 @@ properties:
     type: object
     additionalProperties:
       type: string
-      pattern: '^[^$]'
+      minLength: 1
+      pattern: '^[^$][\s\S]*$'
       x-zitadel-pattern-message: "must not be empty or start with $"
     description: "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
   verified_claims:
@@ -74,6 +76,7 @@ properties:
     properties:
       creation:
         type: string
+        description: 'Whether a user who signs in with this provider and has no account gets one: `auto` creates it, `disabled` does not.'
         enum:
           - disabled
           - auto
@@ -90,11 +93,13 @@ properties:
     properties:
       issuer:
         type: string
+        minLength: 1
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)(/[^\s?#]*)?$'
         x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: "Discovery base. Endpoints are resolved from its `.well-known` document unless the document names them all."
       jwks_uri:
         type: string
+        minLength: 1
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
         x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other endpoints.
@@ -104,16 +109,19 @@ properties:
         description: Read user claims from the id_token instead of the userinfo endpoint, for providers that populate only the former.
       authorization_endpoint:
         type: string
+        minLength: 1
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
         x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: For a provider that exposes no .well-known document. Set together with the other endpoints.
       token_endpoint:
         type: string
+        minLength: 1
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
         x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: For a provider that exposes no .well-known document. Set together with the other endpoints.
       userinfo_endpoint:
         type: string
+        minLength: 1
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
         x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: For a provider that exposes no .well-known document. Set together with the other endpoints; not needed when id_token_mapping is set.
@@ -124,6 +132,7 @@ properties:
         description: "Either a literal, when all environments use the same client, or a `${{ NAME }}` reference to a variable, when each environment has its own client."
       client_secret:
         type: string
+        minLength: 1
         pattern: '^\$\{\{ *[A-Za-z0-9_]+ *\}\}$'
         x-zitadel-pattern-message: "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself"
         description: "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The server resolves it against the environment serving the request."
@@ -141,6 +150,7 @@ properties:
           minLength: 1
         uniqueItems: true
         minItems: 1
+        maxItems: 100
         contains:
           const: openid
         default:

@@ -5,6 +5,8 @@ required:
 properties:
   identity_links:
     type: array
+    maxItems: 100
+    description: 'The page of identity links the user holds.'
     items:
       $ref: user-identity-link.yaml
   next_page_token:

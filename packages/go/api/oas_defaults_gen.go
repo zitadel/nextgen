@@ -158,7 +158,7 @@ func (s *PasswordSetEvaluateFacts) setDefaults() {
 // setDefaults set default value of fields.
 func (s *QueryGrantsRequest) setDefaults() {
 	{
-		val := int(20)
+		val := int64(20)
 		s.Limit.SetTo(Limit(val))
 	}
 }
@@ -166,7 +166,7 @@ func (s *QueryGrantsRequest) setDefaults() {
 // setDefaults set default value of fields.
 func (s *QueryIdpsRequest) setDefaults() {
 	{
-		val := int(20)
+		val := int64(20)
 		s.Limit.SetTo(Limit(val))
 	}
 }
@@ -174,7 +174,7 @@ func (s *QueryIdpsRequest) setDefaults() {
 // setDefaults set default value of fields.
 func (s *QueryProjectsRequest) setDefaults() {
 	{
-		val := int(20)
+		val := int64(20)
 		s.Limit.SetTo(Limit(val))
 	}
 }
@@ -182,7 +182,7 @@ func (s *QueryProjectsRequest) setDefaults() {
 // setDefaults set default value of fields.
 func (s *QuerySessionsRequest) setDefaults() {
 	{
-		val := int(20)
+		val := int64(20)
 		s.Limit.SetTo(Limit(val))
 	}
 }
@@ -190,7 +190,7 @@ func (s *QuerySessionsRequest) setDefaults() {
 // setDefaults set default value of fields.
 func (s *QueryTeamsRequest) setDefaults() {
 	{
-		val := int(20)
+		val := int64(20)
 		s.Limit.SetTo(Limit(val))
 	}
 }
@@ -198,7 +198,7 @@ func (s *QueryTeamsRequest) setDefaults() {
 // setDefaults set default value of fields.
 func (s *QueryUsersRequest) setDefaults() {
 	{
-		val := int(20)
+		val := int64(20)
 		s.Limit.SetTo(Limit(val))
 	}
 }
