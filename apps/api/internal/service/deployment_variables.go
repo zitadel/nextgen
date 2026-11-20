@@ -32,7 +32,8 @@ func (s *DeploymentService) Variables(ctx context.Context, projectID, deployment
 // reuses the restored deployment's set and does not scan: that release and
 // set already passed the check. Anything else builds the set from the live
 // rows of the deployment's kind, including the empty set, and refuses the
-// deploy when the release names a variable that set does not hold.
+// deploy when the release names a variable that set does not hold, or names
+// a plain one as a client secret.
 func resolveDeploymentVariableSet(ctx context.Context, variables VariableService, stmts AllStatements, entity *domain.Deployment, release *domain.Release) (*domain.VariableSet, error) {
 	if entity.Metadata.RollbackTo != nil {
 		set, err := variables.ReadDeploymentVariableSet(ctx, stmts, entity.ProjectID, *entity.Metadata.RollbackTo)
@@ -48,12 +49,30 @@ func resolveDeploymentVariableSet(ctx context.Context, variables VariableService
 	if err != nil {
 		return nil, err
 	}
-	missing, err := missingVariableNames(ctx, stmts, entity.ProjectID, release, set)
+	names, secrets, err := releaseVariableNames(ctx, stmts, entity.ProjectID, release)
 	if err != nil {
 		return nil, err
 	}
+	held := make(map[string]domain.VariableSetEntry, len(set.Entries))
+	for _, entry := range set.Entries {
+		held[entry.Name] = entry
+	}
+	var missing, plain []string
+	for _, name := range names {
+		entry, ok := held[name]
+		if !ok {
+			missing = append(missing, name)
+			continue
+		}
+		if secrets[name] && !entry.IsSecret {
+			plain = append(plain, name)
+		}
+	}
 	if len(missing) > 0 {
 		return nil, domain.ErrDeploymentVariablesMissing(entity.OriginKind, missing)
+	}
+	if len(plain) > 0 {
+		return nil, domain.ErrDeploymentVariablesNotSecret(entity.OriginKind, plain)
 	}
 	return set, nil
 }
@@ -74,27 +93,58 @@ func deploymentSetHash(ctx context.Context, variables VariableService, stmts Var
 	return set.Hash, nil
 }
 
-// missingVariableNames is every ${{ NAME }} in the release's pinned documents
-// that set does not hold, each name once. The set still holds every row of
-// its kind: a name the release does not mention stays in it.
-func missingVariableNames(ctx context.Context, stmts AllStatements, projectID string, release *domain.Release, set *domain.VariableSet) ([]string, error) {
-	present := make(map[string]bool, len(set.Entries))
-	for _, entry := range set.Entries {
-		present[entry.Name] = true
+// releaseVariableNames is every variable the release's pinned documents
+// reference, each name once, and which of them hold a client secret: an
+// application client's or an identity provider's. An application resolves
+// only its clients' secrets, so only those count: a ${{ NAME }} elsewhere in
+// it is served as written.
+func releaseVariableNames(ctx context.Context, stmts AllStatements, projectID string, release *domain.Release) ([]string, map[string]bool, error) {
+	seen := make(map[string]bool)
+	secrets := make(map[string]bool)
+	var names []string
+	add := func(name string) {
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
 	}
-	seen := make(map[string]struct{})
-	var missing []string
 	for _, pointer := range release.Pointers {
 		raw, err := releasePointerDocument(ctx, stmts, projectID, pointer)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(raw) == 0 {
 			continue
 		}
+		switch pointer.Kind {
+		case domain.ReleasePointerKindApplication:
+			doc, err := domain.ParseApplicationDocument(raw)
+			if err != nil {
+				return nil, nil, domain.ErrInternal(err).WithMessage("failed to read a release document")
+			}
+			for _, client := range doc.Clients {
+				if name, ok := client.SecretVariable(); ok {
+					add(name)
+					secrets[name] = true
+				}
+			}
+			continue
+		case domain.ReleasePointerKindIDP:
+			var connection struct {
+				OIDC struct {
+					ClientSecret string `json:"client_secret"`
+				} `json:"oidc"`
+			}
+			if err := json.Unmarshal(raw, &connection); err != nil {
+				return nil, nil, domain.ErrInternal(err).WithMessage("failed to read a release document")
+			}
+			if name, ok := domain.VariableReferenceName(connection.OIDC.ClientSecret); ok {
+				secrets[name] = true
+			}
+		}
 		var value any
 		if err := json.Unmarshal(raw, &value); err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to read a release document")
+			return nil, nil, domain.ErrInternal(err).WithMessage("failed to read a release document")
 		}
 		doc, ok := value.(map[string]any)
 		if !ok {
@@ -102,19 +152,13 @@ func missingVariableNames(ctx context.Context, stmts AllStatements, projectID st
 		}
 		placeholders, err := domain.ScanDocumentForVariables(doc)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, placeholder := range placeholders {
-			if _, ok := seen[placeholder.VariableName]; ok {
-				continue
-			}
-			seen[placeholder.VariableName] = struct{}{}
-			if !present[placeholder.VariableName] {
-				missing = append(missing, placeholder.VariableName)
-			}
+			add(placeholder.VariableName)
 		}
 	}
-	return missing, nil
+	return names, secrets, nil
 }
 
 func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID string, pointer domain.ReleasePointer) ([]byte, error) {
@@ -141,6 +185,12 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 			return nil, revisionReadError(err)
 		}
 		return connection.Document, nil
+	case domain.ReleasePointerKindApplication:
+		application, err := stmts.GetApplicationRevision(ctx, projectID, pointer.RevisionID)
+		if err != nil {
+			return nil, revisionReadError(err)
+		}
+		return application.Document, nil
 	case domain.ReleasePointerKindPolicy:
 		revision, err := stmts.GetPolicyRevision(ctx, projectID, pointer.RevisionID)
 		if err != nil {

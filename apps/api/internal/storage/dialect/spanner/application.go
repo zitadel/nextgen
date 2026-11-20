@@ -15,7 +15,7 @@ import (
 
 const (
 	createApplicationStmt = `INSERT INTO applications ` +
-		`(project_id, id, slug) VALUES (@p1, @p2, @p3) THEN RETURN created_at`
+		`(project_id, id, slug, declared) VALUES (@p1, @p2, @p3, @p4) THEN RETURN created_at`
 
 	// The default CURRENT_TIMESTAMP() is taken when this statement runs, after
 	// the revise transaction read the application row, so revision order
@@ -34,7 +34,7 @@ const (
 
 	lockApplicationStmt = `SELECT id FROM applications WHERE project_id = @p1 AND id = @p2 FOR UPDATE`
 
-	applicationQuery = `SELECT a.project_id, a.id, a.slug, r.id, r.document, a.created_at, r.created_at
+	applicationQuery = `SELECT a.project_id, a.id, a.slug, a.declared, r.id, r.document, a.created_at, r.created_at
 FROM applications a
 JOIN application_revisions r
   ON r.project_id = a.project_id AND r.application_id = a.id`
@@ -60,6 +60,12 @@ JOIN application_revisions r
 	listApplicationClientSecretsStmt = `SELECT project_id, id, application_client_id, secret_hash, created_at` +
 		` FROM application_client_secrets` +
 		` WHERE project_id = @p1 AND application_client_id = @p2 ORDER BY created_at, id`
+
+	getApplicationSecretVariableStmt = `SELECT project_id, name, application_client_id, created_at` +
+		` FROM application_secret_variables WHERE project_id = @p1 AND name = @p2`
+
+	createApplicationSecretVariableStmt = `INSERT INTO application_secret_variables ` +
+		`(project_id, name, application_client_id) VALUES (@p1, @p2, @p3) THEN RETURN created_at`
 )
 
 var _ service.ApplicationStatements = (*applicationStatements)(nil)
@@ -96,6 +102,7 @@ func (s applicationStatements) CreateApplication(ctx context.Context, entity *do
 			entity.ProjectID,
 			entity.ID,
 			entity.Slug,
+			entity.IsDeclared,
 		).statement()
 		if err := tx.Write(ctx, stmt, scanReturnedTimestamp(&createdAt)); err != nil {
 			return err
@@ -173,10 +180,23 @@ func (s applicationStatements) LockApplication(ctx context.Context, projectID, i
 
 // GetApplication implements [service.ApplicationStatements].
 func (s applicationStatements) GetApplication(ctx context.Context, filter database.Filter[domain.ApplicationField]) (*domain.Application, error) {
+	return s.getOne(ctx, filter, newestApplicationRevision)
+}
+
+// GetApplicationRevision implements [service.ApplicationStatements].
+func (s applicationStatements) GetApplicationRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error) {
+	// No newest-revision conjunct: a pinned read must reach a superseded row.
+	return s.getOne(ctx, database.And(
+		database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID),
+		database.Equal(database.Col(domain.ApplicationFieldRevisionID), revisionID),
+	))
+}
+
+func (s applicationStatements) getOne(ctx context.Context, filter database.Filter[domain.ApplicationField], conjuncts ...string) (*domain.Application, error) {
 	var compiler statementCompiler
 	if err := compileRead(&compiler, applicationQuery, &database.ListOptions[domain.ApplicationField]{
 		Filter: filter,
-	}, application.Schema, newestApplicationRevision); err != nil {
+	}, application.Schema, conjuncts...); err != nil {
 		return nil, err
 	}
 	var entity *domain.Application
@@ -254,6 +274,40 @@ func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context,
 	return secrets, nil
 }
 
+// GetApplicationSecretVariable implements [service.ApplicationStatements].
+func (s applicationStatements) GetApplicationSecretVariable(ctx context.Context, projectID, name string) (*domain.ApplicationSecretVariable, error) {
+	var variable *domain.ApplicationSecretVariable
+	if err := s.db.Query(ctx, buildStatement(getApplicationSecretVariableStmt, projectID, name).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		variable, err = collectOneRow(iter, func(row *spanner.Row) (*domain.ApplicationSecretVariable, error) {
+			var variable domain.ApplicationSecretVariable
+			if err := row.Columns(&variable.ProjectID, &variable.Name, &variable.ApplicationClientID, &variable.CreatedAt); err != nil {
+				return nil, err
+			}
+			variable.CreatedAt = variable.CreatedAt.UTC()
+			return &variable, nil
+		})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return variable, nil
+}
+
+// CreateApplicationSecretVariable implements [service.ApplicationStatements].
+func (s applicationStatements) CreateApplicationSecretVariable(ctx context.Context, variable *domain.ApplicationSecretVariable) error {
+	stmt := buildStatement(createApplicationSecretVariableStmt,
+		variable.ProjectID,
+		variable.Name,
+		variable.ApplicationClientID,
+	).statement()
+	if err := s.db.Write(ctx, stmt, scanReturnedTimestamp(&variable.CreatedAt)); err != nil {
+		return err
+	}
+	variable.CreatedAt = variable.CreatedAt.UTC()
+	return nil
+}
+
 func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*domain.ApplicationClient, createdAt time.Time) error {
 	for _, client := range clients {
 		stmt := buildStatement(createApplicationClientStmt,
@@ -278,7 +332,7 @@ func scanApplication(row *spanner.Row) (*domain.Application, error) {
 		documentJSON         spanner.NullJSON
 		createdAt, updatedAt time.Time
 	)
-	if err := row.Columns(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.RevisionID, &documentJSON, &createdAt, &updatedAt); err != nil {
+	if err := row.Columns(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.IsDeclared, &entity.RevisionID, &documentJSON, &createdAt, &updatedAt); err != nil {
 		return nil, err
 	}
 	document, err := decodeNullJSON(documentJSON)

@@ -297,9 +297,10 @@ type IDPConnectionStatements interface {
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 }
 
-// ApplicationStatements persists registered applications, their revisions,
-// their clients and the clients' secrets. Like an IdP connection, the newest
-// revision is the one with the greatest created_at (ADR 063 §7).
+// ApplicationStatements persists applications, declared and registered, their
+// revisions, their clients and the clients' secrets. Like an IdP connection,
+// the newest revision is the one with the greatest created_at (ADR 063 §7).
+// Declared is fixed when the application is created.
 //
 // Clients are rows of their own, never removed by a revision. Each gets a
 // minted client_* id; an empty ClientID takes a copy of it (ADR 047 §5).
@@ -328,6 +329,9 @@ type ApplicationStatements interface {
 	// GetApplication returns the application matching filter at its newest
 	// revision. No match returns *database.NoRowFoundError.
 	GetApplication(ctx context.Context, filter database.Filter[domain.ApplicationField]) (*domain.Application, error)
+	// GetApplicationRevision returns the application at revisionID, newest or
+	// not, as a release pins it. No match returns *database.NoRowFoundError.
+	GetApplicationRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error)
 	// ListApplicationClients returns the application's clients ordered by
 	// slug. An unknown application returns none.
 	ListApplicationClients(ctx context.Context, projectID, applicationID string) ([]*domain.ApplicationClient, error)
@@ -339,6 +343,13 @@ type ApplicationStatements interface {
 	// creates the client, so a client is never stored without its secret. An
 	// unknown client returns *database.ForeignKeyError.
 	CreateApplicationClientSecret(ctx context.Context, secret *domain.ApplicationClientSecret) error
+	// GetApplicationSecretVariable returns the claim on the variable name. No
+	// claim returns *database.NoRowFoundError.
+	GetApplicationSecretVariable(ctx context.Context, projectID, name string) (*domain.ApplicationSecretVariable, error)
+	// CreateApplicationSecretVariable stores the claim and sets CreatedAt. A
+	// name already claimed in the project returns *database.UniqueError, and
+	// an unknown client *database.ForeignKeyError.
+	CreateApplicationSecretVariable(ctx context.Context, variable *domain.ApplicationSecretVariable) error
 	// ListApplicationClientSecrets returns the client's secrets, oldest first.
 	// applicationClientID is the client's row id. An unknown client returns
 	// none.

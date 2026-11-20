@@ -11,6 +11,7 @@ content:
         - $ref: '../../../../components/schemas/errors/dep-not_found.yaml'
         - $ref: '../../../../components/schemas/errors/dep-permission_denied.yaml'
         - $ref: '../../../../components/schemas/errors/dep-variables_missing.yaml'
+        - $ref: '../../../../components/schemas/errors/dep-variables_not_secret.yaml'
         - $ref: '../../../../components/schemas/errors/env-project_not_found.yaml'
         - $ref: '../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
@@ -31,6 +32,7 @@ content:
           dep.not_found: '../../../../components/schemas/errors/dep-not_found.yaml'
           dep.permission_denied: '../../../../components/schemas/errors/dep-permission_denied.yaml'
           dep.variables_missing: '../../../../components/schemas/errors/dep-variables_missing.yaml'
+          dep.variables_not_secret: '../../../../components/schemas/errors/dep-variables_not_secret.yaml'
           env.project_not_found: '../../../../components/schemas/errors/env-project_not_found.yaml'
           evt.invalid: '../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
@@ -56,6 +58,8 @@ content:
         $ref: '../../../../components/examples/errors/dep-permission_denied.yaml'
       dep.variables_missing:
         $ref: '../../../../components/examples/errors/dep-variables_missing.yaml'
+      dep.variables_not_secret:
+        $ref: '../../../../components/examples/errors/dep-variables_not_secret.yaml'
       env.project_not_found:
         $ref: '../../../../components/examples/errors/env-project_not_found.yaml'
       evt.invalid:

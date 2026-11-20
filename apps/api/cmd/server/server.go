@@ -351,7 +351,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	oauthSettingsService := service.NewOAuthSettingsService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator())
+	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator(), variableService, keyService)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	authRequestService := service.NewAuthRequestService(serviceDBPool)
@@ -372,6 +372,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		flowDefinitionSvc,
 		brandingService,
 		idpConnectionService,
+		applicationService,
 		policyService,
 		oauthSettingsService,
 		builtinBases,

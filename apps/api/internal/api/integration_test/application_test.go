@@ -28,7 +28,7 @@ func TestPublishApplication(t *testing.T) {
 		assert.True(t, domain.PrefixApplicationRevision.Matches(created.RevisionID), created.RevisionID)
 		assert.Equal(t, "web", web.Client)
 		assert.True(t, domain.PrefixApplicationClient.Matches(web.ClientID), "a client without client_id gets a generated one: %s", web.ClientID)
-		assert.True(t, strings.HasPrefix(web.Secret, "sk_client_"), web.Secret)
+		assert.True(t, strings.HasPrefix(web.Secret, "sk_csec_"), web.Secret)
 		assert.Equal(t, web.ClientID, created.Definition.Clients[0].ClientID.Value)
 	})
 
