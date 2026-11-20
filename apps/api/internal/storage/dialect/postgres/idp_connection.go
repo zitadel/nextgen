@@ -87,8 +87,6 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 		).Scan(&entity.UpdatedAt); err != nil {
 			return wrapError(err)
 		}
-		// pgx scans timestamptz in Local; reads normalize to UTC.
-		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
 		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID)); err != nil {
 			return err
@@ -116,8 +114,6 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 		).Scan(&entity.UpdatedAt); err != nil {
 			return idpconnection.ReviseNotFound(wrapError(err))
 		}
-		// pgx scans timestamptz in Local; reads normalize to UTC.
-		entity.UpdatedAt = entity.UpdatedAt.UTC()
 		entity.RevisionID = revisionID
 		// The revision's display name is what search shows from now on.
 		return writeSearchEntry(ctx, tx, domain.IDPConnectionSearchEntry(entity))
@@ -216,7 +212,6 @@ func scanIDPConnection(row pgx.CollectableRow) (*domain.IDPConnection, error) {
 	); err != nil {
 		return nil, err
 	}
-	entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 	return entity, nil
 }
 

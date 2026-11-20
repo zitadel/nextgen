@@ -1273,9 +1273,15 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ id: string }>(result).data.id;
   }
 
-  /** The ids of the project's invitations, newest first, as `invitation list --all` reports them. */
+  /** The ids of the project's invitations in every status, newest first, as `invitation list` reports them. */
   async invitationIds(): Promise<string[]> {
-    const result = await this.cli(["invitation", "list", "--all", "--json"]);
+    const result = await this.cli([
+      "invitation",
+      "list",
+      "--all",
+      ...["pending", "accepted", "rejected", "expired"].flatMap((status) => ["--status", status]),
+      "--json",
+    ]);
     expect(result, "invitation list should have succeeded").toSucceed();
     return this.envelopeOf<{ items: { id: string }[] }>(result).data.items.map((invitation) => {
       return invitation.id;
@@ -2099,6 +2105,11 @@ export class ScaffoldedApp {
    */
   lacksEditorSchema(dialect: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/meta/${dialect}.json`);
+  }
+
+  /** Removes the local secret, as a developer who deleted `.zitadel/secret` would. */
+  losesItsLocalSecret(): Promise<void> {
+    return this.deleteProjectFile(".zitadel/secret");
   }
 
   /** Removes a committed connection file, as the developer owning it would. */

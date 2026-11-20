@@ -367,6 +367,7 @@ var operationRolesSessionCookie = map[string][]string{
 	DeleteUserOperation:            []string{},
 	DeleteWebhookOperation:         []string{},
 	EvaluatePolicyOperation:        []string{},
+	GetApplicationOperation:        []string{},
 	GetBrandingOperation:           []string{},
 	GetDeploymentOperation:         []string{},
 	GetEventOperation:              []string{},

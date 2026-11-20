@@ -281,7 +281,7 @@ abstract class WriteOperation<
 }
 
 /** `<topic> create`. */
-export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
+export abstract class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
   static describe<Ctx>(definition: OperationDefinition<Ctx, CreateSpec<Ctx>>): OperationStatics {
     return describeWrite(definition, definition.options, "create");
   }
@@ -294,7 +294,7 @@ export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
 }
 
 /** `<topic> update <id>`. */
-export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
+export abstract class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
   static describe<Ctx>(definition: OperationDefinition<Ctx, UpdateSpec<Ctx>>): OperationStatics {
     return describeWrite(definition, definition.options, "update");
   }

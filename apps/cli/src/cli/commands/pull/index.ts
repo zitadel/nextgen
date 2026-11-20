@@ -22,6 +22,7 @@ import {
   type Schemas,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * A release id, as the platform mints it.
@@ -201,7 +202,7 @@ type PullOutcome =
  * resource by handle, so files are written by handle and the next `deploy`
  * rebuilds the same release.
  */
-export default class Pull extends EnvironmentCommand {
+export default class Pull extends ServerCommand(EnvironmentCommand) {
   static override description =
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
   static override group = CommandGroups.releases;

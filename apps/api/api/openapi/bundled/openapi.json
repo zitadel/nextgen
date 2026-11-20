@@ -7239,6 +7239,9 @@
             "oauth2": [
               "application.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -8088,7 +8091,7 @@
               "examples": {
                 "bundle": {
                   "summary": "Built from the files on disk",
-                  "description": "The CLI's form: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
+                  "description": "A whole bundle: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
                   "value": {
                     "bundle": {
                       "schemas": [
@@ -18778,10 +18781,50 @@
           }
         }
       },
+      "oauthset-not_found": {
+        "description": "Oauth settings: not found\n\nError code: oauthset.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "oauthset.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "oauthset-permission_denied": {
+        "description": "Oauth settings: requires an operator-grade token bound to the project (project.write or an oauth_settings.* scope)\n\nError code: oauthset.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "oauthset.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "oauth-settings": {
         "x-meta-schema": true,
         "type": "object",
-        "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettings` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`\npublishes with the rest of the bundle.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
+        "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettings` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
         "additionalProperties": false,
         "required": [
           "enabled"
@@ -22596,6 +22639,44 @@
           }
         ]
       },
+      "auth-request-created-payload": {
+        "title": "AuthRequestCreatedPayload",
+        "type": "object",
+        "description": "Payload for `auth.request.created` events.",
+        "required": [
+          "client_id"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          }
+        }
+      },
+      "auth-request-created-event": {
+        "title": "AuthRequestCreatedEvent",
+        "description": "An event of type auth.request.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "auth.request.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/auth-request-created-payload"
+              }
+            }
+          }
+        ]
+      },
       "auth-sso-authorization-failed-event": {
         "title": "AuthSsoAuthorizationFailedEvent",
         "description": "An event of type auth.sso.authorization.failed, with the shared event fields and its own payload.\n",
@@ -23543,6 +23624,45 @@
               },
               "payload": {
                 "$ref": "#/components/schemas/invitation-rejected-payload"
+              }
+            }
+          }
+        ]
+      },
+      "oauth-settings-created-payload": {
+        "title": "OAuthSettingsCreatedPayload",
+        "type": "object",
+        "description": "Payload for `oauth_settings.created`: the settings the new revision holds.\nThe revision id is the event's `entity_id`.\n",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the project's OAuth authorization server answers."
+          }
+        }
+      },
+      "oauth_settings-created-event": {
+        "title": "OauthSettingsCreatedEvent",
+        "description": "An event of type oauth_settings.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "oauth_settings.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/oauth-settings-created-payload"
               }
             }
           }
@@ -24602,6 +24722,9 @@
             "$ref": "#/components/schemas/auth-factor-password-set-event"
           },
           {
+            "$ref": "#/components/schemas/auth-request-created-event"
+          },
+          {
             "$ref": "#/components/schemas/auth-sso-authorization-failed-event"
           },
           {
@@ -24663,6 +24786,9 @@
           },
           {
             "$ref": "#/components/schemas/invitation-rejected-event"
+          },
+          {
+            "$ref": "#/components/schemas/oauth_settings-created-event"
           },
           {
             "$ref": "#/components/schemas/origin-added-event"
@@ -24760,6 +24886,7 @@
             "auth.check.succeeded": "#/components/schemas/auth-check-succeeded-event",
             "auth.factor.passkey.enrolled": "#/components/schemas/auth-factor-passkey-enrolled-event",
             "auth.factor.password.set": "#/components/schemas/auth-factor-password-set-event",
+            "auth.request.created": "#/components/schemas/auth-request-created-event",
             "auth.sso.authorization.failed": "#/components/schemas/auth-sso-authorization-failed-event",
             "auth.sso.exchange.failed": "#/components/schemas/auth-sso-exchange-failed-event",
             "auth.sso.exchange.succeeded": "#/components/schemas/auth-sso-exchange-succeeded-event",
@@ -24781,6 +24908,7 @@
             "invitation.cancelled": "#/components/schemas/invitation-cancelled-event",
             "invitation.created": "#/components/schemas/invitation-created-event",
             "invitation.rejected": "#/components/schemas/invitation-rejected-event",
+            "oauth_settings.created": "#/components/schemas/oauth_settings-created-event",
             "origin.added": "#/components/schemas/origin-added-event",
             "origin.removed": "#/components/schemas/origin-removed-event",
             "policy.created": "#/components/schemas/policy-created-event",
@@ -26305,6 +26433,31 @@
             ]
           },
           {
+            "title": "auth.request.created",
+            "description": "An app started a sign-in at the OAuth authorization endpoint. `data`\nnames the app by its `client_id`.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.request.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-request-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
             "title": "auth.sso.authorization.failed",
             "description": "A sign-in through an identity provider (SSO) failed at the provider.\nIt answered with an error, `access_denied` included, or the callback\ncarried no code.\n",
             "allOf": [
@@ -26826,6 +26979,31 @@
                   },
                   "data": {
                     "$ref": "#/components/schemas/invitation-rejected-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "oauth_settings.created",
+            "description": "A project published a new revision of its OAuth settings, which say\nwhether its OAuth authorization server answers. A release build\npublishes one when the bundle's `oauth` resource differs from every\nearlier revision.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "oauth_settings.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/oauth-settings-created-payload"
                   }
                 }
               }
@@ -28313,6 +28491,20 @@
         "value": {
           "code": "brnd.missing_project_id",
           "message": "branding: missing project id"
+        }
+      },
+      "oauthset-not_found": {
+        "summary": "oauthset.not_found",
+        "value": {
+          "code": "oauthset.not_found",
+          "message": "oauth settings: not found"
+        }
+      },
+      "oauthset-permission_denied": {
+        "summary": "oauthset.permission_denied",
+        "value": {
+          "code": "oauthset.permission_denied",
+          "message": "oauth settings: requires an operator-grade token bound to the project (project.write or an oauth_settings.* scope)"
         }
       },
       "idp-field_immutable": {
@@ -34925,6 +35117,12 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/oauthset-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/oauthset-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -34937,6 +35135,8 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "oauthset.not_found": "#/components/schemas/oauthset-not_found",
+                  "oauthset.permission_denied": "#/components/schemas/oauthset-permission_denied",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
                 }
@@ -34951,6 +35151,12 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "oauthset.not_found": {
+                "$ref": "#/components/examples/oauthset-not_found"
+              },
+              "oauthset.permission_denied": {
+                "$ref": "#/components/examples/oauthset-permission_denied"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"

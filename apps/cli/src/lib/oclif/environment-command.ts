@@ -1,6 +1,5 @@
 import { createZitadelClient } from "@/lib/backend";
-import { ZitadelRuntime } from "@/lib/server";
-import { Environment } from "@/lib/environment";
+import { Environment, type ServerAddresses } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -33,6 +32,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
   protected environment!: Environment;
 
   /**
+   * How a server address is read from a flag, an environment file or an answer.
+   * A command that takes a server says; the mixin that makes one take it does.
+   *
+   * @returns What resolves, parses and normalises a server address.
+   */
+  protected abstract servers(): ServerAddresses;
+
+  /**
    * Resolve the environment, then build the invocation context from its server.
    *
    * A missing server is not an error here: whether a command needs one is for
@@ -52,19 +59,18 @@ export abstract class EnvironmentCommand extends BaseCommand {
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
     if (options.environment === false) {
-      return super.toMeta(given, { resolveServer: options.resolveServer, source: options.source });
+      return super.toMeta(given, { source: options.source });
     }
     this.environment = await Environment.resolve({
-      servers: ZitadelRuntime,
+      servers: this.servers(),
       cwd: resolveCwd(text(flags.cwd)),
       env: process.env,
-      serverFlag: options.source ?? text(flags.server),
+      serverFlag: options.source ?? this.serverFlagOf(flags),
       envName: text(flags.env),
       envFile: text(flags.envFile),
     });
 
     return super.toMeta(given, {
-      resolveServer: false,
       source: this.environment.values.ZITADEL_URL?.value ?? "",
     });
   }
