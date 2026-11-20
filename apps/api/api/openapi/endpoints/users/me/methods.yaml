@@ -33,13 +33,13 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../components/schemas/errors/sess-project_mismatch.yaml
+            $ref: ../../../components/schemas/errors/sess-project-mismatch.yaml
     '404':
       description: The user the session refers to was not found.
       content:
         application/json:
           schema:
-            $ref: ../../../components/schemas/errors/user-not_found.yaml
+            $ref: ../../../components/schemas/errors/user-not-found.yaml
     default:
       $ref: getMyUser-error-response.yaml
 
@@ -110,7 +110,7 @@ patch:
       content:
         application/json:
           schema:
-            $ref: ../../../components/schemas/errors/user-not_found.yaml
+            $ref: ../../../components/schemas/errors/user-not-found.yaml
     '409':
       description: |
         A patched value is unique and already taken by another user, or

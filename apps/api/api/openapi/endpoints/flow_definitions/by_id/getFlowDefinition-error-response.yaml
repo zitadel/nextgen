@@ -5,41 +5,41 @@ content:
     schema:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
-        - $ref: '../../../components/schemas/errors/flowdef-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/flowdef-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-not-found.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-permission-denied.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/flowdef-missing_id.yaml'
-        - $ref: '../../../components/schemas/errors/flowdef-missing_project_id.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-missing-id.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-missing-project-id.yaml'
+        - $ref: '../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
-          flowdef.not_found: '../../../components/schemas/errors/flowdef-not_found.yaml'
-          flowdef.permission_denied: '../../../components/schemas/errors/flowdef-permission_denied.yaml'
+          flowdef.not_found: '../../../components/schemas/errors/flowdef-not-found.yaml'
+          flowdef.permission_denied: '../../../components/schemas/errors/flowdef-permission-denied.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          flowdef.missing_id: '../../../components/schemas/errors/flowdef-missing_id.yaml'
-          flowdef.missing_project_id: '../../../components/schemas/errors/flowdef-missing_project_id.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          flowdef.missing_id: '../../../components/schemas/errors/flowdef-missing-id.yaml'
+          flowdef.missing_project_id: '../../../components/schemas/errors/flowdef-missing-project-id.yaml'
+          not_implemented: '../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
       flowdef.not_found:
-        $ref: '../../../components/examples/errors/flowdef-not_found.yaml'
+        $ref: '../../../components/examples/errors/flowdef-not-found.yaml'
       flowdef.permission_denied:
-        $ref: '../../../components/examples/errors/flowdef-permission_denied.yaml'
+        $ref: '../../../components/examples/errors/flowdef-permission-denied.yaml'
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
       flowdef.missing_id:
-        $ref: '../../../components/examples/errors/flowdef-missing_id.yaml'
+        $ref: '../../../components/examples/errors/flowdef-missing-id.yaml'
       flowdef.missing_project_id:
-        $ref: '../../../components/examples/errors/flowdef-missing_project_id.yaml'
+        $ref: '../../../components/examples/errors/flowdef-missing-project-id.yaml'
       not_implemented:
-        $ref: '../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:

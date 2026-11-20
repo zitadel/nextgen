@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: proj.mismatch
+        description: The error code, always `proj.mismatch` for this error.
     required:
       - code

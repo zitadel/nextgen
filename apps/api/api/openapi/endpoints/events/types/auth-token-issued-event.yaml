@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: auth.token.issued
+        description: The event type, always `auth.token.issued` for this event.
       payload:
         $ref: ../payloads/auth-token-issued-payload.yaml

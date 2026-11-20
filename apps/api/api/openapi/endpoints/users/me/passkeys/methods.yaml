@@ -44,6 +44,6 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
+            $ref: ../../../../components/schemas/errors/sess-project-mismatch.yaml
     default:
       $ref: listMyPasskeys-error-response.yaml

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: flowdef.created
+        description: The event type, always `flowdef.created` for this event.
       payload:
         $ref: ../payloads/flowdef-payload.yaml

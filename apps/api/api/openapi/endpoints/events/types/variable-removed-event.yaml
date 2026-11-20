@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: variable.removed
+        description: The event type, always `variable.removed` for this event.
       payload:
         $ref: ../payloads/variable-removed-payload.yaml

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: invitation.accepted
+        description: The event type, always `invitation.accepted` for this event.
       payload:
         $ref: ../payloads/invitation-accepted-payload.yaml

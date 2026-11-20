@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: auth.token.revoked
+        description: The event type, always `auth.token.revoked` for this event.
       payload:
         $ref: ../payloads/empty-event-payload.yaml

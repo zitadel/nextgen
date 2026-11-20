@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: dep.invalid
+        description: The error code, always `dep.invalid` for this error.
     required:
       - code

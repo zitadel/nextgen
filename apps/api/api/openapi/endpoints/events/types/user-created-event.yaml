@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: user.created
+        description: The event type, always `user.created` for this event.
       payload:
         $ref: ../payloads/user-created-payload.yaml

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: team.deactivated
+        description: The event type, always `team.deactivated` for this event.
       payload:
         $ref: ../payloads/empty-event-payload.yaml

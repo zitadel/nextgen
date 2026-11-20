@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: team.created
+        description: The event type, always `team.created` for this event.
       payload:
         $ref: ../payloads/team-payload.yaml

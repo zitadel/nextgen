@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: session.established
+        description: The event type, always `session.established` for this event.
       payload:
         $ref: ../payloads/session-established-payload.yaml

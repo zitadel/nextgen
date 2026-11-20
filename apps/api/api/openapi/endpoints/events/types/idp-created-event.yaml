@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: idp.created
+        description: The event type, always `idp.created` for this event.
       payload:
         $ref: ../payloads/idp-payload.yaml

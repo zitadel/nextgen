@@ -76,15 +76,15 @@ post:
             # schemas differ only by a `const` code, so without it ogen cannot
             # infer one and silently skips the whole operation.
             oneOf:
-              - $ref: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
-              - $ref: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
-              - $ref: ../../../../../components/schemas/errors/auth-csrf_invalid.yaml
+              - $ref: ../../../../../components/schemas/errors/claim-no-personal-team.yaml
+              - $ref: ../../../../../components/schemas/errors/claim-personal-team-not-active.yaml
+              - $ref: ../../../../../components/schemas/errors/auth-csrf-invalid.yaml
             discriminator:
               propertyName: code
               mapping:
-                claim.no_personal_team: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
-                claim.personal_team_not_active: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
-                auth.csrf_invalid: ../../../../../components/schemas/errors/auth-csrf_invalid.yaml
+                claim.no_personal_team: ../../../../../components/schemas/errors/claim-no-personal-team.yaml
+                claim.personal_team_not_active: ../../../../../components/schemas/errors/claim-personal-team-not-active.yaml
+                auth.csrf_invalid: ../../../../../components/schemas/errors/auth-csrf-invalid.yaml
     '404':
       description: Challenge not found. Use the `challenge_id` from the claim URL.
       content:
@@ -113,13 +113,13 @@ post:
             # schemas differ only by a `const` code, so without it ogen cannot
             # infer one and silently skips the whole operation.
             oneOf:
-              - $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
-              - $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+              - $ref: ../../../../../components/schemas/errors/proj-claim-expired.yaml
+              - $ref: ../../../../../components/schemas/errors/proj-claim-window-expired.yaml
             discriminator:
               propertyName: code
               mapping:
-                proj.claim_expired: ../../../../../components/schemas/errors/proj-claim_expired.yaml
-                proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+                proj.claim_expired: ../../../../../components/schemas/errors/proj-claim-expired.yaml
+                proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim-window-expired.yaml
     '429':
       # The rate limit is defined in ADR 046.
       description: |

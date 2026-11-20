@@ -15,7 +15,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: ../types/idp-identity_link-created-event.yaml
+          $ref: ../types/idp-identity-link-created-event.yaml
   responses:
     '2XX':
       $ref: ../webhook-delivered.yaml

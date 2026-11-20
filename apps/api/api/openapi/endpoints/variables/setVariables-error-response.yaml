@@ -5,49 +5,49 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
-        - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
-        - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/enc-key-decrypt-failed.yaml'
+        - $ref: '../../components/schemas/errors/enc-key-not-found.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
-        - $ref: '../../components/schemas/errors/var-invalid_name.yaml'
-        - $ref: '../../components/schemas/errors/var-invalid_value.yaml'
-        - $ref: '../../components/schemas/errors/var-no_project_id.yaml'
-        - $ref: '../../components/schemas/errors/not_implemented.yaml'
-        - $ref: '../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../components/schemas/errors/var-invalid-name.yaml'
+        - $ref: '../../components/schemas/errors/var-invalid-value.yaml'
+        - $ref: '../../components/schemas/errors/var-no-project-id.yaml'
+        - $ref: '../../components/schemas/errors/not-implemented.yaml'
+        - $ref: '../../components/schemas/errors/proj-not-found.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
-        - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/enc-key-unknown-alg.yaml'
         - $ref: '../../components/schemas/errors/unavailable.yaml'
-        - $ref: '../../components/schemas/errors/var-limit_exceeded.yaml'
-        - $ref: '../../components/schemas/errors/var-not_found.yaml'
-        - $ref: '../../components/schemas/errors/var-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/var-limit-exceeded.yaml'
+        - $ref: '../../components/schemas/errors/var-not-found.yaml'
+        - $ref: '../../components/schemas/errors/var-permission-denied.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
-          enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
-          enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          enc_key.decrypt_failed: '../../components/schemas/errors/enc-key-decrypt-failed.yaml'
+          enc_key.not_found: '../../components/schemas/errors/enc-key-not-found.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
-          var.invalid_name: '../../components/schemas/errors/var-invalid_name.yaml'
-          var.invalid_value: '../../components/schemas/errors/var-invalid_value.yaml'
-          var.no_project_id: '../../components/schemas/errors/var-no_project_id.yaml'
-          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
-          proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
+          var.invalid_name: '../../components/schemas/errors/var-invalid-name.yaml'
+          var.invalid_value: '../../components/schemas/errors/var-invalid-value.yaml'
+          var.no_project_id: '../../components/schemas/errors/var-no-project-id.yaml'
+          not_implemented: '../../components/schemas/errors/not-implemented.yaml'
+          proj.not_found: '../../components/schemas/errors/proj-not-found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
-          enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          enc_key.unknown_alg: '../../components/schemas/errors/enc-key-unknown-alg.yaml'
           unavailable: '../../components/schemas/errors/unavailable.yaml'
-          var.limit_exceeded: '../../components/schemas/errors/var-limit_exceeded.yaml'
-          var.not_found: '../../components/schemas/errors/var-not_found.yaml'
-          var.permission_denied: '../../components/schemas/errors/var-permission_denied.yaml'
+          var.limit_exceeded: '../../components/schemas/errors/var-limit-exceeded.yaml'
+          var.not_found: '../../components/schemas/errors/var-not-found.yaml'
+          var.permission_denied: '../../components/schemas/errors/var-permission-denied.yaml'
     examples:
       auth.unauthorized:
         $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       enc_key.decrypt_failed:
-        $ref: '../../components/examples/errors/enc_key-decrypt_failed.yaml'
+        $ref: '../../components/examples/errors/enc-key-decrypt-failed.yaml'
       enc_key.not_found:
-        $ref: '../../components/examples/errors/enc_key-not_found.yaml'
+        $ref: '../../components/examples/errors/enc-key-not-found.yaml'
       evt.invalid:
         $ref: '../../components/examples/errors/evt-invalid.yaml'
       internal:
@@ -55,24 +55,24 @@ content:
       tkn.invalid:
         $ref: '../../components/examples/errors/tkn-invalid.yaml'
       var.invalid_name:
-        $ref: '../../components/examples/errors/var-invalid_name.yaml'
+        $ref: '../../components/examples/errors/var-invalid-name.yaml'
       var.invalid_value:
-        $ref: '../../components/examples/errors/var-invalid_value.yaml'
+        $ref: '../../components/examples/errors/var-invalid-value.yaml'
       var.no_project_id:
-        $ref: '../../components/examples/errors/var-no_project_id.yaml'
+        $ref: '../../components/examples/errors/var-no-project-id.yaml'
       not_implemented:
-        $ref: '../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../components/examples/errors/not-implemented.yaml'
       proj.not_found:
-        $ref: '../../components/examples/errors/proj-not_found.yaml'
+        $ref: '../../components/examples/errors/proj-not-found.yaml'
       req.invalid:
         $ref: '../../components/examples/errors/req-invalid.yaml'
       enc_key.unknown_alg:
-        $ref: '../../components/examples/errors/enc_key-unknown_alg.yaml'
+        $ref: '../../components/examples/errors/enc-key-unknown-alg.yaml'
       unavailable:
         $ref: '../../components/examples/errors/unavailable.yaml'
       var.limit_exceeded:
-        $ref: '../../components/examples/errors/var-limit_exceeded.yaml'
+        $ref: '../../components/examples/errors/var-limit-exceeded.yaml'
       var.not_found:
-        $ref: '../../components/examples/errors/var-not_found.yaml'
+        $ref: '../../components/examples/errors/var-not-found.yaml'
       var.permission_denied:
-        $ref: '../../components/examples/errors/var-permission_denied.yaml'
+        $ref: '../../components/examples/errors/var-permission-denied.yaml'

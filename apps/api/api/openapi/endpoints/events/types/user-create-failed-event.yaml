@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: user.create.failed
+        description: The event type, always `user.create.failed` for this event.
       payload:
         $ref: ../payloads/user-create-failed-payload.yaml

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: invitation.rejected
+        description: The event type, always `invitation.rejected` for this event.
       payload:
         $ref: ../payloads/invitation-rejected-payload.yaml

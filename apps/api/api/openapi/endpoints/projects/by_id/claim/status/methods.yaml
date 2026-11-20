@@ -47,7 +47,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/schemas/errors/proj-permission_denied.yaml
+            $ref: ../../../../../components/schemas/errors/proj-permission-denied.yaml
     '404':
       description: Challenge not found. Use the `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returned.
       content:
@@ -68,13 +68,13 @@ get:
             # schemas differ only by a `const` code, so without it ogen cannot
             # infer one and silently skips the whole operation.
             oneOf:
-              - $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
-              - $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+              - $ref: ../../../../../components/schemas/errors/proj-claim-expired.yaml
+              - $ref: ../../../../../components/schemas/errors/proj-claim-window-expired.yaml
             discriminator:
               propertyName: code
               mapping:
-                proj.claim_expired: ../../../../../components/schemas/errors/proj-claim_expired.yaml
-                proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+                proj.claim_expired: ../../../../../components/schemas/errors/proj-claim-expired.yaml
+                proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim-window-expired.yaml
     '429':
       description: |
         Too many requests: the client polled too many times in a given amount

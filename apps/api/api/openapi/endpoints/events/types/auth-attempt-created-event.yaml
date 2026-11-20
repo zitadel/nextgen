@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: auth.attempt.created
+        description: The event type, always `auth.attempt.created` for this event.
       payload:
         $ref: ../payloads/empty-event-payload.yaml

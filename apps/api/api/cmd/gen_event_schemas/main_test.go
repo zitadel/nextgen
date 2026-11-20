@@ -233,3 +233,31 @@ func catalogSection(t *testing.T, catalog, name string) string {
 	}
 	return section
 }
+
+func TestEventTypeSchemaYAML(t *testing.T) {
+	t.Parallel()
+
+	var schema struct {
+		AllOf []struct {
+			Properties map[string]struct {
+				Const       string `yaml:"const"`
+				Description string `yaml:"description"`
+			} `yaml:"properties"`
+		} `yaml:"allOf"`
+	}
+
+	rendered := eventTypeSchemaYAML("SessionDeletedEvent", "session.deleted", "session-deleted.yaml")
+	require.NoError(t, yaml.Unmarshal([]byte(rendered), &schema))
+	require.Len(t, schema.AllOf, 2)
+
+	eventType := schema.AllOf[1].Properties["event_type"]
+	assert.Equal(t, "session.deleted", eventType.Const)
+	assert.Equal(t, "The event type, always `session.deleted` for this event.", eventType.Description)
+}
+
+func TestEventTypeSlugIsKebabCase(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "flow-signup-challenge-issued-event", eventTypeSlug("flow.signup_challenge.issued"))
+	assert.Equal(t, "session-deleted-event", eventTypeSlug("session.deleted"))
+}

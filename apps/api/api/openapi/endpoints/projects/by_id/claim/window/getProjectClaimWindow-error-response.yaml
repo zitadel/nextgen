@@ -4,18 +4,18 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../../../../components/schemas/errors/claim_challenge-not_found.yaml'
+        - $ref: '../../../../../components/schemas/errors/claim-challenge-not-found.yaml'
         - $ref: '../../../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
-          claim_challenge.not_found: '../../../../../components/schemas/errors/claim_challenge-not_found.yaml'
+          claim_challenge.not_found: '../../../../../components/schemas/errors/claim-challenge-not-found.yaml'
           internal: '../../../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../../../components/schemas/errors/req-invalid.yaml'
     examples:
       claim_challenge.not_found:
-        $ref: '../../../../../components/examples/errors/claim_challenge-not_found.yaml'
+        $ref: '../../../../../components/examples/errors/claim-challenge-not-found.yaml'
       internal:
         $ref: '../../../../../components/examples/errors/internal.yaml'
       req.invalid:

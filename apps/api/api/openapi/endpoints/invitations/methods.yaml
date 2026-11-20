@@ -109,7 +109,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../components/schemas/errors/not_implemented.yaml
+            $ref: ../../components/schemas/errors/not-implemented.yaml
     default:
       $ref: createInvitation-error-response.yaml
 

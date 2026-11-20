@@ -3,8 +3,8 @@ description: |
   code; `req.rate_limited` joins them when the server's own rate limits land.
   Retry after the number of seconds in the `Retry-After` header.
 oneOf:
-  - $ref: errors/user-password_hashing_busy.yaml
+  - $ref: errors/user-password-hashing-busy.yaml
 discriminator:
   propertyName: code
   mapping:
-    user.password_hashing_busy: errors/user-password_hashing_busy.yaml
+    user.password_hashing_busy: errors/user-password-hashing-busy.yaml

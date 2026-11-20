@@ -44,7 +44,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../components/schemas/errors/sess-project_mismatch.yaml
+            $ref: ../../../components/schemas/errors/sess-project-mismatch.yaml
     '404':
       description: Session not found.
       headers:
@@ -53,7 +53,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../../../components/schemas/errors/sess-not_found.yaml
+            $ref: ../../../components/schemas/errors/sess-not-found.yaml
     default:
       $ref: getMySession-error-response.yaml
 

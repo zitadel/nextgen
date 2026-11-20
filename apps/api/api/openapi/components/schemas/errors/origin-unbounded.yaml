@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: origin.unbounded
+        description: The error code, always `origin.unbounded` for this error.
     required:
       - code

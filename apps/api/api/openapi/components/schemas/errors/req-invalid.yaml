@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: req.invalid
+        description: The error code, always `req.invalid` for this error.
     required:
       - code

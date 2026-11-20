@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: release.revoked
+        description: The event type, always `release.revoked` for this event.
       payload:
         $ref: ../payloads/release-revoked-payload.yaml

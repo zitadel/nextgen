@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: pol.invalid
+        description: The error code, always `pol.invalid` for this error.
     required:
       - code

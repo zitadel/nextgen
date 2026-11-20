@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: authz.granted
+        description: The event type, always `authz.granted` for this event.
       payload:
         $ref: ../payloads/authz-granted-payload.yaml

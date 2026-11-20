@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: application.updated
+        description: The event type, always `application.updated` for this event.
       payload:
         $ref: ../payloads/application-payload.yaml

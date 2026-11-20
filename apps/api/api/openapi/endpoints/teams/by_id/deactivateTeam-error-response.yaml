@@ -7,11 +7,11 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
-        - $ref: '../../../components/schemas/errors/team-team_not_found.yaml'
-        - $ref: '../../../components/schemas/errors/team-owns_project.yaml'
-        - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/team-team-not-found.yaml'
+        - $ref: '../../../components/schemas/errors/team-owns-project.yaml'
+        - $ref: '../../../components/schemas/errors/team-permission-denied.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
@@ -19,11 +19,11 @@ content:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          not_implemented: '../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
-          team.team_not_found: '../../../components/schemas/errors/team-team_not_found.yaml'
-          team.owns_project: '../../../components/schemas/errors/team-owns_project.yaml'
-          team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
+          team.team_not_found: '../../../components/schemas/errors/team-team-not-found.yaml'
+          team.owns_project: '../../../components/schemas/errors/team-owns-project.yaml'
+          team.permission_denied: '../../../components/schemas/errors/team-permission-denied.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
@@ -33,14 +33,14 @@ content:
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
       not_implemented:
-        $ref: '../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       team.team_not_found:
-        $ref: '../../../components/examples/errors/team-team_not_found.yaml'
+        $ref: '../../../components/examples/errors/team-team-not-found.yaml'
       team.owns_project:
-        $ref: '../../../components/examples/errors/team-owns_project.yaml'
+        $ref: '../../../components/examples/errors/team-owns-project.yaml'
       team.permission_denied:
-        $ref: '../../../components/examples/errors/team-permission_denied.yaml'
+        $ref: '../../../components/examples/errors/team-permission-denied.yaml'
       unavailable:
         $ref: '../../../components/examples/errors/unavailable.yaml'

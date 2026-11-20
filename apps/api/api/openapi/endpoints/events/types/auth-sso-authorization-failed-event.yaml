@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: auth.sso.authorization.failed
+        description: The event type, always `auth.sso.authorization.failed` for this event.
       payload:
         $ref: ../payloads/auth-check-payload.yaml

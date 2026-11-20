@@ -6,9 +6,9 @@ content:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
-        - $ref: '../../../components/schemas/errors/pol-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/pol-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/not-implemented.yaml'
+        - $ref: '../../../components/schemas/errors/pol-not-found.yaml'
+        - $ref: '../../../components/schemas/errors/pol-permission-denied.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
@@ -16,9 +16,9 @@ content:
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
-          pol.not_found: '../../../components/schemas/errors/pol-not_found.yaml'
-          pol.permission_denied: '../../../components/schemas/errors/pol-permission_denied.yaml'
+          not_implemented: '../../../components/schemas/errors/not-implemented.yaml'
+          pol.not_found: '../../../components/schemas/errors/pol-not-found.yaml'
+          pol.permission_denied: '../../../components/schemas/errors/pol-permission-denied.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
@@ -27,11 +27,11 @@ content:
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
       not_implemented:
-        $ref: '../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../components/examples/errors/not-implemented.yaml'
       pol.not_found:
-        $ref: '../../../components/examples/errors/pol-not_found.yaml'
+        $ref: '../../../components/examples/errors/pol-not-found.yaml'
       pol.permission_denied:
-        $ref: '../../../components/examples/errors/pol-permission_denied.yaml'
+        $ref: '../../../components/examples/errors/pol-permission-denied.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:

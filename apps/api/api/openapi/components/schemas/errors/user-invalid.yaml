@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: user.invalid
+        description: The error code, always `user.invalid` for this error.
     required:
       - code

@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: policy.created
+        description: The event type, always `policy.created` for this event.
       payload:
         $ref: ../payloads/policy-payload.yaml

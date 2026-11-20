@@ -12,5 +12,6 @@ allOf:
       event_type:
         type: string
         const: project.deleted
+        description: The event type, always `project.deleted` for this event.
       payload:
         $ref: ../payloads/empty-event-payload.yaml

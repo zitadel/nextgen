@@ -4,36 +4,36 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
+        - $ref: '../../../components/schemas/errors/auth-csrf-invalid.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/inv-inviter_not_admin.yaml'
-        - $ref: '../../../components/schemas/errors/inv-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/inv-platform_required.yaml'
-        - $ref: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
-        - $ref: '../../../components/schemas/errors/inv-self_accept.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/inv-inviter-not-admin.yaml'
+        - $ref: '../../../components/schemas/errors/inv-not-found.yaml'
+        - $ref: '../../../components/schemas/errors/inv-platform-required.yaml'
+        - $ref: '../../../components/schemas/errors/inv-project-unclaimed.yaml'
+        - $ref: '../../../components/schemas/errors/inv-self-accept.yaml'
+        - $ref: '../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
-          auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
+          auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf-invalid.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          inv.inviter_not_admin: '../../../components/schemas/errors/inv-inviter_not_admin.yaml'
-          inv.not_found: '../../../components/schemas/errors/inv-not_found.yaml'
-          inv.platform_required: '../../../components/schemas/errors/inv-platform_required.yaml'
-          inv.project_unclaimed: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
-          inv.self_accept: '../../../components/schemas/errors/inv-self_accept.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          inv.inviter_not_admin: '../../../components/schemas/errors/inv-inviter-not-admin.yaml'
+          inv.not_found: '../../../components/schemas/errors/inv-not-found.yaml'
+          inv.platform_required: '../../../components/schemas/errors/inv-platform-required.yaml'
+          inv.project_unclaimed: '../../../components/schemas/errors/inv-project-unclaimed.yaml'
+          inv.self_accept: '../../../components/schemas/errors/inv-self-accept.yaml'
+          not_implemented: '../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.csrf_invalid:
-        $ref: '../../../components/examples/errors/auth-csrf_invalid.yaml'
+        $ref: '../../../components/examples/errors/auth-csrf-invalid.yaml'
       auth.unauthorized:
         $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
       evt.invalid:
@@ -41,17 +41,17 @@ content:
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
       inv.inviter_not_admin:
-        $ref: '../../../components/examples/errors/inv-inviter_not_admin.yaml'
+        $ref: '../../../components/examples/errors/inv-inviter-not-admin.yaml'
       inv.not_found:
-        $ref: '../../../components/examples/errors/inv-not_found.yaml'
+        $ref: '../../../components/examples/errors/inv-not-found.yaml'
       inv.platform_required:
-        $ref: '../../../components/examples/errors/inv-platform_required.yaml'
+        $ref: '../../../components/examples/errors/inv-platform-required.yaml'
       inv.project_unclaimed:
-        $ref: '../../../components/examples/errors/inv-project_unclaimed.yaml'
+        $ref: '../../../components/examples/errors/inv-project-unclaimed.yaml'
       inv.self_accept:
-        $ref: '../../../components/examples/errors/inv-self_accept.yaml'
+        $ref: '../../../components/examples/errors/inv-self-accept.yaml'
       not_implemented:
-        $ref: '../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:

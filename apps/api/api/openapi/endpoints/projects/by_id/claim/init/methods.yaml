@@ -46,7 +46,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/schemas/errors/proj-not_found.yaml
+            $ref: ../../../../../components/schemas/errors/proj-not-found.yaml
     '409':
       description: The project is already claimed by a team.
       content:
@@ -61,6 +61,6 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+            $ref: ../../../../../components/schemas/errors/proj-claim-window-expired.yaml
     default:
       $ref: createProjectClaim-error-response.yaml

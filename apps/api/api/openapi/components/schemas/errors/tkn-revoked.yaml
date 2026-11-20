@@ -10,5 +10,6 @@ allOf:
       code:
         type: string
         const: tkn.revoked
+        description: The error code, always `tkn.revoked` for this error.
     required:
       - code

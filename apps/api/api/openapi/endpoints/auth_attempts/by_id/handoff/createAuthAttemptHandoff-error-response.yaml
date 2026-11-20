@@ -4,38 +4,38 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../../../components/schemas/errors/att-already_handed_off.yaml'
-        - $ref: '../../../../components/schemas/errors/att-invalid_state.yaml'
-        - $ref: '../../../../components/schemas/errors/att-not_completed.yaml'
-        - $ref: '../../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../../components/schemas/errors/att-already-handed-off.yaml'
+        - $ref: '../../../../components/schemas/errors/att-invalid-state.yaml'
+        - $ref: '../../../../components/schemas/errors/att-not-completed.yaml'
+        - $ref: '../../../../components/schemas/errors/att-not-found.yaml'
         - $ref: '../../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../../components/schemas/errors/not-implemented.yaml'
         - $ref: '../../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
-          att.already_handed_off: '../../../../components/schemas/errors/att-already_handed_off.yaml'
-          att.invalid_state: '../../../../components/schemas/errors/att-invalid_state.yaml'
-          att.not_completed: '../../../../components/schemas/errors/att-not_completed.yaml'
-          att.not_found: '../../../../components/schemas/errors/att-not_found.yaml'
+          att.already_handed_off: '../../../../components/schemas/errors/att-already-handed-off.yaml'
+          att.invalid_state: '../../../../components/schemas/errors/att-invalid-state.yaml'
+          att.not_completed: '../../../../components/schemas/errors/att-not-completed.yaml'
+          att.not_found: '../../../../components/schemas/errors/att-not-found.yaml'
           auth.unauthorized: '../../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
-          not_implemented: '../../../../components/schemas/errors/not_implemented.yaml'
+          not_implemented: '../../../../components/schemas/errors/not-implemented.yaml'
           req.invalid: '../../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../../components/schemas/errors/unavailable.yaml'
     examples:
       att.already_handed_off:
-        $ref: '../../../../components/examples/errors/att-already_handed_off.yaml'
+        $ref: '../../../../components/examples/errors/att-already-handed-off.yaml'
       att.invalid_state:
-        $ref: '../../../../components/examples/errors/att-invalid_state.yaml'
+        $ref: '../../../../components/examples/errors/att-invalid-state.yaml'
       att.not_completed:
-        $ref: '../../../../components/examples/errors/att-not_completed.yaml'
+        $ref: '../../../../components/examples/errors/att-not-completed.yaml'
       att.not_found:
-        $ref: '../../../../components/examples/errors/att-not_found.yaml'
+        $ref: '../../../../components/examples/errors/att-not-found.yaml'
       auth.unauthorized:
         $ref: '../../../../components/examples/errors/auth-unauthorized.yaml'
       evt.invalid:
@@ -43,7 +43,7 @@ content:
       internal:
         $ref: '../../../../components/examples/errors/internal.yaml'
       not_implemented:
-        $ref: '../../../../components/examples/errors/not_implemented.yaml'
+        $ref: '../../../../components/examples/errors/not-implemented.yaml'
       req.invalid:
         $ref: '../../../../components/examples/errors/req-invalid.yaml'
       unavailable:
