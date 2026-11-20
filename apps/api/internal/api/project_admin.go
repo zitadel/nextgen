@@ -34,20 +34,22 @@ func (h *Handler) ListProjectAdmins(ctx context.Context, params api.ListProjectA
 }
 
 func projectAdminResponse(admin *service.ProjectMember) api.ProjectAdmin {
-	sources := make([]api.ProjectAdminSource, 0, len(admin.Sources))
-	for _, source := range admin.Sources {
-		if source.OwningTeam {
-			sources = append(sources, api.NewProjectAdminOwningTeamSourceProjectAdminSource(api.ProjectAdminOwningTeamSource{
-				Type: api.ProjectAdminOwningTeamSourceTypeOwningTeam,
-				Team: projectMemberTeamRef(source.TeamID, source.TeamName),
-			}))
-			continue
-		}
-		grant := api.ProjectAdminGrantSource{Type: api.ProjectAdminGrantSourceTypeGrant, GrantID: source.GrantID}
-		if source.TeamID != "" {
-			grant.Team = api.NewOptTeamRef(projectMemberTeamRef(source.TeamID, source.TeamName))
-		}
-		sources = append(sources, api.NewProjectAdminGrantSourceProjectAdminSource(grant))
+	return api.ProjectAdmin{
+		User: userRefToAPI(admin.User),
+		Sources: mapProjectMemberSources(admin.Sources,
+			func(team api.TeamRef) api.ProjectAdminSource {
+				return api.NewProjectAdminOwningTeamSourceProjectAdminSource(api.ProjectAdminOwningTeamSource{
+					Type: api.ProjectAdminOwningTeamSourceTypeOwningTeam,
+					Team: team,
+				})
+			},
+			func(grantID string, team api.OptTeamRef) api.ProjectAdminSource {
+				return api.NewProjectAdminGrantSourceProjectAdminSource(api.ProjectAdminGrantSource{
+					Type:    api.ProjectAdminGrantSourceTypeGrant,
+					GrantID: grantID,
+					Team:    team,
+				})
+			},
+		),
 	}
-	return api.ProjectAdmin{User: userRefToAPI(admin.User), Sources: sources}
 }
