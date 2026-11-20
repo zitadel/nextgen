@@ -78,8 +78,6 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 	); err != nil {
 		return nil, err
 	}
-	request.CreatedAt = request.CreatedAt.UTC()
-	request.ExpiresAt = request.ExpiresAt.UTC()
 	return &request, nil
 }
 

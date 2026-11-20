@@ -230,7 +230,6 @@ func (s applicationStatements) CreateApplicationClientSecret(ctx context.Context
 	if err := s.db.Write(ctx, stmt, scanReturnedTimestamp(&secret.CreatedAt)); err != nil {
 		return err
 	}
-	secret.CreatedAt = secret.CreatedAt.UTC()
 	return nil
 }
 
@@ -244,7 +243,6 @@ func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context,
 			if err := row.Columns(&secret.ProjectID, &secret.ID, &secret.ApplicationClientID, &secret.SecretHash, &secret.CreatedAt); err != nil {
 				return nil, err
 			}
-			secret.CreatedAt = secret.CreatedAt.UTC()
 			return &secret, nil
 		})
 		return err
@@ -286,7 +284,7 @@ func scanApplication(row *spanner.Row) (*domain.Application, error) {
 		return nil, wrapError(err)
 	}
 	entity.Document = document
-	entity.CreatedAt, entity.UpdatedAt = createdAt.UTC(), updatedAt.UTC()
+	entity.CreatedAt, entity.UpdatedAt = createdAt, updatedAt
 	return &entity, nil
 }
 
@@ -295,6 +293,5 @@ func scanApplicationClient(row *spanner.Row) (*domain.ApplicationClient, error) 
 	if err := row.Columns(&client.ProjectID, &client.ApplicationID, &client.ID, &client.Slug, &client.ClientID, &client.CreatedAt); err != nil {
 		return nil, err
 	}
-	client.CreatedAt = client.CreatedAt.UTC()
 	return &client, nil
 }

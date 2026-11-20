@@ -223,7 +223,6 @@ func (ds deploymentStatements) collectOrigins(ctx context.Context, query string,
 			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
 				return scanned, err
 			}
-			scanned.DeployedAt = scanned.DeployedAt.UTC()
 			return deployment.WithKind(scanned, kind)
 		})
 		return err

@@ -54,7 +54,6 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 				if err := row.Columns(&entity.CreatedAt); err != nil {
 					return struct{}{}, err
 				}
-				entity.CreatedAt = entity.CreatedAt.UTC()
 				return struct{}{}, nil
 			})
 			return err

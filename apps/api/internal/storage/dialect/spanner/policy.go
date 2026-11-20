@@ -212,7 +212,7 @@ func scanPolicy(row *spanner.Row) (*domain.Policy, error) {
 		return nil, wrapError(err)
 	}
 	entity.Config = config
-	entity.CreatedAt, entity.UpdatedAt = createdAt.UTC(), updatedAt.UTC()
+	entity.CreatedAt, entity.UpdatedAt = createdAt, updatedAt
 	return &entity, nil
 }
 
