@@ -67,10 +67,11 @@ built with, a pool client or an open transaction.
   static statement is fine.
 - Run every statement through the dialect's traced executor (`traced`), never
   the raw pool or transaction: it is what traces and meters the statement.
-- Never `.UTC()` a time scanned in the Postgres dialect or a shared encoder:
-  the pool's `timestamptz` scan location already returns UTC, as the wire
-  contract needs ([conventions](../../../../docs/design/api/conventions.md)).
-  A write still stamps `time.Now().UTC()`.
+- Never `.UTC()` a scanned time, in any dialect or a shared encoder: each
+  dialect already returns UTC — the pgx pool's scan location, Spanner's UTC
+  wire format, SQLite's `timeFromUnixNano` — as the wire contract needs
+  ([conventions](../../../../docs/design/api/conventions.md)). A write still
+  stamps `time.Now().UTC()`.
 
 ## Authz persistence
 

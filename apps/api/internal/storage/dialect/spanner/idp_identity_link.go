@@ -96,7 +96,6 @@ func scanIDPIdentityLink(row *spanner.Row) (*domain.IDPIdentityLink, error) {
 	); err != nil {
 		return nil, err
 	}
-	link.CreatedAt = link.CreatedAt.UTC()
 	return &link, nil
 }
 

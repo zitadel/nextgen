@@ -143,7 +143,6 @@ func scanReturnedTimestamp(dst *time.Time) func(*spanner.RowIterator) error {
 			if err := row.Columns(dst); err != nil {
 				return struct{}{}, err
 			}
-			*dst = dst.UTC()
 			return struct{}{}, nil
 		})
 		return err
@@ -265,7 +264,7 @@ func scanIDPConnection(row *spanner.Row) (*domain.IDPConnection, error) {
 		return nil, wrapError(err)
 	}
 	entity.Document = document
-	entity.CreatedAt, entity.UpdatedAt = createdAt.UTC(), updatedAt.UTC()
+	entity.CreatedAt, entity.UpdatedAt = createdAt, updatedAt
 	return &entity, nil
 }
 

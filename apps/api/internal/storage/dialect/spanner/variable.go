@@ -125,8 +125,8 @@ func scanVariable(row *spanner.Row) (*variable.VariableStorage, error) {
 			return nil, err
 		}
 	}
-	stored.CreatedAt = createdAt.UTC()
-	stored.ModifiedAt = modifiedAt.UTC()
+	stored.CreatedAt = createdAt
+	stored.ModifiedAt = modifiedAt
 	return &stored, nil
 }
 
