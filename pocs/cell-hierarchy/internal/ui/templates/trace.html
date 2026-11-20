@@ -1,0 +1,25 @@
+{{define "trace"}}
+{{if .Trace}}
+<table class="trace">
+  <thead><tr><th>When</th><th>Action</th><th>Hops</th><th>Result</th></tr></thead>
+  <tbody>
+  {{range .Trace}}
+    <tr>
+      <td class="muted"><code>{{.At}}</code></td>
+      <td>{{.Action}}</td>
+      <td>
+        {{range .Hops}}
+        <div><code>{{.Cell}}</code> · {{.Method}} · {{.Ms}}ms · {{.Result}}</div>
+        {{else}}
+        <span class="muted">—</span>
+        {{end}}
+      </td>
+      <td>{{.Note}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No hops yet.</p>
+{{end}}
+{{end}}

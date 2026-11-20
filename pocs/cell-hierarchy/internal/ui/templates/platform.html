@@ -1,0 +1,73 @@
+{{define "platform"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      {{template "layout-breadcrumbs" .}}
+      <h1>Platform</h1>
+      <p class="muted">Hoster surface: the platform project is the lookup zone. Customer teams live here; each customer's workspace (first site) links to a team.</p>
+      {{with .Platform}}
+      {{if .FlashOK}}<p class="flash-ok">{{.FlashOK}}</p>{{end}}
+      {{if .FlashErr}}<p class="flash-err">{{.FlashErr}}</p>{{end}}
+      {{if .Error}}<p class="flash-err">{{.Error}}</p>{{end}}
+
+      <div class="panel">
+        <h2>Platform project</h2>
+        {{if .Project}}
+        <p>
+          <a href="/projects/platform"><code>{{.Project.ID}}</code></a>
+          {{if .Project.LookupEnabled}}<span class="badge lookup">lookup on</span>{{end}}
+          {{if .Project.IsParent}}<span class="badge parent">parent</span>{{end}}
+        </p>
+        <p class="muted">host={{.HostURL}}</p>
+        {{else}}
+        <p class="muted">Platform project not found — run bootstrap.</p>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>Customer teams</h2>
+        {{if .Teams}}
+        <table>
+          <thead><tr><th>ID</th><th>Name</th><th>Created</th></tr></thead>
+          <tbody>
+          {{range .Teams}}
+            <tr>
+              <td><code>{{.ID}}</code></td>
+              <td>{{.Name}}</td>
+              <td class="muted">{{.CreatedAt}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No teams yet.</p>
+        {{end}}
+
+        <h2 style="margin-top:1rem">Create team</h2>
+        <form method="post" action="/platform/teams">
+          <label for="name">Customer name</label>
+          <input id="name" name="name" required placeholder="acme"/>
+          <label for="id">Team id (optional)</label>
+          <input id="id" name="id" placeholder="acme"/>
+          <button type="submit">Create team</button>
+        </form>
+      </div>
+      {{end}}
+
+      {{template "latest-trace" .}}
+    </div>
+  </div>
+</div>
+</body>
+</html>
+{{end}}
