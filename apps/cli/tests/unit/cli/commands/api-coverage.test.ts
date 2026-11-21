@@ -57,6 +57,8 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // Registered applications are written through the API by other systems,
   // not from `.zitadel/`; the CLI has no command for them yet (#2788).
   applications: "registered applications are written through the API, not the CLI (#2788)",
+  // The OpenAPI contract lands first (ADR 090); the CLI commands follow.
+  webhooks: "not yet exposed — `zitadel webhook` lands with the webhooks CLI surface",
   search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
   // OAuth settings are written only through a release, so there is nothing to
   // create or update here; reading them is `zitadel oauth`'s, which comes with
@@ -151,6 +153,13 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   lookupInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
   acceptInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
   rejectInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
+  listWebhooks: "not yet exposed — `zitadel webhook list` lands with the webhooks CLI surface",
+  getWebhook: "not yet exposed — `zitadel webhook get` lands with the webhooks CLI surface",
+  createWebhook: "not yet exposed — `zitadel webhook create` lands with the webhooks CLI surface",
+  updateWebhook: "not yet exposed — `zitadel webhook update` lands with the webhooks CLI surface",
+  deleteWebhook: "not yet exposed — `zitadel webhook delete` lands with the webhooks CLI surface",
+  rotateWebhookSecret:
+    "not yet exposed — `zitadel webhook rotate-secret` lands with the webhooks CLI surface",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;

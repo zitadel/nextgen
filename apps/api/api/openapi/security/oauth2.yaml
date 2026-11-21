@@ -49,9 +49,9 @@ flows:
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
-      webhook.read: Permission to read webhooks (reserved; endpoints not yet available)
-      webhook.write: Permission to create and manage webhooks (reserved; endpoints not yet available)
-      webhook.delete: Permission to delete webhooks (reserved; endpoints not yet available)
+      webhook.read: Permission to read a project's webhooks
+      webhook.write: Permission to create and update a project's webhooks and rotate their secrets
+      webhook.delete: Permission to delete a project's webhooks
       session.read: Permission to read sessions
       session.write: Permission to create and manage sessions
       session.delete: Permission to revoke sessions
@@ -103,9 +103,9 @@ flows:
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
-      webhook.read: Permission to read webhooks (reserved; endpoints not yet available)
-      webhook.write: Permission to create and manage webhooks (reserved; endpoints not yet available)
-      webhook.delete: Permission to delete webhooks (reserved; endpoints not yet available)
+      webhook.read: Permission to read a project's webhooks
+      webhook.write: Permission to create and update a project's webhooks and rotate their secrets
+      webhook.delete: Permission to delete a project's webhooks
       session.read: Permission to read sessions
       session.write: Permission to create and manage sessions
       session.delete: Permission to revoke sessions

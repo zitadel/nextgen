@@ -100,6 +100,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateUserPasskeyRegistrationOperation: []string{
 		"user.write",
 	},
+	CreateWebhookOperation: []string{
+		"webhook.write",
+	},
 	DeactivateTeamOperation: []string{
 		"team.delete",
 	},
@@ -111,6 +114,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	DeleteVariableOperation: []string{
 		"variable.write",
+	},
+	DeleteWebhookOperation: []string{
+		"webhook.delete",
 	},
 	EvaluatePolicyOperation: []string{
 		"policy.read",
@@ -184,6 +190,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetVariableOperation: []string{
 		"variable.read",
 	},
+	GetWebhookOperation: []string{
+		"webhook.read",
+	},
 	ListBrandingOperation: []string{
 		"branding.read",
 	},
@@ -240,6 +249,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListVariablesOperation: []string{
 		"variable.read",
 	},
+	ListWebhooksOperation: []string{
+		"webhook.read",
+	},
 	PublishApplicationOperation: []string{
 		"application.write",
 	},
@@ -291,6 +303,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	RollbackDeploymentOperation: []string{
 		"deployment.write",
 	},
+	RotateWebhookSecretOperation: []string{
+		"webhook.write",
+	},
 	SearchOperation: []string{
 		"project.write",
 	},
@@ -308,6 +323,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	UpdateUserOperation: []string{
 		"user.write",
+	},
+	UpdateWebhookOperation: []string{
+		"webhook.write",
 	},
 	VerifyAuthAttemptChallengeOperation: []string{
 		"auth_attempt.write",
@@ -347,8 +365,10 @@ var operationRolesSessionCookie = map[string][]string{
 	CreateInvitationOperation:      []string{},
 	CreateTeamOperation:            []string{},
 	CreateUserOperation:            []string{},
+	CreateWebhookOperation:         []string{},
 	DeleteGrantOperation:           []string{},
 	DeleteUserOperation:            []string{},
+	DeleteWebhookOperation:         []string{},
 	EvaluatePolicyOperation:        []string{},
 	GetApplicationOperation:        []string{},
 	GetBrandingOperation:           []string{},
@@ -374,6 +394,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetUserOperation:               []string{},
 	GetUserPasswordStateOperation:  []string{},
 	GetVariableOperation:           []string{},
+	GetWebhookOperation:            []string{},
 	ListBrandingOperation:          []string{},
 	ListDeploymentsOperation:       []string{},
 	ListEventsOperation:            []string{},
@@ -393,6 +414,7 @@ var operationRolesSessionCookie = map[string][]string{
 	ListUserPasskeysOperation:      []string{},
 	ListUserTeamsOperation:         []string{},
 	ListVariablesOperation:         []string{},
+	ListWebhooksOperation:          []string{},
 	LookupInvitationOperation:      []string{},
 	QueryGrantsOperation:           []string{},
 	QueryIdpsOperation:             []string{},
@@ -403,11 +425,13 @@ var operationRolesSessionCookie = map[string][]string{
 	RevokeMySessionOperation:       []string{},
 	RevokeReleaseOperation:         []string{},
 	RollbackDeploymentOperation:    []string{},
+	RotateWebhookSecretOperation:   []string{},
 	SearchOperation:                []string{},
 	UpdateMyUserOperation:          []string{},
 	UpdateProjectOperation:         []string{},
 	UpdateTeamOperation:            []string{},
 	UpdateUserOperation:            []string{},
+	UpdateWebhookOperation:         []string{},
 }
 
 // GetRolesForSessionCookie returns the required roles for the given operation.

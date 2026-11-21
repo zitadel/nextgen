@@ -9,74 +9,6 @@ type AddProjectOriginRes interface {
 	addProjectOriginRes()
 }
 
-type ApplicationCreatedRes interface {
-	applicationCreatedRes()
-}
-
-type ApplicationUpdatedRes interface {
-	applicationUpdatedRes()
-}
-
-type AuthAttemptCreatedRes interface {
-	authAttemptCreatedRes()
-}
-
-type AuthAttemptHandedOffRes interface {
-	authAttemptHandedOffRes()
-}
-
-type AuthCheckFailedRes interface {
-	authCheckFailedRes()
-}
-
-type AuthCheckSucceededRes interface {
-	authCheckSucceededRes()
-}
-
-type AuthFactorPasskeyEnrolledRes interface {
-	authFactorPasskeyEnrolledRes()
-}
-
-type AuthFactorPasswordSetRes interface {
-	authFactorPasswordSetRes()
-}
-
-type AuthRequestCreatedRes interface {
-	authRequestCreatedRes()
-}
-
-type AuthSsoAuthorizationFailedRes interface {
-	authSsoAuthorizationFailedRes()
-}
-
-type AuthSsoExchangeFailedRes interface {
-	authSsoExchangeFailedRes()
-}
-
-type AuthSsoExchangeSucceededRes interface {
-	authSsoExchangeSucceededRes()
-}
-
-type AuthTokenIssuedRes interface {
-	authTokenIssuedRes()
-}
-
-type AuthTokenRevokedRes interface {
-	authTokenRevokedRes()
-}
-
-type AuthzGrantedRes interface {
-	authzGrantedRes()
-}
-
-type AuthzRevokedRes interface {
-	authzRevokedRes()
-}
-
-type BrandingCreatedRes interface {
-	brandingCreatedRes()
-}
-
 type BuildReleaseRes interface {
 	buildReleaseRes()
 }
@@ -149,6 +81,10 @@ type CreateUserRes interface {
 	createUserRes()
 }
 
+type CreateWebhookRes interface {
+	createWebhookRes()
+}
+
 type DeactivateTeamRes interface {
 	deactivateTeamRes()
 }
@@ -165,36 +101,20 @@ type DeleteVariableRes interface {
 	deleteVariableRes()
 }
 
-type DeploymentCreatedRes interface {
-	deploymentCreatedRes()
+type DeleteWebhookRes interface {
+	deleteWebhookRes()
 }
 
 type EvaluatePolicyRes interface {
 	evaluatePolicyRes()
 }
 
+type EventStoredRes interface {
+	eventStoredRes()
+}
+
 type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
-}
-
-type FlowSignupChallengeConsumedRes interface {
-	flowSignupChallengeConsumedRes()
-}
-
-type FlowSignupChallengeIssuedRes interface {
-	flowSignupChallengeIssuedRes()
-}
-
-type FlowdefCreatedRes interface {
-	flowdefCreatedRes()
-}
-
-type FlowdefDeletedRes interface {
-	flowdefDeletedRes()
-}
-
-type FlowdefUpdatedRes interface {
-	flowdefUpdatedRes()
 }
 
 type GetApplicationRes interface {
@@ -321,32 +241,8 @@ type GetVariableRes interface {
 	getVariableRes()
 }
 
-type IdpCreatedRes interface {
-	idpCreatedRes()
-}
-
-type IdpIdentityLinkCreatedRes interface {
-	idpIdentityLinkCreatedRes()
-}
-
-type IdpUpdatedRes interface {
-	idpUpdatedRes()
-}
-
-type InvitationAcceptedRes interface {
-	invitationAcceptedRes()
-}
-
-type InvitationCancelledRes interface {
-	invitationCancelledRes()
-}
-
-type InvitationCreatedRes interface {
-	invitationCreatedRes()
-}
-
-type InvitationRejectedRes interface {
-	invitationRejectedRes()
+type GetWebhookRes interface {
+	getWebhookRes()
 }
 
 type ListBrandingRes interface {
@@ -437,44 +333,12 @@ type ListVariablesRes interface {
 	listVariablesRes()
 }
 
+type ListWebhooksRes interface {
+	listWebhooksRes()
+}
+
 type LookupInvitationRes interface {
 	lookupInvitationRes()
-}
-
-type OauthSettingsCreatedRes interface {
-	oauthSettingsCreatedRes()
-}
-
-type OriginAddedRes interface {
-	originAddedRes()
-}
-
-type OriginRemovedRes interface {
-	originRemovedRes()
-}
-
-type PolicyCreatedRes interface {
-	policyCreatedRes()
-}
-
-type PolicyUpdatedRes interface {
-	policyUpdatedRes()
-}
-
-type PreviewRemovedRes interface {
-	previewRemovedRes()
-}
-
-type ProjectCreatedRes interface {
-	projectCreatedRes()
-}
-
-type ProjectDeletedRes interface {
-	projectDeletedRes()
-}
-
-type ProjectUpdatedRes interface {
-	projectUpdatedRes()
 }
 
 type PublishApplicationRes interface {
@@ -529,24 +393,12 @@ type RejectInvitationRes interface {
 	rejectInvitationRes()
 }
 
-type ReleaseCreatedRes interface {
-	releaseCreatedRes()
-}
-
-type ReleaseRevokedRes interface {
-	releaseRevokedRes()
-}
-
 type RemoveProjectOriginRes interface {
 	removeProjectOriginRes()
 }
 
 type RemoveProjectPreviewRes interface {
 	removeProjectPreviewRes()
-}
-
-type RequestApiRes interface {
-	requestApiRes()
 }
 
 type RevokeMySessionRes interface {
@@ -565,20 +417,12 @@ type RollbackDeploymentRes interface {
 	rollbackDeploymentRes()
 }
 
-type SchemaCreatedRes interface {
-	schemaCreatedRes()
+type RotateWebhookSecretRes interface {
+	rotateWebhookSecretRes()
 }
 
 type SearchRes interface {
 	searchRes()
-}
-
-type SessionDeletedRes interface {
-	sessionDeletedRes()
-}
-
-type SessionEstablishedRes interface {
-	sessionEstablishedRes()
 }
 
 type SetUserPasswordRes interface {
@@ -591,18 +435,6 @@ type SetVariablesRes interface {
 
 type SubmitFlowStepRes interface {
 	submitFlowStepRes()
-}
-
-type TeamCreatedRes interface {
-	teamCreatedRes()
-}
-
-type TeamDeactivatedRes interface {
-	teamDeactivatedRes()
-}
-
-type TeamUpdatedRes interface {
-	teamUpdatedRes()
 }
 
 type UpdateMyUserRes interface {
@@ -621,28 +453,8 @@ type UpdateUserRes interface {
 	updateUserRes()
 }
 
-type UserCreateFailedRes interface {
-	userCreateFailedRes()
-}
-
-type UserCreatedRes interface {
-	userCreatedRes()
-}
-
-type UserDeletedRes interface {
-	userDeletedRes()
-}
-
-type UserUpdatedRes interface {
-	userUpdatedRes()
-}
-
-type VariableRemovedRes interface {
-	variableRemovedRes()
-}
-
-type VariableSetRes interface {
-	variableSetRes()
+type UpdateWebhookRes interface {
+	updateWebhookRes()
 }
 
 type VerifyAuthAttemptChallengeRes interface {

@@ -523,6 +523,43 @@ func (UnimplementedHandler) CreateUserPasskeyRegistration(ctx context.Context, r
 	return r, ht.ErrNotImplemented
 }
 
+// CreateWebhook implements createWebhook operation.
+//
+// Creates a webhook for the project in `project_id` and returns it with its signing secret.
+//
+// The server then POSTs each of the project's events whose type is in `event_types` to `url`, one
+// event per request, signed with the secret. Delivery starts with the events stored after this call: a
+// new webhook gets no history. A project that is not claimed yet delivers nothing until the [claim]
+// succeeds.
+//
+// The server refuses a body that breaks one of these rules:
+//
+//   - `url` is `https`, at most 2048 characters, and carries no user info.
+//   - `event_types` holds at least one entry and no entry twice. Each entry is an event type the server
+//     writes, or `*`, and `*` stands alone.
+//   - A project holds at most 10 webhooks. One more answers `409` `webhook.limit_reached`: delete one
+//     with `deleteWebhook` (`DELETE /webhooks/{webhook_id}`) first. Two webhooks may name the same
+//     `url`.
+//
+// The `secret` appears only in this response. Store it where the endpoint can read it, and verify each
+// request with it.
+//
+// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+// returns the first response, `secret` included, and creates nothing. Without the key, a repeated
+// request creates a second webhook. Then find both with `listWebhooks` (`GET /webhooks`), delete one,
+// and issue a secret for the other with `rotateWebhookSecret`
+// (`POST /webhooks/{webhook_id}/rotate_secret`).
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+//
+// [claim]: /docs/concepts/project-team-user#claim
+//
+// POST /webhooks
+func (UnimplementedHandler) CreateWebhook(ctx context.Context, req *CreateWebhookRequest, params CreateWebhookParams) (r CreateWebhookRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeactivateTeam implements deactivateTeam operation.
 //
 // Deactivates a team and removes its memberships.
@@ -585,6 +622,22 @@ func (UnimplementedHandler) DeleteUser(ctx context.Context, params DeleteUserPar
 //
 // DELETE /variables/{variable_name}
 func (UnimplementedHandler) DeleteVariable(ctx context.Context, params DeleteVariableParams) (r DeleteVariableRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteWebhook implements deleteWebhook operation.
+//
+// Deletes a webhook. The server stops sending it events, including those it had not yet delivered, and
+// its signing secret stops being valid.
+//
+// This cannot be undone. To stop delivery and keep the webhook, send `enabled: false` to
+// `updateWebhook` (`PATCH /webhooks/{webhook_id}`) instead.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who administers the project. Cookie requests follow that scheme's CSRF rules.
+//
+// DELETE /webhooks/{webhook_id}
+func (UnimplementedHandler) DeleteWebhook(ctx context.Context, params DeleteWebhookParams) (r DeleteWebhookRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1114,6 +1167,21 @@ func (UnimplementedHandler) GetVariable(ctx context.Context, params GetVariableP
 	return r, ht.ErrNotImplemented
 }
 
+// GetWebhook implements getWebhook operation.
+//
+// Returns one webhook of the project in `project_id`, with the time of its last delivery and of its
+// last failed attempt.
+//
+// The response never includes the signing secret.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can read the project.
+//
+// GET /webhooks/{webhook_id}
+func (UnimplementedHandler) GetWebhook(ctx context.Context, params GetWebhookParams) (r GetWebhookRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListBranding implements listBranding operation.
 //
 // Lists a project's branding revisions, newest first, paginated with a cursor. The first entry of the
@@ -1495,6 +1563,23 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 //
 // GET /variables
 func (UnimplementedHandler) ListVariables(ctx context.Context, params ListVariablesParams) (r ListVariablesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListWebhooks implements listWebhooks operation.
+//
+// Lists the webhooks of the project in `project_id`, newest first by `created_at`, paginated with
+// `limit` and `page_token`.
+//
+// Each webhook carries the time of its last delivery and of its last failed attempt. None carries its
+// signing secret: only `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`
+// (`POST /webhooks/{webhook_id}/rotate_secret`) return it.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can read the project.
+//
+// GET /webhooks
+func (UnimplementedHandler) ListWebhooks(ctx context.Context, params ListWebhooksParams) (r ListWebhooksRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1903,6 +1988,29 @@ func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollb
 	return r, ht.ErrNotImplemented
 }
 
+// RotateWebhookSecret implements rotateWebhookSecret operation.
+//
+// Issues a new signing secret for a webhook and returns the webhook with it.
+//
+// The `secret` appears only in this response. The previous secret stays valid for 24 hours, until
+// `previous_secret_expires_at`: during that time every delivery carries two signatures, one per
+// secret, so the endpoint can switch to the new secret without refusing a request. A second rotation
+// within those 24 hours drops the older of the two secrets at once.
+//
+// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+// returns the first response, `secret` included, and rotates nothing. Without the key, a repeated
+// request rotates again: the secret of the lost response becomes the previous one, and the secret the
+// endpoint still verifies with stops being valid at once. Give the endpoint the secret of the second
+// response right away, since it refuses every delivery until it has it.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+//
+// POST /webhooks/{webhook_id}/rotate_secret
+func (UnimplementedHandler) RotateWebhookSecret(ctx context.Context, params RotateWebhookSecretParams) (r RotateWebhookSecretRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // Search implements search operation.
 //
 // Finds the resources of one project, or of the projects a person can act on, that match a text,
@@ -2128,6 +2236,29 @@ func (UnimplementedHandler) UpdateTeam(ctx context.Context, req *UpdateTeamReque
 //
 // PATCH /users/{user_id}
 func (UnimplementedHandler) UpdateUser(ctx context.Context, req *PatchUserRequest, params UpdateUserParams) (r UpdateUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateWebhook implements updateWebhook operation.
+//
+// Changes a webhook's `url`, `description`, `event_types` or `enabled`, and returns the updated
+// webhook.
+//
+// Fields you leave out keep their value. The body names at least one field: an empty body is refused
+// with `400`. `url` and `event_types` follow the rules `createWebhook` (`POST /webhooks`) states.
+//
+// A new `url` gets the events the old one had not yet acknowledged: the webhook keeps its place in the
+// project's events. The signing secret stays the same.
+//
+// `enabled: false` stops delivery. `enabled: true` starts it again from now, also for a webhook the
+// server disabled after 3 days of failures or a `410`: events stored while it was disabled are not
+// sent.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+//
+// PATCH /webhooks/{webhook_id}
+func (UnimplementedHandler) UpdateWebhook(ctx context.Context, req *UpdateWebhookRequest, params UpdateWebhookParams) (r UpdateWebhookRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

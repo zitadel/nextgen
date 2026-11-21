@@ -64,7 +64,7 @@ rules:
         assertions:
           defined: true
     assertions:
-      pattern: /^(accept|add|build|cancel|complete|create|deactivate|delete|evaluate|exchange|get|list|lookup|publish|query|reject|remove|revoke|rollback|search|set|submit|update|verify)([A-Z][a-z0-9]*)*$/
+      pattern: /^(accept|add|build|cancel|complete|create|deactivate|delete|evaluate|exchange|get|list|lookup|publish|query|reject|remove|revoke|rollback|rotate|search|set|submit|update|verify)([A-Z][a-z0-9]*)*$/
       notPattern: /By[A-Z][A-Za-z0-9]*$/
     severity: error
 
