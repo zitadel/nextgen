@@ -213,7 +213,8 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			WithRuntimeResolver(h.EnsureRuntimeResolver(t)).
 			WithPolicyService(h.EnsurePolicyService(t)).
 			WithOAuthSettingsService(h.EnsureOAuthSettingsService(t)).
-			WithInvitationService(h.EnsureInvitationService(t))
+			WithInvitationService(h.EnsureInvitationService(t)).
+			WithWebhookService(service.NewWebhookService(db, h.EnsureKeyService(t)))
 	}
 	return h.handler.value
 }

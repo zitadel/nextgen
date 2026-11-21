@@ -2,4 +2,4 @@
 "@zitadel/server": minor
 ---
 
-The API now describes webhooks for a project's events: create, list, read, update and delete a webhook and rotate its signing secret, under `/webhooks`. The operations answer `501` for now; the server code follows. See the [Webhooks reference](https://preview.zitadel.com/docs/reference/api/webhooks). Every event type arrives in the same body, described as the one webhook `event`.
+You can now manage webhooks for a project's events: create, list, read, update and delete a webhook and rotate its signing secret, under `/webhooks`. The server stores them and records each change as a `webhook.*` event, but does not deliver events to them yet. See the [Webhooks reference](https://preview.zitadel.com/docs/reference/api/webhooks).
