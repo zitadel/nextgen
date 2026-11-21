@@ -95,8 +95,8 @@ test("adds a webhook, shows its secret once, disables, rotates and deletes it", 
     await expect(page.getByRole("link", { name: url, exact: true })).toBeHidden();
     await expectNoErrorBoundary(page);
   } finally {
-    const { data } = await withErrorBody(zitadel.api.listWebhooks({ ...params, limit: 100 }));
-    for (const webhook of data.filter((candidate) => candidate.url === url)) {
+    const { webhooks } = await withErrorBody(zitadel.api.listWebhooks({ ...params, limit: 100 }));
+    for (const webhook of webhooks.filter((candidate) => candidate.url === url)) {
       await withErrorBody(zitadel.api.deleteWebhook(webhook.id, params));
     }
   }
