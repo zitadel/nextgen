@@ -30,3 +30,12 @@ func TestTeamBoundObjectType(t *testing.T) {
 	assert.False(t, domain.TeamBoundObjectType("branding"))
 	assert.False(t, domain.TeamBoundObjectType(""))
 }
+
+func TestProjectRolesAtLeast(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, []string{"viewer", "editor", "admin"}, domain.ProjectRolesAtLeast(""))
+	assert.Equal(t, []string{"viewer", "editor", "admin"}, domain.ProjectRolesAtLeast("viewer"))
+	assert.Equal(t, []string{"editor", "admin"}, domain.ProjectRolesAtLeast("editor"))
+	assert.Equal(t, []string{"admin"}, domain.ProjectRolesAtLeast("admin"))
+	assert.Empty(t, domain.ProjectRolesAtLeast("team"), "not a project role")
+}
