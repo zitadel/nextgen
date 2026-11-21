@@ -70,6 +70,7 @@ UPDATE webhooks SET lease_holder = ?1, lease_expires_at = ?4
 WHERE (project_id, id) IN (
     SELECT project_id, id FROM webhooks
     WHERE enabled = 1
+      AND (?6 = '' OR project_id = ?6)
       AND (next_attempt_at IS NULL OR next_attempt_at <= ?2)
       AND (lease_expires_at IS NULL OR lease_expires_at <= ?3)
     ORDER BY next_attempt_at, project_id, id
@@ -221,9 +222,9 @@ func (s webhookStatements) RotateWebhookSecret(ctx context.Context, projectID, i
 }
 
 // LeaseDueWebhooks implements [service.WebhookStatements].
-func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
+func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
 	rows, err := s.client.Query(ctx, leaseDueWebhooksStmt,
-		holder, dueBy.UTC().UnixNano(), now.UTC().UnixNano(), leaseUntil.UTC().UnixNano(), limit)
+		holder, dueBy.UTC().UnixNano(), now.UTC().UnixNano(), leaseUntil.UTC().UnixNano(), limit, projectID)
 	if err != nil {
 		return nil, wrapError(err)
 	}

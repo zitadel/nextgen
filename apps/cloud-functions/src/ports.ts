@@ -171,3 +171,26 @@ export interface CrmRequest {
   path: string;
   body?: unknown;
 }
+
+/** A wake-up: the project has events its webhooks were not sent yet (root ADR 090 §4). */
+export interface WebhookWake {
+  project_id: string;
+}
+
+/** When a wake-up is delivered, and what makes a second one for the same moment the same. */
+export interface WakeSchedule {
+  delay_seconds: number;
+  /** Wake-ups of one project due in the same second share it, and the queue delivers one. */
+  idempotency_key: string;
+  /** How long the queue keeps retrying before the hourly round is left to deliver. */
+  retention_seconds: number;
+}
+
+/**
+ * The queue between the server's wake hook and its delivery path (root
+ * ADR 090 §4): it calls back with each wake-up once it is due, and again
+ * after a failure (`src/webhook-wake.ts`).
+ */
+export interface WakeQueue {
+  publish(wake: WebhookWake, schedule: WakeSchedule): Promise<void>;
+}
