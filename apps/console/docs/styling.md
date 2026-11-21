@@ -118,6 +118,7 @@ Canonical examples:
 | Mutation error inside a form or card | `FormError` (`src/components/form-error.tsx`) |
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
+| Value to copy out: a command, a secret shown once | `CopyBlock` (`src/components/copy-block.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 | Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
 

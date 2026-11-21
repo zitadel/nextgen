@@ -59,6 +59,7 @@ const NAV_ORDER = [
   "Deployments",
   "Authentication",
   "Events",
+  "Webhooks",
   "Settings",
 ];
 // The root's list (D42) for someone who holds nothing on the platform project:
@@ -78,6 +79,7 @@ const PLATFORM_ROOT_ORDER = [
   "Deployments",
   "Authentication",
   "Events",
+  "Webhooks",
   "Settings",
 ];
 // Settings' list: the heading that leads back, then what the add-on adds. The
