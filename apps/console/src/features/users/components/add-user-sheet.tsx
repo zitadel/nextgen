@@ -1,10 +1,11 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { FormSheet, FormSheetForm, SHEET_SECTION } from "@/components/form-sheet";
 import { SchemaFields, type SchemaFieldsLayout } from "@/features/schemas/components/schema-fields";
 import { type SchemaOption, SchemaPicker } from "@/features/schemas/components/schema-picker";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useSchemaForm } from "@/features/schemas/use-schema-form";
 import { useSubmit } from "@/hooks/use-submit";
@@ -39,15 +40,23 @@ const SHEET_LAYOUT: SchemaFieldsLayout = { orientation: "vertical", labelRow: LA
  * project roles. It is deliberately omitted rather than mocked: design removed
  * the project selector from the MVP (design decisions log D6, 2026-07-31) and
  * the grant endpoints do not exist (#419).
+ *
+ * Opened from a team, the drawer adds the user to it: `team` is the current
+ * team, shown read-only, and the create carries it as the `team_id` parameter,
+ * which makes the new user a member of the team — not owned by it. No endpoint
+ * sets a lifecycle owner, so a user stays self-owned whichever team they join.
  */
 export function AddUserSheet({
   children,
+  team,
   open,
   onOpenChange,
   onCreated,
 }: {
   /** The trigger — the Users toolbar's `Add` button. Without one, `open` opens it. */
   children?: ReactNode;
+  /** The team the new user joins, when the drawer is opened from one. */
+  team?: { id: string; name: string };
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /** Called with the new user after a successful create, so the caller can refresh or open them. */
@@ -55,19 +64,22 @@ export function AddUserSheet({
 }) {
   return (
     <FormSheet trigger={children} open={open} onOpenChange={onOpenChange}>
-      {(close) => <AddUserForm onCreated={onCreated} onClose={close} />}
+      {(close) => <AddUserForm team={team} onCreated={onCreated} onClose={close} />}
     </FormSheet>
   );
 }
 
 function AddUserForm({
+  team,
   onCreated,
   onClose,
 }: {
+  team?: { id: string; name: string };
   onCreated: (user: { id: string }) => void | Promise<void>;
   onClose: () => void;
 }) {
   const projectId = useRequiredProjectScope();
+  const teamFieldId = useId();
   const [schemas, setSchemas] = useState<SchemaOption[] | undefined>(undefined);
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
@@ -123,7 +135,10 @@ function AddUserForm({
     const attributes = draftValue(root, form.draft, "create") as Record<string, unknown>;
     let user: { id: string };
     try {
-      user = await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
+      user = await api.createUser(
+        { schema: selected.id, attributes },
+        { project_id: projectId, team_id: team?.id },
+      );
     } catch (cause) {
       form.applyServerError(cause);
       throw cause;
@@ -157,6 +172,17 @@ function AddUserForm({
       onClose={onClose}
     >
       <div className={SHEET_SECTION}>
+        {team && (
+          <Field>
+            <div className={LABEL_ROW}>
+              <FieldLabel htmlFor={teamFieldId}>Team</FieldLabel>
+            </div>
+            {/* Read-only, not a picker: the drawer was opened from this team,
+                and the multi-select D1 describes has no endpoint to add a user
+                to a second team yet. */}
+            <Input id={teamFieldId} value={team.name} readOnly disabled />
+          </Field>
+        )}
         <Field>
           <div className={LABEL_ROW}>
             <FieldLabel>User Schema</FieldLabel>
