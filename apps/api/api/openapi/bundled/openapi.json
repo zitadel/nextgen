@@ -2853,7 +2853,7 @@
       "get": {
         "operationId": "listProjectAdmins",
         "summary": "List the admins of a project",
-        "description": "Lists the people who can administer a project, and how each of them\nholds that access.\n\nA person appears once, with one entry in `sources` per way they hold it:\n\n- `owning_team`: an active member of the team that owns the project, the\n  team a claim attaches the project to. Removing a grant does not remove\n  this access. It ends only when the person leaves the team or the\n  project changes owner.\n- `grant`: an unexpired `admin` grant on the project, which is a role\n  given to the person (`grant_id` only) or to a team they are an active\n  member of (`grant_id` and `team`). Revoking that grant removes this\n  source.\n\nThe list follows the authorization check. A person who left a team, or\nwhose team or user was deactivated, is not listed through it. Grants that\nexpired or carry a lower role are left out. A person whose only access is a\n`viewer` or `editor` grant is not an admin and is not listed. Like the\ncheck, the list does not look at a person's user status beyond that, so a\ndirect grant to a suspended person is listed.\n\nA person whose access comes only through teams the caller is not a\nmember of is left out. A team the caller is not in is named by `team_id`\nonly. The grant to such a team still shows in the project's grants.\n\nThe list is ordered by `user_id` and paginated with `page_token`.\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
+        "description": "Lists the people who can administer a project, and how each of them\nholds that access.\n\nA person appears once, with one entry in `sources` per way they hold it:\n\n- `owning_team`: an active member of the team that owns the project, the\n  team a claim attaches the project to. Removing a grant does not remove\n  this access. It ends only when the person leaves the team or the\n  project changes owner.\n- `grant`: an unexpired `admin` grant on the project, which is a role\n  given to the person (`grant_id` only) or to a team they are an active\n  member of (`grant_id` and `team`). Revoking that grant removes this\n  source.\n\nThe list follows the authorization check. A person who left a team, or\nwhose team or user was deactivated, is not listed through it. Grants that\nexpired or carry a lower role are left out. A person whose only access is a\n`viewer` or `editor` grant is not an admin and is not listed. Like the\ncheck, a direct user grant requires an active user, so a suspended\nperson's direct grant is not listed.\n\nEvery caller who passes the project read check sees every listed admin\nand every team name on `sources`. Co-membership no longer filters the\nroster.\n\nThe list is ordered by `user_id` and paginated with `page_token`.\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
         "tags": [
           "Projects"
         ],
@@ -2936,6 +2936,111 @@
           },
           "default": {
             "$ref": "#/components/responses/listProjectAdmins-error-response"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/members": {
+      "get": {
+        "operationId": "listProjectMembers",
+        "summary": "List the members of a project",
+        "description": "Lists the people who have a role on a project, with each person's strongest\nrole and how they hold it.\n\nA person appears once, with their strongest `relation` (`viewer`, `editor`\nor `admin`; a stronger role includes the weaker ones) and one entry in\n`sources` per way they hold that role:\n\n- `owning_team`: an active member of the team that owns the project, the\n  team a claim attaches the project to. It holds `admin`. Removing a grant\n  does not remove this access. It ends only when the person leaves the\n  team or the project changes owner.\n- `grant`: an unexpired grant on the project, which is a role given to the\n  person (`grant_id` only) or to a team they are an active member of\n  (`grant_id` and `team`). Revoking that grant removes this source.\n\nGrants of a weaker role than the person's strongest are not in `sources`;\nthey still show in the project's grants (`queryGrants`,\n`POST /grants/query`).\n\nPass `relation` to list only the people whose strongest role is at least\nthat strong: `relation=admin` lists the people who can administer the\nproject.\n\nThe list follows the authorization check. A person who left a team, or\nwhose team or user was deactivated, is not listed through it. Expired\ngrants are left out. Like the check, a direct user grant requires an\nactive user, so a suspended person's direct grant is not listed.\n\nEvery caller who passes the project read check sees every listed person\nand every team name on `sources`. Co-membership no longer filters the\nroster.\n\nThe list is ordered by `user_id` and paginated with `page_token`.\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/page-token"
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/project-id"
+            }
+          },
+          {
+            "name": "relation",
+            "in": "query",
+            "required": false,
+            "description": "Only the people whose strongest role is at least this strong. Absent\nlists everyone with a role.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "viewer",
+                "editor",
+                "admin"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the project's members.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/list-project-members-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The page token is not valid. Send the `next_page_token` from the previous response unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot read the project's members.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/listProjectMembers-error-response"
           }
         }
       }
@@ -16173,7 +16278,7 @@
             ]
           },
           "team": {
-            "description": "The owning team. Its `name` is present only when the caller is a member\nof it.\n",
+            "description": "The owning team.",
             "$ref": "#/components/schemas/team-ref"
           }
         }
@@ -16198,7 +16303,7 @@
             "description": "The grant (`asgn_<opaque>`), as served by `GET /grants/{grant_id}`."
           },
           "team": {
-            "description": "The team the grant is to, absent for a grant to the person directly. Its\n`name` is present only when the caller is a member of it.\n",
+            "description": "The team the grant is to, absent for a grant to the person directly.",
             "$ref": "#/components/schemas/team-ref"
           }
         }
@@ -16256,6 +16361,130 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/project-admin"
+            }
+          },
+          "next_page_token": {
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "project-member-owning-team-source": {
+        "title": "ProjectMemberOwningTeamSource",
+        "description": "Admin access as an active member of the team that owns the project.",
+        "type": "object",
+        "required": [
+          "type",
+          "team"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "owning_team"
+            ]
+          },
+          "team": {
+            "description": "The owning team.",
+            "$ref": "#/components/schemas/team-ref"
+          }
+        }
+      },
+      "project-member-grant-source": {
+        "title": "ProjectMemberGrantSource",
+        "description": "A role through a grant on the project, to the person or to a team they are\nan active member of.\n",
+        "type": "object",
+        "required": [
+          "type",
+          "grant_id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "grant"
+            ]
+          },
+          "grant_id": {
+            "type": "string",
+            "description": "The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`."
+          },
+          "team": {
+            "description": "The team the grant is to, absent for a grant to the person directly.",
+            "$ref": "#/components/schemas/team-ref"
+          }
+        }
+      },
+      "project-member-source": {
+        "title": "ProjectMemberSource",
+        "description": "One way a person holds their role on the project. Discriminate on `type`.\n\n- `owning_team`: the person is an active member of the owning team named by\n  `team`, which holds `admin`. There is no `grant_id`: this access is not a\n  grant, so the grants API cannot revoke it.\n- `grant`: a grant on the project, named by `grant_id`. `team` is present\n  when the grant is to a team the person is an active member of. It is\n  absent when the grant is to the person directly.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/project-member-owning-team-source"
+          },
+          {
+            "$ref": "#/components/schemas/project-member-grant-source"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "owning_team": "#/components/schemas/project-member-owning-team-source",
+            "grant": "#/components/schemas/project-member-grant-source"
+          }
+        }
+      },
+      "project-member": {
+        "title": "ProjectMember",
+        "description": "One person with a role on the project: their strongest role, and every way\nthey hold it.\n",
+        "type": "object",
+        "required": [
+          "user",
+          "relation",
+          "sources"
+        ],
+        "properties": {
+          "user": {
+            "description": "The person. A user-ref: render `display`, falling back to `identifier`,\nthen `user_id`.\n",
+            "$ref": "#/components/schemas/user-ref"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "viewer",
+              "editor",
+              "admin"
+            ],
+            "description": "The person's strongest role on the project. A stronger role includes\nthe weaker ones.\n"
+          },
+          "sources": {
+            "type": "array",
+            "minItems": 1,
+            "description": "How the person holds `relation`: owning-team access first, then grants\nto teams, then grants to the person. Grants of a weaker role are left\nout; they still show in the project's grants.\n",
+            "items": {
+              "$ref": "#/components/schemas/project-member-source"
+            }
+          }
+        }
+      },
+      "list-project-members-response": {
+        "type": "object",
+        "description": "A page of the people who have a role on a project.",
+        "required": [
+          "members"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/project-member"
             }
           },
           "next_page_token": {
@@ -32263,6 +32492,80 @@
         }
       },
       "listProjectAdmins-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-missing_id"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.missing_id": "#/components/schemas/proj-missing_id",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.permission_denied": "#/components/schemas/proj-permission_denied",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.missing_id": {
+                "$ref": "#/components/examples/proj-missing_id"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.permission_denied": {
+                "$ref": "#/components/examples/proj-permission_denied"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "listProjectMembers-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
