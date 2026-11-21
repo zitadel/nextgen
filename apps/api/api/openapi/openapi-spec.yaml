@@ -152,14 +152,21 @@ tags:
     description: |
       Webhooks are the URLs a project's events are sent to. These operations
       create, list, read, update and delete a project's webhooks and rotate a
-      webhook's signing secret. The server does not deliver events to a
-      project's webhooks yet: it stores a webhook and delivers nothing to it.
+      webhook's signing secret.
 
       A webhook names the event types it receives, or `*` for all of them
       except `request.api`. The server POSTs each matching event to the
-      webhook's `url` as it stores it, one event per request and in the order
-      they were stored. The Event Webhooks section describes the request's
-      body and its delivery.
+      webhook's `url` within seconds of storing it, one event per request and
+      in the order they were stored. The Event Webhooks section describes the
+      request's body. Any `2xx` status acknowledges the event. Delivery is at
+      least once.
+
+      Any other answer, a redirect included, or none within 10 seconds is a
+      failure. The server then sends the same event again after 5 seconds,
+      and after each further failure waits twice as long, up to an hour. The
+      webhook's later events wait behind it. A webhook that fails for 3 days
+      without one success, or that answers `410`, is disabled: its `enabled`
+      becomes `false` and a `webhook.disabled` event records why.
 
       Every request to a project's webhook is signed, following
       [Standard Webhooks](https://www.standardwebhooks.com/). It carries three

@@ -1,0 +1,17 @@
+title: WebhookDisabledPayload
+type: object
+description: |
+  Payload for `webhook.disabled`. The webhook ID is the event's `entity_id`.
+  The failed delivery behind it is on the webhook: `last_error_at` and
+  `last_error_status`.
+required:
+  - reason
+properties:
+  reason:
+    type: string
+    description: |
+      Why the server disabled the webhook. `failing`: its deliveries failed
+      for 3 days without one success. `gone`: its endpoint answered `410`.
+    enum:
+      - failing
+      - gone

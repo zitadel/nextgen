@@ -124,7 +124,7 @@ func TestBuildHTTPMuxGivesEveryRequestOneServerSpan(t *testing.T) {
 	require.NoError(t, err)
 	retention := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
 	mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServers, idpCallbackEcho(),
-		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil), nil, retention, nil)
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil), nil, map[string]http.Handler{audit.RetentionTriggerPath: retention}, nil)
 	require.NoError(t, err)
 	handler := withTracing(instrumentation.TraceConfig{TrustRemoteSpans: true}, propagation.TraceContext{}, muxTracerProvider, mux)
 

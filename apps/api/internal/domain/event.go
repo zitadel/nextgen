@@ -175,6 +175,7 @@ const (
 	EventTypeWebhookUpdated       EventType = "webhook.updated"
 	EventTypeWebhookDeleted       EventType = "webhook.deleted"
 	EventTypeWebhookSecretRotated EventType = "webhook.secret_rotated"
+	EventTypeWebhookDisabled      EventType = "webhook.disabled"
 )
 
 // WrittenEventTypes is every event type the server writes: the Path A and
@@ -211,6 +212,7 @@ func WrittenEventTypes() []EventType {
 		EventTypeAuthRequestCreated, EventTypeOAuthSettingsCreated,
 		EventTypeInvitationCreated, EventTypeInvitationAccepted, EventTypeInvitationRejected, EventTypeInvitationCancelled,
 		EventTypeWebhookCreated, EventTypeWebhookUpdated, EventTypeWebhookDeleted, EventTypeWebhookSecretRotated,
+		EventTypeWebhookDisabled,
 	}
 }
 
