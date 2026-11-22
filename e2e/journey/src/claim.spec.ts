@@ -17,7 +17,7 @@ import { journeyMetadataOrSkip, runCli } from "./support";
  * - `zitadel console` mints a one-time link that signs the admin in to the
  *   local server's own console, with no password, and
  * - that admin can hand the project to a colleague and take it back again
- *   from the console's own Admins section (#1295).
+ *   from the console's own Members page (#1295).
  *
  * Claiming an anonymous project stays a cloud journey. These checks are
  * framework-independent; one suite proves them end to end without slowing
@@ -107,9 +107,9 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     await page.goto(projectUrl);
     await page
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
-    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
     await page.getByRole("button", { name: "Add admin", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add admin" });
     await dialog.getByRole("textbox", { name: "Email address" }).fill(email);
@@ -121,28 +121,28 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     // was created.
     const row = page.getByRole("row").filter({ hasText: email });
     await expect(row).toBeVisible();
-    await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
+    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
 
     // And the grant is what the colleague's own session can now open.
     await colleaguePage.goto(projectUrl);
     await colleaguePage
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
-    await expect(colleaguePage.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(colleaguePage.getByRole("region", { name: "Members" })).toBeVisible();
 
     await row.getByRole("button", { name: `Actions for ${email}` }).click();
-    await page.getByRole("menuitem", { name: "Remove grant" }).click();
+    await page.getByRole("menuitem", { name: "Remove access" }).click();
     await page
       .getByRole("alertdialog")
-      .getByRole("button", { name: "Remove grant", exact: true })
+      .getByRole("button", { name: "Remove access", exact: true })
       .click();
     // The region is asserted again rather than only the row's absence: the
     // table is gone from a not-found state, an unauthorized one and a redirect
     // to login too, so only a still-rendered screen makes the empty list mean
     // what it says.
     await expect(page.getByRole("row").filter({ hasText: email })).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
 
     // The colleague loses the project with the grant: the page's loader fails,
     // so the route's error boundary replaces the screen it rendered before.

@@ -248,7 +248,7 @@ describe("landing routes", () => {
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("Nothing here is yours to set.")).toBeInTheDocument();
-    // No Admins row survives from when that screen lived here.
-    expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
+    // A project's Members page is among its own Settings, not the root's.
+    expect(screen.queryByRole("link", { name: /Members/ })).not.toBeInTheDocument();
   });
 });

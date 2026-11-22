@@ -181,7 +181,7 @@ test("gives a colleague admin access to the project, and takes it away", async (
   // this lane runs without it, where "Add admin" resolves the colleague in the
   // project the console signs into (#1295).
   //
-  // Admins live on the project's page (#1238). The operator needs access to the
+  // Members live on the project's Settings (#1238). The operator needs access to the
   // project to open it — a seeded user can sign in but holds no grant.
   const operator = await seed.user();
   const colleague = await seed.user();
@@ -200,16 +200,15 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await page.goto(`/projects/${zitadel.handle.projectId}`);
     await page
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
-    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
 
-    // The operator's own grant (the one `signIn` wrote) comes back through
-    // `GET /projects/{id}/admins` (#1462) as their row, marked as theirs: the
-    // list read resolves people and how they hold access on the server.
+    // The operator's own grant (the one `signIn` wrote) comes back from the
+    // grants read as their row, marked as theirs, with the role it gives.
     const own = page.getByRole("row").filter({ hasText: operator.email });
-    await expect(own.getByText("(you)", { exact: true })).toBeVisible();
-    await expect(own.getByText("Admin grant", { exact: true })).toBeVisible();
+    await expect(own.getByText(/\(you\)$/)).toBeVisible();
+    await expect(own.getByText("Admin", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Add admin", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add admin" });
@@ -222,7 +221,7 @@ test("gives a colleague admin access to the project, and takes it away", async (
     // whether or not anything was created, which is the point of it.
     const row = page.getByRole("row").filter({ hasText: colleague.email });
     await expect(row).toBeVisible();
-    await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
+    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
 
     // With the grant the colleague's session can write to the project, not only
     // read it: the team comes back from the list read after `POST /teams`.
@@ -237,9 +236,9 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await expectNoErrorBoundary(colleaguePage);
 
     await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
-    await page.getByRole("menuitem", { name: "Remove grant" }).click();
+    await page.getByRole("menuitem", { name: "Remove access" }).click();
     const confirm = page.getByRole("alertdialog");
-    await confirm.getByRole("button", { name: "Remove grant", exact: true }).click();
+    await confirm.getByRole("button", { name: "Remove access", exact: true }).click();
 
     // Gone from the list, which leaves the instance as this test found it.
     await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
@@ -259,8 +258,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
   zitadel,
   seed,
 }) => {
-  // The admins list is people only (#1462), so a grant to a team is a row of
-  // its own from the grants read. Asserted against a real instance because
+  // A grant to a team is a row of its own, the team's (#2857). Asserted against a real instance because
   // which read carries the team, and that `DELETE /grants/{grant_id}` takes the
   // team's grant without touching the operator's own, are server behaviour.
   const operator = await seed.user();
@@ -283,25 +281,26 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     await page.goto(`/projects/${projectId}`);
     await page
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
     const row = page.getByRole("row").filter({ hasText: team.name });
-    await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
+    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
     await expect(row.getByText("Team", { exact: true })).toBeVisible();
 
     await row.getByRole("button", { name: `Actions for ${team.name}` }).click();
-    await page.getByRole("menuitem", { name: "Remove grant" }).click();
+    await page.getByRole("menuitem", { name: "Remove access" }).click();
     const confirm = page.getByRole("alertdialog");
-    // A team's grant, so the copy is about its members.
-    await expect(
-      confirm.getByText(/Team members will lose access provided by this grant/),
-    ).toBeVisible();
-    await confirm.getByRole("button", { name: "Remove grant", exact: true }).click();
+    // A team's grant, so the copy names the team.
+    await expect(confirm.getByText(`${team.name} will lose access to this project.`)).toBeVisible();
+    await confirm.getByRole("button", { name: "Remove access", exact: true }).click();
 
     await expect(page.getByRole("row").filter({ hasText: team.name })).toHaveCount(0);
     // The operator's own grant is untouched.
     await expect(
-      page.getByRole("row").filter({ hasText: operator.email }).getByText("(you)", { exact: true }),
+      page
+        .getByRole("row")
+        .filter({ hasText: operator.email })
+        .getByText(/\(you\)$/),
     ).toBeVisible();
     await expectNoErrorBoundary(page);
   } finally {
@@ -332,7 +331,7 @@ test("answers the same way for an address that belongs to nobody", async ({
   await page.goto(`/projects/${zitadel.handle.projectId}`);
   await page
     .getByRole("navigation", { name: "Project settings" })
-    .getByRole("link", { name: "Admins" })
+    .getByRole("link", { name: "Members" })
     .click();
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
@@ -344,7 +343,7 @@ test("answers the same way for an address that belongs to nobody", async ({
   // cannot fail.
   const refreshed = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === `/api/v1/projects/${zitadel.handle.projectId}/admins` &&
+      new URL(response.url()).pathname === `/api/v1/projects/${zitadel.handle.projectId}/members` &&
       response.ok(),
   );
   await dialog.getByRole("button", { name: "Add admin", exact: true }).click();

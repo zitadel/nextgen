@@ -1,13 +1,13 @@
 /**
  * Adds a second project to a running `@zitadel/console#dev:real` instance and grants the
  * dev account access to it, so screens that list what a person can act on —
- * the project pill, Projects, each project's admins — have more than one project
+ * the project pill, Projects, each project's members — have more than one project
  * to show.
  *
  * `dev-real` boots one project and signs the console into it. A second project
  * is one `POST /projects` away (unauthenticated; the server answers with the
  * new project's secret exactly once), and access is the same grant a
- * project's admins section creates: `POST /grants?project_id=<new>` with the
+ * project's Members page creates: `POST /grants?project_id=<new>` with the
  * new project's secret, binding the dev user by id. The server allows a user homed in the
  * seeded project to be bound on another one because dev-real pins no platform
  * project (`internal/service/grant.go`, `resolvePrincipalHome`).
@@ -38,8 +38,8 @@
  *   --project-id <proj_…>   grant on an existing project instead of creating
  *   --secret <secret>       that project's secret (printed when this script
  *                           created it); required with --project-id. For the
- *                           seeded project, use the Admins section on the
- *                           project's page in the console instead: it grants
+ *                           seeded project, use the Members page in the
+ *                           project's Settings instead: it grants
  *                           with your session.
  *
  * Environment (all optional, same defaults as dev-real):

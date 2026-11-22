@@ -132,7 +132,7 @@ neutral.
 | --- | --- | --- | --- |
 | `positive` | `success` | in force and working | `active`, `live` |
 | `caution` | `warning` | held for now; someone can lift it | `suspended` |
-| `critical` | `destructive` | on its way out, not coming back by itself | `pending_purge` |
+| `critical` | `destructive` | on its way out, or gone, not coming back by itself | `pending_purge`, `expired` |
 | `neutral` | `muted-foreground` | off, or not yet on | `deactivated`, `inactive`, `draft` |
 
 A hard stop that is not one state among several (a revoked release) is the

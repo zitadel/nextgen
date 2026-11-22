@@ -41,6 +41,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
   live: "positive",
   suspended: "caution",
   pending_purge: "critical",
+  expired: "critical",
   deactivated: "neutral",
   inactive: "neutral",
   draft: "neutral",

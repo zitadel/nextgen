@@ -17,14 +17,14 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
-// The project's Settings also read its admins and grants on their Admins page
-// (#1238, #1462), its variables and its password policy; empty answers keep these tests
+// The project's Settings also read its members and grants on their Members page
+// (#1238, #2857), its variables and its password policy; empty answers keep these tests
 // about the project itself. The person can act on the project, so the context
 // switcher names it from their list rather than by its id while its own read is
 // in flight.
 beforeEach(() =>
   server.use(
-    http.get(`${PROJECT_URL}/admins`, () => HttpResponse.json({ admins: [] })),
+    http.get(`${PROJECT_URL}/members`, () => HttpResponse.json({ members: [] })),
     http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
     http.get("http://localhost/api/v1/deployments", () =>

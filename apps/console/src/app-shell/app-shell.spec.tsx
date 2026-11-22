@@ -85,9 +85,9 @@ const PLATFORM_ROOT_ORDER = [
 const SETTINGS_ORDER = ["Settings", "Invoices"];
 // For someone who may act on the platform project, its own Settings pages
 // come first: that project is the root (D42).
-const PLATFORM_SETTINGS_ORDER = ["Settings", "General", "Admins", "Invoices"];
+const PLATFORM_SETTINGS_ORDER = ["Settings", "General", "Members", "Invoices"];
 // The project's Settings list (D40): the heading that leads back, then its pages.
-const PROJECT_SETTINGS_ORDER = ["Settings", "General", "Admins"];
+const PROJECT_SETTINGS_ORDER = ["Settings", "General", "Members"];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -590,9 +590,9 @@ describe("platform root", () => {
       "href",
       scopedPath("/project/general", "proj_platform"),
     );
-    expect(nav.getByRole("link", { name: "Admins" })).toHaveAttribute(
+    expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute(
       "href",
-      scopedPath("/project/admins", "proj_platform"),
+      scopedPath("/project/members", "proj_platform"),
     );
     expect(nav.getByRole("link", { name: "Settings: back to Projects" })).toBeInTheDocument();
   });
@@ -600,10 +600,10 @@ describe("platform root", () => {
   it("draws the platform project's Settings pages under the root's Settings list", async () => {
     server.use(
       http.get("*/api/v1/variables", () => HttpResponse.json({ variables: [] })),
-      http.get("*/api/v1/projects/proj_platform/admins", () => HttpResponse.json({ admins: [] })),
+      http.get("*/api/v1/projects/proj_platform/members", () => HttpResponse.json({ members: [] })),
       http.post("*/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
     );
-    renderShell("/project/admins?project=proj_platform");
+    renderShell("/project/members?project=proj_platform");
 
     // Not the project's Settings list, whose heading leads back to a project.
     const nav = within(await screen.findByRole("navigation", { name: "Settings" }));
@@ -612,7 +612,7 @@ describe("platform root", () => {
         PLATFORM_SETTINGS_ORDER,
       ),
     );
-    expect(nav.getByRole("link", { name: "Admins" })).toHaveAttribute("data-active", "true");
+    expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("data-active", "true");
     expect(screen.queryByRole("navigation", { name: "Project settings" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Switch project/ })).toHaveTextContent("Platform");
   });
@@ -929,14 +929,14 @@ describe("events view", () => {
 
 /**
  * A project's Settings swaps the project's list for its own, as the root
- * Settings swaps the account's (D29, D40): its pages, General and Admins,
+ * Settings swaps the account's (D29, D40): its pages, General and Members,
  * under a heading that leads back to the project. The root's Settings list
  * other pages, an add-on's; both open the same way.
  */
 describe("project settings view", () => {
   beforeEach(() => {
     server.use(
-      http.get(`${PROJECT_1}/admins`, () => HttpResponse.json({ admins: [] })),
+      http.get(`${PROJECT_1}/members`, () => HttpResponse.json({ members: [] })),
       http.post("*/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
       http.get("*/api/v1/variables", () => HttpResponse.json({})),
     );
@@ -955,7 +955,9 @@ describe("project settings view", () => {
     );
     expect(nav.getByRole("link", { name: "General" })).toHaveAttribute("data-active", "true");
     // A row of the list it is already in opens no other.
-    expect(nav.getByRole("link", { name: "Admins" }).querySelector("[data-opens-list]")).toBeNull();
+    expect(
+      nav.getByRole("link", { name: "Members" }).querySelector("[data-opens-list]"),
+    ).toBeNull();
     // The project's list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
   });
@@ -965,17 +967,17 @@ describe("project settings view", () => {
     const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
     expect(await screen.findByLabelText("Project name")).toBeInTheDocument();
 
-    await userEvent.click(nav.getByRole("link", { name: "Admins" }));
+    await userEvent.click(nav.getByRole("link", { name: "Members" }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/admins"));
-    expect(await screen.findByRole("region", { name: "Admins" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/members"));
+    expect(await screen.findByRole("region", { name: "Members" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "console-dev" })).toBeInTheDocument();
-    expect(nav.getByRole("link", { name: "Admins" })).toHaveAttribute("data-active", "true");
+    expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("data-active", "true");
     expect(screen.queryByLabelText("Project name")).not.toBeInTheDocument();
   });
 
   it("goes back up to the project's list from the Settings heading", async () => {
-    const router = renderShell(scopedPath("/project/admins", "proj_1"));
+    const router = renderShell(scopedPath("/project/members", "proj_1"));
     const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
     // Named for where it leads, as Events' heading is: the project's landing.
     const heading = nav.getByRole("link", { name: "Settings: back to the project" });
@@ -1700,7 +1702,7 @@ describe("search", () => {
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
         "General · Settings · console-dev",
-        "Admins · Settings · console-dev",
+        "Members · Settings · console-dev",
         "Invoices · Settings",
       ]),
     );
@@ -2387,7 +2389,7 @@ describe("search", () => {
     );
 
     // A person's name: no page is called that ("admin" would find the
-    // project's Admins page), and the server finds nobody by it here.
+    // project's Members page), and the server finds nobody by it here.
     await userEvent.clear(field);
     await userEvent.type(field, "ada");
     expect(await dialog.findByText("Nothing matches “ada”")).toBeInTheDocument();

@@ -7,7 +7,7 @@
  */
 
 /**
- * What Settings → Admins says on every accepted submit
+ * What Settings → Members says on every accepted submit
  * (`apps/console/src/features/project-settings/components/add-admin-dialog.tsx`), whether or not anyone
  * was granted.
  */

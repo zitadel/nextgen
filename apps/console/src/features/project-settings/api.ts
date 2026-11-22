@@ -1,6 +1,8 @@
 import { api } from "@/api/zitadel";
 import { livePrimaryReleaseId } from "@/features/deployments/deployment";
+import { LIST_PAGE_SIZE, readAllPages } from "@/lib/paging";
 
+import type { Grant, Member } from "./members";
 import type { PasswordPolicyConfig } from "./password-policy";
 
 /** The operation the password policy governs, which is the handle a release pins it under. */
@@ -36,4 +38,32 @@ export async function readDeployedPasswordPolicy(
     throw new Error(`the release pins a ${revision.operation} revision as the password policy`);
   }
   return { config: revision.config };
+}
+
+/**
+ * Everything the members table groups: the people with a role on the project
+ * (`GET /projects/{id}/members`) and the project's grants. Both are read to
+ * the end, because a row gathers a person's or a team's entries from every
+ * page of either.
+ */
+export async function readProjectMembers(
+  projectId: string,
+): Promise<{ members: Member[]; grants: Grant[] }> {
+  const [members, grants] = await Promise.all([
+    readAllPages(async (pageToken) => {
+      const page = await api.listProjectMembers(projectId, {
+        limit: LIST_PAGE_SIZE,
+        page_token: pageToken,
+      });
+      return { items: page.members, next: page.next_page_token };
+    }),
+    readAllPages(async (pageToken) => {
+      const page = await api.queryGrants(
+        { limit: LIST_PAGE_SIZE, page_token: pageToken },
+        { project_id: projectId },
+      );
+      return { items: page.grants, next: page.next_page_token };
+    }),
+  ]);
+  return { members, grants };
 }
