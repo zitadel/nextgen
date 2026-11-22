@@ -74,7 +74,8 @@ export async function lintSpec(): Promise<Finding[]> {
 /**
  * The findings the spec has today and has not fixed yet, one line per finding
  * (`<rule> <path>`), sorted. A new finding fails the lint and a fixed one fails
- * it until its line is removed, so the file only shrinks.
+ * it until its line is removed (`UPDATE_LINT_BASELINE=1` removes them), so the
+ * file only shrinks.
  */
 export class Baseline {
   private static readonly file = resolve(openapiDir, "vacuum-baseline.json");
@@ -95,15 +96,33 @@ export class Baseline {
   }
 
   /**
-   * Writes the findings as the new baseline.
+   * A baseline of the given lines, for tests.
+   *
+   * @param lines `<rule> <path>` lines
+   * @returns the baseline
+   */
+  static of(lines: string[]): Baseline {
+    return new Baseline(lines);
+  }
+
+  /**
+   * The baseline without the lines nothing reports any more. A finding the
+   * baseline does not list is never added: the baseline only shrinks.
+   *
+   * @param findings what the linter found
+   * @returns the sorted lines that are left
+   */
+  shrunk(findings: Finding[]): string[] {
+    return Baseline.difference(this.lines, this.fixedFindings(findings)).sort();
+  }
+
+  /**
+   * Writes {@link shrunk} to `vacuum-baseline.json`.
    *
    * @param findings what the linter found
    */
-  static async write(findings: Finding[]): Promise<void> {
-    const lines = findings.map((finding) => {
-      return Baseline.line(finding);
-    });
-    await writeFile(Baseline.file, `${JSON.stringify(lines.sort(), null, 2)}\n`);
+  async shrink(findings: Finding[]): Promise<void> {
+    await writeFile(Baseline.file, `${JSON.stringify(this.shrunk(findings), null, 2)}\n`);
   }
 
   /**
