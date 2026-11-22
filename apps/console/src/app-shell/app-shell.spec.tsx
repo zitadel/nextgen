@@ -2388,8 +2388,8 @@ describe("search", () => {
       expect(rows(dialog.getByRole("listbox"))).toEqual(["Users · Choose a project"]),
     );
 
-    // A person's name: no page is called that ("admin" would find the
-    // project's Members page), and the server finds nobody by it here.
+    // A person's name: no page is called that, and the server finds nobody by
+    // it here.
     await userEvent.clear(field);
     await userEvent.type(field, "ada");
     expect(await dialog.findByText("Nothing matches “ada”")).toBeInTheDocument();

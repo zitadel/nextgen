@@ -89,6 +89,73 @@ describe("toMemberRows", () => {
     });
   });
 
+  it("clears every grant of a row whose roles have all expired", () => {
+    const rows = toMemberRows(
+      [],
+      [
+        grant("a", { user: person("maya"), expires_at: "2026-01-01T00:00:00Z" }),
+        grant("b", {
+          relation: "viewer",
+          user: person("maya"),
+          expires_at: "2026-02-01T00:00:00Z",
+        }),
+      ],
+      undefined,
+      NOW,
+    );
+    expect(rows[0]).toMatchObject({
+      roles: ["admin", "viewer"],
+      expiry: { kind: "expired" },
+      action: { kind: "remove-access", grantIds: ["a", "b"] },
+    });
+  });
+
+  it("says when the role a row keeps ends", () => {
+    const rows = toMemberRows(
+      [],
+      [
+        grant("a", { user: person("maya"), expires_at: "2026-11-23T00:00:00Z" }),
+        grant("b", { relation: "viewer", user: person("maya") }),
+      ],
+      undefined,
+      NOW,
+    );
+    expect(rows[0]?.action).toEqual({
+      kind: "remove-role",
+      grantIds: ["b"],
+      role: "viewer",
+      keeps: "admin",
+      keepsUntil: "2026-11-23T00:00:00Z",
+    });
+  });
+
+  it("offers the owning team's grant as a role to remove, never its access", () => {
+    const rows = toMemberRows(
+      [member("ada", [{ type: "owning_team", team: OWNERS }])],
+      [grant("g", { relation: "viewer", team: OWNERS, expires_at: "2026-01-01T00:00:00Z" })],
+      undefined,
+      NOW,
+    );
+    expect(rows[0]).toMatchObject({
+      roles: ["admin"],
+      expiry: { kind: "never" },
+      action: { kind: "remove-role", grantIds: ["g"], role: "viewer", keeps: "admin" },
+    });
+  });
+
+  it("puts a person whose access expired after those who hold a role", () => {
+    const rows = toMemberRows(
+      [],
+      [
+        grant("a", { user: person("x", "Xed"), expires_at: "2026-01-01T00:00:00Z" }),
+        grant("b", { relation: "editor", user: person("y", "Yan") }),
+      ],
+      undefined,
+      NOW,
+    );
+    expect(rows.map((row) => row.name)).toEqual(["Yan", "Xed"]);
+  });
+
   it("names a person by display, then identifier, then id", () => {
     const rows = toMemberRows(
       [],

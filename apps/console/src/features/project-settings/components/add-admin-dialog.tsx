@@ -13,7 +13,7 @@ import { useSubmit } from "@/hooks/use-submit";
  * Give somebody admin access to a project by their email address (#1236,
  * journey in #769).
  *
- * **The project is the caller's.** The members section of a project's page
+ * **The project is the caller's.** A project's Members page
  * renders this, so the grant is created against that route's `projectId` —
  * never the console's own platform project, whose grants are not the ones
  * anyone means (#1238).

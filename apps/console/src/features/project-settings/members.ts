@@ -4,7 +4,7 @@ export type Member = Awaited<ReturnType<typeof api.listProjectMembers>>["members
 export type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 type Relation = Grant["relation"];
 
-/** A stronger role includes the weaker ones (root ADR 086 §6). */
+/** A stronger role includes the weaker ones (`GET /projects/{id}/members`). */
 const STRENGTH: Record<Relation, number> = { viewer: 0, editor: 1, admin: 2 };
 
 /** When a row's access ends: never, on a date, or already. */
@@ -13,7 +13,14 @@ export type Expiry = { kind: "never" } | { kind: "on"; at: string } | { kind: "e
 /** What a row's menu offers, from the grants it can revoke. */
 export type RowAction =
   | { kind: "remove-access"; grantIds: string[] }
-  | { kind: "remove-role"; grantIds: string[]; role: Relation; keeps: Relation };
+  | {
+      kind: "remove-role";
+      grantIds: string[];
+      role: Relation;
+      keeps: Relation;
+      /** When the kept role ends, where it does. */
+      keepsUntil?: string;
+    };
 
 /** A person as the table names them. */
 export interface Person {
@@ -38,7 +45,6 @@ interface PersonRow extends Person {
 interface TeamRow {
   kind: "team";
   key: string;
-  teamId: string;
   name: string;
   roles: Relation[];
   expiry: Expiry;
@@ -60,7 +66,8 @@ export type MemberRow = PersonRow | TeamRow;
  * team gives them their strongest role, so a team's people can be more than
  * it lists.
  *
- * People run the viewer first, then strongest role, then name; teams by name.
+ * People run the viewer first, then the strongest role they hold now, then
+ * name, with expired rows last; teams by name.
  */
 export function toMemberRows(
   members: Member[],
@@ -131,27 +138,21 @@ export function toMemberRows(
   });
 
   const teamRows: TeamRow[] = [...teams.entries()].map(([teamId, team]) => {
-    const { roles, action } = holding(team.grants, now);
+    const { roles, action } = holding(team.grants, now, team.owning);
     return {
       kind: "team",
       key: `team:${teamId}`,
-      teamId,
       name: team.name,
-      roles: team.owning ? sortRoles(["admin", ...roles]) : roles,
+      roles,
       // Owning the project ends only when the team leaves it, never by date.
       expiry: team.owning ? { kind: "never" } : expiryOf(team.grants, now),
       members: [...team.members].sort((a, b) => byName(a.name, b.name)),
-      // The owning team holds the project without a grant, so nothing here
-      // takes that away.
-      action: team.owning ? undefined : action,
+      action,
     };
   });
 
   personRows.sort(
-    (a, b) =>
-      Number(b.self) - Number(a.self) ||
-      STRENGTH[b.roles[0] ?? "viewer"] - STRENGTH[a.roles[0] ?? "viewer"] ||
-      byName(a.name, b.name),
+    (a, b) => Number(b.self) - Number(a.self) || rank(b) - rank(a) || byName(a.name, b.name),
   );
   teamRows.sort((a, b) => byName(a.name, b.name));
   return [...personRows, ...teamRows];
@@ -171,28 +172,65 @@ function toPerson(user: { user_id: string; display?: string; identifier?: string
 
 /**
  * What a row holds and what its menu offers. The roles are its live grants';
- * with none live, the ones that expired. One role: removing access revokes
- * every grant, expired ones included. More than one: removing a role revokes
- * the weakest, which the strongest already includes.
+ * with none live, the ones that expired, which removing access clears.
+ *
+ * One role: removing access revokes every grant, expired ones included. More
+ * than one: removing a role revokes the weakest, and the row keeps the
+ * strongest for as long as that one lasts.
+ *
+ * The team that owns the project holds admin without a grant, so any grant it
+ * also has is a role to remove, never its access.
  */
-function holding(grants: Grant[], now: number): { roles: Relation[]; action?: RowAction } {
-  if (grants.length === 0) return { roles: [] };
+function holding(
+  grants: Grant[],
+  now: number,
+  owning = false,
+): { roles: Relation[]; action?: RowAction } {
   const live = grants.filter((grant) => isLive(grant, now));
-  const roles = sortRoles((live.length > 0 ? live : grants).map((grant) => grant.relation));
-  const [strongest] = roles;
-  const weakest = roles.at(-1);
-  if (roles.length > 1 && strongest && weakest) {
+  if (owning) {
+    const granted = sortRoles((live.length > 0 ? live : grants).map((grant) => grant.relation));
+    const weakest = granted.at(-1);
     return {
-      roles,
-      action: {
+      roles: sortRoles(["admin", ...live.map((grant) => grant.relation)]),
+      action: weakest && {
         kind: "remove-role",
-        grantIds: live.filter((grant) => grant.relation === weakest).map((grant) => grant.id),
+        grantIds: grants.filter((grant) => grant.relation === weakest).map((grant) => grant.id),
         role: weakest,
-        keeps: strongest,
+        keeps: "admin",
       },
     };
   }
-  return { roles, action: { kind: "remove-access", grantIds: grants.map((grant) => grant.id) } };
+  if (grants.length === 0) return { roles: [] };
+  const removeAccess: RowAction = {
+    kind: "remove-access",
+    grantIds: grants.map((grant) => grant.id),
+  };
+  if (live.length === 0) {
+    return { roles: sortRoles(grants.map((grant) => grant.relation)), action: removeAccess };
+  }
+  const roles = sortRoles(live.map((grant) => grant.relation));
+  const [strongest] = roles;
+  const weakest = roles.at(-1);
+  if (roles.length === 1 || !strongest || !weakest) return { roles, action: removeAccess };
+  const kept = expiryOf(
+    live.filter((grant) => grant.relation === strongest),
+    now,
+  );
+  return {
+    roles,
+    action: {
+      kind: "remove-role",
+      grantIds: live.filter((grant) => grant.relation === weakest).map((grant) => grant.id),
+      role: weakest,
+      keeps: strongest,
+      keepsUntil: kept.kind === "on" ? kept.at : undefined,
+    },
+  };
+}
+
+/** People sort by the strongest role they hold now; a row that expired holds none. */
+function rank(row: PersonRow): number {
+  return row.expiry.kind === "expired" ? -1 : STRENGTH[row.roles[0] ?? "viewer"];
 }
 
 function isLive(grant: Grant, now: number): boolean {

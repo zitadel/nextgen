@@ -115,7 +115,7 @@ export function ProjectMembers({
               const expanded = row.kind === "team" && open.has(row.key);
               return (
                 <Fragment key={row.key}>
-                  <ResourceRow className="group">
+                  <ResourceRow>
                     <TableCell className={MEMBER_CELL}>
                       {row.kind === "user" ? (
                         <PersonBlock person={row} self={row.self} />
@@ -276,8 +276,7 @@ function RowActions({
 }
 
 /**
- * The page's one action, drawn on its heading's row rather than in the table:
- * the secondary small button the design placed beside the tabs.
+ * The page's one action, drawn on its heading's row rather than in the table.
  */
 export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
   return (

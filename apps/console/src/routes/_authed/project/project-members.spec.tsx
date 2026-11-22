@@ -273,6 +273,18 @@ describe("project members", () => {
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_1", projectId: PROJECT_ID }]));
   });
 
+  it("says access has already expired when clearing an expired row", async () => {
+    stubProject({ grants: [grant({ expires_at: "2026-01-01T00:00:00Z" })] });
+    await renderProject();
+
+    const dialog = await openRemove("Maya Patel");
+    expect(
+      dialog.getByText(
+        "Maya Patel's access to this project has expired. This removes it from the list.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("says a person keeps the project through their team", async () => {
     stubProject({
       members: [member(MAYA, "admin", [{ type: "grant", grant_id: "asgn_ops", team: OPS }])],
@@ -319,9 +331,27 @@ describe("project members", () => {
     const dialog = await openRemove("Maya Patel", "Remove role");
     expect(dialog.getByText("Remove editor role?")).toBeInTheDocument();
     expect(dialog.getByText("Maya Patel keeps admin access to this project.")).toBeInTheDocument();
+
     await userEvent.click(dialog.getByRole("button", { name: "Remove role" }));
     expect(await screen.findByText("Role removed")).toBeInTheDocument();
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_2", projectId: PROJECT_ID }]));
+  });
+
+  it("says when the kept role ends", async () => {
+    stubProject({
+      grants: [
+        grant({ expires_at: "2099-03-01T00:00:00Z" }),
+        grant({ id: "asgn_2", relation: "viewer" }),
+      ],
+    });
+    await renderProject();
+
+    const dialog = await openRemove("Maya Patel", "Remove role");
+    expect(
+      dialog.getByText(
+        `Maya Patel keeps admin access to this project until ${formatDate("2099-03-01T00:00:00Z")}.`,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("does not carry a failed removal into the next opening", async () => {
@@ -346,7 +376,11 @@ describe("project members", () => {
 
   it("reloads what is left when one of a row's grants fails to go", async () => {
     const { memberReads } = stubProject({
-      grants: [grant(), grant({ id: "asgn_2", expires_at: "2027-01-31T00:00:00Z" })],
+      // A live role and one that expired: removing access clears both grants.
+      grants: [
+        grant(),
+        grant({ id: "asgn_2", relation: "editor", expires_at: "2026-01-01T00:00:00Z" }),
+      ],
     });
     server.use(
       http.delete(`${GRANTS_URL}/:id`, ({ params }) =>
@@ -366,6 +400,8 @@ describe("project members", () => {
     expect(await screen.findByText("no such grant")).toBeInTheDocument();
     await waitFor(() => expect(memberReads.length).toBeGreaterThan(reads));
     expect(screen.queryByText("Access removed")).not.toBeInTheDocument();
+    // The reload leaves the dialog and its error in place.
+    expect(screen.getByText("no such grant")).toBeInTheDocument();
   });
 
   it("keeps the row when the removal is cancelled", async () => {

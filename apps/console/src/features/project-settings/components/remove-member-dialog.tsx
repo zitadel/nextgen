@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { api } from "@/api/zitadel";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { MemberRow, RowAction } from "@/features/project-settings/members";
+import { formatDate } from "@/lib/date";
 import { joinAnd } from "@/lib/text";
 
 /**
@@ -62,7 +63,11 @@ export function RemoveMemberDialog({
 
 function describe(row: MemberRow, action: RowAction): string {
   if (action.kind === "remove-role") {
-    return `${row.name} keeps ${action.keeps} access to this project.`;
+    const until = action.keepsUntil ? ` until ${formatDate(action.keepsUntil)}` : "";
+    return `${row.name} keeps ${action.keeps} access to this project${until}.`;
+  }
+  if (row.expiry.kind === "expired") {
+    return `${row.name}'s access to this project has expired. This removes it from the list.`;
   }
   if (row.kind === "team") {
     const count = row.members.length;

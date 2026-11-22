@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 /**
  * The lifecycle status pill, shared by every resource that has one — users
  * (`active`, `suspended`, `deactivated`, `pending_purge`), teams (`active`,
- * `deactivated`), deployments (`live`, `inactive`) and login flows (`draft`).
+ * `deactivated`), deployments (`live`, `inactive`) and login flows (`draft`),
+ * and by a project's members for access that has `expired`.
  *
  * `Badge` is the design-system component and already carries every
  * dimension of the pill — `h-5`, `gap-1`, `px-2 py-0.5`, `rounded-full`,
@@ -26,7 +27,7 @@ import { cn } from "@/lib/utils";
  *
  * - `positive`: in force and working.
  * - `caution`: held for now; someone can lift it.
- * - `critical`: on its way out, and not coming back by itself.
+ * - `critical`: on its way out, or gone, and not coming back by itself.
  * - `neutral`: off, or not yet on; nothing is happening.
  */
 export type StatusTone = "positive" | "caution" | "critical" | "neutral";
