@@ -13,8 +13,15 @@ import {
 import { getFreePort } from "./ports";
 import type { LocalZitadelRuntime } from "./types";
 
+/** How many ports a start on an unspecified port tries before giving up. */
+const PORT_RACE_ATTEMPTS = 5;
+
 export interface BootServerOptions {
-  /** TCP port for the instance; defaults to an OS-assigned free port. */
+  /**
+   * TCP port for the instance. Defaults to an OS-assigned free port; when
+   * another process takes it before the server binds, the start is retried on
+   * a fresh one. An explicit port is never retried.
+   */
   port?: number;
   /**
    * State directory. Defaults to a fresh temp dir that is removed on stop;
@@ -45,15 +52,28 @@ export interface BootedServer {
 export async function bootLocalServer(options: BootServerOptions = {}): Promise<BootedServer> {
   const ownsDir = options.dir === undefined;
   const dir = options.dir ?? (await mkdtemp(join(tmpdir(), "zitadel-testing-")));
-  const port = options.port ?? (await getFreePort());
   const env = cliEnv(options);
 
-  const result = await runCli({
-    args: ["start", "--port", String(port), "--non-interactive", "--json", "-c", dir],
-    bin: options.cliBin,
-    env,
-    timeoutMs: options.timeoutMs,
-  });
+  // The free port is released before the server binds it, so a parallel
+  // process can take it in between; the CLI then refuses with E_PORT_IN_USE.
+  const attempts = options.port === undefined ? PORT_RACE_ATTEMPTS : 1;
+  let result: RunCliResult;
+  for (let attempt = 1; ; attempt += 1) {
+    const port = options.port ?? (await getFreePort());
+    result = await runCli({
+      args: ["start", "--port", String(port), "--non-interactive", "--json", "-c", dir],
+      bin: options.cliBin,
+      env,
+      timeoutMs: options.timeoutMs,
+    });
+    if (
+      result.exitCode === 0 ||
+      attempt >= attempts ||
+      !result.stdout.concat(result.stderr).includes("E_PORT_IN_USE")
+    ) {
+      break;
+    }
+  }
   if (result.exitCode !== 0) {
     // Keep the dir on failure: server.log inside it is the diagnostic.
     throw new Error(

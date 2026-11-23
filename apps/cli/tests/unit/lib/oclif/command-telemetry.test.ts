@@ -19,7 +19,7 @@ function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
     force: false,
     command: "setup",
     cliVersion: "0.1.0-alpha.11",
-    source: "https://api.zitadel.cloud",
+    source: "https://preview.zitadel.com",
     verbose: false,
     debug: false,
     env: {},
@@ -128,6 +128,6 @@ describe("deviceProfileProperties", () => {
     expect("mp_country_code" in props).toBe(false);
     const serialized = JSON.stringify(props);
     expect(serialized).not.toContain("/work/app");
-    expect(serialized).not.toContain("zitadel.cloud");
+    expect(serialized).not.toContain("zitadel.com");
   });
 });

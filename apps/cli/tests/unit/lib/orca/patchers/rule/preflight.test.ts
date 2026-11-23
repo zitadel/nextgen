@@ -48,8 +48,8 @@ function ctxFor(id: string, appDir: string, versionMajor?: number): PatchContext
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
-    server: "https://api.zitadel.cloud",
-    defaultServer: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
     sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
   };

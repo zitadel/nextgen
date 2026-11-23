@@ -28,7 +28,11 @@ type DeleteInput = OperationInput<Json, Record<string, string>>;
  * (`revoke`, `deactivate`): guarded like `reset` — `--force` in
  * non-interactive mode, a confirm prompt otherwise — and honours `--dry-run`.
  */
-export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, DeleteInput> {
+export abstract class DeleteOperation<Ctx> extends ResourceCommand<
+  Ctx,
+  DeleteSpec<Ctx>,
+  DeleteInput
+> {
   static describe<Ctx>({
     topic,
     resource,

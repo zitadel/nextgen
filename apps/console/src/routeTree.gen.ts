@@ -17,6 +17,7 @@ import { Route as AuthedProjectRouteRouteImport } from './routes/_authed/project
 import { Route as ClaimIndexRouteImport } from './routes/claim/index'
 import { Route as InvitationsAcceptRouteImport } from './routes/invitations/accept'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
+import { Route as AuthedApplicationsApplicationIdRouteImport } from './routes/_authed/applications/$applicationId'
 import { Route as AuthedAuthenticationIndexRouteImport } from './routes/_authed/authentication/index'
 import { Route as AuthedBrandingIndexRouteImport } from './routes/_authed/branding/index'
 import { Route as AuthedDeploymentsIndexRouteImport } from './routes/_authed/deployments/index'
@@ -79,6 +80,12 @@ const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   path: '/account/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedApplicationsApplicationIdRoute =
+  AuthedApplicationsApplicationIdRouteImport.update({
+    id: '/applications/$applicationId',
+    path: '/applications/$applicationId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAuthenticationIndexRoute =
   AuthedAuthenticationIndexRouteImport.update({
     id: '/authentication/',
@@ -201,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/project': typeof AuthedProjectRouteRouteWithChildren
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/claim/': typeof ClaimIndexRoute
+  '/applications/$applicationId': typeof AuthedApplicationsApplicationIdRoute
   '/events/$eventId': typeof AuthedEventsEventIdRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/project/general': typeof AuthedProjectGeneralRoute
@@ -230,6 +238,7 @@ export interface FileRoutesByTo {
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/': typeof AuthedIndexRoute
   '/claim': typeof ClaimIndexRoute
+  '/applications/$applicationId': typeof AuthedApplicationsApplicationIdRoute
   '/events/$eventId': typeof AuthedEventsEventIdRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/project/general': typeof AuthedProjectGeneralRoute
@@ -263,6 +272,7 @@ export interface FileRoutesById {
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/_authed/': typeof AuthedIndexRoute
   '/claim/': typeof ClaimIndexRoute
+  '/_authed/applications/$applicationId': typeof AuthedApplicationsApplicationIdRoute
   '/_authed/events/$eventId': typeof AuthedEventsEventIdRoute
   '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/_authed/project/general': typeof AuthedProjectGeneralRoute
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/project'
     | '/invitations/accept'
     | '/claim/'
+    | '/applications/$applicationId'
     | '/events/$eventId'
     | '/flow-definitions/$definitionId'
     | '/project/general'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/invitations/accept'
     | '/'
     | '/claim'
+    | '/applications/$applicationId'
     | '/events/$eventId'
     | '/flow-definitions/$definitionId'
     | '/project/general'
@@ -357,6 +369,7 @@ export interface FileRouteTypes {
     | '/invitations/accept'
     | '/_authed/'
     | '/claim/'
+    | '/_authed/applications/$applicationId'
     | '/_authed/events/$eventId'
     | '/_authed/flow-definitions/$definitionId'
     | '/_authed/project/general'
@@ -445,6 +458,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account/'
       preLoaderRoute: typeof AuthedAccountIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/applications/$applicationId': {
+      id: '/_authed/applications/$applicationId'
+      path: '/applications/$applicationId'
+      fullPath: '/applications/$applicationId'
+      preLoaderRoute: typeof AuthedApplicationsApplicationIdRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/authentication/': {
@@ -636,6 +656,7 @@ interface AuthedRouteChildren {
   AuthedEventsRouteRoute: typeof AuthedEventsRouteRouteWithChildren
   AuthedProjectRouteRoute: typeof AuthedProjectRouteRouteWithChildren
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedApplicationsApplicationIdRoute: typeof AuthedApplicationsApplicationIdRoute
   AuthedFlowDefinitionsDefinitionIdRoute: typeof AuthedFlowDefinitionsDefinitionIdRoute
   AuthedProjectsProjectIdRoute: typeof AuthedProjectsProjectIdRoute
   AuthedReleasesReleaseIdRoute: typeof AuthedReleasesReleaseIdRoute
@@ -660,6 +681,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedEventsRouteRoute: AuthedEventsRouteRouteWithChildren,
   AuthedProjectRouteRoute: AuthedProjectRouteRouteWithChildren,
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedApplicationsApplicationIdRoute: AuthedApplicationsApplicationIdRoute,
   AuthedFlowDefinitionsDefinitionIdRoute:
     AuthedFlowDefinitionsDefinitionIdRoute,
   AuthedProjectsProjectIdRoute: AuthedProjectsProjectIdRoute,
