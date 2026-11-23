@@ -79,7 +79,7 @@ export const fieldsFlag = (options: { fallback?: readonly string[]; shape?: Fiel
  */
 export type ListFlags = {
   readonly plain: boolean | undefined;
-  readonly fields?: readonly string[] | undefined;
+  readonly fields: readonly string[] | undefined;
 };
 
 /**
