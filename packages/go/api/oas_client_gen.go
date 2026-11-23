@@ -337,13 +337,13 @@ type Invoker interface {
 	//
 	// Send `type` and the object named after it. `project_member` takes `relation` (`viewer`, `editor` or
 	// `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
-	// invitations ship. Optional `metadata.name` labels who the link is for. Optional
+	// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 	// `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
 	// and the original is deleted in the same transaction unless it was accepted.
 	//
 	// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
 	// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-	// platform project, and when the project's pending-invitation cap is reached.
+	// platform project, and when the project already has 100 pending unexpired invitations.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 	// Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -683,9 +683,9 @@ type Invoker interface {
 	// `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
 	// owning-team (`relation=team`) rows and grants of another project all return `404`.
 	//
-	// `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
-	// `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
-	// passed the project check may expand without those scopes.
+	// `expand=principal` adds envelope fields on `user` or `team`. Expanding requires read access to the
+	// principal's home project (the platform project when the server has one), for project secrets and for
+	// console sessions alike. A caller without it gets `403` `user.permission_denied`.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 	// requests follow that scheme's CSRF rules.
@@ -1434,9 +1434,9 @@ type Invoker interface {
 	// (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
 	// (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
 	//
-	// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
-	// additionally requires `user.read` and `team.read`. A user-bound console session that already passed
-	// the project check may expand without those scopes.
+	// `expand: ["principal"]` adds envelope fields on `user` and `team`. Expanding requires read access to
+	// the principal's home project (the platform project when the server has one), for project secrets and
+	// for console sessions alike. A caller without it gets `403` `user.permission_denied`.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 	// requests follow that scheme's CSRF rules.
@@ -3874,13 +3874,13 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 //
 // Send `type` and the object named after it. `project_member` takes `relation` (`viewer`, `editor` or
 // `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
-// invitations ship. Optional `metadata.name` labels who the link is for. Optional
+// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 // `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
 // and the original is deleted in the same transaction unless it was accepted.
 //
 // The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
 // can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-// platform project, and when the project's pending-invitation cap is reached.
+// platform project, and when the project already has 100 pending unexpired invitations.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -7190,9 +7190,9 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
 // owning-team (`relation=team`) rows and grants of another project all return `404`.
 //
-// `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
-// `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
-// passed the project check may expand without those scopes.
+// `expand=principal` adds envelope fields on `user` or `team`. Expanding requires read access to the
+// principal's home project (the platform project when the server has one), for project secrets and for
+// console sessions alike. A caller without it gets `403` `user.permission_denied`.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.
@@ -16993,9 +16993,9 @@ func (c *Client) sendPublishSchema(ctx context.Context, request PublishSchemaReq
 // (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
 // (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
 //
-// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
-// additionally requires `user.read` and `team.read`. A user-bound console session that already passed
-// the project check may expand without those scopes.
+// `expand: ["principal"]` adds envelope fields on `user` and `team`. Expanding requires read access to
+// the principal's home project (the platform project when the server has one), for project secrets and
+// for console sessions alike. A caller without it gets `403` `user.permission_denied`.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.
