@@ -699,9 +699,9 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		// The root document is supplied inline, so compilation performs no
 		// I/O that would observe the context; only the post-compile check
-		// can catch the already-expired 1ns envelope.
+		// can catch the already-expired envelope.
 		client := newEgressClient(t, httputil.ClientConfig{})
-		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, time.Nanosecond, client, nil)
+		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, -time.Second, client, nil)
 
 		// The resolver reports the expiry raw; the schema service is what
 		// classifies it into fetch_timeout, keeping fetch codes off
