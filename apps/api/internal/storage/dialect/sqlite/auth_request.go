@@ -7,13 +7,18 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
-	authRequestColumns    = `project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, created_at, expires_at`
-	createAuthRequestStmt = `INSERT INTO auth_requests (` + authRequestColumns + `)` +
+	createAuthRequestColumns = `project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, created_at, expires_at`
+	authRequestColumns       = createAuthRequestColumns + `, code_hash, user_id, session_id, code_expires_at`
+	createAuthRequestStmt    = `INSERT INTO auth_requests (` + createAuthRequestColumns + `)` +
 		` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	getAuthRequestStmt = `SELECT ` + authRequestColumns + ` FROM auth_requests WHERE project_id = ? AND id = ?`
+	getAuthRequestStmt     = `SELECT ` + authRequestColumns + ` FROM auth_requests WHERE project_id = ? AND id = ?`
+	setAuthRequestCodeStmt = `UPDATE auth_requests SET code_hash = ?, user_id = ?, session_id = ?, code_expires_at = ?` +
+		` WHERE project_id = ? AND id = ? AND code_hash IS NULL`
+	redeemAuthRequestCodeStmt = `DELETE FROM auth_requests WHERE project_id = ? AND code_hash = ? RETURNING ` + authRequestColumns
 )
 
 type authRequestStatements struct{ statement }
@@ -67,12 +72,47 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 	return request, nil
 }
 
+// SetAuthRequestCode implements [service.AuthRequestStatements].
+func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest) error {
+	n, err := execAffected(ctx, s.client, setAuthRequestCodeStmt,
+		request.CodeHash,
+		request.UserID,
+		request.SessionID,
+		nullUnixNano(request.CodeExpiresAt),
+		request.ProjectID,
+		request.ID,
+	)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
+// RedeemAuthRequestCode implements [service.AuthRequestStatements].
+func (s authRequestStatements) RedeemAuthRequestCode(ctx context.Context, projectID, codeHash string) (*domain.AuthRequest, error) {
+	rows, err := s.client.Query(ctx, redeemAuthRequestCodeStmt, projectID, codeHash)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	request, err := collectExactlyOneRow(rows, scanAuthRequest)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return request, nil
+}
+
 func scanAuthRequest(rows *sql.Rows) (*domain.AuthRequest, error) {
 	var (
-		request     domain.AuthRequest
-		scopes      string
-		createdNano int64
-		expiresNano int64
+		request                     domain.AuthRequest
+		scopes                      string
+		createdNano                 int64
+		expiresNano                 int64
+		codeHash, userID, sessionID sql.NullString
+		codeExpiresNano             sql.NullInt64
 	)
 	if err := rows.Scan(
 		&request.ProjectID,
@@ -88,6 +128,10 @@ func scanAuthRequest(rows *sql.Rows) (*domain.AuthRequest, error) {
 		&request.BindingHash,
 		&createdNano,
 		&expiresNano,
+		&codeHash,
+		&userID,
+		&sessionID,
+		&codeExpiresNano,
 	); err != nil {
 		return nil, err
 	}
@@ -97,6 +141,12 @@ func scanAuthRequest(rows *sql.Rows) (*domain.AuthRequest, error) {
 	}
 	request.CreatedAt = timeFromUnixNano(createdNano)
 	request.ExpiresAt = timeFromUnixNano(expiresNano)
+	request.CodeHash = codeHash.String
+	request.UserID = userID.String
+	request.SessionID = sessionID.String
+	if codeExpiresNano.Valid {
+		request.CodeExpiresAt = new(timeFromUnixNano(codeExpiresNano.Int64))
+	}
 	return &request, nil
 }
 

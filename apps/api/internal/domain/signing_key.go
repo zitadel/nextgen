@@ -79,7 +79,9 @@ func (k *SigningKey) IsRemoved() bool {
 	return k.State == KeyStateRemoved
 }
 
-func (k *SigningKey) Signer(kek crypto.Crypter) (jose.Signer, error) {
+// Signer signs with the key, decrypted by kek. opts may be nil; its headers
+// are added to every signature's protected header.
+func (k *SigningKey) Signer(kek crypto.Crypter, opts *jose.SignerOptions) (jose.Signer, error) {
 	decrypted, err := kek.Decrypt(k.Key)
 	if err != nil {
 		return nil, ErrDecryptionFailed(err)
@@ -95,7 +97,7 @@ func (k *SigningKey) Signer(kek crypto.Crypter) (jose.Signer, error) {
 				KeyID: k.ID,
 			},
 		},
-		nil,
+		opts,
 	)
 }
 

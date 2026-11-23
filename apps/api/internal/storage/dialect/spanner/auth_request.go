@@ -2,11 +2,13 @@ package spanner
 
 import (
 	"context"
+	"strings"
 
 	"cloud.google.com/go/spanner"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
@@ -14,12 +16,18 @@ const (
 	createAuthRequestStmt = `INSERT INTO auth_requests` +
 		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12) THEN RETURN created_at`
+	setAuthRequestCodeStmt = `UPDATE auth_requests SET code_hash = @p3, user_id = @p4, session_id = @p5, code_expires_at = @p6` +
+		` WHERE project_id = @p1 AND id = @p2 AND code_hash IS NULL`
 )
 
 var authRequestColumns = []string{
 	"project_id", "id", "client_id", "redirect_uri", "state", "scopes", "code_challenge",
 	"issuer", "deployment_id", "release_id", "binding_hash", "created_at", "expires_at",
+	"code_hash", "user_id", "session_id", "code_expires_at",
 }
+
+var redeemAuthRequestCodeStmt = `DELETE FROM auth_requests WHERE project_id = @p1 AND code_hash = @p2 THEN RETURN ` +
+	strings.Join(authRequestColumns, ", ")
 
 type authRequestStatements struct{ statement }
 
@@ -60,7 +68,47 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 	if err != nil {
 		return nil, err
 	}
-	var request domain.AuthRequest
+	return scanAuthRequest(row)
+}
+
+// SetAuthRequestCode implements [service.AuthRequestStatements].
+func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest) error {
+	n, err := s.db.Update(ctx, buildStatement(setAuthRequestCodeStmt,
+		request.ProjectID,
+		request.ID,
+		request.CodeHash,
+		request.UserID,
+		request.SessionID,
+		request.CodeExpiresAt,
+	).statement())
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
+// RedeemAuthRequestCode implements [service.AuthRequestStatements].
+func (s authRequestStatements) RedeemAuthRequestCode(ctx context.Context, projectID, codeHash string) (*domain.AuthRequest, error) {
+	var request *domain.AuthRequest
+	err := s.db.Write(ctx, buildStatement(redeemAuthRequestCodeStmt, projectID, codeHash).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		request, err = collectOneRow(iter, scanAuthRequest)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func scanAuthRequest(row *spanner.Row) (*domain.AuthRequest, error) {
+	var (
+		request                     domain.AuthRequest
+		codeHash, userID, sessionID spanner.NullString
+	)
 	if err := row.Columns(
 		&request.ProjectID,
 		&request.ID,
@@ -75,11 +123,21 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 		&request.BindingHash,
 		&request.CreatedAt,
 		&request.ExpiresAt,
+		&codeHash,
+		&userID,
+		&sessionID,
+		&request.CodeExpiresAt,
 	); err != nil {
 		return nil, err
 	}
 	request.CreatedAt = request.CreatedAt.UTC()
 	request.ExpiresAt = request.ExpiresAt.UTC()
+	request.CodeHash = codeHash.StringVal
+	request.UserID = userID.StringVal
+	request.SessionID = sessionID.StringVal
+	if request.CodeExpiresAt != nil {
+		request.CodeExpiresAt = new(request.CodeExpiresAt.UTC())
+	}
 	return &request, nil
 }
 

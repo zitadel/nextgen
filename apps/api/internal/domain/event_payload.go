@@ -132,6 +132,27 @@ type AuthRequestCreatedPayload struct {
 	ClientID string `json:"client_id"`
 }
 
+// Reasons on auth.request.exchange.failed: the check that refused the code.
+const (
+	AuthRequestExchangeReasonClientMismatch         = "client_mismatch"
+	AuthRequestExchangeReasonCodeExpired            = "code_expired"
+	AuthRequestExchangeReasonRedirectURIMismatch    = "redirect_uri_mismatch"
+	AuthRequestExchangeReasonCodeVerifierMissing    = "code_verifier_missing"
+	AuthRequestExchangeReasonCodeVerifierInvalid    = "code_verifier_invalid"
+	AuthRequestExchangeReasonCodeVerifierUnexpected = "code_verifier_unexpected"
+	AuthRequestExchangeReasonReleaseRevoked         = "release_revoked"
+	AuthRequestExchangeReasonSessionNotActive       = "session_not_active"
+	AuthRequestExchangeReasonUserNotActive          = "user_not_active"
+)
+
+// AuthRequestExchangeFailedPayload names the client that presented the code
+// and why it was refused. The code, its hash, the verifier and the redirect
+// URI stay out.
+type AuthRequestExchangeFailedPayload struct {
+	ClientID string `json:"client_id"`
+	Reason   string `json:"reason"`
+}
+
 type AuthCheckPayload struct {
 	CheckID       string `json:"check_id"`
 	CheckType     string `json:"check_type,omitempty"`

@@ -11443,6 +11443,35 @@
         }
       }
     },
+    "auth.request.exchange.failed": {
+      "post": {
+        "operationId": "authRequestExchangeFailed",
+        "summary": "auth.request.exchange.failed",
+        "description": "An app presented an authorization code at the OAuth token endpoint, and\na check refused it. The code is used up all the same. The payload names\nthe app by its `client_id` and says which check refused the code in\n`reason`.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth-request-exchange-failed-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "auth.sso.authorization.failed": {
       "post": {
         "operationId": "authSsoAuthorizationFailed",
@@ -23760,6 +23789,61 @@
           }
         ]
       },
+      "auth-request-exchange-failed-payload": {
+        "title": "AuthRequestExchangeFailedPayload",
+        "type": "object",
+        "description": "Payload for `auth.request.exchange.failed` events. The code, the\n`code_verifier` and the `redirect_uri` the client sent stay out.\n",
+        "required": [
+          "client_id",
+          "reason"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The client that presented the code."
+          },
+          "reason": {
+            "type": "string",
+            "description": "The check that refused the code.",
+            "enum": [
+              "client_mismatch",
+              "code_expired",
+              "redirect_uri_mismatch",
+              "code_verifier_missing",
+              "code_verifier_invalid",
+              "code_verifier_unexpected",
+              "release_revoked",
+              "session_not_active",
+              "user_not_active"
+            ]
+          }
+        }
+      },
+      "auth-request-exchange-failed-event": {
+        "title": "AuthRequestExchangeFailedEvent",
+        "description": "An event of type auth.request.exchange.failed, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "auth.request.exchange.failed"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/auth-request-exchange-failed-payload"
+              }
+            }
+          }
+        ]
+      },
       "auth-sso-authorization-failed-event": {
         "title": "AuthSsoAuthorizationFailedEvent",
         "description": "An event of type auth.sso.authorization.failed, with the shared event fields and its own payload.\n",
@@ -25639,6 +25723,9 @@
             "$ref": "#/components/schemas/auth-request-created-event"
           },
           {
+            "$ref": "#/components/schemas/auth-request-exchange-failed-event"
+          },
+          {
             "$ref": "#/components/schemas/auth-sso-authorization-failed-event"
           },
           {
@@ -25786,6 +25873,7 @@
             "auth.factor.passkey.enrolled": "#/components/schemas/auth-factor-passkey-enrolled-event",
             "auth.factor.password.set": "#/components/schemas/auth-factor-password-set-event",
             "auth.request.created": "#/components/schemas/auth-request-created-event",
+            "auth.request.exchange.failed": "#/components/schemas/auth-request-exchange-failed-event",
             "auth.sso.authorization.failed": "#/components/schemas/auth-sso-authorization-failed-event",
             "auth.sso.exchange.failed": "#/components/schemas/auth-sso-exchange-failed-event",
             "auth.sso.exchange.succeeded": "#/components/schemas/auth-sso-exchange-succeeded-event",

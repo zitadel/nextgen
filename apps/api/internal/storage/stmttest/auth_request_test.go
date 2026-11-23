@@ -116,6 +116,134 @@ func TestAuthRequestStatements_ProjectDeleteCascades(t *testing.T) {
 	})
 }
 
+func TestAuthRequestStatements_SetAndRedeemCode(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		request := createAuthRequest(t, d)
+		setCode(&request, "code_1")
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &request))
+
+		got, err := d.stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
+		require.NoError(t, err)
+		assert.Equal(t, &request, got)
+
+		redeemed, err := d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, request.CodeHash)
+		require.NoError(t, err)
+		assert.Equal(t, &request, redeemed)
+
+		_, err = d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, request.CodeHash)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		_, err = d.stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+// A request gets one code: a second one changes nothing and the first still
+// redeems.
+func TestAuthRequestStatements_SetCodeOnce(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		request := createAuthRequest(t, d)
+		first := request
+		setCode(&first, "code_1")
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &first))
+
+		second := request
+		setCode(&second, "code_2")
+		second.UserID = "user_2"
+		second.SessionID = "sess_2"
+		err := d.stmts.SetAuthRequestCode(t.Context(), &second)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, second.CodeHash)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		redeemed, err := d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, first.CodeHash)
+		require.NoError(t, err)
+		assert.Equal(t, &first, redeemed)
+	})
+}
+
+func TestAuthRequestStatements_CodeUnknown(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		request := createAuthRequest(t, d)
+
+		unknown := request
+		unknown.ID = "authreq_unknown"
+		setCode(&unknown, "code_1")
+		err := d.stmts.SetAuthRequestCode(t.Context(), &unknown)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, domain.HashSecret("never issued"))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		setCode(&request, "code_1")
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &request))
+		otherProject := ensureProject(t, d.stmts)
+		_, err = d.stmts.RedeemAuthRequestCode(t.Context(), otherProject, request.CodeHash)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		// The refused redemption left the code in its own project.
+		redeemed, err := d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, request.CodeHash)
+		require.NoError(t, err)
+		assert.Equal(t, &request, redeemed)
+	})
+}
+
+// Requests without a code do not collide on the code index (Spanner indexes
+// NULL as a value unless the index is NULL_FILTERED).
+func TestAuthRequestStatements_RequestsWithoutCodeShareAProject(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		first := createAuthRequest(t, d)
+		second := createAuthRequestIn(t, d, first.ProjectID)
+		for _, request := range []domain.AuthRequest{first, second} {
+			got, err := d.stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, &request, got)
+		}
+
+		setCode(&first, "code_1")
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &first))
+		setCode(&second, "code_2")
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &second))
+		for _, request := range []domain.AuthRequest{first, second} {
+			redeemed, err := d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, request.CodeHash)
+			require.NoError(t, err)
+			assert.Equal(t, &request, redeemed)
+		}
+	})
+}
+
+// createAuthRequest stores a request without a code in a project of its own.
+func createAuthRequest(t *testing.T, d dialect) domain.AuthRequest {
+	t.Helper()
+	return createAuthRequestIn(t, d, ensureProject(t, d.stmts))
+}
+
+// createAuthRequestIn stores a request without a code in projectID.
+func createAuthRequestIn(t *testing.T, d dialect, projectID string) domain.AuthRequest {
+	t.Helper()
+	request := domain.AuthRequest{
+		ProjectID:     projectID,
+		ClientID:      "client_1",
+		RedirectURI:   "https://app.example.com/callback",
+		State:         "xyz",
+		Scopes:        []string{"read"},
+		CodeChallenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+		Issuer:        "https://app.example.com/oauth/" + projectID,
+		DeploymentID:  "dep_1",
+		ReleaseID:     "rel_1",
+		BindingHash:   domain.HashSecret("nonce"),
+		ExpiresAt:     authRequestNow().Add(10 * time.Minute),
+	}
+	require.NoError(t, d.stmts.CreateAuthRequest(t.Context(), &request))
+	return request
+}
+
+func setCode(request *domain.AuthRequest, code string) {
+	request.CodeHash = domain.HashSecret(code)
+	request.UserID = "user_1"
+	request.SessionID = "sess_1"
+	request.CodeExpiresAt = new(authRequestNow().Add(time.Minute))
+}
+
 // authRequestNow is truncated to Postgres' microsecond precision so times
 // round-trip equal on every dialect.
 func authRequestNow() time.Time {
