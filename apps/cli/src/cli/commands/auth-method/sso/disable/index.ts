@@ -1,12 +1,13 @@
 import { Flags } from "@oclif/core";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
+import { AuthMethodCommand, noticeLines, writtenLines } from "@/cli/commands/auth-method/command";
 import { CANCELLED } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { Output } from "@/lib/ui";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -31,8 +32,6 @@ const NAME_PROVIDER_REFUSAL = {
  * can be removed today.
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
-  static override narratesItsAnswer = true;
-
   static override description = "Remove an identity provider from a user schema.";
   static override group = CommandGroups.signIn;
   static override groupOrder = 1;
@@ -128,11 +127,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         summary: {
           title: wouldTitle,
           sections: [],
+          lines: Output.screen ? [] : noticeLines(change),
         },
         next: { commands: [real] },
       });
     }
-    await this.write(target, change, confirmed.consent);
+    const written = await this.write(target, change, confirmed.consent);
     this.report(change);
     const followUps = this.followUps(change.changed);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
@@ -152,6 +152,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       summary: {
         title,
         sections: [],
+        lines: Output.screen ? [] : [...writtenLines(change, written), ...noticeLines(change)],
       },
       next:
         actions.length > 0

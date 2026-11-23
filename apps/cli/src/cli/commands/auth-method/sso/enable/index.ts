@@ -63,8 +63,6 @@ const PROVIDER_IS_NAMED_REFUSAL = {
  * history, a process listing, or CI logs.
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
-  static override narratesItsAnswer = true;
-
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.signIn;
   static override groupOrder = 1;

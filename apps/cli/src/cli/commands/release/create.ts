@@ -36,8 +36,6 @@ const MESSAGE = {
  * `zitadel release create` — build a release from .zitadel/ without deploying it.
  */
 export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
-  static override narratesItsAnswer = true;
-
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.releases;
   static override groupOrder = 4;
@@ -88,6 +86,7 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
         summary: {
           title,
           sections: [],
+          lines: this.narrated(prepared.notices),
         },
         next: {
           commands: [await this.realRun()],
@@ -113,6 +112,7 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
       summary: {
         title,
         sections: [],
+        lines: this.narrated(prepared.notices),
       },
       next: {
         commands: [this.suggest({ id: "deployment:create", flags: { release: release.id } })],

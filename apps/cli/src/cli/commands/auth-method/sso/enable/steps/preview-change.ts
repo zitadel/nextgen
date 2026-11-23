@@ -1,12 +1,16 @@
+import { noticeLines } from "@/cli/commands/auth-method/command";
 import {
   drawMapping,
   type EnableServices,
   type Fact,
+  introductionLines,
+  mappingLines,
   payload,
 } from "@/cli/commands/auth-method/sso/enable/shared";
 import type { PublishedCredentials } from "@/lib/idp";
 import type { CommandResult } from "@/lib/oclif";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { Output } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
 
 /**
@@ -25,7 +29,7 @@ const NOTHING_PUBLISHED: PublishedCredentials = {
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"flags" | "summary" | "preview" | "delivery">;
+type Needs = Fact<"flags" | "summary" | "preview" | "delivery" | "target" | "provider">;
 
 /**
  * What the step is given by the command.
@@ -116,9 +120,19 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
       summary: {
         title,
         sections: [],
-        lines: said.slice(1).map((line) => {
-          return escapeControlCharacters(line);
-        }),
+        lines: [
+          ...(Output.screen
+            ? []
+            : [
+                ...introductionLines(needs),
+                ...noticeLines(needs.preview),
+                ...mappingLines(needs.preview),
+                "",
+              ]),
+          ...said.slice(1).map((line) => {
+            return escapeControlCharacters(line);
+          }),
+        ],
       },
       next: { commands: [real] },
     };

@@ -7,7 +7,7 @@ import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schem
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
 import { ZitadelError } from "@/lib/errors";
-import { section, log, warnings } from "@/lib/ui";
+import { log, Output, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -149,8 +149,6 @@ const CHALLENGE_ID: Refused<string> = {
  * waiting on it in a second run.
  */
 export default class Claim extends ServerCommand(EnvironmentCommand) {
-  static override narratesItsAnswer = true;
-
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
@@ -284,6 +282,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
     let waitFor: { challengeId: string; deadline: number };
     // biome-ignore lint/plugin: set by whichever branch runs, which has early returns and prompts in the middle
     let opened: boolean | undefined;
+    const told: string[] = [];
     if (flags.challengeId === undefined) {
       const started = await claimService.start();
       switch (started.outcome) {
@@ -326,15 +325,18 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         "Create an account or sign in to claim your project, make it permanent and start collaborating.",
       ]);
       log.plain(escapeControlCharacters(challenge.claim_url));
+      // A terminal was just shown the link, a script is given it with the result.
+      told.push(...(Output.screen ? [] : [escapeControlCharacters(challenge.claim_url)]));
 
       if (flags.noWait) {
-        return this.linkIssued(projectId, challenge);
+        return this.linkIssued(projectId, challenge, told);
       }
 
       const skipLaunch = flags.noOpen || this.nonInteractive;
       opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
       if (!opened) {
         log.info("Open the link above to continue.");
+        told.push(...(Output.screen ? [] : ["Open the link above to continue."]));
       }
       waitFor = {
         challengeId: challenge.challenge_id,
@@ -397,6 +399,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
       summary: {
         title,
         sections: [],
+        lines: told,
         next: [
           {
             text: "Manage your project and collaborate in the Console:",
@@ -506,6 +509,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
   private linkIssued(
     projectId: string,
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
+    told: readonly string[],
   ): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "link_issued" });
     const wait = this.suggest({ id: "claim", flags: { challengeId: challenge.challenge_id } });
@@ -524,6 +528,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
       summary: {
         title,
         sections: [],
+        lines: told,
         next: [
           {
             text: "Wait for the browser step to finish with:",

@@ -143,14 +143,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
   static heading?: string;
 
   /**
-   * Set by a command whose answer is partly what it says while it works: the
-   * callback URI to register, the files it wrote. A terminal reads that as it
-   * is said. A script is given the same words in the result, under its
-   * headline, since it is never given a log line.
-   */
-  static narratesItsAnswer = false;
-
-  /**
    * Whether this command is a wizard: it walks a person through something, so
    * it draws a chain (`┌`/`│`/`└`), asks its questions inside it, and closes
    * on the summary box holding what it did, what to do next and where it ran.
@@ -321,12 +313,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
 
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
   private settled = false;
-
-  /** What the run said while it ran, which a command that narrates its answer hands a script. */
-  private readonly said: string[] = [];
-
-  /** Stops hearing what the run says. */
-  private stopHearing: (() => void) | undefined;
 
   /** Correlates the started/completed pair; minted at instance construction. */
   private readonly telemetryInvocationId = randomUUID();
@@ -600,6 +586,24 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
   }
 
   /**
+   * The text {@link narrate} says to a terminal, as the lines a script is
+   * given in the result, since a script is never given a log line.
+   *
+   * @param notices - What the publish step produced.
+   * @returns The lines, then a blank line; nothing on a terminal, which was shown them.
+   */
+  protected narrated(notices: readonly string[]): string[] {
+    const lines = notices.flatMap((notice) => {
+      return notice.replace(/\n+$/, "").split("\n");
+    });
+    if (Output.screen || lines.length === 0) {
+      return [];
+    }
+
+    return [...lines, ""];
+  }
+
+  /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
    * new frozen bag replaces the previous one, so no shared object is ever
    * mutated. `step` advances by re-recording it at each milestone.
@@ -701,11 +705,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
     this.ui.bridgeNarration({
       debug,
       silent: json,
-    });
-    this.stopHearing = log.tap((level, text) => {
-      if (level === "info" || level === "done" || level === "start" || level === "plain") {
-        this.said.push(text);
-      }
     });
     this.skillsOffered =
       this.summarises() && !this.meta.dryRun
@@ -877,39 +876,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
   }
 
   /**
-   * The result, carrying what the run said when the command narrates its
-   * answer and stdout is not a terminal.
-   *
-   * @param result - What the command returned.
-   * @returns The result, with the narration under its headline when that applies.
-   */
-  private withWhatWasSaid(result: CommandResult): CommandResult {
-    if (
-      !(this.constructor as typeof BaseCommand).narratesItsAnswer ||
-      Output.screen ||
-      this.said.length === 0 ||
-      result.status !== "ok" ||
-      result.summary === undefined
-    ) {
-      return result;
-    }
-
-    return {
-      ...result,
-      summary: {
-        ...result.summary,
-        lines: [
-          ...this.said.flatMap((text) => {
-            return text.split("\n");
-          }),
-          "",
-          ...(result.summary.lines ?? []),
-        ],
-      },
-    };
-  }
-
-  /**
    * Final step of every command: records the run's telemetry and hands the
    * result to a {@link Presenter}, which writes it for the reader the run has
    * and returns the envelope oclif serialises under `--json`.
@@ -918,7 +884,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    * @returns The envelope.
    */
   protected emit(result: CommandResult): JsonEnvelope {
-    const normalized = normalizeCommandResult(this.withWhatWasSaid(result), this.meta);
+    const normalized = normalizeCommandResult(result, this.meta);
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_COMPLETED,
@@ -1148,7 +1114,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
     this.ui.releaseNarration();
-    this.stopHearing?.();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();

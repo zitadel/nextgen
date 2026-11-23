@@ -535,15 +535,8 @@ export abstract class AuthMethodCommand extends Destructive(
       Consent.assert(consent);
     }
     const written = await change.save(target.store);
-    for (const path of written) {
-      if (change.createdPaths.includes(path)) {
-        log.done(`Wrote ${escapeControlCharacters(path)}`);
-      } else {
-        log.done(`Updated ${escapeControlCharacters(path)}`);
-      }
-    }
-    for (const path of change.removedPaths) {
-      log.done(`Removed ${escapeControlCharacters(path)}`);
+    for (const line of writtenLines(change, written)) {
+      log.done(line);
     }
     return written;
   }
@@ -561,9 +554,10 @@ export abstract class AuthMethodCommand extends Destructive(
     for (const notice of change.notices) {
       if (notice.severity === "warning") {
         warnings.report(notice.message);
-      } else {
-        log.info(escapeControlCharacters(notice.message));
       }
+    }
+    for (const line of noticeLines(change)) {
+      log.info(line);
     }
   }
 
@@ -849,4 +843,41 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
     }
     throw error;
   }
+}
+
+/**
+ * Words which files a change wrote, updated and removed.
+ *
+ * @param change - The change that was saved.
+ * @param written - The files it wrote.
+ * @returns One line for each file.
+ */
+export function writtenLines(change: Change, written: readonly string[]): string[] {
+  return [
+    ...written.map((path) => {
+      return change.createdPaths.includes(path)
+        ? `Wrote ${escapeControlCharacters(path)}`
+        : `Updated ${escapeControlCharacters(path)}`;
+    }),
+    ...change.removedPaths.map((path) => {
+      return `Removed ${escapeControlCharacters(path)}`;
+    }),
+  ];
+}
+
+/**
+ * Words what the configuration said about a change, other than its warnings,
+ * which are reported as warnings.
+ *
+ * @param change - The change.
+ * @returns One line for each notice.
+ */
+export function noticeLines(change: Change): string[] {
+  return change.notices
+    .filter((notice) => {
+      return notice.severity !== "warning";
+    })
+    .map((notice) => {
+      return escapeControlCharacters(notice.message);
+    });
 }

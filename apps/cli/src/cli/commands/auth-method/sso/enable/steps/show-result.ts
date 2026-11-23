@@ -1,16 +1,23 @@
+import { noticeLines, writtenLines } from "@/cli/commands/auth-method/command";
 import {
   drawMapping,
   type EnableServices,
   type Fact,
+  introductionLines,
+  mappingLines,
   payload,
+  publishedLines,
 } from "@/cli/commands/auth-method/sso/enable/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { Output } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"summary" | "change" | "written" | "published" | "delivery">;
+type Needs = Fact<
+  "summary" | "change" | "written" | "published" | "delivery" | "target" | "provider"
+>;
 
 /**
  * What the step is given by the command.
@@ -37,6 +44,36 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
   constructor(deps: Deps) {
     super();
     this.deps = deps;
+  }
+
+  /**
+   * What the run told the person while it worked, as the lines a script reads.
+   *
+   * @remarks
+   * A terminal was shown these as they happened, so it is given none of them
+   * again.
+   *
+   * @param needs - What the run did.
+   * @returns The lines, then a blank line, or nothing when there is none.
+   */
+  private said(needs: Needs): string[] {
+    const lines = [
+      ...introductionLines(needs),
+      ...(needs.summary.reused
+        ? [`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`]
+        : []),
+      ...publishedLines(needs.published, needs.delivery.names),
+      ...writtenLines(needs.change, needs.written),
+      ...noticeLines(needs.change),
+      ...(needs.written.length === 0 && needs.change.notices.length === 0
+        ? [
+            `${escapeControlCharacters(needs.target.schema.name)} and its login flow already offer ${escapeControlCharacters(needs.provider.displayName, { keepLayout: false })}`,
+          ]
+        : []),
+      ...mappingLines(needs.change),
+    ];
+
+    return [...lines, ""];
   }
 
   /**
@@ -84,10 +121,12 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
         summary: {
           title: escapeControlCharacters(title),
           sections: [],
-          lines:
-            unpublished && needs.delivery.areStored(needs.published)
+          lines: [
+            ...(Output.screen ? [] : this.said(needs)),
+            ...(unpublished && needs.delivery.areStored(needs.published)
               ? ["Its credentials are stored in your project."]
-              : [],
+              : []),
+          ],
         },
         next: unpublished
           ? {

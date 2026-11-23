@@ -127,8 +127,6 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * values the platform and the pipeline need.
  */
 export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand)) {
-  static override narratesItsAnswer = true;
-
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 2;
@@ -252,9 +250,6 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
             project_secret: env.ZITADEL_PROJECT_SECRET,
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
-    if (flags.project === undefined) {
-      log.info(`Created project ${escapeControlCharacters(project.id)}`);
-    }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     this.ui.ranAgainst(projectId, server);
 
@@ -484,6 +479,12 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
         title: escapeControlCharacters(title),
         sections: [],
         lines: [
+          ...(createdProject ? [`Created project ${projectId}`] : []),
+          ...(deployment === undefined
+            ? []
+            : [
+                `Deployed ${deployment.contentHash} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
+              ]),
           `Wrote ${environment.file}, which holds ${Object.keys(values).join(", ")}.`,
           ...guidanceBlock([...originGuidance, ...deployGuidance]),
           "",
@@ -569,9 +570,6 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
           this.narrate(notices);
         },
       });
-      log.info(
-        `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
-      );
       return deployment;
     } catch (error) {
       warnings.report(
