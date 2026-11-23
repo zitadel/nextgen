@@ -75,6 +75,34 @@ function ys(path: string) {
   return [...path.matchAll(/[\d.-]+,([\d.-]+)/g)].map((match) => Number(match[1]));
 }
 
+/** Points along an SVG path of `M`, `L` and `C` commands. */
+function sample(path: string, steps = 12) {
+  const points: { x: number; y: number }[] = [];
+  let at = { x: 0, y: 0 };
+  for (const [, command, args] of path.matchAll(/([MLC])([^MLC]*)/g)) {
+    const coords = [...(args ?? "").matchAll(/([\d.-]+),([\d.-]+)/g)].map((match) => ({
+      x: Number(match[1]),
+      y: Number(match[2]),
+    }));
+    const to = coords.at(-1) ?? at;
+    if (command === "M") {
+      points.push(to);
+    } else {
+      const [one, two] = command === "C" ? [coords[0] ?? at, coords[1] ?? to] : [at, to];
+      for (let step = 1; step <= steps; step++) {
+        const t = step / steps;
+        const u = 1 - t;
+        points.push({
+          x: u ** 3 * at.x + 3 * u * u * t * one.x + 3 * u * t * t * two.x + t ** 3 * to.x,
+          y: u ** 3 * at.y + 3 * u * u * t * one.y + 3 * u * t * t * two.y + t ** 3 * to.y,
+        });
+      }
+    }
+    at = to;
+  }
+  return points;
+}
+
 describe("stepSketch", () => {
   it("draws fields, buttons, providers and links in screen order", () => {
     const step: FlowStep = {
@@ -184,11 +212,43 @@ describe("layoutFlowCanvas", () => {
     expect(at.y).toBeLessThan((from?.y ?? 0) + 400);
   });
 
-  it("routes a purpose transition that points left under every card", () => {
+  it("routes a purpose transition that points left as an arc under every card", () => {
     const back = edge("register.sign_in");
-    const bottom = Math.max(...canvas.cards.map((entry) => entry.y + entry.height));
-    expect(Math.max(...ys(back.path))).toBeGreaterThan(bottom);
+    const from = card("register");
+    const samples = sample(back.path);
+    // Curves only, as every other arrow: no quadratic corners.
+    expect(back.path).toMatch(/^M[^QA]*C[^QA]*$/);
+    // Leaves the card's bottom heading down, and enters the pill from below.
+    const [first, second] = samples;
+    expect(first?.y).toBeCloseTo(from.y + from.height);
+    expect(second?.x).toBeCloseTo(first?.x ?? 0);
+    expect(second?.y).toBeGreaterThan(first?.y ?? 0);
+    const [beforeEnd, end] = samples.slice(-2);
+    expect(beforeEnd?.x).toBeCloseTo(end?.x ?? 0);
+    expect(beforeEnd?.y).toBeGreaterThan(end?.y ?? 0);
+    // Clears every other card, and the canvas is tall enough for it.
+    for (const other of canvas.cards.filter((entry) => entry.name !== "register")) {
+      for (const point of samples) {
+        const inside =
+          point.x > other.x &&
+          point.x < other.x + CANVAS_CARD_WIDTH &&
+          point.y > other.y &&
+          point.y < other.y + other.height;
+        expect(inside, `${other.name} at ${point.x},${point.y}`).toBe(false);
+      }
+    }
     expect(canvas.height).toBeGreaterThan(Math.max(...ys(back.path)));
+    // The label sits on the arc's lowest point, below every card.
+    const bottom = Math.max(...canvas.cards.map((entry) => entry.y + entry.height));
+    expect(back.labelAt?.y).toBeGreaterThan(bottom);
+    // To the pixel: the path's coordinates are rounded to a tenth.
+    expect(back.labelAt?.y).toBeCloseTo(Math.max(...samples.map((point) => point.y)), 0);
+  });
+
+  it("draws the other purpose arrows as curves too", () => {
+    for (const entry of canvas.edges.filter((item) => item.kind === "purpose")) {
+      expect(entry.path).not.toMatch(/[QA]/);
+    }
   });
 
   it("skips transitions with nothing on the canvas to point at", () => {

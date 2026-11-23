@@ -236,8 +236,20 @@ export function layoutFlowCanvas(
   });
 
   const graphHeight = graph.graph().height ?? 0;
+  const boxes = steps.map((step) => {
+    const { x, y, height: cardHeight } = node(step.name);
+    const half = CANVAS_CARD_WIDTH / 2;
+    return {
+      name: step.name,
+      left: x - half,
+      right: x + half,
+      top: y - cardHeight / 2,
+      bottom: y + cardHeight / 2,
+    };
+  });
   let height = graphHeight;
-  let lanes = 0;
+  let lane = graphHeight + 12;
+  // Every purpose arrow goes through `spline`, as the laid-out ones do.
   for (const jump of jumps) {
     const from = node(jump.from);
     const pill = node(pillId(jump.purpose));
@@ -245,37 +257,60 @@ export function layoutFlowCanvas(
     const port = top + (sizeOf(jump.from)?.ports[jump.label] ?? from.height / 2);
     const right = from.x + CANVAS_CARD_WIDTH / 2;
     const pillLeft = pill.x - pill.width / 2;
-    let path: string;
+    let points: CanvasPoint[];
     let labelAt: CanvasPoint;
     if (pillLeft >= right) {
       const mid = (right + pillLeft) / 2;
-      path = `M${right},${port} C${mid},${port} ${mid},${pill.y} ${pillLeft},${pill.y}`;
+      points = [
+        { x: right, y: port },
+        { x: mid, y: port },
+        { x: mid, y: pill.y },
+        { x: pillLeft, y: pill.y },
+      ];
       labelAt = { x: mid, y: (port + pill.y) / 2 };
     } else if (Math.abs(pill.x - from.x) < CANVAS_CARD_WIDTH / 2) {
       // The pill shares the card's column: a short arrow from the edge facing it.
       const up = pill.y < from.y;
       const start = from.y + ((up ? -1 : 1) * from.height) / 2;
       const end = pill.y + ((up ? 1 : -1) * PILL_HEIGHT) / 2;
-      path = `M${pill.x},${start} L${pill.x},${end}`;
+      points = [
+        { x: pill.x, y: start },
+        { x: pill.x, y: end },
+      ];
       labelAt = { x: pill.x + labelWidth(jump.label) / 2 + 6, y: (start + end) / 2 + 10 };
     } else {
-      // The pill is behind the card: run under every row, one lane per arrow.
-      const lane = graphHeight + 12 + 18 * lanes++;
-      const bottom = from.y + from.height / 2;
-      const turn = pill.x < from.x ? -12 : 12;
-      path =
-        `M${from.x},${bottom} L${from.x},${lane - 12} Q${from.x},${lane} ${from.x + turn},${lane} ` +
-        `L${pill.x - turn},${lane} Q${pill.x},${lane} ${pill.x},${lane - 12} ` +
-        `L${pill.x},${pill.y + PILL_HEIGHT / 2}`;
-      labelAt = { x: (from.x + pill.x) / 2, y: lane };
-      height = lane + 24;
+      // The pill is behind the card: an arc under every row, down from the
+      // card and up into the pill, each arrow in a lane of its own, sunk
+      // until it clears every card between.
+      const others = boxes.filter((box) => box.name !== jump.from);
+      const arc = (depth: number) => [
+        { x: from.x, y: from.y + from.height / 2 },
+        { x: from.x, y: depth },
+        { x: pill.x, y: depth },
+        { x: pill.x, y: pill.y + PILL_HEIGHT / 2 },
+      ];
+      const first = lane;
+      points = arc(lane);
+      for (let sunk = 0; sunk < 8 && crossesBox(points, others); sunk++) {
+        lane += 24;
+        points = arc(lane);
+      }
+      // A card straight under this one is not cleared by sinking: keep the first lane.
+      if (crossesBox(points, others)) {
+        lane = first;
+        points = arc(lane);
+      }
+      const lowest = sampleSpline(points).reduce((low, point) => (point.y > low.y ? point : low));
+      labelAt = lowest;
+      height = Math.max(height, lowest.y + 24);
+      lane += 18;
     }
     edges.push({
       id: `${jump.from}.${jump.label}`,
       kind: "purpose",
       from: jump.from,
       to: pillId(jump.purpose),
-      path,
+      path: spline(points),
       label: jump.label,
       labelAt,
     });
@@ -430,25 +465,107 @@ function labelWidth(label: string): number {
   return label.length * LABEL_CHAR + 14;
 }
 
-/** A smooth path through the layout's bend points (d3's `curveBasis`). */
-function spline(points: CanvasPoint[]): string {
-  const round = (value: number) => Math.round(value * 10) / 10;
-  const at = (point: CanvasPoint) => `${round(point.x)},${round(point.y)}`;
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (!first || !last) return "";
-  if (points.length < 3) return `M${at(first)} L${at(last)}`;
+/** One piece of a spline: a line, or a cubic with its two control points. */
+type SplinePiece = { to: CanvasPoint; controls?: [CanvasPoint, CanvasPoint] };
+
+/** A smooth curve through the bend points (d3's `curveBasis`), as its start and pieces. */
+function splinePieces(points: CanvasPoint[]): { start: CanvasPoint; pieces: SplinePiece[] } {
+  const mix = (weights: [number, CanvasPoint][], total: number): CanvasPoint => ({
+    x: weights.reduce((sum, [weight, point]) => sum + weight * point.x, 0) / total,
+    y: weights.reduce((sum, [weight, point]) => sum + weight * point.y, 0) / total,
+  });
+  const first = points[0] ?? { x: 0, y: 0 };
+  const last = points[points.length - 1] ?? first;
+  if (points.length < 3) return { start: first, pieces: [{ to: last }] };
   let [a, b] = points as [CanvasPoint, CanvasPoint];
-  let path = `M${at(a)} L${at({ x: (5 * a.x + b.x) / 6, y: (5 * a.y + b.y) / 6 })}`;
+  const pieces: SplinePiece[] = [
+    {
+      to: mix(
+        [
+          [5, a],
+          [1, b],
+        ],
+        6,
+      ),
+    },
+  ];
   const curve = (c: CanvasPoint) => {
-    path +=
-      ` C${at({ x: (2 * a.x + b.x) / 3, y: (2 * a.y + b.y) / 3 })}` +
-      ` ${at({ x: (a.x + 2 * b.x) / 3, y: (a.y + 2 * b.y) / 3 })}` +
-      ` ${at({ x: (a.x + 4 * b.x + c.x) / 6, y: (a.y + 4 * b.y + c.y) / 6 })}`;
+    pieces.push({
+      controls: [
+        mix(
+          [
+            [2, a],
+            [1, b],
+          ],
+          3,
+        ),
+        mix(
+          [
+            [1, a],
+            [2, b],
+          ],
+          3,
+        ),
+      ],
+      to: mix(
+        [
+          [1, a],
+          [4, b],
+          [1, c],
+        ],
+        6,
+      ),
+    });
     a = b;
     b = c;
   };
   for (const point of points.slice(2)) curve(point);
   curve(b);
-  return `${path} L${at(b)}`;
+  pieces.push({ to: b });
+  return { start: first, pieces };
+}
+
+/** The SVG path of {@link splinePieces}: the one function every arrow is drawn by. */
+function spline(points: CanvasPoint[]): string {
+  if (points.length === 0) return "";
+  const round = (value: number) => Math.round(value * 10) / 10;
+  const at = (point: CanvasPoint) => `${round(point.x)},${round(point.y)}`;
+  const { start, pieces } = splinePieces(points);
+  return pieces.reduce(
+    (path, { to, controls }) =>
+      controls ? `${path} C${at(controls[0])} ${at(controls[1])} ${at(to)}` : `${path} L${at(to)}`,
+    `M${at(start)}`,
+  );
+}
+
+/** Points along the curve {@link spline} draws, to test it against the cards. */
+function sampleSpline(points: CanvasPoint[], steps = 12): CanvasPoint[] {
+  const { start, pieces } = splinePieces(points);
+  const samples = [start];
+  let from = start;
+  for (const { to, controls } of pieces) {
+    const [one, two] = controls ?? [from, to];
+    for (let step = 1; step <= steps; step++) {
+      const t = step / steps;
+      const u = 1 - t;
+      samples.push({
+        x: u * u * u * from.x + 3 * u * u * t * one.x + 3 * u * t * t * two.x + t * t * t * to.x,
+        y: u * u * u * from.y + 3 * u * u * t * one.y + 3 * u * t * t * two.y + t * t * t * to.y,
+      });
+    }
+    from = to;
+  }
+  return samples;
+}
+
+function crossesBox(
+  points: CanvasPoint[],
+  boxes: { left: number; right: number; top: number; bottom: number }[],
+): boolean {
+  return sampleSpline(points).some((point) =>
+    boxes.some(
+      (box) =>
+        point.x > box.left && point.x < box.right && point.y > box.top && point.y < box.bottom,
+    ),
+  );
 }
