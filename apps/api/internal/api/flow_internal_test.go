@@ -7,7 +7,7 @@ import (
 
 	apigen "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/flowengine"
+	"github.com/zitadel/nextgen/internal/flowengine"
 )
 
 func TestToFlowField_OmitsValidationWhenAbsent(t *testing.T) {

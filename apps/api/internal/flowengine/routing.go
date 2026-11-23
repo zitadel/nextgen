@@ -7,17 +7,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// navigateHandler handles kind=navigate: it follows the action's transition
-// without taking the step's inputs.
-type navigateHandler struct{}
-
-func (navigateHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
-	// Navigating abandons any pending ceremony; without this the stale
-	// challenge re-attaches on the next render.
-	pc.state.ClearPendingChallenge()
-	return r.routeOutcome(pc, domain.FlowResolvedFields{}, pc.in.Action, false)
-}
-
 // routeOutcome sends the user to the next step: looks up the
 // transition for outcome, flips the purpose, advances state, then
 // renders (or terminates on a terminal step). When outcome differs

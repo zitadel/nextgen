@@ -9,7 +9,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/flowengine"
+	"github.com/zitadel/nextgen/internal/flowengine"
 )
 
 // conflictStep is the sso-conflict step `zitadel auth-method sso enable`

@@ -1195,7 +1195,7 @@ describe("drift audit (Go validator)", () => {
     );
   });
 
-  const stateMachineSource = join(goModule, "internal/domain/flowengine/routing.go");
+  const stateMachineSource = join(goModule, "internal/flowengine/routing.go");
 
   it.skipIf(!inMonorepo)("the switch outcomes match the engine's applyOutcomeFlip", () => {
     const source = readFileSync(stateMachineSource, "utf8");

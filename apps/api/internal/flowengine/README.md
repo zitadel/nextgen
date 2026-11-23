@@ -16,12 +16,12 @@ It does not own:
 `flowengine` imports `domain`; `domain` never imports `flowengine`.
 
 Files by concern: `state_machine.go` (the interface, start and process),
-`actions.go` (the table of one handler per action kind, which `Process`
-dispatches to), `on_success.go` (the table of one handler per `on_success`
-value, which a submit dispatches to), `challenge.go` (the table of one
-declaration per two-phase ceremony method, which every ceremony is issued and
-verified through), `routing.go`, `render.go`, `back.go`, `fields.go`,
-`passkey.go` and `sso.go`; each handler lives in its concern's
-file, and each test file is named after the concern it covers.
+`action.go` (the table of one handler per action kind, which `Process`
+dispatches to), `action_<kind>.go` (one per action kind's handler),
+`on_success.go` (the table of one handler per `on_success` value, which a
+submit dispatches to), `challenge.go` (the table of one declaration per
+two-phase ceremony method, which every ceremony is issued and verified
+through), `routing.go`, `render.go`, `back.go`, `fields.go`, `passkey.go` and
+`sso.go`. Each test file is named after the concern it covers.
 
-The design lives in [docs/design/flowengine](../../../../../docs/design/flowengine/).
+The design lives in [docs/design/flowengine](../../../../docs/design/flowengine/).

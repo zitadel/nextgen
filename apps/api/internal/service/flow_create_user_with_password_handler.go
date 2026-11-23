@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/flowengine"
+	"github.com/zitadel/nextgen/internal/flowengine"
 )
 
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:

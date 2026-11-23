@@ -15,7 +15,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/flowengine"
+	"github.com/zitadel/nextgen/internal/flowengine"
 )
 
 func TestAuthCheckTypeSSOCallback_NameAndClass(t *testing.T) {
