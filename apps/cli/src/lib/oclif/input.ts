@@ -26,6 +26,14 @@ const NOTHING_PIPED_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
+ * `--input` given nothing, or only whitespace.
+ */
+const EMPTY_REFUSAL = {
+  message: "--input is empty",
+  hint: "Pass a JSON object, '@path' to a file holding one, or '-' to read one from stdin.",
+} as const satisfies Refusal;
+
+/**
  * A document that is no JSON object.
  */
 const NOT_A_DOCUMENT_REFUSAL = {
@@ -264,9 +272,16 @@ export class Input {
     if (body === undefined) {
       return argv;
     }
+    const asksForJson = await Promise.resolve(body)
+      .then((text) => {
+        return parseJsonObject(text, "--input").json === true;
+      })
+      .catch(() => {
+        return false;
+      });
     const fallback = [
       ...line.kept,
-      ...(Input.documentSetsJson(body) && !line.given.includes("json") ? ["--json"] : []),
+      ...(asksForJson && !line.given.includes("json") ? ["--json"] : []),
       ...line.others,
       `--input=${Input.inline.test(body.trim()) ? body : JSON.stringify(body)}`,
     ];
@@ -286,7 +301,7 @@ export class Input {
    * Whether a document can be used with this command: what the `--input` flag
    * asks when oclif parses it.
    *
-   * @param source - What the flag was given: the document's text, once the hook has read it, or what names it.
+   * @param source - What the flag was given: the document's text, once `Documented` has read it, or what names it.
    * @param words - The words the command was given, to refuse any beside the document.
    * @returns Nothing, when it can.
    * @throws {ZitadelError} E_VALIDATION when it cannot be read, is no JSON object, names a flag or argument the command lacks, or has other words beside it.
@@ -413,25 +428,6 @@ export class Input {
   }
 
   /**
-   * Whether a JSON document given inline sets `json` to true. A document that
-   * is not given inline, or is no JSON object, asks for nothing.
-   *
-   * @param source - What an `--input` flag was given.
-   * @returns True when the document sets `json` to true.
-   */
-  private static documentSetsJson(source: string | undefined): boolean {
-    if (source === undefined || !source.trim().startsWith("{")) {
-      return false;
-    }
-
-    try {
-      return parseJsonObject(source, "--input").json === true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
    * What a flag's value names, as the document's text.
    *
    * @param source - Inline JSON (an object, a list, a string, `null`, `true` or `false`), `-` for stdin, `@path`, `file://path` or a path.
@@ -440,6 +436,9 @@ export class Input {
    */
   private static async textOf(source: string): Promise<string> {
     const trimmed = source.trim();
+    if (trimmed === "") {
+      throw refusalError(EMPTY_REFUSAL, {});
+    }
     if (Input.inline.test(trimmed)) {
       return trimmed;
     }
@@ -452,15 +451,17 @@ export class Input {
         throw refusalError(NOTHING_PIPED_REFUSAL, {});
       }
 
-      return piped;
+      return piped.replace(/^\uFEFF/u, "");
     }
     const path = trimmed.replace(/^@|^file:\/\//u, "");
-    return readFile(path, "utf8").catch((error: unknown) => {
+    const content = await readFile(path, "utf8").catch((error: unknown) => {
       throw refusalError(UNREADABLE_REFUSAL, {
         path,
         problem: error instanceof Error ? error.message : String(error),
       });
     });
+
+    return content.replace(/^\uFEFF/u, "");
   }
 
   /**
@@ -524,9 +525,9 @@ export class Input {
 
 /**
  * The flag that passes a whole invocation as one JSON document, under the
- * three names people and models reach for. The `prerun` hook has laid the
+ * three names people and models reach for. `Documented` has laid the
  * document under the line before this parses, so what parsing it does is the
- * refusal of a document the hook could not use.
+ * refusal of a document it could not use.
  */
 export const inputFlag = Flags.string({
   description:

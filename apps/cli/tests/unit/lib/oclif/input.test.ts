@@ -301,6 +301,17 @@ describe("Input", () => {
       expect(await expanded(["--cli-input-json", `file://${path}`])).toEqual(["--limit=5"]);
     });
 
+    it("reads a file that starts with a byte-order mark", async ({ dir }) => {
+      const path = join(dir, "bom.json");
+      await writeFile(path, '\uFEFF{"limit":5}');
+
+      expect(await expanded(["--input", path])).toEqual(["--limit=5"]);
+    });
+
+    it("refuses an empty document, saying it is empty", async () => {
+      await expect(new Input(Declaring).verify("  ")).rejects.toThrow("--input is empty");
+    });
+
     it.each([
       ["a key no flag or argument has", '{"nope":1}', "no flag of this command"],
       ["an argument the command lacks", '{"args":{"nope":1}}', "which this command lacks"],
