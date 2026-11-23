@@ -3,7 +3,6 @@ package migration
 import (
 	"context"
 	"database/sql"
-	"net/url"
 	"path/filepath"
 	"testing"
 
@@ -16,12 +15,8 @@ import (
 // later words, at the newest revision.
 func TestSearchEntriesBackfill(t *testing.T) {
 	ctx := context.Background()
-	dsn := &url.URL{
-		Scheme:   "file",
-		Path:     filepath.ToSlash(filepath.Join(t.TempDir(), "backfill.db")),
-		RawQuery: PragmaQuery,
-	}
-	db, err := sql.Open("sqlite", dsn.String())
+	dsn := FileURI(filepath.ToSlash(filepath.Join(t.TempDir(), "backfill.db")))
+	db, err := sql.Open("sqlite", dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	db.SetMaxOpenConns(1)
