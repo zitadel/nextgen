@@ -127,7 +127,11 @@ function resolveProject(env: NodeJS.ProcessEnv): Project | undefined {
     return PRODUCTION;
   }
 
-  return ciFlag.value(env) ? undefined : DEVELOPMENT;
+  if (ciFlag.value(env)) {
+    return undefined;
+  }
+
+  return DEVELOPMENT;
 }
 
 /**
@@ -152,9 +156,8 @@ export function resolveTelemetryEndpoint(env: NodeJS.ProcessEnv): TelemetryEndpo
   const project = resolveProject(env);
   // A baked-in project keeps the region it lives in: naming another would send its
   // token to a region that drops its events. Only a token of one's own is told apart.
-  const named = env.ZITADEL_TELEMETRY_TOKEN?.trim()
-    ? env.ZITADEL_TELEMETRY_REGION?.trim().toLowerCase()
-    : undefined;
+  const named =
+    env.ZITADEL_TELEMETRY_TOKEN?.trim() && env.ZITADEL_TELEMETRY_REGION?.trim().toLowerCase();
   const region = named === "us" || named === "eu" ? named : (project?.region ?? "eu");
 
   return ENDPOINTS[region];

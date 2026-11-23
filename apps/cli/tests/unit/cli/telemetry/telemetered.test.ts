@@ -80,10 +80,6 @@ class TestCommand extends Telemetered(BaseCommand) {
     return !this.interactive;
   }
 
-  protected override get isTTY(): boolean {
-    return this.interactive;
-  }
-
   public override logToStderr(): void {
     this.recorder.order.push("notice");
   }
@@ -239,6 +235,17 @@ describe("Telemetered first-run notice", () => {
     await cmd.open();
 
     expect(cmd.recorder.order.slice(0, 2)).toEqual(["notice", "cli_command_started"]);
+  });
+
+  it("leaves it for a later run when the run failed before its flags were read", async ({
+    configHome,
+  }) => {
+    const cmd = makeCommand();
+    cmd.recorder.isFirstRun = true;
+    cmd.interactive = true;
+    await cmd.failWith(new Error("boom"));
+
+    expect(markNoticed({ XDG_CONFIG_HOME: configHome })).toBe(true);
   });
 
   it("does not show it to a run that cannot ask", async () => {

@@ -173,10 +173,14 @@ export function deviceProfileProperties(meta: GlobalOptions, distinctId: string)
  * What an install's profile says only once: the version it began on, which
  * lets a cohort ask who installed which version.
  *
- * @param version - The version the install began on.
+ * @param version - The version the install began on, when it began on one that records it.
  * @returns The facts to write where the profile does not have them yet.
  */
-export function firstSeenProperties(version: string): Properties {
+export function firstSeenProperties(version?: string): Properties {
+  if (version === undefined) {
+    return {};
+  }
+
   return { first_cli_version: version };
 }
 

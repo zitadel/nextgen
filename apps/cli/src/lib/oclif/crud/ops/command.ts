@@ -100,13 +100,12 @@ export abstract class ResourceCommand<
    */
   protected override describe(): Facts {
     const { kind } = this.definition.resource;
+    const { action } = this;
+    if (kind === undefined || action === undefined) {
+      return super.describe();
+    }
 
-    return {
-      ...super.describe(),
-      ...(kind === undefined || this.action === undefined
-        ? {}
-        : { resource_type: kind, action: this.action }),
-    };
+    return { ...super.describe(), resource_type: kind, action };
   }
 
   protected override async execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope> {

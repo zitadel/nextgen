@@ -178,7 +178,7 @@ export function profileDue(
   try {
     writeStored(join(dir, "telemetry.json"), {
       ...record,
-      ...(firstVersion === undefined ? {} : { firstVersion }),
+      ...(firstVersion !== undefined && { firstVersion }),
       profile: { at: now, hash },
     });
   } catch {

@@ -216,7 +216,7 @@ export function Telemetered<
     ): Promise<GlobalOptions> {
       const meta = await super.toMeta(given, options);
       this.reportGuard(() => {
-        this.reportBegin(typeof given.telemetry === "boolean" ? given.telemetry : undefined);
+        this.reportBegin(typeof given.telemetry === "boolean" ? given.telemetry : undefined, true);
         this.ui.onPrompt(() => {
           this.reportGuard(() => {
             this.reportPrompted();
@@ -252,7 +252,7 @@ export function Telemetered<
         return await super.catch(error);
       } finally {
         this.reportGuard(() => {
-          this.reportBegin(this.argv.includes("--no-telemetry") ? false : undefined);
+          this.reportBegin(this.argv.includes("--no-telemetry") ? false : undefined, false);
           const failure = this.failed ?? toZitadelError(error);
           this.reportTrack(CLI_COMMAND_FAILED, {
             ...this.reportNotes,
@@ -293,7 +293,7 @@ export function Telemetered<
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
     }
 
-    private reportBegin(reporting: boolean | undefined): void {
+    private reportBegin(reporting: boolean | undefined, resolved: boolean): void {
       if (this.reportClient !== undefined) {
         return;
       }
@@ -309,7 +309,7 @@ export function Telemetered<
       }
       // The notice comes before the first send, and until a run that can show
       // it has, every run is the first.
-      if (client.isFirstRun && this.reportInteractive() && markNoticed(this.env)) {
+      if (client.isFirstRun && resolved && !this.nonInteractive && markNoticed(this.env)) {
         this.logToStderr(FIRST_RUN_NOTICE);
       }
       this.reportTrack(CLI_COMMAND_STARTED, { ...this.reportNotes });
@@ -330,24 +330,8 @@ export function Telemetered<
         .digest("hex");
       const due = profileDue(this.env, hash, client.record, this.meta.cliVersion);
       if (due !== undefined) {
-        client.profile(
-          facts,
-          { $ip: 0 },
-          due.firstVersion === undefined ? {} : firstSeenProperties(due.firstVersion),
-        );
+        client.profile(facts, { $ip: 0 }, firstSeenProperties(due.firstVersion));
       }
-    }
-
-    private reportInteractive(): boolean {
-      if (this.nonInteractive || this.jsonEnabled()) {
-        return false;
-      }
-      const argv = this.argv;
-      if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
-        return false;
-      }
-
-      return this.isTTY;
     }
 
     private reportFacts(): Facts {
