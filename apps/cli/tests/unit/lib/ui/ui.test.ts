@@ -203,7 +203,7 @@ describe("Ui", () => {
       const ui = normally();
 
       ui.bridgeNarration();
-      log.done("Wrote .zitadel/idps/google.json");
+      log.info("Wrote .zitadel/idps/google.json");
       log.info("Callback URI   https://example.com/callback");
       ui.releaseNarration();
 

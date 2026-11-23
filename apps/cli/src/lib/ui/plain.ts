@@ -31,6 +31,6 @@ export function writePlain(level: LogLevel, text: string): void {
  */
 export function announce(text: string): void {
   if (!Output.json) {
-    writePlain("plain", text);
+    writePlain("info", text);
   }
 }

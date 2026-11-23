@@ -1,5 +1,5 @@
 import { log, type LogLevel } from "./log";
-import { GUIDE, MARK } from "./marks";
+import { MARK } from "./marks";
 import { Output } from "./output";
 import { writePlain } from "./plain";
 import { DrawnSpinner } from "./spinner";
@@ -25,12 +25,9 @@ export interface Narratable {
 
 /** The mark a level deserves in a chain. */
 const MARKS: Readonly<Record<LogLevel, string>> = {
-  done: MARK.done,
   info: MARK.info,
-  start: MARK.started,
   warn: MARK.warning,
   fail: MARK.failed,
-  plain: GUIDE,
   debug: MARK.detail,
 };
 

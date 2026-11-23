@@ -218,7 +218,7 @@ async function installWith(input: InstallInput) {
 function stepsOf(said: ReadonlyArray<Said>): string[] {
   return said
     .filter(({ level }) => {
-      return level === "start" || level === "done";
+      return level === "info";
     })
     .map(({ text }) => {
       return text;
@@ -539,8 +539,8 @@ describe("InstallDependencies", () => {
       log.stop();
 
       expect(log.said).toEqual([
-        { level: "start", text: "Installing dependencies with npm install" },
-        { level: "done", text: "Installed dependencies" },
+        { level: "info", text: "Installing dependencies with npm install" },
+        { level: "info", text: "Installed dependencies" },
       ]);
     });
   });

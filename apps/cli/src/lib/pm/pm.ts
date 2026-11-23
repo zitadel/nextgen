@@ -50,7 +50,7 @@ export type InstallContext = {
   /** Draws the step: the command's `this.ui.task`. */
   task: <T>(label: string, work: () => Promise<T>, done?: (result: T) => string) => Promise<T>;
   /** Narrates the step when it is not drawn as a task: the CLI's `log`. */
-  log: { start(message: string): void; done(message: string): void };
+  log: { info(message: string): void };
   /** The error a failed install becomes. */
   failed: (error: unknown, command: PackageCommand) => Error;
   /** What stands in for the process, for a test. */
@@ -188,9 +188,9 @@ export class PM {
       });
     } else {
       // The package manager writes to the terminal itself, so no spinner may draw over it.
-      context.log.start(label);
+      context.log.info(label);
       await run();
-      context.log.done("Installed dependencies");
+      context.log.info("Installed dependencies");
     }
     return report("completed");
   }

@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
 import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
-import { section } from "@/lib/ui";
+import { log, section } from "@/lib/ui";
 import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -108,6 +108,8 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
         });
       }
 
+      log.info("The console of this project's server:");
+      log.info(escapeControlCharacters(consoleUrl));
       const skipLaunch = flags.noOpen || this.nonInteractive;
       const opened = skipLaunch ? false : (await openInBrowser(consoleUrl)).opened;
 
@@ -158,6 +160,8 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
     const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
     const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
+    log.info(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
+    log.info(escapeControlCharacters(signInUrl));
     const skipLaunch = flags.noOpen || this.nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
 

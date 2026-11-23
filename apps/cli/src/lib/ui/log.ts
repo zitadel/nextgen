@@ -6,7 +6,7 @@ import { writePlain } from "./plain";
  * What a line of narration is. The level decides the mark it carries in a
  * wizard's chain; a normal command draws every level as a plain line.
  */
-export type LogLevel = "info" | "done" | "start" | "warn" | "fail" | "plain" | "debug";
+export type LogLevel = "info" | "warn" | "fail" | "debug";
 
 /** Whatever draws a command's narration: the UI the base command hands it to. */
 export type LogSink = (level: LogLevel, text: string) => void;
@@ -37,24 +37,6 @@ export class Log {
   }
 
   /**
-   * Something finished.
-   *
-   * @param args - What to say, formatted the way `console` formats it.
-   */
-  done(...args: unknown[]): void {
-    this.emit("done", args);
-  }
-
-  /**
-   * Work that has begun, and will report how it ended.
-   *
-   * @param args - What to say, formatted the way `console` formats it.
-   */
-  start(...args: unknown[]): void {
-    this.emit("start", args);
-  }
-
-  /**
    * Something that worked but wants a look. Use `warnings.report` to warn.
    *
    * @param args - What to say, formatted the way `console` formats it.
@@ -70,15 +52,6 @@ export class Log {
    */
   fail(...args: unknown[]): void {
     this.emit("fail", args);
-  }
-
-  /**
-   * A line with no mark of its own, such as a link or a pasted diff.
-   *
-   * @param args - What to say, formatted the way `console` formats it.
-   */
-  plain(...args: unknown[]): void {
-    this.emit("plain", args);
   }
 
   /**

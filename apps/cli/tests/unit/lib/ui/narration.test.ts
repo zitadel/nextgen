@@ -44,13 +44,12 @@ describe("Narration", () => {
     terminal.tty(true);
     const { chain } = drawn();
 
-    log.done("Done");
+    log.info("Said");
     log.warn("Careful");
     log.fail("Broken");
-    log.start("Working");
 
     expect(chain.lines.map((line) => line.split(" ")[0])).toEqual(
-      [MARK.done, MARK.warning, MARK.failed, MARK.started].map(stripAnsi),
+      [MARK.info, MARK.warning, MARK.failed].map(stripAnsi),
     );
   });
 
@@ -107,12 +106,7 @@ describe("Narration", () => {
     }).not.toThrow();
   });
   describe("off a terminal", () => {
-    it.for<[string, () => void]>([
-      ["info", () => log.info("a statement")],
-      ["done", () => log.done("a result")],
-      ["start", () => log.start("a beginning")],
-      ["plain", () => log.plain("a link")],
-    ])(
+    it.for<[string, () => void]>([["info", () => log.info("a statement")]])(
       "leaves a %s line out, so stdout holds only what a script reads",
       ([, say], { terminal }) => {
         terminal.tty(false);
@@ -128,7 +122,7 @@ describe("Narration", () => {
       terminal.tty(false);
       const { chain } = drawn();
 
-      log.start("Waiting for the browser step to finish");
+      log.info("Waiting for the browser step to finish");
 
       expect(chain.lines).toEqual([]);
     });
@@ -148,10 +142,10 @@ describe("Narration", () => {
       terminal.tty(true);
       const { chain } = drawn();
 
-      log.start("Waiting for the browser step to finish");
+      log.info("Waiting for the browser step to finish");
 
       expect(chain.lines).toEqual([
-        `${stripAnsi(MARK.started)} Waiting for the browser step to finish`,
+        `${stripAnsi(MARK.info)} Waiting for the browser step to finish`,
       ]);
     });
   });

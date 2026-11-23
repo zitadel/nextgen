@@ -581,7 +581,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    */
   protected narrate(notices: readonly string[]): void {
     for (const notice of notices) {
-      log.plain(notice.replace(/\n+$/, ""));
+      log.info(notice.replace(/\n+$/, ""));
     }
   }
 

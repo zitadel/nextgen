@@ -1,4 +1,6 @@
 import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { log } from "@/lib/ui";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -44,6 +46,9 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
             needs.candidate.withEndpoints(needs.given.endpoints).document,
             needs.options,
           );
+    if (needs.summary.reused) {
+      log.info(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);
+    }
     await change.check(needs.target.store);
     return {
       change,

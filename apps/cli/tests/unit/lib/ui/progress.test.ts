@@ -38,7 +38,7 @@ const it = atScreenRecording.extend<{
   },
   said: ({ at }, use) => {
     return use(() => {
-      return at("plain").map((text) => {
+      return at("info").map((text) => {
         return stripAnsi(text);
       });
     });
@@ -58,7 +58,7 @@ describe("Progress", () => {
         }),
       ).rejects.toThrow("boom");
 
-      expect(at("start")).toEqual(["Fetching"]);
+      expect(at("info")).toEqual(["Fetching"]);
       expect(at("fail")).toEqual(["Fetching failed"]);
     });
 
@@ -126,9 +126,7 @@ describe("Progress", () => {
       });
 
       expect(terminal.shown()).toBe("");
-      expect(at("start")).toEqual(["Fetching users"]);
-      expect(at("info")).toEqual(["Wrote .env.local"]);
-      expect(at("done")).toEqual(["Fetching users"]);
+      expect(at("info")).toEqual(["Fetching users", "Wrote .env.local", "Fetching users"]);
     });
   });
 
@@ -194,8 +192,7 @@ describe("Progress", () => {
       step.done("Detected Next.js");
 
       expect(terminal.shown()).toBe("");
-      expect(at("info")).toEqual(["package.json"]);
-      expect(at("done")).toEqual(["Detected Next.js"]);
+      expect(at("info")).toEqual(["Detecting framework", "package.json", "Detected Next.js"]);
     });
 
     // Ending once is the step's contract, not the chain's: a caller that ends
@@ -205,7 +202,7 @@ describe("Progress", () => {
       step.done("Detected Next.js");
       step.fail("Detected nothing");
 
-      expect(at("done")).toHaveLength(1);
+      expect(at("info")).toEqual(["Detecting framework", "Detected Next.js"]);
       expect(at("fail")).toEqual([]);
     });
   });

@@ -250,6 +250,9 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
             project_secret: env.ZITADEL_PROJECT_SECRET,
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
+    if (flags.project === undefined) {
+      log.info(`Created project ${escapeControlCharacters(project.id)}`);
+    }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     this.ui.ranAgainst(projectId, server);
 
@@ -264,6 +267,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await Project.envFile(environment.path).write(values);
+    log.info(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
       {
@@ -553,7 +557,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
     projectSecret: string;
     suggest: Suggest;
   }): Promise<InitialDeployment | undefined> {
-    log.start("Deploying .zitadel/ to the new environment");
+    log.info("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await Environment.deployInitialRelease({
         client: createZitadelClient({
@@ -570,6 +574,9 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
           this.narrate(notices);
         },
       });
+      log.info(
+        `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
+      );
       return deployment;
     } catch (error) {
       warnings.report(

@@ -176,7 +176,7 @@ export class Skills {
       });
 
       try {
-        log.plain(
+        log.info(
           [
             "",
             "Using an AI coding agent?",

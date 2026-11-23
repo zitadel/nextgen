@@ -2,7 +2,7 @@ import type { Interfaces } from "@oclif/core";
 
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { Output, warnings } from "@/lib/ui";
+import { log, Output, warnings } from "@/lib/ui";
 import { Destructive } from "@/lib/oclif/destructive";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
@@ -534,7 +534,18 @@ export abstract class AuthMethodCommand extends Destructive(
     ) {
       Consent.assert(consent);
     }
-    return change.save(target.store);
+    const written = await change.save(target.store);
+    for (const path of written) {
+      if (change.createdPaths.includes(path)) {
+        log.info(`Wrote ${escapeControlCharacters(path)}`);
+      } else {
+        log.info(`Updated ${escapeControlCharacters(path)}`);
+      }
+    }
+    for (const path of change.removedPaths) {
+      log.info(`Removed ${escapeControlCharacters(path)}`);
+    }
+    return written;
   }
 
   /**
@@ -550,6 +561,8 @@ export abstract class AuthMethodCommand extends Destructive(
     for (const notice of change.notices) {
       if (notice.severity === "warning") {
         warnings.report(notice.message);
+      } else {
+        log.info(escapeControlCharacters(notice.message));
       }
     }
   }

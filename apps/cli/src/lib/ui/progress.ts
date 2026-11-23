@@ -86,7 +86,7 @@ export class Progress {
     const lines: Line[] = [];
     const report = Progress.collect(lines);
     if (!this.drawing.interactive) {
-      narration.start(label);
+      narration.info(label);
       const result = await work(report).catch((error: unknown) => {
         narration.fail(`${label} failed`);
         throw error;
@@ -94,7 +94,7 @@ export class Progress {
       for (const { verb, subject } of lines) {
         narration.info(`${verb} ${subject}`);
       }
-      narration.done(done?.(result) ?? label);
+      narration.info(done?.(result) ?? label);
 
       return result;
     }
@@ -122,7 +122,7 @@ export class Progress {
    */
   begin(label: string): Step {
     if (!this.drawing.interactive) {
-      narration.start(label);
+      narration.info(label);
       const narrated = new Once();
 
       return {
@@ -131,7 +131,7 @@ export class Progress {
         },
         done: (text) => {
           return narrated.run(() => {
-            return narration.done(text ?? label);
+            return narration.info(text ?? label);
           });
         },
         fail: (text) => {
@@ -213,7 +213,7 @@ export class Progress {
    */
   private detail(text: string): void {
     if (!this.drawing.chained) {
-      narration.plain(stripColumnMarks(`  ${text}`));
+      narration.info(stripColumnMarks(`  ${text}`));
       return;
     }
     this.line(GUIDE, text);
@@ -229,7 +229,7 @@ export class Progress {
    */
   private line(symbol: string, text: string): void {
     if (!this.drawing.chained) {
-      narration.plain(stripColumnMarks(text));
+      narration.info(stripColumnMarks(text));
       return;
     }
     log.message(stripColumnMarks(text), {
