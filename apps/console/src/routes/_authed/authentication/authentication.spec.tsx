@@ -75,7 +75,6 @@ const LOGIN_FLOW = {
   updated_at: CREATED_AT,
   flow_definition: {
     name: "default-login",
-    status: "active",
     user_schema: "sch_customers",
     purposes: { login: "identifier" },
     steps: [{ name: "identifier", sso_providers: ["google"] }],
@@ -279,6 +278,11 @@ describe("identity provider detail", () => {
     await renderAt("/authentication/idps/idp_google");
 
     expect(await screen.findByRole("heading", { name: "Google" })).toBeInTheDocument();
+    // Its list is a tab of Authentication, which the link above the title opens.
+    expect(screen.getByRole("link", { name: "Identity providers" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/\/authentication\?.*tab=identity-providers/),
+    );
     expect(screen.getByText("idp_google")).toBeInTheDocument();
     expect(screen.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Connection ID" })).toBeInTheDocument();

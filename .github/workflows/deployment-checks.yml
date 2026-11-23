@@ -76,6 +76,9 @@ on:
 
 permissions:
   contents: read
+  # For deployment-suite.yml's remote-cache step, which a called workflow
+  # gets only when its caller grants it.
+  id-token: write
 
 concurrency:
   # The event is part of the group, so a run by hand never cancels the run

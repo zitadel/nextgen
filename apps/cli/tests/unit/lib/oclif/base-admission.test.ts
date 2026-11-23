@@ -10,10 +10,6 @@ import { cliPackageRoot } from "@tests/helpers/oclif-build";
 const config = await Config.load(cliPackageRoot);
 
 class Admission extends BaseCommand {
-  static override meta = {
-    resolveServer: false,
-  };
-
   static override strict = false;
 
   static override flags = {

@@ -71,6 +71,12 @@ A request that fails answers with a `4xx` or `5xx` status and the error envelope
 
 [Errors](/docs/reference/api/errors) lists every code, what it means, and the operations that return it.
 
+## Timestamps
+
+Every timestamp the API returns is a UTC [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) string ending in `Z`, such as `2026-04-28T15:45:00Z`. The API returns no other offset, and never epoch seconds or milliseconds. Fractional seconds appear only when the value has them, so parse the string instead of matching a fixed length.
+
+Show a time in your user's own zone in your client; the API does not convert.
+
 ## Pagination
 
 A list is paged with a cursor. Set the page size with `limit`, from 1 to 100, 20 when you leave it out. While more results follow, the response carries `next_page_token`; repeat the request with it as `page_token` to get the next page. On the last page `next_page_token` is absent or `null`. A list returns no total count.
@@ -105,7 +111,8 @@ Some operations declare a `429 Too Many Requests` response, with the error envel
   <Card title="Schemas" href="/docs/reference/api/schemas" description="User schema creation, listing, and lookup endpoints." />
   <Card title="Branding" href="/docs/reference/api/branding" description="Login branding revisions: layout, template, assets, colors, typography, and shape." />
   <Card title="Identity providers" href="/docs/reference/api/identity-providers" description="External login provider connections and their revisions." />
-  <Card title="Applications" href="/docs/reference/api/applications" description="Registered applications and their OAuth clients. Specified; no handler yet." />
+  <Card title="Applications" href="/docs/reference/api/applications" description="Registered applications and their OAuth clients." />
+  <Card title="OAuth settings" href="/docs/reference/api/oauth-settings" description="Whether a project's OAuth authorization server answers; published by a release." />
   <Card title="Variables" href="/docs/reference/api/variables" description="Named values and secrets that identity provider connections reference." />
   <Card title="Releases" href="/docs/reference/api/releases" description="Immutable sets of pinned schema, flow, and branding revisions." />
   <Card title="Deployments" href="/docs/reference/api/deployments" description="Record which release runs where. Specified; answers 501 today." />

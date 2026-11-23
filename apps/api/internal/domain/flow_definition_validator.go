@@ -341,7 +341,7 @@ func uniqueNonEmptyFields(stepName string, items []Field) error {
 // - every non-terminal step must have at least one outgoing transition
 // - every transition names a target or a served purpose (whose entry step a target must be)
 // - every transition target with no action must be a step in the flow definition
-// - every transition target with an action must be an active flow definition in the same project
+// - every transition target with an action must be a flow definition in the same project
 // - every step must be reachable from some entry point in Purposes
 func validateGraph(flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 	stepNames, err := stepNamesMap(flowDefinition.Steps)
@@ -390,8 +390,8 @@ func validateGraph(flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
 						"step %q: transition %q has invalid action %q", step.Name, key, t.Action), nil)
 				}
-				// switch/pivot: target must be an active flow definition in the same project
-				// the service layer must validate that an active flow definition exists with this target name in the same project.
+				// switch/pivot: target must be a flow definition in the same project
+				// the service layer must validate that a flow definition exists with this target name in the same project.
 				pivotingTargets = append(pivotingTargets, PivotingTarget{
 					Name: t.Target, Step: step.Name, Transition: key,
 				})

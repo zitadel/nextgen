@@ -2,10 +2,11 @@ import { rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { frameworkCli } from "./framework-clis";
 import type { NodeEngines } from "./node-engines";
 
 /** The Angular CLI setup runs, for both `ng new` and the engine lookup. */
-const ANGULAR_CLI = "@angular/cli@latest";
+const ANGULAR_CLI = frameworkCli("@angular/cli");
 
 /**
  * Derives a valid Angular project name from the target directory. `ng new`
@@ -32,7 +33,8 @@ function angularProjectName(cwd: string): string {
  *
  * The Angular CLI refuses Node versions outside its `engines.node` range, so
  * {@link nodeEngines} declares it with `refuse` enforcement and the base
- * class checks the range before `ng new` runs.
+ * class checks the range before `ng new` runs. It installs nothing: setup's
+ * own install step does, once, and not under `--skip-install`.
  */
 export class AngularScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Angular";
@@ -44,6 +46,7 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
     fallback: "^22.22.3 || ^24.15.0 || >=26.0.0",
     enforcement: "refuse",
   };
+  override readonly pinnedPackages: ReadonlyArray<string> = [ANGULAR_CLI];
 
   protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
@@ -59,6 +62,9 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
         "--style=css",
         "--ssr=false",
         "--skip-git",
+        // Setup installs once, after it has added the SDKs, and not at all
+        // under --skip-install; an install here would ignore that flag.
+        "--skip-install",
       ],
       cwd,
     );

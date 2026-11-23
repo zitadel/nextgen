@@ -44,9 +44,9 @@ describe("module server handler", () => {
     vi.stubGlobal("fetch", upstream);
     const handle = await moduleHandler({ url: "" });
 
-    await handle(new Request("http://localhost:3000/__nextgen/flow"));
+    await handle(new Request("http://localhost:3000/__nextgen/flows"));
 
-    expect(upstream).toHaveBeenCalledWith("http://runtime.test/flow", expect.anything());
+    expect(upstream).toHaveBeenCalledWith("http://runtime.test/flows", expect.anything());
   });
 
   it("sends the ZITADEL_PROJECT_SECRET the server runs with on the session exchange", async () => {
@@ -68,10 +68,10 @@ describe("module server handler", () => {
     vi.stubGlobal("fetch", upstream);
     const handle = await moduleHandler({ url: "http://zitadel.test", proxyPath: "/auth" });
 
-    const res = await handle(new Request("http://localhost:3000/auth/flow?step=1"));
+    const res = await handle(new Request("http://localhost:3000/auth/flows?step=1"));
 
     expect(res.status).toBe(200);
-    expect(upstream).toHaveBeenCalledWith("http://zitadel.test/flow?step=1", expect.anything());
+    expect(upstream).toHaveBeenCalledWith("http://zitadel.test/flows?step=1", expect.anything());
   });
 
   it("leaves /__nextgen alone when another prefix is configured", async () => {
@@ -79,7 +79,7 @@ describe("module server handler", () => {
     vi.stubGlobal("fetch", upstream);
     const handle = await moduleHandler({ url: "http://zitadel.test", proxyPath: "/auth" });
 
-    await handle(new Request("http://localhost:3000/__nextgen/flow"));
+    await handle(new Request("http://localhost:3000/__nextgen/flows"));
 
     expect(upstream).not.toHaveBeenCalled();
   });
@@ -89,9 +89,9 @@ describe("module server handler", () => {
     vi.stubGlobal("fetch", upstream);
     const handle = await moduleHandler({ url: "http://zitadel.test" });
 
-    await handle(new Request("http://localhost:3000/__nextgen/flow"));
+    await handle(new Request("http://localhost:3000/__nextgen/flows"));
 
-    expect(upstream).toHaveBeenCalledWith("http://zitadel.test/flow", expect.anything());
+    expect(upstream).toHaveBeenCalledWith("http://zitadel.test/flows", expect.anything());
   });
 
   it("skips the ignoredRoutes the module configured", async () => {
@@ -120,7 +120,7 @@ describe("module server handler", () => {
     );
     const handle = await moduleHandler({ url: "http://zitadel.test", ...UNSET_BY_NITRO });
 
-    const res = await handle(new Request("http://localhost:3000/__nextgen/flow"));
+    const res = await handle(new Request("http://localhost:3000/__nextgen/flows"));
 
     expect(res.status).toBe(200);
   });

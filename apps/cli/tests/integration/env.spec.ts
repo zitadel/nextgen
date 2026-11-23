@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { asTerminal, offTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
 import { cliVersion } from "@tests/helpers/run-cli";

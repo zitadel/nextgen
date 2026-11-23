@@ -37,6 +37,7 @@ function fixture() {
     "vercel.json",
     "apps/cloud/build-launcher.sh",
     "apps/cloud/deploy.sh",
+    "apps/cloud/install-go.sh",
     "apps/api/internal/build/info.go",
   ]) {
     write(root, file, readFileSync(join(repo, file)));
@@ -75,10 +76,10 @@ function fixture() {
 import ("fmt"; "os"; "time"; "github.com/zitadel/nextgen/internal/build")
 var buildRef string
 func main() {
-  if len(os.Args) > 1 && os.Args[1] == "migrate" {
+  if len(os.Args) > 1 && (os.Args[1] == "migrate" || os.Args[1] == "seed") {
     f, err := os.OpenFile("calls", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
     if err != nil { panic(err) }; defer f.Close()
-    fmt.Fprintln(f, "migrate"); return
+    fmt.Fprintln(f, os.Args[1]); return
   }
   fmt.Printf("%s\\n%s\\n%s\\n%s\\n", build.Version(), build.Commit(), build.Date().Format(time.RFC3339), buildRef)
 }
@@ -126,7 +127,7 @@ function run(root, overrides = {}) {
   const [goos, goarch] = target.trim().split("\n");
   const command = JSON.parse(readFileSync(join(root, "vercel.json"))).services.server.buildCommand;
   return execFileSync("sh", ["-c", command], {
-    cwd: join(root, "apps/api"),
+    cwd: join(root, "apps/cloud"),
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
     env: {
@@ -139,7 +140,6 @@ function run(root, overrides = {}) {
       VERCEL: "1",
       VERCEL_GIT_COMMIT_REF: "feature",
       VERCEL_GIT_COMMIT_SHA: "first",
-      VERCEL_OUTPUT_FILE: join(root, "function"),
       GOOS: goos,
       GOARCH: goarch,
       GOFLAGS: "-x",
@@ -152,10 +152,12 @@ function run(root, overrides = {}) {
   });
 }
 function metadata(root) {
-  return execFileSync(join(root, "function"), [], { encoding: "utf8" }).trim().split("\n");
+  return execFileSync(join(root, "apps/cloud/dist/nextgen-launcher"), [], { encoding: "utf8" })
+    .trim()
+    .split("\n");
 }
 
-test("restored Go caches skip compilation, refresh metadata and still migrate and deploy", async () => {
+test("restored Go caches skip compilation, refresh metadata, still migrate, seed, deploy", async () => {
   const first = fixture();
   write(first, ".vercel/cache/golang/obsolete", "old cache");
   write(first, "apps/api/.vercel/cache/golang/pkg/mod/obsolete", "old module");
@@ -169,7 +171,7 @@ test("restored Go caches skip compilation, refresh metadata and still migrate an
   expect(readFileSync(join(first, "apps/api/.vercel/cache/golang/bin/go"), "utf8")).toBe(
     "preset toolchain",
   );
-  expect(readFileSync(join(first, "calls"), "utf8")).toBe("migrate\ndeploy\n");
+  expect(readFileSync(join(first, "calls"), "utf8")).toBe("migrate\nseed\ndeploy\n");
 
   await new Promise((resolve) => setTimeout(resolve, 1100));
   const next = fixture();
@@ -188,15 +190,17 @@ test("restored Go caches skip compilation, refresh metadata and still migrate an
   expect(existsSync(join(next, `${downloaded}.zip`))).toBe(false);
   expect(existsSync(join(next, extracted))).toBe(true);
   expect(readFileSync(join(next, `${downloaded}.ziphash`), "utf8")).toBe("preserved checksum");
-  expect(readFileSync(join(next, "calls"), "utf8")).toBe("migrate\ndeploy\n");
-  // Identical Turbo inputs still execute both side effects on the next run.
+  expect(readFileSync(join(next, "calls"), "utf8")).toBe("migrate\nseed\ndeploy\n");
+  // Identical Turbo inputs still execute every side effect on the next run.
   run(next);
-  expect(readFileSync(join(next, "calls"), "utf8")).toBe("migrate\ndeploy\nmigrate\ndeploy\n");
+  expect(readFileSync(join(next, "calls"), "utf8")).toBe(
+    "migrate\nseed\ndeploy\nmigrate\nseed\ndeploy\n",
+  );
   // A source edit really recompiles; keeping caches must not hide it.
   write(next, "apps/api/internal/build/extra.go", "package build\nconst changed = true\n");
   expect(run(next)).toMatch(/\/compile /);
   expect(readFileSync(join(next, "calls"), "utf8")).toBe(
-    "migrate\ndeploy\nmigrate\ndeploy\nmigrate\ndeploy\n",
+    "migrate\nseed\ndeploy\nmigrate\nseed\ndeploy\nmigrate\nseed\ndeploy\n",
   );
   // A changed workspace dependency set drops obsolete modules, keeping compiled packages.
   write(next, "apps/other/go.mod", "module example.com/other\ngo 1.26.0\n");

@@ -88,8 +88,7 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 			DeployedBy:     encoded.DeployedBy,
 			DeployedByType: actorType,
 		},
-		// Spanner returns UTC while pgx defaults to local; normalize.
-		DeployedAt: row.DeployedAt.UTC(),
+		DeployedAt: row.DeployedAt,
 	}, nil
 }
 

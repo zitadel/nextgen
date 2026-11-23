@@ -1,10 +1,10 @@
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
 
 import pMap from "p-map";
 
 import { readManifest } from "./lib.mjs";
+import { publishBody } from "./publish-body.mjs";
 
 const tarballsDir = process.argv[2];
 if (!tarballsDir) {
@@ -29,54 +29,26 @@ const packages = tarballs.map((file) => {
   return { tarball, manifest };
 });
 
-// Each package is two npm calls that spend most of their time idle: npm's
-// start-up, then seconds of waiting before it exits (2-10 s each on a busy
-// machine). They are independent of each other, so most of them run at once;
-// at six, the CLI wrapper's 16 packages took three rounds of 10-30 s.
+// The request `npm publish` sends, from this process: two npm processes per
+// package took 7 s for a journey's 13 packages on an otherwise idle CI
+// runner and 24 s beside the other journeys. A few at once: the server
+// platform packages' bodies are about 35 MB each.
 await pMap(
   packages,
   async ({ tarball, manifest }) => {
-    await run("npm", [
-      "publish",
-      tarball,
-      "--registry",
-      registryUrl,
-      "--tag",
-      "alpha",
-      "--access",
-      "public",
-      "--ignore-scripts",
-      "--loglevel",
-      "error",
-    ]);
-    await run("npm", [
-      "dist-tag",
-      "add",
-      `${manifest.name}@${manifest.version}`,
-      "latest",
-      "--registry",
-      registryUrl,
-      "--loglevel",
-      "error",
-    ]);
+    const body = publishBody(manifest, await readFile(tarball), registryUrl, ["alpha", "latest"]);
+    const response = await fetch(`${registryUrl}/${manifest.name.replaceAll("/", "%2f")}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `publishing ${manifest.name}@${manifest.version} to ${registryUrl} failed with ${response.status}: ${(await response.text()).slice(0, 1000)}`,
+      );
+    }
     console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
   },
-  { concurrency: 16, stopOnError: false },
+  { concurrency: 4 },
 );
-
-function run(command, args) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: "inherit" });
-    child.on("error", (error) => {
-      reject(new Error(`${command} ${args.join(" ")} failed: ${error.message}`));
-    });
-    child.on("exit", (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      const detail = signal ?? code ?? "unknown status";
-      reject(new Error(`${command} ${args.join(" ")} failed with ${detail}`));
-    });
-  });
-}

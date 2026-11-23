@@ -217,7 +217,7 @@ change are not a supported mixed-version combination.
   `api/openapi/components/headers/set-cookie-session-token.yaml`, the session
   operations in `api/openapi/endpoints/sessions/`, and
   `api/openapi/endpoints/projects/by_id/claim/complete/methods.yaml`.
-  Regenerate `api/generated` with `moon run server:generate`.
+  Regenerate `api/generated` with `turbo run generate --filter=@zitadel/server`.
 - **Server tests**: update cookie literals in `internal/api` and
   `internal/api/integration_test`, including the generated-client and CSRF
   helpers. Test both new names on their allowed transports, rejection of
@@ -232,7 +232,7 @@ change are not a supported mixed-version combination.
 - **CLI**: update the hooks in
   `apps/cli/src/lib/orca/patchers/rule/session-cookie.ts`, their recognition in
   `vite-support.ts` and `angular/templates.ts`, scaffold READMEs,
-  `apps/cli/src/lib/local-server/sign-in.ts`, the doctor checks and
+  `apps/cli/src/lib/server/local/sign-in.ts`, the doctor checks and
   `apps/cli/skills/zitadel-cli/SKILL.md`. Update setup, doctor, proxy and local
   sign-in tests for the new names and immediate v1-hook failure.
 - **Test kit and mock**: update `packages/testing/src/session.ts`,

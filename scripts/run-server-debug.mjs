@@ -3,14 +3,13 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
+import { forwardedArgs, formatCommand, isOneShotServerCommand, run } from "./dev-process.mjs";
 import {
   assertServerBuildPackage,
   gitInfo,
   serverLdflags,
   serverModuleRoot,
 } from "./server-build.mjs";
-import { runnerCommand } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const moduleRoot = serverModuleRoot(repoRoot);
@@ -44,9 +43,8 @@ try {
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
-    if (args[0] !== "migrate" && args[0] !== "completion") {
-      const build = runnerCommand(["console:build"]);
-      await run(build.command, build.args, { cwd: repoRoot });
+    if (!isOneShotServerCommand(args)) {
+      await run("turbo", ["run", "@zitadel/console#build"], { cwd: repoRoot });
     }
     await run("go", buildArgs, { cwd: moduleRoot });
     await runBinary(`./${out}`, args, repoRoot);
@@ -114,7 +112,7 @@ function withServerMigrateArgs(args) {
   if (isHelp(args) || args.includes("--migrate")) {
     return args;
   }
-  if (args[0] === "migrate" || args[0] === "completion") {
+  if (isOneShotServerCommand(args)) {
     return args;
   }
   return [...args, "--migrate"];

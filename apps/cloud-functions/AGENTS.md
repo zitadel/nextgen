@@ -24,13 +24,14 @@ takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
 - Local loop:
 
   ```sh
-  moon run cloud-functions:dev      # http://localhost:5180, runs kept in .next/workflow-data
-  npx workflow inspect runs --web   # in apps/cloud-functions: runs, steps, payloads
-  moon run cloud-functions:typecheck cloud-functions:test cloud-functions:build
+  turbo run dev --filter=@zitadel/cloud-functions   # http://localhost:5180, runs kept in .next/workflow-data
+  npx workflow inspect runs --web                   # in apps/cloud-functions: runs, steps, payloads
+  turbo run typecheck test build --filter=@zitadel/cloud-functions
   ```
 
-- Start the dev server through moon, whose task points the sign-in calls at
-  `console:dev-real`'s instance; bare `next dev` sends them back to itself.
+- Start the dev server with the `dev` script, which points the sign-in calls
+  (`CLOUD_ZITADEL_URL`) at the console's `dev:real` instance unless the shell
+  sets it; bare `next dev` sends them back to itself.
 
 - Secrets (Stripe, HubSpot, `CRON_SECRET`, the bypass secret) live in the
   `cloud` project's environment; the [runbook](../../docs/runbooks/cloud.md)

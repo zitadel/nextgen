@@ -1,0 +1,237 @@
+//go:build postgres_integration || spanner_integration || sqlite_integration
+
+package stmttest
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+func TestApplicationStatements_CreateAndGet(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		slug := "shop-" + uniqueSuffix(t)
+		generated := &domain.ApplicationClient{Slug: "web"}
+		supplied := &domain.ApplicationClient{Slug: "api", ClientID: "shop-api-" + uniqueSuffix(t)}
+
+		application := createApplication(t, d.stmts, projectID, slug, generated, supplied)
+
+		assert.True(t, domain.PrefixApplication.Matches(application.ID), "id %q is not app_-prefixed", application.ID)
+		assert.True(t, domain.PrefixApplicationRevision.Matches(application.RevisionID), "revision id %q is not apprev_-prefixed", application.RevisionID)
+		assert.WithinDuration(t, time.Now(), application.CreatedAt, 5*time.Second)
+		assert.True(t, application.CreatedAt.Equal(application.UpdatedAt), "an application that was never revised must not look edited")
+
+		// ADR 047 §5: a client without a client_id gets a copy of its key.
+		assert.True(t, domain.PrefixApplicationClient.Matches(generated.ID))
+		assert.Equal(t, generated.ID, generated.ClientID)
+		assert.True(t, domain.PrefixApplicationClient.Matches(supplied.ID))
+		assert.NotEqual(t, supplied.ID, supplied.ClientID)
+
+		scope, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindApplication, projectID, application.ID)
+		require.NoError(t, err)
+		assert.Equal(t, projectID, scope.ProjectID)
+
+		byID, err := d.stmts.GetApplication(t.Context(), applicationByID(projectID, application.ID))
+		require.NoError(t, err)
+		assert.Equal(t, slug, byID.Slug)
+		assert.Equal(t, application.RevisionID, byID.RevisionID)
+		assert.JSONEq(t, string(application.Document), string(byID.Document))
+		assert.JSONEq(t, string(applicationDocument(slug, generated, supplied)), string(byID.Document), "the stored document holds the generated client_id")
+		assert.True(t, byID.UpdatedAt.Equal(application.UpdatedAt), "create must report the timestamp a read serves")
+
+		bySlug, err := d.stmts.GetApplication(t.Context(), applicationBySlug(projectID, slug))
+		require.NoError(t, err)
+		assert.Equal(t, application.ID, bySlug.ID)
+
+		clients, err := d.stmts.ListApplicationClients(t.Context(), projectID, application.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []*domain.ApplicationClient{supplied, generated}, clients, "ordered by slug")
+
+		first := &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: generated.ID, SecretHash: domain.HashSecret("one")}
+		require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), first))
+		assert.True(t, domain.PrefixApplicationClientSecret.Matches(first.ID), "id %q is not csec_-prefixed", first.ID)
+		assert.WithinDuration(t, time.Now(), first.CreatedAt, 5*time.Second)
+		second := &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: generated.ID, SecretHash: domain.HashSecret("two")}
+		require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), second))
+
+		secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, generated.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []*domain.ApplicationClientSecret{first, second}, secrets, "a client can hold more than one secret, oldest first")
+		secrets, err = d.stmts.ListApplicationClientSecrets(t.Context(), projectID, supplied.ID)
+		require.NoError(t, err)
+		assert.Empty(t, secrets)
+	})
+}
+
+func TestApplicationStatements_SlugUniquePerProject(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		slug := "shop-" + uniqueSuffix(t)
+		createApplication(t, d.stmts, projectID, slug)
+
+		dup := &domain.Application{ProjectID: projectID, Slug: slug, Document: applicationDocument(slug)}
+		assert.ErrorIs(t, d.stmts.CreateApplication(t.Context(), dup, nil), new(database.UniqueError))
+	})
+}
+
+// A client_id is unique per project, across applications. The service tells
+// client_id_taken from other unique errors by reading the holder afterwards.
+func TestApplicationStatements_ClientIDUniquePerProject(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		clientID := "shared-" + uniqueSuffix(t)
+		holder := &domain.ApplicationClient{Slug: "web", ClientID: clientID}
+		owner := createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), holder)
+
+		second := &domain.Application{ProjectID: projectID, Slug: "blog-" + uniqueSuffix(t), Document: applicationDocument("blog")}
+		err := d.stmts.CreateApplication(t.Context(), second, []*domain.ApplicationClient{
+			{Slug: "web", ClientID: clientID},
+		})
+		require.ErrorIs(t, err, new(database.UniqueError))
+
+		// The failed create left no application behind.
+		_, err = d.stmts.GetApplication(t.Context(), applicationBySlug(projectID, second.Slug))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		got, err := d.stmts.GetApplicationClientByClientID(t.Context(), projectID, clientID)
+		require.NoError(t, err)
+		assert.Equal(t, owner.ID, got.ApplicationID)
+		assert.Equal(t, holder.ID, got.ID)
+
+		_, err = d.stmts.GetApplicationClientByClientID(t.Context(), projectID, clientID+"-nope")
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func TestApplicationStatements_ReviseAddsClients(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		slug := "shop-" + uniqueSuffix(t)
+		web := &domain.ApplicationClient{Slug: "web"}
+		application := createApplication(t, d.stmts, projectID, slug, web)
+		firstRevisionID := application.RevisionID
+
+		// The revision leaves web's client_id out, which the contract allows.
+		api := &domain.ApplicationClient{Slug: "api"}
+		application.Document = applicationDocument(slug, &domain.ApplicationClient{Slug: "web"}, api)
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), application, []*domain.ApplicationClient{api}))
+		assert.NotEqual(t, firstRevisionID, application.RevisionID)
+		assert.True(t, domain.PrefixApplicationRevision.Matches(application.RevisionID))
+		assert.True(t, application.UpdatedAt.After(application.CreatedAt))
+		assert.True(t, api.CreatedAt.Equal(application.UpdatedAt), "a client takes the stamp of the revision that adds it")
+
+		got, err := d.stmts.GetApplication(t.Context(), applicationByID(projectID, application.ID))
+		require.NoError(t, err)
+		assert.Equal(t, application.RevisionID, got.RevisionID)
+		assert.JSONEq(t, string(application.Document), string(got.Document))
+		assert.JSONEq(t, string(applicationDocument(slug, web, api)), string(got.Document), "the stored document holds the stored and the generated client_id")
+
+		clients, err := d.stmts.ListApplicationClients(t.Context(), projectID, application.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []*domain.ApplicationClient{api, web}, clients)
+
+		// A revise that trips the client_id index rolls back whole: the
+		// revision insert before it does not survive.
+		holder := &domain.ApplicationClient{Slug: "web", ClientID: "held-" + uniqueSuffix(t)}
+		createApplication(t, d.stmts, projectID, "blog-"+uniqueSuffix(t), holder)
+		revised := application.RevisionID
+		err = d.stmts.ReviseApplication(t.Context(), application, []*domain.ApplicationClient{
+			{Slug: "worker", ClientID: holder.ClientID},
+		})
+		require.ErrorIs(t, err, new(database.UniqueError))
+		assert.Equal(t, revised, application.RevisionID, "a failed revise must not move the entity to a rolled-back revision")
+
+		got, err = d.stmts.GetApplication(t.Context(), applicationByID(projectID, application.ID))
+		require.NoError(t, err)
+		assert.Equal(t, revised, got.RevisionID)
+	})
+}
+
+func TestApplicationStatements_UnknownApplication(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		unknown := &domain.Application{ProjectID: projectID, ID: "app_unknown", Document: applicationDocument("x")}
+
+		assert.ErrorIs(t, d.stmts.ReviseApplication(t.Context(), unknown, nil), new(database.NoRowFoundError))
+		err := d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			return tx.Statements().LockApplication(ctx, projectID, unknown.ID)
+		})
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		_, err = d.stmts.GetApplication(t.Context(), applicationByID(projectID, unknown.ID))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		clients, err := d.stmts.ListApplicationClients(t.Context(), projectID, unknown.ID)
+		require.NoError(t, err)
+		assert.Empty(t, clients)
+
+		err = d.stmts.CreateApplicationClientSecret(t.Context(), &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: "client_unknown", SecretHash: domain.HashSecret("one")})
+		assert.ErrorIs(t, err, new(database.ForeignKeyError))
+		secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, "client_unknown")
+		require.NoError(t, err)
+		assert.Empty(t, secrets)
+	})
+}
+
+func TestApplicationStatements_ProjectDeleteCascades(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		client := &domain.ApplicationClient{Slug: "web"}
+		application := createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), client)
+		require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: client.ID, SecretHash: domain.HashSecret("one")}))
+
+		_, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
+		require.NoError(t, err)
+
+		_, err = d.stmts.GetApplication(t.Context(), applicationByID(projectID, application.ID))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		_, err = d.stmts.GetApplicationClientByClientID(t.Context(), projectID, client.ClientID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, client.ID)
+		require.NoError(t, err)
+		assert.Empty(t, secrets)
+	})
+}
+
+// applicationDocument lists clients by slug, each with the client_id it has.
+// The type field stands for the fields storage does not model.
+func applicationDocument(slug string, clients ...*domain.ApplicationClient) []byte {
+	docClients := make([]map[string]any, 0, len(clients))
+	for _, client := range clients {
+		docClient := map[string]any{"slug": client.Slug, "type": "web"}
+		if client.ClientID != "" {
+			docClient["client_id"] = client.ClientID
+		}
+		docClients = append(docClients, docClient)
+	}
+	document, _ := json.Marshal(map[string]any{"slug": slug, "name": "Shop", "clients": docClients})
+	return document
+}
+
+func applicationByID(projectID, id string) database.Filter[domain.ApplicationField] {
+	return database.And(
+		database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID),
+		database.Equal(database.Col(domain.ApplicationFieldID), id),
+	)
+}
+
+func applicationBySlug(projectID, slug string) database.Filter[domain.ApplicationField] {
+	return database.And(
+		database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID),
+		database.Equal(database.Col(domain.ApplicationFieldSlug), slug),
+	)
+}
+
+func createApplication(t *testing.T, stmts service.ApplicationStatements, projectID, slug string, clients ...*domain.ApplicationClient) *domain.Application {
+	t.Helper()
+	application := &domain.Application{ProjectID: projectID, Slug: slug, Document: applicationDocument(slug, clients...)}
+	require.NoError(t, stmts.CreateApplication(t.Context(), application, clients))
+	return application
+}

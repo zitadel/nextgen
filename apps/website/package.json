@@ -13,8 +13,7 @@
     "start": "next start --port 3004",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
-    "test": "vitest run",
-    "test:all": "pnpm run test"
+    "test": "vitest run"
   },
   "dependencies": {
     "@vercel/analytics": "catalog:",

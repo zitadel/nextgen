@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, SETUP_ORIGIN } from "@tests/helpers/project";
 import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],
@@ -18,7 +19,7 @@ describe("origin rm", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.removeOrigin(PRIMARY_ORIGIN);
 
         expect(result).toFailWith("E_NOT_FOUND");
         expect(app.envelopeOf(result)).toEqual({
@@ -42,7 +43,7 @@ describe("origin rm", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.removeOrigin(PRIMARY_ORIGIN);
 
         expect(result).toFailWith("E_NETWORK");
         expect(app.envelopeOf(result)).toEqual({
@@ -66,7 +67,7 @@ describe("origin rm", () => {
         const app = await aSetUpApp();
         platform.refusesConnections();
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.removeOrigin(PRIMARY_ORIGIN);
 
         expect(result).toFailWith("E_NETWORK");
         expect(app.envelopeOf(result)).toEqual({
@@ -92,7 +93,7 @@ describe("origin rm", () => {
         const app = await aSetUpApp();
         const waiting = platform.hangs();
 
-        const result = app.removeOrigin("https://app.acme.com");
+        const result = app.removeOrigin(PRIMARY_ORIGIN);
         await waiting;
         pressCtrlC();
 
@@ -133,7 +134,7 @@ describe("origin rm", () => {
         const result = await app.run([
           "origin",
           "rm",
-          "https://app.acme.com",
+          PRIMARY_ORIGIN,
           "--force",
           "--env",
           "ci",
@@ -159,9 +160,9 @@ describe("origin rm", () => {
 
       it("stops admitting a pattern that was added", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.removeOrigin(PRIMARY_ORIGIN);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -169,8 +170,8 @@ describe("origin rm", () => {
           command: "origin:rm",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Removed https://app.acme.com from the project's origins",
-            pattern: "https://app.acme.com",
+            title: `Removed ${PRIMARY_ORIGIN} from the project's origins`,
+            pattern: PRIMARY_ORIGIN,
             deleted: true,
           },
           warnings: [],
@@ -181,7 +182,7 @@ describe("origin rm", () => {
       it("succeeds on a pattern the project does not hold, as the server answers 204", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.removeOrigin(PRIMARY_ORIGIN);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -189,8 +190,8 @@ describe("origin rm", () => {
           command: "origin:rm",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Removed https://app.acme.com from the project's origins",
-            pattern: "https://app.acme.com",
+            title: `Removed ${PRIMARY_ORIGIN} from the project's origins`,
+            pattern: PRIMARY_ORIGIN,
             deleted: true,
           },
           warnings: [],
@@ -219,9 +220,9 @@ describe("origin rm", () => {
       it("warns once that removing the last origin admits no origin except loopback", async () => {
         const app = await aSetUpApp();
         await app.clearOrigins();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.removeOrigin(PRIMARY_ORIGIN);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -229,22 +230,22 @@ describe("origin rm", () => {
           command: "origin:rm",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Removed https://app.acme.com",
-            pattern: "https://app.acme.com",
+            title: `Removed ${PRIMARY_ORIGIN}`,
+            pattern: PRIMARY_ORIGIN,
             deleted: true,
           },
           warnings: [
-            `https://app.acme.com was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with ${expectedPublicCliCommand(app.againAsRun("origin add '<your-app-url>' --kind primary"))}.`,
+            `${PRIMARY_ORIGIN} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with ${expectedPublicCliCommand(app.againAsRun("origin add '<your-app-url>' --kind primary"))}.`,
           ],
         });
       });
 
       it("does not warn while other origins remain", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
         await app.addOrigin("https://www.acme.com", "primary");
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.removeOrigin(PRIMARY_ORIGIN);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -252,8 +253,8 @@ describe("origin rm", () => {
           command: "origin:rm",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Removed https://app.acme.com from the project's origins",
-            pattern: "https://app.acme.com",
+            title: `Removed ${PRIMARY_ORIGIN} from the project's origins`,
+            pattern: PRIMARY_ORIGIN,
             deleted: true,
           },
           warnings: [],
@@ -262,15 +263,9 @@ describe("origin rm", () => {
 
       it("answers a dry run with the pattern it would remove and the command to run for real", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-        const result = await app.run([
-          "origin",
-          "rm",
-          "https://app.acme.com",
-          "--dry-run",
-          "--json",
-        ]);
+        const result = await app.run(["origin", "rm", PRIMARY_ORIGIN, "--dry-run", "--json"]);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -279,12 +274,12 @@ describe("origin rm", () => {
           source: "http://mock.zitadel.test",
           data: {
             dry_run: true,
-            title: "Would remove origin https://app.acme.com from the project (dry run)",
+            title: `Would remove origin ${PRIMARY_ORIGIN} from the project (dry run)`,
             verb: "remove",
             topic: "origin",
-            id: "https://app.acme.com",
+            id: PRIMARY_ORIGIN,
             next_commands: [
-              expectedPublicCliCommand(app.againAsRun("origin rm https://app.acme.com")),
+              expectedPublicCliCommand(app.againAsRun(`origin rm ${PRIMARY_ORIGIN}`)),
             ],
           },
           warnings: [],
@@ -297,7 +292,7 @@ describe("origin rm", () => {
         const result = await app.run([
           "origin",
           "rm",
-          "https://app.acme.com",
+          PRIMARY_ORIGIN,
           "--force",
           "--dry-run",
           "--json",
@@ -310,12 +305,12 @@ describe("origin rm", () => {
           source: "http://mock.zitadel.test",
           data: {
             dry_run: true,
-            title: "Would remove origin https://app.acme.com from the project (dry run)",
+            title: `Would remove origin ${PRIMARY_ORIGIN} from the project (dry run)`,
             verb: "remove",
             topic: "origin",
-            id: "https://app.acme.com",
+            id: PRIMARY_ORIGIN,
             next_commands: [
-              expectedPublicCliCommand(app.againAsRun("origin rm https://app.acme.com --force")),
+              expectedPublicCliCommand(app.againAsRun(`origin rm ${PRIMARY_ORIGIN} --force`)),
             ],
           },
           warnings: [],
@@ -324,22 +319,22 @@ describe("origin rm", () => {
 
       it("removes nothing on a dry run", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-        await app.run(["origin", "rm", "https://app.acme.com", "--dry-run", "--json"]);
+        await app.run(["origin", "rm", PRIMARY_ORIGIN, "--dry-run", "--json"]);
 
         expect(await app.projectOrigins()).toEqual([
           SETUP_ORIGIN,
-          { pattern: "https://app.acme.com", kind: "primary" },
+          { pattern: PRIMARY_ORIGIN, kind: "primary" },
         ]);
       });
 
       describe("without --force when no one can be asked", () => {
         it("is refused, naming what it would remove and how to run it again", async () => {
           const app = await aSetUpApp();
-          await app.addOrigin("https://app.acme.com", "primary");
+          await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-          const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
+          const result = await app.run(["origin", "rm", PRIMARY_ORIGIN, "--json"]);
 
           expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
           expect(app.envelopeOf(result)).toEqual({
@@ -348,14 +343,13 @@ describe("origin rm", () => {
             command: "origin:rm",
             source: "http://mock.zitadel.test",
             code: "E_CONFIRMATION_REQUIRED",
-            message:
-              "Cannot remove https://app.acme.com from the project without --force in non-interactive mode",
-            hint: `Ask a person first: Remove https://app.acme.com from ${await app.projectPlace()}? Pass --force only once they agree.`,
+            message: `Cannot remove ${PRIMARY_ORIGIN} from the project without --force in non-interactive mode`,
+            hint: `Ask a person first: Remove ${PRIMARY_ORIGIN} from ${await app.projectPlace()}? Pass --force only once they agree.`,
             next_commands: [
-              expectedPublicCliCommand(app.againAsRun("origin rm https://app.acme.com --force")),
+              expectedPublicCliCommand(app.againAsRun(`origin rm ${PRIMARY_ORIGIN} --force`)),
             ],
             details: {
-              question: `Remove https://app.acme.com from ${await app.projectPlace()}?`,
+              question: `Remove ${PRIMARY_ORIGIN} from ${await app.projectPlace()}?`,
             },
           });
         });
@@ -364,12 +358,12 @@ describe("origin rm", () => {
           "names the project and the server it would act on, for %s",
           async (_kind, server) => {
             const app = await aSetUpApp();
-            await app.addOrigin("https://app.acme.com", "primary");
+            await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
             const result = await app.runWithoutServer([
               "origin",
               "rm",
-              "https://app.acme.com",
+              PRIMARY_ORIGIN,
               "--server",
               server,
               "--json",
@@ -381,16 +375,15 @@ describe("origin rm", () => {
               command: "origin:rm",
               source: server,
               code: "E_CONFIRMATION_REQUIRED",
-              message:
-                "Cannot remove https://app.acme.com from the project without --force in non-interactive mode",
-              hint: `Ask a person first: Remove https://app.acme.com from ${await app.projectPlace(server)}? Pass --force only once they agree.`,
+              message: `Cannot remove ${PRIMARY_ORIGIN} from the project without --force in non-interactive mode`,
+              hint: `Ask a person first: Remove ${PRIMARY_ORIGIN} from ${await app.projectPlace(server)}? Pass --force only once they agree.`,
               next_commands: [
                 expectedPublicCliCommand(
-                  `origin rm https://app.acme.com --force --server ${server} --cwd ${app.path}`,
+                  `origin rm ${PRIMARY_ORIGIN} --force --server ${server} --cwd ${app.path}`,
                 ),
               ],
               details: {
-                question: `Remove https://app.acme.com from ${await app.projectPlace(server)}?`,
+                question: `Remove ${PRIMARY_ORIGIN} from ${await app.projectPlace(server)}?`,
               },
             });
           },
@@ -428,13 +421,13 @@ describe("origin rm", () => {
 
         it("removes nothing", async () => {
           const app = await aSetUpApp();
-          await app.addOrigin("https://app.acme.com", "primary");
+          await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-          await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
+          await app.run(["origin", "rm", PRIMARY_ORIGIN, "--json"]);
 
           expect(await app.projectOrigins()).toEqual([
             SETUP_ORIGIN,
-            { pattern: "https://app.acme.com", kind: "primary" },
+            { pattern: PRIMARY_ORIGIN, kind: "primary" },
           ]);
         });
       });
@@ -443,22 +436,22 @@ describe("origin rm", () => {
     describe("rendered for a terminal", () => {
       it("says what stops being admitted, as the envelope's title does", async () => {
         const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-        const result = await app.run(["origin", "rm", "https://app.acme.com", "--force"]);
+        const result = await app.run(["origin", "rm", PRIMARY_ORIGIN, "--force"]);
 
         expect(result.stdout.split("\n")[0]).toBe(
-          "Removed https://app.acme.com from the project's origins",
+          `Removed ${PRIMARY_ORIGIN} from the project's origins`,
         );
       });
 
       it("draws the dry run's headline", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["origin", "rm", "https://app.acme.com", "--dry-run"]);
+        const result = await app.run(["origin", "rm", PRIMARY_ORIGIN, "--dry-run"]);
 
         expect(result.stdout.split("\n")[0]).toBe(
-          "Would remove origin https://app.acme.com from the project (dry run)",
+          `Would remove origin ${PRIMARY_ORIGIN} from the project (dry run)`,
         );
       });
 
@@ -484,9 +477,9 @@ describe("origin rm", () => {
       it("warns once that removing the last origin admits no origin except loopback", async () => {
         const app = await aSetUpApp();
         await app.clearOrigins();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-        const result = await app.run(["origin", "rm", "https://app.acme.com", "--force"]);
+        const result = await app.run(["origin", "rm", PRIMARY_ORIGIN, "--force"]);
 
         expect(result).toSayOnce("admits no origin except a loopback origin. Add");
       });
@@ -494,9 +487,9 @@ describe("origin rm", () => {
       it("says how to add an origin back after removing the last one, once", async () => {
         const app = await aSetUpApp();
         await app.clearOrigins();
-        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
-        const result = await app.run(["origin", "rm", "https://app.acme.com", "--force"]);
+        const result = await app.run(["origin", "rm", PRIMARY_ORIGIN, "--force"]);
 
         expect(result).toSayOnce(
           expectedPublicCliCommand(app.againAsRun("origin add '<your-app-url>' --kind primary")),

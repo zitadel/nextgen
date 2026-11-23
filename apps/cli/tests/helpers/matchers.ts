@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
 import { parseJson, stripAnsi } from "./run-cli";
-import { asOneLine } from "./terminal";
+import { asOneLine } from "@tests/fixtures/terminal";
 
 /**
  * Whether a run said `text`, wherever the layout happened to break it.
@@ -121,6 +121,19 @@ function envelopeOf(result: CliResult): Envelope {
   } catch {
     return {};
   }
+}
+
+/**
+ * The commands a run suggested, each without the runner that spells it out
+ * (`npx @zitadel/cli@<version>`), which differs by how the CLI was invoked.
+ *
+ * @param received - The finished run.
+ * @returns The suggested commands, in the order they were suggested.
+ */
+function commandsAfterRunner(received: CliResult): string[] {
+  return suggestionsIn(envelopeOf(received)).map((candidate) => {
+    return candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, "");
+  });
 }
 
 function describeResult(result: CliResult): string {
@@ -310,10 +323,7 @@ expect.extend({
   },
 
   toSuggestExactly(received: CliResult, command: string) {
-    // The command after the runner, which differs by how the CLI was invoked.
-    const suggested = suggestionsIn(envelopeOf(received)).map((candidate) =>
-      candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, ""),
-    );
+    const suggested = commandsAfterRunner(received);
     const pass = suggested.includes(command);
     return {
       pass,
@@ -323,6 +333,27 @@ expect.extend({
           : `expected to suggest exactly "${command}", but next_commands were: ${
               suggested.join(", ") || "(none)"
             }`,
+    };
+  },
+
+  toSuggestOnly(received: CliResult, ...commands: string[]) {
+    const suggested = commandsAfterRunner(received);
+    const pass =
+      suggested.length === commands.length &&
+      suggested.every((command, index) => {
+        return command === commands[index];
+      });
+    const wanted = commands.join(", ") || "(none)";
+    const found = suggested.join(", ") || "(none)";
+    return {
+      pass,
+      message: () => {
+        if (pass) {
+          return `expected the suggestions not to be exactly: ${wanted}`;
+        }
+
+        return `expected the suggestions to be exactly: ${wanted}, but next_commands were: ${found}`;
+      },
     };
   },
 
@@ -472,9 +503,16 @@ declare module "vitest" {
     toSuggest(command: string): T;
     /**
      * One of the suggested `next_commands` is exactly this, after the runner
-     * (`npx @zitadel/cli@<version>`): no flag missing, extra or repeated.
+     * (`npx @zitadel/cli@<version>`): no flag missing, extra or repeated. It
+     * checks one command; to check the whole list, use `toSuggestOnly`.
      */
     toSuggestExactly(command: string): T;
+    /**
+     * The suggested `next_commands` are exactly these, in this order, after the
+     * runner (`npx @zitadel/cli@<version>`): none missing and none extra. Unlike
+     * `toSuggestExactly`, which checks one command, it checks the whole list.
+     */
+    toSuggestOnly(...commands: string[]): T;
     /** stdout contains this text. Prefer it over `toSay` for rendered output. */
     toPrint(text: string): T;
     /** stdout contains this text byte for byte, line breaks included, where `toPrint` lets them fold. */

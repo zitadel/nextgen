@@ -1,11 +1,11 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
 import type { NodeEngines } from "@/lib/orca/scaffolders/node-engines";
+import { it } from "@tests/fixtures";
 import { SUPPORTED_NODE } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn(() => ({ failed: true, stdout: "" })) }));
@@ -35,14 +35,14 @@ class AnyFolderScaffolder extends RecordingScaffolder {
   protected override readonly requiresValidFolderName = false;
 }
 
-const dirs: string[] = [];
-afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
-
-async function folderNamed(name: string): Promise<string> {
-  const parent = await mkdtemp(join(tmpdir(), "zitadel-cli-scaffolder-"));
-  dirs.push(parent);
+/**
+ * Makes a folder with the given name inside a directory.
+ *
+ * @param parent - The directory to make it in.
+ * @param name - The folder's name.
+ * @returns The folder's path.
+ */
+async function folderNamed(parent: string, name: string): Promise<string> {
   const cwd = join(parent, name);
   await mkdir(cwd);
   return cwd;
@@ -50,8 +50,8 @@ async function folderNamed(name: string): Promise<string> {
 
 describe("AbstractCLIScaffolder", () => {
   describe("in a folder whose name is a valid package name", () => {
-    it("runs the framework CLI in the folder itself", async () => {
-      const cwd = await folderNamed("my-app");
+    it("runs the framework CLI in the folder itself", async ({ dir }) => {
+      const cwd = await folderNamed(dir, "my-app");
       const scaffolder = new RecordingScaffolder(SUPPORTED_NODE);
 
       await scaffolder.scaffold(cwd, "recording");
@@ -62,8 +62,8 @@ describe("AbstractCLIScaffolder", () => {
   });
 
   describe("in a folder whose name is not a valid package name", () => {
-    it("runs the framework CLI in a subfolder named as a valid package name", async () => {
-      const cwd = await folderNamed("tmp.w4SK1wDYDb");
+    it("runs the framework CLI in a subfolder named as a valid package name", async ({ dir }) => {
+      const cwd = await folderNamed(dir, "tmp.w4SK1wDYDb");
       const scaffolder = new RecordingScaffolder(SUPPORTED_NODE);
 
       await scaffolder.scaffold(cwd, "recording");
@@ -71,8 +71,8 @@ describe("AbstractCLIScaffolder", () => {
       expect(scaffolder.ranIn.map((ran) => basename(ran))).toEqual(["tmp-w4sk1wdydb"]);
     });
 
-    it("moves what the framework CLI created up into the folder", async () => {
-      const cwd = await folderNamed("tmp.w4SK1wDYDb");
+    it("moves what the framework CLI created up into the folder", async ({ dir }) => {
+      const cwd = await folderNamed(dir, "tmp.w4SK1wDYDb");
 
       await new RecordingScaffolder(SUPPORTED_NODE).scaffold(cwd, "recording");
 
@@ -80,8 +80,8 @@ describe("AbstractCLIScaffolder", () => {
       expect(await readFile(join(cwd, "app", "page.tsx"), "utf8")).toBe("page\n");
     });
 
-    it("cuts the subfolder's name to npm's 214 characters", async () => {
-      const cwd = await folderNamed(`${"a".repeat(215)}.`);
+    it("cuts the subfolder's name to npm's 214 characters", async ({ dir }) => {
+      const cwd = await folderNamed(dir, `${"a".repeat(215)}.`);
       const scaffolder = new RecordingScaffolder(SUPPORTED_NODE);
 
       await scaffolder.scaffold(cwd, "recording");
@@ -89,8 +89,8 @@ describe("AbstractCLIScaffolder", () => {
       expect(scaffolder.ranIn.map((ran) => basename(ran))).toEqual(["a".repeat(214)]);
     });
 
-    it("falls back to app when nothing of the name is usable", async () => {
-      const cwd = await folderNamed("__");
+    it("falls back to app when nothing of the name is usable", async ({ dir }) => {
+      const cwd = await folderNamed(dir, "__");
       const scaffolder = new RecordingScaffolder(SUPPORTED_NODE);
 
       await scaffolder.scaffold(cwd, "recording");
@@ -98,8 +98,8 @@ describe("AbstractCLIScaffolder", () => {
       expect(scaffolder.ranIn.map((ran) => basename(ran))).toEqual(["app"]);
     });
 
-    it("does not use a subfolder when the scaffolder takes any folder name", async () => {
-      const cwd = await folderNamed("tmp.w4SK1wDYDb");
+    it("does not use a subfolder when the scaffolder takes any folder name", async ({ dir }) => {
+      const cwd = await folderNamed(dir, "tmp.w4SK1wDYDb");
       const scaffolder = new AnyFolderScaffolder(SUPPORTED_NODE);
 
       await scaffolder.scaffold(cwd, "recording");

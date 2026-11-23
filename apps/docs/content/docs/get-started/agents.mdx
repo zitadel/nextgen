@@ -81,6 +81,8 @@ Summarize commands run, JSON statuses, files changed, browser steps completed, a
 
 The run worked when `setup` returned `status: ok` and the browser loop ends on the signed-in page, with the profile showing the user you registered.
 
+To keep that proof as a test in the app, write it with `@zitadel/testing`, which boots its own Zitadel server and seeds the users ([Test your app's sign-in](/docs/guides/test-your-app)).
+
 ## Stable UI proof
 
 `<zitadel-login>` and `<zitadel-session>` are web components that render in a shadow DOM, and the fields and buttons inside them have shadow roots of their own. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers need to recurse through every shadow root.

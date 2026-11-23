@@ -21,7 +21,7 @@ const (
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
     operation_status, status_class,
@@ -67,7 +67,7 @@ var eventColumns = []string{
 	"project_id", "id", "event_type", "category",
 	"occurred_at", "created_at",
 	"team_id", "actor_id", "actor_type",
-	"entity_type", "entity_id",
+	"entity_type", "entity_id", "user_id",
 	"client_id", "token_id", "delegation_type", "delegation_id", "grantor", "fingerprint",
 	"request_id", "session_id", "flow_id",
 	"operation_status", "status_class",
@@ -132,6 +132,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		"actor_type":       nullActorType(event.ActorType),
 		"entity_type":      nullString(event.EntityType),
 		"entity_id":        nullString(event.EntityID),
+		"user_id":          nullString(event.UserID),
 		"client_id":        event.ClientID,
 		"token_id":         event.TokenID,
 		"delegation_type":  event.DelegationType,
@@ -368,6 +369,7 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 		ev                                               domain.Event
 		eventType, category                              string
 		teamID, actorID, actorType, entityType, entityID spanner.NullString
+		userID                                           spanner.NullString
 		requestID, sessionID, flowID                     spanner.NullString
 		operationStatus, statusClass                     spanner.NullString
 		payload, metadata                                spanner.NullJSON
@@ -376,7 +378,7 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 		&ev.ProjectID, &ev.ID, &eventType, &category,
 		&ev.OccurredAt, &ev.CreatedAt,
 		&teamID, &actorID, &actorType,
-		&entityType, &entityID,
+		&entityType, &entityID, &userID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
 		&operationStatus, &statusClass,
@@ -396,6 +398,7 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 	}
 	ev.EntityType = spannerNullStringPtr(entityType)
 	ev.EntityID = spannerNullStringPtr(entityID)
+	ev.UserID = spannerNullStringPtr(userID)
 	ev.RequestID = spannerNullStringPtr(requestID)
 	ev.SessionID = spannerNullStringPtr(sessionID)
 	ev.FlowID = spannerNullStringPtr(flowID)

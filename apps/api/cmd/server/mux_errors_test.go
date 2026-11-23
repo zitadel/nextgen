@@ -23,11 +23,12 @@ func TestBuildHTTPMuxAnswersAPathNothingServes(t *testing.T) {
 	apiServers, err := api.NewServers(oasapi.UnimplementedHandler{}, api.NewSecurityHandler(nil),
 		apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), consoleLink("/console"), 0)...)
 	require.NoError(t, err)
-	mux, err := buildHTTPMux(ServerConfig{RequestIDHeader: "x-vercel-id"}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, nil, nil)
+	mux, err := buildHTTPMux(ServerConfig{RequestIDHeader: "x-vercel-id"}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	const vercelRequestID = "2vxlh-1792820352212-3ce3eb4ad630"
-	for _, path := range []string{"/no-such-page", "/api/v1/no-such-page", "/api/v1"} {
+	// With oauth.enabled off, the OAuth server's paths are such paths too.
+	for _, path := range []string{"/no-such-page", "/api/v1/no-such-page", "/api/v1", "/oauth/proj_123/token", "/.well-known/oauth-authorization-server/oauth/proj_123"} {
 		send := func(accept string) *httptest.ResponseRecorder {
 			r := httptest.NewRequest(http.MethodGet, path, nil)
 			r.Header.Set("Accept", accept)

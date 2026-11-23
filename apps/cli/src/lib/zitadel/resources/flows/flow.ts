@@ -203,11 +203,10 @@ export class Flow extends ConfigDocument<FlowValue> {
   /**
    * Whether the flow can sign anyone in.
    *
-   * @returns True when it is `active`, the only status that is served, and has
-   *   a `login` entry.
+   * @returns True when it has a `login` entry.
    */
   get servesLogin(): boolean {
-    return this.value.status === "active" && this.value.purposes.login !== undefined;
+    return this.value.purposes.login !== undefined;
   }
 
   /**

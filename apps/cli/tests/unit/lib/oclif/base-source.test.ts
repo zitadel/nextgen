@@ -6,7 +6,7 @@ import { CLI_COMMAND_STARTED } from "@/lib/oclif/command-telemetry";
 import type { JsonEnvelope } from "@/lib/oclif/types";
 import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { onTerminalReadingAFile } from "@tests/fixtures/terminal";
 
 const config = await Config.load(cliPackageRoot);
 
@@ -39,10 +39,6 @@ class RecordingTelemetry {
 class Sourced extends BaseCommand {
   public static override readonly id = "sourced-test";
   public readonly recorder = new RecordingTelemetry();
-
-  public static override meta = {
-    resolveServer: false,
-  };
 
   protected override createTelemetry(_deps: TelemetryDeps): Telemetry {
     return this.recorder as unknown as Telemetry;
@@ -81,10 +77,6 @@ describe("the server a run is about", () => {
 /** A command that answers with whether this run's output is coloured. */
 class Coloured extends BaseCommand {
   public static override readonly id = "coloured-test";
-
-  public static override meta = {
-    resolveServer: false,
-  };
 
   public answer: boolean | undefined;
 

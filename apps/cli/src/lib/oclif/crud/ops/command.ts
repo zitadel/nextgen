@@ -2,11 +2,24 @@ import type { Command, Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
 import type { Admitted, BaseCommand } from "@/lib/oclif/base";
+import type { CommandClass } from "@/lib/oclif/command-class";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "@/lib/oclif/crud/types";
 import { Destructive } from "@/lib/oclif/destructive";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+
+/**
+ * What gives a command the server it talks to: the mixin the CLI applies to
+ * every command (`ServerCommand`), handed in by the one place that builds these
+ * commands, so this layer names no server of its own.
+ */
+export type ServerMixin = <
+  TBase extends CommandClass<BaseCommand> &
+    Pick<typeof BaseCommand, "baseFlags" | "enableJsonFlag">,
+>(
+  Base: TBase,
+) => TBase;
 
 /** Everything an operation needs to know about the resource it serves. */
 export type OperationDefinition<Ctx, Spec> = Readonly<{
@@ -44,7 +57,6 @@ export type OperationInput<
  * that turns a definition into the command's statics.
  */
 export type OperationClass<Ctx, Spec> = typeof ResourceCommand<Ctx, Spec> & {
-  new (...args: ConstructorParameters<typeof Command>): ResourceCommand<Ctx, Spec>;
   describe(definition: OperationDefinition<Ctx, Spec>): OperationStatics;
 };
 
@@ -55,7 +67,7 @@ export type OperationClass<Ctx, Spec> = typeof ResourceCommand<Ctx, Spec> & {
  * definition is bound onto a subclass by {@link bindOperation}; the operation
  * classes themselves are never registered with oclif directly.
  */
-export class ResourceCommand<
+export abstract class ResourceCommand<
   Ctx,
   Spec,
   Input extends OperationInput = OperationInput,
@@ -97,13 +109,23 @@ export class ResourceCommand<
 /**
  * Produce the oclif command class for one operation on one resource: a
  * subclass carrying the definition and the statics `describe` derives from it.
+ * The subclass takes its server from `takesServer`, which makes it a command
+ * that can be run.
  */
 export const bindOperation = <Ctx, Spec>(
   operation: OperationClass<Ctx, Spec>,
   definition: OperationDefinition<Ctx, Spec>,
+  takesServer: ServerMixin,
 ): typeof Command => {
   const statics = operation.describe(definition);
-  const bound = class extends operation {
+  const runnable = takesServer(operation) as unknown as Omit<
+    OperationClass<Ctx, Spec>,
+    "prototype"
+  > &
+    (new (
+      ...args: ConstructorParameters<typeof Command>
+    ) => object);
+  const bound = class extends runnable {
     static override description = statics.description;
     static override examples = [...statics.examples];
     static override flags = statics.flags;
@@ -117,7 +139,7 @@ export const bindOperation = <Ctx, Spec>(
   // dwarf the metadata an agent actually reads.
   definitions.set(bound, definition as OperationDefinition<unknown, unknown>);
 
-  return bound;
+  return bound as unknown as typeof Command;
 };
 
 /** Definitions held beside their command classes, keyed weakly so they are collectable. */

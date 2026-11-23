@@ -9,7 +9,7 @@ import { devApiRoute } from "../../vite.config";
  * Pins the API base (Console ADR 0002 §4, revised): the console puts nothing
  * in front of the API's `/api/v1`, under the dev server, whose proxy forwards
  * that path unchanged, as in the embedded production build, where the Go
- * server serves it (ADR 077). The embedded e2e lane (`e2e:console-embedded`)
+ * server serves it (ADR 077). The embedded e2e lane (`@zitadel/e2e#console-embedded`)
  * proves the full request path but is opt-in local; this spec is the
  * CI-visible guard on the client half, the counterpart of
  * `cmd/server/mux_test.go` pinning the server half.

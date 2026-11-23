@@ -284,7 +284,9 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 		Times(1)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.Value == email
+			// Register marks the lookup as a sign-up's, which records no
+			// failed check when the email is free.
+			return in.Value == email && in.Register
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
@@ -340,7 +342,8 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
 			return assert.Equal(t, attemptID, in.AttemptID) &&
 				assert.Equal(t, "email", in.AttributeName) &&
-				assert.Equal(t, email, in.Value)
+				assert.Equal(t, email, in.Value) &&
+				assert.False(t, in.Register, "a sign-in's lookup is not a sign-up's")
 		})).
 		Return(userID, nil).
 		Times(1)
@@ -3096,15 +3099,16 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField(t *
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
 		Return(domain.ErrUserAlreadyExists())
 	// Re-resolution walks the identifier-class candidates in field order:
-	// the username is fresh (rejected), the email resolves the owner.
+	// the username is fresh (rejected), the email resolves the owner. Both
+	// are a sign-up's lookups, so the fresh one writes no failed check.
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.AttributeName == "username" && in.Value == username
+			return in.AttributeName == "username" && in.Value == username && in.Register
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.AttributeName == "email" && in.Value == email
+			return in.AttributeName == "email" && in.Value == email && in.Register
 		})).
 		Return(existingUserID, nil)
 
@@ -5037,7 +5041,7 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 }
 
 // The case a client cannot cover for itself: the widget keeps collected
-// values in memory only, while GET /flow/{id} re-renders from flow state.
+// values in memory only, while GET /flows/{flow_id} re-renders from flow state.
 func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -6209,7 +6213,7 @@ func TestFlowStateMachine_Render_TerminalStepSkipsResolution(t *testing.T) {
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
 	assert.Equal(t, "done", result.Step.Name)
-	// Marked complete, so GET /flow/{id} can answer 410 for a finished flow.
+	// Marked complete, so GET /flows/{flow_id} can answer 410 for a finished flow.
 	assert.NotNil(t, result.Step.Complete)
 }
 

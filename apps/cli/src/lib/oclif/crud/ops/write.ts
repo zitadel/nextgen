@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
@@ -157,11 +157,11 @@ const describeWrite = <
 };
 
 /** What a write without a body to send is refused for. */
-const NEEDS_BODY_REFUSAL: Refusal = {
+const NEEDS_BODY_REFUSAL = {
   message: "{command} needs a body",
   hint: "Pass the body's fields as flags (the help below lists them), --set <path>=<value>, or --data '<json>' / --file <path>.",
   next: ["{help}"],
-};
+} as const satisfies Refusal;
 
 const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
   return (
@@ -207,6 +207,10 @@ abstract class WriteOperation<
         document: documentSchemaOf(spec.schema, spec.root),
         fields,
         references: options.references,
+        retry: await this.rerun<{
+          file: Interfaces.OptionFlag<string | undefined>;
+          data: Interfaces.OptionFlag<string | undefined>;
+        }>({ with: { file: "<path>" }, without: ["data"] }),
       },
       flags,
     );
@@ -228,20 +232,20 @@ abstract class WriteOperation<
       });
     }
 
-    // Some writes answer without a body (`grants create` by identifier answers
+    // Some writes answer without a body (`grant create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
-    let summary: Summary = {
-      title: "Command completed",
-      sections: [],
-    };
-    if (result !== undefined) {
-      summary = {
-        title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
-        sections: [],
-        lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
-      };
-    }
+    const summary: Summary =
+      result === undefined
+        ? {
+            title: "Command completed",
+            sections: [],
+          }
+        : {
+            title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
+            sections: [],
+            lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+          };
 
     return {
       status: "ok",
@@ -277,7 +281,7 @@ abstract class WriteOperation<
 }
 
 /** `<topic> create`. */
-export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
+export abstract class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
   static describe<Ctx>(definition: OperationDefinition<Ctx, CreateSpec<Ctx>>): OperationStatics {
     return describeWrite(definition, definition.options, "create");
   }
@@ -290,7 +294,7 @@ export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
 }
 
 /** `<topic> update <id>`. */
-export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
+export abstract class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
   static describe<Ctx>(definition: OperationDefinition<Ctx, UpdateSpec<Ctx>>): OperationStatics {
     return describeWrite(definition, definition.options, "update");
   }

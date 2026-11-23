@@ -14,12 +14,12 @@ import (
 
 const (
 	createFlowDefinitionStmt = `INSERT INTO flow_definitions
-(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING created_at, updated_at`
+(project_id, id, name, schema_version, purposes, definition, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = ? AND id = ? RETURNING name`
 
-	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at
+	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, definition, created_at, updated_at
 FROM flow_definitions`
 
 	// newestFlowDefinitionByNameStmt is one descent of the name revision index.
@@ -68,7 +68,7 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
 		if err := scanFlowDefinitionTimestamps(entity, tx.QueryRow(ctx, createFlowDefinitionStmt,
 			entity.ProjectID, entity.ID, entity.Name, entity.SchemaVersion,
-			entity.Status.String(), purposes, defStr, now, now,
+			purposes, defStr, now, now,
 		)); err != nil {
 			return err
 		}
@@ -184,16 +184,12 @@ func (f flowDefinitionStatements) replaceSearchEntry(ctx context.Context, tx que
 
 func (f flowDefinitionStatements) scanFlowDefinition(rows *sql.Rows) (*domain.FlowDefinition, error) {
 	var (
-		projectID, id, name, schemaVersion, statusStr string
-		definitionStr                                 sql.NullString
-		createdNano, updatedNano                      int64
+		projectID, id, name, schemaVersion string
+		definitionStr                      sql.NullString
+		createdNano, updatedNano           int64
 	)
-	if err := rows.Scan(&projectID, &id, &name, &schemaVersion, &statusStr, &definitionStr, &createdNano, &updatedNano); err != nil {
+	if err := rows.Scan(&projectID, &id, &name, &schemaVersion, &definitionStr, &createdNano, &updatedNano); err != nil {
 		return nil, err
-	}
-	status, err := domain.FlowDefinitionStatusString(statusStr)
-	if err != nil {
-		return nil, wrapError(err)
 	}
 	var raw []byte
 	if definitionStr.Valid && definitionStr.String != "" {
@@ -201,7 +197,7 @@ func (f flowDefinitionStatements) scanFlowDefinition(rows *sql.Rows) (*domain.Fl
 	}
 	createdAt := timeFromUnixNano(createdNano)
 	updatedAt := timeFromUnixNano(updatedNano)
-	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, status, createdAt, updatedAt, raw)
+	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, createdAt, updatedAt, raw)
 }
 
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)

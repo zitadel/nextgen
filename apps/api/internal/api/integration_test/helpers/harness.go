@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -28,6 +29,7 @@ type Harness struct {
 
 	httpClient       dependency[*http.Client]
 	testServer       dependency[*httptest.Server]
+	specValidator    dependency[*SpecValidator]
 	hasherFactory    dependency[*crypto.HasherFactory]
 	passwordPolicy   dependency[*service.PasswordPolicy]
 	userCreatePolicy dependency[*service.UserCreatePolicy]
@@ -37,6 +39,8 @@ type Harness struct {
 	joseSigner       dependency[jose.Signer]
 
 	apiServers      dependency[*api.Servers]
+	oauthHandlers   dependency[*oauth.Handlers]
+	runtimeResolver dependency[*service.RuntimeResolver]
 	handler         dependency[*api.Handler]
 	securityHandler dependency[*api.SecurityHandler]
 
@@ -52,13 +56,17 @@ type Harness struct {
 	flowStateMachine      dependency[*domain.FlowStateMachineRuntime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
+	oauthSettingsService  dependency[*service.OAuthSettingsService]
 	releaseService        dependency[service.ReleaseService]
 	deploymentService     dependency[*service.DeploymentService]
 	idpConnectionService  dependency[service.IDPConnectionService]
+	applicationService    dependency[service.ApplicationService]
 	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]
 	variableService       dependency[service.VariableService]
 	tokenService          dependency[service.TokenService]
+	grantService          dependency[*service.GrantService]
+	invitationService     dependency[*service.InvitationService]
 
 	schemaStore     dependency[domain.JSONSchemaStore]
 	schemaResolver  dependency[*domain.JSONSchemaResolver]

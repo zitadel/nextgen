@@ -16,6 +16,7 @@ type ListEventsRequest struct {
 	Categories  []string
 	EventTypes  []string
 	ActorID     string
+	UserID      string
 	ClientID    string
 	SessionID   string
 	FlowID      string
@@ -229,10 +230,10 @@ type eventRead struct {
 // time bounds and the page token narrow any of them:
 //
 //   - A request or a login flow holds few events and has an index by time.
-//   - A session, a resource, an actor and a resource type can each hold as
-//     many events as the project, most of them of one category, so their
-//     indexes hold the category before the time. Their read is a range per
-//     category, the ones named or every one, merged.
+//   - A session, a resource, a user, an actor and a resource type can each
+//     hold as many events as the project, most of them of one category, so
+//     their indexes hold the category before the time. Their read is a range
+//     per category, the ones named or every one, merged.
 //   - An operation's index holds it with the status class, as one key
 //     (events.OperationStatus), so its failed calls are a range apart from
 //     its successful ones. Its read is a range per operation and status
@@ -261,6 +262,7 @@ func planEventRead(req ListEventsRequest) eventRead {
 		{domain.EventFieldFlowID, req.FlowID, false},
 		{domain.EventFieldSessionID, req.SessionID, true},
 		{domain.EventFieldEntityID, req.EntityID, true},
+		{domain.EventFieldUserID, req.UserID, true},
 		{domain.EventFieldActorID, req.ActorID, true},
 		{domain.EventFieldEntityType, req.EntityType, true},
 	} {
@@ -383,7 +385,7 @@ func listEventsOptions(req ListEventsRequest, read eventRead) (*database.ListOpt
 		cursor = []byte(req.PageToken)
 	}
 
-	orderBy := events.CreatedAtDesc()
+	var orderBy database.OrderBy[domain.EventField]
 	switch req.Order {
 	case "", "desc":
 		orderBy = events.CreatedAtDesc()

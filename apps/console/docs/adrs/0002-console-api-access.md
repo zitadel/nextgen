@@ -125,7 +125,7 @@ elsewhere — components authenticated by the platform send no client token (see
 > mux that mounts only `/ui/login`, `/ui/console`, `/console/runtime.json`,
 > and `/`, so every call 404'd and `/ui/console/` rendered
 > "POST /api/flow returned 404". It survived because no test lane served the
-> console the way the Go binary does — closed by `e2e:console-embedded`.
+> console the way the Go binary does — closed by the `console-embedded` lane.
 
 ### 2. Reuse `configureZitadel()` + `getApi()`, not a bespoke `src/api/client.ts`
 
@@ -195,7 +195,7 @@ that follows from who serves the console:
 
 - **Production** — the built console is embedded in the Go binary, which
   serves the ogen API under `/api/v1` (root ADR 077). The base is `""`: the
-  generated client calls `/api/v1/flow`, `/api/v1/sessions/me`, … on the
+  generated client calls `/api/v1/flows`, `/api/v1/sessions/me`, … on the
   same origin.
 - **Dev** — Vite serves the console on `:5174`, the API is on `:8080`. The
   console calls the same `/api/v1` paths on Vite's origin, and the Vite dev
@@ -219,7 +219,7 @@ escape hatch for a deployment that puts the server behind a path or on
 another origin, in front of `/api/v1`.
 `vite preview` deliberately proxies nothing, so it cannot be mistaken for the
 production path — which also means it cannot _prove_ it; that job belongs to
-the embedded lane (`e2e:console-embedded`), which serves the console from
+the embedded lane (`@zitadel/e2e#console-embedded`), which serves the console from
 the Go binary.
 
 ### 5. Console-user authentication uses the existing slot

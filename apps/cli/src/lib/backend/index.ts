@@ -34,7 +34,13 @@ export {
   type AttemptProofResult,
   AuthAttemptService,
 } from "./services/auth-attempt";
-export { type BrandingRevision, BrandingService, type BrandingSummary } from "./services/branding";
+export {
+  type BrandingPage,
+  type BrandingQuery,
+  type BrandingRevision,
+  BrandingService,
+  type BrandingSummary,
+} from "./services/branding";
 export {
   type ClaimChallenge,
   type ClaimProgress,
@@ -66,6 +72,18 @@ export {
   type FlowSummary,
 } from "./services/flow";
 export { IdpService, type IdpSummary } from "./services/idp";
+export {
+  type CreatedInvitation,
+  type Invitation,
+  type InvitationInput,
+  type InvitationPageQuery,
+  invitationGrant,
+  type InvitationRelation,
+  invitationRole,
+  InvitationService,
+  type InvitationStatus,
+  type InvitationType,
+} from "./services/invitation";
 export {
   type ApiOperation,
   type ApiRequest,
@@ -108,6 +126,8 @@ export {
   type ReleasePointerKind,
   type ReleaseRecord,
   ReleaseService,
+  type RevokeOutcome,
+  type ServingOrigin,
 } from "./services/release";
 export {
   type CreatedSchema,

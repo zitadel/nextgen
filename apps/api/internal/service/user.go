@@ -1249,6 +1249,7 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		ProjectID:  o.CreateUser.ProjectID,
 		EntityType: "user",
 		EntityID:   o.CreateUser.ID,
+		UserID:     o.CreateUser.ID,
 		Payload: domain.UserCreatedPayload{
 			SchemaID:      o.CreateUser.SchemaURL,
 			AttributeKeys: attrKeys,
@@ -1417,6 +1418,7 @@ func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error 
 		ProjectID:  o.ProjectID,
 		EntityType: "user",
 		EntityID:   o.UserID,
+		UserID:     o.UserID,
 		Payload: domain.UserUpdatedPayload{
 			AttributeKeys: attrKeys,
 			Attributes:    attrValues,
@@ -1491,6 +1493,7 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		ProjectID:  o.ProjectID,
 		EntityType: "user_password",
 		EntityID:   pw.ID,
+		UserID:     o.UserID,
 		Payload: domain.AuthFactorPayload{
 			UserID:   o.UserID,
 			FactorID: pw.ID,
@@ -1584,6 +1587,7 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		ProjectID:  o.ProjectID,
 		EntityType: "user",
 		EntityID:   o.UserID,
+		UserID:     o.UserID,
 	})
 }
 

@@ -1,28 +1,51 @@
+import { Flags } from "@oclif/core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { aSuggest } from "@tests/helpers/suggestions";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 import {
+  Spelling,
+  WHAT_CHANGED,
+  andTheRest,
   commandOf,
-  type Declared,
   declaredOf,
   distinct,
-  type HelpNext,
   helpOf,
-  inShell,
   isSuggestion,
-  type Next,
+  pipedFrom,
+  readingFrom,
   renderSuggestion,
-  type SuggestedCommand,
-  type SuggestionId,
-  type Suggestion,
   shellCommand,
+  shellSteps,
   spelled,
+  suggestedCommandOf,
   suggestionWords,
-  WHAT_CHANGED,
+  type Declared,
+  type FlagsOf,
+  type HelpNext,
+  type Next,
+  type SuggestedCommand,
+  type Suggestion,
+  type SuggestionId,
 } from "@/lib/suggestion";
+import { relatedFlags } from "@/lib/suggestion/relations";
+import { type PackageCommand, PM } from "@/lib/pm";
+import { CliPackage } from "@/lib/upgrade";
 
 const VERSION = "1.0.0-alpha.25";
+
+/** An add given a valued option before its verb, as a directory flag is. */
+const FILTERED_ADD = PM.named("pnpm").add(["x"]).inDirectory("app", "/abs/app");
+
+/** A run of this CLI's binary as a project script. */
+const CLI_RUN = PM.named("yarn").script(Spelling.BINARY);
+
+/** An SDK pinned at an exact version, as a dependency check installs it. */
+const SDK_PIN = "@zitadel/sdk-next@1.0.0";
+
+/** A commit message quoted as one shell word, which names the CLI and a `;`. */
+const QUOTED_MESSAGE = "'don'\\''t; zitadel deploy again'";
 
 /**
  * Holds `next` to the type every suggestion is written as, so a
@@ -35,17 +58,39 @@ function checked(next: Next): Next {
   return next;
 }
 
+/** A command whose one switch is required, as no command in the table has yet. */
+const RequiredSwitch = {
+  flags: relatedFlags(
+    { confirm: Flags.boolean({ description: "Confirm it." }) },
+    { confirm: { required: true } },
+  ),
+};
+
+describe("FlagsOf", () => {
+  it("takes a required switch given on", () => {
+    expectTypeOf<{ confirm: true }>().toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+
+  it("takes no required switch given off", () => {
+    expectTypeOf<{ confirm: false }>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+
+  it("takes no required switch left out", () => {
+    expectTypeOf<Record<never, never>>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+});
+
 describe("NextTable", () => {
   it("names a generated resource command under each verb its descriptor has", () => {
-    expectTypeOf<"users:get">().toExtend<SuggestionId>();
+    expectTypeOf<"user:get">().toExtend<SuggestionId>();
     expectTypeOf<"release:list">().toExtend<SuggestionId>();
-    expectTypeOf<"sessions:revoke">().toExtend<SuggestionId>();
-    expectTypeOf<"teams:deactivate">().toExtend<SuggestionId>();
+    expectTypeOf<"session:revoke">().toExtend<SuggestionId>();
+    expectTypeOf<"team:deactivate">().toExtend<SuggestionId>();
   });
 
   it("names no generated command for a verb its descriptor lacks", () => {
-    expectTypeOf<"events:create">().not.toExtend<SuggestionId>();
-    expectTypeOf<"sessions:delete">().not.toExtend<SuggestionId>();
+    expectTypeOf<"event:create">().not.toExtend<SuggestionId>();
+    expectTypeOf<"session:delete">().not.toExtend<SuggestionId>();
   });
 });
 
@@ -107,13 +152,29 @@ describe("a suggestion", () => {
     expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
   });
 
+  it("takes a value left to fill in for any flag that takes one", () => {
+    expect(aSuggest({}, VERSION)({ id: "start", flags: { port: "<port>" } })).toBe(
+      "npx @zitadel/cli@1.0.0-alpha.25 start --port '<port>'",
+    );
+  });
+
+  it("does not compile with a value left to fill in for a switch", () => {
+    // @ts-expect-error a switch takes no value to fill in
+    checked({ id: "doctor", flags: { fix: "<fix>" } });
+  });
+
+  it("does not compile with a value to fill in written without angle brackets", () => {
+    // @ts-expect-error a value to fill in is written in angle brackets
+    checked({ id: "start", flags: { port: "port" } });
+  });
+
   it("does not compile for a command that does not exist, or a command line as text", () => {
     // @ts-expect-error there is no `deplyo`
     checked({ id: "deplyo" });
     // @ts-expect-error a suggestion names its target by id, never as a command line
     checked({ id: "deploy --dry-run" });
-    // @ts-expect-error the generated `events` resource has no create
-    checked({ id: "events:create" });
+    // @ts-expect-error the generated `event` resource has no create
+    checked({ id: "event:create" });
   });
 
   it("is not a command line until a run renders it", () => {
@@ -158,9 +219,9 @@ describe("distinct", () => {
   });
 
   it("keeps a rendered command once", () => {
-    expect(distinct([shellCommand("docker version"), shellCommand("docker version")])).toEqual([
-      "docker version",
-    ]);
+    expect(
+      distinct([shellCommand("docker", "version"), shellCommand("docker", "version")]),
+    ).toEqual(["docker version"]);
   });
 });
 
@@ -216,20 +277,99 @@ describe("a suggested help", () => {
 });
 
 describe("shellCommand", () => {
-  it("is suggested exactly as written", () => {
-    expect(shellCommand("npm install @zitadel/cli@alpha")).toBe("npm install @zitadel/cli@alpha");
-  });
-});
-
-describe("inShell", () => {
-  it("puts a pipe before the command", () => {
-    expect(inShell(shellCommand("cat"), { before: "printf '%s' \"$S\" | " })).toBe(
-      "printf '%s' \"$S\" | cat",
+  it("is its program and its words, as written", () => {
+    expect(shellCommand("docker", "pull", "ghcr.io/zitadel/zitadel")).toBe(
+      "docker pull ghcr.io/zitadel/zitadel",
     );
   });
 
-  it("puts a redirection after it", () => {
-    expect(inShell(shellCommand("cat"), { after: " < value.txt" })).toBe("cat < value.txt");
+  it("does not compile for the CLI", () => {
+    // @ts-expect-error the CLI is suggested as an object the renderer checks
+    shellCommand("zitadel", "deploy");
+  });
+
+  it("does not compile for a runner", () => {
+    // @ts-expect-error a runner runs whatever it is given, the CLI included
+    shellCommand("npx", CliPackage.NAME);
+  });
+
+  it("does not compile for a package manager", () => {
+    // @ts-expect-error a package manager's command goes through suggestedCommandOf
+    shellCommand("pnpm", "dlx", CliPackage.NAME);
+  });
+
+  it("takes a word that only names the CLI, as a commit message does", () => {
+    expect(shellCommand("git", "commit", "-m", QUOTED_MESSAGE)).toBe(
+      `git commit -m ${QUOTED_MESSAGE}`,
+    );
+  });
+});
+
+describe("suggestedCommandOf", () => {
+  it.each<[string, PackageCommand]>([
+    ["an install", PM.named("npm").addExact([SDK_PIN])],
+    ["a script in another directory", PM.named("npm").dev().inDirectory("app", "/abs/app")],
+    ["an install in a directory named exec", PM.named("pnpm").install().inDirectory("exec", "/x")],
+    ["a removal of a package named like the CLI", PM.named("npm").remove([Spelling.BINARY])],
+  ])("is %s as its display shows it", (_what, command) => {
+    expect(suggestedCommandOf(command)).toBe(command.display);
+  });
+
+  it("is a command whose verb follows an option's value", () => {
+    expect(suggestedCommandOf(FILTERED_ADD)).toBe(FILTERED_ADD.display);
+  });
+
+  it("refuses a run of the CLI's binary", () => {
+    const error = thrownBy(() => {
+      return suggestedCommandOf(CLI_RUN);
+    });
+
+    expect(error).toMatchObject({
+      message: `${CLI_RUN.display} runs the CLI: suggest it as { id, args, flags }`,
+    });
+  });
+
+  it("is never a command that runs a package", () => {
+    expectTypeOf<"dlx">().not.toExtend<PackageCommand["verb"]>();
+  });
+});
+
+describe("shellSteps", () => {
+  it("runs each command after the one before it worked", () => {
+    expect(
+      shellSteps(shellCommand("cd", "app"), suggestedCommandOf(PM.named("npm").remove(["x"]))),
+    ).toBe("cd app && npm uninstall x");
+  });
+});
+
+describe("pipedFrom", () => {
+  it("feeds the command a secret from a shell variable", () => {
+    expect(pipedFrom("CLIENT_SECRET", shellCommand("git", "status"))).toBe(
+      `printf '%s' "$CLIENT_SECRET" | git status`,
+    );
+  });
+
+  it("refuses a name no shell variable has", () => {
+    const error = thrownBy(() => {
+      return pipedFrom("A; zitadel", shellCommand("git", "status"));
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: "A; zitadel is no shell variable's name" });
+  });
+});
+
+describe("readingFrom", () => {
+  it("puts the redirection after the command", () => {
+    expect(readingFrom(shellCommand("git", "status"), "my value.txt")).toBe(
+      "git status < 'my value.txt'",
+    );
+  });
+});
+
+describe("andTheRest", () => {
+  it("follows the command with an ellipsis for everything else it was given", () => {
+    expect(andTheRest(shellCommand("git", "status"))).toBe("git status ...");
   });
 });
 
@@ -389,36 +529,36 @@ describe("suggestionWords, for a target only known at run time", () => {
 
   it("refuses a flag the target requires, left out", () => {
     expect(() => {
-      return suggestionWords("users:list", { args: { id: "1" } }, LIST, {});
-    }).toThrow("users:list requires --kind");
+      return suggestionWords("user:list", { args: { id: "1" } }, LIST, {});
+    }).toThrow("user:list requires --kind");
   });
 
   it("refuses two flags the target declares exclusive", () => {
     expect(() => {
       return suggestionWords(
-        "users:list",
+        "user:list",
         { args: { id: "1" }, flags: { kind: "k", all: true, pageToken: "t" } },
         LIST,
         {},
       );
-    }).toThrow("users:list refuses --all with --page-token");
+    }).toThrow("user:list refuses --all with --page-token");
   });
 
   it("refuses a flag whose dependsOn is left out", () => {
     expect(() => {
       return suggestionWords(
-        "users:list",
+        "user:list",
         { args: { id: "1" }, flags: { kind: "k", force: true } },
         LIST,
         {},
       );
-    }).toThrow("users:list takes --force only with --fix");
+    }).toThrow("user:list takes --force only with --fix");
   });
 
   it("refuses an argument the target requires, left out", () => {
     expect(() => {
-      return suggestionWords("users:list", { flags: { kind: "k" } }, LIST, {});
-    }).toThrow("users:list requires its id");
+      return suggestionWords("user:list", { flags: { kind: "k" } }, LIST, {});
+    }).toThrow("user:list requires its id");
   });
 });
 

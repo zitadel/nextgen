@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"encoding/json"
-	"net/url"
 	"testing"
 
 	"github.com/descope/virtualwebauthn"
@@ -32,11 +31,10 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
-	rpOriginURL, err := url.Parse(testServer.URL)
-	require.NoError(t, err)
+	rpOriginURL := passkeyOrigin(t, testServer.URL)
 	rpIDStr := rpOriginURL.Hostname()
 
-	rp := virtualwebauthn.RelyingParty{ID: rpIDStr, Name: rpIDStr, Origin: testServer.URL}
+	rp := virtualwebauthn.RelyingParty{ID: rpIDStr, Name: rpIDStr, Origin: rpOriginURL.String()}
 	// UserHandle is ignored for passkey_register: the engine derives it from
 	// the session's pinned _user_id, not the authenticator.
 	auth := virtualwebauthn.NewAuthenticator()
@@ -46,7 +44,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
@@ -77,12 +75,12 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
-	regOK := regResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, regResp, helpers.MustMarshal(t, regResp))
+	regOK := regResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-password", regOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, regOK.SetCookie)
 
@@ -95,12 +93,12 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
-	pwOK := pwResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name,
 		"after create_user the session must be threaded into the passkey-upsell step")
 	// Replay the solved proof with the pre-signup cookie while the attempt is
@@ -110,7 +108,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepErrorResponseStatusCode{}, replay, helpers.MustMarshal(t, replay))
 	require.Equal(t, 403, replay.(*api.SubmitFlowStepErrorResponseStatusCode).StatusCode)
@@ -126,13 +124,13 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	issueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "passkey_register",
 	}, api.SubmitFlowStepParams{
-		ID:     flowID,
+		FlowID: flowID,
 		Zflow:  zflow,
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
-	issueOK := issueResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, issueResp, helpers.MustMarshal(t, issueResp))
+	issueOK := issueResp.(*api.FlowResponseHeaders)
 	zflow = mustExtractZflow(t, issueOK.SetCookie)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected challenge on passkey_register issue")
@@ -171,12 +169,12 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 			Proof:       api.NewOptFlowSubmitRequestChallengeResponseProof(attestProof),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
-	verifyOK := verifyResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, verifyResp, helpers.MustMarshal(t, verifyResp))
+	verifyOK := verifyResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "done", verifyOK.Response.Step.Name)
 	require.True(t, verifyOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -201,7 +199,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
@@ -229,10 +227,10 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
-	regOK := regResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, regResp, helpers.MustMarshal(t, regResp))
+	regOK := regResp.(*api.FlowResponseHeaders)
 	zflow = mustExtractZflow(t, regOK.SetCookie)
 
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -241,19 +239,19 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
-	pwOK := pwResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, pwOK.SetCookie)
 
 	skipResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "skip",
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, skipResp, helpers.MustMarshal(t, skipResp))
-	skipOK := skipResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, skipResp, helpers.MustMarshal(t, skipResp))
+	skipOK := skipResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "done", skipOK.Response.Step.Name)
 	require.True(t, skipOK.Response.Step.Complete.Set, "expected terminal step")
 }
@@ -265,7 +263,6 @@ func passkeyUpsellFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "register-with-passkey-upsell",
-		Status:     "active",
 		UserSchema: userSchemaURL,
 		Purposes:   api.FlowDefinitionPurposes{"register": "register"},
 		Steps: []api.FlowDefinitionStep{

@@ -30,20 +30,20 @@ module that compiles two things into one k6 binary:
 ## Run it
 
 A running, healthy server is the one prerequisite. The harness never starts
-or stops one: the lane's provisioning tool does — Moon locally, a container
+or stops one: the lane's provisioning tool does — turbo locally, a container
 or a cloud deployment elsewhere — and the harness is pointed at it with
 `--base`. Every command first checks that `/readyz` answers, which takes the
 server's database answering too.
 
 ```sh
-moon run workspace:server                              # terminal 1: the local server on :8080, migrated
-moon run bench:sweep                                   # terminal 2: fixtures/local.json, 1/5/20 VUs × 20 s
-moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser
-moon run bench:sweep -- --base http://localhost:9090 --lane postgres   # any other server; later flags win
-moon run bench:summarize -- dist/sweep-<stamp>          # rewrite summary.md / aggregate.json
+pnpm run server                                        # terminal 1: the local server on :8080, migrated
+turbo run sweep --filter=bench                         # terminal 2: fixtures/local.json, 1/5/20 VUs × 20 s
+turbo run sweep --filter=bench -- --vus 5 --duration 10s --scenarios getUser
+turbo run sweep --filter=bench -- --base http://localhost:9090 --lane postgres   # any other server; later flags win
+turbo run summarize --filter=bench -- dist/sweep-<stamp>   # rewrite summary.md / aggregate.json
 ```
 
-`bench:sweep` builds the k6 binary (`dist/k6`) through Moon, then
+`bench#sweep` builds the k6 binary (`dist/k6`) through turbo, then
 `k6 x nextgen sweep --base …` provisions the fixture, runs the matrix one run
 at a time — each run is `k6 run --scenario <name>` on the one entry script,
 with the VU count and duration as `-e` — and writes `runs.json`, k6's summary export and console output
@@ -85,8 +85,9 @@ read, so a fixture that cannot be driven fails before anything is measured.
 
 ## Checks
 
-`moon run bench:test` (format, vet, unit tests) and `moon run bench:build`
-run in CI through `moon ci`. No load is generated in CI.
+`turbo run lint test build --filter=bench` (format and vet under `lint`, the
+unit tests under `test`) run in CI through `turbo run lint typecheck build
+test`. No load is generated in CI.
 
 ## Licensing
 

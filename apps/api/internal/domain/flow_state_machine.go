@@ -141,7 +141,7 @@ var purposeChangeNotices = map[string]string{
 type FlowStateMachine interface {
 	Start(ctx context.Context, in FlowStartInput) (FlowStepResult, error)
 	Process(ctx context.Context, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
-	// Render re-emits the current step without advancing. Backs GET /flow/{id}.
+	// Render re-emits the current step without advancing. Backs GET /flows/{flow_id}.
 	Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
 }
 
@@ -482,7 +482,7 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 // one goes on to render the step as usual. The bool reports that the state
 // changed and the handler must re-seal it.
 //
-// It runs on every render, so every GET /flow/{id} pays one attempt read even
+// It runs on every render, so every GET /flows/{flow_id} pays one attempt read even
 // without SSO. The read is not only for SSO: LoadParked also restarts any flow
 // whose attempt expired or was handed off. Do not limit it to steps that offer
 // sso_providers.
@@ -1877,6 +1877,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				AttributeName: name,
 				Value:         value,
 				UserSchemaURL: state.UserSchemaURL,
+				Register:      state.CurrentPurpose == FlowDefinitionPurposeRegister,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
@@ -2075,12 +2076,16 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 					candidates = uniqueFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
 				}
 				for _, candidate := range candidates {
+					// Only a sign-up's create loses this race, so a free
+					// candidate is the sign-up's own value, not a failed
+					// sign-in: Register keeps it from writing one.
 					userID, rerr := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 						ProjectID:     state.ProjectID,
 						AttemptID:     state.AuthAttemptID,
 						AttributeName: candidate[0],
 						Value:         candidate[1],
 						UserSchemaURL: state.UserSchemaURL,
+						Register:      true,
 					})
 					if rerr == nil {
 						recordResolvedUser(state, userID)
@@ -2420,7 +2425,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 		return nil, err
 	}
 	// A terminal step renders as complete, so a re-render of a finished flow
-	// says so (GET /flow/{id} answers 410 on it).
+	// says so (GET /flows/{flow_id} answers 410 on it).
 	return r.buildStep(ctx, state, step, resolved, nil, step.Complete, nil)
 }
 

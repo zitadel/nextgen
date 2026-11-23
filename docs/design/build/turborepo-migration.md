@@ -15,6 +15,10 @@
 > configures every moon task for turbo, leaves moon fully working, and ports
 > the scripts and one CI workflow. Moon stays the runner of record until the
 > cutover phase below.
+>
+> **Outcome:** the cutover landed in #2881 on 2026-11-12 and moon is gone
+> ([ADR 089](../../adrs/089-turborepo-task-runner.md)); this document is
+> history. The current rules are in [turborepo.md](turborepo.md).
 
 ## Short answer
 
@@ -37,7 +41,7 @@ workflow, not the task graph.
 | Area | Files | What it does |
 |---|---|---|
 | Task graph | root `turbo.json`, 26 package `turbo.json` files (`"extends": ["//"]`) | Every moon task, with the same dependency edges. The root file holds the shared task shapes (moon's `.moon/tasks/*.yml`); each package file adds only what differs, which turbo merges field by field. |
-| Scripts as the task contract | 30 `package.json` files | Every task runs a `package.json` script: `lint` scripts for the 26 TypeScript packages, the Go server's 13 tasks as scripts in `apps/server/package.json`, 16 `build-release` scripts, the e2e lanes with the environment moon used to set. |
+| Scripts as the task contract | 30 `package.json` files | Every task runs a `package.json` script: `lint` scripts for the 26 TypeScript packages, the Go server's 13 tasks as scripts in `apps/server/package.json`, the e2e lanes with the environment moon used to set. |
 | Tool packages | `tools/release/package.json`, `pnpm-workspace.yaml` (`tools/*`), `go.work` | Moon's `release` project becomes a private workspace package (`@zitadel/release`) so turbo can address its tasks. Its `go`, `bench` and `oidc-mock` projects are Go modules, which turbo reads from `go.work` as the packages `zitadel/v5`, `bench` and `oidc-mock`. |
 | Mutex and retry | `scripts/task-guard.mjs` | `--mutex <name>` (a lock directory in the OS temp dir, keyed by repository root, stale holders reclaimed) and `--retries <n>`. Used by the four browser-mode test scripts and the six generated-sources tasks. It acts only when turbo runs the task (`TURBO_HASH` is set); under moon, which has its own `mutex` and `retryCount`, and when a person runs the script, it runs the command once, unchanged. |
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
@@ -51,7 +55,8 @@ Verified in the prototype, 2026-10-12:
 - `turbo run lint typecheck build test` resolves 116 real tasks (160 task ids,
   44 of them placeholders for packages that have no such script, which turbo
   skips: that is how moon's `inheritedTasks.exclude` maps).
-- The release graph resolves without cycles: `snapshot` 40 tasks, `pack` 32.
+- The release graph resolves without cycles: `pack`, `snapshot` and
+  `publish` 36 task ids each, 30 of them run (decision 11).
 - The e2e lanes pull exactly moon's dependencies (`console-e2e:e2e-real`: 17
   tasks ending in `server#build`, `cli#build`, `testing#build`).
 - A package `turbo.json` overrides a root task field by field: `{"build":
@@ -155,30 +160,30 @@ as they were.
 | project | moon task | turbo task | script / replacement |
 |---|---|---|---|
 | api | `generate` (mutex generated-sources, inputs `/api/openapi/**/*.yaml`) | `@zitadel/api#generate` | `generate` → `task-guard --mutex generated-sources -- orval …`; inputs `$TURBO_ROOT$/api/openapi/**/*.yaml` |
-| api | `build-release` (inline, mutex public-dist) | `#build-release` | **new** `release-clean.mjs local-dist && pnpm run build`; ordered after `@zitadel/cli#test` |
+| api | `build-release` (inline, mutex public-dist) | — | none: turbo's release packs this package's `build` (decision 11) |
 | api-mock, components, sdk-qwik, storybook | `install-browsers` (cache false) | `#install-browsers` | **new** `playwright install chromium`; the `test` task depends on it, as in moon |
 | api-mock | `test` (retryCount 3) | `#test` | `test` → `task-guard --retries 3 -- vitest run` |
 | api-mock | `start` (persistent) | `#start` | existing |
 | components | `build` (dep config:build, design-tokens:build) | `#build` | same edges |
-| components | `build-release` (inline + check script) | `#build-release` | **new** script with `check-standalone-artifact.mjs` |
+| components | `build-release` (inline + check script) | — | none: turbo's release packs `#build`, whose artifact `src/standalone-artifact.spec.ts` checks in `#test` (decision 11) |
 | components | `test` (retry, dep build) | `#test` | guarded script |
 | config | `sync-schemas` (mutex generated-sources) | `#sync-schemas` | script wrapped in the guard; the `pre*` scripts keep calling it |
-| config | `build-release` (mutex public-dist) | `#build-release` | ordered after api's release build |
+| config | `build-release` (mutex public-dist) | — | none: turbo's release packs this package's `build` (decision 11) |
 | design-tokens | `sync` (cache false) | `#sync` | `passThroughEnv: FIGMA_*` |
 | design-tokens | `sync-export` | `#sync:export` | existing script; gains the output it writes |
 | design-tokens | `generate` (4 outputs) | `#generate` | same outputs |
 | sdk-core / sdk-next / sdk-nuxt / sdk-react / sdk-vue / sdk-angular / sdk-solid / sdk-svelte / sdk-qwik | `typecheck`, `build`, `test` | same | same edges (api-mock for the specs that need it, components, sdk-core) |
-| sdk-* | `build-release` (inline) | `#build-release` | **new** script; the dev build's edges, on the release builds (components, sdk-core) |
+| sdk-* | `build-release` (inline) | — | none: turbo's release packs this package's `build` (decision 11) |
 | sdk-nuxt | `build` (mutex sdk-nuxt-dist) | `#build` | ordered by the demo-nuxt edge; see mutexes |
 | sdk-nuxt | `dev` (persistent) | `#dev` | existing |
 | sdk-qwik | `install-browsers`, `test` (retry) | same | guarded script |
 | testing | `test-integration` (env, cache false) | `#test:integration` | existing script, now sets the env itself; depends on the **new** `#install-browsers` |
-| testing | `build-release` | `#build-release` | after config's release build |
-| cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes an edge: the release builds start after it |
-| cli | `build-release` (runDepsInParallel false, dep test) | `#build-release` | **new** script; `dependsOn: ["test", "@zitadel/sdk-next#build-release"]` |
+| testing | `build-release` | — | none: turbo's release packs this package's `build` (decision 11) |
+| cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; no mutex: no turbo task rewrites a dist the tests import |
+| cli | `build-release` (runDepsInParallel false, dep test) | — | none: turbo's release packs this package's `build` (decision 11) |
 | cli | `readme` | `#readme` | existing; `outputs: ["README.md"]` |
 | console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_ADDON"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
-| console | `build-release` | `#build-release` | **new** `vite build`; waits for the public packages' release builds |
+| console | `build-release` | — | none: the server platform binaries embed `#build` (decision 11) |
 | console | `dev`, `preview` (persistent) | `#dev`, `#preview` | existing |
 | console | `dev-real`, `dev-claim` (persistent) | `#dev:real`, `#dev:claim` | existing; the script builds the server through the selected runner, and under turbo the task also depends on `@zitadel/server#build`, with Go's compiler cache keeping a repeated build incremental |
 | demo-next | `build` (outputs .next) | `#build` | outputs `.next/**`, `!.next/cache/**` |
@@ -209,9 +214,9 @@ as they were.
 | mutex | protected | replacement |
 |---|---|---|
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
-| `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release builds start after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
+| `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | none: turbo has no release builds (decision 11), so nothing cleans a dist the CLI tests import. |
 | `demo-next-app` (e2e `demo-next-mock`, `demo-next-real`) | the two lanes that serve apps/demo-next with `next dev` on :3002 from one `.next` folder; the other lanes of ci.yml's e2e step (`moon exec e2e:all`) run beside them | their two scripts hold `task-guard --mutex demo-next-app`, which keeps them apart in ci-turbo.yml's one run of every lane but the journey's. |
-| `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
+| `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the builds, and turbo has no second build of the dist (decision 11). |
 
 The lock lives in the OS temp dir under a hash of the repository root, so two
 checkouts never block each other, and the holder's pid is recorded so the lock
@@ -236,7 +241,7 @@ moon at the cutover.
 
 Turbo runs what is named. The gate names `lint typecheck build test
 check-adrs check-moon-graph`; every `runInCI: false` task has another name
-(`build-release`, `dev`, …) and is never reached. Moon's e2e lanes are
+(`dev`, `start`, …) and is never reached. Moon's e2e lanes are
 `runInCI: "skip"`, which keeps them out of the `moon ci` graph, and ci.yml runs
 them in a step of its own with `moon exec e2e:all --ignore-ci-checks`; turbo
 has no `all`, and ci-turbo.yml names every lane but the journey's, which has
@@ -256,7 +261,7 @@ dance in the workflows goes away.
 |---|---|
 | server `format`, bench `format` (gofmt over tracked files) | `scripts/go-format-check.mjs` (same check, from the current directory) |
 | server `lint` (analyzers per build tag + Biome on `bin/`) | `scripts/go-lint.mjs` |
-| 14 × `build-release` (`release-clean.mjs local-dist` then build) | `package.json` scripts: `node ../../scripts/release-clean.mjs local-dist && pnpm run build` (+ the standalone check for components) |
+| 14 × `build-release` (`release-clean.mjs local-dist` then build) | none: turbo has no release builds (decision 11); moon keeps its inline scripts |
 | workspace `check-typecheck`, `check-openapi-rules` | root `package.json` scripts, same commands |
 
 Moon could run the same files (`command: node scripts/go-lint.mjs`), but
@@ -301,19 +306,15 @@ needed none: the configs default the binary path and the ports.
 
 ### `runDepsInParallel: false` (6 uses)
 
-Turbo has no serial dependencies. The release project relied on them because
+Turbo has no serial dependencies, and its release graph needs none: it has no
+release builds (decision 11). Moon's release project relies on them because
 every `build-release` cleans and rewrites the `dist/` that the dev builds and
-tests of the same graph read. The prototype wrote moon's serial order as
-edges, a chain of the 14 public-package release builds. Since moon runs those
-builds in parallel on their package edges (2026-10-14), turbo has the same
-edges: the release builds start after `cli#test` (`api#build-release`
-depends on it, the rest reach `api`'s), each depends on the release builds of
-the packages its dev build depends on, and the two UI release builds wait for
-all of them. The console release build also waits for `server#test` before
-rewriting the embedded dist that Go compiles; in moon, `snapshot` is the only
-release entry point with Go tasks, and its serial dependencies order them.
-`scripts/task-graph.test.mjs` checks the resulting order in both runners. Separate release output directories remain open decision 5; the
-full release order check (`release:check-graph`) still needs its Turbo port.
+tests of the same graph read. Turbo's `pack`, `snapshot` and `publish` depend
+on every public package's `build` and each server platform package's
+`build-binary` instead, so nothing rewrites a `dist/` and nothing has to wait
+for a test. `scripts/task-graph.test.mjs` checks both graphs: moon's release
+builds wait for the Go readers, turbo's entry points reach every public
+package's build and no test.
 
 ## Script ports
 
@@ -322,14 +323,14 @@ full release order check (`release:check-graph`) still needs its Turbo port.
 | `scripts/ci-mode.mjs` | `moon query tasks --affected --downstream deep` | none: ci-turbo.yml selects with turbo's own `--affected` and `turbo query affected` ([turborepo-graph.md](turborepo-graph.md)). ci-mode serves ci.yml alone and goes with moon (phase 3). | not needed (the port of 2026-10-12 was removed on 2026-10-27) |
 | `scripts/report-moon-failures.mjs` | `.moon/cache/ciReport.json` | none: in GitHub Actions turbo groups each task's log and annotates every failed task itself (`::error::`). report-moon-failures serves ci.yml alone and goes with moon. | not needed (the port was removed on 2026-10-28) |
 | `scripts/check-moon-graph.mjs` | `moon query projects` | kept during the dual run (as `//#check-moon-graph`); dropped with moon. Its rule "the moon edge and the npm dependency go together" has no turbo form to check, and its hashed-edge subtlety disappears: turbo hashes every dependency's result. | unchanged |
-| `scripts/check-release-graph.mjs` | `moon task-graph`, `moon task` | reads `turbo run snapshot --dry=json` (dependencies per task) and asserts: each public package's `build-release` cleans local dist, mirrors its dev build's package edges and starts after `cli#test`, no release build reaches its own `build`, the UI release builds depend on the release builds of the packages they bundle, mirror their dev builds' package edges and reach no public package's `build`, no public package's `build` runs after the release builds, and the entry points depend on `build-public-packages`. The mutex and `runInCI` assertions go. | not ported (plan: 1 day incl. tests) |
-| `scripts/release-manifest.mjs` | `moonProject` fields, `buildTarget` `project:build-release` | `buildTarget` becomes `@zitadel/<name>#build-release` (or stays and is mapped through `task-runner.mjs`); `release-manifest.test.ts` asserts against `turbo.json` files instead of `.moon/workspace.yml` and `moon.yml` | not ported (half a day) |
+| `scripts/check-release-graph.mjs` | `moon task-graph`, `moon task` | none: it checks moon's release builds, which turbo does not have (decision 11), and goes with moon. `scripts/task-graph.test.mjs` checks turbo's release graph: `pack`, `snapshot` and `publish` reach every public package's `build` and each platform's `build-binary`, and no test | not needed |
+| `scripts/release-manifest.mjs` | `moonProject` fields, `buildTarget` `project:build-release` | none: `buildTarget` names moon's release builds and goes with moon; turbo's graph test reads the manifest's packages and what they publish (`files`) | not needed |
 | `scripts/check-typecheck-programs.mjs` | parses each `moon.yml` `typecheck` task | reads each package's `typecheck` script directly (the moon task only ever ran that script); the `moon.yml` existence check becomes "has a `typecheck` script" | not ported (half a day; test unchanged) |
 | `scripts/doctor.mjs` | `node_modules/.bin/moon --version` | checks turbo the same way (`turbo --version` from `node_modules/.bin`, the catalog pin); drops the PATH-shadowing warning or applies it to turbo | not ported (half a day) |
 | `scripts/check.mjs` | `moon run …`, `moon ci …` | phases call `runnerCommand` / `workspaceCommand`; the Node phase runs the whole gate under turbo (no `--affected`, see below) | done |
 | `scripts/run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `e2e/journey/scripts/local-registry.mjs` | `moon run <targets>` | `runnerCommand(targets)` | done; existing tests pass (default runner moon) |
 | `scripts/go-generate.mjs`, `check-pr-title.mjs`, `clean-generated.mjs`, `generated-outputs.mjs`, `assert-file.mjs` | mention moon in skip lists or hints | `.turbo` is already skipped; hints say `moon run server:generate` → runner-neutral wording | cutover |
-| `scripts/release.mjs` | none (its deps came from the task graph) | reads `RELEASE_SKIP_CONTAINER=1` as `--skip-container`: under turbo, arguments after `--` would put new cache keys on the whole release graph (turborepo.md, Commands) | done |
+| `scripts/release.mjs` | none (its deps came from the task graph) | reads `RELEASE_SKIP_CONTAINER=1` as `--skip-container`: under turbo, arguments after `--` would put new cache keys on the whole release graph (turborepo.md, Commands). Turbo's entry points pass `--prebuilt` (pack the builds and binaries the graph made), and each server platform package's `build-binary` runs `release.mjs binary` | done |
 
 CI selects the gate and every lane with `--affected`. With
 `futureFlags.affectedUsingTaskInputs` it matches the diff against each
@@ -432,10 +433,10 @@ Two workable setups; the prototype's draft uses the first.
 | | Vercel Remote Cache (OIDC) | Depot's turbo cache |
 |---|---|---|
 | Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), no `TURBO_API` (turbo's default, `https://vercel.com/api`, is the cache; `https://vercel.com` is the dashboard, which answers 405), a runner that does not point turbo at a cache of its own (Depot's do, unless the organization turns off "Allow Actions jobs to automatically connect to Depot Cache": ci-turbo's Depot runs restored from Depot's cache with `TURBO_API` set in the workflow), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
-| Shared with | the cloud deployments (same team cache, apart by key: turbo hashes `VERCEL_TARGET_ENV` into every task on Vercel, so a build CI did is no hit there) | CI only |
+| Shared with | the cloud deployments (same team cache, apart by key: the root `turbo.json` hashes `VERCEL` into every task, so a build CI did is no hit there) | CI only |
 | Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue, pushes to main (which run the gate alone), the nightly run and runs by hand, as moon's runs write Depot's cache; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue, pushes to main (which run the gate alone), the nightly run and runs by hand, as moon's runs write Depot's cache; on Vercel, every build reads and writes as Vercel's cache policies allow: a preview reads main's entries and its own branch's, and writes only its own (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
@@ -460,13 +461,21 @@ sets them up:
 
 - **Vercel builds** use the cache as Vercel sets it up (decision 3): every
   build, production and preview, reads and writes it with a token Vercel
-  gives the build, and keeps no local cache. Turbo puts `VERCEL_TARGET_ENV`
-  into every task's hash, so production builds restore only entries written
-  under production's keys, previews only previews'. That separation is by
-  key, not by permission: a branch's preview build runs the branch's code
-  with a token that can write any entry, production's keys included, so
-  anyone who can push a branch could plant one. Forks cannot: their pull
-  requests get no build, and so no token, until a team member approves one
+  gives the build, and keeps no local cache. Vercel's
+  [cache policies](https://vercel.com/docs/monorepos/remote-caching#how-cache-policies-isolate-artifacts)
+  sort the artifacts by where a build came from: a verified push to `main`
+  reads and writes the repository's shared namespace; a build of another
+  branch reads that namespace and its own branch's, and writes only its
+  own; a redeploy reads and writes nothing. So production is apart from the
+  previews by permission, not by key: a branch's preview runs the branch's
+  code, but what it uploads stays in that branch's namespace, which
+  production never reads. The logs agree: of 101 preview builds on
+  2026-11-13, none restored an entry another branch had stored, 271 times
+  with the key there. Production and previews therefore compute the same
+  keys (the root `turbo.json` drops turbo's default `VERCEL_TARGET_ENV`
+  hash), and a branch's first preview restores from main's build every
+  package it does not change. Forks get no build, and so no token, until a
+  team member approves one
   (the project's Git fork protection). A planted entry is removed by
   clearing the team's cache (owners only). The cloud's launcher, which runs
   with production's secrets, stays `cache: false` in every environment
@@ -481,8 +490,8 @@ sets them up:
   pull request's later pushes restore what its earlier ones built, and the
   merge queue writes the results of the commit that lands on main. A
   read-only flag (`remote:r`) is the pull request's own choice, so it only
-  ever kept honest branches out. Without `VERCEL_TARGET_ENV`, CI's entries
-  are apart from the Vercel builds'. A poisoned artifact could still make a
+  ever kept honest branches out. CI's keys lack `VERCEL`, which Vercel's
+  builds hash, so CI's entries are apart from theirs. A poisoned artifact could still make a
   pull-request or merge-queue run pass for code that fails; the signatures
   below close that.
 - **Later, to let only main's results reach production:** turbo's
@@ -509,8 +518,9 @@ recommendation was to hedge and wait for a trigger.
 Land the prototype with moon's configuration exactly as on main: no
 `moon.yml` or `.moon/tasks` change. Moon's `test` runs `test:all`, which
 bypasses the guard, and its Go `format`/`lint` keep their inline scripts.
-Then port `check-release-graph.mjs`, `release-manifest`,
-`check-typecheck-programs` and `doctor` behind the runner switch. Wire
+Then port `check-typecheck-programs` and `doctor` behind the runner switch
+(`check-release-graph.mjs` and `release-manifest`'s `buildTarget` need no
+port: turbo has no release builds, decision 11). Wire
 `ci-turbo.yml` to `pull_request` and `merge_group` as a non-required check,
 and to pushes to main, which run the gate alone to fill the remote cache; set
 up the remote cache. Every PR then runs both. What to compare, weekly:
@@ -568,14 +578,11 @@ the release graph.
 
 ## Risks
 
-1. **The release graph.** Moon orders it with serial dependencies and the
-   release builds' package edges; turbo's edges reproduce that order for
-   `snapshot`, `pack` and `publish`. The console release build waits for the
-   server tests in both runners, checked by the task-graph regression suite;
-   under turbo that edge makes `pack` and `publish` run the Go tests too.
-   Separate release output directories (decision 5) would drop the edge and
-   isolate independent runner invocations that currently share a checkout. The full
-   release graph checker still needs its Turbo port before cutover.
+1. **The release graph.** The two runners build a release differently until
+   the cutover (decision 11): moon rebuilds every public package in its
+   release builds, turbo packs the builds its graph made. A tarball that
+   differs between them is a bug until explained; the publish workflow stays
+   on moon until turbo's `publish` passes a dry run.
 2. **Selection.** `--affected` follows task inputs and task edges only with
    `futureFlags.affectedUsingTaskInputs` (root `turbo.json`);
    `--filter=…[ref]` still selects packages and drops the artifact edges. It
@@ -613,15 +620,21 @@ the release graph.
    only.
 3. **Vercel builds use the remote cache as Vercel sets it up** (2026-10-13,
    replacing "production never restores from the cache"). Every build,
-   production and preview, reads and writes the team's remote cache, and
-   turbo's default `VERCEL_TARGET_ENV` hash keeps production's entries
-   apart from the previews'. Writing takes the team's token, which forks do
+   production and preview, reads and writes the team's remote cache.
+   Vercel's cache policies keep a branch's entries away from production,
+   so production and previews share keys and a preview restores main's
+   entries (2026-11-13, replacing "turbo's default `VERCEL_TARGET_ENV` hash
+   keeps production's entries apart from the previews'"). Writing takes the team's token, which forks do
    not get (see "Who may write to the cache"). The cloud's builds set no
    cache policy of their own.
 4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,
    inert).
-5. **Release builds keep rewriting `dist/` in place**, ordered by the edge
-   chain; separate output directories stay a later cleanup.
+5. **Turbo's release packs the graph's own builds** (2026-11-06, replacing
+   "release builds keep rewriting `dist/` in place"). Turbo has no
+   `build-release`: `pack`, `snapshot` and `publish` depend on every public
+   package's `build` and on each server platform package's `build-binary`,
+   so a release builds each package once and waits for no test. Moon keeps
+   its release builds (decision 11).
 6. **`test` is the full lane, `test:unit` the fast one** in `components` and
    `api-mock`.
 7. **Dual run as proposed:** two to four weeks, exit after two consecutive
@@ -663,3 +676,13 @@ the release graph.
     `--continue` reports every suite. The suites build and cache nothing,
     so the runner changes nothing else there: moon took about 1.5 s of a
     one-minute job.
+11. **Turbo-native, not moon's workarounds** (2026-11-06). The turbo side
+    stops reproducing what moon needed: no mutexes, retries, mirrored
+    release builds or adapters between the runners. Each change gets the
+    turbo-native form and is measured on `ci-turbo`; GitHub Actions may
+    spread task groups over jobs where that pays. Moon's configuration stays
+    as on main until the cutover, so divergences by design are expected and
+    named in the PR that makes them. The order: the release graph packs the
+    graph's own builds (decision 5); a build stage first, then task groups
+    in parallel; mutexes and retries out; Go caching, with the server's Go
+    tasks on the `nextgen` package; then the cutover and moon's removal.

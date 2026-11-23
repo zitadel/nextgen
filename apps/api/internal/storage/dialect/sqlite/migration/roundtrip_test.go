@@ -2,11 +2,11 @@ package migration
 
 import (
 	"database/sql"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver the dialect migrates through
@@ -21,14 +21,17 @@ import (
 // No build tag: SQLite needs no container, so the walk is as cheap as any
 // unit test and runs with them.
 func TestMigrationsRoundTrip(t *testing.T) {
-	// Opened as the dialect opens it: the same pragmas, foreign keys on
-	// among them, and one connection.
-	dsn := &url.URL{
-		Scheme:   "file",
-		Path:     filepath.ToSlash(filepath.Join(t.TempDir(), "roundtrip.db")),
-		RawQuery: PragmaQuery,
-	}
-	db, err := sql.Open("sqlite", dsn.String())
+	p, snap := openRoundTrip(t)
+	migrationtest.RoundTrip(t, p, snap, known)
+}
+
+// openRoundTrip opens a database as the dialect opens it (the same pragmas,
+// foreign keys on among them, and one connection) and returns a provider over
+// it and the snapshot of its schema.
+func openRoundTrip(t *testing.T) (*goose.Provider, func(t *testing.T) migrationtest.Schema) {
+	t.Helper()
+	dsn := FileURI(filepath.ToSlash(filepath.Join(t.TempDir(), "roundtrip.db")))
+	db, err := sql.Open("sqlite", dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	db.SetMaxOpenConns(1)
@@ -36,10 +39,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 
 	p, err := newProvider(db)
 	require.NoError(t, err)
-
-	migrationtest.RoundTrip(t, p, func(t *testing.T) migrationtest.Schema {
-		return snapshot(t, db)
-	}, known)
+	return p, func(t *testing.T) migrationtest.Schema { return snapshot(t, db) }
 }
 
 // known: SQLite's ALTER TABLE ADD COLUMN takes NOT NULL only with a non-NULL

@@ -59,6 +59,7 @@ var payloadByEventType = map[string]string{
 	"auth.attempt.handed_off":        "empty-event-payload.yaml",
 	"auth.check.failed":              "auth-check-payload.yaml",
 	"auth.check.succeeded":           "auth-check-payload.yaml",
+	"auth.request.created":           "auth-request-created-payload.yaml",
 
 	"auth.sso.authorization.failed": "auth-check-payload.yaml",
 	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
@@ -72,11 +73,16 @@ var payloadByEventType = map[string]string{
 
 	"branding.created": "branding-created-payload.yaml",
 
+	"oauth_settings.created": "oauth-settings-created-payload.yaml",
+
 	"policy.created": "policy-payload.yaml",
 	"policy.updated": "policy-payload.yaml",
 
 	"release.created": "release-created-payload.yaml",
 	"release.revoked": "release-revoked-payload.yaml",
+
+	"application.created": "application-payload.yaml",
+	"application.updated": "application-payload.yaml",
 
 	"idp.created": "idp-payload.yaml",
 	"idp.updated": "idp-payload.yaml",
@@ -169,6 +175,8 @@ var webhookByEventType = map[string]webhookDoc{
 		"password."},
 	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. The event is also sent " +
 		"when a factor is recorded without a challenge, as on sign-up."},
+	"auth.request.created": {description: "An app started a sign-in at the OAuth authorization endpoint. The " +
+		"payload names the app by its `client_id`."},
 
 	"auth.sso.authorization.failed": {description: "A sign-in through an identity provider (SSO) failed at the provider. " +
 		"It answered with an error, `access_denied` included, or the callback carried no code."},
@@ -187,6 +195,10 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"branding.created": {description: "A branding revision was created."},
 
+	"oauth_settings.created": {description: "A project published a new revision of its OAuth settings, " +
+		"which say whether its OAuth authorization server answers. A release build publishes one when the " +
+		"bundle's `oauth` resource differs from every earlier revision."},
+
 	"policy.created": {description: "A project published the first revision of its policy for an operation. " +
 		"A policy guards an operation, such as setting a password."},
 	"policy.updated": {description: "A project published a new revision of its policy for an operation. The " +
@@ -195,6 +207,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"release.created": {description: "A release was created. A [release](/docs/concepts/repo-config) is an immutable " +
 		"build of the project's configuration, which a deployment makes live."},
 	"release.revoked": {description: "A release was revoked."},
+
+	"application.created": {description: "A registered application was created."},
+	"application.updated": {description: "A registered application was revised. The payload holds the new " +
+		"revision, the name when it changed, and the clients the revision added."},
 
 	"idp.created": {description: "An identity provider (IdP) connection was created."},
 	"idp.updated": {description: "An IdP connection was revised. The payload holds the new " +
@@ -222,9 +238,8 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"invitation.created": {description: "An invitation was created, new or as the replacement of another."},
 	"invitation.accepted": {description: "An invitation was accepted. Grant events the acceptance writes " +
-		"carry this event's `request_id`; there are none when the user already holds an identical active grant.",
-		status: statusContracted},
-	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
+		"carry this event's `request_id`; there are none when the user already holds an identical active grant."},
+	"invitation.rejected": {description: "An invitation was declined."},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +
 		"or an unaccepted one was deleted by its replacement."},
 

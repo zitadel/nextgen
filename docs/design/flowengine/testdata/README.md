@@ -16,11 +16,11 @@ component package for the Chromium solver tests; `--check` verifies both fixture
 Future solvers should use these vectors rather than copying the AGPL server or
 research implementation into a client package.
 
-Run `moon run server:test-pow` for vectors and the Go race suite. Its default Go
+Run `turbo run test:pow --filter=@zitadel/server` for vectors and the Go race suite. Its default Go
 test run also executes fuzz seeds. For bounded exploratory fuzzing, pass
 `-- -run '^$' -fuzz FuzzParseProof -fuzztime 20000x -parallel 2` or replace the target
-with `FuzzVerifyStoredChallenge`. The normal server test task includes the Go
-tests and depends on `server:check-pow-vectors`.
+with `FuzzVerifyStoredChallenge`. The server's `test` includes the Go tests, and
+its `lint` runs `check-pow-vectors`.
 
 Regenerate after reviewing an intentional change with
 `node docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs` from the repository

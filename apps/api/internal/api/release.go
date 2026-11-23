@@ -63,7 +63,6 @@ func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest
 	if err := requireBuildKindScopes(ctx, req.Bundle); err != nil {
 		return nil, err
 	}
-
 	input, err := mapBuildReleaseRequest(projectID, req)
 	if err != nil {
 		return nil, err
@@ -99,6 +98,7 @@ func requireBuildKindScopes(ctx context.Context, bundle api.ConfigurationBundle)
 		{len(bundle.Idps) > 0, "idp.write", "idps"},
 		{len(bundle.Policies) > 0, "policy.write", "policies"},
 		{bundle.Branding.IsSet(), "branding.write", "branding"},
+		{bundle.OAuth.IsSet(), "oauth_settings.write", "oauth"},
 	}
 	for _, check := range checks {
 		if !check.needed {
@@ -185,6 +185,13 @@ func mapBuildReleaseRequest(projectID string, req *api.BuildReleaseRequest) (ser
 			Shape:          brandingShapeFromAPI(branding.Shape),
 		}
 	}
+
+	if settings, ok := req.Bundle.OAuth.Get(); ok {
+		input.OAuth = &service.CreateOAuthSettingsInput{
+			ProjectID: projectID,
+			Enabled:   settings.Enabled,
+		}
+	}
 	return input, nil
 }
 
@@ -231,7 +238,7 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 		if err != nil {
 			// The decoder rejects kinds outside the wire enum with req.invalid,
 			// so this is reached only by a kind the contract admits before the
-			// service resolves it: idp, until the release service learns it.
+			// service resolves it.
 			return nil, domain.ErrReleaseInvalid("unknown pointer kind", err)
 		}
 		pointers = append(pointers, service.CreateReleasePointer{
@@ -270,7 +277,7 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	return &reused, nil
 }
 
-func (h *Handler) GetReleaseById(ctx context.Context, params api.GetReleaseByIdParams) (api.GetReleaseByIdRes, error) {
+func (h *Handler) GetRelease(ctx context.Context, params api.GetReleaseParams) (api.GetReleaseRes, error) {
 	// Releases are addressed by a path id, but the read is scoped to the
 	// project the caller named, so a release of another project reads as an
 	// unknown id rather than a forbidden one and is no existence oracle.

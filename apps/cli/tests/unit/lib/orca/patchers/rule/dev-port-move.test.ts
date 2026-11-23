@@ -5,6 +5,7 @@ import {
   envValueEdit,
   replaceOrigin,
 } from "@/lib/orca/patchers/rule/dev-port-move";
+import { PREVIEW_PATTERN } from "@tests/helpers/records";
 
 describe("envValueEdit", () => {
   const edit = envValueEdit("ZITADEL_ISSUER", "http://localhost:3101");
@@ -45,7 +46,7 @@ describe("configIssuerEdit", () => {
         project: "proj",
         environments: {
           development: { issuer: "http://localhost:3000" },
-          preview: { issuer_pattern: ["https://*-acme.vercel.app", "http://localhost:3000"] },
+          preview: { issuer_pattern: [PREVIEW_PATTERN, "http://localhost:3000"] },
         },
         preset: "password-first",
       },
@@ -57,7 +58,7 @@ describe("configIssuerEdit", () => {
 
     expect(out.environments).toEqual({
       development: { issuer: "http://localhost:3101" },
-      preview: { issuer_pattern: ["https://*-acme.vercel.app", "http://localhost:3101"] },
+      preview: { issuer_pattern: [PREVIEW_PATTERN, "http://localhost:3101"] },
     });
     expect(out.preset).toBe("password-first");
   });

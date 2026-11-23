@@ -9,9 +9,12 @@ import {
 import { fetchSession, signOut } from "@/auth/session";
 import { AppShell } from "@/app-shell/app-shell";
 import { routerRelativeHref, withoutTrailingSlash } from "@/lib/base-path";
+import { readPlatformAccess } from "@/features/platform/access";
 import {
   PROJECT_SCOPE_PARAM,
+  isRootPath,
   resolveDefaultProjectScope,
+  selectsPlatformProject,
   validateProjectScopeSearch,
 } from "@/features/projects/project-scope";
 
@@ -26,7 +29,11 @@ import {
  *
  * It also owns the selected project (`src/features/projects/project-scope.ts`): `?project=`
  * is validated here and retained on every navigation beneath the layout, so a
- * sidebar link or a row link keeps the selection without naming it. Any
+ * sidebar link or a row link keeps the selection without naming it. The
+ * root's own screens (Projects, Settings, the profile) are the exception:
+ * they hold the root, the platform project for someone who may act on it and
+ * no selection for anyone else, so going up never leaves a project selected
+ * that the bar does not name (D44). Any
  * screen opened without a selection is redirected to itself with the default
  * one, so a single-project person gets it wherever they arrive. With no default
  * — several projects to choose from — an unscoped screen renders as it is, and
@@ -47,6 +54,38 @@ export const Route = createFileRoute("/_authed")({
       throw redirect({ to: "/login", search: { next: routerRelativeHref(location.href) } });
     }
     const leaf = matches[matches.length - 1];
+    // The root's screens hold the root, never a project (D44): the platform
+    // project for someone who may act on it (D42), none for anyone else. So
+    // they take no default either.
+    if (leaf && isRootPath(withoutTrailingSlash(leaf.fullPath))) {
+      const root = await readPlatformAccess().catch(() => undefined);
+      if (search.project !== root) {
+        throw redirect({
+          to: withoutTrailingSlash(leaf.fullPath),
+          params: leaf.params,
+          search: { ...leaf.search, project: root },
+          replace: true,
+        });
+      }
+      return { session };
+    }
+    // The reserved platform project is the root (D42): its screens are the
+    // root's, for someone who may act on it. For anyone else a URL naming it
+    // goes on without it, and gets the default like any project they cannot
+    // choose. `undefined` removes the retained key, which leaving it out
+    // would keep.
+    if (
+      leaf &&
+      selectsPlatformProject(location.search) &&
+      !(await readPlatformAccess().catch(() => undefined))
+    ) {
+      throw redirect({
+        to: withoutTrailingSlash(leaf.fullPath),
+        params: leaf.params,
+        search: { ...leaf.search, project: undefined },
+        replace: true,
+      });
+    }
     if (!search.project && leaf) {
       const project = await resolveDefaultProjectScope();
       if (project) {

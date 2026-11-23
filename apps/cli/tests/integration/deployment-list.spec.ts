@@ -8,7 +8,8 @@ import {
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal, RENDERINGS } from "@tests/fixtures/terminal";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -408,7 +409,7 @@ describe("deployment list", () => {
 
         expect(result).toSucceed();
         expect(result.stdout).not.toContain("\u001b[2J");
-        expect(result.stdout).toContain("https://app.acme.com\\x1b[2Jwiped");
+        expect(result.stdout).toContain(`${PRIMARY_ORIGIN}\\x1b[2Jwiped`);
       });
 
       it.each(RENDERINGS)("suggests the next page once, %s", async (_how, colour) => {
@@ -446,6 +447,29 @@ describe("deployment list", () => {
           "deploy",
           "http://localhost:3000, https://app.example.com",
           /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
+          "primary",
+          "",
+        );
+      });
+
+      it("prints the expiry preview list shows for a preview, piped", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        await app.previewData(PREVIEW_URL);
+        const expires = await app.previewExpiry(PREVIEW_URL);
+
+        const result = await offTerminal(() =>
+          app.run(["deployment", "list", "--live", "--plain"]),
+        );
+
+        expect(result).toPrintPlainRow(
+          /^dep_/,
+          /^rel_/,
+          "deploy",
+          PREVIEW_URL,
+          /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
+          "preview",
+          expires,
         );
       });
 

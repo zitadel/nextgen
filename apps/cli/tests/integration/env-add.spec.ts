@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -471,7 +472,7 @@ describe("env add", () => {
           source: "",
           code: "E_VALIDATION",
           message: 'Invalid app URL "ftp://x"',
-          hint: "Use a URL like https://app.acme.com.",
+          hint: `Use a URL like ${PRIMARY_ORIGIN}.`,
         });
       });
 
@@ -524,10 +525,10 @@ describe("env add", () => {
           source: "",
           code: "E_VALIDATION",
           message: "No server supplied",
-          hint: `Pass --server. For example: ${expectedPublicCliCommand(`env add production --server https://api.zitadel.cloud --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`)}`,
+          hint: `Pass --server. For example: ${expectedPublicCliCommand(`env add production --server https://preview.zitadel.com --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`)}`,
           next_commands: [
             expectedPublicCliCommand(
-              `env add production --server https://api.zitadel.cloud --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`,
+              `env add production --server https://preview.zitadel.com --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`,
             ),
           ],
         });

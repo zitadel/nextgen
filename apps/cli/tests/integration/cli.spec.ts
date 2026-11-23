@@ -11,6 +11,7 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 
@@ -38,12 +39,12 @@ async function typescriptFiles(dir: string): Promise<string[]> {
   return files;
 }
 
-/** Every command id the source suggests through `publicCliCommand` or copy. */
+/** Every command id the source suggests through `Spelling#command` or copy. */
 async function suggestedCommandIds(): Promise<Set<string>> {
   const commands = new Set<string>();
   for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
     const source = await readFile(file, "utf8");
-    for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
+    for (const match of source.matchAll(/Spelling\.at\([^)]*\)\.command\(\s*(["`])([^"`$]*)/g)) {
       const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
@@ -419,23 +420,353 @@ describe("the cli", () => {
       });
     });
 
-    describe("handled by oclif rather than us", () => {
-      it("exits 127 for a command that does not exist", async () => {
-        const result = await runCliForTest(["bogus", "--json"]);
+    describe("for a command that does not exist", () => {
+      describe("--json", () => {
+        it("prints one error envelope naming the command and the topic's help", async () => {
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
 
-        expect(result).toExitWith(127);
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "team:delete",
+            source: "",
+            code: "E_VALIDATION",
+            message: "team delete is not a zitadel command",
+            next_commands: [expectedPublicCliCommand("team --help")],
+          });
+        });
+
+        it("prints one error envelope with the commands it was close to", async () => {
+          const result = await runCliForTest(["variable", "lst", "--json"]);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "variable:lst",
+            source: "",
+            code: "E_VALIDATION",
+            message: "variable lst is not a zitadel command",
+            next_commands: [
+              expectedPublicCliCommand("variable list --help"),
+              expectedPublicCliCommand("variable --help"),
+            ],
+          });
+        });
+
+        it("points at the CLI's help when nothing is close", async () => {
+          const result = await runCliForTest(["frobnicate", "--json"]);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "frobnicate",
+            source: "",
+            code: "E_VALIDATION",
+            message: "frobnicate is not a zitadel command",
+            next_commands: [expectedPublicCliCommand("--help")],
+          });
+        });
+
+        const refusals = [
+          [
+            "a short typo of a subcommand",
+            ["env", "ad"],
+            "env:ad",
+            "env ad is not a zitadel command",
+            ["env add --help", "env --help"],
+            127,
+          ],
+          [
+            "a mistyped subcommand of a command with subcommands",
+            ["env", "ls"],
+            "env:ls",
+            "env ls is not a zitadel command",
+            ["env --help"],
+            127,
+          ],
+          [
+            "a typo only in case",
+            ["DEPLOY"],
+            "DEPLOY",
+            "DEPLOY is not a zitadel command",
+            ["deploy --help"],
+            127,
+          ],
+          [
+            "the plural of a noun alone",
+            ["policies"],
+            "policies",
+            "policies is not a zitadel command",
+            ["policy --help"],
+            127,
+          ],
+          [
+            "a word after a plural that is no command of its noun",
+            ["policies", "lst"],
+            "policy:lst",
+            "policy lst is not a zitadel command",
+            ["policy list --help", "policy --help"],
+            127,
+          ],
+          [
+            "a typo of an alias",
+            ["ejct"],
+            "ejct",
+            "ejct is not a zitadel command",
+            ["eject --help"],
+            127,
+          ],
+          [
+            "flags the command it meant takes",
+            ["--env", "staging", "variable", "lst"],
+            "variable:lst",
+            "variable lst is not a zitadel command",
+            ["variable list --help", "variable --help"],
+            127,
+          ],
+          [
+            "a word a real command does not take",
+            ["deploy", "extra"],
+            "deploy",
+            "deploy does not take the argument typed after it",
+            ["deploy --help"],
+            3,
+          ],
+          [
+            "a typo of a hidden subcommand",
+            ["autocomplete:crete"],
+            "autocomplete",
+            "autocomplete does not take the argument typed after it",
+            ["autocomplete --help"],
+            3,
+          ],
+        ] as const;
+
+        it.each(refusals)(
+          "answers %s with one envelope",
+          async (_, argv, command, message, next) => {
+            const result = await runCliForTest([...argv, "--json"]);
+
+            expect(parseJson(result.stdout)).toEqual({
+              status: "error",
+              cli_version: cliVersion.version,
+              command,
+              source: "",
+              code: "E_VALIDATION",
+              message,
+              next_commands: next.map((step) => expectedPublicCliCommand(step)),
+            });
+          },
+        );
+
+        it.each(refusals)("exits %s with its own code", async (_, argv, _c, _m, _n, exitCode) => {
+          const result = await runCliForTest([...argv, "--json"]);
+
+          expect(result).toExitWith(exitCode);
+        });
+
+        it.each([
+          [
+            "a flag before the words",
+            ["--json", "statu"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a flag and its value before the words",
+            ["--cwd", "/tmp", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          ["no words at all", ["--json"], "(default)", "That is not a zitadel command", ["--help"]],
+          [
+            "the value of a flag no command declares",
+            ["--token", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "the value of a short flag no command declares",
+            ["-x", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "the value of a cluster of short flags no command declares",
+            ["-xy", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a flag with colons in its value",
+            ["--token:secret:credential:frobnicate", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a switch another command declares before the words",
+            ["--plain", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a switch another command declares before a topic",
+            ["--plain", "variable", "lst", "--json"],
+            "variable:lst",
+            "variable lst is not a zitadel command",
+            ["variable list --help", "variable --help"],
+          ],
+          [
+            "a short flag no base flag has before --json",
+            ["variable", "lst", "-f", "--json"],
+            "variable:lst",
+            "variable lst is not a zitadel command",
+            ["variable list --help", "variable --help"],
+          ],
+          [
+            "a switch whose own name starts with no-",
+            ["--no-open", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a switch turned off with no-",
+            ["--no-color", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a word of only spaces",
+            [" ", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a flag-like word after a pass-through nothing came before",
+            ["--json", "--", "-x", "SECRET"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a word after a word of only spaces",
+            [" ", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "the values of a flag that takes every word after it",
+            ["--origin", "a", "SECRET", "statu", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a word after a pass-through nothing came before",
+            ["--json", "--", "frobnicate"],
+            "frobnicate",
+            "frobnicate is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a short flag cluster that takes the value after it",
+            ["-nc", "/tmp", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+        ])("answers %s by what was typed", async (_, argv, command, message, next) => {
+          const result = await runCliForTest(argv);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command,
+            source: "",
+            code: "E_VALIDATION",
+            message,
+            next_commands: next.map((step) => expectedPublicCliCommand(step)),
+          });
+        });
+
+        it("prints no envelope for a --json typed as another flag's value", async () => {
+          const result = await runCliForTest(["--cwd", "--json", "statu"]);
+
+          expect(result.stdout).toBe("");
+        });
+
+        it("prints no envelope for a --json after the pass-through", async () => {
+          const result = await runCliForTest(["frobnicate", "--", "--json"]);
+
+          expect(result.stdout).toBe("");
+        });
+
+        it("writes nothing to stderr", async () => {
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
+
+          expect(result.stderr).toBe("");
+        });
       });
 
-      it("emits no envelope for a command that does not exist", async () => {
-        const result = await runCliForTest(["bogus", "--json"]);
+      describe("piped", () => {
+        it("prints the error on stderr", async () => {
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
 
-        expect(result.stdout.trim()).toBe("");
+          expect(result.stderr).toBe(
+            [
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
+              "",
+              "Next:",
+              `  $ ${expectedPublicCliCommand("team --help")}`,
+              "",
+            ].join("\n"),
+          );
+        });
+
+        it("prints nothing on stdout", async () => {
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
+
+          expect(result.stdout).toBe("");
+        });
       });
 
-      it("says on stderr which command does not exist", async () => {
-        const result = await runCliForTest(["bogus", "--json"]);
+      describe("rendered for a terminal", () => {
+        it("prints the error and offers no prompt to run another command", async () => {
+          const result = await asTerminal(() =>
+            runCliForTest(["team", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
+          );
 
-        expect(result.stderr).toContain("bogus is not a zitadel command.");
+          expect(result.stderr).toBe(
+            [
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
+              "",
+              "Next:",
+              `  $ ${expectedPublicCliCommand("team --help")}`,
+              "",
+            ].join("\n"),
+          );
+        });
+
+        it("names the command it was close to as one to type", async () => {
+          const result = await asTerminal(() =>
+            runCliForTest(["variable", "lst"], { NO_COLOR: "1" }),
+          );
+
+          expect(result.stderr).toContain(
+            `  $ ${expectedPublicCliCommand("variable list --help")}`,
+          );
+        });
       });
     });
   });

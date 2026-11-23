@@ -201,13 +201,12 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
-    // the designated identifier sits under it, its property as a chip beside
-    // it rather than in a tooltip (D23).
+    // the designated identifier sits under it, with no chip naming its property.
     const link = await screen.findByRole("link", { name: "Maya Patel" });
     const table = within(screen.getByRole("table"));
-    const identifier = table.getByText("maya.patel@acme.com").parentElement as HTMLElement;
-    expect(within(identifier).getByText("email")).toBeInTheDocument();
-    expect(within(link.parentElement as HTMLElement).queryByText("email")).not.toBeInTheDocument();
+    const cell = link.closest("td") as HTMLElement;
+    expect(within(cell).getByText("maya.patel@acme.com")).toBeInTheDocument();
+    expect(cell).toHaveTextContent(/^Maya Patelmaya\.patel@acme\.com$/);
     // Schema properties are not columns until the viewer pins one (D23): the
     // rest of the record reads in one Attributes cell, in the schema's field
     // order, without the email that would only repeat the line under the name.
@@ -258,8 +257,8 @@ describe("users screen", () => {
     const table = within(await screen.findByRole("table"));
     const link = table.getByRole("link", { name: "maya@acme.com" });
     expect(table.getAllByText("maya@acme.com")).toHaveLength(1);
-    // With no display name the identifier is the link, and the chip sits beside it.
-    expect(within(link.parentElement as HTMLElement).getByText("email")).toBeInTheDocument();
+    // With no display name the identifier is the link, alone in the cell.
+    expect(link.closest("td")).toHaveTextContent(/^maya@acme\.com$/);
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
       "Revision",
@@ -348,8 +347,12 @@ describe("users screen", () => {
       "href",
       scopedPath("/schemas/sch_staff"),
     );
-    expect(card.getByText("username")).toBeInTheDocument();
+    expect(card.getByText("Signs in with").nextElementSibling).toHaveTextContent(
+      /^evelyn\.berezin$/,
+    );
     expect(card.getByText("None")).toBeInTheDocument();
+    // Schema mechanics belong to the schema's docs, not to this card.
+    expect(card.queryByText(/x-identifier|x-display/)).not.toBeInTheDocument();
     expect(card.getByText("Field Ops, Platform (pending)")).toBeInTheDocument();
     expect(card.getByText("Lifecycle owner").nextElementSibling).toHaveTextContent("Field Ops");
     expect(card.getByText("Created").nextElementSibling).toHaveTextContent(
@@ -459,7 +462,7 @@ describe("users screen", () => {
     expect(popover.getByRole("tab", { name: "YAML" })).toBeInTheDocument();
     // Data, not configuration: no CLI hint about applying it.
     expect(popover.queryByText(/deploy your changes/)).not.toBeInTheDocument();
-    expect(popover.getByRole("link", { name: "View details" })).toHaveAttribute(
+    expect(popover.getByRole("link", { name: "View user" })).toHaveAttribute(
       "href",
       scopedPath("/users/user_1"),
     );
@@ -1672,10 +1675,14 @@ describe("users screen", () => {
   it("reads only the rows for a new term, keeping the older revisions filter", async () => {
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    // What a search must not read again is the filter's own chrome: the
+    // options, the revisions and the newest revision, all reads of the schema
+    // list. A schema read by its id is a row's columns, and with no rows here
+    // it is an earlier test's replaced search finishing late (`serveLineage`).
     const schemaReads: string[] = [];
     const countSchemaReads = ({ request }: { request: Request }) => {
       const url = new URL(request.url);
-      if (url.pathname.startsWith("/api/v1/schemas")) schemaReads.push(url.pathname + url.search);
+      if (url.pathname === "/api/v1/schemas") schemaReads.push(url.pathname + url.search);
     };
     await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
     await screen.findByText("No users match this filter.");

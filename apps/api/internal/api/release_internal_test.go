@@ -91,6 +91,7 @@ func TestBuildReleaseRequestShape(t *testing.T) {
 		// bundle as a whole is the server's to refuse, not the decoder's.
 		"empty kinds": `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
 		"schema url":  `{"bundle":{"schemas":[{"kind":"schema-url","url":"https://acme.example/human.json"}]}}`,
+		"oauth only":  `{"bundle":{"oauth":{"enabled":true}}}`,
 	}
 	for name, body := range accepted {
 		t.Run(name, func(t *testing.T) {
@@ -107,6 +108,11 @@ func TestBuildReleaseRequestShape(t *testing.T) {
 		// A project has one branding: an array of them is refused at
 		// decoding, before it can be materialised element by element.
 		"branding as an array": `{"bundle":{"branding":[{},{}]}}`,
+		// OAuth settings have one required field and no default for it, so an
+		// empty object says nothing and is refused; so is a second key.
+		"oauth without enabled":     `{"bundle":{"oauth":{}}}`,
+		"oauth with an unknown key": `{"bundle":{"oauth":{"enabled":true,"issuer":"https://acme.example"}}}`,
+		"oauth as an array":         `{"bundle":{"oauth":[{"enabled":true}]}}`,
 	}
 	for name, body := range refused {
 		t.Run(name, func(t *testing.T) {
@@ -211,6 +217,19 @@ func TestRequireBuildKindScopes(t *testing.T) {
 		assert.Contains(t, err.Error(), "policy.write")
 	})
 
+	t.Run("missing oauth_settings.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		err := requireBuildKindScopes(ctx, api.ConfigurationBundle{
+			OAuth: api.NewOptOAuthSettings(api.OAuthSettings{Enabled: true}),
+		})
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "oauth_settings.write")
+	})
+
 	t.Run("empty kinds need no extra scope", func(t *testing.T) {
 		ctx := WithScopeContext(context.Background(), ScopeContext{
 			ProjectID: "proj_a",
@@ -218,4 +237,37 @@ func TestRequireBuildKindScopes(t *testing.T) {
 		})
 		require.NoError(t, requireBuildKindScopes(ctx, api.ConfigurationBundle{}))
 	})
+}
+
+// The bundle's oauth singleton maps onto the build input under the project
+// the path names, so the service can validate it like branding.
+func TestMapBuildReleaseRequestMapsOAuth(t *testing.T) {
+	t.Parallel()
+
+	input, err := mapBuildReleaseRequest("proj_1", &api.BuildReleaseRequest{
+		Bundle: api.ConfigurationBundle{OAuth: api.NewOptOAuthSettings(api.OAuthSettings{Enabled: true})},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, input.OAuth)
+	assert.Equal(t, "proj_1", input.OAuth.ProjectID)
+	assert.True(t, input.OAuth.Enabled)
+
+	without, err := mapBuildReleaseRequest("proj_1", &api.BuildReleaseRequest{})
+	require.NoError(t, err)
+	assert.Nil(t, without.OAuth)
+}
+
+// An OAuth settings revision is read back under its own envelope, and its
+// errors map like branding's.
+func TestOAuthSettingsResponses(t *testing.T) {
+	t.Parallel()
+
+	resp := oauthSettingsRevisionResponse(&domain.OAuthSettings{ID: "oauthset_1", Enabled: true})
+	assert.Equal(t, "oauthset_1", resp.ID)
+	assert.True(t, resp.OAuth.Enabled)
+
+	assert.Equal(t, http.StatusNotFound, oauthSettingsErrorResponse(domain.ErrOAuthSettingsNotFound()).StatusCode)
+	assert.Equal(t, http.StatusForbidden, oauthSettingsErrorResponse(domain.ErrOAuthSettingsPermissionDenied()).StatusCode)
+	assert.Equal(t, http.StatusBadRequest, oauthSettingsErrorResponse(domain.ErrOAuthSettingsMissingProjectID()).StatusCode)
+	assert.Equal(t, http.StatusNotFound, errorResponse(domain.ErrOAuthSettingsNotFound()).StatusCode, "errorResponse routes the prefix")
 }

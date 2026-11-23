@@ -5,49 +5,45 @@
   // go.work as the package `bench`. The server module, the Go client, the
   // config defaults and the design tokens are dependencies through replace
   // directives; the root's `go-sources` reaches their sources through the
-  // module graph. The tasks are moon's (moon.yml) as commands; turbo's
-  // built-in `dev` (go run ./cmd/k6) is dropped.
+  // module graph. A Go module has no scripts, so each task gives its
+  // `command`; turbo's built-in `dev` (go run ./cmd/k6) is dropped.
   "tasks": {
-    // Tracked Go files only, as the server project checks them.
+    // Tracked Go files only, as the server project checks them. Turbo's own
+    // `format` (go fmt) rewrites and stays uncached; this one only checks.
     "format": {
-      "cache": false,
+      "cache": true,
       "command": ["node", "../../scripts/go-format-check.mjs"],
       "inputs": ["**/*.go", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
-    // Compiles the server module's generated output (the JSON meta-schemas its
-    // api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which the server's
-    // generation rewrites mid-graph; the edge keeps vet behind it, as the
-    // server's own vet is. Test waits through vet; build waits directly on
-    // generation so a test-only change does not select a production build.
     "vet": {
-      "cache": false,
-      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "dependsOn": ["go-sources"],
       "command": ["go", "vet", "./..."],
       "inputs": ["$TURBO_DEFAULT$"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The JavaScript k6 scenarios go through Biome like the server launcher.
+    // It also stands for vet and format, so `turbo run lint` runs them.
     "lint": {
+      "dependsOn": ["vet", "format"],
       "command": ["pnpm", "exec", "biome", "check", "scripts", "--no-errors-on-unmatched"],
       "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json", "$TURBO_ROOT$/biome-plugins/*.grit"]
     },
     "dev": { "extends": false },
-    // `build` and `test` are turbo's built-in Go tasks with moon's commands,
-    // and turbo adds every file of this module and of the modules it
+    // `build` and `test` are turbo's built-in Go tasks with their own
+    // commands, and turbo adds every file of this module and of the modules it
     // requires to their inputs, tests included. The negations take the
     // tests back out: the server's would select the harness for a test-only
-    // change.
+    // change. The binary leaves out Go's VCS stamp, so a restored one does not
+    // name another commit.
     "build": {
-      "cache": false,
-      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
-      "command": ["go", "build", "-o", "dist/k6", "./cmd/k6"],
+      "dependsOn": ["go-sources"],
+      "command": ["go", "build", "-buildvcs=false", "-o", "dist/k6", "./cmd/k6"],
       "inputs": ["$TURBO_EXTENDS$", "!$TURBO_ROOT$/**/*_test.go", "!$TURBO_ROOT$/**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "outputs": ["dist/k6"]
     },
     "test": {
-      "cache": false,
-      "dependsOn": ["go-sources", "format", "vet"],
+      "dependsOn": ["go-sources"],
       "command": ["go", "test", "-timeout", "5m", "./..."],
       "inputs": [
         "$TURBO_DEFAULT$",

@@ -394,6 +394,24 @@ func TestEventService_List_plansEachReadOntoAnIndex(t *testing.T) {
 			req:   service.ListEventsRequest{EntityID: "user_2", Categories: []string{"entity"}},
 			lists: each(domain.EventFieldCategory, []string{"entity"}, equal(domain.EventFieldEntityID, "user_2")),
 		},
+		"one user, every category: its index is by category": {
+			req:   service.ListEventsRequest{UserID: "user_2"},
+			lists: each(domain.EventFieldCategory, everyCategory, equal(domain.EventFieldUserID, "user_2")),
+		},
+		"one user's sign-ins: the user in one category": {
+			req:   service.ListEventsRequest{UserID: "user_2", Categories: []string{"auth"}},
+			lists: each(domain.EventFieldCategory, []string{"auth"}, equal(domain.EventFieldUserID, "user_2")),
+		},
+		"a user and an actor: the user reads, the actor is matched": {
+			req:   service.ListEventsRequest{UserID: "user_2", ActorID: "user_1", Categories: []string{"admin"}},
+			scans: each(domain.EventFieldCategory, []string{"admin"}, equal(domain.EventFieldUserID, "user_2")),
+			match: database.And(equal(domain.EventFieldActorID, "user_1")),
+		},
+		"a resource and a user: the resource reads, the user is matched": {
+			req:   service.ListEventsRequest{EntityID: "sess_1", UserID: "user_2", Categories: []string{"session"}},
+			scans: each(domain.EventFieldCategory, []string{"session"}, equal(domain.EventFieldEntityID, "sess_1")),
+			match: database.And(equal(domain.EventFieldUserID, "user_2")),
+		},
 		"the time bounds narrow every range": {
 			req: service.ListEventsRequest{ActorID: "user_1", Categories: []string{"auth"}, CreatedAfter: &after},
 			lists: each(domain.EventFieldCategory, []string{"auth"},

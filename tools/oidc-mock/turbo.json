@@ -3,32 +3,34 @@
   "extends": ["//"],
   // Test-only OIDC provider for the journey runner: the Go module turbo finds
   // through go.work as the package `oidc-mock`. No other module of ours is a
-  // dependency. The tasks are moon's (moon.yml) as commands; turbo's
-  // built-in `lint` (go vet, which `vet` runs) and `dev` are dropped.
+  // dependency. A Go module has no scripts, so each task gives its
+  // `command`; turbo's built-in `lint` (go vet, which `vet` runs) and `dev`
+  // are dropped.
   "tasks": {
-    // Tracked Go files only, as the server project checks them.
+    // Tracked Go files only, as the server project checks them. Turbo's own
+    // `format` (go fmt) rewrites and stays uncached; this one only checks.
     "format": {
-      "cache": false,
+      "cache": true,
       "command": ["node", "../../scripts/go-format-check.mjs"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
     "vet": {
-      "cache": false,
       "command": ["go", "vet", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
-    "lint": { "extends": false },
+    // The lint group: vet and format do the work. A Go module's task always
+    // gets turbo's built-in command (go vet for lint), hence the no-op.
+    "lint": { "extends": false, "dependsOn": ["vet", "format"], "command": ["node", "-e", "0"] },
     "dev": { "extends": false },
+    // No VCS stamp, so a restored binary does not name another commit.
     "build": {
-      "cache": false,
-      "command": ["go", "build", "-o", "dist/oidc-mock", "."],
+      "command": ["go", "build", "-buildvcs=false", "-o", "dist/oidc-mock", "."],
       "inputs": ["$TURBO_EXTENDS$", "!**/*_test.go", "!**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "outputs": ["dist/oidc-mock"]
     },
     "test": {
-      "cache": false,
-      "dependsOn": ["format", "vet"],
+      "dependsOn": [],
       "command": ["go", "test", "-timeout", "2m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     }

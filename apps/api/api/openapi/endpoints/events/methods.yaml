@@ -1,6 +1,6 @@
 get:
   operationId: listEvents
-  x-zitadel-cli: events list
+  x-zitadel-cli: event list
   summary: List events
   # Pages are keyset-paginated on (created_at, id) (ADR 027 / ADR 049). The
   # event types are catalogued in docs/design/api/events-catalog.md.
@@ -17,13 +17,13 @@ get:
     credential's team. Team-scoped credentials are not issued today.
 
     Each item carries an `event_type` that says which type of event it is, and
-    the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+    the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).
 
     Filters combine. These are answered from an index and fill their pages: no
     filter, `category`, `event_type`, `status_class`, `operation_id` with or
     without `status_class`, `request_id`, `flow_id`, and `session_id`,
-    `entity_id`, `actor_id` or `entity_type` with or without `category`, each
-    with or without the time bounds. Any other filter or combination is
+    `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
+    `category`, each with or without the time bounds. Any other filter or combination is
     matched event by event, over at most a few thousand events per request.
     Such a page can hold fewer events than `limit`, or none, and still carry
     `next_page_token`: keep passing the token until a response has none.
@@ -67,6 +67,16 @@ get:
     - name: actor_id
       in: query
       description: Only events triggered by this actor ID.
+      schema:
+        type: string
+    - name: user_id
+      in: query
+      description: |
+        Only events that concern this user ID, whoever triggered them: the
+        user's sign-ins, sessions and credentials, and the changes made to
+        the user. Events recorded by a server version before this filter
+        existed are not matched; they leave the list as retention removes
+        them.
       schema:
         type: string
     - name: client_id

@@ -163,7 +163,7 @@ func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (
 	if err != nil {
 		return nil, err
 	}
-	challenge, err := domain.NewClaimChallenge(id, projectID, secretHash, time.Now().Add(domain.ClaimChallengeTTL))
+	challenge, err := domain.NewClaimChallenge(id, projectID, secretHash, time.Now().UTC().Add(domain.ClaimChallengeTTL))
 	if err != nil {
 		return nil, err
 	}
@@ -304,6 +304,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 			ProjectID:  asgn.ProjectID,
 			EntityType: "authz_assignment",
 			EntityID:   asgn.ID,
+			UserID:     asgn.PrincipalUserID(),
 			ActorID:    &userID,
 			ActorType:  &actorType,
 			Payload: domain.AuthzGrantedPayload{

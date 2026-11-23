@@ -2,9 +2,9 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { _resetLiveForTesting } from "@/features/events/use-live-events";
-import { formatEventTime } from "@/lib/date";
+import { formatClockTime, formatEventDay, formatEventTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -61,10 +61,10 @@ function request(id: string, payload: Record<string, unknown> = {}) {
     entity_type: null,
     entity_id: null,
     payload: {
-      operation_id: "deleteUserByID",
+      operation_id: "deleteUser",
       method: "DELETE",
       // The server records the operation as the route, never the raw path.
-      route_template: "deleteUserByID",
+      route_template: "deleteUser",
       status: 204,
       duration_ms: 12,
       ...payload,
@@ -93,12 +93,12 @@ function isFlowRead(query: URLSearchParams): boolean {
  * events is answered apart, with none unless `serveRequestEvents` or
  * `serveFlowEvents` says otherwise, and is not recorded: it is not the list's.
  */
-function serveEvents(...pages: { data: unknown[]; next_page_token?: string }[]) {
+function serveEvents(...pages: { events: unknown[]; next_page_token?: string }[]) {
   const queries: URLSearchParams[] = [];
   server.use(
     http.get(EVENTS_URL, ({ request: call }) => {
       const query = new URL(call.url).searchParams;
-      if (isRequestRead(query) || isFlowRead(query)) return HttpResponse.json({ data: [] });
+      if (isRequestRead(query) || isFlowRead(query)) return HttpResponse.json({ events: [] });
       queries.push(query);
       const page = pages[Math.min(queries.length, pages.length) - 1];
       return HttpResponse.json(page);
@@ -108,34 +108,34 @@ function serveEvents(...pages: { data: unknown[]; next_page_token?: string }[]) 
 }
 
 /** The drawer's read of one request's events: these, oldest first; records the queries. */
-function serveRequestEvents(data: unknown[], more = false) {
+function serveRequestEvents(events: unknown[], more = false) {
   const queries: URLSearchParams[] = [];
   server.use(
     http.get(EVENTS_URL, ({ request: call }) => {
       const query = new URL(call.url).searchParams;
       if (!isRequestRead(query)) return undefined;
       queries.push(query);
-      return HttpResponse.json({ data, next_page_token: more ? "more" : undefined });
+      return HttpResponse.json({ events, next_page_token: more ? "more" : undefined });
     }),
   );
   return queries;
 }
 
 /** The drawer's read of one login flow's events: these, oldest first; records the queries. */
-function serveFlowEvents(data: unknown[], more = false) {
+function serveFlowEvents(events: unknown[], more = false) {
   const queries: URLSearchParams[] = [];
   server.use(
     http.get(EVENTS_URL, ({ request: call }) => {
       const query = new URL(call.url).searchParams;
       if (!isFlowRead(query)) return undefined;
       queries.push(query);
-      return HttpResponse.json({ data, next_page_token: more ? "more" : undefined });
+      return HttpResponse.json({ events, next_page_token: more ? "more" : undefined });
     }),
   );
   return queries;
 }
 
-/** `GET /events/{id}`, answering with one of `events` by its id. */
+/** `GET /events/{event_id}`, answering with one of `events` by its id. */
 function serveEvent(...events: ReturnType<typeof event>[]) {
   server.use(
     http.get(`${EVENTS_URL}/:id`, ({ params }) => {
@@ -158,6 +158,29 @@ async function drawer() {
 afterEach(() => {
   _resetLiveForTesting();
 });
+
+const USERS_URL = "http://localhost/api/v1/users/:id";
+
+// The rows name users by what they are called, read one by one; a user the
+// test does not name is not found, and its row keeps the ID.
+beforeEach(() => {
+  server.use(http.get(USERS_URL, () => HttpResponse.json({ error: "not found" }, { status: 404 })));
+});
+
+/** `GET /users/{id}` for these users, by ID, each with its identifier. */
+function serveUsers(identifiers: Record<string, string>) {
+  const reads: string[] = [];
+  server.use(
+    http.get(USERS_URL, ({ params }) => {
+      const id = String(params.id);
+      reads.push(id);
+      const identifier = identifiers[id];
+      if (!identifier) return undefined;
+      return HttpResponse.json({ id, identifier, schema: "", status: "active" });
+    }),
+  );
+  return reads;
+}
 
 async function renderAt(path: string) {
   const router = createAppRouter({
@@ -201,6 +224,11 @@ async function filters() {
   return within(await screen.findByRole("group", { name: "Filters" }));
 }
 
+/** Ticks or unticks one value of a filter in the sidebar. */
+async function tick(name: string | RegExp) {
+  await userEvent.click((await filters()).getByRole("checkbox", { name }));
+}
+
 /** Opens the menu of the row that holds the link `name`, and returns its items' scope. */
 async function openRowMenu(name: string) {
   const row = (await screen.findByRole("link", { name })).closest("tr") as HTMLElement;
@@ -222,7 +250,7 @@ function expectServed(query: URLSearchParams | undefined) {
 
 describe("events", () => {
   it("opens on the audit events, and says so when the project has none", async () => {
-    const queries = serveEvents({ data: [] });
+    const queries = serveEvents({ events: [] });
     await renderAt("/events");
 
     expect(await screen.findByRole("heading", { name: "Events" })).toBeInTheDocument();
@@ -237,9 +265,9 @@ describe("events", () => {
     expectServed(queries[0]);
   });
 
-  it("lists each event with its type, what it was about, its actor and its time", async () => {
+  it("lists each event with its time, its type, what it was about and its actor", async () => {
     const queries = serveEvents({
-      data: [
+      events: [
         request("evt_2"),
         event("evt_1"),
         event("evt_0", {
@@ -257,9 +285,15 @@ describe("events", () => {
     const rows = await screen.findAllByRole("row");
     // The header row, then the three events in the server's order, newest first.
     expect(rows).toHaveLength(4);
-    const [, requestRow, changeRow, anonymousRow] = rows as HTMLElement[];
+    const [header, requestRow, changeRow, anonymousRow] = rows as HTMLElement[];
     // Every event: no category is asked for.
     expect(queries[0]?.has("category")).toBe(false);
+    // The time leads the row, as a log's does.
+    expect(
+      within(header as HTMLElement)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Time", "Event", "Details", "Actor", "Actions"]);
 
     // An API request reads as its method, operation and status.
     const first = within(requestRow as HTMLElement);
@@ -268,9 +302,13 @@ describe("events", () => {
       "href",
       scopedPath("/events/evt_2?view=all"),
     );
-    expect(first.getByText("DELETE deleteUserByID")).toBeInTheDocument();
+    expect(first.getByText("DELETE deleteUser")).toBeInTheDocument();
     expect(first.getByText("204")).toBeInTheDocument();
-    expect(first.getByText(formatEventTime(OCCURRED_AT))).toBeInTheDocument();
+    // The day, then the clock time; the whole moment, with its year, on hover.
+    const time = first.getByTitle(formatEventTime(OCCURRED_AT));
+    expect(time).toHaveTextContent(formatEventDay(OCCURRED_AT));
+    expect(time).toHaveTextContent(formatClockTime(OCCURRED_AT));
+    expect((requestRow as HTMLElement).firstElementChild).toContainElement(time);
 
     // Any other event reads as the record it touched, and who caused it.
     const second = within(changeRow as HTMLElement);
@@ -291,8 +329,8 @@ describe("events", () => {
 
   it("appends the next page on Load more, under the filters and the range the list began with", async () => {
     const queries = serveEvents(
-      { data: fullPage("evt_a"), next_page_token: "page-2" },
-      { data: [event("evt_1", { event_type: "user.created" })] },
+      { events: fullPage("evt_a"), next_page_token: "page-2" },
+      { events: [event("evt_1", { event_type: "user.created" })] },
     );
     await renderAt("/events?category=entity&session=sess_1&since=24h");
 
@@ -317,9 +355,9 @@ describe("events", () => {
     // The server matched these filters over the events it read this request,
     // and stopped at its bound: one row so far, and a token for the rest.
     const queries = serveEvents(
-      { data: [event("evt_3")], next_page_token: "page-2" },
-      { data: fullPage("evt_b"), next_page_token: "page-3" },
-      { data: [event("evt_1", { event_type: "user.created" })] },
+      { events: [event("evt_3")], next_page_token: "page-2" },
+      { events: fullPage("evt_b"), next_page_token: "page-3" },
+      { events: [event("evt_1", { event_type: "user.created" })] },
     );
     await renderAt("/events?actor=user_admin&resource=user_gone");
 
@@ -354,9 +392,9 @@ describe("events", () => {
 
   it("says nothing has matched so far for an empty page with more behind it", async () => {
     const queries = serveEvents(
-      { data: [], next_page_token: "page-2" },
-      { data: [], next_page_token: "page-3" },
-      { data: [] },
+      { events: [], next_page_token: "page-2" },
+      { events: [], next_page_token: "page-3" },
+      { events: [] },
     );
     await renderAt("/events?session=sess_1&resource=user_gone");
 
@@ -384,8 +422,8 @@ describe("events", () => {
 
   it("reads the list again from the newest event on Refresh", async () => {
     const queries = serveEvents(
-      { data: [event("evt_1")] },
-      { data: [event("evt_2", { event_type: "user.created" }), event("evt_1")] },
+      { events: [event("evt_1")] },
+      { events: [event("evt_2", { event_type: "user.created" }), event("evt_1")] },
     );
     await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
@@ -400,7 +438,7 @@ describe("events", () => {
 
   it("opens an event in a drawer over the list, without reading the list again", async () => {
     const queries = serveEvents({
-      data: [event("evt_2", { event_type: "user.created" }), event("evt_1")],
+      events: [event("evt_2", { event_type: "user.created" }), event("evt_1")],
     });
     serveEvent(event("evt_1"));
     const router = await renderAt("/events?category=entity");
@@ -410,7 +448,7 @@ describe("events", () => {
     expect(await (await drawer()).findByRole("heading", { name: "user.deleted" })).toBeVisible();
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/events/evt_1"));
     // The list stays, under its filters, with the open event's row marked.
-    expect(router.state.resolvedLocation?.search).toMatchObject({ category: "entity" });
+    expect(router.state.resolvedLocation?.search).toMatchObject({ category: ["entity"] });
     const row = screen
       .getAllByRole("link", { name: "user.deleted" })[0]
       ?.closest("tr") as HTMLElement;
@@ -425,7 +463,7 @@ describe("events", () => {
       event("evt_2", { event_type: "user.updated" }),
       event("evt_1"),
     ];
-    serveEvents({ data: rows });
+    serveEvents({ events: rows });
     serveEvent(...rows);
     const router = await renderAt("/events/evt_3");
     const at = (id: string) =>
@@ -453,7 +491,7 @@ describe("events", () => {
   it("lists the other events of the event's request in the drawer, in the order they happened", async () => {
     const change = event("evt_1");
     const call = request("evt_2");
-    serveEvents({ data: [call, change] });
+    serveEvents({ events: [call, change] });
     serveEvent(change, call);
     const requestQueries = serveRequestEvents([change, call]);
     await renderAt("/events/evt_1?view=all");
@@ -469,15 +507,22 @@ describe("events", () => {
     expect(requestQueries[0]?.get("order")).toBe("asc");
     const steps = section.getAllByRole("listitem");
     expect(steps).toHaveLength(2);
+    // A request's events fall within its run: each keeps its clock time
+    // rather than an offset of nothing.
+    expect(within(steps[0] as HTMLElement).getByText(formatClockTime(OCCURRED_AT))).toBeVisible();
+    expect(section.queryByText(/^\+/)).toBeNull();
     // The open event is marked, not a link; the API call behind it opens.
     expect(
       within(steps[0] as HTMLElement)
         .getByText("user.deleted")
         .closest("[aria-current]"),
     ).not.toBeNull();
+    // The API call says how long it ran.
+    expect(within(steps[1] as HTMLElement).getByText("12 ms")).toBeVisible();
     await userEvent.click(within(steps[1] as HTMLElement).getByRole("link"));
     expect(await panel.findByRole("heading", { name: "request.api" })).toBeVisible();
-    expect(panel.getByText("12 ms")).toBeInTheDocument();
+    // On its own row as well as on its step.
+    expect(panel.getAllByText("12 ms")).toHaveLength(2);
   });
 
   it("lists the whole login flow of a sign-in event in the drawer, in place of its one request", async () => {
@@ -510,18 +555,23 @@ describe("events", () => {
       request_id: "req_exchange",
       payload: { user_id: "user_admin" },
     });
-    serveEvents({ data: [established, check, attempt] });
+    serveEvents({ events: [established, check, attempt] });
     serveEvent(attempt, check, established);
     const requestQueries = serveRequestEvents([attempt]);
     const flowQueries = serveFlowEvents([attempt, check, established], true);
     await renderAt("/events/evt_attempt");
 
     const panel = await drawer();
+    // Headed by what the flow came to, as a trace by its outcome: told from
+    // the events the drawer holds, which are not all of them.
     const section = within(
-      (await panel.findByRole("heading", { name: "This login flow" })).closest(
+      (await panel.findByRole("heading", { name: "Signed in with a password" })).closest(
         "section",
       ) as HTMLElement,
     );
+    expect(section.getByText("Signed in")).toBeInTheDocument();
+    expect(section.getByText("user_admin")).toBeInTheDocument();
+    expect(section.getByText("so far")).toBeInTheDocument();
     // One range of the flow index, oldest first, and no read of the request.
     expect(flowQueries[0]?.get("flow_id")).toBe("flow_1");
     expect(flowQueries[0]?.get("order")).toBe("asc");
@@ -530,6 +580,8 @@ describe("events", () => {
     expect(panel.queryByRole("heading", { name: "This request" })).toBeNull();
 
     const steps = section.getAllByRole("listitem");
+    // Each step by its time since the first.
+    expect(within(steps[0] as HTMLElement).getByText("+0 ms")).toBeVisible();
     expect(steps.map((step) => within(step).getByText(/^(auth|session)\./).textContent)).toEqual([
       "auth.attempt.created",
       "auth.check.succeeded",
@@ -548,11 +600,11 @@ describe("events", () => {
     // A later step of the flow opens in the drawer, under the same timeline.
     await userEvent.click(within(steps[2] as HTMLElement).getByRole("link"));
     expect(await panel.findByRole("heading", { name: "session.established" })).toBeVisible();
-    expect(panel.getByRole("heading", { name: "This login flow" })).toBeVisible();
+    expect(panel.getByRole("heading", { name: "Signed in with a password" })).toBeVisible();
   });
 
   it("closes the drawer back to the list, under the same filters", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     serveEvent(event("evt_1"));
     const router = await renderAt("/events/evt_1?actor=user_admin");
 
@@ -565,7 +617,7 @@ describe("events", () => {
   });
 
   it("narrows the list to what the signed-in person did from the search, and back", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events?category=admin");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -594,10 +646,10 @@ describe("events", () => {
       http.get(EVENTS_URL, ({ request: call }) => {
         const query = new URL(call.url).searchParams;
         queries.push(query);
-        if (query.get("order") !== "asc") return HttpResponse.json({ data: [newest] });
+        if (query.get("order") !== "asc") return HttpResponse.json({ events: [newest] });
         // Oldest first, from the newest event held, which comes back too.
         return HttpResponse.json({
-          data: [newest, event("evt_2", { event_type: "user.created" })],
+          events: [newest, event("evt_2", { event_type: "user.created" })],
         });
       }),
     );
@@ -631,7 +683,7 @@ describe("events", () => {
   });
 
   it("offers no Live for a range that has ended", async () => {
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events?from=2026-11-10T08:00:00Z&to=2026-11-10T09:00:00Z");
 
     await screen.findByText("No events match these filters.");
@@ -641,7 +693,7 @@ describe("events", () => {
   it("copies the loaded events as JSON", async () => {
     const writeText = vi.fn(async (_text: string) => undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    serveEvents({ data: [event("evt_2", { event_type: "user.created" }), event("evt_1")] });
+    serveEvents({ events: [event("evt_2", { event_type: "user.created" }), event("evt_1")] });
     await renderAt("/events");
     await screen.findByRole("link", { name: "user.created" });
 
@@ -656,7 +708,7 @@ describe("events", () => {
 
 describe("events views", () => {
   it("chooses the view from a picker in the sidebar, in place of the project's screens", async () => {
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events");
 
     await userEvent.click(await viewPicker("Audit events"));
@@ -665,8 +717,9 @@ describe("events views", () => {
     const items = await screen.findAllByRole("menuitem");
     expect(items.map((item) => item.textContent)).toEqual([
       "Audit eventsSign-ins and changes to the project",
+      "Sign-insOne row per sign-in, and how it ended",
       "API requestsOne per call to the API",
-      "AllBoth, in the order they happened",
+      "AllAudit events and API requests",
     ]);
     expect(items[0]).toHaveAttribute("aria-current", "page");
     expect(items[1]).not.toHaveAttribute("aria-current");
@@ -676,31 +729,46 @@ describe("events views", () => {
   });
 
   it("lists the API requests alone in their view, which has no category to narrow by", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] }, { data: [request("evt_2")] });
+    const queries = serveEvents({ events: [event("evt_1")] }, { events: [request("evt_2")] });
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
-    expect((await filters()).getByRole("combobox", { name: "Category" })).toBeInTheDocument();
+    expect((await filters()).getByRole("group", { name: "Category" })).toBeInTheDocument();
 
     await chooseView("API requests");
 
-    expect(await screen.findByRole("link", { name: "request.api" })).toBeInTheDocument();
+    // Every row is a request there, so the row is the request: its method
+    // and operation, its status and how long it took.
+    const link = await screen.findByRole("link", { name: "DELETE deleteUser" });
+    expect(link.getAttribute("href")).toContain("/events/evt_2?");
+    expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
+      "Time",
+      "Request",
+      "Status",
+      "Duration",
+      "Actor",
+      "Actions",
+    ]);
+    const row = within(link.closest("tr") as HTMLElement);
+    expect(row.getByText("204")).toBeInTheDocument();
+    expect(row.getByText("12 ms")).toBeInTheDocument();
+    expect(row.queryByText("request.api")).not.toBeInTheDocument();
     expect(queries[1]?.getAll("category")).toEqual(["request"]);
     await waitFor(() =>
       expect(router.state.resolvedLocation?.search).toMatchObject({ view: "requests" }),
     );
     expect(await viewPicker("API requests")).toBeInTheDocument();
-    expect((await filters()).queryByRole("combobox", { name: "Category" })).not.toBeInTheDocument();
+    expect((await filters()).queryByRole("group", { name: "Category" })).not.toBeInTheDocument();
   });
 
   it("says so when the project has no API requests", async () => {
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events?view=requests");
 
     expect(await screen.findByText("This project has no API requests.")).toBeInTheDocument();
   });
 
   it("opens on the default view for a view or a category the URL makes up", async () => {
-    const queries = serveEvents({ data: [] });
+    const queries = serveEvents({ events: [] });
     await renderAt("/events?view=everything&category=request&since=forever");
 
     expect(await viewPicker("Audit events")).toBeInTheDocument();
@@ -710,34 +778,59 @@ describe("events views", () => {
 });
 
 describe("events filters", () => {
-  it("narrows the audit events to one category, and back to all of them", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+  it("narrows the audit events to the categories ticked, several at once, and back to all of them", async () => {
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
-    await userEvent.click((await filters()).getByRole("combobox", { name: "Category" }));
-    // The API's own values, under the choice of none.
-    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "Any category",
-      "auth",
-      "session",
-      "admin",
-      "entity",
+    // The API's own values, all in sight, none ticked: every category.
+    const group = within((await filters()).getByRole("group", { name: "Category" }));
+    const boxes = group.getAllByRole("checkbox");
+    expect(boxes.map((box) => box.getAttribute("aria-checked"))).toEqual(Array(4).fill("false"));
+    expect(group.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Auth",
+      "Session",
+      "Admin",
+      "Entity",
     ]);
-    await userEvent.click(screen.getByRole("option", { name: "auth" }));
 
+    await tick("Auth");
     await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["auth"]));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ category: "auth" });
+    expect(router.state.resolvedLocation?.search).toMatchObject({ category: ["auth"] });
+    expect(group.getByRole("checkbox", { name: "Auth" })).toBeChecked();
 
-    await userEvent.click((await filters()).getByRole("combobox", { name: "Category" }));
-    await userEvent.click(screen.getByRole("option", { name: "Any category" }));
+    // A second one beside it: either category, in the API's order.
+    await tick("Entity");
+    await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["auth", "entity"]));
+    expectServed(queries.at(-1));
 
+    await tick("Auth");
+    await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["entity"]));
+    await tick("Entity");
     await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(AUDIT));
     expect(router.state.resolvedLocation?.search.category).toBeUndefined();
   });
 
+  it("folds a filter away under its name, which then says how many values are set", async () => {
+    serveEvents({ events: [event("evt_1")] });
+    await renderAt("/events?category=auth&category=admin");
+    const sidebar = await filters();
+    expect(sidebar.getByRole("checkbox", { name: "Admin" })).toBeChecked();
+
+    await userEvent.click(sidebar.getByRole("button", { name: "Category" }));
+
+    expect(sidebar.queryByRole("checkbox", { name: "Admin" })).not.toBeInTheDocument();
+    expect(sidebar.getByRole("button", { name: "Category, 2 set" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    await userEvent.click(sidebar.getByRole("button", { name: "Category, 2 set" }));
+    expect(sidebar.getByRole("checkbox", { name: "Admin" })).toBeChecked();
+  });
+
   it("reads back only as far as the time range", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -767,7 +860,7 @@ describe("events filters", () => {
   });
 
   it("reads between two fixed moments from a custom range", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events?since=1h");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -798,7 +891,7 @@ describe("events filters", () => {
 
   it("reads the minutes around an event from its row menu, under no other filter", async () => {
     const queries = serveEvents({
-      data: [event("evt_1", { created_at: "2026-11-10T08:15:43.000Z" })],
+      events: [event("evt_1", { created_at: "2026-11-10T08:15:43.000Z" })],
     });
     await renderAt("/events?actor=user_admin&category=entity");
 
@@ -813,12 +906,19 @@ describe("events filters", () => {
     expect(queries.at(-1)?.has("category")).toBe(false);
   });
 
+  const BADGE_ON_HIGHLIGHT = "data-[selected=true]:**:data-[slot=badge]:text-accent-foreground";
+
   it("narrows to types chosen from the list, several at once, or to the failures", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events?category=auth");
     await screen.findByRole("link", { name: "user.deleted" });
 
     await userEvent.click((await filters()).getByRole("combobox", { name: "Event types" }));
+    // Resting, cmdk marks the first row selected but nothing is filled, so the
+    // shortcut's badge keeps its tint.
+    const resting = await screen.findByRole("option", { name: /^Only failures/ });
+    expect(resting).toHaveAttribute("data-selected", "true");
+    expect(resting).not.toHaveClass(BADGE_ON_HIGHLIGHT);
     await userEvent.click(await screen.findByRole("option", { name: "user.created" }));
     await waitFor(() => expect(queries.at(-1)?.getAll("event_type")).toEqual(["user.created"]));
     await userEvent.click(await screen.findByRole("option", { name: "user.deleted" }));
@@ -838,7 +938,27 @@ describe("events filters", () => {
 
     // The shortcut is the list's first row, so the types it ticks show under it.
     await userEvent.click((await filters()).getByRole("combobox", { name: "Event types" }));
-    await userEvent.click(await screen.findByRole("option", { name: /^Only failures/ }));
+    const failures = await screen.findByRole("option", { name: /^Only failures/ });
+    // Reopened, the list rests again: what was navigated before is not filled.
+    expect(failures).not.toHaveClass(BADGE_ON_HIGHLIGHT);
+    // Highlighted, its badge reads in the row's foreground: the tinted
+    // destructive text is under 4.5:1 on the fill in the dark theme.
+    await userEvent.keyboard("{ArrowDown}{ArrowUp}");
+    expect(failures).toHaveAttribute("data-selected", "true");
+    expect(failures).toHaveClass(BADGE_ON_HIGHLIGHT);
+
+    // The rule under the shortcut hides while a search narrows the list; the
+    // footer's stays.
+    const list = within(screen.getByRole("dialog", { name: "Event types" }));
+    const rules = () =>
+      list.getByRole("listbox").querySelectorAll('[data-slot="command-separator"]');
+    expect(rules()).toHaveLength(2);
+    const find = screen.getByRole("combobox", { name: "Find a type" });
+    await userEvent.type(find, "user");
+    await waitFor(() => expect(rules()).toHaveLength(1));
+    await userEvent.clear(find);
+    await waitFor(() => expect(rules()).toHaveLength(2));
+    await userEvent.click(failures);
 
     await waitFor(() =>
       expect(queries.at(-1)?.getAll("event_type")).toEqual([
@@ -854,7 +974,7 @@ describe("events filters", () => {
   });
 
   it("narrows by an application, a device and a resource type, named in the search", async () => {
-    const queries = serveEvents({ data: [] });
+    const queries = serveEvents({ events: [] });
     await renderAt("/events");
     await screen.findByText("This project has no audit events.");
 
@@ -878,24 +998,32 @@ describe("events filters", () => {
   });
 
   it("narrows the API requests by status, or to the failed ones, and by operation", async () => {
-    const queries = serveEvents({ data: [request("evt_2")] });
+    const queries = serveEvents({ events: [request("evt_2")] });
     const router = await renderAt("/events?view=requests");
-    await screen.findByRole("link", { name: "request.api" });
+    await screen.findByRole("link", { name: "DELETE deleteUser" });
 
     // A request is one type: the requests narrow by status instead, and only
     // they have an operation.
     expect(
       (await filters()).queryByRole("combobox", { name: "Event types" }),
     ).not.toBeInTheDocument();
-    await userEvent.click((await filters()).getByRole("combobox", { name: "Status classes" }));
-    await userEvent.click(await screen.findByRole("option", { name: /^Only failed requests/ }));
+    // The classes, each with what it means, all in sight.
+    const status = within((await filters()).getByRole("group", { name: "Status" }));
+    expect(status.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "2xxSucceeded",
+      "3xxRedirected",
+      "4xxRefused",
+      "5xxFailed",
+    ]);
+    await tick(/^5xx/);
+    await waitFor(() => expect(queries.at(-1)?.getAll("status_class")).toEqual(["5xx"]));
+    await tick(/^4xx/);
 
     await waitFor(() => expect(queries.at(-1)?.getAll("status_class")).toEqual(["4xx", "5xx"]));
     // One range of the status index each: no category beside them.
     expect(queries.at(-1)?.has("category")).toBe(false);
-    expect((await filters()).getByRole("combobox", { name: "Status classes" })).toHaveTextContent(
-      "Only failed requests",
-    );
+    expect(status.getByRole("checkbox", { name: /^4xx/ })).toBeChecked();
+    expect(status.getByRole("checkbox", { name: /^2xx/ })).not.toBeChecked();
 
     await searchFor("createUser");
 
@@ -913,8 +1041,20 @@ describe("events filters", () => {
     expect(queries.at(-1)?.has("status_class")).toBe(false);
   });
 
+  it("says that older requests are not matched when an operation finds none", async () => {
+    serveEvents({ events: [] });
+    await renderAt("/events?view=requests&operation=createUser");
+
+    expect(await screen.findByText("No events match these filters.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Events recorded before the server had the operation filter are not matched.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("narrows by an ID pasted into the search, and removes it from its chip", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events?category=entity");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -928,7 +1068,7 @@ describe("events filters", () => {
     expect(queries.at(-1)?.getAll("category")).toEqual(["entity"]);
     expect(router.state.resolvedLocation?.search).toMatchObject({
       view: "audit",
-      category: "entity",
+      category: ["entity"],
       actor: "user_admin",
     });
     expectServed(queries.at(-1));
@@ -941,7 +1081,7 @@ describe("events filters", () => {
   });
 
   it("removes the last chip with Backspace in the empty field", async () => {
-    const queries = serveEvents({ data: [] });
+    const queries = serveEvents({ events: [] });
     await renderAt("/events?view=all&session=sess_1&request=req_1");
     await screen.findByText("No events match these filters.");
 
@@ -954,7 +1094,7 @@ describe("events filters", () => {
   });
 
   it("keeps the pasted filters out of the sidebar, which holds what is chosen from a list", async () => {
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events");
 
     const group = await filters();
@@ -969,7 +1109,7 @@ describe("events filters", () => {
   });
 
   it("reads a type in the All view with no category, and keeps the actor beside it", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events?category=entity&actor=user_admin");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -995,7 +1135,7 @@ describe("events filters", () => {
     const START = "/events?view=all&type=user.deleted";
 
     it("keeps the type beside an actor", async () => {
-      const queries = serveEvents({ data: [event("evt_1")] });
+      const queries = serveEvents({ events: [event("evt_1")] });
       const router = await renderAt(START);
       await screen.findByRole("link", { name: "user.deleted" });
       expect(queries[0]?.getAll("event_type")).toEqual(["user.deleted"]);
@@ -1015,12 +1155,11 @@ describe("events filters", () => {
     });
 
     it("gives up the type for a category", async () => {
-      const queries = serveEvents({ data: [event("evt_1")] });
+      const queries = serveEvents({ events: [event("evt_1")] });
       const router = await renderAt(START);
       await screen.findByRole("link", { name: "user.deleted" });
 
-      await userEvent.click((await filters()).getByRole("combobox", { name: "Category" }));
-      await userEvent.click(screen.getByRole("option", { name: "entity" }));
+      await tick("Entity");
 
       await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["entity"]));
       expect(queries.at(-1)?.has("event_type")).toBe(false);
@@ -1028,7 +1167,7 @@ describe("events filters", () => {
     });
 
     it("gives up the type for a view other than All", async () => {
-      const queries = serveEvents({ data: [event("evt_1")] });
+      const queries = serveEvents({ events: [event("evt_1")] });
       const router = await renderAt(START);
       await screen.findByRole("link", { name: "user.deleted" });
 
@@ -1040,7 +1179,7 @@ describe("events filters", () => {
     });
 
     it("keeps the type beside a time range and a request", async () => {
-      const queries = serveEvents({ data: [event("evt_1")] });
+      const queries = serveEvents({ events: [event("evt_1")] });
       await renderAt(`${START}&since=7d&request=${REQUEST_ID}`);
       await screen.findByRole("link", { name: "user.deleted" });
 
@@ -1052,7 +1191,7 @@ describe("events filters", () => {
   });
 
   it("gives a type no category, and sends no filter it has no field for, whatever the URL says", async () => {
-    const queries = serveEvents({ data: [] });
+    const queries = serveEvents({ events: [] });
     await renderAt(
       "/events?view=audit&category=auth&type=user.deleted&actor=user_admin&client_id=app_1&team_id=team_1&entity_type=user",
     );
@@ -1068,7 +1207,7 @@ describe("events filters", () => {
   });
 
   it("sends every filter the URL carries, together, and clears them all at once", async () => {
-    const queries = serveEvents({ data: [] });
+    const queries = serveEvents({ events: [] });
     const router = await renderAt(
       "/events?view=all&category=auth&since=7d&actor=user_admin&resource=user_gone&request=req_1&session=sess_1&flow=flow_1",
     );
@@ -1108,7 +1247,7 @@ describe("events filters", () => {
   });
 
   it("narrows by what an event carries from its row menu, on top of what is set", async () => {
-    const queries = serveEvents({ data: [event("evt_1", { session_id: "sess_1" })] });
+    const queries = serveEvents({ events: [event("evt_1", { session_id: "sess_1" })] });
     const router = await renderAt("/events?category=entity");
 
     const menu = await openRowMenu("user.deleted");
@@ -1131,7 +1270,7 @@ describe("events filters", () => {
     expect(queries.at(-1)?.getAll("category")).toEqual(["entity"]);
     expect(router.state.resolvedLocation?.search).toMatchObject({
       view: "audit",
-      category: "entity",
+      category: ["entity"],
       actor: "user_admin",
     });
     // Set, it shows as a chip, and the row no longer offers it.
@@ -1142,8 +1281,8 @@ describe("events filters", () => {
 
   it("follows a request through every view, since its own event is not an audit event", async () => {
     const queries = serveEvents(
-      { data: [event("evt_1")] },
-      { data: [request("evt_2"), event("evt_1")] },
+      { events: [event("evt_1")] },
+      { events: [request("evt_2"), event("evt_1")] },
     );
     const router = await renderAt("/events");
 
@@ -1163,25 +1302,25 @@ describe("events filters", () => {
 
 describe("events search", () => {
   it("says in the field what it takes", async () => {
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events");
 
     expect(await find()).toHaveAttribute("placeholder", "Search by ID, event type or operation");
   });
 
   it("lists the filters it can name under the empty field", async () => {
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events");
 
     await userEvent.click(await find());
 
     expect(await screen.findByText(/name the filter:/)).toHaveTextContent(
-      "actor:, resource:, resource_type:, app:, device:",
+      "actor:, user:, resource:, resource_type:, app:, device:",
     );
   });
 
   it("follows a request, a session or a login flow from its ID", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -1202,7 +1341,7 @@ describe("events search", () => {
   });
 
   it("narrows to an event type from its name", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -1218,7 +1357,7 @@ describe("events search", () => {
   });
 
   it("narrows to an API operation from its name", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -1232,7 +1371,7 @@ describe("events search", () => {
   });
 
   it("opens the event an event ID names", async () => {
-    serveEvents({ data: [event("evt_1")] });
+    serveEvents({ events: [event("evt_1")] });
     server.use(http.get(`${EVENTS_URL}/evt_9`, () => HttpResponse.json(event("evt_9"))));
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
@@ -1243,37 +1382,57 @@ describe("events search", () => {
   });
 
   it("asks whether another ID is an actor or a resource, rather than guessing", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
+    const router = await renderAt("/events");
+    await screen.findByRole("link", { name: "user.deleted" });
+
+    await searchFor("team_gone");
+
+    // Enter chose nothing: both readings are offered.
+    expect(queries).toHaveLength(1);
+    expect(await screen.findByText("This ID can be either. Choose one:")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Actor team_gone/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Resource team_gone/ }));
+
+    await waitFor(() => expect(queries.at(-1)?.get("entity_id")).toBe("team_gone"));
+    expect(queries.at(-1)?.has("actor_id")).toBe(false);
+    expect(router.state.resolvedLocation?.search).toMatchObject({ resource: "team_gone" });
+  });
+
+  it("asks whether a user's ID is the account or the actor", async () => {
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
     await searchFor("user_gone");
 
-    // Enter chose nothing: both readings are offered.
     expect(queries).toHaveLength(1);
     expect(await screen.findByText("This ID can be either. Choose one:")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Actor user_gone/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Resource user_gone/ }));
+    // What happened to the account, whoever did it: its sign-ins too.
+    await userEvent.click(
+      screen.getByRole("button", { name: "User user_gone, what happened to its account" }),
+    );
 
-    await waitFor(() => expect(queries.at(-1)?.get("entity_id")).toBe("user_gone"));
+    await waitFor(() => expect(queries.at(-1)?.get("user_id")).toBe("user_gone"));
     expect(queries.at(-1)?.has("actor_id")).toBe(false);
-    expect(router.state.resolvedLocation?.search).toMatchObject({ resource: "user_gone" });
+    expect(router.state.resolvedLocation?.search).toMatchObject({ user: "user_gone" });
   });
 
   it("reaches the choices with the arrow key", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
     await userEvent.type(await find(), "user_admin{ArrowDown}");
-    expect(await screen.findByRole("button", { name: /^Actor user_admin/ })).toHaveFocus();
+    expect(await screen.findByRole("button", { name: /^User user_admin/ })).toHaveFocus();
     await userEvent.keyboard("{Enter}");
 
-    await waitFor(() => expect(queries.at(-1)?.get("actor_id")).toBe("user_admin"));
+    await waitFor(() => expect(queries.at(-1)?.get("user_id")).toBe("user_admin"));
   });
 
   it("is not a text search, and says so", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
@@ -1292,7 +1451,7 @@ describe("events with the sidebar as an icon rail", () => {
   });
 
   it("draws no way to the filters beside the open sidebar, which shows them", async () => {
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events");
 
     await screen.findByRole("heading", { name: "Events" });
@@ -1302,7 +1461,7 @@ describe("events with the sidebar as an icon rail", () => {
   it("names the view and the filters on the page, and opens the collapsed sidebar", async () => {
     // biome-ignore lint/suspicious/noDocumentCookie: the sidebar keeps its state in this cookie
     document.cookie = "sidebar_state=false; path=/";
-    serveEvents({ data: [] });
+    serveEvents({ events: [] });
     await renderAt("/events?view=all&actor=user_admin&since=24h");
 
     const open = await screen.findByRole("button", {
@@ -1330,7 +1489,7 @@ describe("events with the sidebar as an icon rail", () => {
           dispatchEvent: () => false,
         }) as unknown as MediaQueryList,
     );
-    const queries = serveEvents({ data: [] });
+    const queries = serveEvents({ events: [] });
     await renderAt("/events");
 
     await userEvent.click(
@@ -1356,7 +1515,7 @@ describe("event drawer", () => {
         return HttpResponse.json(event("evt_1"));
       }),
     );
-    serveEvents({ data: [event("evt_1")] });
+    serveEvents({ events: [event("evt_1")] });
     await renderAt("/events/evt_1");
 
     const panel = await drawer();
@@ -1391,7 +1550,7 @@ describe("event drawer", () => {
   it("leads on to the events that share one of its values, in every view", async () => {
     const opened = event("evt_1", { session_id: "sess_1" });
     serveEvent(opened);
-    const queries = serveEvents({ data: [opened] }, { data: [request("evt_2"), opened] });
+    const queries = serveEvents({ events: [opened] }, { events: [request("evt_2"), opened] });
     const router = await renderAt("/events/evt_1");
 
     const panel = await drawer();
@@ -1426,14 +1585,13 @@ describe("event drawer", () => {
 
   it("keeps the list's view marked in the sidebar, where a filter narrows the list and closes it", async () => {
     serveEvent(event("evt_1"));
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events/evt_1?view=all");
     await (await drawer()).findByRole("heading", { name: "user.deleted" });
 
     expect(await viewPicker("All")).toBeInTheDocument();
 
-    await userEvent.click((await filters()).getByRole("combobox", { name: "Category" }));
-    await userEvent.click(await screen.findByRole("option", { name: "auth" }));
+    await tick("Auth");
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/events"));
     await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["auth"]));
@@ -1446,7 +1604,7 @@ describe("event drawer", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
       serveEvent();
-      serveEvents({ data: [] });
+      serveEvents({ events: [] });
       const router = await renderAt("/events/evt_gone");
 
       // Retention deletes an event by age, so a kept link can outlive it.
@@ -1460,5 +1618,186 @@ describe("event drawer", () => {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe("events sign-ins", () => {
+  const SIGNED_IN = ["session.established"];
+  const FAILED = ["auth.check.failed", "auth.sso.authorization.failed", "auth.sso.exchange.failed"];
+
+  /** An event of a login flow: no actor until it ends, and its flow and session. */
+  function step(id: string, overrides: Record<string, unknown>) {
+    return event(id, {
+      category: "auth",
+      actor_id: null,
+      actor_type: null,
+      flow_id: "flow_1",
+      session_id: "sess_1",
+      ...overrides,
+    });
+  }
+
+  it("lists one row per sign-in, by the types a sign-in ends in, with whose account and how it ended", async () => {
+    serveUsers({ user_ada: "ada@example.com" });
+    const queries = serveEvents({
+      events: [
+        step("evt_in", {
+          event_type: "session.established",
+          category: "session",
+          entity_type: "session",
+          entity_id: "sess_1",
+          user_id: "user_ada",
+          actor_type: "service",
+          payload: { user_id: "user_ada" },
+        }),
+        step("evt_failed", {
+          event_type: "auth.check.failed",
+          entity_type: "check",
+          entity_id: "ch_1",
+          flow_id: "flow_2",
+          session_id: "sess_2",
+          user_id: "user_bo",
+          payload: { check_type: "Password" },
+        }),
+        // An anonymous `POST /sessions` writes the same type, with no user.
+        step("evt_open", {
+          event_type: "session.established",
+          category: "session",
+          entity_type: "session",
+          entity_id: "sess_3",
+          flow_id: null,
+          session_id: "sess_3",
+          actor_type: "service",
+          payload: {},
+        }),
+      ],
+    });
+    await renderAt("/events?view=signins");
+
+    const rows = await screen.findAllByRole("row");
+    // The types a sign-in ends in, each one range of the type index, and no category.
+    expect(queries[0]?.getAll("event_type")).toEqual([...SIGNED_IN, ...FAILED]);
+    expect(queries[0]?.has("category")).toBe(false);
+    expectServed(queries[0]);
+    const [header, signedIn, failed, opened] = rows as HTMLElement[];
+    expect(
+      within(header as HTMLElement)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Time", "Outcome", "User", "Session", "Actions"]);
+
+    const first = within(signedIn as HTMLElement);
+    expect(first.getByRole("link", { name: "Signed in" })).toHaveAttribute(
+      "href",
+      scopedPath("/events/evt_in?view=signins"),
+    );
+    // Whose account, by what it is called now, with its ID on hover.
+    expect(await first.findByText("ada@example.com")).toHaveAttribute("title", "user_ada");
+    expect(first.getByText("sess_1")).toBeInTheDocument();
+
+    // A failure says what failed; a user the console cannot read keeps its ID.
+    const second = within(failed as HTMLElement);
+    expect(second.getByRole("link", { name: "Failed" })).toBeInTheDocument();
+    expect(second.getByText("Password check failed")).toBeInTheDocument();
+    expect(second.getByText("user_bo")).toBeInTheDocument();
+
+    expect(
+      within(opened as HTMLElement).getByRole("link", { name: "Session opened" }),
+    ).toBeVisible();
+  });
+
+  it("narrows the sign-ins to how they ended, in place of a category and types", async () => {
+    const queries = serveEvents({ events: [] });
+    const router = await renderAt("/events?view=signins");
+    expect(await screen.findByText("This project has no sign-ins.")).toBeInTheDocument();
+    const sidebar = await filters();
+    expect(sidebar.queryByRole("group", { name: "Category" })).not.toBeInTheDocument();
+    expect(sidebar.queryByText("Type")).not.toBeInTheDocument();
+
+    const outcome = within(sidebar.getByRole("group", { name: "Outcome" }));
+    expect(outcome.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Signed in",
+      "Failed",
+    ]);
+    await tick("Failed");
+
+    await waitFor(() => expect(queries.at(-1)?.getAll("event_type")).toEqual(FAILED));
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "signins",
+      outcome: ["failed"],
+    });
+    // Both ticked read every sign-in, as neither does.
+    await tick("Signed in");
+    await waitFor(() =>
+      expect(queries.at(-1)?.getAll("event_type")).toEqual([...SIGNED_IN, ...FAILED]),
+    );
+    await tick("Signed in");
+    await waitFor(() => expect(queries.at(-1)?.getAll("event_type")).toEqual(FAILED));
+
+    // Another view has no outcome: it leaves with the view.
+    await chooseView("Audit events");
+    await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(AUDIT));
+    expect(router.state.resolvedLocation?.search.outcome).toBeUndefined();
+  });
+
+  it("names the people who acted rather than their IDs, reading each once", async () => {
+    const reads = serveUsers({ user_admin: "admin@example.com" });
+    serveEvents({ events: [event("evt_2"), event("evt_1")] });
+    await renderAt("/events");
+
+    const names = await screen.findAllByText("admin@example.com");
+    expect(names).toHaveLength(2);
+    expect(names[0]).toHaveAttribute("title", "user_admin");
+    expect(reads).toEqual(["user_admin"]);
+  });
+
+  it("marks an authentication attempt whose flow never finished as abandoned, under no filter but the view", async () => {
+    const rows = [
+      // Its flow was handed off: not abandoned.
+      step("evt_handed", { event_type: "auth.attempt.handed_off", entity_type: "auth_attempt" }),
+      step("evt_started", { event_type: "auth.attempt.created", entity_type: "auth_attempt" }),
+      // Its flow never finished, and it is far older than an attempt lives.
+      step("evt_left", {
+        event_type: "auth.attempt.created",
+        entity_type: "auth_attempt",
+        flow_id: "flow_2",
+        session_id: "sess_2",
+      }),
+    ];
+    serveEvents({ events: rows }, { events: rows });
+    await renderAt("/events");
+
+    const left = (await screen.findAllByRole("link", { name: "auth.attempt.created" }))[1];
+    expect(within(left?.closest("tr") as HTMLElement).getByText("Abandoned")).toBeInTheDocument();
+    expect(screen.getAllByText("Abandoned")).toHaveLength(1);
+
+    // A filter could hide what the flow went on to write: nothing is claimed.
+    await tick("Auth");
+    await waitFor(() => expect(screen.queryByText("Abandoned")).not.toBeInTheDocument());
+  });
+
+  it("marks the rows of the open event's login flow", async () => {
+    const rows = [
+      step("evt_other", {
+        event_type: "auth.attempt.created",
+        entity_type: "auth_attempt",
+        flow_id: "flow_2",
+      }),
+      step("evt_check", { event_type: "auth.check.succeeded", entity_type: "check" }),
+      step("evt_attempt", { event_type: "auth.attempt.created", entity_type: "auth_attempt" }),
+    ];
+    serveEvents({ events: rows });
+    serveEvent(...rows);
+    serveFlowEvents([rows[2], rows[1]]);
+    await renderAt("/events/evt_check");
+
+    await drawer();
+    const marked = await screen.findAllByText("Of the open event’s login flow");
+    expect(marked).toHaveLength(1);
+    expect(
+      within(marked[0]?.closest("tr") as HTMLElement).getByRole("link", {
+        name: "auth.attempt.created",
+      }),
+    ).toHaveAttribute("href", expect.stringContaining("evt_attempt"));
   });
 });

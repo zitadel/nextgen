@@ -14,7 +14,8 @@ import {
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { offTerminal } from "@tests/helpers/terminal";
+import { offTerminal } from "@tests/fixtures/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],
@@ -35,7 +36,7 @@ const NO_BASELINE = {
 };
 
 const UNCOMMITTED =
-  "The git working tree has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.";
+  "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.";
 
 const NO_EMAIL_LOCKOUT = expect.stringContaining(
   '1 of 1 existing user of "human-user" has no "email"',
@@ -45,6 +46,9 @@ const LOCKOUT_MESSAGE =
   "Cannot deploy a release that leaves existing users unable to sign in without --force in non-interactive mode";
 
 const A_SHA = expect.stringMatching(/^[0-9a-f]{40}$/);
+
+/** A deploy message written over two lines, as `git commit -m` keeps one. */
+const TWO_LINE_MESSAGE = "add a nickname\nand a title";
 
 /** A set-up app with Google sign-in enabled, ready for a deploy. */
 async function anAppWithGoogle(): Promise<ScaffoldedApp> {
@@ -231,7 +235,7 @@ describe("deploy", () => {
     describe("--json", () => {
       it("deploys the config to every primary origin", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await app.deploy();
 
@@ -246,7 +250,7 @@ describe("deploy", () => {
             content_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
             deployment_id: expect.stringMatching(/^dep_/),
             resources: 4,
-            origins: [SETUP_ORIGIN.pattern, "https://app.acme.com"],
+            origins: [SETUP_ORIGIN.pattern, PRIMARY_ORIGIN],
             diff: NO_BASELINE,
             next_commands: [expectedPublicCliCommand(app.againAsRun("deployment list"))],
           },
@@ -655,7 +659,7 @@ describe("deploy", () => {
           },
           warnings: [
             expect.stringContaining(
-              `users update '<user_id>' --schema '<revision_id>' --set 'attributes.email=<value>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              `user update '<user_id>' --schema '<revision_id>' --set 'attributes.email=<value>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
             ),
           ],
         });
@@ -1626,7 +1630,7 @@ describe("deploy", () => {
             },
             next_commands: [
               expectedPublicCliCommand(app.againAsRun("deployment list")),
-              `git -C '${app.path}' add .zitadel && git -C '${app.path}' commit -m 'test deploy' -- .zitadel`,
+              `git -C ${app.path} add .zitadel && git -C ${app.path} commit -m 'test deploy' -- .zitadel`,
             ],
           },
           warnings: [UNCOMMITTED],
@@ -1665,10 +1669,27 @@ describe("deploy", () => {
             },
             next_commands: [
               expectedPublicCliCommand(app.againAsRun("deployment list")),
-              `git -C '${app.path}' add .zitadel && git -C '${app.path}' commit -m 'add a nickname' -- .zitadel`,
+              `git -C ${app.path} add .zitadel && git -C ${app.path} commit -m 'add a nickname' -- .zitadel`,
             ],
           },
           warnings: [UNCOMMITTED],
+        });
+      });
+
+      it("writes a message that spans lines as one word in the commit it suggests", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy(["-m", TWO_LINE_MESSAGE]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          data: {
+            next_commands: expect.arrayContaining([
+              `git -C ${app.path} add .zitadel && git -C ${app.path} commit -m $'add a nickname\\nand a title' -- .zitadel`,
+            ]),
+          },
         });
       });
 
@@ -1698,7 +1719,34 @@ describe("deploy", () => {
             },
             next_commands: [expectedPublicCliCommand(app.againAsRun("deployment list"))],
           },
-          warnings: [UNCOMMITTED],
+          warnings: [],
+        });
+      });
+
+      it("records a clean release when only files outside .zitadel are uncommitted", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+        await app.commit();
+        await app.editPackageJson((pkg) => {
+          pkg.dependencies.left = "1.0.0";
+        });
+        await app.deploy();
+        await app.editUserSchema((schema) => {
+          schema.properties.title = { type: "string" };
+        });
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          data: {
+            diff: {
+              files: [
+                expect.objectContaining({ path: ".zitadel/schemas/default-human-user.json" }),
+              ],
+            },
+          },
         });
       });
 
@@ -1954,7 +2002,7 @@ describe("deploy", () => {
     describe("rendered for a terminal", () => {
       it("says what it deployed", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await app.deployRendered();
 
@@ -1963,16 +2011,16 @@ describe("deploy", () => {
 
       it("names the release and every origin it went to, under the closing line", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await app.deployRendered();
 
-        expect(result).toPrint("is now live on http://localhost:3000 and https://app.acme.com.");
+        expect(result).toPrint(`is now live on http://localhost:3000 and ${PRIMARY_ORIGIN}.`);
       });
 
       it("sets the release line apart from the title when piped, as the terminal does", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await offTerminal(() => app.deployRendered());
 
@@ -1997,7 +2045,7 @@ describe("deploy", () => {
         const result = await app.deployRendered();
 
         expect(result).toPrint(
-          "Release sha256\\x1b[2Jwiped:aaaaaaaaaaaa is now live on https://app.acme.com\\x1b[2Jwiped.",
+          `Release sha256\\x1b[2Jwiped:aaaaaaaaaaaa is now live on ${PRIMARY_ORIGIN}\\x1b[2Jwiped.`,
         );
       });
 

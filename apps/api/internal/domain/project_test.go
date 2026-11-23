@@ -16,6 +16,16 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// Only the built-in row is reserved (D42): a pin naming an ordinary project,
+// and no platform project at all, mark nothing.
+func TestReservedPlatformProjectID(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, domain.PlatformProjectID, domain.ReservedPlatformProjectID(domain.PlatformProjectID))
+	assert.Empty(t, domain.ReservedPlatformProjectID("proj_customer"))
+	assert.Empty(t, domain.ReservedPlatformProjectID(""))
+}
+
 func TestNewProject(t *testing.T) {
 	t.Parallel()
 	type args struct {

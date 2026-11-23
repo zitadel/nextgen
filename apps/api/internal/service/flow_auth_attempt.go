@@ -54,6 +54,7 @@ func (a *FlowAuthAttemptAdapter) SubmitIdentifier(ctx context.Context, in domain
 			AttributeName: in.AttributeName,
 			LoginName:     in.Value,
 			UserSchemaURL: in.UserSchemaURL,
+			Register:      in.Register,
 		},
 	})
 	if err != nil {

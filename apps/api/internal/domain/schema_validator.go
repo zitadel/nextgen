@@ -35,6 +35,7 @@ const (
 	SchemaKindUser           KnownSchemaKind = "user"
 	SchemaKindFlowDefinition KnownSchemaKind = "flow-definition"
 	SchemaKindIDPConnection  KnownSchemaKind = "idp-connection"
+	SchemaKindApplication    KnownSchemaKind = "application"
 )
 
 // todo: handling multiple versions of the meta-schemas, e.g. "flow-definition-v1.2.3.json" or "flow-definition/1.2.3/schema.json"?
@@ -42,6 +43,7 @@ var schemaKindFilenames = map[KnownSchemaKind]string{
 	SchemaKindUser:           "user-schema.json",
 	SchemaKindFlowDefinition: "flow-definition.json",
 	SchemaKindIDPConnection:  "idp-connection.json",
+	SchemaKindApplication:    "application.json",
 }
 
 // SchemaValidator validates a tenant schema document against the

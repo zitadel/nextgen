@@ -15,6 +15,7 @@
     "identity-providers",
     "applications",
     "policies",
+    "oauth-settings",
     "variables",
     "releases",
     "deployments",

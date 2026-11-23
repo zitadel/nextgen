@@ -1,8 +1,9 @@
-// Command launcher starts the nextgen server on Vercel's Go runtime.
+// Command launcher starts the nextgen server in the cloud's Vercel function.
 //
-// Vercel's Go framework preset runs one binary with no script in front of
-// it, so the binary itself turns the environment a Vercel function receives
-// into what the server accepts:
+// The function is a Node.js wrapper (apps/cloud/server) that runs this
+// binary as its child and forwards requests to it, so that the server's spans
+// and metrics reach Vercel (exportToWrapper). The binary itself turns the
+// environment a Vercel function receives into what the server accepts:
 //
 //   - The database (database.go). CLOUD_DATABASE_URL (pooled, through
 //     PgBouncer) and CLOUD_MIGRATOR_DATABASE_URL (direct) name PlanetScale
@@ -17,7 +18,7 @@
 //     add the key the data is still wrapped with, marked for decryption only;
 //     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
-//     becomes a --user-file.
+//     becomes a --user-file of the seeding.
 //   - The audit event purge. A function runs only while it serves a request,
 //     so the server's own hourly purge cannot run here: a Vercel Cron Job
 //     (repo-root vercel.json) calls the server's retention trigger instead,
@@ -34,15 +35,21 @@
 //     variable says otherwise. The URLs Vercel serves the deployment at are
 //     added to NEXTGEN_SERVER_CONSOLE_ORIGINS, whatever it already names.
 //
-// A deployment migrates at deploy time, never at startup: a turbo task runs
-// `launcher migrate` after compiling, which creates a preview's database when
-// it is missing and runs the server's migrate command against the direct
-// URL. The serving invocation refuses --migrate, so a function cannot change
-// a schema by starting. The build also parses everything the function needs
-// to start (parseServing), so a deployment whose function could not start
-// fails its build and never replaces the deployment that serves. A local run
-// without CLOUD_DATABASE_URL (`pnpm run cloud`, scripts/run-cloud.mjs) has no
-// build step, so it migrates its own database before serving.
+// A deployment migrates and seeds at deploy time, never at startup. A turbo
+// task runs `launcher migrate` after compiling, which creates a preview's
+// database when it is missing and runs the server's migrate command against
+// the direct URL. The next runs `launcher seed`: the server's seed command,
+// with the function's own configuration and through the pooled URL it serves
+// from, creates the platform project, deploys the configuration the server
+// ships for it, imports the bootstrap admin and reconciles the platform
+// operators. The serving invocation refuses --migrate and starts the server
+// with --seed=false, so a function writes nothing by starting, and a seeding
+// that fails fails the build instead of every cold start. The build also
+// parses everything the function needs to start (parseServing), so a
+// deployment whose function could not start fails its build and never
+// replaces the deployment that serves. A local run (`pnpm run cloud`,
+// scripts/run-cloud.mjs) has no build step, so it seeds when it starts, and
+// without CLOUD_DATABASE_URL migrates its own database first.
 //
 // `launcher drop-preview` removes preview databases from the preview cluster:
 // a merged branch's, or every one no deployment stamped for a while
@@ -56,6 +63,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -110,6 +118,16 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "seed" {
+		if err := runSeed(); err != nil {
+			fmt.Fprintln(os.Stderr, "launcher:", err)
+			if errors.Is(err, errPrepareFailed) {
+				os.Exit(64)
+			}
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "drop-preview" {
 		if err := runDropPreview(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, "launcher:", err)
@@ -128,8 +146,8 @@ func main() {
 	}
 }
 
-// errPrepareFailed marks a prepareMigration/prepareServer failure (exit 64)
-// rather than a migrate/server execution failure (exit 1).
+// errPrepareFailed marks a prepareMigration/prepareSeed/prepareServer failure
+// (exit 64) rather than a migrate/seed/server execution failure (exit 1).
 var errPrepareFailed = errors.New("prepare failed")
 
 // executeServer runs the nextgen server command with args. Tests replace it.
@@ -170,6 +188,94 @@ func runMigrate(extra []string) error {
 		return fmt.Errorf("%w: %v", errPrepareFailed, err)
 	}
 	return executeServer(args)
+}
+
+// runSeed is the deploy-time seeding, the build step after runMigrate. One
+// seeding runs per database at a time (withSeedLock): two builds of a branch
+// would otherwise each store the platform's schema and deploy a release of
+// their own. A local run has no build step and seeds when it starts.
+func runSeed() error {
+	env := os.Getenv("VERCEL_ENV")
+	if !deployed(env) {
+		fmt.Fprintln(os.Stderr, "launcher: not a deployment, nothing to seed here: a local run seeds its database when it starts")
+		return nil
+	}
+	lockDSN, _, err := deploymentDatabase(env)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	args, cleanup, err := prepareSeed()
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	defer cleanup()
+	return withSeedLock(context.Background(), lockDSN, func() error { return executeServer(args) })
+}
+
+// deploymentDatabase is the direct URL of the database a deployment's build
+// migrates and seeds: the migrator URL, with a preview's own database swapped
+// in, whose name comes back too. Production is only ever changed from its
+// production branch, so a production build of any other branch (a promoted
+// preview, which Vercel rebuilds with production variables, or a CLI deploy)
+// fails instead.
+func deploymentDatabase(env string) (dsn, preview string, err error) {
+	ref := gitRef()
+	if env == "production" {
+		if branch := productionBranch(); ref != branch {
+			return "", "", fmt.Errorf("refusing to change production from %q: production deploys from %q (CLOUD_PRODUCTION_BRANCH)", ref, branch)
+		}
+	}
+	base := os.Getenv(migratorDatabaseURLVar)
+	if base == "" {
+		return "", "", fmt.Errorf("%s must be set for a %s deployment", migratorDatabaseURLVar, env)
+	}
+	if env != "preview" {
+		return base, "", nil
+	}
+	if preview, err = previewDatabaseName(ref); err != nil {
+		return "", "", err
+	}
+	if dsn, err = withDatabase(base, preview); err != nil {
+		return "", "", err
+	}
+	return dsn, preview, nil
+}
+
+// prepareSeed renders the function's configuration for the server's seed
+// command and returns its arguments, and what removes the files again: they
+// hold the master key and the admin's password hash, and the build machine
+// has no use for them once it has seeded. The seeding exports no telemetry:
+// it runs on a build machine, whose log has every line it prints, and like the
+// migration it sends a backend nothing under the server's name.
+func prepareSeed() (args []string, cleanup func(), err error) {
+	cleanup = func() {
+		dataDir := os.Getenv("NEXTGEN_SERVER_DATA_DIR")
+		if dataDir == "" {
+			return
+		}
+		_ = os.Remove(filepath.Join(dataDir, configFile))
+		_ = os.Remove(filepath.Join(dataDir, adminFile))
+	}
+	r, err := render()
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	admin, err := r.adminArgs()
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	// The seeding makes the public base the platform project's one primary
+	// origin, where the console signs operators in. Without the URL Vercel
+	// serves the deployment at, it would be the server's built-in default.
+	base := os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE")
+	if base == "" {
+		cleanup()
+		return nil, nil, errors.New("the build does not know the deployment's URL: set NEXTGEN_SERVER_PUBLIC_BASE, or enable access to System Environment Variables on the Vercel project (VERCEL_PROJECT_PRODUCTION_URL, VERCEL_BRANCH_URL, VERCEL_URL)")
+	}
+	fmt.Fprintf(os.Stderr, "launcher: seeding the %s database%s for %s\n", describeEnv(r.env), r.database, base)
+	return append([]string{"seed", "--config", r.configPath}, admin...), cleanup, nil
 }
 
 const dropPreviewUsage = "usage: launcher drop-preview [--dry-run] (--idle-days <n> | [--] <branch>...)"
@@ -294,23 +400,16 @@ func deployed(env string) bool {
 
 // prepareMigration is the deploy-time mode: it creates a preview's database
 // when it is missing and points the server's migrate command at the direct
-// URL of the deployment's database. Production migrates only from its
-// production branch, so a production build of any other branch (a promoted
-// preview, which Vercel rebuilds with production variables, or a CLI deploy)
-// fails instead of changing the schema.
+// URL of the deployment's database (deploymentDatabase). A local run migrates
+// whatever the migrator URL, or else the server's own configuration, names.
 func prepareMigration(extra []string) ([]string, error) {
 	env := os.Getenv("VERCEL_ENV")
-	ref := gitRef()
-	if env == "production" {
-		if branch := productionBranch(); ref != branch {
-			return nil, fmt.Errorf("refusing to migrate production from %q: production deploys from %q (CLOUD_PRODUCTION_BRANCH)", ref, branch)
-		}
-	}
 	dsn := os.Getenv(migratorDatabaseURLVar)
-	if dsn == "" && deployed(env) {
-		return nil, fmt.Errorf("%s must be set for a %s deployment", migratorDatabaseURLVar, env)
-	}
 	if deployed(env) {
+		target, preview, err := deploymentDatabase(env)
+		if err != nil {
+			return nil, err
+		}
 		if err := checkServedThroughPooler(os.Getenv(databaseURLVar), dsn); err != nil {
 			return nil, err
 		}
@@ -321,18 +420,12 @@ func prepareMigration(extra []string) ([]string, error) {
 		if _, err := parseServing(env); err != nil {
 			return nil, fmt.Errorf("the serving function would refuse to start: %w", err)
 		}
-	}
-	if dsn != "" && env == "preview" {
-		name, err := previewDatabaseName(ref)
-		if err != nil {
-			return nil, err
+		if preview != "" {
+			if err := ensureDatabase(context.Background(), dsn, preview, gitRef(), time.Now()); err != nil {
+				return nil, err
+			}
 		}
-		if err := ensureDatabase(context.Background(), dsn, name, ref, time.Now()); err != nil {
-			return nil, err
-		}
-		if dsn, err = withDatabase(dsn, name); err != nil {
-			return nil, err
-		}
+		dsn = target
 	}
 	if dsn != "" {
 		if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", dsn); err != nil {
@@ -463,15 +556,28 @@ func parseServing(env string) (*serving, error) {
 	return s, nil
 }
 
-// prepareServer renders the config and bootstrap files from the environment
-// and returns the server arguments. Secrets leave the environment once they
-// are on disk, so the server process does not carry them.
-func prepareServer(extra []string) ([]string, error) {
-	for _, arg := range extra {
-		if arg == "--migrate" || strings.HasPrefix(arg, "--migrate=") {
-			return nil, errors.New("refusing --migrate; migrations run in the build step (launcher migrate), never in the serving function")
-		}
-	}
+// What render writes into the data dir.
+const (
+	configFile = "nextgen.yaml"
+	adminFile  = "admin-user.json"
+)
+
+// rendered is the function's configuration once it is in the config file and
+// in the environment the server's commands read.
+type rendered struct {
+	*serving
+	env        string
+	dataDir    string
+	configPath string
+	port       string
+}
+
+// render writes the config file and sets the environment the server reads,
+// from what parseServing finds. The server and the deploy-time seeding both
+// start from it, so the seeding seeds what the function serves. Secrets leave
+// the environment once they are on disk or parsed, so the server process does
+// not carry them.
+func render() (*rendered, error) {
 	env := os.Getenv("VERCEL_ENV")
 	s, err := parseServing(env)
 	if err != nil {
@@ -481,7 +587,6 @@ func prepareServer(extra []string) ([]string, error) {
 		if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", s.dsn); err != nil {
 			return nil, err
 		}
-		fmt.Fprintf(os.Stderr, "launcher: serving the %s database%s\n", describeEnv(env), s.database)
 	}
 
 	if err := setDefault("NEXTGEN_SERVER_DATA_DIR", defaultDataDir); err != nil {
@@ -492,7 +597,7 @@ func prepareServer(extra []string) ([]string, error) {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return nil, err
 	}
-	configPath := filepath.Join(dataDir, "nextgen.yaml")
+	configPath := filepath.Join(dataDir, configFile)
 	config, err := renderConfig(s)
 	if err != nil {
 		return nil, err
@@ -500,28 +605,8 @@ func prepareServer(extra []string) ([]string, error) {
 	if err := os.WriteFile(configPath, config, 0o600); err != nil {
 		return nil, err
 	}
-	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
-	_ = os.Unsetenv("MASTER_KEY_PREVIOUS_PEM_B64")
-	_ = os.Unsetenv("CRON_SECRET")
-	if s.previousID != "" {
-		fmt.Fprintf(os.Stderr, "launcher: master key %s, re-wrapping what %s wrapped; delete MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID once this deployment has started\n", s.keyID, s.previousID)
-	}
-
-	args := []string{"server", "--config", configPath}
-	// A local run serves the server's own database (SQLite unless a
-	// NEXTGEN_DATABASE_* variable names another) and no build step migrated
-	// it, so the server migrates it before serving. A deployment never does.
-	if !deployed(env) && s.dsn == "" {
-		args = append(args, "--migrate")
-	}
-
-	if s.admin != nil {
-		adminPath := filepath.Join(dataDir, "admin-user.json")
-		if err := os.WriteFile(adminPath, s.admin, 0o600); err != nil {
-			return nil, err
-		}
-		_ = os.Unsetenv("BOOTSTRAP_ADMIN_USER_JSON_B64")
-		args = append(args, "--user-file", adminPath)
+	for _, secret := range []string{"MASTER_KEY_PEM_B64", "MASTER_KEY_PREVIOUS_PEM_B64", "CRON_SECRET", "BOOTSTRAP_ADMIN_USER_JSON_B64"} {
+		_ = os.Unsetenv(secret)
 	}
 
 	port := os.Getenv("PORT")
@@ -566,8 +651,73 @@ func prepareServer(extra []string) ([]string, error) {
 			return nil, err
 		}
 	}
-	// An OTLP endpoint on the environment turns telemetry export on. The OTLP
-	// SDK reads it and OTEL_EXPORTER_OTLP_HEADERS, the backend's credentials,
+	// Added to, not defaulted: a deployment names its custom domains there, and
+	// the URLs Vercel serves it at must stay console origins beside them.
+	if err := os.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", consoleOrigins(env, os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))); err != nil {
+		return nil, err
+	}
+	return &rendered{serving: s, env: env, dataDir: dataDir, configPath: configPath, port: port}, nil
+}
+
+// adminArgs writes the bootstrap admin document where a seeding reads it and
+// returns the arguments that name it: none without a document. Only what
+// seeds calls it, so a function that does not seed gets no copy on its disk.
+func (r *rendered) adminArgs() ([]string, error) {
+	if r.admin == nil {
+		return nil, nil
+	}
+	path := filepath.Join(r.dataDir, adminFile)
+	if err := os.WriteFile(path, r.admin, 0o600); err != nil {
+		return nil, err
+	}
+	return []string{"--user-file", path}, nil
+}
+
+// prepareServer renders the function's configuration and returns the
+// arguments the server serves with.
+func prepareServer(extra []string) ([]string, error) {
+	for _, arg := range extra {
+		if arg == "--migrate" || strings.HasPrefix(arg, "--migrate=") {
+			return nil, errors.New("refusing --migrate; migrations run in the build step (launcher migrate), never in the serving function")
+		}
+	}
+	r, err := render()
+	if err != nil {
+		return nil, err
+	}
+	if r.dsn != "" {
+		fmt.Fprintf(os.Stderr, "launcher: serving the %s database%s\n", describeEnv(r.env), r.database)
+	}
+	if r.previousID != "" {
+		fmt.Fprintf(os.Stderr, "launcher: master key %s, re-wrapping what %s wrapped; delete MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID once this deployment has started\n", r.keyID, r.previousID)
+	}
+
+	args := []string{"server", "--config", r.configPath}
+	// A deployment's build migrated and seeded its database (runMigrate,
+	// runSeed), so its function does neither by starting. A local run has no
+	// build step: the server seeds when it starts, and migrates first when it
+	// serves its own database (SQLite unless a NEXTGEN_DATABASE_* variable
+	// names another).
+	if deployed(r.env) {
+		args = append(args, "--seed=false")
+	} else {
+		if r.dsn == "" {
+			args = append(args, "--migrate")
+		}
+		admin, err := r.adminArgs()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, admin...)
+	}
+
+	if err := exportToWrapper(r.port); err != nil {
+		return nil, err
+	}
+	// An OTLP endpoint on the environment makes that backend the telemetry
+	// sink, for spans, metrics and logs; behind the wrapper's collector none
+	// is left to name one (exportToWrapper). The OTLP SDK reads it and
+	// OTEL_EXPORTER_OTLP_HEADERS, the backend's credentials,
 	// itself, so the exporters' own endpoint stays unset; an environment
 	// without it exports nothing rather than retry localhost:4318. The batch
 	// durations are the SDK's defaults, named so the cloud's export cadence is
@@ -586,11 +736,6 @@ func prepareServer(extra []string) ([]string, error) {
 				return nil, err
 			}
 		}
-	}
-	// Added to, not defaulted: a deployment names its custom domains there, and
-	// the URLs Vercel serves it at must stay console origins beside them.
-	if err := os.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", consoleOrigins(env, os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))); err != nil {
-		return nil, err
 	}
 	return append(args, extra...), nil
 }
@@ -726,4 +871,88 @@ func renderConfig(s *serving) ([]byte, error) {
 		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
 	}
 	return yaml.Marshal(config)
+}
+
+// otlpCollectorEnv names the wrapper's OTLP collector. The cloud's server
+// service is a Node.js function (apps/cloud/server) that runs this launcher
+// as its child, because only a Node.js function can add spans to Vercel
+// Tracing and report Vercel custom metrics. The wrapper sets the variable to
+// its loopback collector.
+const otlpCollectorEnv = "CLOUD_OTLP_COLLECTOR"
+
+// otlpBackendEnv is what names an OTLP backend to the SDK's exporters: where
+// it is, for every signal or for one, and its credentials.
+var otlpBackendEnv = []string{
+	"OTEL_EXPORTER_OTLP_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_HEADERS",
+	"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+	"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+	"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+}
+
+// exportToWrapper points the server's traces and metrics at the wrapper when
+// the wrapper names its collector, and keeps the server off every other
+// interface. Vercel is the telemetry sink then, and the only one: the wrapper
+// names its collector only while the environment names no OTLP backend
+// (apps/cloud/server/sink.mjs), and prints the server's log lines as Vercel's
+// logs. The settings are set, not defaulted: they follow from how the wrapper
+// runs the server.
+//
+//   - Spans go to the wrapper's collector over OTLP/HTTP, batched for at most
+//     100ms, so a request's spans arrive soon after its response.
+//   - The server continues the incoming traceparent (ADR 080). The wrapper
+//     replaces the client's trace context with Vercel's root span for the
+//     request, and the server listens on loopback only, so no caller can
+//     reach it with a traceparent of its own.
+//   - A fraction of 0 leaves sampling to Vercel: a request is traced when
+//     Vercel's sampling rules trace it and the wrapper sends a sampled
+//     traceparent, and a root the server starts itself is dropped.
+//   - Metrics go to the same collector every 100ms, as deltas: Vercel takes
+//     single data points and aggregates them itself, so the wrapper needs
+//     what happened since the last export, not a running total. The interval
+//     is short because the wrapper can only send from a request: what an
+//     instance exports after its last request waits until it serves again,
+//     and is lost if it never does. At 10s, a quarter of the sessions a burst
+//     of requests created never showed up.
+//   - What names an OTLP backend is cleared, so nothing is exported a second
+//     time, and so the exports to the wrapper stay where it serves them: an
+//     exporter given only a host takes its path from
+//     OTEL_EXPORTER_OTLP_ENDPOINT, and beside Grafana Cloud's /otlp every
+//     export went to /otlp/v1/…, which the collector answers with 404.
+func exportToWrapper(port string) error {
+	collector := os.Getenv(otlpCollectorEnv)
+	if collector == "" {
+		return nil
+	}
+	host, _, err := net.SplitHostPort(collector)
+	if err != nil || host != "127.0.0.1" {
+		return fmt.Errorf("%s must be 127.0.0.1:<port>, the wrapper's loopback collector, got %q", otlpCollectorEnv, collector)
+	}
+	for _, key := range otlpBackendEnv {
+		if err := os.Unsetenv(key); err != nil {
+			return err
+		}
+	}
+	for key, value := range map[string]string{
+		"NEXTGEN_SERVER_ADDRESS":                                 "127.0.0.1:" + port,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE":            "http",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT":        collector,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE":        "true",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION":  "100ms",
+		"NEXTGEN_INSTRUMENTATION_TRACE_FRACTION":                 "0",
+		"NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS":       "true",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE":           "http",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT":       collector,
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE":       "true",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION": "100ms",
+		"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE":      "delta",
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }

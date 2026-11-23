@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"cmp"
+	"context"
 	"net/http"
 	"slices"
 	"testing"
@@ -189,6 +190,51 @@ func TestListMyProjects(t *testing.T) {
 		// The second page is the last: look-ahead sees no further row, so it
 		// carries no token and there is no trailing empty page (#849).
 		assert.False(t, page2.NextPageToken.Set, helpers.MustMarshal(t, page2))
+	})
+
+	// The storage half of `exclude_platform` (D42): the excluded project is left
+	// out with the grants and the name search, so a page is never short a row.
+	t.Run("an excluded project is left out of the page", func(t *testing.T) {
+		t.Parallel()
+
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		name := helpers.ProjectName()
+		excluded, err := harness.EnsureProjectService(t).Create(t.Context(), name+" one", nil, false)
+		require.NoError(t, err)
+		kept, err := harness.EnsureProjectService(t).Create(t.Context(), name+" two", nil, false)
+		require.NoError(t, err)
+		harness.SeedProjectViewer(t, excluded.ID, userID)
+		harness.SeedProjectViewer(t, kept.ID, userID)
+
+		listed, err := harness.EnsureProjectService(t).ListAuthorized(t.Context(), service.ListAuthorizedProjectsRequest{
+			HomeProjectID:    platform.ID,
+			UserID:           userID,
+			NameContains:     name,
+			Limit:            1,
+			ExcludeProjectID: excluded.ID,
+		})
+		require.NoError(t, err)
+		require.Len(t, listed.Projects, 1)
+		assert.Equal(t, kept.ID, listed.Projects[0].ID)
+		assert.Empty(t, listed.NextPageToken)
+	})
+
+	// The harness pins an ordinary project as the platform project, as a
+	// self-hoster's platform.project_id does: it is not reserved, so
+	// `exclude_platform` keeps it (Console ADR 0004 §2).
+	t.Run("exclude_platform keeps a pinned ordinary project", func(t *testing.T) {
+		t.Parallel()
+
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		grant := harness.SeedProjectViewer(t, platform.ID, userID)
+		t.Cleanup(func() {
+			_ = stmts.RevokeAuthzAssignment(context.Background(), platform.ID, grant.ID)
+		})
+
+		listed := listMyProjects(t, sessionClientForUser(t, userID), api.ListMyProjectsParams{
+			ExcludePlatform: api.NewOptBool(true),
+		})
+		assert.Equal(t, []string{platform.ID}, myProjectIDs(listed))
 	})
 
 	// `order` reaches the statement and its token is held to it. That each

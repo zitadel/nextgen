@@ -20,7 +20,7 @@ import (
 // change writes its authz.granted or authz.revoked event in the same
 // transaction.
 //
-// It runs at every start, possibly on several replicas at once: a grant
+// It runs at every seeding, possibly on several replicas at once: a grant
 // another replica already wrote, or a revocation it already made, counts as
 // done.
 //
@@ -135,6 +135,7 @@ func emitOperatorEvent(ctx context.Context, stmts service.AllStatements, typ dom
 		ProjectID:  a.ProjectID,
 		EntityType: "authz_assignment",
 		EntityID:   a.ID,
+		UserID:     a.PrincipalUserID(),
 		Payload:    payload,
 		ActorType:  &system,
 	})

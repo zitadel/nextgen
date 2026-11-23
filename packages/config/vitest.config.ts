@@ -8,9 +8,7 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/config",
     environment: "node",
-    // meta-schemas are synced before Vitest runs, not by a global setup: the
-    // `pretest` lifecycle hook (`pnpm run sync-schemas`) covers a direct
-    // `pnpm test` / `pnpm test:all`, and the moon `sync-schemas` dep
-    // (mutex: generated-sources) covers the moon graph.
+    // meta-schemas are synced before Vitest runs, not by a global setup: by
+    // the `sync-schemas` task the turbo build depends on (turbo.json).
   },
 });

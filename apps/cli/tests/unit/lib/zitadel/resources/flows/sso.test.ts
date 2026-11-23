@@ -231,7 +231,6 @@ function withoutDefaultPrimary(flow: JsonObject): JsonObject {
 function flowEndingAt(terminal: string): JsonObject {
   return {
     name: "custom",
-    status: "active",
     user_schema: "https://example.test/u.json",
     purposes: { login: "identifier" },
     steps: [
@@ -967,7 +966,6 @@ describe("SsoGenerator.withProvider", () => {
      */
     const flow = {
       name: "custom",
-      status: "active",
       user_schema: "https://example.test/u.json",
       purposes: { login: "identifier" },
       steps: [

@@ -1,5 +1,5 @@
 get:
-  operationId: getDeploymentVariables
+  operationId: listDeploymentVariables
   x-zitadel-cli: variable resolve
   summary: Get a deployment's variables
   description: |
@@ -25,4 +25,4 @@ get:
           schema:
             $ref: ../../../variables/variables.yaml
     default:
-      $ref: getDeploymentVariables-error-response.yaml
+      $ref: listDeploymentVariables-error-response.yaml

@@ -111,6 +111,7 @@ const (
 	EventTypeAuthAttemptHandedOff    EventType = "auth.attempt.handed_off"
 	EventTypeAuthCheckFailed         EventType = "auth.check.failed"
 	EventTypeAuthCheckSucceeded      EventType = "auth.check.succeeded"
+	EventTypeAuthRequestCreated      EventType = "auth.request.created"
 
 	// The SSO callback's outcome, separate from auth.check.*: a succeeded
 	// exchange is not a sign-in, since the identity may still match no account.
@@ -133,11 +134,16 @@ const (
 
 	EventTypeBrandingCreated EventType = "branding.created"
 
+	EventTypeOAuthSettingsCreated EventType = "oauth_settings.created"
+
 	EventTypePolicyCreated EventType = "policy.created"
 	EventTypePolicyUpdated EventType = "policy.updated"
 
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
+
+	EventTypeApplicationCreated EventType = "application.created"
+	EventTypeApplicationUpdated EventType = "application.updated"
 
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
@@ -182,6 +188,11 @@ type Event struct {
 
 	EntityType *string
 	EntityID   *string
+
+	// UserID is the user the event concerns, whoever acted: the user a
+	// session, a token, a sign-in check or a credential belongs to, and the
+	// user a change was made to. Nil on an event that concerns no user.
+	UserID *string
 
 	ClientID       string
 	TokenID        string
@@ -263,6 +274,7 @@ const (
 	EventFieldFlowID
 	EventFieldOperationStatus
 	EventFieldStatusClass
+	EventFieldUserID
 )
 
 func ErrEventNotFound() Error {

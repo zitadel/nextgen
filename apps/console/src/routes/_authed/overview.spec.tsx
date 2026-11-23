@@ -47,7 +47,7 @@ function serveEvents(data: unknown[]): URLSearchParams[] {
   server.use(
     http.get(EVENTS_URL, ({ request }) => {
       queries.push(new URL(request.url).searchParams);
-      return HttpResponse.json({ data });
+      return HttpResponse.json({ events: data });
     }),
   );
   return queries;

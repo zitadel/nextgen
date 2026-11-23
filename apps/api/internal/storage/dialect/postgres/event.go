@@ -41,7 +41,7 @@ INSERT INTO zitadel_nextgen.events (
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
     operation_status, status_class,
@@ -51,11 +51,11 @@ SELECT
     $1, $2, $3, $4,
     stamp.at - ($5 * interval '1 second'), stamp.at,
     $6, $7, $8,
-    $9, $10,
-    $11, $12, $13, $14, $15, $16,
-    $17, $18, $19,
-    $20, $21,
-    $22, $23
+    $9, $10, $11,
+    $12, $13, $14, $15, $16, $17,
+    $18, $19, $20,
+    $21, $22,
+    $23, $24
 FROM stamp
 RETURNING occurred_at, created_at`
 
@@ -77,7 +77,7 @@ WHERE locktype = 'advisory'
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
     operation_status, status_class,
@@ -147,7 +147,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		event.ProjectID, event.ID, string(event.EventType), string(event.Category),
 		waitSecs,
 		nullString(event.TeamID), nullString(event.ActorID), nullActorType(event.ActorType),
-		nullString(event.EntityType), nullString(event.EntityID),
+		nullString(event.EntityType), nullString(event.EntityID), nullString(event.UserID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
 		nullString(event.RequestID), nullString(event.SessionID), nullString(event.FlowID),
 		nullString(events.OperationStatusOf(event)), nullStatusClass(event.StatusClass),
@@ -156,8 +156,6 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	if err != nil {
 		return wrapError(err)
 	}
-	event.OccurredAt = event.OccurredAt.UTC()
-	event.CreatedAt = event.CreatedAt.UTC()
 	event.Payload = payload
 	event.Metadata = metadata
 	return nil
@@ -238,7 +236,6 @@ func (e eventStatements) ScanEvents(ctx context.Context, within *database.ListOp
 	scanned, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.Scanned, error) {
 		var s events.Scanned
 		err := row.Scan(&s.ID, &s.CreatedAt, &s.Matched)
-		s.CreatedAt = s.CreatedAt.UTC()
 		return s, err
 	})
 	if err != nil {
@@ -291,7 +288,6 @@ func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, project
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	c.LastCreatedAt = c.LastCreatedAt.UTC()
 	return &c, nil
 }
 
@@ -312,7 +308,7 @@ func (e eventStatements) EventsSettledBefore(ctx context.Context, projectID stri
 	if err := e.client.QueryRow(ctx, eventsSettledBeforeStmt, projectID).Scan(&before); err != nil {
 		return time.Time{}, wrapError(err)
 	}
-	return before.UTC(), nil
+	return before, nil
 }
 
 // ListEventsAfterCursor implements [service.EventStatements].
@@ -360,6 +356,7 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 		ev                                               domain.Event
 		eventType, category                              string
 		teamID, actorID, actorType, entityType, entityID sql.NullString
+		userID                                           sql.NullString
 		requestID, sessionID, flowID                     sql.NullString
 		operationStatus, statusClass                     sql.NullString
 		payload, metadata                                []byte
@@ -368,7 +365,7 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 		&ev.ProjectID, &ev.ID, &eventType, &category,
 		&ev.OccurredAt, &ev.CreatedAt,
 		&teamID, &actorID, &actorType,
-		&entityType, &entityID,
+		&entityType, &entityID, &userID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
 		&operationStatus, &statusClass,
@@ -378,8 +375,6 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 	}
 	ev.EventType = domain.EventType(eventType)
 	ev.Category = domain.EventCategory(category)
-	ev.OccurredAt = ev.OccurredAt.UTC()
-	ev.CreatedAt = ev.CreatedAt.UTC()
 	ev.TeamID = nullStringPtr(teamID)
 	ev.ActorID = nullStringPtr(actorID)
 	if actorType.Valid {
@@ -388,6 +383,7 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 	}
 	ev.EntityType = nullStringPtr(entityType)
 	ev.EntityID = nullStringPtr(entityID)
+	ev.UserID = nullStringPtr(userID)
 	ev.RequestID = nullStringPtr(requestID)
 	ev.SessionID = nullStringPtr(sessionID)
 	ev.FlowID = nullStringPtr(flowID)
