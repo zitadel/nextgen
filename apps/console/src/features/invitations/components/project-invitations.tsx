@@ -89,13 +89,12 @@ export async function readInvitations(
  * when creating the link, and the server erases it once the invitation is
  * accepted or declined. A row without one is `Unnamed invitation`.
  *
- * **Actions follow the lifecycle.** A pending link can be cancelled or
- * replaced, and a declined one removed or replaced: `DELETE
- * /invitations/{id}` deletes both, and a replacement of a declined link keeps
- * its name. An expired one can only be replaced, since the server keeps
- * expired rows until its own cleanup. The design draws `Cancel invitation` on
- * an expired row too, with a `Remove expired invitation?` confirmation; it
- * returns with an endpoint that removes one.
+ * **Actions follow the status** (`ACTIONS`). A pending link can be replaced or
+ * cancelled. An expired one can be replaced; it is to be removable too, as
+ * `Remove` since its link is already dead, once `DELETE
+ * /invitations/{invitation_id}` deletes an expired row, which today it answers
+ * with the opaque `404` and leaves to the cleanup job. A declined one can only
+ * be removed: the person said no, so there is no link to make again.
  *
  * **Replacing shows a link again.** A replace is a create
  * (`replaces_invitation_id`), so its response is the second and last time a
@@ -258,6 +257,7 @@ function InvitationRow({
 }) {
   const status = effectiveStatus(invitation);
   const name = invitation.metadata?.name ?? "Unnamed invitation";
+  const actions = ACTIONS[status];
   // What stands beside the badge: when a pending link runs out, or when a
   // declined one was answered.
   const detail =
@@ -293,12 +293,12 @@ function InvitationRow({
         </span>
       </TableCell>
       <TableCell className={RESOURCE_CELL}>
-        {status !== "accepted" && (
+        {actions && (
           <InvitationActions
             projectId={projectId}
             invitation={invitation}
             name={name}
-            removal={REMOVAL[status]}
+            actions={actions}
             onCancelled={onCancelled}
             onReplaced={onReplaced}
           />
@@ -340,26 +340,47 @@ interface Removal {
   done: string;
 }
 
+/** What a row's menu offers. */
+interface RowActions {
+  /** Regenerate link: a new link for the same person and role. */
+  regenerate: boolean;
+  /** How the row is deleted, where the server deletes its status. */
+  removal?: Removal;
+  /** Whether deleting it ends a link that still worked. */
+  cancels?: boolean;
+}
+
 /**
- * `DELETE /invitations/{id}` by status. A pending link is cancelled: it stops
- * working. A declined one already has, so deleting it only takes the row and
- * the name on it out of the list. The server keeps an expired row, so it has
- * no entry.
+ * The menu by status. A pending link is cancelled: it stops working. An
+ * expired or a declined one already has, so deleting it is `Remove` and only
+ * takes the row and the name on it out of the list. An accepted invitation is
+ * final and has no menu.
+ *
+ * Expired has no `removal` yet: `DELETE /invitations/{invitation_id}` deletes
+ * pending and declined rows and answers an expired one with the opaque `404`.
  */
-const REMOVAL: Partial<Record<InvitationStatus, Removal>> = {
+const ACTIONS: Partial<Record<InvitationStatus, RowActions>> = {
   pending: {
-    action: "Cancel invitation",
-    title: "Cancel invitation?",
-    description: "This invitation link will stop working.",
-    fallback: "Could not cancel the invitation. Try again.",
-    done: "Invitation cancelled",
+    regenerate: true,
+    cancels: true,
+    removal: {
+      action: "Cancel invitation",
+      title: "Cancel invitation?",
+      description: "This invitation link will stop working.",
+      fallback: "Could not cancel the invitation. Try again.",
+      done: "Invitation cancelled",
+    },
   },
+  expired: { regenerate: true },
   rejected: {
-    action: "Remove invitation",
-    title: "Remove declined invitation?",
-    description: "The invitation was declined. Removing it takes it off this list.",
-    fallback: "Could not remove the invitation. Try again.",
-    done: "Invitation removed",
+    regenerate: false,
+    removal: {
+      action: "Remove invitation",
+      title: "Remove declined invitation?",
+      description: "The invitation was declined. Removing it takes it off this list.",
+      fallback: "Could not remove the invitation. Try again.",
+      done: "Invitation removed",
+    },
   },
 };
 
@@ -367,18 +388,18 @@ function InvitationActions({
   projectId,
   invitation,
   name,
-  removal,
+  actions,
   onCancelled,
   onReplaced,
 }: {
   projectId: string;
   invitation: Invitation;
   name: string;
-  /** How the row is deleted, where the server deletes its status. */
-  removal?: Removal;
+  actions: RowActions;
   onCancelled: () => void;
   onReplaced: (created: CreatedInvitation) => void;
 }) {
+  const { regenerate, removal, cancels } = actions;
   const [dialog, setDialog] = useState<"regenerate" | "cancel" | undefined>(undefined);
   const close = (open: boolean) => {
     if (!open) setDialog(undefined);
@@ -387,16 +408,16 @@ function InvitationActions({
   return (
     <>
       <RowMenu name={name} contentClassName="w-50">
-        <DropdownMenuItem onSelect={() => setDialog("regenerate")}>
-          Regenerate link
-        </DropdownMenuItem>
+        {regenerate && (
+          <DropdownMenuItem onSelect={() => setDialog("regenerate")}>
+            Regenerate link
+          </DropdownMenuItem>
+        )}
+        {regenerate && removal && <DropdownMenuSeparator />}
         {removal && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={() => setDialog("cancel")}>
-              {removal.action}
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem variant="destructive" onSelect={() => setDialog("cancel")}>
+            {removal.action}
+          </DropdownMenuItem>
         )}
       </RowMenu>
 
@@ -406,7 +427,7 @@ function InvitationActions({
         variant="default"
         title="Regenerate invitation link?"
         description={
-          invitation.status === "pending" && removal
+          cancels
             ? "The current link will stop working. The new link will be shown only once and expires in 72 hours."
             : "The new link will be shown only once and expires in 72 hours."
         }
@@ -445,6 +466,14 @@ function InvitationActions({
           fallback={removal.fallback}
           onConfirm={async () => {
             await api.cancelInvitation(invitation.id, { project_id: projectId });
+            // Only a link that still worked was cancelled; the rest were
+            // already dead and removing them is housekeeping.
+            if (cancels) {
+              trackEvent("invitation_cancelled", {
+                role: analyticsRole(invitation),
+                invitation_journey_id: invitation.journey_id,
+              });
+            }
             toast.success(removal.done);
             onCancelled();
           }}

@@ -13,6 +13,7 @@ type Events = {
   invitation_created: InvitationEvent;
   invitation_accepted: InvitationEvent;
   invitation_rejected: InvitationEvent;
+  invitation_cancelled: InvitationEvent;
 };
 
 /** `role` is the type and its role combined: `project_editor`. */
