@@ -61,10 +61,10 @@ func (r *FlowStateMachineRuntime) takeInputs(pc *processCtx, inputs stepInputs) 
 }
 
 // acceptsSignupProof reports whether a submission to step may carry the
-// sign-up proof: one to a step that creates its user on success, or one a
-// kind the step declares accepts it with.
+// sign-up proof: one to a step whose on_success spends it, or one a kind the
+// step declares accepts it with.
 func acceptsSignupProof(step *domain.FlowDefinitionStep, state *domain.FlowState, in FlowSubmitInput) bool {
-	if step.OnSuccess != nil && *step.OnSuccess == domain.FlowOnSuccessCreateUser {
+	if step.OnSuccessSpec().SpendsSignupProof {
 		return true
 	}
 	for _, a := range step.Actions {

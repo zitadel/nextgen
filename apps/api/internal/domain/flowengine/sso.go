@@ -105,7 +105,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 		recordResolvedUser(state, parked.CollisionUserID)
 		// The marker replaced the row a collection step creates from, so that
 		// step cannot be shown again. An entry step can: it starts a new ceremony.
-		collection := currentStep.OnSuccess != nil && *currentStep.OnSuccess == domain.FlowOnSuccessCreateUserWithSso
+		collection := currentStep.OnSuccessSpec().ProviderIdentity
 		result, err := r.routeOutcome(pc, resolvedFields, domain.FlowImplicitOutcomeUserAlreadyExists, collection)
 		return result, true, err
 	}
@@ -596,7 +596,7 @@ func ssoRetryRoute(step *domain.FlowDefinitionStep) (outcome string, irreversibl
 	if ssoAuthenticatedRoutes(step) {
 		return domain.FlowImplicitOutcomeSSOAuthenticated, false, true
 	}
-	if step.OnSuccess == nil || *step.OnSuccess != domain.FlowOnSuccessCreateUserWithSso {
+	if !step.OnSuccessSpec().ProviderIdentity {
 		return "", false, false
 	}
 	for _, a := range step.Actions {
@@ -679,6 +679,13 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 		},
 		SSOBindingNonce: out.BindingNonce,
 	}, nil
+}
+
+// createUserWithSSOHandler handles create_user_with_sso (see processSSOCollection).
+type createUserWithSSOHandler struct{}
+
+func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error) {
+	return r.processSSOCollection(pc, resolved)
 }
 
 // processSSOCollection creates the user from the identity the engine resolved

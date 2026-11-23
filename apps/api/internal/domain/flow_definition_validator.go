@@ -528,10 +528,7 @@ func validateOnSuccessManifests(def FlowDefinition, resolvedByStep map[string]Fl
 
 	for i := range def.Steps {
 		step := &def.Steps[i]
-		if step.OnSuccess == nil {
-			continue
-		}
-		manifest := ManifestForOnSuccess(*step.OnSuccess)
+		manifest := step.OnSuccessSpec().Manifest
 		if manifest == nil {
 			continue
 		}

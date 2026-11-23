@@ -31,7 +31,7 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (domain.FlowReso
 // cannot succeed. A field showing a verified unique claim is read-only, since
 // the submit refuses a changed value.
 func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, resolved *domain.FlowResolvedFields) error {
-	if step.OnSuccess != nil && *step.OnSuccess == domain.FlowOnSuccessCreateUserWithSso {
+	if step.OnSuccessSpec().ProviderIdentity {
 		collected, err := r.ssoIdentities.LoadCollected(ctx, domain.FlowSSOLoadInput{
 			ProjectID:       state.ProjectID,
 			AttemptID:       state.AuthAttemptID,

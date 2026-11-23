@@ -489,63 +489,29 @@ func (submitHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowSt
 	}
 	// The step's values describe the provider's identity, not a sign-in, so
 	// its identifier is never submitted as one.
-	if pc.currentStep.OnSuccess != nil && *pc.currentStep.OnSuccess == domain.FlowOnSuccessCreateUserWithSso {
-		return r.processSSOCollection(pc, resolved)
-	}
-	dispatch, err := r.dispatchChallenges(pc, resolved)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	if dispatch.StepError != nil {
-		return r.renderStepError(pc, resolved, dispatch.StepError)
-	}
-	if dispatch.Outcome != "" {
-		return r.routeOutcome(pc, resolved, dispatch.Outcome, false)
+	if !pc.currentStep.OnSuccessSpec().ProviderIdentity {
+		dispatch, err := r.dispatchChallenges(pc, resolved)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		if dispatch.StepError != nil {
+			return r.renderStepError(pc, resolved, dispatch.StepError)
+		}
+		if dispatch.Outcome != "" {
+			return r.routeOutcome(pc, resolved, dispatch.Outcome, false)
+		}
 	}
 	if pc.currentStep.OnSuccess == nil {
 		return r.routeOutcome(pc, resolved, pc.in.Action, false)
 	}
-
-	// on_success reads across every visited step, not just the current one.
-	visitedResolved, err := r.resolveVisitedFields(pc)
-	if err != nil {
-		return FlowStepResult{}, err
+	handler, ok := onSuccessHandlers[*pc.currentStep.OnSuccess]
+	if !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: on_success %s not wired", domain.ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
 	}
-	result, err := r.runOnSuccess(pc, visitedResolved)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	if result.StepError != nil {
-		return r.renderStepError(pc, resolved, result.StepError)
-	}
-	if result.UserID != "" {
-		// The handler already recorded the user's factors on the attempt
-		// inside its own transaction; only the flow state needs the id.
-		recordResolvedUser(pc.state, result.UserID)
-	}
-	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
+	return handler.run(r, pc, resolved)
 }
 
 func (submitHandler) acceptsSignupProof(*domain.FlowState, FlowSubmitInput) bool { return false }
-
-// runOnSuccess dispatches the step's on_success mutation. Add a case
-// when a new [domain.FlowOnSuccess] handler lands.
-func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved domain.FlowResolvedFields) (domain.FlowOnSuccessResult, error) {
-	switch *pc.currentStep.OnSuccess {
-	case domain.FlowOnSuccessCreateUser:
-		return r.userCreater.Handle(pc.ctx, domain.FlowOnSuccessInput{
-			GateProofs:    pc.in.GateProofs,
-			ProjectID:     pc.state.ProjectID,
-			UserSchemaURL: pc.state.UserSchemaURL,
-			Fields:        pc.in.Fields,
-			Resolved:      resolved,
-			State:         pc.state,
-			ResolvedFlow:  pc.def,
-		})
-	default:
-		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", domain.ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
-	}
-}
 
 // recordResolvedUser stores the resolved user id; if it changed, any
 // state bound to the previous user is cleared.

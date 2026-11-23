@@ -385,7 +385,7 @@ func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinition
 }
 
 // attachSignupGate announces the sign-up gate on a step whose next submit
-// creates a user: one whose on_success is create_user, or one carrying a
+// spends the sign-up proof: one whose on_success declares it, or one carrying a
 // passkey registration that creates its user. Runtime enforcement does not
 // depend on template markup or client-selected purpose.
 // def must be the definition result.State names: Process refuses cross-flow
@@ -395,7 +395,7 @@ func (s *flowService) attachSignupGate(ctx context.Context, def *domain.FlowDefi
 		return nil
 	}
 	step, ok := def.FindStep(result.Step.Name)
-	if ok && step.OnSuccess != nil && *step.OnSuccess == domain.FlowOnSuccessCreateUser {
+	if ok && step.OnSuccessSpec().SpendsSignupProof {
 		result.Step.SignupRequired = true
 		return nil
 	}

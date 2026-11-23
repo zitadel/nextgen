@@ -1243,10 +1243,10 @@ describe("drift audit (Go validator)", () => {
 
   it.skipIf(!inMonorepo)("on_success manifests match the Go source exactly", () => {
     const source = readFileSync(onSuccessSource, "utf8");
-    const body = source.match(/func ManifestForOnSuccess[\s\S]*?\n}/)?.[0] ?? "";
-    const cases = [...body.matchAll(/case FlowOnSuccess(\w+):/g)].map(([, name]) =>
-      snake(name ?? ""),
-    );
+    const body = source.match(/var flowOnSuccessSpecs = [\s\S]*?\n}/)?.[0] ?? "";
+    const cases = [...body.matchAll(/^\tFlowOnSuccess(\w+): \{([\s\S]*?)^\t\},$/gm)]
+      .filter(([, , spec]) => spec?.includes("Manifest:"))
+      .map(([, name]) => snake(name ?? ""));
     // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
     // on_success gaining a manifest in Go without a port here skips its
     // collected-upstream check at plan time.

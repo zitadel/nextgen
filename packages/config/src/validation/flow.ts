@@ -92,7 +92,7 @@ const RESERVED_ACTION_NAMES = new Map<string, string>([
 /** Mirrors `AuthMethodPrefix` in flow_definition.go. */
 const AUTH_METHOD_PREFIX = "x-auth-methods#";
 
-/** Mirrors `ManifestForOnSuccess` in flow_on_success.go. */
+/** Mirrors the `Manifest` entries of `flowOnSuccessSpecs` in flow_on_success.go. */
 const ON_SUCCESS_MANIFESTS: Readonly<Record<string, readonly FieldChallenge[]>> = {
   create_user: ["identifier", "password"],
 };
