@@ -75,8 +75,6 @@ function aMeta(source: string): GlobalOptions {
     debug: false,
     env: {},
     isTTY: false,
-    colored: false,
-    json: false,
   };
 }
 

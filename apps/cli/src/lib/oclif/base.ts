@@ -670,8 +670,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
       debug,
       env: process.env,
       isTTY,
-      colored: !json && colored,
-      json,
     };
     Output.settle({
       json,
@@ -853,7 +851,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
     if (this.nonInteractive || this.jsonEnabled()) {
       return false;
     }
-    const argv = process.argv;
+    const argv = this.argv;
     if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
@@ -1125,8 +1123,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
       debug: false,
       env: process.env,
       isTTY: isTerminal(),
-      colored: false,
-      json: false,
     };
   }
 }

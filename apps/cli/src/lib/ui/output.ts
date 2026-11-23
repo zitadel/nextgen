@@ -3,9 +3,11 @@
  * read by whatever writes: a diff that is painted, a release published while
  * stdout belongs to the envelope.
  *
- * A command never reads the mode itself and never hands it on, so the one
- * place that knows `--json`, `--color`, `--no-color` and `NO_COLOR` is the base
- * command. The defaults are a plain, human run, which is what a library used
+ * The one place that decides `--json`, `--color`, `--no-color` and `NO_COLOR` is
+ * the base command, which settles this once; a command asks here rather than
+ * recomputing it from the process, and a library that starts a child process or
+ * paints a diff reads its default from here. The defaults are a plain, human
+ * run, which is what a library used
  * on its own gets.
  */
 const mode = {

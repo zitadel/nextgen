@@ -302,6 +302,15 @@ describe("Input", () => {
       expect(await expanded(["--cli-input-json", `file://${path}`])).toEqual(["--limit=5"]);
     });
 
+    it("keeps the --json a document asks for when the line has a flag the command lacks", async () => {
+      expect(await expanded(["--input", '{"json":true}', "--bogus"])).toEqual([
+        "--input",
+        '{"json":true}',
+        "--bogus",
+        "--json",
+      ]);
+    });
+
     it("leaves a line with two documents as it was, for the flag to refuse", async () => {
       const line = ["--input", '{"limit":1}', "--input", '{"limit":2}'];
 

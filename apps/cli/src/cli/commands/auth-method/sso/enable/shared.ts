@@ -236,10 +236,6 @@ export type EnableServices = Readonly<{
   nonInteractive: boolean;
 
   /**
-   * Whether the run answers with JSON.
-   */
-
-  /**
    * Whether this is a development build that may ask where a provider answers.
    */
   developmentBuild: boolean;

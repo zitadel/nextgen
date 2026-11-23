@@ -286,7 +286,29 @@ export class Input {
   public async rewrite(argv: readonly string[]): Promise<readonly string[]> {
     const line = await this.scan(argv);
     const [source] = line.sources;
-    if (source === undefined || line.sources.length > 1) {
+    if (source === undefined) {
+      for (const [index, word] of argv.entries()) {
+        const [name = ""] = word.split("=");
+        if (!["--input", "--flags-file", "--cli-input-json"].includes(name)) {
+          continue;
+        }
+        const value = word.includes("=") ? word.slice(word.indexOf("=") + 1) : argv[index + 1];
+        const asksForJson =
+          value !== undefined &&
+          (await Input.textOf(value)
+            .then((text) => {
+              return parseJsonObject(text, "--input").json === true;
+            })
+            .catch(() => {
+              return false;
+            }));
+
+        return asksForJson && !argv.includes("--json") ? [...argv, "--json"] : argv;
+      }
+
+      return argv;
+    }
+    if (line.sources.length > 1) {
       return argv;
     }
     const body = await Input.textOf(source).catch(() => {
