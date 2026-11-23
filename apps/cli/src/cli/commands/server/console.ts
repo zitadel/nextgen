@@ -174,12 +174,8 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
       summary: {
         title,
         sections: [
-          section(undefined, [
-            "Signed in as",
-            escapeControlCharacters(admin.email),
-            "Link",
-            escapeControlCharacters(signInUrl),
-          ]),
+          section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
+          section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
         ],
       },
       next: {
