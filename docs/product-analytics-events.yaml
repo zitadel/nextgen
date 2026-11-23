@@ -139,7 +139,9 @@ properties:
   action:
     type: string
     values: [create, update, delete, deactivate, enable, disable, test, deploy, redeploy, rollback]
-    description: What happened.
+    description: >-
+      What happened. A command that creates, updates, deletes or deactivates a user, team or grant
+      records it on its completed and failed events, beside `resource_type`.
   resource_type:
     type: string
     values:
@@ -154,7 +156,8 @@ properties:
       - branding
       - release
       - deployment
-    description: What the action acted on.
+    description: >-
+      What the action acted on, a name from this list and never one a person gave it.
   entry_point:
     type: string
     values: [onboarding, standalone]

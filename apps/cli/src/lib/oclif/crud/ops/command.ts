@@ -1,7 +1,7 @@
 import type { Command, Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import type { Admitted, BaseCommand } from "@/lib/oclif/base";
+import type { Admitted, BaseCommand, Facts } from "@/lib/oclif/base";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "@/lib/oclif/crud/types";
 import { Destructive } from "@/lib/oclif/destructive";
@@ -81,6 +81,32 @@ export abstract class ResourceCommand<
       );
     }
     return definition as OperationDefinition<Ctx, Spec>;
+  }
+
+  /**
+   * What the command does to its resource, when it changes one: `create`,
+   * `update`, or the verb a delete goes by. A read leaves it unset.
+   */
+  protected get action(): string | undefined {
+    return undefined;
+  }
+
+  /**
+   * Which resource a run changed and how, when the resource names itself and
+   * the command changes it; a read, and a resource that names no kind, say
+   * nothing.
+   *
+   * @returns The facts, with the layers below.
+   */
+  protected override describe(): Facts {
+    const { kind } = this.definition.resource;
+
+    return {
+      ...super.describe(),
+      ...(kind === undefined || this.action === undefined
+        ? {}
+        : { resource_type: kind, action: this.action }),
+    };
   }
 
   protected override async execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope> {

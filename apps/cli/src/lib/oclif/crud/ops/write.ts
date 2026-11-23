@@ -201,6 +201,15 @@ abstract class WriteOperation<
   protected abstract verb: "create" | "update";
 
   /**
+   * A write is the verb it is.
+   *
+   * @returns `create` or `update`.
+   */
+  protected override get action(): string {
+    return this.verb;
+  }
+
+  /**
    * The body this run sent, once it has.
    */
   private written: Json | undefined;

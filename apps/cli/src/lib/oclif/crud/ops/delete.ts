@@ -57,6 +57,15 @@ export abstract class DeleteOperation<Ctx> extends ResourceCommand<
     };
   }
 
+  /**
+   * A delete is the verb its resource gives it.
+   *
+   * @returns `delete`, or the lifecycle verb the resource declares.
+   */
+  protected override get action(): string {
+    return this.definition.spec.verb ?? "delete";
+  }
+
   protected override async operate({ args }: DeleteInput): Promise<CommandResult> {
     const { topic, resource, spec } = this.definition;
     const verb = spec.verb ?? "delete";

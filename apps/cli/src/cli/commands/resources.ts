@@ -380,6 +380,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndAccess,
     groupOrder: 1,
     singular: "user",
+    kind: "user",
     idSchema: GetUserParams.shape.user_id,
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
@@ -478,6 +479,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndAccess,
     groupOrder: 2,
     singular: "team",
+    kind: "team",
     idField: "id",
     columns: ["id", "name", "status", "created_at"],
     heading: "name",
@@ -692,6 +694,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndAccess,
     groupOrder: 3,
     singular: "grant",
+    kind: "grant",
     idField: "id",
     columns: ["id", "user.user_id", "team.team_id", "relation", "created_at", "expires_at"],
     heading: "id",
