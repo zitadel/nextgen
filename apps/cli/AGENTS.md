@@ -161,6 +161,10 @@
   `this.isColored`, `this.isOnScreen` (output on a screen) and `this.isTTY`
   (someone there to ask). A command that reads `process.stdout` or recomputes
   colour has its own answer to a question the run already settled.
+- State what a pipe gets as the result's `piped` rendering beside its summary;
+  the base command picks one. A command never branches on `isOnScreen` or
+  `isJson` to choose its output, and a library that must know the mode reads
+  `Output` (`src/lib/ui/output.ts`), which the base command settles once.
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - Group `src/lib` by area: a directory whose `index.ts` exports one entry class (plus its

@@ -137,6 +137,13 @@ export type CommandResult =
        * can spell it out the way that kind takes.
        */
       readonly pretty?: Rendering;
+      /**
+       * What stdout carries when it is not a terminal, in place of {@link pretty}
+       * and the summary: the record as JSON, or the tab-separated rows a script
+       * reads. A command states it beside its summary and the base command
+       * chooses between them, so no command asks where its output goes.
+       */
+      readonly piped?: Rendering;
       readonly next?: NextSteps<SuggestedCommand>;
       /**
        * Set when the command already printed {@link next} in output of its

@@ -615,8 +615,6 @@ export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
             cwd: this.cwd,
             dryRun: this.dryRun,
             env: this.env,
-            isColored: this.isColored,
-            isJson: this.isJson,
             narrate: (notices) => {
               this.narrate(notices);
             },

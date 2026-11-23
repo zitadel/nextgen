@@ -230,7 +230,6 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       mode: "deploy",
       dryRun: this.dryRun,
       compare: true,
-      ...this.rendering,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);

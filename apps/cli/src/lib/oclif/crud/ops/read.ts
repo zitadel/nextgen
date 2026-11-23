@@ -60,19 +60,8 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
     const title = `Read ${escapeControlCharacters(heading ?? resource.singular, { keepLayout: false })}`;
 
     const record = flags.fields === undefined ? item : this.pickFields(item, flags.fields);
-    if (!this.isOnScreen) {
-      return {
-        status: "ok",
-        data: record,
-        pretty: json(record),
-        summary: {
-          title,
-          sections: [],
-        },
-      };
-    }
     const sections =
-      flags.fields === undefined && !this.isJson
+      flags.fields === undefined
         ? ((await spec.sections?.(item, (columns, rows) => {
             return this.tabulate(columns, rows);
           })) ?? [])
@@ -82,6 +71,7 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
     return {
       status: "ok",
       data: record,
+      piped: json(record),
       pretty: painted(
         [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), rendered].join(
           "\n",

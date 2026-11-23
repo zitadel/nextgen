@@ -65,7 +65,6 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
       mode: "deploy",
       dryRun: this.dryRun,
       compare: false,
-      ...this.rendering,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);

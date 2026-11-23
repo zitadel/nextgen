@@ -51,23 +51,12 @@ export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCo
     });
 
     const title = `Read ${escapeControlCharacters(args.name)}`;
-    if (!this.isOnScreen) {
-      return this.emit({
-        status: "ok",
-        data: variable,
-        pretty: json(variable),
-        summary: {
-          title,
-          sections: [],
-        },
-      });
-    }
-
     const cell = VariableView.of(variable).cell();
 
     return this.emit({
       status: "ok",
       data: variable,
+      piped: json(variable),
       summary: {
         title,
         sections: [],

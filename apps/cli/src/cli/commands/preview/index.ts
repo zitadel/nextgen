@@ -289,7 +289,6 @@ export default class Preview extends ServerCommand(PreviewCommand) {
       mode: "preview",
       dryRun: this.dryRun,
       compare: false,
-      ...this.rendering,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);

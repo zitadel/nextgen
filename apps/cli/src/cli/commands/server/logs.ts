@@ -106,20 +106,13 @@ export default class Logs extends LocalServerCommand(ServerCommand(BaseCommand),
       });
 
       const title = "Stopped following local Zitadel logs";
-      if (this.isOnScreen) {
-        return this.emit({
-          status: "ok",
-          data: { title },
-          summary: { title, sections: [] },
-        });
-      } else {
-        return this.emit({
-          status: "ok",
-          data: { title },
-          pretty: prose(""),
-          summary: { title, sections: [] },
-        });
-      }
+
+      return this.emit({
+        status: "ok",
+        data: { title },
+        piped: prose(""),
+        summary: { title, sections: [] },
+      });
     } else {
       const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
       const shown = lines.drawn(this.isColored);

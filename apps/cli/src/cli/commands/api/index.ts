@@ -436,7 +436,7 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
       status: "ok",
       data: response.body ?? null,
       verbatim: true,
-      ...(answer.pretty === undefined ? {} : { pretty: answer.pretty }),
+      piped: answer.piped,
       summary: answer.summary,
     });
   }
@@ -460,14 +460,14 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
   private answered(
     operationId: string,
     response: ApiResponse,
-  ): { summary: Summary; pretty?: Rendering } {
+  ): { summary: Summary; piped: Rendering } {
     if (response.body === undefined) {
       return {
         summary: {
           title: `No content (${response.status})`,
           sections: [],
         },
-        ...(this.isOnScreen ? {} : { pretty: prose("") }),
+        piped: prose(""),
       };
     }
     const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
@@ -477,7 +477,7 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
         sections: [],
         lines: pretty.text.split("\n"),
       },
-      ...(this.isOnScreen ? {} : { pretty }),
+      piped: pretty,
     };
   }
 

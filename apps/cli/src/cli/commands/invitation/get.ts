@@ -51,21 +51,11 @@ export default class InvitationGet extends Tabulatable(ServerCommand(Environment
     const invitation = await invitationService.get(args.invitationId);
 
     const title = `Read ${escapeControlCharacters(invitation.id)}`;
-    if (this.isJson || !this.isOnScreen) {
-      return this.emit({
-        status: "ok",
-        data: invitation,
-        pretty: json(invitation),
-        summary: {
-          title,
-          sections: [],
-        },
-      });
-    }
 
     return this.emit({
       status: "ok",
       data: invitation,
+      piped: json(invitation),
       summary: {
         title,
         sections: [],

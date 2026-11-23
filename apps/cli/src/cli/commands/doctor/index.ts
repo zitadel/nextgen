@@ -406,7 +406,7 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
       next,
       fixes: warningAdvice?.fixes ?? [],
       verbose: this.meta.verbose,
-      columns: this.isOnScreen ? process.stdout.columns : undefined,
+      columns: process.stdout.columns,
     };
 
     if (failed.length > 0) {
