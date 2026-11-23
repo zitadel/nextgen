@@ -82,7 +82,7 @@ const CHECK = {
   secretPermissions: {
     name: "secret-permissions",
     status: "pass",
-    message: ".zitadel/secret has 0600 permissions",
+    message: ".zitadel/secret is as private as its filesystem allows",
     path: ".zitadel/secret",
     category: "credentials",
   },
