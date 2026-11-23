@@ -1,6 +1,7 @@
 import { execa } from "execa";
 
 import { Cmd } from "@/lib/cmd";
+import { Output } from "@/lib/ui/output";
 
 import type { PMName } from "./pm";
 
@@ -134,7 +135,10 @@ export class PackageCommand {
       cwd: options.cwd,
       env: options.env ?? process.env,
       extendEnv: false,
-      stdio: capture || options.redirectStdoutToStderr ? ["ignore", "pipe", "pipe"] : "inherit",
+      stdio:
+        capture || (options.redirectStdoutToStderr ?? Output.json)
+          ? ["ignore", "pipe", "pipe"]
+          : "inherit",
       all: capture,
       reject: false,
     });

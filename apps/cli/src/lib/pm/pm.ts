@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from "node:path";
 
 import { pathExists } from "@/lib/fs";
+import { Output } from "@/lib/ui/output";
 
 import { Manifest, type PackageJson } from "./manifest";
 import { PackageCommand, type Runner, type Verb } from "./package-command";
@@ -45,7 +46,7 @@ export type InstallContext = {
   /** The environment the package manager starts with. */
   env: NodeJS.ProcessEnv;
   /** Keeps the package manager's output off stdout, which `--json` reserves. */
-  json: boolean;
+  json?: boolean;
   /** Draws the step: the command's `this.ui.task`. */
   task: <T>(label: string, work: () => Promise<T>, done?: (result: T) => string) => Promise<T>;
   /** Narrates the step when it is not drawn as a task: the CLI's `log`. */
@@ -173,7 +174,7 @@ export class PM {
         const options = {
           cwd: context.cwd,
           env: context.env,
-          redirectStdoutToStderr: context.json,
+          redirectStdoutToStderr: context.json ?? Output.json,
         };
         await (context.run === undefined ? command.run(options) : context.run(command, options));
       } catch (error) {
