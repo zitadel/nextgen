@@ -141,8 +141,8 @@ describe("Narration", () => {
       },
     );
 
-    it("draws a progress line into a chain whether or not stdout is a terminal", ({ terminal }) => {
-      terminal.tty(false);
+    it("draws a progress line into a chain on a terminal", ({ terminal }) => {
+      terminal.tty(true);
       const { chain } = drawn();
 
       log.progress("Waiting for the browser step to finish");
@@ -150,6 +150,15 @@ describe("Narration", () => {
       expect(chain.lines).toEqual([
         `${stripAnsi(MARK.started)} Waiting for the browser step to finish`,
       ]);
+    });
+
+    it("leaves a progress line out of a chain off a terminal", ({ terminal }) => {
+      terminal.tty(false);
+      const { chain } = drawn();
+
+      log.progress("Waiting for the browser step to finish");
+
+      expect(chain.lines).toEqual([]);
     });
   });
 });

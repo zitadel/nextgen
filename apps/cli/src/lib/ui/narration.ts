@@ -78,11 +78,11 @@ export class Narration {
     if (this.silent || (level === "debug" && !this.debug)) {
       return;
     }
-    if (this.chain.chained) {
-      this.chain.narrate(MARKS[level], text);
+    if (level === "progress" && !Output.screen) {
       return;
     }
-    if (level === "progress" && !Output.screen) {
+    if (this.chain.chained) {
+      this.chain.narrate(MARKS[level], text);
       return;
     }
     // A line written while a spinner draws would be glued to its frame.
