@@ -58,6 +58,22 @@ describe("variable get", () => {
 
       expect(result.stdout + result.stderr).not.toContain("hunter2");
     });
+
+    it("never carries a secret's value under --json either", async () => {
+      const app = await aSetUpApp();
+      expect(await app.setVariable("FOO", "hunter2", { secret: true })).toSucceed();
+
+      const result = await app.run([
+        "variable",
+        "get",
+        "FOO",
+        "--fields",
+        "name,secret,value",
+        "--json",
+      ]);
+
+      expect(result.stdout + result.stderr).not.toContain("hunter2");
+    });
   });
 
   describe("a name the platform cannot accept", () => {

@@ -69,15 +69,16 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
         : undefined,
     ]);
 
+    const held = variables ?? [];
     const listed =
-      variables === undefined || variables.length === 0
+      held.length === 0
         ? ["variables  none"]
         : [
             "variables",
             ...(
               await this.tabulate(
                 ["name", "value"],
-                variables.map((variable) => {
+                held.map((variable) => {
                   return VariableView.of(variable).cell();
                 }),
               )

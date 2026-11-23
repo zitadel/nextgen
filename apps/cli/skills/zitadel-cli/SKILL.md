@@ -143,7 +143,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   object; slicing it with `head -c`/`head -n` yields invalid JSON and silently
   drops records or fields, so you end up reasoning from partial data. It is
   finite — read it whole, or narrow it *at the source*: use `--fields id,name`
-  (every `list` and resource `get` takes it, and it cuts each record under `--json`
+  (every `list` and every `get` takes it, and it cuts each record under `--json`
   to those dot-paths), a `list` verb's `filter_fields` and pagination to fetch
   fewer records, or pipe to `jq` to pull
   just what you need (e.g. `… resources --json | jq '.data.items[].topic'`).
