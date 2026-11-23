@@ -1,6 +1,6 @@
 ---
 title: Projects
-description: Create a project, claim it for a team, and manage its origins and admins.
+description: Create a project, claim it for a team, and manage its origins and members.
 ---
 
 A project is the top-level boundary that holds users, sessions and their
@@ -20,5 +20,11 @@ A common sequence:
 
 A claim must finish within 14 days of the project's creation. After that the
 project can no longer be claimed.
+
+`GET /projects/{project_id}/members` lists each effective member once with their
+strongest role and sources. Prefer it, with an optional `relation` filter, when
+you need every role. `GET /projects/{project_id}/admins` returns only admins and
+remains available while older clients use it. How owning teams, grants and
+invitations combine: [Access and memberships](/docs/concepts/access-and-memberships).
 
 <Operations />

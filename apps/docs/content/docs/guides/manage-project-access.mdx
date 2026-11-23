@@ -1,0 +1,135 @@
+---
+title: Manage project access
+description: Invite collaborators with a link, grant a role to an existing user or team, check who has access, and revoke or replace it.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Give colleagues `viewer`, `editor`, or `admin` access to a claimed project. Use an **invitation** when you want a 72-hour shareable link. Use a **grant** when you already know a user or team on the platform project, or when you want an expiring grant. [Access and memberships](/docs/concepts/access-and-memberships) explains the model.
+
+<Callout title="Console invitation UI is not shipped yet" type="warn">
+  The server and CLI create invitation links today. The console does not yet host
+  `/invitations/accept` or a Members and Invitations screen. Until that ships,
+  create and manage invitations with the CLI or API, and use Project Settings →
+  Admins in the console only to add or remove existing platform users as
+  admins via grants.
+</Callout>
+
+## Before you start
+
+- **A project from `zitadel setup`.** Setup writes `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, and `ZITADEL_PROJECT_SECRET` to `.env.local` / `.zitadel/secret` ([Quickstart](/docs/get-started/quickstart)).
+- **A claimed project.** On a hosted server run `npx @zitadel/cli@latest claim`. Local `setup --server local` claims against the local admin's team automatically ([Claim](/docs/concepts/project-team-user#claim)).
+- **A platform project on the server.** Hosted cloud and `zitadel start` enable it by default. Turning off `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT` disables claim and invitations ([Run Zitadel locally](/docs/guides/local-runtime)).
+
+## Invite a collaborator with a link
+
+Create an invitation and share the one-shot link out of band:
+
+```sh
+npx @zitadel/cli@latest invitation create --name "Alex Rivera" --relation editor
+```
+
+It prints the invitation ID, the link once, and a 72-hour warning. Whoever opens the link while signed in on the platform project can accept the `editor` role. The cleartext token never appears again; do not commit the link or paste it into shared logs.
+
+For scripts and agents, add `--non-interactive --json`. The envelope's `data` carries the invitation and the `link`.
+
+When the recipient opens `{console}/invitations/accept#token=…`, they sign in or sign up on the platform project, then accept or decline. The browser calls the redeem operations on [Invitations](/docs/reference/api/invitations). Until the console hosts that page, redeem through those API operations from a signed-in session, or wait for the console route.
+
+## Check, replace, or cancel invitations
+
+List open invitations. Accepted ones are hidden by default:
+
+```sh
+npx @zitadel/cli@latest invitation list
+```
+
+`--status` is repeatable. Pass `--status accepted` to include accepted rows, or combine statuses such as `--status pending --status expired`.
+
+Read one invitation (never returns the link):
+
+```sh
+npx @zitadel/cli@latest invitation get <invitation_id>
+```
+
+After someone answers, the row shows `responded_by` and `responded_at`.
+
+Replace a lost, expired, or declined invitation. The new row keeps `journey_id` and reuses `--name` unless you override it:
+
+```sh
+npx @zitadel/cli@latest invitation create --replaces <invitation_id> --relation editor
+```
+
+Cancel a pending or declined invitation. Accepted and expired invitations cannot be cancelled:
+
+```sh
+npx @zitadel/cli@latest invitation cancel <invitation_id>
+```
+
+Add `--force` when the run is non-interactive.
+
+## Grant access to an existing user or team
+
+Grant a role when you already know the principal.
+
+By user identifier (email). The response is an opaque `202` with no body, so the call cannot be used to discover whether the account exists:
+
+```sh
+npx @zitadel/cli@latest grant create --relation viewer --user-identifier alex@example.com
+```
+
+By user ID, or by team ID or name, the response is `201` with the grant:
+
+```sh
+npx @zitadel/cli@latest grant create --relation editor --team-name platform-ops
+```
+
+Optional `--expires-at <RFC 3339>` stops authorizing after that time. The binding still occupies the unique slot until you revoke it.
+
+In the console, open Project Settings → Admins → **Add admin**. That path creates an `admin` grant for an existing platform user by email. It does not create invitations or `viewer` / `editor` grants.
+
+## Verify who has access and revoke a grant
+
+List grants for the project, including expired ones so you can revoke them:
+
+```sh
+npx @zitadel/cli@latest grant list
+```
+
+List effective members with each person's strongest role and sources:
+
+```sh
+npx @zitadel/cli@latest api listProjectMembers
+```
+
+Optional `relation` on that call filters to a minimum role. Prefer this over `listProjectAdmins` when you need every role ([Projects](/docs/reference/api/projects)).
+
+Revoke a grant:
+
+```sh
+npx @zitadel/cli@latest grant delete <grant_id>
+```
+
+Add `--force` when non-interactive. Owning-team access does not appear as a grant and cannot be removed this way. To change a role, revoke and recreate, or create a stronger grant and let the strongest role win ([Access and memberships](/docs/concepts/access-and-memberships#how-project-access-is-granted)).
+
+## Audit who changed access
+
+Invitation and grant changes write audit events. Filter them:
+
+```sh
+npx @zitadel/cli@latest event list --filter event_type=invitation.accepted
+```
+
+Useful types: `invitation.created`, `invitation.accepted`, `invitation.rejected`, `invitation.cancelled`, `authz.granted`, `authz.revoked`. See [Events](/docs/reference/api/events) and [Event webhooks](/docs/reference/api/event-webhooks).
+
+## Recover from a refusal
+
+| Error | Fix |
+| --- | --- |
+| `inv.project_unclaimed` / `grant.project_unclaimed` | Run `npx @zitadel/cli@latest claim`, or confirm local `setup --server local` attached the project. |
+| `inv.platform_required` | Enable the platform project (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true`, the default). |
+| `inv.pending_limit` | The project has 100 pending unexpired invitations. Run `invitation list --status pending` and cancel unused ones. |
+| `inv.self_accept` / `inv.self_reject` | The creator cannot redeem their own link. Test with a second platform account, or cancel with `invitation cancel`. |
+| `inv.inviter_not_admin` | The creator lost `admin` before acceptance. Create a fresh invitation as a current admin, or with a project secret. |
+| `grant.already_exists` | Run `grant list` (expired grants still bind). Revoke with `grant delete <grant_id>`, then create again. |
+| `404` on cancel, replace, or redeem | The invitation was already accepted, expired (on cancel), or unknown. |
+| `proj.last_owner` / `team.owns_project` | Add another active owning-team member before deleting the last one, or move ownership before deactivating the team. |
