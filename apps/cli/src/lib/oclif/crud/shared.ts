@@ -2,7 +2,7 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { ZitadelError } from "@/lib/errors";
-import { nonBlankArg, taken } from "@/lib/oclif/flags";
+import { taken } from "@/lib/oclif/flags";
 import { named } from "@/lib/names";
 import { regularPlural } from "@/lib/plural";
 import { prose } from "@/lib/oclif/rendering";
@@ -30,7 +30,23 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) =>
   const lists = topic !== undefined && resource.list !== undefined;
   const take =
     resource.idSchema === undefined
-      ? nonBlankArg
+      ? Args.custom<string>({
+          parse: taken({
+            schema: z
+              .string()
+              .trim()
+              .refine((id) => {
+                return id !== "" && id !== "." && id !== ".." && !/\p{Cc}/u.test(id);
+              }, "it must be an id: not blank, not . or .., and no control character"),
+            refusal: {
+              message: "Invalid {input}: {problem}",
+              hint: "Pass the id exactly as it was listed.",
+              details: {
+                argument: "{input}",
+              },
+            },
+          }),
+        })
       : Args.custom<string>({
           parse: taken({
             schema: z.string().trim().pipe(resource.idSchema),

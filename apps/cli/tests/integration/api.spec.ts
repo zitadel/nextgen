@@ -137,6 +137,17 @@ describe("api", () => {
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
 
+    it.each([
+      ["a dot segment", ".."],
+      ["a control character", "a\u0007b"],
+    ])("refuses %s as a path value", async (_what, value) => {
+      const app = await aSetUpApp();
+
+      const result = await app.api("getSession", value);
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
     describe("--json", () => {
       it("answers with the operation's response body", async () => {
         const app = await aSetUpApp();

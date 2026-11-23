@@ -74,6 +74,23 @@ describe("ApiCall.pathValues", () => {
     );
   });
 
+  it.each([
+    ["a dot segment", ".."],
+    ["a single dot", "."],
+    ["an empty value", ""],
+    ["a control character", "a\u0007b"],
+  ])("refuses %s as a path value", (_what, value) => {
+    expect(() => ApiCall.to(resolveTarget("getSession")).pathValues([value], undefined)).toThrow(
+      /Invalid session_id/,
+    );
+  });
+
+  it("refuses a dot segment given in the path", () => {
+    expect(() => ApiCall.to(resolveTarget("/sessions/..")).pathValues([], undefined)).toThrow(
+      /Invalid session_id/,
+    );
+  });
+
   it("refuses a positional when the path already names its parameters", () => {
     expect(() => ApiCall.to(resolveTarget("/sessions/s_1")).pathValues(["s_2"], undefined)).toThrow(
       /already names session_id/,

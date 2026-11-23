@@ -2914,6 +2914,17 @@ describe("the id of a resource whose id has a format", () => {
   });
 });
 
+describe("an id the CLI refuses", () => {
+  it("keeps the details its refusal carries in the failure envelope", async ({ dir: cwd }) => {
+    await makeProject(cwd);
+
+    const res = await run(cwd, ["user", "get", "..", "--json"]);
+
+    expect(res).toFailWith("E_VALIDATION");
+    expect(parseJson(res.stdout)).toMatchObject({ details: { argument: "id" } });
+  });
+});
+
 describe("a record read with --fields", () => {
   it("is cut to the fields named under --json", async ({ server, dir: cwd }) => {
     await makeProject(cwd);

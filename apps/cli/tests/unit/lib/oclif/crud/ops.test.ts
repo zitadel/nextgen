@@ -108,12 +108,24 @@ const options = {
   operations: ["equals"],
   flags: { extra: { type: "boolean" as const } },
 } as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
-const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
+const definition = <Spec>(
+  spec: Spec,
+  described: ResourceDescriptor<Ctx> = resource,
+): OperationDefinition<Ctx, Spec> => ({
   topic: "team",
-  resource,
+  resource: described,
   spec,
   options,
 });
+
+/**
+ * A resource whose own id schema takes any text, so an id reaches the command
+ * as typed and what the command does with a control character is observable.
+ */
+const freeTextIds: ResourceDescriptor<Ctx> = {
+  ...resource,
+  idSchema: z.string(),
+};
 
 describe("operation statics", () => {
   it("list (query) exposes paging, filter, sort, and the extra flags", () => {
@@ -955,12 +967,16 @@ describe("delete confirmation", () => {
     revoke: "session:revoke",
     deactivate: "team:deactivate",
   } as const;
-  const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
+  const deleting = (
+    verb: "delete" | "revoke" | "deactivate",
+    call = async () => undefined,
+    described: ResourceDescriptor<Ctx> = resource,
+  ) =>
     Object.assign(
       inCli(
         bindOperationOnly(
           DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
-          definition<DeleteSpec<Ctx>>({ verb, call }),
+          definition<DeleteSpec<Ctx>>({ verb, call }, described),
           ServerCommand,
         ),
         DELETING[verb],
@@ -1025,7 +1041,11 @@ describe("delete confirmation", () => {
 
   it("keeps the id exact in the question a --json refusal carries", async () => {
     const failure = JSON.parse(
-      (await printedByFailing(() => deleting("delete").run(["team\u001bx", "--json"]))).stdout,
+      (
+        await printedByFailing(() =>
+          deleting("delete", undefined, freeTextIds).run(["team\u001bx", "--json"]),
+        )
+      ).stdout,
     );
 
     expect(failure.details.question).toBe(
@@ -1055,7 +1075,9 @@ describe("delete confirmation", () => {
   it("spells out a control character in the id it asks about", async () => {
     const talk = answering(true);
 
-    await asTerminal(() => deleting("delete").run(["team\u001b]0;x\u0007"]));
+    await asTerminal(() =>
+      deleting("delete", undefined, freeTextIds).run(["team\u001b]0;x\u0007"]),
+    );
 
     expect(talk.asked()).toEqual([
       "Delete team team\\x1b]0;x\\x07 in project proj_env on api.zitadel.example?",
@@ -1065,10 +1087,28 @@ describe("delete confirmation", () => {
   it("closes on what it deleted as one line when the id has a line break in it", async () => {
     const talk = answering(true);
 
-    await asTerminal(() => deleting("delete").run(["a\nb"]));
+    await asTerminal(() => deleting("delete", undefined, freeTextIds).run(["a\nb"]));
 
     expect(talk.plain()).toContain("Deleted team a\\x0ab");
   });
+
+  it.each(["team\u001b]0;x\u0007", "a\nb"])(
+    "refuses an id holding a control character, %j, before it asks",
+    async (id) => {
+      const talk = answering(true);
+
+      const failure = JSON.parse(
+        (await printedByFailing(() => deleting("delete").run([id, "--json"]))).stdout,
+      );
+
+      expect(failure).toMatchObject({
+        status: "error",
+        code: "E_VALIDATION",
+      });
+      expect(failure.message).toContain("control character");
+      expect(talk.asked()).toEqual([]);
+    },
+  );
 
   it("is skipped when the answer is no", async () => {
     answering(false);
