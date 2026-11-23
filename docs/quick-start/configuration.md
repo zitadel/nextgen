@@ -61,9 +61,10 @@ with `=`: `--seed false` is refused.
 
 ## OAuth
 
-| YAML key        | Environment             | Default | Description |
-| --------------- | ----------------------- | ------- | ----------- |
-| `oauth.enabled` | `NEXTGEN_OAUTH_ENABLED` | `false` | Serves the OAuth 2.0 authorization server: a project's [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>` and its endpoints under `/oauth/<project_id>`. A project's issuer answers only once the release deployed to that origin carries `oauth: { "enabled": true }`; with the switch off, those paths answer like any other path nothing serves. |
+| YAML key             | Environment                  | Default | Description |
+| -------------------- | ---------------------------- | ------- | ----------- |
+| `oauth.enabled`      | `NEXTGEN_OAUTH_ENABLED`      | `false` | Serves the OAuth 2.0 authorization server: a project's [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>` and its endpoints under `/oauth/<project_id>`. A project's issuer answers only once the release deployed to that origin carries `oauth: { "enabled": true }`; with the switch off, those paths answer like any other path nothing serves. |
+| `oauth.jwks_max_age` | `NEXTGEN_OAUTH_JWKS_MAX_AGE` | `5m`    | How long a verifier may cache a project's JWKS at `/oauth/<project_id>/jwks`, sent as its `Cache-Control` max-age in whole seconds. Must not be negative. |
 
 ## Database
 

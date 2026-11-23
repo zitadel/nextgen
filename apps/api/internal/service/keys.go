@@ -27,6 +27,7 @@ type KeyService interface {
 	SaveSigningKey(ctx context.Context, stmts AllStatements, key *domain.SigningKey) error
 	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error)
 	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error)
+	GetProjectPublicSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) ([]jose.JSONWebKey, error)
 	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
 	MigrateToLatestMasterKey(ctx context.Context) error
 }
@@ -281,6 +282,51 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 		return nil, err
 	}
 	return key.Signer(kek)
+}
+
+func (s *keyService) GetProjectPublicSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ []jose.JSONWebKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectPublicSigningKeys")
+	defer end(&err)
+
+	keys, err := s.db.Statements().ListSigningKeys(ctx, database.And(
+		database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.SigningKeyFieldPurpose), purpose),
+		database.Not(database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateRemoved)),
+	))
+	if err != nil {
+		if mapped := mapStorageError(err); mapped != err {
+			return nil, mapped
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to list signing keys from the database")
+	}
+	public := make([]jose.JSONWebKey, 0, len(keys))
+	for _, key := range keys {
+		jwk, err := s.publicSigningKey(ctx, key)
+		if err != nil {
+			if domain.IsServerFault(err) {
+				return nil, err
+			}
+			// The server cannot read a key it stored: whatever the
+			// reason, that is its own fault, not the caller's.
+			return nil, domain.ErrInternal(err).
+				WithMessage("failed to read the public half of a signing key").
+				WithDetails(map[string]any{"keyID": key.ID})
+		}
+		public = append(public, jwk)
+	}
+	return public, nil
+}
+
+func (s *keyService) publicSigningKey(ctx context.Context, key *domain.SigningKey) (jose.JSONWebKey, error) {
+	jweHeader, err := domain.DecodeJWEHeader(key.Key)
+	if err != nil {
+		return jose.JSONWebKey{}, err
+	}
+	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+	if err != nil {
+		return jose.JSONWebKey{}, err
+	}
+	return key.PublicKey(kek)
 }
 
 // ------------------------------------------------------

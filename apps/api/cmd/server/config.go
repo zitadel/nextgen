@@ -57,6 +57,18 @@ type OAuthConfig struct {
 	// metadata at its well-known path and its endpoints under
 	// oauth.Prefix. Off by default while the server is being built.
 	Enabled bool `mapstructure:"enabled"`
+	// JWKSMaxAge is how long a verifier may cache a project's JWKS, sent as
+	// its Cache-Control max-age in whole seconds. It is the propagation
+	// window of ADR 039 §1: a new signing key must be published at least
+	// this long before it signs, or a verifier's cached set misses its kid.
+	JWKSMaxAge time.Duration `mapstructure:"jwks_max_age"`
+}
+
+func (c OAuthConfig) Validate() error {
+	if c.JWKSMaxAge < 0 {
+		return fmt.Errorf("oauth.jwks_max_age %s must not be negative", c.JWKSMaxAge)
+	}
+	return nil
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.
@@ -154,6 +166,7 @@ func (c Config) Validate() error {
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
 		c.Events.Retention.Validate,
+		c.OAuth.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err

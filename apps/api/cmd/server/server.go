@@ -592,6 +592,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 			Settings:        oauth.NewReleaseSettings(runtimeResolver, oauthSettingsService),
 			Clients:         applicationService,
 			AuthRequests:    authRequestService,
+			SigningKeys:     keyService,
+			JWKSMaxAge:      cfg.OAuth.JWKSMaxAge,
 		})
 	}
 
@@ -904,6 +906,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.request.flush_wait", time.Duration(0))
 	// Off: the OAuth authorization server is not mounted (ADR 081).
 	v.SetDefault("oauth.enabled", false)
+	// ADR 039's default propagation window.
+	v.SetDefault("oauth.jwks_max_age", 5*time.Minute)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)

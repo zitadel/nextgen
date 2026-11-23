@@ -104,24 +104,16 @@ func (s *server) withIssuer(next http.Handler) http.Handler {
 	})
 }
 
-// deriveIssuer builds the issuer of a request to tenant. The empty tenant
-// is the platform project's issuer, only when a platform project is
-// configured; any other tenant must be a project ID. A project's URL is the
-// one the client fetched: the forwarded origin, normalized, the forwarded
-// prefix and Prefix, then the project ID. The platform project's own ID is
-// no tenant, because its issuer is Prefix itself.
+// deriveIssuer builds the issuer of a request to tenant, for the project
+// tenantProject names. A project's URL is the one the client fetched: the
+// forwarded origin, normalized, the forwarded prefix and Prefix, then the
+// project ID.
 func (s *server) deriveIssuer(r *http.Request, tenant string) (Issuer, error) {
-	issuer := Issuer{ProjectID: tenant}
-	switch {
-	case tenant == "":
-		if !s.platformEnabled {
-			return Issuer{}, domain.ErrProjectNotFound()
-		}
-		issuer.ProjectID = domain.PlatformProjectID
-		issuer.Platform = true
-	case tenant == domain.PlatformProjectID, !domain.PrefixProject.Matches(tenant):
-		return Issuer{}, domain.ErrProjectNotFound()
+	projectID, err := tenantProject(tenant, s.platformEnabled)
+	if err != nil {
+		return Issuer{}, err
 	}
+	issuer := Issuer{ProjectID: projectID, Platform: tenant == ""}
 	origin, err := domain.NormalizeOrigin(httputil.ForwardedOrigin(r))
 	if err != nil {
 		return Issuer{}, err
@@ -163,6 +155,19 @@ func (s *server) platformIssuer(r *http.Request, issuer Issuer, origin string) (
 	}
 	issuer.URL = &url.URL{Scheme: s.publicBase.Scheme, Host: s.publicBase.Host, Path: base + Prefix}
 	return issuer, nil
+}
+
+func tenantProject(tenant string, platformEnabled bool) (string, error) {
+	switch {
+	case tenant == "":
+		if !platformEnabled {
+			return "", domain.ErrProjectNotFound()
+		}
+		return domain.PlatformProjectID, nil
+	case tenant == domain.PlatformProjectID, !domain.PrefixProject.Matches(tenant):
+		return "", domain.ErrProjectNotFound()
+	}
+	return tenant, nil
 }
 
 // forwardedPrefix is the path prefix the client's request carried before a

@@ -862,3 +862,76 @@ func TestKeyService_MigrateToLatestMasterKey(t *testing.T) {
 		assert.ErrorIs(t, de.Parent, sentinel)
 	})
 }
+
+func TestKeyService_GetProjectPublicSigningKeys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("publishes the public half of every listed key", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, masterKey := newMockedKeyService(t)
+		kek := newActiveKEK(t, "proj-1", masterKey)
+		kekCrypter, err := kek.Crypter(masterKey)
+		require.NoError(t, err)
+
+		var keys []*domain.SigningKey
+		for _, id := range []string{"sig_key_active", "sig_key_queued"} {
+			key, err := domain.NewSigningKey("proj-1", domain.SigningKeyPurposeToken, jose.EdDSA, kekCrypter)
+			require.NoError(t, err)
+			key.ID = id
+			keys = append(keys, key)
+		}
+		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return(keys, nil)
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil)
+
+		public, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		require.NoError(t, err)
+		require.Len(t, public, 2)
+
+		// Each published key verifies what its signer signs.
+		for i, key := range keys {
+			assert.Equal(t, key.ID, public[i].KeyID)
+			assert.True(t, public[i].IsPublic())
+			signer, err := key.Signer(kekCrypter)
+			require.NoError(t, err)
+			jws, err := signer.Sign([]byte("payload"))
+			require.NoError(t, err)
+			_, err = jws.Verify(public[i])
+			assert.NoError(t, err)
+		}
+	})
+
+	t.Run("no keys is an empty list", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, _ := newMockedKeyService(t)
+		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return(nil, nil)
+
+		public, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		require.NoError(t, err)
+		assert.Empty(t, public)
+	})
+
+	t.Run("a storage failure is a fault", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, _ := newMockedKeyService(t)
+		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return(nil, errors.New("connection refused"))
+
+		_, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		assert.True(t, domain.IsServerFault(err))
+	})
+
+	t.Run("a key the server cannot read is a fault", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, masterKey := newMockedKeyService(t)
+		kek := newActiveKEK(t, "proj-1", masterKey)
+		kekCrypter, err := kek.Crypter(masterKey)
+		require.NoError(t, err)
+		key, err := domain.NewSigningKey("proj-1", domain.SigningKeyPurposeToken, jose.EdDSA, kekCrypter)
+		require.NoError(t, err)
+
+		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return([]*domain.SigningKey{key}, nil)
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+
+		_, err = svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		assert.True(t, domain.IsServerFault(err))
+	})
+}

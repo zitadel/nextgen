@@ -135,6 +135,45 @@ func TestSigningKey_Signer(t *testing.T) {
 	})
 }
 
+func TestSigningKey_PublicKey(t *testing.T) {
+	t.Run("verifies what the signer signs", func(t *testing.T) {
+		kek := &crypto.InverseCrypter{}
+		key, err := NewSigningKey("proj", SigningKeyPurposeToken, jose.EdDSA, kek)
+		require.NoError(t, err)
+		key.ID = "sig_key_test"
+
+		public, err := key.PublicKey(kek)
+		require.NoError(t, err)
+		assert.Equal(t, "sig_key_test", public.KeyID)
+		assert.Equal(t, string(jose.EdDSA), public.Algorithm)
+		assert.Equal(t, "sig", public.Use)
+		assert.True(t, public.IsPublic(), "only the public half is published")
+		assert.True(t, public.Valid())
+
+		signer, err := key.Signer(kek)
+		require.NoError(t, err)
+		jws, err := signer.Sign([]byte("payload"))
+		require.NoError(t, err)
+		serialized, err := jws.CompactSerialize()
+		require.NoError(t, err)
+
+		parsed, err := jose.ParseSigned(serialized, []jose.SignatureAlgorithm{jose.EdDSA})
+		require.NoError(t, err)
+		verified, err := parsed.Verify(public)
+		require.NoError(t, err)
+		assert.Equal(t, []byte("payload"), verified)
+	})
+
+	t.Run("decrypt error", func(t *testing.T) {
+		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
+		kek.EXPECT().Decrypt(gomock.Any()).Return("", errors.New("no can do"))
+
+		key := &SigningKey{Key: "whatever", Algorithm: jose.EdDSA}
+		_, err := key.PublicKey(kek)
+		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)
+	})
+}
+
 func TestSigningKey_Activate(t *testing.T) {
 	t.Run("no current key", func(t *testing.T) {
 		k := &SigningKey{State: KeyStateNotActiveYet}
