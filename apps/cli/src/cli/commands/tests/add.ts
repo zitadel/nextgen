@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 
 import { pathExists } from "@/lib/fs";
 import { isObject } from "@/lib/json";
-import { log } from "@/lib/ui";
+import { log, Output } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
@@ -127,7 +127,7 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
       {
         cwd: this.cwd,
         env: this.env,
-        json: this.isJson,
+        json: Output.json,
         task: (label, work, done) => {
           return this.ui.task(label, work, done);
         },

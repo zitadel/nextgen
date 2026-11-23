@@ -49,7 +49,7 @@ import {
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { Scope } from "@/lib/suggestion";
-import { warnings } from "@/lib/ui";
+import { Output, warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
@@ -592,7 +592,7 @@ export default class Setup extends Destructive(Promptable(ServerCommand(BaseComm
             cwd: this.cwd,
             dryRun: this.dryRun,
             env: this.env,
-            isJson: this.isJson,
+            isJson: Output.json,
             signal: this.signal,
             suggest: this.suggest,
             ui: this.ui,
@@ -638,7 +638,7 @@ export default class Setup extends Destructive(Promptable(ServerCommand(BaseComm
             cliVersion: this.cliVersion,
             cwd: this.cwd,
             dryRun: this.dryRun,
-            isJson: this.isJson,
+            isJson: Output.json,
             realRun: () => {
               return this.realRun();
             },

@@ -30,7 +30,7 @@ type Needs = Fact<"flags" | "summary" | "preview" | "delivery">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "isJson" | "realRun" | "report">;
+type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "realRun" | "report">;
 
 /**
  * Ends a dry run with what would be written and stored, before anything is
@@ -82,9 +82,7 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
   async run(needs: Needs): Promise<CommandResult> {
     const real = await this.deps.realRun();
     this.deps.report(needs.preview);
-    if (!this.deps.isJson) {
-      drawMapping(needs.preview);
-    }
+    drawMapping(needs.preview);
     const toStore = !needs.summary.reused
       ? [needs.delivery.names.clientId, needs.delivery.names.clientSecret].filter((name) => {
           return name !== undefined;

@@ -14,7 +14,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/ui";
+import { log, Output } from "@/lib/ui";
 import { ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
@@ -384,7 +384,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
 
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
-    if (this.isOnScreen) {
+    if (Output.screen) {
       log.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
     }
     const destructive = request.operation.destructive;
@@ -468,7 +468,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
           title: `No content (${response.status})`,
           sections: [],
         },
-        ...(this.isOnScreen ? {} : { pretty: prose("") }),
+        ...(Output.screen ? {} : { pretty: prose("") }),
       };
     }
     const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
@@ -478,7 +478,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
         sections: [],
         lines: pretty.text.split("\n"),
       },
-      ...(this.isOnScreen ? {} : { pretty }),
+      ...(Output.screen ? {} : { pretty }),
     };
   }
 

@@ -157,14 +157,13 @@
 - Keep the CLI spelling in three places only: the definition key, oclif's own
   cross-references (`char`, `aliases`, `exclusive`, `dependsOn`,
   `relationships`) and the flag as a refusal's message names it.
-- Ask the run, never the process: `this.cwd`, `this.env`, `this.isJson`,
-  `this.isColored`, `this.isOnScreen` (output on a screen) and `this.isTTY`
-  (someone there to ask). A command that reads `process.stdout` or recomputes
-  colour has its own answer to a question the run already settled.
+- Ask the run, never the process: `this.cwd`, `this.env` and `this.isTTY`
+  (someone there to ask). The output mode (`--json`, colour, a terminal on
+  stdout) is read from `Output` (`src/lib/ui/output.ts`), which the base command
+  settles once; a command that reads `process.stdout` or recomputes colour has
+  its own answer to a question the run already settled.
 - JSON is for `--json` alone: off a terminal a command prints its plain summary,
-  never JSON, so a command never branches on `isOnScreen` or `isJson` to choose
-  its output. A library that must know the mode reads `Output`
-  (`src/lib/ui/output.ts`), which the base command settles once.
+  never JSON, so a command does not choose its output by the mode.
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - Group `src/lib` by area: a directory whose `index.ts` exports one entry class (plus its

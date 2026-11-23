@@ -8,7 +8,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
 import { Skills } from "@/lib/skills";
-import { style } from "@/lib/ui";
+import { Output, style } from "@/lib/ui";
 import { Spelling, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { releaseChannel } from "@/lib/upgrade/config";
@@ -97,7 +97,7 @@ export default class Upgrade extends ServerCommand(BaseCommand) {
       installer: new PackageInstaller({
         cwd: this.cwd,
         typedCwd: flags.cwd,
-        redirectStdoutToStderr: this.isJson,
+        redirectStdoutToStderr: Output.json,
       }),
     });
 

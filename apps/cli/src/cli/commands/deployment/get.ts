@@ -12,6 +12,7 @@ import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Output } from "@/lib/ui";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
@@ -52,7 +53,7 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
   protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
-    const shows = !this.isJson && this.isOnScreen;
+    const shows = !Output.json && Output.screen;
     const [deployment, variables] = await Promise.all([
       deploymentService.get(args.deploymentId),
       shows ? deploymentService.variables(args.deploymentId) : undefined,

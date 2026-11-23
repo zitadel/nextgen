@@ -38,6 +38,17 @@ export const Output = {
   },
 
   /**
+   * Whether stdout is a terminal, which is where a person reads it. Asked of
+   * stdout alone, so it says what to draw, where whether anyone can be asked a
+   * question is another matter.
+   *
+   * @returns True when stdout is a terminal.
+   */
+  get screen(): boolean {
+    return Boolean(process.stdout.isTTY);
+  },
+
+  /**
    * Records how this run draws its output.
    *
    * @param settled - Whether the run answers in JSON, and whether it is coloured.

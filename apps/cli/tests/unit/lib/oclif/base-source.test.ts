@@ -7,6 +7,7 @@ import type { JsonEnvelope } from "@/lib/oclif/types";
 import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { onTerminalReadingAFile } from "@tests/fixtures/terminal";
+import { Output } from "@/lib/ui";
 
 const config = await Config.load(cliPackageRoot);
 
@@ -91,7 +92,7 @@ class Coloured extends BaseCommand {
   }
 
   protected async execute(): Promise<JsonEnvelope> {
-    this.answer = this.isColored;
+    this.answer = Output.color;
     return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }

@@ -259,30 +259,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
     return this.meta.isTTY;
   }
 
-  /**
-   * Whether this run's output is read on a screen rather than by something
-   * else. It asks stdout alone, so it answers what to draw — a table, a line
-   * naming the server — where {@link isTTY} answers whether anyone can be
-   * asked a question.
-   */
-  protected get isOnScreen(): boolean {
-    return Boolean(process.stdout.isTTY);
-  }
-
-  /** Whether this run answers in the JSON envelope (`--json`). */
-  protected get isJson(): boolean {
-    return this.meta.json;
-  }
-
-  /**
-   * Whether this run's human output is coloured: the one decision every
-   * command shares, honouring `--color`/`--no-color`, `NO_COLOR`,
-   * `FORCE_COLOR` and a dumb terminal. A JSON run is never coloured.
-   */
-  protected get isColored(): boolean {
-    return this.meta.colored;
-  }
-
   /** The release of the CLI that is running. */
   protected get cliVersion(): string {
     return this.meta.cliVersion;
@@ -917,7 +893,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
       if (next !== "") {
         // Set apart from the result only when both share a screen; a piped
         // result is not on screen to be set apart from.
-        this.logAside(rendered !== "" && this.isOnScreen ? `\n${next}` : next);
+        this.logAside(rendered !== "" && Output.screen ? `\n${next}` : next);
       }
       // Only the script's own output stays on stdout; what the CLI adds goes beside it.
       for (const warning of warningsOf(normalized)) {
@@ -935,7 +911,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
       if (footer !== undefined) {
         this.log(`\n${stripColumnMarks(footer)}`);
       }
-    } else if (!this.isJson) {
+    } else if (!Output.json) {
       const text = this.ui.written(ending).replace(/\n+$/, "");
       if (text !== "") {
         this.log(text);
@@ -1008,7 +984,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    * the way it always ends.
    */
   private rendersForAMachine(): boolean {
-    return this.ui.reported || (!this.summarises() && !this.isOnScreen);
+    return this.ui.reported || (!this.summarises() && !Output.screen);
   }
 
   /**

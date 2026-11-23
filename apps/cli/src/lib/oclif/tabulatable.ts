@@ -13,6 +13,7 @@ import { painted, rows } from "./rendering";
 import { type Refusal, refusalError } from "./refusal";
 import type { CommandResult, JsonEnvelope } from "./types";
 import type { CommandClass } from "./command-class";
+import { Output } from "@/lib/ui";
 
 /**
  * The flags a paged list declares, which the command for its next page sets:
@@ -245,7 +246,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         // style off means naming both. The run has already settled the
         // question, and a `--no-color` run whose table arrived coloured anyway
         // would be the answer going unheard.
-        headerOptions: this.isColored
+        headerOptions: Output.color
           ? { bold: true, color: "blue" }
           : { bold: false, color: undefined },
       });
@@ -322,7 +323,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
             };
       // A list is for a script when `--plain` asks, or when nothing is on
       // screen to draw a table on.
-      const plain = flags.plain === true || !this.isOnScreen;
+      const plain = flags.plain === true || !Output.screen;
       // The cursor is opaque text from the server: `Cmd.option` quotes it so
       // whitespace, shell metacharacters and control characters cannot run from
       // a copied command, and spelling it out first would change what it reads
