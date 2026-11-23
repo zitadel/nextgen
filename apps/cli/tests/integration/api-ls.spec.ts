@@ -127,18 +127,24 @@ describe("api ls", () => {
       expect(result).toFailWith("E_VALIDATION");
     });
 
-    it("accepts every field an operation carries under --json", async () => {
+    it.each([
+      "id",
+      "method",
+      "path",
+      "summary",
+      "tag",
+      "auth",
+      "callable",
+      "parameters",
+      "body",
+      "paging",
+      "command",
+    ])("accepts %s, which an operation carries under --json", async (field) => {
       const app = await aSetUpApp();
-      const listed = app.envelopeOf(await app.apiOperations("getLive")).data as {
-        operations: Array<Record<string, unknown>>;
-      };
 
-      const fields = Object.keys(listed.operations[0] ?? {});
+      const result = await app.apiOperations("getLive", "--fields", field);
 
-      expect(fields.length).toBeGreaterThan(0);
-      for (const field of fields) {
-        expect(await app.apiOperations("getLive", "--fields", field), field).toSucceed();
-      }
+      expect(result).toSucceed();
     });
 
     it("refuses a field no operation carries, whatever the filter left", async () => {

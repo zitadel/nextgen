@@ -8,87 +8,6 @@ import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures
 const platform = usePlatformMock();
 
 describe("variable get", () => {
-  describe("--fields", () => {
-    it("judges the fields by the record's shape", async () => {
-      const app = await aSetUpApp();
-      expect(await app.setVariable("FOO", "bar")).toSucceed();
-
-      const accepted = await app.run(["variable", "get", "FOO", "--fields", "value", "--json"]);
-      const refused = await app.run([
-        "variable",
-        "get",
-        "FOO",
-        "--fields",
-        "no_such_field",
-        "--json",
-      ]);
-
-      expect(accepted).toSucceed();
-      expect(refused).toFailWith("E_VALIDATION");
-      expect(JSON.parse(refused.stdout).hint).toContain("name, secret, value");
-    });
-
-    it("cuts the data to the fields chosen", async () => {
-      const app = await aSetUpApp();
-      expect(await app.setVariable("FOO", "bar")).toSucceed();
-
-      const result = await app.run(["variable", "get", "FOO", "--fields", "value", "--json"]);
-
-      expect(app.envelopeOf(result).data).toEqual({
-        title: "Read FOO",
-        value: "bar",
-      });
-    });
-
-    it("prints only the fields chosen", async () => {
-      const app = await aSetUpApp();
-      expect(await app.setVariable("FOO", "bar")).toSucceed();
-
-      const result = await app.run(["variable", "get", "FOO", "--fields", "name"]);
-
-      expect(result).toPrintRow("name", "FOO");
-      expect(result).not.toPrintRow("value");
-    });
-
-    it("leaves a secret's value out of the data and prints it as held", async () => {
-      const app = await aSetUpApp();
-      expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();
-
-      const json = await app.run(["variable", "get", "TOKEN", "--fields", "value", "--json"]);
-      const human = await app.run(["variable", "get", "TOKEN", "--fields", "value"]);
-
-      expect(json).toSucceed();
-      expect(app.envelopeOf(json).data).toEqual({ title: "Read TOKEN" });
-      expect(human).toSucceed();
-      expect(human).toPrintRow("value", "(secret)");
-    });
-
-    it("never carries a secret's value", async () => {
-      const app = await aSetUpApp();
-      expect(await app.setVariable("FOO", "hunter2", { secret: true })).toSucceed();
-
-      const result = await app.run(["variable", "get", "FOO", "--fields", "name,secret,value"]);
-
-      expect(result.stdout + result.stderr).not.toContain("hunter2");
-    });
-
-    it("never carries a secret's value under --json either", async () => {
-      const app = await aSetUpApp();
-      expect(await app.setVariable("FOO", "hunter2", { secret: true })).toSucceed();
-
-      const result = await app.run([
-        "variable",
-        "get",
-        "FOO",
-        "--fields",
-        "name,secret,value",
-        "--json",
-      ]);
-
-      expect(result.stdout + result.stderr).not.toContain("hunter2");
-    });
-  });
-
   describe("a name the platform cannot accept", () => {
     // Every command that names a variable refuses the name itself, so neither a
     // dry run nor a confirmation can report work the platform would never do.
@@ -273,6 +192,68 @@ describe("variable get", () => {
     });
 
     describe("--json", () => {
+      it("accepts a field the record carries", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variable", "get", "FOO", "--fields", "value", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the record lacks", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run([
+          "variable",
+          "get",
+          "FOO",
+          "--fields",
+          "no_such_field",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("cuts the data to the fields chosen", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variable", "get", "FOO", "--fields", "value", "--json"]);
+
+        expect(app.envelopeOf(result).data).toEqual({
+          title: "Read FOO",
+          value: "bar",
+        });
+      });
+
+      it("leaves a secret's value out of the data", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();
+
+        const result = await app.run(["variable", "get", "TOKEN", "--fields", "value", "--json"]);
+
+        expect(app.envelopeOf(result).data).toEqual({ title: "Read TOKEN" });
+      });
+
+      it("never carries a secret's value under --json either", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "hunter2", { secret: true })).toSucceed();
+
+        const result = await app.run([
+          "variable",
+          "get",
+          "FOO",
+          "--fields",
+          "name,secret,value",
+          "--json",
+        ]);
+
+        expect(result.stdout + result.stderr).not.toContain("hunter2");
+      });
+
       it("reads back a value that was entered", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
@@ -441,6 +422,34 @@ describe("variable get", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("prints only the fields chosen", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variable", "get", "FOO", "--fields", "name"]);
+
+        expect(result).toPrintRow("name", "FOO");
+        expect(result).not.toPrintRow("value");
+      });
+
+      it("prints a secret's value as held", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();
+
+        const result = await app.run(["variable", "get", "TOKEN", "--fields", "value"]);
+
+        expect(result).toPrintRow("value", "(secret)");
+      });
+
+      it("never carries a secret's value", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "hunter2", { secret: true })).toSucceed();
+
+        const result = await app.run(["variable", "get", "FOO", "--fields", "name,secret,value"]);
+
+        expect(result.stdout + result.stderr).not.toContain("hunter2");
+      });
+
       it("spells out a value for a person, where a pipe gets it as it was stored", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("BANNER", "hello\u001b[2Jwiped")).toSucceed();

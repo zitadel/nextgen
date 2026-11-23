@@ -11,7 +11,19 @@ vi.mock("@oclif/table", async (importOriginal) => {
 
 import { makeTable } from "@oclif/table";
 
+import ApiLs from "@/cli/commands/api/ls";
+import DeploymentGet from "@/cli/commands/deployment/get";
+import DeploymentList from "@/cli/commands/deployment/list";
+import EnvList from "@/cli/commands/env/list";
+import InvitationGet from "@/cli/commands/invitation/get";
+import InvitationList from "@/cli/commands/invitation/list";
+import OriginList from "@/cli/commands/origin/list";
+import PreviewList from "@/cli/commands/preview/list";
+import VariableGet from "@/cli/commands/variable/get";
+import VariableList from "@/cli/commands/variable/list";
+import VariableResolve from "@/cli/commands/variable/resolve";
 import { it } from "@tests/fixtures";
+import { parseFlag } from "@tests/helpers/inputs";
 import { asTerminal, offTerminal, type TerminalFixture } from "@tests/fixtures/terminal";
 import { aTableDrawnByARun, aTabulatingCommand } from "@tests/helpers/tabulate";
 import type { ListFlags } from "@/lib/oclif/tabulatable";
@@ -640,7 +652,9 @@ describe("Tabulatable", () => {
     const defining: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) continue;
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
+        continue;
+      }
       if (/\bplain: Flags\./.test(await readFile(join(root, file), "utf8"))) {
         defining.push(file);
       }
@@ -654,7 +668,9 @@ describe("Tabulatable", () => {
     const importing: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) continue;
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
+        continue;
+      }
       if (/["']@oclif\/table["']/.test(await readFile(join(root, file), "utf8"))) {
         importing.push(file);
       }
@@ -668,7 +684,9 @@ describe("Tabulatable", () => {
     const without: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts")) continue;
+      if (!file.endsWith(".ts")) {
+        continue;
+      }
       const source = await readFile(join(root, file), "utf8");
       if (source.includes("emitList(") && !source.includes("const COLUMNS")) {
         without.push(file);
@@ -874,38 +892,22 @@ describe("--fields on one record", () => {
   });
 });
 
-describe("every list command", () => {
-  it("declares --fields beside --plain, so every list takes it", async () => {
-    const root = fileURLToPath(new URL("../../../../src", import.meta.url));
-    const without: string[] = [];
-
-    for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
-        continue;
-      }
-      const source = await readFile(join(root, file), "utf8");
-      if (/plain: plainFlag/.test(source) && !/fields: fieldsFlag/.test(source)) {
-        without.push(file);
-      }
-    }
-
-    expect(without).toEqual([]);
-  });
-
-  it("gives --fields a shape, so a field is judged without a record to look at", async () => {
-    const root = fileURLToPath(new URL("../../../../src", import.meta.url));
-    const without: string[] = [];
-
-    for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
-        continue;
-      }
-      const source = await readFile(join(root, file), "utf8");
-      if (/fields: fieldsFlag\(\)/.test(source)) {
-        without.push(file);
-      }
-    }
-
-    expect(without).toEqual([]);
+describe("every command taking --fields", () => {
+  it.each([
+    ["variable list", VariableList.flags.fields],
+    ["variable resolve", VariableResolve.flags.fields],
+    ["variable get", VariableGet.flags.fields],
+    ["deployment list", DeploymentList.flags.fields],
+    ["deployment get", DeploymentGet.flags.fields],
+    ["invitation list", InvitationList.flags.fields],
+    ["invitation get", InvitationGet.flags.fields],
+    ["preview list", PreviewList.flags.fields],
+    ["origin list", OriginList.flags.fields],
+    ["env list", EnvList.flags.fields],
+    ["api ls", ApiLs.flags.fields],
+  ])("judges a field by its shape before any request, in %s", async (_name, flag) => {
+    await expect(parseFlag(flag, "no_such_field", "fields")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 });

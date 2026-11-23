@@ -21,13 +21,10 @@ describe("variable set", () => {
 
       const result = await app.setVariableFrom(DOCUMENT);
 
-      expect(JSON.parse(result.stdout)).toMatchObject({
-        status: "ok",
-        data: {
-          dry_run: true,
-          id: "FOO",
-          name: "FOO",
-        },
+      expect(app.envelopeOf(result).data).toMatchObject({
+        dry_run: true,
+        id: "FOO",
+        name: "FOO",
       });
     });
 
@@ -36,13 +33,10 @@ describe("variable set", () => {
 
       const result = await app.setVariableFrom("-", DOCUMENT);
 
-      expect(JSON.parse(result.stdout)).toMatchObject({
-        status: "ok",
-        data: {
-          dry_run: true,
-          id: "FOO",
-          name: "FOO",
-        },
+      expect(app.envelopeOf(result).data).toMatchObject({
+        dry_run: true,
+        id: "FOO",
+        name: "FOO",
       });
     });
 
@@ -51,13 +45,10 @@ describe("variable set", () => {
 
       const result = await app.setVariableFromFile("variable.json", DOCUMENT);
 
-      expect(JSON.parse(result.stdout)).toMatchObject({
-        status: "ok",
-        data: {
-          dry_run: true,
-          id: "FOO",
-          name: "FOO",
-        },
+      expect(app.envelopeOf(result).data).toMatchObject({
+        dry_run: true,
+        id: "FOO",
+        name: "FOO",
       });
     });
 

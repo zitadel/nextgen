@@ -8,12 +8,6 @@ const LIST = ["invitation", "list"];
 const platform = usePlatformMock();
 
 describe("invitation list", () => {
-  it("judges --fields by the records' shape, whatever the page holds", async () => {
-    const app = await aSetUpApp();
-
-    await app.judgesFieldsByTheShape(["invitation", "list"], "id");
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -47,6 +41,22 @@ describe("invitation list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["invitation", "list", "--fields", "id", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["invitation", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("lists the project's invitations, newest first", async () => {
         const app = await aSetUpApp();
         const older = await app.invite();

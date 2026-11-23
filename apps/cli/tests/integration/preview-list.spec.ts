@@ -26,12 +26,6 @@ async function anAppWithTwoPreviews() {
 }
 
 describe("preview list", () => {
-  it("judges --fields by the records' shape, whatever the page holds", async () => {
-    const app = await aSetUpApp();
-
-    await app.judgesFieldsByTheShape(["preview", "list"], "origin");
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -117,6 +111,22 @@ describe("preview list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "list", "--fields", "origin", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("fails naming the preview credential when it is not set", async () => {
         const app = await anApp();
         await app.bindEnvironment("preview", {

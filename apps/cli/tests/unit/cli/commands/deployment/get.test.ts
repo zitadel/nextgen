@@ -9,7 +9,7 @@ import { asTerminal } from "@tests/fixtures/terminal";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import DeploymentGet from "@/cli/commands/deployment/get";
 import { it } from "@tests/fixtures";
-import { parseArg } from "@tests/helpers/inputs";
+import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = "https://preview.zitadel.com";
@@ -176,6 +176,17 @@ describe("deployment_id", () => {
       code: "E_VALIDATION",
       message: expect.stringContaining("must be a deployment ID"),
       hint: "List the deployments to find one.",
+    });
+  });
+
+  describe("--fields", () => {
+    it("refuses a field a deployment does not carry, naming the ones it does", async () => {
+      await expect(
+        parseFlag(DeploymentGet.flags.fields, "no_such_field", "fields"),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        hint: expect.stringContaining("release_id"),
+      });
     });
   });
 });

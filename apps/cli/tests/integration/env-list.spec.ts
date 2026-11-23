@@ -8,12 +8,6 @@ import { offTerminal } from "@tests/fixtures/terminal";
 const platform = usePlatformMock();
 
 describe("env list", () => {
-  it("judges --fields by the records' shape, whatever the page holds", async () => {
-    const app = await aSetUpApp();
-
-    await app.judgesFieldsByTheShape(["env", "list"], "name");
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("still succeeds, as it never asks the server", async () => {
@@ -96,6 +90,22 @@ describe("env list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["env", "list", "--fields", "name", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["env", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("lists the environments bound in this directory", async () => {
         const app = await aSetUpApp();
         const { ZITADEL_PROJECT_ID } = await app.developmentValues();

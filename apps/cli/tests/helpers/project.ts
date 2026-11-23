@@ -1422,22 +1422,6 @@ export class ScaffoldedApp {
   }
 
   /**
-   * Holds a list command to taking `--fields` for a field its records carry
-   * and refusing one they cannot, before it reads anything, so the verdict
-   * never depends on what a page holds.
-   *
-   * @param list - The list command's words, without `--fields`.
-   * @param field - A field the list's records carry.
-   */
-  async judgesFieldsByTheShape(list: string[], field: string): Promise<void> {
-    const accepted = await this.run([...list, "--fields", field, "--json"]);
-    const refused = await this.run([...list, "--fields", "no_such_field", "--json"]);
-
-    expect(accepted, `${list.join(" ")} --fields ${field}`).toSucceed();
-    expect(refused, `${list.join(" ")} --fields no_such_field`).toFailWith("E_VALIDATION");
-  }
-
-  /**
    * The same run in each way a reader sees it, held to the fixture's invariants
    * in every one: as a script reads it, piped, and on a terminal in colour and
    * without.

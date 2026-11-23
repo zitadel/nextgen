@@ -8,12 +8,6 @@ import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 const platform = usePlatformMock();
 
 describe("origin list", () => {
-  it("judges --fields by the records' shape, whatever the page holds", async () => {
-    const app = await aSetUpApp();
-
-    await app.judgesFieldsByTheShape(["origin", "list"], "pattern");
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -124,6 +118,22 @@ describe("origin list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["origin", "list", "--fields", "pattern", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["origin", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("refuses an environment holding only the preview token", async () => {
         const app = await anApp();
         await app.bindEnvironment("ci", {

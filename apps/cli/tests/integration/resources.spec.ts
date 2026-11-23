@@ -2,13 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, MOCK_SERVER_URL, PASSWORD_POLICY } from "@tests/helpers/project";
-import {
-  cliVersion,
-  expectedPublicCliCommand,
-  parseJson,
-  pressCtrlC,
-  runCliForTest,
-} from "@tests/helpers/run-cli";
+import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],
@@ -64,23 +58,6 @@ const WRONG_KIND: readonly { args: string[]; list: string; message: string }[] =
 ];
 
 describe("resources", () => {
-  describe("--fields", () => {
-    it("cuts each record under --json to the fields named", async () => {
-      const result = await runCliForTest(["resources", "--fields", "topic", "--json"]);
-
-      expect(result).toSucceed();
-      expect(parseJson(result.stdout)).toMatchObject({
-        data: { items: expect.arrayContaining([{ topic: expect.any(String) }]) },
-      });
-    });
-
-    it("refuses a field the records do not carry", async () => {
-      const result = await runCliForTest(["resources", "--fields", "nope", "--json"]);
-
-      expect(result).toFailWith("E_VALIDATION");
-    });
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("still succeeds", async () => {
@@ -220,6 +197,24 @@ describe("resources", () => {
     });
 
     describe("--json", () => {
+      it("cuts each record to the fields named", async () => {
+        const app = await anApp();
+
+        const result = await app.run(["resources", "--fields", "topic", "--json"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          items: expect.arrayContaining([{ topic: expect.any(String) }]),
+        });
+      });
+
+      it("refuses a field the records do not carry", async () => {
+        const app = await anApp();
+
+        const result = await app.run(["resources", "--fields", "nope", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("lists what the CLI manages before the project is set up", async () => {
         const app = await anApp();
 

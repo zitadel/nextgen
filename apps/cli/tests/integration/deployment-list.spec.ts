@@ -19,12 +19,6 @@ const DEPLOYMENT_ID = /^dep_[a-zA-Z0-9_-]+$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
 describe("deployment list", () => {
-  it("judges --fields by the records' shape, whatever the page holds", async () => {
-    const app = await aSetUpApp();
-
-    await app.judgesFieldsByTheShape(["deployment", "list"], "id");
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -88,6 +82,22 @@ describe("deployment list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["deployment", "list", "--fields", "id", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["deployment", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("is empty before anything is deployed", async () => {
         const app = await anUndeployedEnvironment();
 

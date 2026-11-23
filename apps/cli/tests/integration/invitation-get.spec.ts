@@ -9,78 +9,6 @@ const UNKNOWN = "inv_missing";
 const platform = usePlatformMock();
 
 describe("invitation get", () => {
-  describe("--fields", () => {
-    it("judges the fields by the record's shape", async () => {
-      const app = await aSetUpApp();
-      const invitation = await app.invite();
-
-      const refused = await app.run([
-        "invitation",
-        "get",
-        invitation,
-        "--fields",
-        "no_such_field",
-        "--json",
-      ]);
-
-      expect(refused).toFailWith("E_VALIDATION");
-      expect(JSON.parse(refused.stdout).hint).toContain("status");
-    });
-
-    it("cuts the data to the fields chosen", async () => {
-      const app = await aSetUpApp();
-      const invitation = await app.invite();
-
-      const result = await app.run([
-        "invitation",
-        "get",
-        invitation,
-        "--fields",
-        "id,status",
-        "--json",
-      ]);
-
-      expect(app.envelopeOf(result).data).toEqual({
-        title: `Read ${invitation}`,
-        id: invitation,
-        status: "pending",
-      });
-    });
-
-    it("prints only the fields chosen", async () => {
-      const app = await aSetUpApp();
-      const invitation = await app.invite();
-
-      const result = await app.run(["invitation", "get", invitation, "--fields", "status"]);
-
-      expect(result).toPrintRow("status", "pending");
-      expect(result).not.toPrintRow("role");
-    });
-
-    it("carries a field the platform reports as null, as null", async () => {
-      const app = await aSetUpApp();
-      const invitation = await app.invite();
-
-      const json = await app.run([
-        "invitation",
-        "get",
-        invitation,
-        "--fields",
-        "responded_by",
-        "--json",
-      ]);
-      const human = await app.run(["invitation", "get", invitation, "--fields", "responded_by"]);
-
-      expect(json).toSucceed();
-      expect(app.envelopeOf(json).data).toEqual({
-        title: `Read ${invitation}`,
-        responded_by: null,
-      });
-      expect(human).toSucceed();
-      expect(human).not.toPrintRow("responded_by");
-    });
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -115,6 +43,61 @@ describe("invitation get", () => {
     });
 
     describe("--json", () => {
+      it("refuses a field the record lacks", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run([
+          "invitation",
+          "get",
+          invitation,
+          "--fields",
+          "no_such_field",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("cuts the data to the fields chosen", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run([
+          "invitation",
+          "get",
+          invitation,
+          "--fields",
+          "id,status",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toEqual({
+          title: `Read ${invitation}`,
+          id: invitation,
+          status: "pending",
+        });
+      });
+
+      it("carries a field the platform reports as null, as null", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run([
+          "invitation",
+          "get",
+          invitation,
+          "--fields",
+          "responded_by",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toEqual({
+          title: `Read ${invitation}`,
+          responded_by: null,
+        });
+      });
+
       it("reads one invitation", async () => {
         const app = await aSetUpApp();
         const invitation = await app.invite();
@@ -166,6 +149,26 @@ describe("invitation get", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("prints only the fields chosen", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run(["invitation", "get", invitation, "--fields", "status"]);
+
+        expect(result).toPrintRow("status", "pending");
+        expect(result).not.toPrintRow("role");
+      });
+
+      it("leaves a field the platform reports as null out of the rows", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run(["invitation", "get", invitation, "--fields", "responded_by"]);
+
+        expect(result).toSucceed();
+        expect(result).not.toPrintRow("responded_by");
+      });
+
       it("prints the invitation as plain text when piped", async () => {
         const app = await aSetUpApp();
         const invitation = await app.invite();

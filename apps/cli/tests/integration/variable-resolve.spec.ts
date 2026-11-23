@@ -11,12 +11,6 @@ const platform = usePlatformMock();
 const LIVE_ORIGINS = ["http://localhost:3000", "https://app.example.com"];
 
 describe("variable resolve", () => {
-  it("judges --fields by the records' shape, whatever the page holds", async () => {
-    const app = await aSetUpApp();
-
-    await app.judgesFieldsByTheShape(["variable", "resolve"], "name");
-  });
-
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -137,6 +131,28 @@ describe("variable resolve", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "resolve", "--fields", "name", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "variable",
+          "resolve",
+          "--fields",
+          "no_such_field",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("is a miss when nothing is deployed", async () => {
         const app = await anUndeployedEnvironment();
 
