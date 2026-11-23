@@ -7,6 +7,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -108,7 +109,7 @@ func proofRejectedResult(cause error) metrics.AuthResult {
 
 // flowResult classifies where a flow engine operation left the flow: at a
 // step the client renders next, at a terminal step, or in an error.
-func flowResult(res domain.FlowStepResult, err error) metrics.FlowResult {
+func flowResult(res flowengine.FlowStepResult, err error) metrics.FlowResult {
 	switch {
 	case err != nil:
 		return metrics.FlowFailed

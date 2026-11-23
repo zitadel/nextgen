@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -568,7 +569,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 	}{
 		{
 			name:      "a failed result emits the given event",
-			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			result:    &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled},
 			eventType: domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
@@ -578,7 +579,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 		},
 		{
 			name:      "a refused write emits nothing",
-			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			result:    &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			writeErr:  domain.ErrSSOStateInvalid(),
 			wantErr:   domain.ErrSSOStateInvalid(),
 			eventType: domain.EventTypeAuthSSOExchangeFailed,

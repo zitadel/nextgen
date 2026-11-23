@@ -42,6 +42,7 @@ import (
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/httputil"
@@ -444,7 +445,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		schemaStore,
 		serviceDBPool,
 		signupProtection)
-	stateMachine := domain.NewFlowStateMachine(
+	stateMachine := flowengine.NewFlowStateMachine(
 		storageSchemaResolver,
 		// The raw statements: the state machine only hands this store to the
 		// resolver, which follows the namespace itself, so the aliasing wrapper

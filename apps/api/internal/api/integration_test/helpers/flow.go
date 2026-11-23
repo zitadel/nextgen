@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -43,7 +44,7 @@ func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 	return h.flowService.value
 }
 
-func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineRuntime {
+func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.FlowStateMachineRuntime {
 	t.Helper()
 	h.flowStateMachine.mutex.Lock()
 	defer h.flowStateMachine.mutex.Unlock()
@@ -51,7 +52,7 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineR
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
-		h.flowStateMachine.value = domain.NewFlowStateMachine(
+		h.flowStateMachine.value = flowengine.NewFlowStateMachine(
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaStore(t),
 			fields,

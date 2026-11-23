@@ -16,6 +16,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/passwap/argon2"
@@ -40,16 +41,16 @@ func (stubFlowService) Resolve(_ context.Context, _ service.ResolveFlowRequest) 
 	return nil, nil
 }
 
-func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (domain.FlowStepResult, error) {
-	return domain.FlowStepResult{}, nil
+func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (flowengine.FlowStepResult, error) {
+	return flowengine.FlowStepResult{}, nil
 }
 
-func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (domain.FlowStepResult, error) {
-	return domain.FlowStepResult{}, nil
+func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (flowengine.FlowStepResult, error) {
+	return flowengine.FlowStepResult{}, nil
 }
 
-func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (domain.FlowStepResult, error) {
-	return domain.FlowStepResult{}, nil
+func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (flowengine.FlowStepResult, error) {
+	return flowengine.FlowStepResult{}, nil
 }
 
 // stubAuthAttemptService satisfies [service.AuthAttemptService] while doing nothing.
@@ -192,17 +193,17 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	// The shipped default offers no passkey: the preset does.
 	identifierStep, ok := flowDef.FindStep("identifier")
 	require.True(t, ok)
-	assert.NotContains(t, actionNames(identifierStep.Actions), domain.FlowActionPasskey)
+	assert.NotContains(t, actionNames(identifierStep.Actions), flowengine.FlowActionPasskey)
 
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
 	assert.Equal(t, []domain.Field{"x-auth-methods#password"}, passwordStep.Fields)
-	assert.NotContains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
+	assert.NotContains(t, actionNames(passwordStep.Actions), flowengine.FlowActionPasskey)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
 	assert.Equal(t, []domain.Field{"email"}, registerStep.Fields)
-	assert.NotContains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
+	assert.NotContains(t, actionNames(registerStep.Actions), flowengine.FlowActionPasskeyRegister)
 
 	registerPasswordStep, ok := flowDef.FindStep("register-password")
 	require.True(t, ok)
@@ -211,7 +212,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
 	// Registration completes directly — no passkey upsell step; passkey
 	// registration is offered up front on the register step instead.
-	assert.Equal(t, "done", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+	assert.Equal(t, "done", registerPasswordStep.Transitions[flowengine.FlowActionSubmit].Target)
 
 	_, ok = flowDef.FindStep("passkey-upsell")
 	assert.False(t, ok)

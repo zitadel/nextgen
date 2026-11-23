@@ -10,6 +10,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -105,15 +106,15 @@ func TestFlowResult(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
 		name string
-		res  domain.FlowStepResult
+		res  flowengine.FlowStepResult
 		err  error
 		want metrics.FlowResult
 	}{
-		{"error", domain.FlowStepResult{}, errors.New("x"), metrics.FlowFailed},
-		{"error with a step", domain.FlowStepResult{Step: &domain.FlowStep{Complete: new(domain.FlowStepCompleteRedirect)}}, errors.New("x"), metrics.FlowFailed},
-		{"no step", domain.FlowStepResult{}, nil, metrics.FlowStep},
-		{"step", domain.FlowStepResult{Step: &domain.FlowStep{Name: "password"}}, nil, metrics.FlowStep},
-		{"complete", domain.FlowStepResult{Step: &domain.FlowStep{Complete: new(domain.FlowStepCompleteRedirect)}}, nil, metrics.FlowComplete},
+		{"error", flowengine.FlowStepResult{}, errors.New("x"), metrics.FlowFailed},
+		{"error with a step", flowengine.FlowStepResult{Step: &flowengine.FlowStep{Complete: new(domain.FlowStepCompleteRedirect)}}, errors.New("x"), metrics.FlowFailed},
+		{"no step", flowengine.FlowStepResult{}, nil, metrics.FlowStep},
+		{"step", flowengine.FlowStepResult{Step: &flowengine.FlowStep{Name: "password"}}, nil, metrics.FlowStep},
+		{"complete", flowengine.FlowStepResult{Step: &flowengine.FlowStep{Complete: new(domain.FlowStepCompleteRedirect)}}, nil, metrics.FlowComplete},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

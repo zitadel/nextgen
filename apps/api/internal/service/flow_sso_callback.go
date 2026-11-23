@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/idp"
 )
 
@@ -131,9 +132,9 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		}
 		// access_denied is the person saying no and gets its own key. Every
 		// other code is the provider failing.
-		key := domain.FlowStepErrorSSOFailed
+		key := flowengine.FlowStepErrorSSOFailed
 		if in.Error == oauthErrorAccessDenied {
-			key = domain.FlowStepErrorSSOCancelled
+			key = flowengine.FlowStepErrorSSOCancelled
 		}
 		// The description and URI go to the operator's line and are never
 		// stored: the user sees only the localized key.
@@ -245,7 +246,7 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID, de
 // so the user can retry from the step: the state is already consumed, and the
 // error page has no way back.
 func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
-	return c.park(ctx, projectID, check, domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, cause), eventType)
+	return c.park(ctx, projectID, check, domain.FlowStepFailed(flowengine.FlowStepErrorSSOFailed, cause), eventType)
 }
 
 // park stores the failure's key on the consumed record, emitting eventType,

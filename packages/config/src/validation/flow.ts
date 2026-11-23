@@ -50,7 +50,7 @@ export const FLOW_PURPOSES = [
 ] as const;
 
 /**
- * The identifier half of `applyOutcomeFlip` in flow_state_machine.go: the
+ * The identifier half of `applyOutcomeFlip` in flowengine/routing.go: the
  * outcome that switches each purpose to the other. `sso_user_not_found`
  * also switches login to register but comes only from SSO resolution, so
  * it is left out here.
@@ -79,7 +79,7 @@ const PASSKEY_ACTION_KINDS = new Set(["passkey", "passkey_register"]);
 
 /**
  * Action names the engine claims, with the reason the validator reports.
- * Mirrors `flowBackActionName` and `FlowActionSSO` in flow_state_machine.go,
+ * Mirrors `FlowBackActionName` and `FlowActionSSO` in flow_definition.go,
  * and `reservedOutcomes` in flow_definition_validator.go.
  * A Map, not an object, so a name like `constructor` cannot match by accident.
  */
@@ -89,7 +89,7 @@ const RESERVED_ACTION_NAMES = new Map<string, string>([
   ...RESERVED_OUTCOMES.map((outcome): [string, string] => [outcome, "flow outcomes"]),
 ]);
 
-/** Mirrors `authMethodPrefix` in flow_definition.go. */
+/** Mirrors `AuthMethodPrefix` in flow_definition.go. */
 const AUTH_METHOD_PREFIX = "x-auth-methods#";
 
 /** Mirrors `ManifestForOnSuccess` in flow_on_success.go. */
@@ -693,7 +693,7 @@ function schemaRequired(schema: Record<string, unknown>): string[] {
 }
 
 /**
- * Mirrors `schemaReader.RequiredPaths`: every name in `required`,
+ * Mirrors `SchemaReader.RequiredPaths`: every name in `required`,
  * recursed through the nested `required` of each required object. A
  * required object declaring no `required` of its own ends the descent at
  * the object itself.
@@ -790,7 +790,7 @@ function resolveFieldChallenge(
     return { challenge: null };
   }
 
-  // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
+  // Mirrors SchemaReader.JSONType: the nullable idiom `["null", X]`
   // reduces to X; any other multi-entry union is unsupported. Go reduces
   // before it tests for a composite, so the union error wins and the
   // object/array test below reads the reduced type rather than the union.

@@ -1195,17 +1195,17 @@ describe("drift audit (Go validator)", () => {
     );
   });
 
-  const stateMachineSource = join(goModule, "internal/domain/flow_state_machine.go");
+  const stateMachineSource = join(goModule, "internal/domain/flowengine/routing.go");
 
   it.skipIf(!inMonorepo)("the switch outcomes match the engine's applyOutcomeFlip", () => {
     const source = readFileSync(stateMachineSource, "utf8");
     const body = source.match(/func applyOutcomeFlip[\s\S]*?\n}/)?.[0] ?? "";
     // login → user_not_found → register, register → user_already_exists → login.
     expect(body).toMatch(
-      /CurrentPurpose == FlowDefinitionPurposeLogin &&[\s\S]*?FlowImplicitOutcomeUserNotFound[\s\S]*?CurrentPurpose = FlowDefinitionPurposeRegister/,
+      /CurrentPurpose == domain\.FlowDefinitionPurposeLogin &&[\s\S]*?domain\.FlowImplicitOutcomeUserNotFound[\s\S]*?CurrentPurpose = domain\.FlowDefinitionPurposeRegister/,
     );
     expect(body).toMatch(
-      /CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:\s*state\.CurrentPurpose = FlowDefinitionPurposeLogin/,
+      /CurrentPurpose == domain\.FlowDefinitionPurposeRegister && outcome == domain\.FlowImplicitOutcomeUserAlreadyExists:\s*state\.CurrentPurpose = domain\.FlowDefinitionPurposeLogin/,
     );
     expect(PURPOSE_FLIP_TARGETS).toEqual({
       login: { user_not_found: "register" },

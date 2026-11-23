@@ -10,6 +10,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -72,7 +73,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	flipOK := flipResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	require.Equal(t, api.NewOptFlowStepPurpose(api.FlowStepPurposeRegister), flipOK.Response.Step.Purpose)
-	require.Equal(t, api.NewOptNilString(domain.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
+	require.Equal(t, api.NewOptNilString(flowengine.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
 		"the user asked to sign in, so the sign-up says why")
 	zflow = mustExtractZflow(t, flipOK.SetCookie)
 

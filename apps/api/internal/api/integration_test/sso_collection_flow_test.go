@@ -10,6 +10,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	api "go.zitadel.com/zitadel/v5/api"
 )
@@ -202,7 +203,7 @@ func TestSSOCollectionSubmitEditedVerifiedEmailIsRefused(t *testing.T) {
 
 	resp := f.submit(t, flow, map[string]string{"email": "mallory@example.com", "username": "mallory"})
 
-	f.requireStepError(t, flow, resp, "sub-new", domain.FlowStepErrorSSOVerifiedUniqueValueChanged)
+	f.requireStepError(t, flow, resp, "sub-new", flowengine.FlowStepErrorSSOVerifiedUniqueValueChanged)
 	for _, email := range []string{"alice@example.com", "mallory@example.com"} {
 		_, err := f.userByEmail(t, email)
 		require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user holds %s", email)
@@ -284,7 +285,7 @@ func TestSSOCollectionSubmitInvalidUserShowsStepError(t *testing.T) {
 
 	resp := f.submit(t, flow, map[string]string{"email": "alice@example.com", "username": "alice", "country": "DE"})
 
-	f.requireStepError(t, flow, resp, "sub-new", domain.FlowStepErrorSSOUserInvalid)
+	f.requireStepError(t, flow, resp, "sub-new", flowengine.FlowStepErrorSSOUserInvalid)
 	_, err := f.userByEmail(t, "alice@example.com")
 	require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created")
 

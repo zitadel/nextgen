@@ -15,6 +15,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 )
 
 func TestAuthCheckTypeSSOCallback_NameAndClass(t *testing.T) {
@@ -299,7 +300,7 @@ func TestSSOCallbackResult_NoTokenFields(t *testing.T) {
 func TestSSOCallbackResult_IsError(t *testing.T) {
 	t.Parallel()
 	assert.False(t, domain.SSOCallbackResult{Subject: "sub-1"}.IsError())
-	assert.True(t, domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}.IsError())
+	assert.True(t, domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled}.IsError())
 }
 
 func TestErrSSOStateInvalid(t *testing.T) {

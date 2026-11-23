@@ -14,6 +14,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	api "go.zitadel.com/zitadel/v5/api"
@@ -337,7 +338,7 @@ func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
 	assert.False(t, got.HandoffToken.Set)
 	// The unverified email cannot create a user, so the identity is collected;
 	// this definition does not route that outcome.
-	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "a collected identity stays parked for the prefill")
 }
@@ -438,7 +439,7 @@ func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	step := resp.(*api.FlowResponseHeaders).Response.Step
 	assert.Equal(t, "identifier", step.Name)
-	assert.Equal(t, domain.FlowStepErrorSSOCreationDisabled, step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOCreationDisabled, step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "the parked result stays, so a lost response can show the error again")
 
@@ -497,7 +498,7 @@ func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	got := resp.(*api.FlowResponseHeaders).Response
 	assert.Equal(t, "identifier", got.Step.Name)
-	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)
 	attempt := f.attempt(t, flow)
 	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)

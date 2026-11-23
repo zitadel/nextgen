@@ -10,6 +10,7 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -182,7 +183,7 @@ func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, out.StepError)
-	assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, out.StepError.Key)
+	assert.Equal(t, flowengine.FlowStepErrorUserAlreadyExists, out.StepError.Key)
 	assert.ErrorIs(t, out.StepError.Cause, domain.ErrUserAlreadyExists())
 	assert.Empty(t, out.UserID)
 }

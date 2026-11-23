@@ -11,6 +11,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/events"
@@ -414,7 +415,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	require.Equal(t, "signup", badStep.Step.Name, "duplicate email must keep flow on signup step")
 	errVal, errSet := badStep.Step.Error.Get()
 	require.True(t, errSet, "expected an error on the step")
-	require.Equal(t, domain.FlowStepErrorUserAlreadyExists, errVal)
+	require.Equal(t, flowengine.FlowStepErrorUserAlreadyExists, errVal)
 	require.False(t, badStep.Step.Complete.Set, "expected non-terminal step")
 	_, hasToken := badStep.HandoffToken.Get()
 	require.False(t, hasToken, "no handoff token on rejected registration")

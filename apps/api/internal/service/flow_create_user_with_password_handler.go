@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 )
 
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
@@ -105,7 +106,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction, recordFactorsAction)
 	if err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
-			return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.FlowStepErrorUserAlreadyExists, err)}, nil
+			return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(flowengine.FlowStepErrorUserAlreadyExists, err)}, nil
 		}
 		// A password the policy rejects stays on the step, next to the field,
 		// so the user can pick another one instead of seeing a failed request.

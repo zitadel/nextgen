@@ -20,6 +20,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -82,19 +83,19 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		{
 			name:       "access_denied stores the cancelled key",
 			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", ErrorDescription: "the provider's words"},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name:       "every other provider code stores the failed key",
 			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "temporarily_unavailable"},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name:       "neither code nor error stores the failed key",
 			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
@@ -104,7 +105,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			// A code arrived, so the refusal is an exchange failure.
 			name:       "a path naming another connection stores the failed key without a token request",
 			in:         service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Code: "the-code"},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -113,13 +114,13 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			// not the pinned connection's.
 			name:       "a provider error on another connection's path stores the failed key",
 			in:         service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Error: "access_denied"},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name:       "a path naming no connection stores the failed key",
 			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -132,7 +133,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -145,7 +146,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
@@ -155,7 +156,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
@@ -166,7 +167,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
@@ -175,7 +176,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -184,7 +185,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -199,7 +200,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				require.NoError(t, err)
 				m.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -214,7 +215,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				require.NoError(t, err)
 				m.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -225,7 +226,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -234,7 +235,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrInternal(errors.New("db down")))
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -242,7 +243,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			in:            service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied"},
 			setResultErrs: []error{domain.ErrSSOStateInvalid()},
 			wantErr:       domain.ErrSSOStateInvalid(),
-			wantResult:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantResult:    &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled},
 			wantEvent:     domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
@@ -253,7 +254,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			},
 			setResultErrs: []error{domain.ErrUnavailable()},
 			wantErr:       domain.ErrUnavailable(),
-			wantResult:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult:    &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
 			wantEvent:     domain.EventTypeAuthSSOExchangeFailed,
 		},
 	}
@@ -316,8 +317,8 @@ func TestFlowSSOCallback_Process_ReturnsTheFailure(t *testing.T) {
 	out, err := svc.Process(ctx, service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"})
 	require.NoError(t, err)
 	require.NotNil(t, out.Failure)
-	assert.Equal(t, domain.FlowStepErrorSSOFailed, out.Failure.Key)
-	assert.ErrorContains(t, out.Failure.Cause, "the step refused the submission with "+domain.FlowStepErrorSSOFailed)
+	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, out.Failure.Key)
+	assert.ErrorContains(t, out.Failure.Cause, "the step refused the submission with "+flowengine.FlowStepErrorSSOFailed)
 	assert.ErrorContains(t, errors.Unwrap(out.Failure.Cause), "client_secret is not a variable reference")
 	assert.Equal(t, "proj-1", out.ProjectID)
 	assert.Equal(t, ssoCallbackSlug, out.Slug)
@@ -462,14 +463,14 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 		{
 			name:          "a failed identity write stores the failed key",
 			setResultErrs: []error{domain.ErrUnavailable()},
-			wantErrorKey:  domain.FlowStepErrorSSOFailed,
+			wantErrorKey:  flowengine.FlowStepErrorSSOFailed,
 			wantEvent:     domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name:          "a failed write of the failed key passes through",
 			setResultErrs: []error{domain.ErrUnavailable(), domain.ErrUnavailable()},
 			wantErr:       domain.ErrUnavailable(),
-			wantErrorKey:  domain.FlowStepErrorSSOFailed,
+			wantErrorKey:  flowengine.FlowStepErrorSSOFailed,
 			wantEvent:     domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
@@ -584,6 +585,6 @@ func TestFlowSSOCallback_SealedDeploymentWithoutVariablesFailsTheStep(t *testing
 		ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, domain.FlowStepErrorSSOFailed, attempts.setResult.ErrorKey)
+	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, attempts.setResult.ErrorKey)
 	assert.Equal(t, "https://app.example.com/login?flow=flow-1", out.ReturnTarget)
 }
