@@ -1,4 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
 import { Flags, type Command, type Interfaces, Parser } from "@oclif/core";
@@ -508,23 +509,24 @@ export class Input {
       return piped.replace(/^\uFEFF/u, "");
     }
     const path = trimmed.replace(/^@|^file:\/\//u, "");
-    const found = await stat(path).catch((error: unknown) => {
+    const unreadable = (error: unknown): never => {
       throw refusalError(UNREADABLE_REFUSAL, {
         path,
         problem: error instanceof Error ? error.message : String(error),
       });
-    });
-    if (!found.isFile() || found.size > 8_000_000) {
-      throw refusalError(NOT_A_SMALL_FILE_REFUSAL, { path });
-    }
-    const content = await readFile(path, "utf8").catch((error: unknown) => {
-      throw refusalError(UNREADABLE_REFUSAL, {
-        path,
-        problem: error instanceof Error ? error.message : String(error),
-      });
-    });
+    };
+    const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK).catch(unreadable);
+    try {
+      const found = await handle.stat().catch(unreadable);
+      if (!found.isFile() || found.size > 8_000_000) {
+        throw refusalError(NOT_A_SMALL_FILE_REFUSAL, { path });
+      }
+      const content = await handle.readFile("utf8").catch(unreadable);
 
-    return content.replace(/^\uFEFF/u, "");
+      return content.replace(/^\uFEFF/u, "");
+    } finally {
+      await handle.close();
+    }
   }
 
   /**
