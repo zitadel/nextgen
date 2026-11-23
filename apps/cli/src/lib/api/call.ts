@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
-import { z } from "zod";
-
 import { ZitadelError } from "@/lib/errors";
-import { read, type Refused } from "@/lib/oclif/flags";
+import { read } from "@/lib/oclif/flags";
+import { SAFE_ID } from "@/lib/oclif/crud/shared";
 import { parseJsonObject } from "@/lib/json";
 import type { ApiRequest, Operation, Target } from "@/lib/backend";
 import * as schemas from "@/lib/backend/schemas";
@@ -17,26 +16,6 @@ import type { Suggested } from "@/lib/suggestion";
 
 /** The flag a field is given with, which errors name. */
 const FIELD = "--field";
-
-/**
- * What a path value may be, as an id may: not blank, not `.` or `..`, which a
- * URL resolves as a step up the path, and without a control character.
- */
-const SAFE_ID = {
-  schema: z
-    .string()
-    .trim()
-    .refine((id) => {
-      return id !== "" && id !== "." && id !== ".." && !/\p{Cc}/u.test(id);
-    }, "it must be an id: not blank, not . or .., and no control character"),
-  refusal: {
-    message: "Invalid {input}: {problem}",
-    hint: "Pass the value exactly as it was listed.",
-    details: {
-      argument: "{input}",
-    },
-  },
-} as const satisfies Refused<string>;
 
 /** Path parameter values read so far, and the names still without one. */
 export type PathValues = Readonly<{

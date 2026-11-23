@@ -2,4 +2,6 @@
 "@zitadel/cli": minor
 ---
 
-Every command that prints a list takes `--fields`, and `--fields` cuts the records under `--json` as well as the table: `user list --fields id,email --json` returns only those paths. A field a list does not carry is refused with the ones it does. `get` cuts its record the same way, and `api ls` judges `--fields` by the shape of an operation. Breaking: `--json` was unaffected by `--fields` before.
+Every command that prints a list or a record takes `--fields`, and it cuts the records under `--json` as well as the table: `user list --fields id,email --json` returns only those paths, and a field the command does not carry is refused with the ones it does.
+
+**Breaking:** `--json` ignored `--fields` before, so a script that passed it and read the whole record must stop passing it.

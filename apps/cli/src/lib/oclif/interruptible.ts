@@ -1,10 +1,5 @@
-import type { Command } from "@oclif/core";
-
 import { ZitadelError } from "@/lib/errors";
-
-/** A class that can be extended, abstract or not, whatever arguments it takes. */
-// biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
-type CommandClass = abstract new (...args: any[]) => Command;
+import type { CommandClass } from "./command-class";
 
 /** How long a command may keep running after its first Ctrl-C before it is stopped. */
 const GRACE_MS = 1_000;

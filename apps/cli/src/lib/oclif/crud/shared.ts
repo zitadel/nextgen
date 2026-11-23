@@ -2,7 +2,7 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { ZitadelError } from "@/lib/errors";
-import { taken } from "@/lib/oclif/flags";
+import { type Refused, taken } from "@/lib/oclif/flags";
 import { named } from "@/lib/names";
 import { regularPlural } from "@/lib/plural";
 import { prose } from "@/lib/oclif/rendering";
@@ -12,6 +12,27 @@ import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/term
 
 import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
+
+/**
+ * What an id may be, which a path value in `api` may be too: not blank, not `.`
+ * or `..`, which a URL resolves as a step up the path, and without a control
+ * character.
+ */
+export const SAFE_ID = {
+  schema: z
+    .string()
+    .trim()
+    .refine((id) => {
+      return id !== "" && id !== "." && id !== ".." && !/\p{Cc}/u.test(id);
+    }, "it must be an id: not blank, not . or .., and no control character"),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Pass the id exactly as it was listed.",
+    details: {
+      argument: "{input}",
+    },
+  },
+} as const satisfies Refused<string>;
 
 /** Helpers shared by more than one verb builder. */
 
@@ -31,21 +52,7 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) =>
   const take =
     resource.idSchema === undefined
       ? Args.custom<string>({
-          parse: taken({
-            schema: z
-              .string()
-              .trim()
-              .refine((id) => {
-                return id !== "" && id !== "." && id !== ".." && !/\p{Cc}/u.test(id);
-              }, "it must be an id: not blank, not . or .., and no control character"),
-            refusal: {
-              message: "Invalid {input}: {problem}",
-              hint: "Pass the id exactly as it was listed.",
-              details: {
-                argument: "{input}",
-              },
-            },
-          }),
+          parse: taken(SAFE_ID),
         })
       : Args.custom<string>({
           parse: taken({

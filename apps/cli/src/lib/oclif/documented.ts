@@ -1,10 +1,5 @@
-import type { Command } from "@oclif/core";
-
 import { Input } from "./input";
-
-/** A class that can be extended, abstract or not, whatever arguments it takes. */
-// biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
-type CommandClass = abstract new (...args: any[]) => Command;
+import type { CommandClass } from "./command-class";
 
 /**
  * Lets a command take its whole invocation as one JSON document, passed with

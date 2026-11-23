@@ -160,9 +160,14 @@
   `relationships`) and the flag as a refusal's message names it.
 - Ask the run, never the process: `this.cwd`, `this.env` and `this.isTTY`
   (someone there to ask). The output mode (`--json`, colour, a terminal on
-  stdout) is read from `Output` (`src/lib/ui/output.ts`), which the base command
-  settles once; a command that reads `process.stdout` or recomputes colour has
-  its own answer to a question the run already settled.
+  stdout) is read from `Output` (`src/lib/ui/output.ts`): the base command
+  settles `json` and `color` once, and `screen` follows stdout. Only the base
+  command and the `Tabulatable` and `Wrapped` mixins ask oclif's own
+  `jsonEnabled()`, which `--json` sets. A command that reads `process.stdout` or
+  recomputes colour has its own answer to a question the run already settled.
+- To find where a flag's meaning is decided: `--json` and colour in `Output`,
+  `--fields` in `fieldsFlag` and `src/lib/oclif/columns.ts`, `--input` in
+  `inputFlag` and the `Documented` mixin.
 - JSON is for `--json` alone: off a terminal a command prints its plain summary,
   never JSON, so a command does not choose its output by the mode.
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A

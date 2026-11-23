@@ -3,12 +3,12 @@
  * read by whatever writes: a diff that is painted, a release published while
  * stdout belongs to the envelope.
  *
- * The one place that decides `--json`, `--color`, `--no-color` and `NO_COLOR` is
- * the base command, which settles this once; a command asks here rather than
- * recomputing it from the process, and a library that starts a child process or
- * paints a diff reads its default from here. The defaults are a plain, human
- * run, which is what a library used
- * on its own gets.
+ * The base command settles `json` and `color` here once, from `--json`,
+ * `--color`, `--no-color`, `NO_COLOR` and `FORCE_COLOR`; `screen` follows
+ * whether stdout is a terminal. A command asks here rather than recomputing
+ * any of it from the process, and a library that starts a child process or
+ * paints a diff reads its default here. The defaults are a plain, human run,
+ * which is what a library used on its own gets.
  */
 const mode = {
   json: false,
