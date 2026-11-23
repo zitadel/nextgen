@@ -1,8 +1,6 @@
-import mixpanelLib, {
-  type Mixpanel as MixpanelClient,
-  type Modifiers,
-  type Properties,
-} from "mixpanel";
+import { createRequire } from "node:module";
+
+import type { Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
 
 import { resolveTelemetryEndpoint, type TelemetryEndpoint } from "./config";
 import { Outbox } from "./outbox";
@@ -100,5 +98,36 @@ export class MixpanelSink implements TelemetrySink {
 
 /** Real Mixpanel client construction, kept apart so a test can swap it. */
 function defaultInit(token: string, { host, path }: TelemetryEndpoint): MixpanelClient {
-  return mixpanelLib.init(token, { host, path, geolocate: false });
+  return loadMixpanel().init(token, { host, path, geolocate: false });
+}
+
+/**
+ * Loads the Mixpanel SDK so that it can send through a proxy.
+ *
+ * With `HTTPS_PROXY` or `HTTP_PROXY` set, the SDK builds its agent with
+ * `new HttpsProxyAgent(...)` from the `https-proxy-agent` it pins (7.x), which
+ * exports the class by name only, so the client fails to be made with
+ * `HttpsProxyAgent is not a constructor` and every event is dropped. The
+ * module's export is made the class itself before the SDK reads it, and the SDK
+ * is loaded here, on first use, for that reason.
+ *
+ * @returns The SDK.
+ */
+function loadMixpanel(): typeof import("mixpanel") {
+  const own = createRequire(import.meta.url);
+  const sdk = own.resolve("mixpanel");
+  const fromSdk = createRequire(sdk);
+  const agent = fromSdk.resolve("https-proxy-agent");
+  const exported = fromSdk(agent) as unknown;
+  if (typeof exported !== "function" && own.cache[agent] !== undefined) {
+    own.cache[agent].exports = (exported as { HttpsProxyAgent: unknown }).HttpsProxyAgent;
+    // An SDK loaded before this took the unusable export with it.
+    for (const loaded of Object.keys(own.cache)) {
+      if (/[\\/]mixpanel[\\/]/.test(loaded)) {
+        delete own.cache[loaded];
+      }
+    }
+  }
+
+  return own("mixpanel") as typeof import("mixpanel");
 }

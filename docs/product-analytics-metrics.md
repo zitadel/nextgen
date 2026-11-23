@@ -28,7 +28,7 @@ A funnel's step 1 may not hold a property that is only known later, such as `fra
 
 ## Funnels
 
-All funnels count unique users, use a 30-day window, and read the median time to convert from the funnel's own panel.
+All funnels but F5 count unique users, use a 30-day window, and read the median time to convert from the funnel's own panel. F5 counts attempts, as its row says.
 
 | # | Name | Steps | Split by | Answers |
 | --- | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ All funnels count unique users, use a 30-day window, and read the median time to
 | F2 | Setup journey drop-off | `flow_started` → `step_completed` (`step = framework_selection`) → `step_completed` (`step = preset_selection`) → `flow_completed` (`flow = onboarding`) | `framework` | Where people give up during setup |
 | F3 | Authentication set up and deployed | `flow_completed` (`flow = onboarding`) → `cli_command_completed` (`command = deploy`, `dry_run = false`, `status = ok`) | `preset` | Of those who set up sign-in, how many deployed, by password-first or passkey-first |
 | F4 | Identity provider setup | `flow_started` (`flow = oidc_provider_setup`) → `flow_completed` (`flow = oidc_provider_setup`) | `provider_type` | How many finish adding an OpenID Connect provider, and which kind |
-| F5 | Deploy reliability | `cli_command_started` (`command = deploy`, `dry_run = false`) → `cli_command_completed` (`command = deploy`, `dry_run = false`, `status = ok`) | `server_kind` | How many deploys succeed |
+| F5 | Deploy reliability, per attempt | `cli_command_started` (`command = deploy`, `dry_run = false`) → `cli_command_completed` (`command = deploy`, `dry_run = false`, `status = ok`), counting unique `invocation_id` | `server_kind` | What share of deploy attempts succeed. Someone who fails twice and succeeds on the third try is one success out of three attempts, because each run has its own `invocation_id` that its started and completed events share |
 
 ## Charts
 
