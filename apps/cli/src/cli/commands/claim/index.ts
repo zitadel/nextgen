@@ -375,7 +375,6 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
     }
     // The team id stays out of the human output by design (it lives in the
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
-    log.done("Project claimed");
 
     this.recordTelemetry({
       claim_outcome: "completed",

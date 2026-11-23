@@ -203,7 +203,7 @@ describe("env add", () => {
       const out = await addRendered(cwd);
 
       expect(out).toContain(
-        "Added the production environment, bound to proj_new .env.production.local holds",
+        "Added the production environment, bound to proj_new Wrote .env.production.local, which holds",
       );
       expect(out).not.toContain("Summary");
     });
@@ -213,7 +213,7 @@ describe("env add", () => {
 
       const out = await addRendered(cwd);
 
-      expect(out).toContain(".env.production.local holds ZITADEL_URL,");
+      expect(out).toContain("Wrote .env.production.local, which holds ZITADEL_URL,");
     });
 
     it("reports no deployment when it made none", async ({ dir }) => {
