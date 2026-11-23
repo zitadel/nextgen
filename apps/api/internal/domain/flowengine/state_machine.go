@@ -511,8 +511,6 @@ func (submitHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowSt
 	return handler.run(r, pc, resolved)
 }
 
-func (submitHandler) acceptsSignupProof(*domain.FlowState, FlowSubmitInput) bool { return false }
-
 // recordResolvedUser stores the resolved user id; if it changed, any
 // state bound to the previous user is cleared.
 func recordResolvedUser(state *domain.FlowState, userID string) {

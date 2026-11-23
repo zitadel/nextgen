@@ -43,8 +43,6 @@ func (passkeyHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowS
 	return r.issueChallenge(pc, FlowChallengeMethodPasskey, resolved, resolved)
 }
 
-func (passkeyHandler) acceptsSignupProof(*domain.FlowState, FlowSubmitInput) bool { return false }
-
 // passkeyRegisterHandler handles kind=passkey_register, a two-phase WebAuthn
 // enrollment. The issue leg uses the collected user id (or lets the
 // registration service mint a provisional one), then issues a creation

@@ -302,7 +302,7 @@ func (e FlowFieldValidationErrors) StepError() string {
 }
 
 // FlowFieldPassword is the reserved field a flow collects a password in.
-const FlowFieldPassword = AuthMethodPrefix + "password"
+const FlowFieldPassword = AuthMethodPrefix + AuthMethodPassword
 
 // PasswordPolicyStepError renders a password policy violation for a flow
 // step: one field-validation key per failed rule on the password field

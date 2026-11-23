@@ -18,8 +18,6 @@ func (navigateHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (Flow
 	return r.routeOutcome(pc, domain.FlowResolvedFields{}, pc.in.Action, false)
 }
 
-func (navigateHandler) acceptsSignupProof(*domain.FlowState, FlowSubmitInput) bool { return false }
-
 // routeOutcome sends the user to the next step: looks up the
 // transition for outcome, flips the purpose, advances state, then
 // renders (or terminates on a terminal step). When outcome differs

@@ -35,7 +35,7 @@ const (
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
 	// FlowOnSuccessCreateUserWithSso creates the user from the identity an
 	// external provider returned, with the values the step collected, and
-	// links the identity to it (see processSSOCollection).
+	// links the identity to it.
 	FlowOnSuccessCreateUserWithSso
 )
 

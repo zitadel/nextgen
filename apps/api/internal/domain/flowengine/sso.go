@@ -681,23 +681,16 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 	}, nil
 }
 
-// createUserWithSSOHandler handles create_user_with_sso (see processSSOCollection).
+// createUserWithSSOHandler handles create_user_with_sso: it creates the user
+// from the identity the engine resolved into this step, with the values the
+// step collected. A unique value another user holds binds that user instead,
+// as on the render.
 type createUserWithSSOHandler struct{}
 
 func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error) {
-	return r.processSSOCollection(pc, resolved)
-}
-
-// processSSOCollection creates the user from the identity the engine resolved
-// into this step, with the values the step collected. A unique value another
-// user holds binds that user instead, as on the render.
-func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error) {
 	step, state := pc.currentStep, pc.state
 	// The user and the link cannot be undone, so the submitted action must
 	// route before anything is written, and keep the user it creates.
-	if stepActionKind(step, pc.in.Action) != domain.FlowActionKindSubmit {
-		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), pc.in.Action, step.Name)
-	}
 	transition, ok := step.Transitions[pc.in.Action]
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), pc.in.Action, step.Name)

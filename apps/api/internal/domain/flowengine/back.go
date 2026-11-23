@@ -28,8 +28,6 @@ func (r *FlowStateMachineRuntime) advance(state *domain.FlowState, prev *domain.
 // leaves all of it in place.
 type backHandler struct{}
 
-func (backHandler) acceptsSignupProof(*domain.FlowState, FlowSubmitInput) bool { return false }
-
 func (backHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
 	prev, ok := pc.state.PeekBackStack()
 	if !ok {

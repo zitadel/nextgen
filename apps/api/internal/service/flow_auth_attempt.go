@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -146,13 +145,9 @@ func (a *FlowAuthAttemptAdapter) VerifyChallenge(ctx context.Context, in domain.
 // the PublicKeyCredentialRequestOptions the browser hands to
 // navigator.credentials.get().
 func (a *FlowAuthAttemptAdapter) issuePasskeyChallenge(ctx context.Context, in domain.FlowIssueChallengeInput, params domain.FlowPasskeyChallengeParams) (domain.FlowIssuedChallenge, error) {
-	origins := make([]url.URL, 0, len(params.RPOrigins))
-	for _, o := range params.RPOrigins {
-		u, err := url.Parse(o)
-		if err != nil {
-			return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: parse rp origin %q: %w", o, err)
-		}
-		origins = append(origins, *u)
+	origins, err := parseOrigins(params.RPOrigins)
+	if err != nil {
+		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: %w", err)
 	}
 
 	attempt, err := a.attempts.IssueChallenge(ctx, IssueChallengeInput{

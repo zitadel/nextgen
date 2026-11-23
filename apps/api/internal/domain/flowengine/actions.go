@@ -8,8 +8,11 @@ import (
 type actionKindHandler interface {
 	// process handles a submission of an action of this kind on the current step.
 	process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error)
-	// acceptsSignupProof reports whether a step declaring an action of this
-	// kind lets the submission carry the sign-up proof.
+}
+
+// signupProofAcceptor is an [actionKindHandler] whose kind can create a user:
+// a step declaring it may let the submission carry the sign-up proof.
+type signupProofAcceptor interface {
 	acceptsSignupProof(state *domain.FlowState, in FlowSubmitInput) bool
 }
 
@@ -68,7 +71,7 @@ func acceptsSignupProof(step *domain.FlowDefinitionStep, state *domain.FlowState
 		return true
 	}
 	for _, a := range step.Actions {
-		if handler, ok := actionKindHandlers[a.Kind]; ok && handler.acceptsSignupProof(state, in) {
+		if acceptor, ok := actionKindHandlers[a.Kind].(signupProofAcceptor); ok && acceptor.acceptsSignupProof(state, in) {
 			return true
 		}
 	}
