@@ -1793,7 +1793,7 @@ EXAMPLES
 
 ## `zitadel invitation cancel [INVITATION_ID]`
 
-Cancel a pending invitation so its link stops working, or remove a declined one.
+Cancel a pending invitation so its link stops working, or remove an expired or declined one.
 
 ```
 USAGE
@@ -1801,7 +1801,7 @@ USAGE
     [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
-  [INVITATION_ID]  The invitation to cancel. Omit it to pick a pending or declined one.
+  [INVITATION_ID]  The invitation to cancel. Omit it to pick a pending, expired or declined one.
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
