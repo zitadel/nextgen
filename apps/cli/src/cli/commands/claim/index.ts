@@ -149,6 +149,8 @@ const CHALLENGE_ID: Refused<string> = {
  * waiting on it in a second run.
  */
 export default class Claim extends ServerCommand(EnvironmentCommand) {
+  static override narratesItsAnswer = true;
+
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
@@ -353,7 +355,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         }),
       };
     }
-    log.progress("Waiting for the browser step to finish");
+    log.info("Waiting for the browser step to finish");
 
     const completed = await this.poll(
       claimService,

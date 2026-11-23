@@ -63,6 +63,8 @@ const PROVIDER_IS_NAMED_REFUSAL = {
  * history, a process listing, or CI logs.
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
+  static override narratesItsAnswer = true;
+
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.signIn;
   static override groupOrder = 1;
@@ -145,101 +147,109 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
 
-    return this.emit(
-      await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
-        .step(
-          new ChooseProvider({
-            dryRun: this.dryRun,
-            nonInteractive: this.nonInteractive,
-          }),
-        )
-        .step(
-          new ReadIssuer({
-            cwd: this.cwd,
-            env: this.env,
-          }),
-        )
-        .step(
-          new LoadSchema({
-            loadSchemaTarget: (input) => {
-              return this.loadSchemaTarget(input);
-            },
-          }),
-        )
-        .step(
-          new ReadOrigins({
-            connect: () => {
-              return this.connect();
-            },
-          }),
-        )
-        .step(
-          new SelectConnection({
-            ask: this.ask,
-            dryRun: this.dryRun,
-          }),
-        )
-        .step(
-          new PlanChange({
-            ask: this.ask,
-            machine: new RealMachine(),
-            developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
-            suggest: this.suggest,
-            again: this.again,
-          }),
-        )
-        .step(new IntroduceProvider())
-        .endWhen(
-          new PreviewChange({
-            argsOf: (command) => {
-              return this.argsOf(command);
-            },
-            dryRun: this.dryRun,
-            realRun: () => {
-              return this.realRun();
-            },
-            report: (change) => {
-              this.report(change);
-            },
-          }),
-        )
-        .step(new CollectCredentials())
-        .step(new BuildChange())
-        .step(
-          new PublishCredentials({
-            signal: this.signal,
-            source: this.meta.source,
-          }),
-        )
-        .step(
-          new WriteFiles({
-            report: (change) => {
-              this.report(change);
-            },
-            write: (target, change) => {
-              return this.write(target, change, undefined);
-            },
-          }),
-        )
-        .step(
-          new ShowResult({
-            followUps: (changed, leading) => {
-              return this.followUps(changed, leading);
-            },
-            suggest: this.suggest,
-          }),
-        )
-        .finish((state) => {
-          return state.answer;
-        })
-        .run(
-          { flags },
-          {
-            onUndoError: (key, error) => {
-              warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
-            },
+    return this.emit(await this.enable(flags));
+  }
+
+  /**
+   * Run the steps.
+   *
+   * @param flags - The provider, its settings, the schema and the environment flags.
+   * @returns The result.
+   */
+  private enable(flags: Admitted<typeof AuthMethodSsoEnable>["flags"]): Promise<CommandResult> {
+    return Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
+      .step(
+        new ChooseProvider({
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+        }),
+      )
+      .step(
+        new ReadIssuer({
+          cwd: this.cwd,
+          env: this.env,
+        }),
+      )
+      .step(
+        new LoadSchema({
+          loadSchemaTarget: (input) => {
+            return this.loadSchemaTarget(input);
           },
-        ),
-    );
+        }),
+      )
+      .step(
+        new ReadOrigins({
+          connect: () => {
+            return this.connect();
+          },
+        }),
+      )
+      .step(
+        new SelectConnection({
+          ask: this.ask,
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(
+        new PlanChange({
+          ask: this.ask,
+          machine: new RealMachine(),
+          developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
+          suggest: this.suggest,
+          again: this.again,
+        }),
+      )
+      .step(new IntroduceProvider())
+      .endWhen(
+        new PreviewChange({
+          argsOf: (command) => {
+            return this.argsOf(command);
+          },
+          dryRun: this.dryRun,
+          realRun: () => {
+            return this.realRun();
+          },
+          report: (change) => {
+            this.report(change);
+          },
+        }),
+      )
+      .step(new CollectCredentials())
+      .step(new BuildChange())
+      .step(
+        new PublishCredentials({
+          signal: this.signal,
+          source: this.meta.source,
+        }),
+      )
+      .step(
+        new WriteFiles({
+          report: (change) => {
+            this.report(change);
+          },
+          write: (target, change) => {
+            return this.write(target, change, undefined);
+          },
+        }),
+      )
+      .step(
+        new ShowResult({
+          followUps: (changed, leading) => {
+            return this.followUps(changed, leading);
+          },
+          suggest: this.suggest,
+        }),
+      )
+      .finish((state) => {
+        return state.answer;
+      })
+      .run(
+        { flags },
+        {
+          onUndoError: (key, error) => {
+            warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
+          },
+        },
+      );
   }
 }

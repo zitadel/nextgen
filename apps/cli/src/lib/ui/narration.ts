@@ -28,7 +28,6 @@ const MARKS: Readonly<Record<LogLevel, string>> = {
   done: MARK.done,
   info: MARK.info,
   start: MARK.started,
-  progress: MARK.started,
   warn: MARK.warning,
   fail: MARK.failed,
   plain: GUIDE,
@@ -78,7 +77,7 @@ export class Narration {
     if (this.silent || (level === "debug" && !this.debug)) {
       return;
     }
-    if (level === "progress" && !Output.screen) {
+    if (!Output.screen && level !== "warn" && level !== "fail" && level !== "debug") {
       return;
     }
     if (this.chain.chained) {

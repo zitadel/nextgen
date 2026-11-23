@@ -175,6 +175,8 @@ function commitConfig(
  * diff, writing nothing to the server.
  */
 export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand)) {
+  static override narratesItsAnswer = true;
+
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
   static override group = CommandGroups.releases;

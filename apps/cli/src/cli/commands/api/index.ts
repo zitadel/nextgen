@@ -382,7 +382,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
       });
     }
 
-    log.progress(`${operation.method} ${escapeControlCharacters(String(url))}`);
+    log.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
     const destructive = request.operation.destructive;
     const consent = destructive
       ? await this.consent({

@@ -6,7 +6,7 @@ import { writePlain } from "./plain";
  * What a line of narration is. The level decides the mark it carries in a
  * wizard's chain; a normal command draws every level as a plain line.
  */
-export type LogLevel = "info" | "done" | "start" | "progress" | "warn" | "fail" | "plain" | "debug";
+export type LogLevel = "info" | "done" | "start" | "warn" | "fail" | "plain" | "debug";
 
 /** Whatever draws a command's narration: the UI the base command hands it to. */
 export type LogSink = (level: LogLevel, text: string) => void;
@@ -26,6 +26,9 @@ export type LogSink = (level: LogLevel, text: string) => void;
 export class Log {
   /** Every sink still installed, oldest first; the newest draws. */
   private readonly sinks: Array<{ draw: LogSink }> = [];
+
+  /** Everyone who is told of each line as it is said, whatever draws it. */
+  private readonly taps: LogSink[] = [];
 
   /**
    * A statement of fact: what was found, or where a command is pointed.
@@ -52,17 +55,6 @@ export class Log {
    */
   start(...args: unknown[]): void {
     this.emit("start", args);
-  }
-
-  /**
-   * What the command is doing while it works, which says nothing the result does
-   * not: a request being made, a wait. A terminal draws it, and off a terminal
-   * it is dropped, so a script reading stdout is never given it.
-   *
-   * @param args - What to say, formatted the way `console` formats it.
-   */
-  progress(...args: unknown[]): void {
-    this.emit("progress", args);
   }
 
   /**
@@ -124,6 +116,24 @@ export class Log {
   }
 
   /**
+   * Hears every line said until the returned function is called, without
+   * drawing it. A command that answers by narrating uses it to keep what it
+   * said, so it can put that in its result.
+   *
+   * @param observer - Told of each line as it is said.
+   * @returns A function that stops listening.
+   */
+  tap(observer: LogSink): () => void {
+    this.taps.push(observer);
+    return () => {
+      const at = this.taps.indexOf(observer);
+      if (at !== -1) {
+        this.taps.splice(at, 1);
+      }
+    };
+  }
+
+  /**
    * Hands one line to the newest sink, or writes it plainly when there is none.
    *
    * @param level - What the line is.
@@ -131,6 +141,9 @@ export class Log {
    */
   private emit(level: LogLevel, args: readonly unknown[]): void {
     const text = format(...args);
+    for (const observer of this.taps) {
+      observer(level, text);
+    }
     const sink = this.sinks.at(-1);
     if (sink !== undefined) {
       sink.draw(level, text);

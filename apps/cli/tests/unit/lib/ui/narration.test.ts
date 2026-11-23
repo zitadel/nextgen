@@ -31,7 +31,8 @@ const drawn = (chain = new Collected(), options: { debug?: boolean; silent?: boo
 };
 
 describe("Narration", () => {
-  it("draws what a command says into the chain", () => {
+  it("draws what a command says into the chain", ({ terminal }) => {
+    terminal.tty(true);
     const { chain } = drawn();
 
     log.info("Looking for a project");
@@ -39,7 +40,8 @@ describe("Narration", () => {
     expect(chain.lines).toEqual([`${stripAnsi(MARK.info)} Looking for a project`]);
   });
 
-  it("gives each level the mark that level deserves", () => {
+  it("gives each level the mark that level deserves", ({ terminal }) => {
+    terminal.tty(true);
     const { chain } = drawn();
 
     log.done("Done");
@@ -52,7 +54,8 @@ describe("Narration", () => {
     );
   });
 
-  it("draws a blank line as it was written, so a note keeps its spacing", () => {
+  it("draws a blank line as it was written, so a note keeps its spacing", ({ terminal }) => {
+    terminal.tty(true);
     const { chain } = drawn();
 
     log.info("");
@@ -103,62 +106,53 @@ describe("Narration", () => {
       new Narration(new Collected()).restore();
     }).not.toThrow();
   });
-  describe("when no chain is drawn", () => {
-    it("writes a progress line on a terminal", ({ terminal }) => {
-      terminal.tty(true);
-      drawn(new Collected(false));
-
-      log.progress("GET https://example.test/");
-
-      expect(terminal.plain()).toContain("GET https://example.test/");
-    });
-
-    it("leaves a progress line out off a terminal, so stdout holds only what a script reads", ({
-      terminal,
-    }) => {
-      terminal.tty(false);
-      drawn(new Collected(false));
-
-      log.progress("GET https://example.test/");
-
-      expect(terminal.plain()).toBe("");
-    });
-
+  describe("off a terminal", () => {
     it.for<[string, () => void]>([
       ["info", () => log.info("a statement")],
       ["done", () => log.done("a result")],
       ["start", () => log.start("a beginning")],
       ["plain", () => log.plain("a link")],
     ])(
-      "still writes a %s line off a terminal, which can be the command's answer",
+      "leaves a %s line out, so stdout holds only what a script reads",
       ([, say], { terminal }) => {
         terminal.tty(false);
         drawn(new Collected(false));
 
         say();
 
-        expect(terminal.plain()).not.toBe("");
+        expect(terminal.plain()).toBe("");
       },
     );
 
-    it("draws a progress line into a chain on a terminal", ({ terminal }) => {
+    it("leaves a line out of a chain too", ({ terminal }) => {
+      terminal.tty(false);
+      const { chain } = drawn();
+
+      log.start("Waiting for the browser step to finish");
+
+      expect(chain.lines).toEqual([]);
+    });
+  });
+
+  describe("on a terminal", () => {
+    it("writes a line", ({ terminal }) => {
+      terminal.tty(true);
+      drawn(new Collected(false));
+
+      log.info("a statement");
+
+      expect(terminal.plain()).toContain("a statement");
+    });
+
+    it("draws a line into a chain", ({ terminal }) => {
       terminal.tty(true);
       const { chain } = drawn();
 
-      log.progress("Waiting for the browser step to finish");
+      log.start("Waiting for the browser step to finish");
 
       expect(chain.lines).toEqual([
         `${stripAnsi(MARK.started)} Waiting for the browser step to finish`,
       ]);
-    });
-
-    it("leaves a progress line out of a chain off a terminal", ({ terminal }) => {
-      terminal.tty(false);
-      const { chain } = drawn();
-
-      log.progress("Waiting for the browser step to finish");
-
-      expect(chain.lines).toEqual([]);
     });
   });
 });

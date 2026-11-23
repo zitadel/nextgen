@@ -31,6 +31,8 @@ const NAME_PROVIDER_REFUSAL = {
  * can be removed today.
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
+  static override narratesItsAnswer = true;
+
   static override description = "Remove an identity provider from a user schema.";
   static override group = CommandGroups.signIn;
   static override groupOrder = 1;

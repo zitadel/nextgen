@@ -36,6 +36,8 @@ const MESSAGE = {
  * `zitadel release create` — build a release from .zitadel/ without deploying it.
  */
 export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
+  static override narratesItsAnswer = true;
+
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.releases;
   static override groupOrder = 4;

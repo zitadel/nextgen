@@ -127,6 +127,8 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * values the platform and the pipeline need.
  */
 export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand)) {
+  static override narratesItsAnswer = true;
+
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 2;
@@ -251,7 +253,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
     if (flags.project === undefined) {
-      log.progress(`Created project ${escapeControlCharacters(project.id)}`);
+      log.info(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     this.ui.ranAgainst(projectId, server);
@@ -550,7 +552,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
     projectSecret: string;
     suggest: Suggest;
   }): Promise<InitialDeployment | undefined> {
-    log.progress("Deploying .zitadel/ to the new environment");
+    log.info("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await Environment.deployInitialRelease({
         client: createZitadelClient({
@@ -567,7 +569,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
           this.narrate(notices);
         },
       });
-      log.progress(
+      log.info(
         `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;

@@ -187,9 +187,8 @@
   sink decides the look, and `--json` installs one that draws nothing; with no
   sink installed, a line is written plainly. A unit test fails on a
   `consola` import.
-- Say what a command is working on, with nothing for a script to read, as `log.progress`: a
-  terminal draws it, `--json` and a pipe drop it, so a command checks neither. `info`, `done`,
-  `start` and `plain` are for a line that is part of the answer and stay on a pipe.
+- A `log` line is for a person at a terminal: a terminal draws it, `--json` and a pipe drop it
+  (`warn` and `fail` stay). Put anything a script reads in the command's result, never a `log` line.
 - Report a warning through `warnings.report` (`src/lib/ui/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.
