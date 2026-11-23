@@ -330,18 +330,19 @@ describe("variable get", () => {
     });
   });
 
-  it("prints the whole record on a pipe, as every other get does", async ({ dir: cwd }) => {
+  it("prints the record as plain text off a terminal, and JSON only with --json", async ({
+    dir: cwd,
+  }) => {
     await makeProject(cwd);
     server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "999-prod" })));
 
     const res = await runCliForTest(["variable", "get", "GOOGLE_CLIENT_ID", ...plainArgs(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(JSON.parse(res.stdout)).toEqual({
-      name: "GOOGLE_CLIENT_ID",
-      secret: false,
-      value: "999-prod",
-    });
+    expect(res.stdout).toMatch(/value\s+999-prod/);
+    expect(() => {
+      JSON.parse(res.stdout);
+    }).toThrow();
   });
 
   it("gives a pipe no value to capture for a secret", async ({ dir: cwd }) => {
@@ -353,7 +354,7 @@ describe("variable get", () => {
     const res = await runCliForTest(["variable", "get", "TOKEN", ...plainArgs(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(JSON.parse(res.stdout)).toEqual({ name: "TOKEN", secret: true });
+    expect(res.stdout).toMatch(/value\s+\(secret\)/);
   });
 
   it("lays the record out field by field on a terminal", async ({ dir: cwd, terminal }) => {

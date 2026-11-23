@@ -2,8 +2,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { Paging } from "@/lib/backend/transport";
-import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
-import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import { fieldPaths } from "@/lib/oclif/crud/paths";
 import {
   type ParsedFilter,
   parseFilter,
@@ -15,7 +14,7 @@ import { parseOrThrow, pluralOf } from "@/lib/oclif/crud/shared";
 import type { FilterField, Json, ListSpec } from "@/lib/oclif/crud/types";
 import { wireOf } from "@/lib/oclif/crud/wire";
 import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
-import { plainFlag } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag } from "@/lib/oclif/tabulatable";
 import type { CommandResult } from "@/lib/oclif/types";
 
 import {
@@ -85,21 +84,6 @@ export abstract class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<C
         exclusive: ["page-token"],
       }),
     };
-    const presentation = {
-      fields: Flags.custom<
-        readonly string[],
-        Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
-      >({
-        parse: async (input, _command, flag) => {
-          return readColumns(input, flag.fallback, flag.shape);
-        },
-      })({
-        description:
-          "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
-        fallback: resource.columns,
-        shape: fieldPaths(spec.item),
-      }),
-    };
     const filters = spec.filters ?? [];
     const sorts = spec.sorts ?? [];
     // One `--filter` for every list. The help names each field with the
@@ -160,7 +144,10 @@ export abstract class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<C
       ],
       flags: {
         ...(paged ? pagingFlags : {}),
-        ...presentation,
+        fields: fieldsFlag({
+          fallback: resource.columns,
+          shape: fieldPaths(spec.item),
+        }),
         ...specific,
         ...options.flags,
         plain: plainFlag,
@@ -277,7 +264,7 @@ export abstract class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<C
     );
 
     const rows = items;
-    const columns = chosenColumns(flags.fields, resource.columns, items, shape);
+    const columns = resource.columns;
     const footer: string[] = [];
     const page = {
       token: next,
@@ -286,9 +273,13 @@ export abstract class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<C
     const extra = {};
 
     return this.listResult(
-      { plain: flags.plain === true },
+      {
+        plain: flags.plain === true,
+        fields: flags.fields,
+      },
       {
         columns,
+        shape,
         rows,
         items,
         singular: resource.singular,

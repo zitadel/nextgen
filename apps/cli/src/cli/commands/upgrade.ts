@@ -97,7 +97,6 @@ export default class Upgrade extends ServerCommand(BaseCommand) {
       installer: new PackageInstaller({
         cwd: this.cwd,
         typedCwd: flags.cwd,
-        redirectStdoutToStderr: this.isJson,
       }),
     });
 

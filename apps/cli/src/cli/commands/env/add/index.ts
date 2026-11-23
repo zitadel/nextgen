@@ -14,6 +14,7 @@ import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { type Refused, reads, taken } from "@/lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Promptable } from "@/lib/oclif/promptable";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -125,7 +126,7 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
+export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand)) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 2;
@@ -562,8 +563,6 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
         projectId: opts.projectId,
         cwd: opts.cwd,
         env: this.env,
-        json: this.isJson,
-        color: this.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
         narrate: (notices) => {
           this.narrate(notices);

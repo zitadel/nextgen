@@ -102,6 +102,59 @@ describe("api ls", () => {
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
 
+    it("cuts the records of --json to the fields named", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiOperations("getLive", "--fields", "id");
+
+      expect(app.envelopeOf(result).data).toMatchObject({ items: [{ id: "getLive" }] });
+      expect(result.stdout).not.toContain('"method"');
+    });
+
+    it("accepts a field below one the shape leaves open, whatever the filter left", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiOperations("getLive", "--fields", "id,body.type");
+
+      expect(app.envelopeOf(result).data).toMatchObject({ items: [{ id: "getLive" }] });
+    });
+
+    it("refuses a path through a list, which the shape does not leave open", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiOperations("getLive", "--fields", "parameters.name");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it.each([
+      "id",
+      "method",
+      "path",
+      "summary",
+      "tag",
+      "auth",
+      "callable",
+      "parameters",
+      "body",
+      "paging",
+      "command",
+    ])("accepts %s, which an operation carries under --json", async (field) => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiOperations("getLive", "--fields", field);
+
+      expect(result).toSucceed();
+    });
+
+    it("refuses a field no operation carries, whatever the filter left", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiOperations("nosuchthing", "--fields", "bogus");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
     describe("--json", () => {
       it("lists the operations of a tag with what a caller needs to build the call", async () => {
         const app = await aSetUpApp();

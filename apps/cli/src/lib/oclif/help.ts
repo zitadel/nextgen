@@ -41,7 +41,24 @@ export abstract class GroupedHelp extends Help {
   /** The groups the root screen lists, in print order; commands with no group are listed with the last. */
   protected abstract readonly groups: readonly string[];
 
+  /**
+   * Shows help for `argv`. With `--json` among them the wrapped `help` command
+   * answers, which prints the text this class makes and wraps it in the
+   * envelope.
+   *
+   * @param argv - The words typed.
+   */
   override async showHelp(argv: string[]): Promise<void> {
+    if (argv.includes("--json")) {
+      await this.config.runCommand("help", [
+        ...argv.filter((word) => {
+          return word !== "--help" && word !== "-h" && word !== "--json";
+        }),
+        "--json",
+      ]);
+
+      return;
+    }
     const nouns = aliasedNouns(this.config.commands);
     const subject = argv.findIndex((word) => {
       return !word.startsWith("-");

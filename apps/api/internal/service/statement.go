@@ -849,11 +849,9 @@ type InvitationStatements interface {
 	// [database.NoRowFoundError].
 	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error)
 	// DeleteUnacceptedInvitation removes an invitation that was not accepted,
-	// as replace does. An accepted or absent one returns a [database.NoRowFoundError].
+	// as cancel and replace do. An accepted or absent one returns a
+	// [database.NoRowFoundError].
 	DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error
-	// DeleteCancellableInvitation removes a pending, unexpired invitation or
-	// a rejected one. Any other invitation returns a [database.NoRowFoundError].
-	DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error
 	// CountPendingInvitations counts the project's pending, unexpired
 	// invitations. The cap holds only when the count and the create run in
 	// one transaction under LockProject.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { chosenColumns, readColumns } from "@/lib/oclif/columns";
 import { fieldPaths } from "@/lib/oclif/crud/paths";
 
 describe("readColumns", () => {
@@ -30,6 +30,7 @@ describe("chosenColumns", () => {
   it.each([
     [["emial"], "No such column: emial"],
     [["emial", "nme"], "No such columns: emial, nme"],
+    [["emial", "emial"], "No such column: emial"],
   ])("words a refusal of %j for one column or several", (chosen, message) => {
     expect(() => chosenColumns(chosen, ["id"], [{ id: "1", email: "a@b.c", name: "n" }])).toThrow(
       message,

@@ -2,7 +2,6 @@ import type { ServerAddresses } from "@/lib/environment";
 import { serverFlag } from "@/lib/oclif/flags";
 import type { BaseCommand } from "@/lib/oclif";
 import type { CommandClass } from "@/lib/oclif/command-class";
-import { Promptable } from "@/lib/oclif/promptable";
 import {
   LocalRuntime,
   type LocalMachine,
@@ -117,7 +116,7 @@ export function ChoosingServerCommand<
   TBase extends CommandClass<BaseCommand> &
     Pick<typeof BaseCommand, "baseFlags" | "enableJsonFlag">,
 >(Base: TBase) {
-  abstract class ServerChoosing extends Promptable(ServerCommand(Base)) {
+  abstract class ServerChoosing extends ServerCommand(Base) {
     /**
      * Resolves nothing before the person is asked: the run's `source` stays
      * empty, as it does for a command that names no server, and
@@ -153,7 +152,7 @@ export function ChoosingServerCommand<
      * @throws {ZitadelError} When the answer is not a server, or no one can be asked.
      */
     protected async askServer(retry: SuggestedCommand): Promise<string> {
-      return this.ask.text({
+      return this.ui.questions().text({
         name: "server",
         message: "What is the URL of your Zitadel server?",
         flag: "--server",
