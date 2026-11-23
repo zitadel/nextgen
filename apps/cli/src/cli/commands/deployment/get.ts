@@ -6,13 +6,11 @@ import { GetDeploymentParams } from "@/lib/backend/schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
-import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 import { ServerCommand } from "@/cli/commands/server-command";
-import { Output } from "@/lib/ui";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
@@ -53,10 +51,11 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
   protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
-    const shows = !Output.json && Output.screen;
     const [deployment, variables] = await Promise.all([
       deploymentService.get(args.deploymentId),
-      shows ? deploymentService.variables(args.deploymentId) : undefined,
+      this.forHumans(() => {
+        return deploymentService.variables(args.deploymentId);
+      }),
     ]);
 
     const listed =
@@ -79,18 +78,6 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
           ];
     const frozen = variables === undefined ? undefined : listed;
     const title = `Read ${escapeControlCharacters(deployment.id)}`;
-    if (!shows) {
-      return this.emit({
-        status: "ok",
-        data: deployment,
-        pretty: json(deployment),
-        summary: {
-          title,
-          sections: [],
-        },
-      });
-    }
-
     return this.emit({
       status: "ok",
       data: deployment,

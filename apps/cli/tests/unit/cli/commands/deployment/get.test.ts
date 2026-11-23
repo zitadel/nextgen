@@ -118,22 +118,36 @@ describe("deployment get", () => {
     expect(res.stdout).toMatch(/^ {2,}TOKEN {2,}\(secret\)$/m);
   });
 
-  it("gives a pipe the record itself, as every other get does", async ({ server, dir: cwd }) => {
+  it("gives a pipe the plain text, and JSON only with --json", async ({ server, dir: cwd }) => {
     await aProject(server, cwd);
 
     const res = await read(cwd);
 
-    expect(JSON.parse(res.stdout)).toMatchObject({ id: "dep_1", kind: "primary" });
+    expect(res.stdout).toMatch(/id\s+dep_1/);
+    expect(() => {
+      JSON.parse(res.stdout);
+    }).toThrow();
   });
 
-  it("asks for the frozen set only for the rendering that names it", async ({
+  it("asks for the frozen set only for a rendering a person reads, never for --json", async ({
     server,
     dir: cwd,
   }) => {
     const variableReads: string[] = [];
     await aProject(server, cwd, variableReads);
 
-    await read(cwd);
+    await runCliForTest([
+      "deployment",
+      "get",
+      "dep_1",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--no-telemetry",
+      "--json",
+    ]);
     expect(variableReads).toHaveLength(0);
 
     await asTerminal(() => read(cwd));

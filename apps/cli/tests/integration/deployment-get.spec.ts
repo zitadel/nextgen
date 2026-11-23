@@ -342,28 +342,16 @@ describe("deployment get", () => {
         },
       );
 
-      it("prints the record whole, piped, so a script can read it", async () => {
+      it("prints the record as plain text, piped, and JSON only with --json", async () => {
         const app = await aSetUpApp();
         const deployed = await app.deployData();
 
         const result = await app.run(["deployment", "get", deployed.deployment_id ?? ""]);
 
-        expect(JSON.parse(result.stdout)).toEqual({
-          id: deployed.deployment_id,
-          project_id: expect.stringMatching(/^proj-/),
-          release_id: deployed.release_id,
-          targets: [{ origin: "http://localhost:3000" }],
-          kind: "primary",
-          status: "live",
-          deployed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/),
-          metadata: {
-            reason: "deploy",
-            message: "Initial deployment from setup",
-            rollback_to: null,
-            deployed_by: null,
-            deployed_by_type: "service",
-          },
-        });
+        expect(result).toPrintRow("id", deployed.deployment_id ?? "");
+        expect(() => {
+          JSON.parse(result.stdout);
+        }).toThrow();
       });
 
       it("explains a refusal with the message the envelope carries", async () => {

@@ -259,6 +259,19 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
     return this.meta.isTTY;
   }
 
+  /**
+   * Runs a read only a person reads the result of: the extra lookup that fills
+   * a human rendering and appears nowhere in `data`. Under `--json` it is not
+   * run, so the envelope never costs a request, or a permission, that nothing
+   * in it uses.
+   *
+   * @param read - The lookup, which a command states without asking where its output goes.
+   * @returns What it read, or `undefined` when nobody reads a rendering.
+   */
+  protected async forHumans<T>(read: () => Promise<T>): Promise<T | undefined> {
+    return Output.json ? undefined : read();
+  }
+
   /** The release of the CLI that is running. */
   protected get cliVersion(): string {
     return this.meta.cliVersion;

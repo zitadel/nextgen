@@ -11,7 +11,6 @@ import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
-import { Output } from "@/lib/ui";
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;
@@ -107,11 +106,12 @@ export default class DeploymentList extends Tabulatable(ServerCommand(Environmen
       },
     );
 
-    const serving = Output.json
-      ? new Map<string, Deployment>()
-      : await PreviewExpiries.reading(() => {
+    const serving =
+      (await this.forHumans(() => {
+        return PreviewExpiries.reading(() => {
           return deploymentService.servingLivePreviews(listed.items, flags.live === true);
         }, new Map<string, Deployment>());
+      })) ?? new Map<string, Deployment>();
     const expiries = await PreviewExpiries.of(client, projectId).live(
       [...serving.values()].flatMap((deployment) => {
         return deployment.origins;
