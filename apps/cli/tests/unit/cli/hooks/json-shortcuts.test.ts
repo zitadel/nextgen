@@ -45,4 +45,20 @@ describe("the json-shortcuts hook", () => {
 
     expect(result.stdout).toContain("Usage");
   });
+
+  it("leaves --version as the plain version line when nothing asks for JSON", async () => {
+    const result = await runCliForTest(["--version"]);
+
+    expect(result.stdout).toMatch(/zitadel|@zitadel\/cli/);
+    expect(result.stdout).not.toContain('"status"');
+  });
+
+  it.each([["version"], ["commands"]])(
+    "leaves %s with --json to its own command, as one envelope",
+    async (id) => {
+      const result = await runCliForTest([id, "--json"]);
+
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", command: id });
+    },
+  );
 });

@@ -1261,3 +1261,51 @@ describe("update confirmation", () => {
     expect(bodies).toEqual([{ name: "a" }]);
   });
 });
+
+describe("list truncation", () => {
+  const pages: ListSpec<Ctx, Json, { teams: readonly unknown[]; next_page_token?: string }> = {
+    ...list,
+    body: z.object({}).passthrough(),
+    call: async (_ctx, body) => {
+      const token = (body as { page_token?: string }).page_token;
+
+      return token === undefined
+        ? { teams: [{ id: "team_1", name: "a" }], next_page_token: "p2" }
+        : { teams: [{ id: "team_2", name: "b" }] };
+    },
+  };
+
+  /**
+   * Runs the list command and reads the `data` of the envelope it answered.
+   *
+   * @param spec - How the resource lists.
+   * @param argv - The words after `team list`.
+   * @returns The envelope's `data`.
+   */
+  async function listed(
+    spec: ListSpec<Ctx, Json, { teams: readonly unknown[]; next_page_token?: string }>,
+    argv: string[],
+  ): Promise<{ truncated: boolean; count: number }> {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(spec as ListSpec<Ctx>),
+    );
+    const envelope = await Reflect.apply(command.run, command, [argv]);
+
+    return JSON.parse(JSON.stringify(envelope)).data;
+  }
+
+  it("says more remain when the page ends with a next page token", async () => {
+    expect(await listed(pages, ["--json"])).toMatchObject({
+      truncated: true,
+      count: 1,
+    });
+  });
+
+  it("says nothing remains once --all has drained every page", async () => {
+    expect(await listed(pages, ["--all", "--json"])).toMatchObject({
+      truncated: false,
+      count: 2,
+    });
+  });
+});

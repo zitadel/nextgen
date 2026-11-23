@@ -116,8 +116,15 @@ export function Wrapped<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
         written.push([message, ...args].join(" "));
       };
       const write = process.stdout.write;
-      process.stdout.write = ((chunk: string | Uint8Array): boolean => {
+      process.stdout.write = ((
+        chunk: string | Uint8Array,
+        encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+        callback?: (error?: Error | null) => void,
+      ): boolean => {
         written.push(String(chunk).replace(/\n$/, ""));
+        const done = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
+        done?.();
+
         return true;
       }) as typeof process.stdout.write;
       const consoleLog = console.log;

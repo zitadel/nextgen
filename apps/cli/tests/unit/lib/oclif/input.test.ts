@@ -176,6 +176,22 @@ describe("Input", () => {
       ]);
     });
 
+    it.each([
+      ["two short flags", ["-e", "production", "-c", "/x"], ["--env=production", "--cwd=/x"]],
+      [
+        "two short flags the other way round",
+        ["-c", "/x", "-e", "production"],
+        ["--cwd=/x", "--env=production"],
+      ],
+      [
+        "a short flag and a long one",
+        ["-c/x", "--env", "production", "--json"],
+        ["--cwd=/x", "--env=production", "--json"],
+      ],
+    ])("keeps the global flags the line gave as %s", async (_how, typed, kept) => {
+      expect(await expanded([...typed, "--input", '{"limit":3}'])).toEqual([...kept, "--limit=3"]);
+    });
+
     it("keeps --json", async () => {
       expect(await expanded(["--json", "--input", '{"limit":3}'])).toEqual(["--json", "--limit=3"]);
     });
