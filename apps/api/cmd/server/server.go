@@ -445,21 +445,21 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		schemaStore,
 		serviceDBPool,
 		signupProtection)
-	stateMachine := flowengine.NewFlowStateMachine(
-		storageSchemaResolver,
+	stateMachine := flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
+		Schemas: storageSchemaResolver,
 		// The raw statements: the state machine only hands this store to the
 		// resolver, which follows the namespace itself, so the aliasing wrapper
 		// would only double the reads of a miss.
-		serviceDBPool.Statements(),
-		fields,
-		createUserHandler,
-		flowAuth,
-		service.NewFlowSSOProviderResolver(idpConnectionService),
-		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
-		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
-		passwordPolicy,
-		time.Now,
-	)
+		SchemaStore:   serviceDBPool.Statements(),
+		Fields:        fields,
+		CreateUser:    createUserHandler,
+		AuthAttempts:  flowAuth,
+		SSOProviders:  service.NewFlowSSOProviderResolver(idpConnectionService),
+		SSOIdentities: service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
+		SSORedirects:  service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
+		Passwords:     passwordPolicy,
+		Now:           time.Now,
+	})
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases, signupProtection)

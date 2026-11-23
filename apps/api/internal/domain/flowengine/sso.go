@@ -647,7 +647,7 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 	}
 	// Leaving for the provider abandons any pending ceremony; without this
 	// the stale challenge re-attaches on the next render (the mismatch
-	// cleanup in Process never runs on this early-return path).
+	// cleanup in [takeInputs] never runs on this path).
 	pc.state.ClearPendingChallenge()
 	out, err := r.ssoRedirects.Issue(pc.ctx, domain.FlowIssueSSORedirectInput{
 		ProjectID:     pc.state.ProjectID,

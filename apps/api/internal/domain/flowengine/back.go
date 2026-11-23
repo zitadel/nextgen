@@ -16,9 +16,9 @@ func (r *FlowStateMachineRuntime) advance(state *domain.FlowState, prev *domain.
 	state.IssuedAt = r.now()
 }
 
-// processBack pops the previous BackStack entry and re-renders that step,
-// restoring the snapshotted purpose. PendingChallenge is dropped; History is
-// left intact.
+// backHandler handles kind=back: it pops the previous BackStack entry and
+// re-renders that step, restoring the snapshotted purpose. PendingChallenge
+// is dropped; History is left intact.
 //
 // CollectedData.UserData survives, so the previous form prefills. The rest of
 // CollectedData depends on where back lands: a step that collects the
@@ -26,7 +26,11 @@ func (r *FlowStateMachineRuntime) advance(state *domain.FlowState, prev *domain.
 // the resolved user and the password collected for them go too, and the auth
 // attempt rotates with them (see [dropResolvedUser]). Landing anywhere else
 // leaves all of it in place.
-func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
+type backHandler struct{}
+
+func (backHandler) acceptsSignupProof(*domain.FlowState, FlowSubmitInput) bool { return false }
+
+func (backHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
 	prev, ok := pc.state.PeekBackStack()
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", domain.ErrFlowInvalidAction(), pc.state.CurrentStep)

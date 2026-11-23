@@ -16,7 +16,9 @@ It does not own:
 `flowengine` imports `domain`; `domain` never imports `flowengine`.
 
 Files by concern: `state_machine.go` (the interface, start and process),
-`routing.go`, `render.go`, `back.go`, `fields.go`, `passkey.go` and `sso.go`;
-each test file is named after the concern it covers.
+`actions.go` (the table of one handler per action kind, which `Process`
+dispatches to), `routing.go`, `render.go`, `back.go`, `fields.go`,
+`passkey.go` and `sso.go`; each kind's handler lives in its concern's file,
+and each test file is named after the concern it covers.
 
 The design lives in [docs/design/flowengine](../../../../../docs/design/flowengine/).

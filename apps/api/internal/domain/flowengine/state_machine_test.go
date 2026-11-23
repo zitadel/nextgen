@@ -145,18 +145,18 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
 
-	sm := flowengine.NewFlowStateMachine(
-		schemaResolver,
-		schemaStore,
-		resolver,
-		createUser,
-		authAttemptService,
-		ssoProviders,
-		ssoIdentities,
-		ssoRedirects,
-		passwords,
-		now,
-	)
+	sm := flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
+		Schemas:       schemaResolver,
+		SchemaStore:   schemaStore,
+		Fields:        resolver,
+		CreateUser:    createUser,
+		AuthAttempts:  authAttemptService,
+		SSOProviders:  ssoProviders,
+		SSOIdentities: ssoIdentities,
+		SSORedirects:  ssoRedirects,
+		Passwords:     passwords,
+		Now:           now,
+	})
 
 	return &flowTestWorld{
 		mock:               mock,

@@ -340,33 +340,38 @@ type FlowStateMachineRuntime struct {
 	now           func() time.Time
 }
 
-// NewFlowStateMachine wires the runtime. The now hook is injectable so
-// tests can produce deterministic [domain.FlowState.IssuedAt] values.
-func NewFlowStateMachine(
-	schemas domain.SchemaResolver,
-	schemaStore domain.JSONSchemaStore,
-	fields domain.FlowFieldResolver,
-	createUser domain.FlowOnSuccessHandler,
-	authAttempts domain.FlowAuthAttemptService,
-	ssoProviders domain.FlowSSOProviderResolver,
-	ssoIdentities domain.FlowSSOIdentityService,
-	ssoRedirects domain.FlowSSORedirectIssuer,
-	passwords domain.FlowPasswordPolicy,
-	now func() time.Time,
-) *FlowStateMachineRuntime {
+// FlowStateMachineDeps are the services the runtime calls. Now is injectable
+// so tests can produce deterministic [domain.FlowState.IssuedAt] values; nil
+// means [time.Now].
+type FlowStateMachineDeps struct {
+	Schemas       domain.SchemaResolver
+	SchemaStore   domain.JSONSchemaStore
+	Fields        domain.FlowFieldResolver
+	CreateUser    domain.FlowOnSuccessHandler
+	AuthAttempts  domain.FlowAuthAttemptService
+	SSOProviders  domain.FlowSSOProviderResolver
+	SSOIdentities domain.FlowSSOIdentityService
+	SSORedirects  domain.FlowSSORedirectIssuer
+	Passwords     domain.FlowPasswordPolicy
+	Now           func() time.Time
+}
+
+// NewFlowStateMachine wires the runtime.
+func NewFlowStateMachine(deps FlowStateMachineDeps) *FlowStateMachineRuntime {
+	now := deps.Now
 	if now == nil {
 		now = time.Now
 	}
 	return &FlowStateMachineRuntime{
-		schemas:       schemas,
-		schemaStore:   schemaStore,
-		fields:        fields,
-		userCreater:   createUser,
-		authAttempts:  authAttempts,
-		ssoProviders:  ssoProviders,
-		ssoIdentities: ssoIdentities,
-		ssoRedirects:  ssoRedirects,
-		passwords:     passwords,
+		schemas:       deps.Schemas,
+		schemaStore:   deps.SchemaStore,
+		fields:        deps.Fields,
+		userCreater:   deps.CreateUser,
+		authAttempts:  deps.AuthAttempts,
+		ssoProviders:  deps.SSOProviders,
+		ssoIdentities: deps.SSOIdentities,
+		ssoRedirects:  deps.SSORedirects,
+		passwords:     deps.Passwords,
 		now:           now,
 	}
 }
@@ -428,7 +433,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 }
 
 // processCtx carries the per-submission context threaded through the
-// per-kind methods and their helpers.
+// action kind handlers and their helpers.
 type processCtx struct {
 	ctx         context.Context
 	def         *domain.FlowDefinition
@@ -438,7 +443,7 @@ type processCtx struct {
 }
 
 // Process advances the flow one step by dispatching the submission to
-// the handler for its action kind.
+// the handler for its action kind (see [actionKindHandlers]).
 func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState, in FlowSubmitInput) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", domain.ErrFlowIntegrity())
@@ -460,63 +465,28 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *domain.FlowD
 	if in.Action == domain.FlowActionSSO || in.SSOProvider != nil {
 		return r.processSSO(pc)
 	}
-	actionKind := stepActionKind(currentStep, in.Action)
+	handler, ok := actionKindHandlers[stepActionKind(currentStep, in.Action)]
 	// Only an action the step declares can be submitted. The outcome names
 	// (user_not_found, sso_authenticated, ...) are routed by the engine
 	// alone; a client naming one would otherwise take that route.
-	if actionKind == domain.FlowActionKindUnset {
+	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), in.Action, currentStep.Name)
 	}
+	return handler.process(r, pc)
+}
 
-	// Back and Navigate both skip the input pipeline entirely.
-	if actionKind == domain.FlowActionKindBack {
-		return r.processBack(pc)
-	}
-	if actionKind == domain.FlowActionKindNavigate {
-		// Navigating abandons any pending ceremony; without this the
-		// stale challenge re-attaches on the next render (the mismatch
-		// cleanup below never runs on this early-return path).
-		state.ClearPendingChallenge()
-		return r.routeOutcome(pc, domain.FlowResolvedFields{}, in.Action, false)
-	}
+// submitHandler handles kind=submit: collect the step's fields, dispatch
+// challenges, run on_success (if declared), and route the resulting outcome.
+type submitHandler struct{}
 
-	// Every other kind resolves the step's inputs, then validates and
-	// merges what the client sent.
-	resolved, err := r.resolveInputs(pc)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	if actionKind == domain.FlowActionKindPasskey {
-		pc.in.Fields = identifierFieldsOnly(resolved, pc.in.Fields)
-	}
-	halt, err := r.validateAndMerge(pc, resolved, actionKind)
+func (submitHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
+	resolved, halt, err := r.takeInputs(pc, stepInputs{collectsStepFields: true})
 	if err != nil {
 		return FlowStepResult{}, err
 	}
 	if halt != nil {
 		return *halt, nil
 	}
-
-	// If a ceremony is pending and the user picked a different action,
-	// drop it so we don't re-emit the abandoned prompt.
-	if state.PendingChallenge != nil && in.ChallengeResponse == nil &&
-		!pendingMatchesKind(state.PendingChallenge.Method, actionKind) {
-		state.ClearPendingChallenge()
-	}
-
-	switch actionKind {
-	case domain.FlowActionKindPasskey:
-		return r.processPasskeyLogin(pc, resolved)
-	case domain.FlowActionKindPasskeyRegister:
-		return r.processPasskeyRegister(pc, resolved)
-	default:
-		return r.processSubmit(pc, resolved)
-	}
-}
-
-// processSubmit handles kind=submit: dispatch challenges, run
-// on_success (if declared), and route the resulting outcome.
-func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error) {
 	// The step's values describe the provider's identity, not a sign-in, so
 	// its identifier is never submitted as one.
 	if pc.currentStep.OnSuccess != nil && *pc.currentStep.OnSuccess == domain.FlowOnSuccessCreateUserWithSso {
@@ -556,6 +526,8 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved domain.
 	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
 }
 
+func (submitHandler) acceptsSignupProof(*domain.FlowState, FlowSubmitInput) bool { return false }
+
 // runOnSuccess dispatches the step's on_success mutation. Add a case
 // when a new [domain.FlowOnSuccess] handler lands.
 func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved domain.FlowResolvedFields) (domain.FlowOnSuccessResult, error) {
@@ -573,56 +545,6 @@ func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved domain.F
 	default:
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", domain.ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
 	}
-}
-
-// acceptsSignupProof reports whether a submission to step may carry the
-// sign-up proof: one to a step that creates its user on success, or one to a
-// step carrying a passkey registration, which creates its user when the
-// attempt has none yet. Only the attestation spends the proof there, but the
-// step announces the gate for as long as the ceremony is pending, so a client
-// solves it for whatever it submits next: the password path it falls back to
-// after a cancelled prompt must not be refused for bringing it.
-func acceptsSignupProof(step *domain.FlowDefinitionStep, state *domain.FlowState, in FlowSubmitInput) bool {
-	if step.OnSuccess != nil && *step.OnSuccess == domain.FlowOnSuccessCreateUser {
-		return true
-	}
-	if !stepHasActionKind(step, domain.FlowActionKindPasskeyRegister) {
-		return false
-	}
-	pending := state.PendingChallenge != nil && state.PendingChallenge.Method == FlowChallengeMethodPasskeyRegister
-	// Without a pending registration only its attestation may bring the
-	// proof: an assertion of a sign-in the step also offers creates nobody.
-	attests := in.ChallengeResponse != nil && in.ChallengeResponse.Method == FlowChallengeMethodPasskeyRegister
-	return pending || attests
-}
-
-// stepHasActionKind reports whether the step declares any action of the
-// given kind.
-func stepHasActionKind(step *domain.FlowDefinitionStep, kind domain.FlowActionKind) bool {
-	for _, a := range step.Actions {
-		if a.Kind == kind {
-			return true
-		}
-	}
-	return false
-}
-
-// stepActionKind returns the kind of the step's action with the given name.
-// Returns the zero value (unset) when name does not match any action on the
-// step.
-func stepActionKind(step *domain.FlowDefinitionStep, actionName string) domain.FlowActionKind {
-	for _, a := range step.Actions {
-		if a.Name == actionName {
-			return a.Kind
-		}
-	}
-
-	// back is not always defined in the step.Actions, it might be auto-injected.
-	if actionName == domain.FlowBackActionName {
-		return domain.FlowActionKindBack
-	}
-
-	return domain.FlowActionKindUnset
 }
 
 // recordResolvedUser stores the resolved user id; if it changed, any

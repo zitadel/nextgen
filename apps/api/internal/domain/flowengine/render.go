@@ -63,7 +63,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *domain.Fl
 // buildStep assembles a FlowStep from the raw pieces. The step it renders is
 // always the caller's to name: Start and renderStep supply state + step
 // directly, mid-pipeline callers pass pc.state + pc.currentStep, and
-// processBack passes pc.state with the back-stack step it just popped to.
+// the back handler passes pc.state with the back-stack step it just popped to.
 func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, resolved domain.FlowResolvedFields, failure *domain.FlowStepFailure, complete *domain.FlowStepComplete, redirectURL *string) (*FlowStep, error) {
 	providers, err := r.resolveSSOProviders(ctx, state, step)
 	if err != nil {

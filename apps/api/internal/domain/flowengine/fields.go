@@ -69,10 +69,10 @@ func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *domain
 //
 // Every action validates the values it sent — which is why a leg that
 // consumes a subset is narrowed to that subset before it gets here (see
-// [identifierFieldsOnly]); field-collecting actions (see
-// [collectsStepFields]) additionally require declared required fields to be
+// [identifierFieldsOnly]); a submission that collects the step's fields (see
+// [stepInputs]) additionally requires declared required fields to be
 // present.
-func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved domain.FlowResolvedFields, actionKind domain.FlowActionKind) (*FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved domain.FlowResolvedFields, collectsStepFields bool) (*FlowStepResult, error) {
 	var errs domain.FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
 		v, ok := errors.AsType[domain.FlowFieldValidationErrors](validationErr)
@@ -81,7 +81,7 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved doma
 		}
 		errs = append(errs, v...)
 	}
-	if collectsStepFields(actionKind, pc.in) {
+	if collectsStepFields {
 		errs = append(errs, r.fields.MissingRequired(resolved, pc.in.Fields)...)
 	}
 	if len(errs) > 0 {
@@ -224,17 +224,6 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (domain.F
 		return domain.FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve visited fields: %w", err)
 	}
 	return resolved, nil
-}
-
-// collectsStepFields reports whether a submission commits the step's
-// fields to user creation: the submit action, or the passkey-register
-// issue leg (no proof yet). These enforce required-field presence; passkey
-// login legs and challenge-verify legs send a subset or none.
-func collectsStepFields(kind domain.FlowActionKind, in FlowSubmitInput) bool {
-	if kind == domain.FlowActionKindSubmit {
-		return true
-	}
-	return kind == domain.FlowActionKindPasskeyRegister && in.ChallengeResponse == nil
 }
 
 // prefillFromCollected sets FlowField.Value from collectedData for any field
