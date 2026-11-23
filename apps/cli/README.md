@@ -901,7 +901,7 @@ Read one deployment by id.
 ```
 USAGE
   $ zitadel deployment get DEPLOYMENT_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   DEPLOYMENT_ID  The deployment to read.
@@ -918,6 +918,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
                           positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1980,7 +1982,7 @@ Read one invitation by id.
 ```
 USAGE
   $ zitadel invitation get INVITATION_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   INVITATION_ID  The invitation to read.
@@ -1997,6 +1999,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
                           positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -4055,7 +4059,7 @@ Get one variable from the project.
 ```
 USAGE
   $ zitadel variable get NAME [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview] [--fields <value>]
 
 ARGUMENTS
   NAME  Variable name to read.
@@ -4072,6 +4076,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
                           positional arguments go under "args". Only the global flags may stand beside it.
       --preview           Read the preview value instead of the primary one.
