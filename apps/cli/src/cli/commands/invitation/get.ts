@@ -5,7 +5,6 @@ import { GetInvitationResponse } from "@/lib/backend/schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
-import { chosenColumns } from "@/lib/oclif/columns";
 import { fieldPaths } from "@/lib/oclif/crud";
 import { fieldsFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -60,29 +59,26 @@ export default class InvitationGet extends Tabulatable(ServerCommand(Environment
     const invitation = await invitationService.get(args.invitationId);
 
     const title = `Read ${escapeControlCharacters(invitation.id)}`;
+    const view = this.viewRecord(invitation, flags.fields, [
+      "id",
+      "name",
+      "role",
+      "status",
+      "created_at",
+      "expires_at",
+      "responded_by",
+      "responded_at",
+    ]);
 
     return this.emit({
       status: "ok",
-      data: flags.fields === undefined ? invitation : this.pickFields(invitation, flags.fields),
+      data: view.data,
       summary: {
         title,
         sections: [],
         lines: this.tabulateDetail(
           undefined,
-          chosenColumns(
-            flags.fields,
-            [
-              "id",
-              "name",
-              "role",
-              "status",
-              "created_at",
-              "expires_at",
-              "responded_by",
-              "responded_at",
-            ],
-            [],
-          ),
+          view.columns,
           flags.fields === undefined
             ? {
                 id: invitation.id,

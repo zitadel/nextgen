@@ -1,4 +1,3 @@
-import { chosenColumns } from "@/lib/oclif/columns";
 import { fieldPaths } from "@/lib/oclif/crud/paths";
 import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
 import type { GetSpec } from "@/lib/oclif/crud/types";
@@ -53,24 +52,22 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
 
   protected override async operate({ flags, args }: ReadInput): Promise<CommandResult> {
     const { resource, spec } = this.definition;
-    const shape = fieldPaths(spec.response);
     const item = await spec.call(await this.context(), idValue(resource, args));
-    const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
     const heading = headingOf(resource.heading ?? resource.idField, item);
     const title = `Read ${escapeControlCharacters(heading ?? resource.singular, { keepLayout: false })}`;
 
-    const record = flags.fields === undefined ? item : this.pickFields(item, flags.fields);
+    const view = this.viewRecord(item, flags.fields, resource.detail ?? resource.columns);
     const sections =
       flags.fields === undefined
         ? ((await spec.sections?.(item, (columns, rows) => {
             return this.tabulate(columns, rows);
           })) ?? [])
         : [];
-    const rendered = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
+    const rendered = [this.tabulateDetail(undefined, view.columns, item), ...sections].join("\n\n");
 
     return {
       status: "ok",
-      data: record,
+      data: view.data,
       pretty: painted(
         [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), rendered].join(
           "\n",

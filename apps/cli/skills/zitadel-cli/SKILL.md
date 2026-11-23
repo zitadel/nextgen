@@ -144,7 +144,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   drops records or fields, so you end up reasoning from partial data. It is
   finite — read it whole, or narrow it *at the source*: use `--fields id,name`
   (every `list` and every `get` takes it, and it cuts each record under `--json`
-  to those dot-paths), a `list` verb's `filter_fields` and pagination to fetch
+  to those dot-paths; a field the record has no value for comes back `null` or
+  omitted, never an error), a `list` verb's `filter_fields` and pagination to fetch
   fewer records, or pipe to `jq` to pull
   just what you need (e.g. `… resources --json | jq '.data.items[].topic'`).
   `jq` may not be installed; `node -e` always is, so fall back to it rather

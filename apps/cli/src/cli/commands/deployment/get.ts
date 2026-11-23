@@ -6,7 +6,6 @@ import { GetDeploymentParams, GetDeploymentResponse } from "@/lib/backend/schema
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
-import { chosenColumns } from "@/lib/oclif/columns";
 import { fieldPaths } from "@/lib/oclif/crud";
 import { fieldsFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
@@ -90,20 +89,23 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
           ];
     const frozen = variables === undefined ? undefined : listed;
     const title = `Read ${escapeControlCharacters(deployment.id)}`;
+    const view = this.viewRecord(deployment, flags.fields, [
+      "id",
+      "release_id",
+      "reason",
+      "origins",
+      "deployed_at",
+    ]);
     return this.emit({
       status: "ok",
-      data: flags.fields === undefined ? deployment : this.pickFields(deployment, flags.fields),
+      data: view.data,
       summary: {
         title,
         sections: [],
         lines: [
           ...this.tabulateDetail(
             undefined,
-            chosenColumns(
-              flags.fields,
-              ["id", "release_id", "reason", "origins", "deployed_at"],
-              [],
-            ),
+            view.columns,
             flags.fields === undefined
               ? {
                   id: deployment.id,
@@ -112,7 +114,7 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
                   origins: deployment.origins.join(", "),
                   deployed_at: deployment.deployed_at,
                 }
-              : this.pickFields(deployment, flags.fields),
+              : view.data,
           ).split("\n"),
           ...(frozen === undefined ? [] : ["", ...frozen]),
         ],

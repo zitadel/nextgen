@@ -285,6 +285,39 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
     }
 
     /**
+     * What a command that reads one record carries and shows under `--fields`:
+     * the record `--json` prints, cut to the paths chosen, and the columns the
+     * human rows draw. The paths were judged against the record's shape when the
+     * flag was parsed, so a path the record does not carry is simply left out
+     * of the data, and the columns are the ones chosen, never re-judged here.
+     *
+     * @param record - The record the command read.
+     * @param fields - The parsed `--fields`, or `undefined` when none was given.
+     * @param fallback - The columns shown when no field was chosen.
+     * @returns The `data` for the envelope, whole when no field was chosen, and the `columns` for the rows.
+     */
+    protected viewRecord<Record_>(
+      record: Record_,
+      fields: readonly string[] | undefined,
+      fallback: readonly string[],
+    ): {
+      readonly data: Record_ | Record<string, unknown>;
+      readonly columns: readonly string[];
+    } {
+      if (fields === undefined) {
+        return {
+          data: record,
+          columns: fallback,
+        };
+      }
+
+      return {
+        data: this.pickFields(record, fields),
+        columns: fields,
+      };
+    }
+
+    /**
      * {@link emitList}, for a caller that returns the result instead of
      * emitting it.
      *

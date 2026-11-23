@@ -50,6 +50,19 @@ describe("variable get", () => {
       expect(result).not.toPrintRow("value");
     });
 
+    it("leaves a secret's value out of the data and prints it as held", async () => {
+      const app = await aSetUpApp();
+      expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();
+
+      const json = await app.run(["variable", "get", "TOKEN", "--fields", "value", "--json"]);
+      const human = await app.run(["variable", "get", "TOKEN", "--fields", "value"]);
+
+      expect(json).toSucceed();
+      expect(app.envelopeOf(json).data).toEqual({ title: "Read TOKEN" });
+      expect(human).toSucceed();
+      expect(human).toPrintRow("value", "(secret)");
+    });
+
     it("never carries a secret's value", async () => {
       const app = await aSetUpApp();
       expect(await app.setVariable("FOO", "hunter2", { secret: true })).toSucceed();

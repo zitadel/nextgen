@@ -124,6 +124,30 @@ describe("deployment get", () => {
       expect(result).not.toPrintRow("release_id");
       expect(result).not.toPrint("variables");
     });
+
+    it("carries a field the platform reports as null, as null", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      const deployed = await app.deployData();
+      const args = [
+        "deployment",
+        "get",
+        deployed.deployment_id ?? "",
+        "--fields",
+        "metadata.deployed_by",
+      ];
+
+      const json = await app.run([...args, "--json"]);
+      const human = await app.run(args);
+
+      expect(json).toSucceed();
+      expect(app.envelopeOf(json).data).toEqual({
+        title: `Read ${deployed.deployment_id}`,
+        metadata: { deployed_by: null },
+      });
+      expect(human).toSucceed();
+      expect(human).not.toPrintRow("deployed_by");
+    });
   });
 
   describe("against a valid server", () => {

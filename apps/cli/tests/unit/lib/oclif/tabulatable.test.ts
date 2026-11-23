@@ -809,6 +809,41 @@ describe("--fields cutting a record", () => {
   });
 });
 
+describe("--fields on one record", () => {
+  const record = {
+    id: "a",
+    name: "Ann",
+    attributes: {
+      email: "ann@example.com",
+      age: 3,
+    },
+  };
+
+  it("carries the whole record and the default columns when no field was chosen", async () => {
+    const view = draw().view(record, undefined, ["id", "name"]);
+
+    expect(view.data).toBe(record);
+    expect(view.columns).toEqual(["id", "name"]);
+  });
+
+  it("cuts the data to the fields chosen and shows them as the columns", async () => {
+    const view = draw().view(record, ["id", "attributes.email"], ["name"]);
+
+    expect(view.data).toEqual({
+      id: "a",
+      attributes: { email: "ann@example.com" },
+    });
+    expect(view.columns).toEqual(["id", "attributes.email"]);
+  });
+
+  it("leaves a field the record lacks out of the data and does not refuse it", async () => {
+    const view = draw().view(record, ["id", "responded_by"], ["name"]);
+
+    expect(view.data).toEqual({ id: "a" });
+    expect(view.columns).toEqual(["id", "responded_by"]);
+  });
+});
+
 describe("every list command", () => {
   it("declares --fields beside --plain, so every list takes it", async () => {
     const root = fileURLToPath(new URL("../../../../src", import.meta.url));

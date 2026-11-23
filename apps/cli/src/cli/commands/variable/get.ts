@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { chosenColumns } from "@/lib/oclif/columns";
 import { fieldsFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
@@ -44,6 +43,9 @@ export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCo
     fields: fieldsFlag({
       fallback: ["name"],
       shape: {
+        /**
+         * The keys of {@link Variable}'s JSON that a single read carries; `variable list` adds the preview.
+         */
         known: new Set(["name", "secret", "value"]),
         open: [],
       },
@@ -60,14 +62,15 @@ export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCo
 
     const title = `Read ${escapeControlCharacters(args.name)}`;
     const cell = VariableView.of(variable).cell();
+    const view = this.viewRecord(variable, flags.fields, ["value"]);
 
     return this.emit({
       status: "ok",
-      data: flags.fields === undefined ? variable : this.pickFields(variable, flags.fields),
+      data: view.data,
       summary: {
         title,
         sections: [],
-        lines: this.tabulateDetail(undefined, chosenColumns(flags.fields, ["value"], []), {
+        lines: this.tabulateDetail(undefined, view.columns, {
           name: variable.name,
           secret: variable.secret,
           value: cell.value === "" ? '""' : cell.value,

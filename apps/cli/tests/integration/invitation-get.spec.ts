@@ -56,6 +56,29 @@ describe("invitation get", () => {
       expect(result).toPrintRow("status", "pending");
       expect(result).not.toPrintRow("role");
     });
+
+    it("carries a field the platform reports as null, as null", async () => {
+      const app = await aSetUpApp();
+      const invitation = await app.invite();
+
+      const json = await app.run([
+        "invitation",
+        "get",
+        invitation,
+        "--fields",
+        "responded_by",
+        "--json",
+      ]);
+      const human = await app.run(["invitation", "get", invitation, "--fields", "responded_by"]);
+
+      expect(json).toSucceed();
+      expect(app.envelopeOf(json).data).toEqual({
+        title: `Read ${invitation}`,
+        responded_by: null,
+      });
+      expect(human).toSucceed();
+      expect(human).not.toPrintRow("responded_by");
+    });
   });
 
   describe("against an invalid server", () => {
