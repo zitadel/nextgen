@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -75,6 +75,16 @@ describe("FlowCanvas", () => {
     expect(level).toHaveTextContent("90%");
     await user.click(screen.getByRole("button", { name: "Fit" }));
     expect(level).toHaveTextContent("100%");
+  });
+
+  it("zooms by the wheel instead of scrolling", () => {
+    render(<FlowCanvas definition={DEFINITION} name="Sign in" />);
+    const wheel = new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true });
+    act(() => {
+      screen.getByRole("region", { name: "Flow canvas" }).dispatchEvent(wheel);
+    });
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(screen.getByRole("status", { name: "Zoom" })).toHaveTextContent("86%");
   });
 
   it("opens full screen at 100% and leaves it by Escape or by its button", async () => {

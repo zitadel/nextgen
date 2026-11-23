@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { resolveLogoUrl } from "@zitadel/components";
 
 import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
@@ -18,6 +18,7 @@ import type { BrandingRevision } from "@/features/branding/branding-palette";
 import { brandingVariables } from "@/features/branding/branding-variables";
 import { useDocumentTheme } from "@/hooks/use-document-theme";
 import { useDragToPan } from "@/hooks/use-drag-to-pan";
+import { useWheel } from "@/hooks/use-wheel";
 import { cn } from "@/lib/utils";
 
 import {
@@ -26,11 +27,13 @@ import {
   type CardSize,
   type FlowCanvasLayout,
   ZOOM_STEP,
+  anchoredScroll,
   clampZoom,
   fitZoom,
   highlightStep,
   layoutFlowCanvas,
   sameCardSizes,
+  wheelZoom,
 } from "../canvas";
 import type { FlowDefinition } from "../model";
 import { StepCard } from "./step-card";
@@ -82,6 +85,28 @@ export function FlowCanvas({
     setZoom(fitZoom({ width: element.clientWidth, height: element.clientHeight }, canvas));
   }, [canvas]);
 
+  const current = useRef(zoom);
+  current.current = zoom;
+  const onWheel = useCallback((event: WheelEvent) => {
+    const element = viewport.current;
+    if (!element) return;
+    event.preventDefault();
+    const from = current.current;
+    const to = wheelZoom(from, event);
+    if (to === from) return;
+    const box = element.getBoundingClientRect();
+    const scroll = anchoredScroll(
+      { left: element.scrollLeft, top: element.scrollTop },
+      { x: event.clientX - box.left, y: event.clientY - box.top },
+      from,
+      to,
+    );
+    // The sizer has to grow before the new offsets fit inside it.
+    flushSync(() => setZoom(to));
+    element.scrollLeft = scroll.left;
+    element.scrollTop = scroll.top;
+  }, []);
+
   useLayoutEffect(() => {
     if (!full) return;
     setZoom(1);
@@ -109,6 +134,7 @@ export function FlowCanvas({
       canvas={canvas}
       zoom={zoom}
       viewport={viewport}
+      onWheel={onWheel}
       branding={branding}
       onMeasure={onMeasure}
       className={full ? "min-h-0 flex-1" : "h-105 rounded-md border"}
@@ -215,6 +241,7 @@ function Viewport({
   canvas,
   zoom,
   viewport,
+  onWheel,
   branding,
   onMeasure,
   className,
@@ -222,11 +249,13 @@ function Viewport({
   canvas: FlowCanvasLayout;
   zoom: number;
   viewport: RefObject<HTMLElement | null>;
+  onWheel: (event: WheelEvent) => void;
   branding?: BrandingRevision;
   onMeasure: (sizes: Record<string, CardSize>) => void;
   className: string;
 }) {
   const dragging = useDragToPan(viewport);
+  useWheel(viewport, onWheel);
   const side = useDocumentTheme();
   const variables = useMemo(() => brandingVariables(branding, side), [branding, side]);
   const logo = resolveLogoUrl(branding, side);

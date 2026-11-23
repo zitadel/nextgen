@@ -358,6 +358,43 @@ export function clampZoom(zoom: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(zoom * 100) / 100));
 }
 
+/** Pixels per wheel line and page, for a wheel that reports in those units. */
+const WHEEL_UNIT = [1, 16, 800] as const;
+
+/**
+ * The zoom after one wheel event: exponential in the delta, so many small
+ * trackpad events and one notch of a mouse wheel cover the same ground. A
+ * pinch arrives as ctrl+wheel with small deltas, so it scales faster. Not
+ * rounded, or a run of small deltas would never move off a step.
+ */
+export function wheelZoom(
+  zoom: number,
+  wheel: { deltaY: number; deltaMode: number; ctrlKey: boolean },
+): number {
+  const pixels = wheel.deltaY * (WHEEL_UNIT[wheel.deltaMode as 0 | 1 | 2] ?? 1);
+  // One notch is about 100px; a larger burst should not jump further.
+  const delta = Math.max(-100, Math.min(100, pixels));
+  const next = zoom * Math.exp(-delta * (wheel.ctrlKey ? 0.01 : 0.0015));
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+}
+
+/**
+ * The scroll offsets that keep the canvas point under `pointer` (relative to
+ * the viewport's corner) under it when the zoom goes `from` → `to`.
+ */
+export function anchoredScroll(
+  scroll: { left: number; top: number },
+  pointer: CanvasPoint,
+  from: number,
+  to: number,
+): { left: number; top: number } {
+  const scale = to / from;
+  return {
+    left: (scroll.left + pointer.x) * scale - pointer.x,
+    top: (scroll.top + pointer.y) * scale - pointer.y,
+  };
+}
+
 /** The zoom that shows the whole canvas in the viewport, never above 100%. */
 export function fitZoom(
   viewport: { width: number; height: number },

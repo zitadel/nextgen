@@ -4,11 +4,13 @@ import {
   CANVAS_CARD_WIDTH,
   MAX_ZOOM,
   MIN_ZOOM,
+  anchoredScroll,
   clampZoom,
   fitZoom,
   highlightStep,
   layoutFlowCanvas,
   stepSketch,
+  wheelZoom,
 } from "./canvas";
 import type { FlowDefinition, FlowStep } from "./model";
 
@@ -232,6 +234,33 @@ describe("zoom", () => {
     expect(clampZoom(0)).toBe(MIN_ZOOM);
     expect(clampZoom(9)).toBe(MAX_ZOOM);
     expect(clampZoom(0.1 + 0.2)).toBe(0.3);
+  });
+
+  it("zooms in on a wheel up and out on a wheel down, within the range", () => {
+    const wheel = (deltaY: number, deltaMode = 0, ctrlKey = false) => ({
+      deltaY,
+      deltaMode,
+      ctrlKey,
+    });
+    expect(wheelZoom(1, wheel(-100))).toBeGreaterThan(1);
+    expect(wheelZoom(1, wheel(100))).toBeLessThan(1);
+    expect(wheelZoom(MAX_ZOOM, wheel(-100))).toBe(MAX_ZOOM);
+    expect(wheelZoom(MIN_ZOOM, wheel(100))).toBe(MIN_ZOOM);
+    // A notch in lines moves as far as the same notch in pixels, and a burst no further.
+    expect(wheelZoom(1, wheel(3, 1))).toBeCloseTo(wheelZoom(1, wheel(48)));
+    expect(wheelZoom(1, wheel(1000))).toBe(wheelZoom(1, wheel(100)));
+    // A pinch's small deltas still move, and are not rounded away.
+    expect(wheelZoom(1, wheel(-2, 0, true))).toBeGreaterThan(wheelZoom(1, wheel(-2)));
+    expect(wheelZoom(1, wheel(-1))).not.toBe(1);
+  });
+
+  it("keeps the point under the pointer in place", () => {
+    const scroll = { left: 100, top: 40 };
+    const pointer = { x: 200, y: 150 };
+    const next = anchoredScroll(scroll, pointer, 0.5, 1);
+    // Canvas point under the pointer before and after.
+    expect((next.left + pointer.x) / 1).toBeCloseTo((scroll.left + pointer.x) / 0.5);
+    expect((next.top + pointer.y) / 1).toBeCloseTo((scroll.top + pointer.y) / 0.5);
   });
 
   it("fits the canvas into the viewport, never above 100%", () => {
