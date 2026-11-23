@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { VariableView } from "@/lib/variable";
 import { ServerCommand } from "@/cli/commands/server-command";
 import { Telemetered } from "@/cli/telemetry/telemetered";
@@ -37,6 +37,13 @@ export default class VariableList extends Telemetered(
     preview: Flags.boolean({
       default: false,
       description: "List the preview values instead of the primary ones.",
+    }),
+    fields: fieldsFlag({
+      fallback: ["name"],
+      shape: {
+        known: new Set(["name", "secret", "value", "preview", "preview.secret", "preview.value"]),
+        open: [],
+      },
     }),
     plain: plainFlag,
   };

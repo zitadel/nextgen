@@ -37,29 +37,18 @@ type Admission interface {
 	Admit(ctx context.Context, projectID, origin string) error
 }
 
-// Settings are the OAuth settings of an issuer's project.
+// Settings are the OAuth settings of an issuer's project, with the
+// deployment and release they were read from, so a flow the issuer opens
+// keeps reading that release.
 type Settings struct {
-	Enabled bool
+	Enabled      bool
+	DeploymentID string
+	ReleaseID    string
 }
 
 // SettingsSource reads the OAuth settings that apply to an issuer.
 type SettingsSource interface {
 	Get(ctx context.Context, issuer Issuer) (Settings, error)
-}
-
-// NotEnabled is the SettingsSource of a server that has OAuth enabled for
-// no project.
-type NotEnabled struct{}
-
-func (NotEnabled) Get(context.Context, Issuer) (Settings, error) {
-	return Settings{}, nil
-}
-
-// DenyAll is the Admission of a server that admits no origin as an issuer.
-type DenyAll struct{}
-
-func (DenyAll) Admit(context.Context, string, string) error {
-	return domain.ErrOriginNotFound()
 }
 
 // issuerKey is the context key of the issuerState withIssuer records.

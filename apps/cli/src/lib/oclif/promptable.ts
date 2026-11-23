@@ -3,9 +3,6 @@ import type { Questions } from "@/lib/ui";
 import type { BaseCommand } from "./base";
 import type { CommandClass } from "./command-class";
 
-/** Marks the classes {@link Promptable} made, so applying it again returns the same one. */
-const PROMPTABLE = Symbol("promptable");
-
 /**
  * Marks a command that can ask a person a question, and gives it the one way
  * to do it. Only a command built on this has `this.ask`, so what can prompt
@@ -37,11 +34,5 @@ export function Promptable<TBase extends CommandClass<BaseCommand>>(Base: TBase)
       return this.ui.questions();
     }
   }
-  // Applied twice (a `Destructive` command is already `Promptable`, and so is a
-  // command that chooses its server), it is the same class once.
-  if (Reflect.has(Base.prototype, PROMPTABLE)) {
-    return Base as unknown as typeof PromptableCommand;
-  }
-  Object.defineProperty(PromptableCommand.prototype, PROMPTABLE, { value: true });
   return PromptableCommand;
 }

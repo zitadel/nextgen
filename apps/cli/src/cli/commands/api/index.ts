@@ -14,7 +14,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/ui";
+import { log, Output } from "@/lib/ui";
 import { ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
@@ -29,6 +29,7 @@ import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { Suggested } from "@/lib/suggestion";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
+import { Promptable } from "@/lib/oclif/promptable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
@@ -69,7 +70,7 @@ const NOTHING_TO_PAGE_REFUSAL = {
 const FORCE_REQUIRED_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: "Cannot call {operation} without --force in non-interactive mode",
-  hint: "Ask a person first: {question} Once they agree, run the same command again, with its --field values or the pipe into --input, and add --force.",
+  hint: "Ask a person first: {question} Once they agree, run the same command again, with its --field values or the pipe into --file, and add --force.",
   details: { question: "{question}" },
 } as const satisfies Refusal;
 
@@ -154,22 +155,22 @@ export function pathValuesFromWords(
 }
 
 /**
- * `--field` and `--input` laid over the operation's schema, each typed by it.
+ * `--field` and `--file` laid over the operation's schema, each typed by it.
  * It refuses a field the operation does not take, a value of the wrong type, a
- * body on an operation that takes none, and `--input -` with nothing piped in.
+ * body on an operation that takes none, and `--file -` with nothing piped in.
  */
 export async function requestOf(
   target: Target,
   flags: Readonly<{
     field?: readonly string[];
-    input?: string;
+    file?: string;
   }>,
   projectId: string | undefined,
   retry: Suggested,
 ): Promise<ApiRequest> {
   return ApiCall.to(target).request({
     fields: flags.field ?? [],
-    input: await ApiCall.readInput(flags.input, retry),
+    input: await ApiCall.readInput(flags.file, retry),
     projectId,
   });
 }
@@ -223,7 +224,9 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Telemetered(Destructive(ServerCommand(EnvironmentCommand))) {
+export default class Api extends Telemetered(
+  Destructive(Promptable(ServerCommand(EnvironmentCommand))),
+) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override group = CommandGroups.apiAndEvents;
@@ -237,7 +240,7 @@ export default class Api extends Telemetered(Destructive(ServerCommand(Environme
     "<%= config.bin %> api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json",
     "<%= config.bin %> api listEvents -F category=auth --paginate --json",
     "<%= config.bin %> api createTeam -F name=Support --dry-run",
-    "<%= config.bin %> api createTeam --input - < team.json",
+    "<%= config.bin %> api createTeam --file - < team.json",
   ];
   // The path parameters follow the operation as further arguments.
   static override strict = false;
@@ -262,7 +265,7 @@ export default class Api extends Telemetered(Destructive(ServerCommand(Environme
       multiple: true,
       multipleNonGreedy: true,
     }),
-    input: nonBlankString({
+    file: nonBlankString({
       description: "Read the JSON body from a file, or from stdin with -. --field lays over it.",
     }),
     paginate: Flags.boolean({
@@ -334,7 +337,10 @@ export default class Api extends Telemetered(Destructive(ServerCommand(Environme
       target,
       flags,
       projectId,
-      await this.again("api", { with: { input: "<path>" }, without: ["field"] }),
+      await this.again("api", {
+        with: { file: "<path>" },
+        without: ["field"],
+      }),
     );
     // The question a person is asked, and the one a refusal hands to whoever must ask them.
     const question = [
@@ -382,7 +388,7 @@ export default class Api extends Telemetered(Destructive(ServerCommand(Environme
 
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
-    if (this.isOnScreen) {
+    if (Output.screen) {
       log.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
     }
     const destructive = request.operation.destructive;
@@ -466,7 +472,7 @@ export default class Api extends Telemetered(Destructive(ServerCommand(Environme
           title: `No content (${response.status})`,
           sections: [],
         },
-        ...(this.isOnScreen ? {} : { pretty: prose("") }),
+        ...(Output.screen ? {} : { pretty: prose("") }),
       };
     }
     const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
@@ -476,7 +482,7 @@ export default class Api extends Telemetered(Destructive(ServerCommand(Environme
         sections: [],
         lines: pretty.text.split("\n"),
       },
-      ...(this.isOnScreen ? {} : { pretty }),
+      ...(Output.screen ? {} : { pretty }),
     };
   }
 

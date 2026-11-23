@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
+import { Output } from "@/lib/ui";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
@@ -487,5 +488,66 @@ describe("Publisher.prepare", () => {
         expect(all).not.toHaveBeenCalled();
       });
     });
+  });
+});
+
+describe("Publisher.prepare with the json option left out", () => {
+  afterEach(() => {
+    Output.settle({ json: false, color: false });
+  });
+
+  /**
+   * What a comparing deploy of a project nothing is deployed to asks of `prepare`, naming neither
+   * `json` nor `color`.
+   *
+   * @param cwd - The project directory.
+   * @returns The request.
+   */
+  function aComparisonOf(cwd: string): PrepareRequest {
+    return {
+      cwd,
+      env: {},
+      mode: "deploy",
+      dryRun: true,
+      compare: true,
+    };
+  }
+
+  /**
+   * A publisher whose project holds the connection's secret and has nothing deployed.
+   *
+   * @returns The publisher.
+   */
+  function aPublisherWithNothingDeployed(): Publisher {
+    return new Publisher(
+      fakeClient({
+        ...ACME_SECRET_HELD,
+        queryIdps: listing("acme"),
+        listDeployments: {
+          all: async () => {
+            return [];
+          },
+        },
+      }),
+      PROJECT_ID,
+    );
+  }
+
+  test("reports the diff as data when the run answers in JSON", async ({ dir }) => {
+    Output.settle({ json: true, color: false });
+    await aProjectWithAnEmailSubject(dir);
+
+    const prepared = await aPublisherWithNothingDeployed().prepare(aComparisonOf(dir));
+
+    expect(prepared.report).toHaveProperty("diff");
+  });
+
+  test("prints the diff's note when the run does not answer in JSON", async ({ dir }) => {
+    Output.settle({ json: false, color: false });
+    await aProjectWithAnEmailSubject(dir);
+
+    const prepared = await aPublisherWithNothingDeployed().prepare(aComparisonOf(dir));
+
+    expect(prepared.notices.join("")).toContain("No diff available");
   });
 });

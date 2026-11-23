@@ -1,11 +1,12 @@
 import { Args } from "@oclif/core";
 
 import { InvitationService, invitationRole } from "@/lib/backend";
+import { GetInvitationResponse } from "@/lib/backend/schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { json } from "@/lib/oclif/rendering";
+import { fieldPaths } from "@/lib/oclif/crud";
+import { fieldsFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -31,7 +32,8 @@ const INVITATION_ID: Refused<string> = {
 /**
  * `zitadel invitation get <invitation_id>` — read one invitation: who it is
  * for, the role it grants, its status and when it expires. The link is never
- * shown again after `invitation create`.
+ * shown again after `invitation create`. `--fields` cuts the data and the rows
+ * to the dot-paths it names, judged by the invitation's shape.
  */
 export default class InvitationGet extends Telemetered(
   Tabulatable(ServerCommand(EnvironmentCommand)),
@@ -47,53 +49,51 @@ export default class InvitationGet extends Telemetered(
     }),
   };
 
-  protected async execute({ args }: Admitted<typeof InvitationGet>): Promise<JsonEnvelope> {
+  static override flags = {
+    fields: fieldsFlag({
+      shape: fieldPaths(GetInvitationResponse),
+    }),
+  };
+
+  protected async execute({ args, flags }: Admitted<typeof InvitationGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     const invitationService = new InvitationService(client, projectId);
     const invitation = await invitationService.get(args.invitationId);
 
     const title = `Read ${escapeControlCharacters(invitation.id)}`;
-    if (this.isJson || !this.isOnScreen) {
-      return this.emit({
-        status: "ok",
-        data: invitation,
-        pretty: json(invitation),
-        summary: {
-          title,
-          sections: [],
-        },
-      });
-    }
+    const view = this.viewRecord(invitation, flags.fields, [
+      "id",
+      "name",
+      "role",
+      "status",
+      "created_at",
+      "expires_at",
+      "responded_by",
+      "responded_at",
+    ]);
 
     return this.emit({
       status: "ok",
-      data: invitation,
+      data: view.data,
       summary: {
         title,
         sections: [],
         lines: this.tabulateDetail(
           undefined,
-          [
-            "id",
-            "name",
-            "role",
-            "status",
-            "created_at",
-            "expires_at",
-            "responded_by",
-            "responded_at",
-          ],
-          {
-            id: invitation.id,
-            name: invitation.metadata?.name ?? "",
-            role: invitationRole(invitation),
-            status: invitation.status,
-            created_at: invitation.created_at,
-            expires_at: invitation.expires_at,
-            responded_by: invitation.responded_by ?? "",
-            responded_at: invitation.responded_at ?? "",
-          },
+          view.columns,
+          flags.fields === undefined
+            ? {
+                id: invitation.id,
+                name: invitation.metadata?.name ?? "",
+                role: invitationRole(invitation),
+                status: invitation.status,
+                created_at: invitation.created_at,
+                expires_at: invitation.expires_at,
+                responded_by: invitation.responded_by ?? "",
+                responded_at: invitation.responded_at ?? "",
+              }
+            : invitation,
         ).split("\n"),
       },
     });

@@ -128,6 +128,17 @@ var brandingAccess = resourceAccess{
 	configuration: true,
 }
 
+// oauthSettingsAccess gates the OAuth settings revision read. A revision's
+// own id resolves through RSI, like branding's; a release is the only writer,
+// so no write path reaches writeMiss.
+var oauthSettingsAccess = resourceAccess{
+	kind:          domain.ResourceKindOAuthSettings,
+	readMiss:      domain.ErrOAuthSettingsNotFound,
+	writeMiss:     domain.ErrOAuthSettingsNotFound,
+	denied:        domain.ErrOAuthSettingsPermissionDenied,
+	configuration: true,
+}
+
 // policyAccess gates operation policies (ADR 066). Publish and the revision
 // read are project-scoped like releases: a revision has no index row. A
 // policy's own id resolves through RSI in the named project, like an IdP

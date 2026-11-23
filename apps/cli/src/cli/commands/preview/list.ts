@@ -2,11 +2,13 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { PreviewService } from "@/lib/backend";
+import { ListProjectPreviewsResponse } from "@/lib/backend/schemas";
+import { fieldPaths } from "@/lib/oclif/crud";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type JsonEnvelope, nonBlankString, PreviewCommand } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
@@ -64,6 +66,9 @@ export default class PreviewList extends Telemetered(Tabulatable(ServerCommand(P
       all: Flags.boolean({
         char: "a",
         description: "Fetch every page instead of one.",
+      }),
+      fields: fieldsFlag({
+        shape: fieldPaths(ListProjectPreviewsResponse.shape.previews.element),
       }),
       plain: plainFlag,
     },

@@ -50,6 +50,11 @@
       "types": "./dist/server.d.mts",
       "import": "./dist/server.mjs"
     },
+    "./application-presets": {
+      "@zitadel/source": "./src/application-presets.ts",
+      "types": "./dist/application-presets.d.mts",
+      "import": "./dist/application-presets.mjs"
+    },
     "./branding-url": {
       "@zitadel/source": "./src/branding-url.ts",
       "types": "./dist/branding-url.d.mts",

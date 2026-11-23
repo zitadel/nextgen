@@ -232,8 +232,6 @@ export default class Deploy extends Telemetered(Destructive(ServerCommand(Enviro
       mode: "deploy",
       dryRun: this.dryRun,
       compare: true,
-      json: this.isJson,
-      color: this.isColored,
     });
     this.annotate({ stage: undefined });
     for (const warning of prepared.warnings) {

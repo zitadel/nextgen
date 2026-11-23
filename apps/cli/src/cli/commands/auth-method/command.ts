@@ -3,7 +3,7 @@ import { CUSTOM_PROVIDER, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log, warnings } from "@/lib/ui";
+import { log, Output, warnings } from "@/lib/ui";
 import type { Facts } from "@/lib/oclif/base";
 import { Destructive } from "@/lib/oclif/destructive";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
@@ -11,6 +11,7 @@ import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { JsonEnvelope } from "@/lib/oclif/types";
+import { Promptable } from "@/lib/oclif/promptable";
 import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -354,7 +355,7 @@ export function providerKind(provider: unknown): string | undefined {
  * configuration change.
  */
 export abstract class AuthMethodCommand extends Telemetered(
-  Destructive(ServerCommand(EnvironmentCommand)),
+  Destructive(Promptable(ServerCommand(EnvironmentCommand))),
 ) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
@@ -498,7 +499,6 @@ export abstract class AuthMethodCommand extends Telemetered(
             return this.argsOf(command);
           }),
         },
-        json: this.isJson,
       };
       if (this.dryRun && this.nonInteractive && !this.force) {
         refuseNoSignInLeft(refusal);
@@ -751,7 +751,6 @@ type NoSignInLeftRefusal = {
   readonly question: string;
   /** The exact re-run first, then enabling each method the schema could take instead, then a provider. */
   readonly suggested: FollowUps;
-  readonly json: boolean;
 };
 
 /**
@@ -768,7 +767,7 @@ type NoSignInLeftRefusal = {
  */
 function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
   const error = input.error;
-  const where = input.json
+  const where = Output.json
     ? " (the first of details.suggested_args holds the exact arguments)."
     : ".";
   // Its --force retry is a consent only a person may give, as every gate's is.

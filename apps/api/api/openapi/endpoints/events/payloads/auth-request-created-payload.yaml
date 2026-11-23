@@ -1,0 +1,8 @@
+title: AuthRequestCreatedPayload
+type: object
+description: Payload for `auth.request.created` events.
+required:
+  - client_id
+properties:
+  client_id:
+    type: string

@@ -24,9 +24,8 @@
       "type": "option"
     },
     {
-      "name": "server",
-      "char": "s",
-      "description": "Override the resolved server URL.",
+      "name": "input",
+      "description": "The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go under \"args\". Only the global flags may stand beside it.",
       "type": "option"
     },
     {
@@ -82,7 +81,7 @@
     {
       "name": "FORCE_COLOR",
       "flag": "color",
-      "description": "Turns color on where it would be off, such as in a pipe, as `--color` does.",
+      "description": "Turns color on where it would be off, such as in a pipe, as `--color` does; `0` or `false` turns it off.",
       "precedence": "`--no-color` and `NO_COLOR` win over it."
     },
     {
@@ -228,6 +227,12 @@
           "name": "sso-scopes",
           "description": "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
           "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -268,6 +273,12 @@
         {
           "name": "challenge-id",
           "description": "Wait for the link a --no-wait run printed, instead of creating a new one.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -346,6 +357,12 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": []
@@ -355,7 +372,14 @@
       "group": "Getting started",
       "description": "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.",
       "args": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        }
+      ],
       "examples": [
         {
           "command": "skills add"
@@ -381,6 +405,12 @@
           "name": "skip-install",
           "description": "Do not install the new dev dependencies.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -416,6 +446,12 @@
             "binary",
             "docker"
           ]
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": []
@@ -430,6 +466,12 @@
           "name": "all",
           "description": "Stop all discovered CLI-managed local Zitadel runtime processes.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": []
@@ -440,6 +482,12 @@
       "description": "Summarize the local Zitadel server and project state.",
       "args": [],
       "flags": [
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
         {
           "name": "env",
           "char": "e",
@@ -481,6 +529,12 @@
           "description": "Number of lines to show, counting only those --level shows.",
           "type": "option",
           "default": 200
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -502,6 +556,12 @@
           "name": "no-open",
           "description": "Print the link instead of opening a browser.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -524,6 +584,12 @@
           "char": "f",
           "description": "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": []
@@ -542,6 +608,12 @@
           "char": "f",
           "description": "Remove the managed files and local state without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": []
@@ -591,6 +663,12 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -633,6 +711,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -664,7 +748,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -717,7 +807,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -735,6 +825,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -811,6 +907,18 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -869,6 +977,12 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -911,6 +1025,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -942,7 +1062,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -995,7 +1121,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1013,6 +1139,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -1080,6 +1212,18 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -1175,6 +1319,12 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -1217,6 +1367,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -1248,7 +1404,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -1301,7 +1463,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1319,6 +1481,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -1358,7 +1526,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -1411,7 +1585,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1429,6 +1603,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -1473,6 +1653,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -1514,6 +1700,12 @@
         {
           "name": "replaces",
           "description": "The invitation this one replaces; the new one keeps its journey.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -1589,9 +1781,20 @@
           ]
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -1633,6 +1836,17 @@
       ],
       "flags": [
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -1666,6 +1880,12 @@
           "char": "f",
           "description": "Cancel the invitation without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -1704,6 +1924,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "schema",
           "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
@@ -1724,6 +1950,12 @@
       "description": "Enable passkey sign-in for a user schema.",
       "args": [],
       "flags": [
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
         {
           "name": "schema",
           "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
@@ -1752,6 +1984,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "schema",
           "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
@@ -1772,6 +2010,12 @@
       "description": "Enable password sign-in for a user schema.",
       "args": [],
       "flags": [
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
         {
           "name": "schema",
           "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
@@ -1803,6 +2047,12 @@
           "char": "f",
           "description": "Disable the schema's last way to sign in. Its users can then only be managed through the API.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "schema",
@@ -1857,6 +2107,12 @@
         {
           "name": "client-id",
           "description": "Client id of the application registered with the provider.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2063,6 +2319,12 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -2100,7 +2362,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2153,7 +2421,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2171,6 +2439,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2210,7 +2484,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2263,7 +2543,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2276,6 +2556,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2317,6 +2603,12 @@
           "name": "design",
           "description": "Design to start from: centered or minimal (default: centered).",
           "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": []
@@ -2335,7 +2627,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2388,13 +2686,19 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2431,7 +2735,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2484,7 +2794,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2497,6 +2807,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2536,7 +2852,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2589,7 +2911,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2602,6 +2924,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2641,6 +2969,12 @@
         {
           "name": "release",
           "description": "Test the policies a release pins (rel_…) instead of the files in .zitadel/policies/.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2684,7 +3018,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -2737,7 +3077,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2755,6 +3095,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2881,6 +3227,18 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -2907,6 +3265,12 @@
       "description": "Show which server and project resolve, and where each value came from.",
       "args": [],
       "flags": [
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
         {
           "name": "env",
           "char": "e",
@@ -2957,6 +3321,12 @@
           "name": "force",
           "description": "Overwrite an existing .env.<name>.local.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2975,9 +3345,20 @@
       "args": [],
       "flags": [
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3023,6 +3404,12 @@
           ]
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3050,9 +3437,20 @@
       "args": [],
       "flags": [
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3094,6 +3492,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3132,6 +3536,17 @@
           "type": "boolean"
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3167,9 +3582,20 @@
           "type": "boolean"
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3212,9 +3638,20 @@
           "type": "option"
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3265,6 +3702,12 @@
           "char": "f",
           "description": "Remove the variable without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3328,6 +3771,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3359,7 +3808,14 @@
       "group": "Project settings",
       "description": "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.",
       "args": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        }
+      ],
       "examples": [
         {
           "command": "upgrade"
@@ -3385,6 +3841,12 @@
           "name": "message",
           "char": "m",
           "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -3438,6 +3900,12 @@
           "name": "strict",
           "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3494,9 +3962,20 @@
           ]
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3541,6 +4020,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3572,6 +4057,12 @@
         }
       ],
       "flags": [
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
         {
           "name": "env",
           "char": "e",
@@ -3609,6 +4100,12 @@
           "type": "option"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3643,7 +4140,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -3696,13 +4199,19 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3744,6 +4253,12 @@
           "type": "boolean"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3783,6 +4298,12 @@
           "type": "option"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3812,6 +4333,17 @@
         }
       ],
       "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
         {
           "name": "env",
           "char": "e",
@@ -3868,9 +4400,20 @@
           ]
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -3923,6 +4466,12 @@
           "type": "option"
         },
         {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3960,7 +4509,13 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
           "type": "option"
         },
         {
@@ -4013,7 +4568,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -4031,6 +4586,12 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -4082,7 +4643,7 @@
           "multiple": true
         },
         {
-          "name": "input",
+          "name": "file",
           "description": "Read the JSON body from a file, or from stdin with -. --field lays over it.",
           "type": "option"
         },
@@ -4096,6 +4657,12 @@
           "char": "f",
           "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -4129,7 +4696,7 @@
           "command": "api createTeam -F name=Support --dry-run"
         },
         {
-          "command": "api createTeam --input - < team.json"
+          "command": "api createTeam --file - < team.json"
         }
       ]
     },
@@ -4150,9 +4717,20 @@
           "type": "option"
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -4177,9 +4755,20 @@
       "args": [],
       "flags": [
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -4193,6 +4782,115 @@
           "command": "resources --json | jq -r '.data.items[] | \"\\(.topic): \\(.verbs | join(\", \"))\"'"
         }
       ]
+    },
+    {
+      "id": "autocomplete",
+      "group": "CLI",
+      "description": "Display autocomplete installation instructions.",
+      "args": [],
+      "variadic": true,
+      "flags": [
+        {
+          "name": "refresh-cache",
+          "char": "r",
+          "description": "Refresh cache (ignores displaying instructions).",
+          "type": "boolean"
+        }
+      ],
+      "examples": []
+    },
+    {
+      "id": "commands",
+      "group": "CLI",
+      "description": "List all zitadel commands.",
+      "args": [],
+      "variadic": true,
+      "flags": [
+        {
+          "name": "columns",
+          "description": "Only show provided columns (comma-separated).",
+          "type": "option",
+          "multiple": true,
+          "options": [
+            "id",
+            "plugin",
+            "summary",
+            "type"
+          ]
+        },
+        {
+          "name": "deprecated",
+          "description": "Show deprecated commands.",
+          "type": "boolean"
+        },
+        {
+          "name": "extended",
+          "char": "x",
+          "description": "Show extra columns.",
+          "type": "boolean"
+        },
+        {
+          "name": "hidden",
+          "description": "Show hidden commands.",
+          "type": "boolean"
+        },
+        {
+          "name": "no-truncate",
+          "description": "Do not truncate output.",
+          "type": "boolean"
+        },
+        {
+          "name": "sort",
+          "description": "Property to sort by.",
+          "type": "option",
+          "options": [
+            "id",
+            "plugin",
+            "summary",
+            "type"
+          ],
+          "default": "id"
+        },
+        {
+          "name": "tree",
+          "description": "Show tree of commands.",
+          "type": "boolean"
+        }
+      ],
+      "examples": []
+    },
+    {
+      "id": "help",
+      "group": "CLI",
+      "description": "Display help for zitadel.",
+      "args": [],
+      "variadic": true,
+      "flags": [
+        {
+          "name": "nested-commands",
+          "description": "Include all nested commands in the output.",
+          "type": "boolean"
+        }
+      ],
+      "examples": []
+    },
+    {
+      "id": "version",
+      "group": "CLI",
+      "description": "Show the CLI version.",
+      "args": [],
+      "variadic": true,
+      "flags": [],
+      "examples": []
+    },
+    {
+      "id": "which",
+      "group": "CLI",
+      "description": "Show which plugin a command is in.",
+      "args": [],
+      "variadic": true,
+      "flags": [],
+      "examples": []
     }
   ]
 }

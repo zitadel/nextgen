@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"embed"
 	"io/fs"
+	"net/url"
+	"strings"
 
 	"github.com/pressly/goose/v3"
 )
@@ -22,6 +24,18 @@ var sqlFS embed.FS
 // commits. busy_timeout covers remaining lock waits if MaxOpenConns is raised.
 // Pragmas are applied via DSN so every opened connection gets them.
 const PragmaQuery = "_txlock=immediate&_pragma=busy_timeout(30000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=case_sensitive_like(1)"
+
+// FileURI returns the SQLite URI for an absolute, slash-separated path with
+// the connection pragmas as its query. A Windows drive path ("D:/x") gets the
+// leading slash a URI path needs, or the drive letter reads as the authority
+// ("file://D:/x" fails with "invalid uri authority: D:").
+func FileURI(slashPath string) string {
+	if !strings.HasPrefix(slashPath, "/") {
+		slashPath = "/" + slashPath
+	}
+	u := &url.URL{Scheme: "file", Path: slashPath, RawQuery: PragmaQuery}
+	return u.String()
+}
 
 // Migrate applies all pending migrations to db.
 func Migrate(ctx context.Context, sqlDB *sql.DB) error {

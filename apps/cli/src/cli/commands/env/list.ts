@@ -1,7 +1,7 @@
 import { Environment } from "@/lib/environment";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
@@ -21,6 +21,13 @@ export default class EnvList extends Telemetered(Tabulatable(ServerCommand(Envir
 
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
+    fields: fieldsFlag({
+      fallback: ["name"],
+      shape: {
+        known: new Set(["name", "source", "server", "project_id", "resolved"]),
+        open: [],
+      },
+    }),
     plain: plainFlag,
   };
 

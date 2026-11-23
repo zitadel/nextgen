@@ -2,7 +2,7 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { ZitadelError } from "@/lib/errors";
-import { nonBlankArg, taken } from "@/lib/oclif/flags";
+import { type Refused, taken } from "@/lib/oclif/flags";
 import { named } from "@/lib/names";
 import { regularPlural } from "@/lib/plural";
 import { prose } from "@/lib/oclif/rendering";
@@ -12,6 +12,27 @@ import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/term
 
 import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
+
+/**
+ * What an id may be, which a path value in `api` may be too: not blank, not `.`
+ * or `..`, which a URL resolves as a step up the path, and without a control
+ * character.
+ */
+export const SAFE_ID = {
+  schema: z
+    .string()
+    .trim()
+    .refine((id) => {
+      return id !== "" && id !== "." && id !== ".." && !/\p{Cc}/u.test(id);
+    }, "it must be an id: not blank, not . or .., and no control character"),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Pass the id exactly as it was listed.",
+    details: {
+      argument: "{input}",
+    },
+  },
+} as const satisfies Refused<string>;
 
 /** Helpers shared by more than one verb builder. */
 
@@ -30,7 +51,9 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) =>
   const lists = topic !== undefined && resource.list !== undefined;
   const take =
     resource.idSchema === undefined
-      ? nonBlankArg
+      ? Args.custom<string>({
+          parse: taken(SAFE_ID),
+        })
       : Args.custom<string>({
           parse: taken({
             schema: z.string().trim().pipe(resource.idSchema),
@@ -121,6 +144,11 @@ export type DryRun = Readonly<{
   body?: Json;
   /** What the server answered when asked to check the write; absent when it was not asked. */
   checked?: Json;
+  /**
+   * What the real run does that the preview does not show, such as the fields
+   * it removes.
+   */
+  warnings?: readonly string[];
   context?: CredentialContext;
   /** The real command: this run again without `--dry-run`, which the command builds (`realRun`). */
   next: SuggestedCommand;
@@ -134,6 +162,7 @@ export const dryRunResult = ({
   clause,
   body,
   checked,
+  warnings,
   context,
   next,
 }: DryRun): CommandResult => {
@@ -159,6 +188,7 @@ export const dryRunResult = ({
 
   return {
     status: "ok",
+    ...(warnings === undefined || warnings.length === 0 ? {} : { warnings: [...warnings] }),
     data: {
       dry_run: true,
       title,

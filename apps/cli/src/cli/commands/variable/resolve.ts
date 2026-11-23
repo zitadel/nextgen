@@ -8,7 +8,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { VariableView } from "@/lib/variable";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -82,6 +82,13 @@ export default class VariableResolve extends Telemetered(
   static override flags = {
     origin: nonBlankString({
       description: "The origin whose live deployment to read.",
+    }),
+    fields: fieldsFlag({
+      fallback: ["name"],
+      shape: {
+        known: new Set(["name", "secret", "value", "preview", "preview.secret", "preview.value"]),
+        open: [],
+      },
     }),
     plain: plainFlag,
   };

@@ -290,8 +290,6 @@ export default class Preview extends Telemetered(ServerCommand(PreviewCommand)) 
       mode: "preview",
       dryRun: this.dryRun,
       compare: false,
-      json: this.isJson,
-      color: this.isColored,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);

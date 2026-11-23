@@ -197,7 +197,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               return this.argsOf(command);
             },
             dryRun: this.dryRun,
-            isJson: this.isJson,
             realRun: () => {
               return this.realRun();
             },
@@ -229,7 +228,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             followUps: (changed, leading) => {
               return this.followUps(changed, leading);
             },
-            isJson: this.isJson,
             suggest: this.suggest,
           }),
         )

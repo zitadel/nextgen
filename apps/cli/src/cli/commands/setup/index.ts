@@ -42,13 +42,14 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { accepts, parses, reads } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Promptable } from "@/lib/oclif/promptable";
 import { createOrca } from "@/lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { Scope } from "@/lib/suggestion";
-import { warnings } from "@/lib/ui";
+import { Output, warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
@@ -188,7 +189,9 @@ const RENDERER_FLAG_DESCRIPTION =
  * `--design` is hidden so scripts and agents passing it get a targeted error
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
-export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCommand))) {
+export default class Setup extends Telemetered(
+  Destructive(Promptable(ServerCommand(BaseCommand))),
+) {
   /**
    * What `--help` says the command does.
    */
@@ -593,7 +596,7 @@ export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCom
             cwd: this.cwd,
             dryRun: this.dryRun,
             env: this.env,
-            isJson: this.isJson,
+            isJson: Output.json,
             signal: this.signal,
             suggest: this.suggest,
             ui: this.ui,
@@ -617,8 +620,6 @@ export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCom
             cwd: this.cwd,
             dryRun: this.dryRun,
             env: this.env,
-            isColored: this.isColored,
-            isJson: this.isJson,
             narrate: (notices) => {
               this.narrate(notices);
             },
@@ -641,7 +642,7 @@ export default class Setup extends Telemetered(Destructive(ServerCommand(BaseCom
             cliVersion: this.cliVersion,
             cwd: this.cwd,
             dryRun: this.dryRun,
-            isJson: this.isJson,
+            isJson: Output.json,
             realRun: () => {
               return this.realRun();
             },

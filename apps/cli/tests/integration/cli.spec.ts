@@ -303,7 +303,7 @@ describe("the cli", () => {
         const listed = await runCliForTest(["commands", "--json"]);
         expect(listed).toSucceed();
         const visible = new Set(
-          (parseJson(listed.stdout) as Array<{ id?: unknown }>)
+          (parseJson(listed.stdout) as { data: { result: Array<{ id?: unknown }> } }).data.result
             .map((command) => command.id)
             .filter((id): id is string => typeof id === "string"),
         );
@@ -360,12 +360,6 @@ describe("the cli", () => {
           code: "E_VALIDATION",
           message: "Nonexistent flag: -Z",
           next_commands: [expectedPublicCliCommand("resources --help")],
-          details: {
-            original: {
-              name: "Error",
-              message: "Nonexistent flag: -Z\nSee more help with --help",
-            },
-          },
         });
       });
 

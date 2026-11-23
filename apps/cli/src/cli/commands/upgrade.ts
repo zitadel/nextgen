@@ -98,7 +98,6 @@ export default class Upgrade extends Telemetered(ServerCommand(BaseCommand)) {
       installer: new PackageInstaller({
         cwd: this.cwd,
         typedCwd: flags.cwd,
-        redirectStdoutToStderr: this.isJson,
       }),
     });
 

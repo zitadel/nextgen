@@ -60,6 +60,7 @@ class TestCommand extends Telemetered(BaseCommand) {
   public readonly recorder = new RecordingTelemetry();
   public optOut = false;
   public learned: Facts = {};
+  public consentFlag: boolean | undefined;
   /** Whether a person is at the terminal, answering what the run would. */
   public interactive = false;
   public watchdogs = 0;
@@ -67,6 +68,7 @@ class TestCommand extends Telemetered(BaseCommand) {
   public olderInstall = false;
 
   protected override createTelemetry(deps: TelemetryDeps): Telemetry {
+    this.consentFlag = deps.flag;
     this.recorder.enabled = deps.flag !== false && !this.optOut;
     this.recorder.record = this.olderInstall
       ? { distinctId: "an-earlier-install" }
@@ -285,17 +287,18 @@ describe("Telemetered run that fails early", () => {
     expect(names(cmd)).toEqual(["cli_command_started", "cli_command_failed"]);
   });
 
-  it("sends nothing when --no-telemetry is on the command line", async () => {
-    const argv = process.argv;
-    process.argv = [...argv, "--no-telemetry"];
-    try {
-      const cmd = makeCommand();
-      await cmd.failWith(new Error("boom"));
+  it("sends nothing when --no-telemetry is among the words the command was run with", async () => {
+    const cmd = new TestCommand(["--no-telemetry"], aConfigAt("0.0.0-test"));
+    await cmd.failWith(new Error("boom"));
 
-      expect(names(cmd)).toEqual([]);
-    } finally {
-      process.argv = argv;
-    }
+    expect(names(cmd)).toEqual([]);
+  });
+
+  it("leaves the decision to the other signals when the words do not opt out", async () => {
+    const cmd = makeCommand();
+    await cmd.failWith(new Error("boom"));
+
+    expect(cmd.consentFlag).toBeUndefined();
   });
 });
 

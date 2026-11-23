@@ -252,7 +252,7 @@ export function Telemetered<
         return await super.catch(error);
       } finally {
         this.reportGuard(() => {
-          this.reportBegin(process.argv.includes("--no-telemetry") ? false : undefined);
+          this.reportBegin(this.argv.includes("--no-telemetry") ? false : undefined);
           const failure = this.failed ?? toZitadelError(error);
           this.reportTrack(CLI_COMMAND_FAILED, {
             ...this.reportNotes,
@@ -342,7 +342,7 @@ export function Telemetered<
       if (this.nonInteractive || this.jsonEnabled()) {
         return false;
       }
-      const argv = process.argv;
+      const argv = this.argv;
       if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
         return false;
       }

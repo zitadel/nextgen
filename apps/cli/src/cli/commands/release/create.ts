@@ -66,8 +66,6 @@ export default class ReleaseCreate extends Telemetered(ServerCommand(Environment
       mode: "deploy",
       dryRun: this.dryRun,
       compare: false,
-      json: this.isJson,
-      color: this.isColored,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
