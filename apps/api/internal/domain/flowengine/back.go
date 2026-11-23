@@ -69,7 +69,7 @@ func (backHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStep
 		// rejected password would otherwise reach create_user for whoever the
 		// flow resolves next. A password field always renders empty, so
 		// clearing it costs the user nothing.
-		pc.state.CollectedData.AuthMethods.Password = ""
+		delete(pc.state.CollectedData.AuthMethods, domain.AuthMethodPassword)
 	}
 
 	// Prefill and build after the drop, so the step reflects the state the

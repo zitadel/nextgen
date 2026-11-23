@@ -44,7 +44,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	if in.State == nil || in.ProjectID == "" || in.State.ProjectID != in.ProjectID {
 		return domain.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
 	}
-	password := in.State.CollectedData.AuthMethods.Password
+	password := in.State.CollectedData.AuthMethods[domain.AuthMethodPassword]
 	if password == "" {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}

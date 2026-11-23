@@ -123,8 +123,8 @@ func TestFlowCreateUserWithPassword_PreMintsSharedUserID(t *testing.T) {
 			FlowProgress: domain.FlowProgress{
 				CollectedData: domain.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
-					AuthMethods: domain.CollectedAuthMethodData{
-						Password: "s3cret",
+					AuthMethods: map[string]string{
+						domain.AuthMethodPassword: "s3cret",
 					},
 				},
 			},
@@ -174,8 +174,8 @@ func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
 			FlowProgress: domain.FlowProgress{
 				CollectedData: domain.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
-					AuthMethods: domain.CollectedAuthMethodData{
-						Password: "s3cret",
+					AuthMethods: map[string]string{
+						domain.AuthMethodPassword: "s3cret",
 					},
 				},
 			},
@@ -203,8 +203,8 @@ func TestFlowCreateUserWithPassword_PolicyViolationShowsStepError(t *testing.T) 
 			FlowProgress: domain.FlowProgress{
 				CollectedData: domain.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
-					AuthMethods: domain.CollectedAuthMethodData{
-						Password: "s3cret",
+					AuthMethods: map[string]string{
+						domain.AuthMethodPassword: "s3cret",
 					},
 				},
 			},
@@ -239,7 +239,7 @@ func TestFlowCreateUserWithPassword_ProofBeforeUserOrPasswordWork(t *testing.T) 
 		// Nil mutation dependencies deliberately prove that a refused proof never
 		// reaches ID allocation, password hashing, schema lookup or user writes.
 		handler := service.NewFlowCreateUserHandler(nil, noPolicyGate(t), nil, nil, nil, stubSignupProtection{err: refusal})
-		state := &domain.FlowState{ProjectID: "proj_1", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: domain.CollectedAuthMethodData{Password: "secret"}}}}
+		state := &domain.FlowState{ProjectID: "proj_1", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "secret"}}}}
 		_, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: state.ProjectID, State: state})
 		require.ErrorIs(t, err, refusal)
 	}
@@ -249,7 +249,7 @@ func TestFlowCreateUserWithPassword_PolicyRefusalDoesNotSpendProof(t *testing.T)
 	gate := newGate(t, fixedPolicy{config: map[string]any{"min_length": 12}}, nil, nil)
 	// Consume would fail if called; no ID, hasher or mutation dependencies exist.
 	handler := service.NewFlowCreateUserHandler(nil, gate, nil, nil, nil, stubSignupProtection{err: domain.ErrFlowProofInvalid()})
-	state := &domain.FlowState{ProjectID: "proj", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: domain.CollectedAuthMethodData{Password: "short"}}}}
+	state := &domain.FlowState{ProjectID: "proj", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "short"}}}}
 	result, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: "proj", State: state})
 	require.NoError(t, err)
 	require.NotNil(t, result.StepError)

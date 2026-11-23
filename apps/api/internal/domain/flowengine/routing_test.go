@@ -195,7 +195,7 @@ func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t 
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
+		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
 		Times(0)
 
 	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
@@ -326,7 +326,7 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 			assert.Equal(t, tt.wantAttempt, result.State.AuthAttemptID)
 			// A later step may not collect the password again, and create_user
 			// fails without it.
-			assert.Equal(t, "s3cret-pass", result.State.CollectedData.AuthMethods.Password)
+			assert.Equal(t, "s3cret-pass", result.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
 		})
 	}
 }
@@ -969,10 +969,10 @@ func TestFlowStateMachine_Process_NavigateClearsPendingChallenge(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
-		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}, nil)
+		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
+		Return(domain.FlowIssuedChallenge{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}, nil)
 	// navigation abandons the ceremony; no verification may run
-	w.authAttemptService.EXPECT().SubmitPasskey(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, nil)).Times(0)
 
 	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
 		Definition:    def,
@@ -1100,7 +1100,7 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	)
 	// The register leg must never issue a passkey registration or create a
 	// user for the login-resolved account.
-	w.authAttemptService.EXPECT().IssuePasskeyChallenge(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).Times(0)
 	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
 
 	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
@@ -1138,7 +1138,7 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 		"a re-purpose after identification must rotate the auth attempt")
 	assert.Empty(t, toRegister.State.CollectedData.UserID,
 		"the login-resolved user must not survive a declared re-purpose")
-	assert.Empty(t, toRegister.State.CollectedData.AuthMethods.Password)
+	assert.Empty(t, toRegister.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
 
 	// Re-identifying the same existing email in register mode routes
 	// through user_already_exists into password verification.

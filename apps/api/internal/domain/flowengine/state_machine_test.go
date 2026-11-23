@@ -298,7 +298,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
 			return in.State.CollectedData.UserData["email"] == email &&
-				in.State.CollectedData.AuthMethods.Password == password
+				in.State.CollectedData.AuthMethods[domain.AuthMethodPassword] == password
 		})).
 		Return(domain.FlowOnSuccessResult{UserID: userID}, nil)
 	w.authAttemptService.EXPECT().

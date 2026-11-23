@@ -245,6 +245,9 @@ type FlowDefinitionAudience struct {
 // "x-auth-methods#password") rather than to a user property.
 const AuthMethodPrefix = SchemaAnnotationAuthMethods + "#"
 
+// AuthMethodPassword is the `x-auth-methods` entry of the password.
+const AuthMethodPassword = "password"
+
 // Field carries the raw field name from a flow-definition step.
 type Field string
 

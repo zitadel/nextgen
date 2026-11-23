@@ -267,12 +267,15 @@ func mergeCollected(state *domain.FlowState, fields map[string]any) error {
 	for k, v := range fields {
 		if strings.HasPrefix(k, domain.AuthMethodPrefix) {
 			switch k {
-			case domain.AuthMethodPrefix + "password":
+			case domain.AuthMethodPrefix + domain.AuthMethodPassword:
 				pwd, ok := v.(string)
 				if !ok {
 					return errors.New("password is not a string")
 				}
-				state.CollectedData.AuthMethods.Password = pwd
+				if state.CollectedData.AuthMethods == nil {
+					state.CollectedData.AuthMethods = map[string]string{}
+				}
+				state.CollectedData.AuthMethods[domain.AuthMethodPassword] = pwd
 				continue
 			}
 			return fmt.Errorf("unknown auth method %s", k)

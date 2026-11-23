@@ -808,7 +808,7 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		ConnectionID:  collected.ConnectionID,
 		Subject:       collected.Subject,
 		Attributes:    attributes,
-		Password:      state.CollectedData.AuthMethods.Password,
+		Password:      state.CollectedData.AuthMethods[domain.AuthMethodPassword],
 	})
 	switch {
 	case errors.Is(err, domain.ErrUserAlreadyExists()):

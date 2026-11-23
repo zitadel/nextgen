@@ -126,7 +126,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterOmittedRequiredFieldKeepsStep(t
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	// No IssuePasskeyRegistrationChallenge expectation: the missing required
+	// No IssueChallenge expectation: the missing required
 	// field must halt before any challenge is minted.
 
 	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{

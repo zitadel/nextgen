@@ -116,7 +116,7 @@ func TestFlowStateMachine_Process_ConflictBackAfterSignInAsksToSignIn(t *testing
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, flowengine.FlowStepErrorSignInFirst, *result.Step.Error)
-	assert.Empty(t, result.State.CollectedData.AuthMethods.Password, "a password with nobody to check it against is not kept")
+	assert.Empty(t, result.State.CollectedData.AuthMethods[domain.AuthMethodPassword], "a password with nobody to check it against is not kept")
 }
 
 // bankedRegisterPassword starts a register flow whose register step collects
@@ -157,7 +157,7 @@ func bankedRegisterPassword(t *testing.T) (*flowTestWorld, *domain.FlowDefinitio
 	})
 	require.NoError(t, err)
 	require.Equal(t, "register-password", banked.State.CurrentStep)
-	require.Equal(t, "correct-horse-battery-staple", banked.State.CollectedData.AuthMethods.Password)
+	require.Equal(t, "correct-horse-battery-staple", banked.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
 	return w, def, banked.State
 }
 
@@ -171,7 +171,7 @@ func TestFlowStateMachine_Process_RePurposeDropsBankedRegisterPassword(t *testin
 	result, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{Action: "sign_in"})
 	require.NoError(t, err)
 	assert.Equal(t, "identifier", result.State.CurrentStep)
-	assert.Empty(t, result.State.CollectedData.AuthMethods.Password)
+	assert.Empty(t, result.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
 }
 
 // Back onto a step that collects the identifier drops the banked password the
@@ -183,7 +183,7 @@ func TestFlowStateMachine_Process_BackToIdentificationDropsBankedPassword(t *tes
 	result, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{Action: "back"})
 	require.NoError(t, err)
 	assert.Equal(t, "register", result.State.CurrentStep)
-	assert.Empty(t, result.State.CollectedData.AuthMethods.Password)
+	assert.Empty(t, result.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
 }
 
 // The bound user's password signs in, and the verified password is not kept
@@ -206,7 +206,7 @@ func TestFlowStateMachine_Process_ConflictPasswordSignsInAndDropsPassword(t *tes
 	require.NotNil(t, result.Step.Complete)
 	assert.Equal(t, "handoff_01TEST", result.HandoffToken)
 	assert.Equal(t, "user_alice", result.State.CollectedData.UserID)
-	assert.Empty(t, result.State.CollectedData.AuthMethods.Password)
+	assert.Empty(t, result.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
 }
 
 // A passkey on the conflict step signs in the bound user: the ceremony runs on
@@ -218,13 +218,13 @@ func TestFlowStateMachine_Process_ConflictPasskeySignsInBoundUser(t *testing.T) 
 	const proof = `{"id":"x"}`
 	w, def, state := conflictWorld(t)
 	w.authAttemptService.EXPECT().
-		IssuePasskeyChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyChallengeInput) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyChallengeParams) bool {
 			return in.AttemptID == "attempt-1"
 		})).
-		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil)
+		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil)
 	w.authAttemptService.EXPECT().
-		SubmitPasskey(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyInput) bool {
-			return in.ChallengeID == challengeID && string(in.Assertion) == proof
+		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, func(in domain.FlowVerifyChallengeInput) bool {
+			return in.ChallengeID == challengeID && string(in.Proof) == proof
 		})).
 		Return("user_alice", nil)
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)

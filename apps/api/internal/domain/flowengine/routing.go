@@ -71,7 +71,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved domain.F
 		if err := r.dropResolvedUser(pc, "re-purpose"); err != nil {
 			return FlowStepResult{}, err
 		}
-		pc.state.CollectedData.AuthMethods.Password = ""
+		pc.state.CollectedData.AuthMethods = nil
 		pc.state.CurrentPurpose = *transition.Purpose
 
 		// Purpose entries link to each other, forming a zero-input loop.
@@ -259,7 +259,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved do
 			// carried into whatever the flow resolves next. The only
 			// on_success a login step can run is create_user, which would
 			// store it on a new account rather than the one it verified.
-			state.CollectedData.AuthMethods.Password = ""
+			delete(state.CollectedData.AuthMethods, domain.AuthMethodPassword)
 			if state.CollectedData.UserID == "" {
 				return flowDispatchResult{StepError: domain.FlowStepFailed(FlowStepErrorSignInFirst, nil)}, nil
 			}
