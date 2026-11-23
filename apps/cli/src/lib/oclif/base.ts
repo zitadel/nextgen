@@ -7,6 +7,8 @@ import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 import { Cmd } from "@/lib/cmd";
 import { byName, type ByName } from "@/lib/names";
 import { nonBlankString } from "./flags";
+import { inputFlag } from "./input";
+import { Documented } from "./documented";
 import { Interruptible } from "./interruptible";
 import { log, style, warnings } from "@/lib/ui";
 
@@ -131,7 +133,7 @@ export type Admitted<C extends typeof BaseCommand> = Readonly<{
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Interruptible(Command) {
+export abstract class BaseCommand extends Documented(Interruptible(Command)) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -178,6 +180,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
+    input: inputFlag,
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -278,6 +281,18 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected get isColored(): boolean {
     return this.meta.colored;
+  }
+
+  /**
+   * How what a command starts (a child process, a progress display) must write
+   * for this run: whether it keeps stdout to the envelope, and whether it is
+   * coloured. A command hands it on as it is and never reads the mode itself.
+   */
+  protected get rendering(): Readonly<{ json: boolean; color: boolean }> {
+    return {
+      json: this.isJson,
+      color: this.isColored,
+    };
   }
 
   /** The release of the CLI that is running. */
@@ -1191,7 +1206,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       help,
     );
     this.meta = meta;
-    this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
+    this.openTelemetry(this.argv.includes("--no-telemetry") ? false : undefined);
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_FAILED,

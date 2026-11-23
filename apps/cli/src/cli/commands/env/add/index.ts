@@ -562,8 +562,7 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
         projectId: opts.projectId,
         cwd: opts.cwd,
         env: this.env,
-        json: this.isJson,
-        color: this.isColored,
+        ...this.rendering,
         message: INITIAL_DEPLOY_MESSAGE,
         narrate: (notices) => {
           this.narrate(notices);

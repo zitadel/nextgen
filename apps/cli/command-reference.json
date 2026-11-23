@@ -24,6 +24,11 @@
       "type": "option"
     },
     {
+      "name": "input",
+      "description": "The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go under \"args\". Only the global flags may stand beside it.",
+      "type": "option"
+    },
+    {
       "name": "non-interactive",
       "char": "n",
       "description": "Disable prompts. Required when scripting or running as an agent.",
@@ -4623,7 +4628,7 @@
           "multiple": true
         },
         {
-          "name": "input",
+          "name": "file",
           "description": "Read the JSON body from a file, or from stdin with -. --field lays over it.",
           "type": "option"
         },
@@ -4676,7 +4681,7 @@
           "command": "api createTeam -F name=Support --dry-run"
         },
         {
-          "command": "api createTeam --input - < team.json"
+          "command": "api createTeam --file - < team.json"
         }
       ]
     },

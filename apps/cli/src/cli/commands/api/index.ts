@@ -68,7 +68,7 @@ const NOTHING_TO_PAGE_REFUSAL = {
 const FORCE_REQUIRED_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: "Cannot call {operation} without --force in non-interactive mode",
-  hint: "Ask a person first: {question} Once they agree, run the same command again, with its --field values or the pipe into --input, and add --force.",
+  hint: "Ask a person first: {question} Once they agree, run the same command again, with its --field values or the pipe into --file, and add --force.",
   details: { question: "{question}" },
 } as const satisfies Refusal;
 
@@ -153,22 +153,22 @@ export function pathValuesFromWords(
 }
 
 /**
- * `--field` and `--input` laid over the operation's schema, each typed by it.
+ * `--field` and `--file` laid over the operation's schema, each typed by it.
  * It refuses a field the operation does not take, a value of the wrong type, a
- * body on an operation that takes none, and `--input -` with nothing piped in.
+ * body on an operation that takes none, and `--file -` with nothing piped in.
  */
 export async function requestOf(
   target: Target,
   flags: Readonly<{
     field?: readonly string[];
-    input?: string;
+    file?: string;
   }>,
   projectId: string | undefined,
   retry: Suggested,
 ): Promise<ApiRequest> {
   return ApiCall.to(target).request({
     fields: flags.field ?? [],
-    input: await ApiCall.readInput(flags.input, retry),
+    input: await ApiCall.readInput(flags.file, retry),
     projectId,
   });
 }
@@ -235,7 +235,7 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
     "<%= config.bin %> api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json",
     "<%= config.bin %> api listEvents -F category=auth --paginate --json",
     "<%= config.bin %> api createTeam -F name=Support --dry-run",
-    "<%= config.bin %> api createTeam --input - < team.json",
+    "<%= config.bin %> api createTeam --file - < team.json",
   ];
   // The path parameters follow the operation as further arguments.
   static override strict = false;
@@ -260,7 +260,7 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
       multiple: true,
       multipleNonGreedy: true,
     }),
-    input: nonBlankString({
+    file: nonBlankString({
       description: "Read the JSON body from a file, or from stdin with -. --field lays over it.",
     }),
     paginate: Flags.boolean({
@@ -332,7 +332,10 @@ export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) 
       target,
       flags,
       projectId,
-      await this.again("api", { with: { input: "<path>" }, without: ["field"] }),
+      await this.again("api", {
+        with: { file: "<path>" },
+        without: ["field"],
+      }),
     );
     // The question a person is asked, and the one a refusal hands to whoever must ask them.
     const question = [

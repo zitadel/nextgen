@@ -1547,6 +1547,24 @@ export class ScaffoldedApp {
     );
   }
 
+  /**
+   * `variable set --input <source>`, with `stdin` piped in for `--input -`.
+   */
+  setVariableFrom(source: string, stdin = ""): Promise<CliResult> {
+    return this.pipingStdin(stdin, () =>
+      this.cli(["variable", "set", "--input", source, "--json"]),
+    );
+  }
+
+  /**
+   * `variable set --input @<file>`, with `contents` written to `file` in the project first.
+   */
+  async setVariableFromFile(file: string, contents: string): Promise<CliResult> {
+    await this.writeProjectFile(file, contents);
+
+    return this.setVariableFrom(`@${join(this.path, file)}`);
+  }
+
   /** `variable set` without `--json`, for a spec asserting what the developer reads. */
   setVariableRendered(name: string, ...args: string[]): Promise<CliResult> {
     return this.cli(["variable", "set", name, ...args]);

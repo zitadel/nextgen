@@ -135,6 +135,9 @@
     needs through its constructor, which the command's `execute` fills when it builds the wizard,
     and the command keeps its flags, refusals and telemetry (recorded through the observer given
     to `.step(...)`) and emits the one result the wizard returns.
+- `--input` (also `--flags-file`, `--cli-input-json`) passes a whole invocation as one JSON document,
+  read by the `Documented` mixin (`src/lib/oclif/documented.ts`), which `BaseCommand` extends.
+- Beside `--input` only the global flags may stand, so a command never knows about it.
 - An id argument without its own `idSchema` refuses empty, `.`, `..` and control characters in
   `idArg` (`crud/shared.ts`); `api` does the same for its path values in `ApiCall.pathValues`.
 - `version`, `commands`, `which`, `help` and `autocomplete` extend `Wrapped(BaseCommand)`

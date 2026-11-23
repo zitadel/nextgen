@@ -232,9 +232,9 @@ Call any operation of the Zitadel API, with this project's server and project se
 
 ```
 USAGE
-  $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-X GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input
-    <value>] [--paginate] [-f]
+  $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-X GET|POST|PUT|PATCH|DELETE] [-F <value>...]
+    [--file <value>] [--paginate] [-f]
 
 ARGUMENTS
   [OPERATION...]  An operationId (queryUsers) or a path (/users/query), then the path parameters. Omit it to choose one.
@@ -259,7 +259,10 @@ FLAGS
       --env-file=<value>                  Read ZITADEL_* values from this file ahead of the process environment. A
                                           relative path is read from the current directory, not from --cwd. Cannot be
                                           combined with --env.
-      --input=<value>                     Read the JSON body from a file, or from stdin with -. --field lays over it.
+      --file=<value>                      Read the JSON body from a file, or from stdin with -. --field lays over it.
+      --input=<value>                     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are
+                                          flag names; positional arguments go under "args". Only the global flags may
+                                          stand beside it.
       --paginate                          Follow next_page_token to the last page, and answer with every page's items in
                                           one list.
       --[no-]telemetry                    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -283,7 +286,7 @@ EXAMPLES
 
   $ zitadel api createTeam -F name=Support --dry-run
 
-  $ zitadel api createTeam --input - < team.json
+  $ zitadel api createTeam --file - < team.json
 ```
 
 ## `zitadel api ls [FILTER]`
@@ -292,8 +295,8 @@ List the operations of the Zitadel API that the api command calls.
 
 ```
 USAGE
-  $ zitadel api ls [FILTER] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--tag <value>] [--fields <value>] [--plain]
+  $ zitadel api ls [FILTER] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--tag <value>] [--fields <value>] [--plain]
 
 ARGUMENTS
   [FILTER]  Only operations whose id, path, summary or tag contains this text.
@@ -308,6 +311,8 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show and to return under --json, comma-separated dot-paths (e.g.
                          id,attributes.email). Defaults to the command's own columns.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --plain            Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --tag=<value>      Only the operations of this part of the API (Users, Teams, …).
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
@@ -334,8 +339,8 @@ Disable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
-    [--schema <value>] [-f]
+  $ zitadel auth-method passkey disable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -346,6 +351,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -364,8 +371,8 @@ Enable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
-    [--schema <value>]
+  $ zitadel auth-method passkey enable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -375,6 +382,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -393,8 +402,8 @@ Disable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
-    [--schema <value>] [-f]
+  $ zitadel auth-method password disable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -405,6 +414,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -423,8 +434,8 @@ Enable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
-    [--schema <value>]
+  $ zitadel auth-method password enable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -434,6 +445,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -452,8 +465,8 @@ Remove an identity provider from a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
-    [--schema <value>] [--provider <value>] [-f]
+  $ zitadel auth-method sso disable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [--schema <value>] [--provider <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -464,6 +477,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --provider=<value>  Identity provider to remove.
       --schema=<value>    User schema to change, by file name or objectType. Required when the project has more than
                           one.
@@ -484,9 +499,9 @@ Add an identity provider to a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
-    <value>] [--env-file <value>] [--schema <value>] [--provider google|custom] [--slug <value>] [--display-name
-    <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>]
+  $ zitadel auth-method sso enable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--provider google|custom] [--slug <value>]
+    [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -502,6 +517,8 @@ FLAGS
       --dry-run               Preview without mutating files or the platform.
       --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                               read from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>         The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                              positional arguments go under "args". Only the global flags may stand beside it.
       --issuer=<value>        Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.
       --provider=<option>     Identity provider to enable, or "custom" for a custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
@@ -533,7 +550,8 @@ Display autocomplete installation instructions.
 
 ```
 USAGE
-  $ zitadel autocomplete [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-r]
+  $ zitadel autocomplete [--json] [-c <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [-r]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -543,6 +561,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -558,8 +578,8 @@ Take ownership of the login template: scaffold .zitadel/branding/ from a shipped
 
 ```
 USAGE
-  $ zitadel branding eject [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-f] [--design <value>]
+  $ zitadel branding eject [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-f] [--design <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -571,6 +591,8 @@ FLAGS
       --debug            Debug logging.
       --design=<value>   Design to start from: centered or minimal (default: centered).
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -586,8 +608,8 @@ Get one branding revision by id.
 
 ```
 USAGE
-  $ zitadel branding get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel branding get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  branding revision id
@@ -606,6 +628,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -626,9 +650,9 @@ List branding revisions.
 
 ```
 USAGE
-  $ zitadel branding list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain]
+  $ zitadel branding list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -645,6 +669,8 @@ FLAGS
                             read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the command's own columns.
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -668,8 +694,9 @@ Claim this project to make it permanent. Opens a browser to create an account or
 
 ```
 USAGE
-  $ zitadel claim [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--no-open] [--no-wait | --challenge-id <value> | --timeout <value>]
+  $ zitadel claim [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--no-open] [--no-wait | --challenge-id <value> |
+    --timeout <value>]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -684,6 +711,8 @@ FLAGS
       --dry-run               Preview without mutating files or the platform.
       --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                               read from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>         The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                              positional arguments go under "args". Only the global flags may stand beside it.
       --no-open               Print the link instead of opening a browser.
       --no-wait               Print the link and exit, without opening a browser or waiting for the browser step. The
                               result names the command that waits for it.
@@ -714,8 +743,9 @@ List all zitadel commands.
 
 ```
 USAGE
-  $ zitadel commands [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [--columns
-    id|plugin|summary|type...] [--deprecated] [-x] [--hidden] [--no-truncate] [--sort id|plugin|summary|type] [--tree]
+  $ zitadel commands [--json] [-c <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [--columns id|plugin|summary|type...] [--deprecated] [-x] [--hidden] [--no-truncate] [--sort
+    id|plugin|summary|type] [--tree]
 
 FLAGS
   -c, --cwd=<value>          Project directory to operate on.
@@ -729,6 +759,8 @@ FLAGS
       --deprecated           Show deprecated commands.
       --dry-run              Preview without mutating files or the platform.
       --hidden               Show hidden commands.
+      --input=<value>        The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                             positional arguments go under "args". Only the global flags may stand beside it.
       --no-truncate          Do not truncate output.
       --sort=<option>        [default: id] Property to sort by.
                              <options: id|plugin|summary|type>
@@ -748,8 +780,8 @@ Open the console of the server the project uses.
 
 ```
 USAGE
-  $ zitadel console [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--no-open]
+  $ zitadel console [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--no-open]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -759,6 +791,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --no-open          Print the link instead of opening a browser.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -784,8 +818,8 @@ Apply your local configuration to Zitadel.
 
 ```
 USAGE
-  $ zitadel deploy [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f] [-m <value>]
+  $ zitadel deploy [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -803,6 +837,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -827,8 +863,8 @@ Deploy an existing release to the project's origins.
 
 ```
 USAGE
-  $ zitadel deployment create --release <value> [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-m <value>]
+  $ zitadel deployment create --release <value> [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
+    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -843,6 +879,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --release=<value>   (required) The release id to deploy.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -862,8 +900,8 @@ Read one deployment by id.
 
 ```
 USAGE
-  $ zitadel deployment get DEPLOYMENT_ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>]
+  $ zitadel deployment get DEPLOYMENT_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
 
 ARGUMENTS
   DEPLOYMENT_ID  The deployment to read.
@@ -880,6 +918,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -898,9 +938,9 @@ List the project's deployments, newest first.
 
 ```
 USAGE
-  $ zitadel deployment list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--live] [--limit <value>] [-a | --page-token
-    <value>] [--fields <value>] [--plain]
+  $ zitadel deployment list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--live] [--limit <value>] [-a |
+    --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -917,6 +957,8 @@ FLAGS
                             read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the command's own columns.
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --live                What each target serves now, not the full history.
       --origin=<value>      Only deployments that targeted this origin.
@@ -946,8 +988,8 @@ Roll back to an earlier deployment.
 
 ```
 USAGE
-  $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f] [-m <value>]
+  $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
+    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f] [-m <value>]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to roll back to. Omit to undo the last deploy.
@@ -966,6 +1008,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -988,9 +1032,9 @@ Verify local runtime and project state.
 
 ```
 USAGE
-  $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-f --fix] [--image <value>] [--port <value>] [--runtime binary|docker] [-e <value>] [--env-file
-    <value>]
+  $ zitadel doctor [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-f --fix] [--image <value>] [--port <value>] [--runtime binary|docker] [-e <value>]
+    [--env-file <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1008,6 +1052,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --port=<value>      Local HTTP port to check. Defaults to the port this directory's server uses.
       --runtime=<option>  Local runtime backend.
                           <options: binary|docker>
@@ -1026,8 +1072,8 @@ Remove managed files and local Zitadel state.
 
 ```
 USAGE
-  $ zitadel eject [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-f]
+  $ zitadel eject [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1039,6 +1085,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1057,8 +1105,8 @@ Show which server and project resolve, and where each value came from.
 
 ```
 USAGE
-  $ zitadel env [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>]
+  $ zitadel env [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1072,6 +1120,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1094,8 +1144,8 @@ Bind an environment to a project, creating the project if needed.
 
 ```
 USAGE
-  $ zitadel env add NAME [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--project <value>] [--app-url <value>] [--force]
+  $ zitadel env add NAME [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--project <value>] [--app-url <value>] [--force]
 
 ARGUMENTS
   NAME  The environment name, e.g. production.
@@ -1111,6 +1161,8 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --force            Overwrite an existing .env.<name>.local.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --project=<value>  Bind this existing project instead of creating one. Its secrets come from
                          ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN in the process environment.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1133,8 +1185,8 @@ List the environments bound in this directory's .env files.
 
 ```
 USAGE
-  $ zitadel env list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
+  $ zitadel env list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1150,6 +1202,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -1171,8 +1225,8 @@ Get one event by id.
 
 ```
 USAGE
-  $ zitadel event get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel event get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  event id
@@ -1191,6 +1245,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1211,9 +1267,9 @@ List events.
 
 ```
 USAGE
-  $ zitadel event list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--sort <value>] [--plain]
+  $ zitadel event list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -1259,6 +1315,10 @@ FLAGS
       (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx;
       repeats widen), created_at (greater_than_or_equal|less_than).
 
+  --input=<value>
+      The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go
+      under "args". Only the global flags may stand beside it.
+
   --limit=<value>
       Page size (server default 20, max 100).
 
@@ -1294,8 +1354,8 @@ Get one flow definition by flow name (newest revision) or revision id.
 
 ```
 USAGE
-  $ zitadel flow-definition get FLOW [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel flow-definition get FLOW [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   FLOW  flow name (newest revision) or revision id
@@ -1314,6 +1374,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1334,9 +1396,9 @@ List flow definitions.
 
 ```
 USAGE
-  $ zitadel flow-definition list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--plain]
+  $ zitadel flow-definition list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -1355,6 +1417,8 @@ FLAGS
                             id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: name (equals),
                             purpose (equals), revisions (equals; values all|latest).
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -1380,8 +1444,8 @@ Create a grant.
 
 ```
 USAGE
-  $ zitadel grant create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--relation viewer|editor|admin] [--expires-at <value>]
+  $ zitadel grant create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--relation viewer|editor|admin] [--expires-at <value>]
     [--user-user-id <value>] [--user-identifier <value>] [--team-team-id <value>] [--team-name <value>] [--data <value>
     | --file <value>] [--set <value>...]
 
@@ -1397,6 +1461,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -1442,8 +1508,8 @@ Delete a grant by id.
 
 ```
 USAGE
-  $ zitadel grant delete ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel grant delete ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   ID  grant id
@@ -1461,6 +1527,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1479,8 +1547,8 @@ Get one grant by id.
 
 ```
 USAGE
-  $ zitadel grant get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel grant get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  grant id
@@ -1499,6 +1567,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1519,9 +1589,9 @@ List grants.
 
 ```
 USAGE
-  $ zitadel grant list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--sort <value>] [--plain]
+  $ zitadel grant list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -1569,6 +1639,10 @@ FLAGS
       expires_at
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).
 
+  --input=<value>
+      The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go
+      under "args". Only the global flags may stand beside it.
+
   --limit=<value>
       Page size (server default 20, max 100).
 
@@ -1604,8 +1678,8 @@ Display help for zitadel.
 
 ```
 USAGE
-  $ zitadel help [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
-    [--nested-commands]
+  $ zitadel help [--json] [-c <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [--nested-commands]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1614,6 +1688,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --nested-commands  Include all nested commands in the output.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -1630,8 +1706,8 @@ Create an identity provider connection.
 
 ```
 USAGE
-  $ zitadel idp create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--slug <value>] [--protocol oidc] [--template <value>]
+  $ zitadel idp create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--slug <value>] [--protocol oidc] [--template <value>]
     [--display-name <value>] [--subject-claim <value>] [--claim-mapping <value>...] [--verified-claims <value>...]
     [--provisioning-creation disabled|auto] [--oidc-issuer <value>] [--oidc-jwks-uri <value>] [--oidc-id-token-mapping]
     [--oidc-authorization-endpoint <value>] [--oidc-token-endpoint <value>] [--oidc-userinfo-endpoint <value>]
@@ -1651,6 +1727,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 OPTIONAL FIELD FLAGS
@@ -1721,8 +1799,8 @@ Get one identity provider connection by id.
 
 ```
 USAGE
-  $ zitadel idp get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel idp get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  identity provider connection id
@@ -1741,6 +1819,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1761,9 +1841,9 @@ List identity provider connections.
 
 ```
 USAGE
-  $ zitadel idp list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--sort <value>] [--plain]
+  $ zitadel idp list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -1784,6 +1864,8 @@ FLAGS
                             als|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
                             created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_tha
                             n|greater_than_or_equal).
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -1810,8 +1892,8 @@ Cancel a pending invitation so its link stops working, or remove a declined one.
 
 ```
 USAGE
-  $ zitadel invitation cancel [INVITATION_ID] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel invitation cancel [INVITATION_ID] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
+    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   [INVITATION_ID]  The invitation to cancel. Omit it to pick a pending or declined one.
@@ -1829,6 +1911,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1851,9 +1935,9 @@ Invite someone into the project with a link to share.
 
 ```
 USAGE
-  $ zitadel invitation create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--relation viewer|editor|admin] [--replaces
-    <value>]
+  $ zitadel invitation create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--relation viewer|editor|admin]
+    [--replaces <value>]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
@@ -1867,6 +1951,8 @@ FLAGS
       --dry-run            Preview without mutating files or the platform.
       --env-file=<value>   Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                            read from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>      The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                           positional arguments go under "args". Only the global flags may stand beside it.
       --name=<value>       Who the invitation is for, shown to other administrators. Never matched.
       --relation=<option>  The project role whoever accepts receives.
                            <options: viewer|editor|admin>
@@ -1893,8 +1979,8 @@ Read one invitation by id.
 
 ```
 USAGE
-  $ zitadel invitation get INVITATION_ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>]
+  $ zitadel invitation get INVITATION_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
 
 ARGUMENTS
   INVITATION_ID  The invitation to read.
@@ -1911,6 +1997,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1929,8 +2017,8 @@ List the project's invitations, newest first.
 
 ```
 USAGE
-  $ zitadel invitation list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--status pending|accepted|rejected|expired...] [--type
+  $ zitadel invitation list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--status pending|accepted|rejected|expired...] [--type
     project_member|team_member] [--limit <value>] [-a | --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
@@ -1948,6 +2036,8 @@ FLAGS
                             read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the command's own columns.
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -1980,8 +2070,8 @@ Show local Zitadel server logs.
 
 ```
 USAGE
-  $ zitadel logs [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--follow] [--level debug|info|warn|error] [--tail <value>]
+  $ zitadel logs [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--follow] [--level debug|info|warn|error] [--tail <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1992,6 +2082,8 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --follow           Keep printing lines as the server writes them.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --level=<option>   Show only lines at this level or above.
                          <options: debug|info|warn|error>
       --tail=<value>     [default: 200] Number of lines to show, counting only those --level shows.
@@ -2018,8 +2110,8 @@ Add an origin pattern to the project.
 
 ```
 USAGE
-  $ zitadel origin add PATTERN --kind primary|preview [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+  $ zitadel origin add PATTERN --kind primary|preview [--json] [-c <value>] [-s <value>] [--input <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
 
 ARGUMENTS
   PATTERN  The origin pattern to add.
@@ -2036,6 +2128,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --kind=<option>     (required) What the pattern is for.
                           <options: primary|preview>
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2058,8 +2152,8 @@ List the origin patterns on the project.
 
 ```
 USAGE
-  $ zitadel origin list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
+  $ zitadel origin list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -2075,6 +2169,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -2096,8 +2192,8 @@ Remove an origin pattern from the project.
 
 ```
 USAGE
-  $ zitadel origin rm PATTERN [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel origin rm PATTERN [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   PATTERN  The origin pattern to remove.
@@ -2115,6 +2211,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2135,8 +2233,8 @@ Get one policy by policy id or operation.
 
 ```
 USAGE
-  $ zitadel policy get POLICY [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel policy get POLICY [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   POLICY  policy id or operation
@@ -2155,6 +2253,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2175,9 +2275,9 @@ List policies.
 
 ```
 USAGE
-  $ zitadel policy list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--plain]
+  $ zitadel policy list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -2195,6 +2295,8 @@ FLAGS
       --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: operation (equals).
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2220,8 +2322,8 @@ Run the test cases in .zitadel/policies/ against the policies.
 
 ```
 USAGE
-  $ zitadel policy test [OPERATION] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--release <value>]
+  $ zitadel policy test [OPERATION] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--release <value>]
 
 ARGUMENTS
   [OPERATION]  Test only this operation's policy, such as auth.factor.password.set.
@@ -2238,6 +2340,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --release=<value>   Test the policies a release pins (rel_…) instead of the files in .zitadel/policies/.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -2271,8 +2375,9 @@ Deploy a release from .zitadel/ to a pull-request build's preview URLs.
 
 ```
 USAGE
-  $ zitadel preview [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>...] [--ttl <value>] [-m <value>] [--strict]
+  $ zitadel preview [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>...] [--ttl <value>] [-m <value>]
+    [--strict]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
@@ -2288,6 +2393,8 @@ FLAGS
       --dry-run            Preview without mutating files or the platform.
       --env-file=<value>   Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                            read from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>      The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                           positional arguments go under "args". Only the global flags may stand beside it.
       --origin=<value>...  A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.
       --strict             Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.
       --[no-]telemetry     Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2316,9 +2423,9 @@ List the project's live previews, newest first.
 
 ```
 USAGE
-  $ zitadel preview list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain]
+  $ zitadel preview list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -2335,6 +2442,8 @@ FLAGS
                             read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the command's own columns.
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2360,8 +2469,8 @@ Remove a live preview from the project.
 
 ```
 USAGE
-  $ zitadel preview rm URL [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel preview rm URL [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   URL  The preview URL to remove.
@@ -2379,6 +2488,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2399,8 +2510,8 @@ Get one project by id.
 
 ```
 USAGE
-  $ zitadel project get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel project get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  project id
@@ -2419,6 +2530,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2439,9 +2552,9 @@ List projects.
 
 ```
 USAGE
-  $ zitadel project list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--sort <value>] [--plain]
+  $ zitadel project list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -2461,6 +2574,8 @@ FLAGS
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: created_at
                             (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_t
                             han_or_equal).
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2487,8 +2602,8 @@ Update a project by id.
 
 ```
 USAGE
-  $ zitadel project update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--password-hash-algorithm
+  $ zitadel project update ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--password-hash-algorithm
     argon2i|argon2id|bcrypt|scrypt|pbkdf2|sha2] [--password-hash-params-time <value>] [--password-hash-params-memory
     <value>] [--password-hash-params-threads <value>] [--password-hash-params-cost <value>]
     [--password-hash-params-rounds <value>] [--password-hash-params-hash sha1|sha224|sha256|sha384|sha512] [--data
@@ -2510,6 +2625,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -2551,8 +2668,8 @@ Rebuild your .zitadel/ files from a release.
 
 ```
 USAGE
-  $ zitadel pull [TARGET] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>]
+  $ zitadel pull [TARGET] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
 
 ARGUMENTS
   [TARGET]  [default: latest] What to pull: 'latest' (the live release), a release id (rel_…), or a deployment id
@@ -2570,6 +2687,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2594,8 +2713,8 @@ Build a release from .zitadel/ without deploying it.
 
 ```
 USAGE
-  $ zitadel release create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-m <value>]
+  $ zitadel release create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -2610,6 +2729,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2630,8 +2751,8 @@ Get one release by id.
 
 ```
 USAGE
-  $ zitadel release get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel release get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  release id
@@ -2650,6 +2771,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2670,9 +2793,9 @@ List releases.
 
 ```
 USAGE
-  $ zitadel release list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain]
+  $ zitadel release list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -2689,6 +2812,8 @@ FLAGS
                             read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the command's own columns.
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2712,8 +2837,8 @@ Revoke a release so its content is never served again.
 
 ```
 USAGE
-  $ zitadel release revoke RELEASE_ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel release revoke RELEASE_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   RELEASE_ID  The release to revoke.
@@ -2731,6 +2856,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2751,8 +2878,8 @@ Delete the local Zitadel server runtime and data.
 
 ```
 USAGE
-  $ zitadel reset [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-f]
+  $ zitadel reset [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2764,6 +2891,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2779,8 +2908,8 @@ List the resources this CLI manages.
 
 ```
 USAGE
-  $ zitadel resources [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--fields <value>] [--plain]
+  $ zitadel resources [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2792,6 +2921,8 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show and to return under --json, comma-separated dot-paths (e.g.
                          id,attributes.email). Defaults to the command's own columns.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --plain            Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -2817,8 +2948,8 @@ Get one schema by object type (current revision) or revision id.
 
 ```
 USAGE
-  $ zitadel schema get SCHEMA [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel schema get SCHEMA [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   SCHEMA  object type (current revision) or revision id
@@ -2837,6 +2968,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2857,9 +2990,9 @@ List schemas.
 
 ```
 USAGE
-  $ zitadel schema list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--plain]
+  $ zitadel schema list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -2878,6 +3011,8 @@ FLAGS
                             id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: object_type
                             (equals), kind (equals), revisions (equals; values all|latest).
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2919,8 +3054,8 @@ Get one session by id.
 
 ```
 USAGE
-  $ zitadel session get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel session get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  session id
@@ -2939,6 +3074,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2959,9 +3096,9 @@ List sessions.
 
 ```
 USAGE
-  $ zitadel session list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--sort <value>] [--plain]
+  $ zitadel session list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -3008,6 +3145,10 @@ FLAGS
       lifecycle_owner_team_id
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).
 
+  --input=<value>
+      The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go
+      under "args". Only the global flags may stand beside it.
+
   --limit=<value>
       Page size (server default 20, max 100).
 
@@ -3043,8 +3184,8 @@ Revoke a session by id.
 
 ```
 USAGE
-  $ zitadel session revoke ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel session revoke ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   ID  session id
@@ -3062,6 +3203,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3080,8 +3223,8 @@ Create a Zitadel project and scaffold local auth. An interactive setup ends with
 
 ```
 USAGE
-  $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-f] [--framework
+  $ zitadel setup [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-f] [--framework
     next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-router|qwik|angular] [--renderer react]
     [--dev-port <value>] [--skip-install] [--git] [--preset password-first|passkey-first] [--use-case
     minimal|consumer|business] [--password-min-length <value>] [--sso google|custom] [--sso-client-id <value>]
@@ -3108,6 +3251,9 @@ FLAGS
       --[no-]git                     Commit the project setup writes, initialising a repository first when there is
                                      none, so a release records the commit it was built from. Refuses a repository that
                                      already has uncommitted work. Use --no-git to leave version control alone.
+      --input=<value>                The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag
+                                     names; positional arguments go under "args". Only the global flags may stand beside
+                                     it.
       --password-min-length=<value>  Minimum password length for the project's password policy, for example 12; 0 sets
                                      none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change
                                      it in .zitadel/policies/ later.
@@ -3152,7 +3298,8 @@ Add the Zitadel agent skills to this project.
 
 ```
 USAGE
-  $ zitadel skills add [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+  $ zitadel skills add [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -3162,6 +3309,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3185,8 +3334,8 @@ Start a local Zitadel server.
 
 ```
 USAGE
-  $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--image <value>] [--port <value>] [--runtime binary|docker]
+  $ zitadel start [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--image <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3197,6 +3346,8 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --image=<value>     Container image to run.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --port=<value>      Local HTTP port. By default this directory keeps the port it had, or takes the first free one
                           from 8080.
       --runtime=<option>  Local runtime backend.
@@ -3216,8 +3367,8 @@ Summarize the local Zitadel server and project state.
 
 ```
 USAGE
-  $ zitadel status [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>]
+  $ zitadel status [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3231,6 +3382,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3246,8 +3399,8 @@ Stop the local Zitadel server.
 
 ```
 USAGE
-  $ zitadel stop [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--all]
+  $ zitadel stop [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--all]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -3258,6 +3411,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3273,8 +3428,8 @@ Create a team.
 
 ```
 USAGE
-  $ zitadel team create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
+  $ zitadel team create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
     <value>...]
 
 FLAGS
@@ -3289,6 +3444,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -3321,8 +3478,8 @@ Deactivate a team by id.
 
 ```
 USAGE
-  $ zitadel team deactivate ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel team deactivate ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   ID  team id
@@ -3340,6 +3497,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3358,8 +3517,8 @@ Get one team by id.
 
 ```
 USAGE
-  $ zitadel team get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel team get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  team id
@@ -3378,6 +3537,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3398,9 +3559,9 @@ List teams.
 
 ```
 USAGE
-  $ zitadel team list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--sort <value>] [--plain]
+  $ zitadel team list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -3422,6 +3583,8 @@ FLAGS
                             han_or_equal), name (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|gr
                             eater_than|greater_than_or_equal), status (equals|not_equals|contains|not_contains|less_than
                             |less_than_or_equal|greater_than|greater_than_or_equal).
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -3448,8 +3611,8 @@ Update a team by id.
 
 ```
 USAGE
-  $ zitadel team update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
+  $ zitadel team update ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
     <value>...] [-f]
 
 ARGUMENTS
@@ -3468,6 +3631,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -3498,8 +3663,8 @@ Add end-to-end tests of the sign-in to this app.
 
 ```
 USAGE
-  $ zitadel tests add [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-f] [--skip-install]
+  $ zitadel tests add [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-f] [--skip-install]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -3510,6 +3675,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --skip-install     Do not install the new dev dependencies.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -3536,8 +3703,8 @@ Remove managed files and local Zitadel state.
 
 ```
 USAGE
-  $ zitadel uninstall [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-f]
+  $ zitadel uninstall [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -3549,6 +3716,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3567,7 +3736,8 @@ Upgrade this project to the latest Zitadel release.
 
 ```
 USAGE
-  $ zitadel upgrade [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+  $ zitadel upgrade [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -3577,6 +3747,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3601,9 +3773,9 @@ Create a user.
 
 ```
 USAGE
-  $ zitadel user create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
-    --file <value>] [--set <value>...]
+  $ zitadel user create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data
+    <value> | --file <value>] [--set <value>...]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3617,6 +3789,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 REQUIRED FIELD FLAGS
@@ -3652,8 +3826,8 @@ Delete a user by id.
 
 ```
 USAGE
-  $ zitadel user delete ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [-f]
+  $ zitadel user delete ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   ID  user id
@@ -3671,6 +3845,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3689,8 +3865,8 @@ Get one user by id.
 
 ```
 USAGE
-  $ zitadel user get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+  $ zitadel user get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
   ID  user id
@@ -3709,6 +3885,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3729,9 +3907,9 @@ List users.
 
 ```
 USAGE
-  $ zitadel user list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--filter <value>...] [--sort <value>] [--plain]
+  $ zitadel user list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -3782,6 +3960,10 @@ FLAGS
       lifecycle_owner_team_id
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).
 
+  --input=<value>
+      The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go
+      under "args". Only the global flags may stand beside it.
+
   --limit=<value>
       Page size (server default 20, max 100).
 
@@ -3817,9 +3999,9 @@ Update a user by id.
 
 ```
 USAGE
-  $ zitadel user update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
-    --file <value>] [--set <value>...] [-f]
+  $ zitadel user update ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data
+    <value> | --file <value>] [--set <value>...] [-f]
 
 ARGUMENTS
   ID  user id
@@ -3837,6 +4019,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 OPTIONAL FIELD FLAGS
@@ -3870,8 +4054,8 @@ Get one variable from the project.
 
 ```
 USAGE
-  $ zitadel variable get NAME [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--preview]
+  $ zitadel variable get NAME [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview]
 
 ARGUMENTS
   NAME  Variable name to read.
@@ -3888,6 +4072,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --preview           Read the preview value instead of the primary one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -3911,8 +4097,8 @@ List the variables entered on the project.
 
 ```
 USAGE
-  $ zitadel variable list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--preview] [--fields <value>] [--plain]
+  $ zitadel variable list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3928,6 +4114,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --preview           List the preview values instead of the primary ones.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -3952,8 +4140,9 @@ Show the variables a deployment froze, the live one by default.
 
 ```
 USAGE
-  $ zitadel variable resolve [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--fields <value>] [--plain]
+  $ zitadel variable resolve [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
+    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--fields <value>]
+    [--plain]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to read; the live one when omitted.
@@ -3972,6 +4161,8 @@ FLAGS
                           from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --origin=<value>    The origin whose live deployment to read.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -3998,8 +4189,8 @@ Remove one variable from the project.
 
 ```
 USAGE
-  $ zitadel variable rm NAME [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--preview] [-f]
+  $ zitadel variable rm NAME [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview] [-f]
 
 ARGUMENTS
   NAME  Variable name to remove.
@@ -4017,6 +4208,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --preview           Remove the preview value alone, leaving the primary one standing.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -4040,8 +4233,9 @@ Set one variable on the project.
 
 ```
 USAGE
-  $ zitadel variable set NAME [VALUE] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--secret] [--as string|number|boolean] [--preview]
+  $ zitadel variable set NAME [VALUE] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--secret] [--as string|number|boolean]
+    [--preview]
 
 ARGUMENTS
   NAME     Variable name (letters, digits and underscores).
@@ -4061,6 +4255,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
       --preview           Write the preview value alone, leaving the primary one as it is.
       --secret            Store the value encrypted. It can be replaced later but never read back.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -4087,7 +4283,8 @@ Show the CLI version.
 
 ```
 USAGE
-  $ zitadel version [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+  $ zitadel version [--json] [-c <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -4096,6 +4293,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -4111,7 +4310,8 @@ Show which plugin a command is in.
 
 ```
 USAGE
-  $ zitadel which [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+  $ zitadel which [--json] [-c <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -4120,6 +4320,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS

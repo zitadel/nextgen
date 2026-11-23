@@ -48,7 +48,9 @@ export type PathValues = Readonly<{
 export type RequestInput = Readonly<{
   /** `--field` entries, in the order given. */
   fields: readonly string[];
-  /** The `--input` document, when one was given. */
+  /**
+   * The `--file` document, when one was given.
+   */
   input?: Readonly<Record<string, unknown>>;
   /** The CLI's project, for a required `project_id` the caller leaves out. */
   projectId?: string;
@@ -56,7 +58,7 @@ export type RequestInput = Readonly<{
 
 /**
  * One `zitadel api` call: an operation the user named, from which the request
- * is built out of `--field` and `--input`, typed by the operation's generated
+ * is built out of `--field` and `--file`, typed by the operation's generated
  * schemas, as `--set` is on the resource commands.
  */
 export class ApiCall {
@@ -97,11 +99,11 @@ export class ApiCall {
   }
 
   /**
-   * The `--input` document: a file, or stdin with `-`. Reading a terminal to
+   * The `--file` document: a file, or stdin with `-`. Reading a terminal to
    * its end would look like a hang, so `-` with nothing piped in is refused.
    *
    * @param source - The path, `-` for stdin, or undefined when none was given.
-   * @param retry - The run again with `--input <path>`, which the refusal suggests.
+   * @param retry - The run again with `--file <path>`, which the refusal suggests.
    * @returns The document, or undefined when no source was given.
    * @throws {ZitadelError} E_VALIDATION when `-` is given with nothing piped in, or the document is no JSON object.
    */
@@ -116,9 +118,9 @@ export class ApiCall {
       if (process.stdin.isTTY) {
         throw new ZitadelError(
           "E_VALIDATION",
-          "--input - reads the body from a pipe, but nothing is piped in",
+          "--file - reads the body from a pipe, but nothing is piped in",
           {
-            hint: "Pipe a body in and pass --input -, or pass --input <path>.",
+            hint: "Pipe a body in and pass --file -, or pass --file <path>.",
             nextCommands: [retry],
           },
         );
@@ -186,10 +188,10 @@ export class ApiCall {
    *
    * A field whose name the operation declares as a query parameter sets that
    * parameter; every other field is a dot path into the body, laid over
-   * `--input`. A body the operation requires but nothing gave is `{}`, the
+   * `--file`. A body the operation requires but nothing gave is `{}`, the
    * empty document.
    *
-   * @param input - The fields, the `--input` document and the CLI's project.
+   * @param input - The fields, the `--file` document and the CLI's project.
    * @returns The request, its path parameters not yet filled in.
    * @throws {ZitadelError} E_VALIDATION for a field the operation cannot take.
    */
@@ -200,11 +202,9 @@ export class ApiCall {
       query.set(name, [...(query.get(name) ?? []), value]);
     }
     if (input !== undefined && operation.body === null) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${operation.id} takes no body, but --input gave one`,
-        { hint: "Leave out --input." },
-      );
+      throw new ZitadelError("E_VALIDATION", `${operation.id} takes no body, but --file gave one`, {
+        hint: "Leave out --file.",
+      });
     }
 
     const fragments: unknown[] = [];

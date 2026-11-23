@@ -65,8 +65,7 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
       mode: "deploy",
       dryRun: this.dryRun,
       compare: false,
-      json: this.isJson,
-      color: this.isColored,
+      ...this.rendering,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);

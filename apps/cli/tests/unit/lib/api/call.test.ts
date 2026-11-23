@@ -159,7 +159,7 @@ describe("ApiCall.request", () => {
     ).toEqual({ filter: [{ field: "status", operation: "equals", value: "active" }] });
   });
 
-  it("lays the fields over --input", () => {
+  it("lays the fields over --file", () => {
     expect(
       requestFor("queryUsers", ["limit=5"], { input: { limit: 1, sorting: { field: "id" } } }).body,
     ).toEqual({ limit: 5, sorting: { field: "id" } });
@@ -179,9 +179,9 @@ describe("ApiCall.request", () => {
     expect(requestFor("getLive")).not.toHaveProperty("body");
   });
 
-  it("refuses --input for an operation that takes no body", () => {
+  it("refuses --file for an operation that takes no body", () => {
     expect(() => requestFor("getLive", [], { input: {} })).toThrow(
-      "getLive takes no body, but --input gave one",
+      "getLive takes no body, but --file gave one",
     );
   });
 
@@ -263,7 +263,7 @@ describe("ApiCall.readInput", () => {
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      hint: "Pipe a body in and pass --input -, or pass --input <path>.",
+      hint: "Pipe a body in and pass --file -, or pass --file <path>.",
       nextCommands: [{ id: "setup" }],
     });
   });
