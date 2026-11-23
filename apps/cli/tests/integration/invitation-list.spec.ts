@@ -41,6 +41,22 @@ describe("invitation list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["invitation", "list", "--fields", "id", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["invitation", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("lists the project's invitations, newest first", async () => {
         const app = await aSetUpApp();
         const older = await app.invite();
@@ -73,6 +89,38 @@ describe("invitation list", () => {
         expect(app.envelopeOf(result).data).toMatchObject({ items: [{ id: pending }], count: 1 });
       });
 
+      it("leaves accepted invitations out without --status", async () => {
+        const app = await aSetUpApp();
+        const accepted = await app.invite();
+        const pending = await app.invite();
+        platform.acceptsInvitation(accepted);
+
+        const result = await app.run([...LIST, "--json"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({ items: [{ id: pending }], count: 1 });
+      });
+
+      it("lists every status --status names when it repeats", async () => {
+        const app = await aSetUpApp();
+        const accepted = await app.invite();
+        const pending = await app.invite();
+        platform.acceptsInvitation(accepted);
+
+        const result = await app.run([
+          ...LIST,
+          "--status",
+          "pending",
+          "--status",
+          "accepted",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          items: [{ id: pending }, { id: accepted }],
+          count: 2,
+        });
+      });
+
       it("narrows to one type with --type", async () => {
         const app = await aSetUpApp();
         await app.invite();
@@ -91,6 +139,7 @@ describe("invitation list", () => {
 
         expect(app.envelopeOf(result).data).toMatchObject({
           count: 1,
+          truncated: true,
           next_page_token: expect.any(String),
         });
       });
@@ -122,6 +171,15 @@ describe("invitation list", () => {
         const result = await app.run(LIST);
 
         expect(result).toPrint("Ada\\x1b[2Jwiped");
+      });
+
+      it("says how to list accepted invitations when it leaves out every one", async () => {
+        const app = await aSetUpApp();
+        platform.acceptsInvitation(await app.invite());
+
+        const result = await app.run(LIST);
+
+        expect(result.stderr).toContain("pass --status accepted to list them");
       });
     });
   });

@@ -67,8 +67,7 @@ test("shows the status the API stamped on a team", async ({ page, zitadel, seed 
   await addTeam.name.fill(name);
   await addTeam.submit.click();
 
-  // `team-status` returns `active`; the console renders that value rather than
-  // the design's `Inactive`/`Active` wording, so this asserts the API's own word.
+  // `team-status` returns `active`, which the list labels `Active`.
   const row = page.getByRole("row").filter({ hasText: name });
   await expect(row.getByText("Active", { exact: true })).toBeVisible();
 });

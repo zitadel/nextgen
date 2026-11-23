@@ -4,7 +4,6 @@ import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 
 import type { BaseCommand } from "./base";
-import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
 import type { CommandClass } from "./command-class";
 
@@ -62,7 +61,7 @@ export type DestructiveChange<Ready = undefined> = Omit<Gate, "message"> & {
  * overwriting files) gives consent with it too.
  */
 export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
-  abstract class DestructiveCommand extends Promptable(Base) {
+  abstract class DestructiveCommand extends Base {
     /**
      * The whole of a destructive command's work, in one order: a dry run
      * answers with `preview`; otherwise `prepare` reads what the change needs,

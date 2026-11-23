@@ -9,7 +9,9 @@
  */
 
 /**
- * The canonical list/collection envelope: `{ items, count, next_page_token }`.
+ * The canonical list/collection envelope: `{ items, count, truncated,
+ * next_page_token }`. `truncated` says outright whether more remain, so a reader
+ * need not infer it from the cursor.
  * Every command that returns a collection emits this, so it reads uniformly
  * across all of them. A single-page endpoint passes `nextPageToken: null` (the
  * default); a paginated one passes the server cursor (or `null` once drained).
@@ -20,14 +22,16 @@ export function listData<T, K extends string = "next_page_token">(
 ): {
   items: readonly T[];
   count: number;
+  truncated: boolean;
 } & Record<K, string | null> {
   const cursorKey: string = opts.cursorKey ?? "next_page_token";
 
   return {
     items,
     count: items.length,
+    truncated: opts.nextPageToken != null,
     [cursorKey]: opts.nextPageToken ?? null,
-  } as { items: readonly T[]; count: number } & Record<K, string | null>;
+  } as { items: readonly T[]; count: number; truncated: boolean } & Record<K, string | null>;
 }
 
 /**

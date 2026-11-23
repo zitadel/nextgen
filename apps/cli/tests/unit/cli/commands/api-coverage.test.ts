@@ -146,6 +146,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   removeProjectOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
+  listProjectMembers: "not yet exposed; a project sub-resource listing, no command reads it yet",
   // Redeeming a link is the invitee's, in the browser, on their own session.
   lookupInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
   acceptInvitation: "redeems a link in the browser; no command (ADR 086 §8)",

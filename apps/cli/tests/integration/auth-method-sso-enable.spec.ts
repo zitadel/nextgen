@@ -1094,13 +1094,6 @@ describe("auth-method sso enable", () => {
             code: "E_VALIDATION",
             message: "Expected --provider=gogle to be one of: google, custom",
             next_commands: [expectedPublicCliCommand("auth-method sso enable --help")],
-            details: {
-              original: {
-                name: "Error",
-                message:
-                  "Expected --provider=gogle to be one of: google, custom\nSee more help with --help",
-              },
-            },
           });
         });
       });

@@ -328,12 +328,6 @@ describe("deployment create", () => {
           code: "E_VALIDATION",
           message: "Nonexistent flag: --origin",
           next_commands: [expectedPublicCliCommand("deployment create --help")],
-          details: {
-            original: {
-              name: "Error",
-              message: "Nonexistent flag: --origin\nSee more help with --help",
-            },
-          },
         });
       });
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func TestDeployedByNewerBuild(t *testing.T) {
@@ -83,7 +84,7 @@ func TestDrift(t *testing.T) {
 func TestPlatformBundleIsTheServersDefaults(t *testing.T) {
 	const builtinBase = "https://example.com/api/schemas"
 
-	bundle, err := platformBundle(builtinBase)
+	bundle, err := platformBundle(builtinBase, false)
 	require.NoError(t, err)
 
 	assert.Equal(t, domain.PlatformProjectID, bundle.ProjectID)
@@ -102,4 +103,10 @@ func TestPlatformBundleIsTheServersDefaults(t *testing.T) {
 	assert.InDelta(t, 15, bundle.Policies[0].Config["min_length"], 0)
 	assert.Equal(t, "user.create", bundle.Policies[1].Operation)
 	assert.Equal(t, map[string]any{"challenge": domain.SignupGateProvider}, bundle.Policies[1].Config)
+	assert.Nil(t, bundle.OAuth, "oauth.enabled off: the platform issuer stays off")
+
+	bundle, err = platformBundle(builtinBase, true)
+	require.NoError(t, err)
+	assert.Equal(t, &service.CreateOAuthSettingsInput{ProjectID: domain.PlatformProjectID, Enabled: true}, bundle.OAuth)
+	assert.Len(t, bundle.FlowDefinitions, len(defaults), "the login flows stay with the OAuth settings")
 }

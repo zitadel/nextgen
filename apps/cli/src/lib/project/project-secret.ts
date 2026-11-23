@@ -1,5 +1,5 @@
-import { readFile, rename } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, rename } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
@@ -51,7 +51,7 @@ export class ProjectSecret {
    * @param cwd - The project's directory.
    * @param data - What the file holds.
    */
-  private constructor(cwd: string, data: Readonly<ProjectSecretData>) {
+  constructor(cwd: string, data: Readonly<ProjectSecretData>) {
     this.cwd = cwd;
     this.data = data;
   }
@@ -101,8 +101,8 @@ export class ProjectSecret {
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
-          hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
-          nextCommands: [{ id: "setup" }, { id: "doctor", flags: { fix: true } }],
+          hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+          nextCommands: [{ id: "doctor", flags: { fix: true } }],
         });
       }
       throw error;
@@ -133,6 +133,7 @@ export class ProjectSecret {
    */
   async write(): Promise<void> {
     const path = join(this.cwd, PATH);
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
     const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
     await new SecretFile(tmp).write(`${stableStringify(this.data)}\n`);
     await rename(tmp, path);

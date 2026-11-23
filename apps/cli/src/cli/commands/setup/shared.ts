@@ -748,11 +748,6 @@ export type SetupServices = Readonly<{
   source: string;
 
   /**
-   * Whether the run draws in colour.
-   */
-  isColored: boolean;
-
-  /**
    * Says what the run did, outside the result.
    *
    * @param notices - The lines to say.

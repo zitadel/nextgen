@@ -137,6 +137,17 @@ describe("api", () => {
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
 
+    it.each([
+      ["a dot segment", ".."],
+      ["a control character", "a\u0007b"],
+    ])("refuses %s as a path value", async (_what, value) => {
+      const app = await aSetUpApp();
+
+      const result = await app.api("getSession", value);
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
     describe("--json", () => {
       it("answers with the operation's response body", async () => {
         const app = await aSetUpApp();
@@ -186,10 +197,10 @@ describe("api", () => {
         expect(app.envelopeOf(await app.getVariable("FOO")).data).toMatchObject({ value: "bar" });
       });
 
-      it("writes the body piped in with --input -", async () => {
+      it("writes the body piped in with --file -", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.apiPiping('{"FOO":"bar"}', "setVariables", "--input", "-");
+        const result = await app.apiPiping('{"FOO":"bar"}', "setVariables", "--file", "-");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -517,7 +528,7 @@ describe("api", () => {
             source: "http://mock.zitadel.test",
             code: "E_CONFIRMATION_REQUIRED",
             message: "Cannot call removeProjectPreview without --force in non-interactive mode",
-            hint: `Ask a person first: Call removeProjectPreview in ${await app.projectPlace()}? Remove a preview. Once they agree, run the same command again, with its --field values or the pipe into --input, and add --force.`,
+            hint: `Ask a person first: Call removeProjectPreview in ${await app.projectPlace()}? Remove a preview. Once they agree, run the same command again, with its --field values or the pipe into --file, and add --force.`,
             details: {
               question: `Call removeProjectPreview in ${await app.projectPlace()}? Remove a preview.`,
             },

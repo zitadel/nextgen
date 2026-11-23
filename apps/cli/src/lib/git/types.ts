@@ -46,6 +46,8 @@ export interface UncommittedFile {
   readonly path: string;
   /** Whether git does not track it yet. */
   readonly untracked: boolean;
+  /** For a rename or a copy, where the file came from, named as `path` is. */
+  readonly from?: string;
 }
 
 /** One changed file of a diff. */

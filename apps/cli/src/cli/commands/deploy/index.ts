@@ -18,7 +18,6 @@ import {
   messageTooLong,
   Publisher,
 } from "@/lib/publish";
-import { configIsDirty } from "@/lib/publish/git";
 import {
   type NextOf,
   type Suggested,
@@ -137,12 +136,23 @@ const NO_PRIMARY_ORIGIN_REFUSAL = {
  *
  * @param deployed - The directory that was deployed.
  * @param message - The message the deploy was given, if any.
- * @returns `git add` then `git commit` of `.zitadel/`, one after the other.
+ * @param referenced - The files the release inlines from outside `.zitadel/`.
+ * @returns `git add` then `git commit` of `.zitadel/` and those files, one after the other.
  */
-function commitConfig(deployed: string, message: string | undefined): SuggestedCommand {
+function commitConfig(
+  deployed: string,
+  message: string | undefined,
+  referenced: readonly string[],
+): SuggestedCommand {
+  const paths = [
+    ".zitadel",
+    ...referenced.map((path) => {
+      return Cmd.quote(path);
+    }),
+  ];
   const where = resolve(deployed) === process.cwd() ? [] : ["-C", Cmd.quote(deployed)];
   return shellSteps(
-    shellCommand("git", ...where, "add", ".zitadel"),
+    shellCommand("git", ...where, "add", ...paths),
     shellCommand(
       "git",
       ...where,
@@ -150,7 +160,7 @@ function commitConfig(deployed: string, message: string | undefined): SuggestedC
       "-m",
       Cmd.quote(message ?? "<what changed>"),
       "--",
-      ".zitadel",
+      ...paths,
     ),
   );
 }
@@ -220,8 +230,6 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       mode: "deploy",
       dryRun: this.dryRun,
       compare: true,
-      json: this.isJson,
-      color: this.isColored,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
@@ -271,12 +279,13 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       });
     }
 
-    // Record whether the whole worktree was dirty when this release was built,
-    // and warn: a release pins content, but its git provenance is only exact
-    // when the tree was clean, so the reader knows the commit is approximate.
+    // Record whether a file the release is built from was dirty when it was
+    // built, and warn: a release pins content, but its git provenance is only
+    // exact when those files were committed, so the reader knows the commit is
+    // approximate. A change to any other file in the repository does not count.
     if (prepared.gitDirty) {
       warnings.report(
-        "The git working tree has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
+        "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
       );
     }
 
@@ -323,7 +332,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
 
     // The release is live; if the tree was dirty, committing now keeps what was
     // deployed in git (the warning above says to commit before the next deploy).
-    const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
+    const configUncommitted = prepared.gitDirty;
 
     const title = `Deployed ${resources}`;
     const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
@@ -355,7 +364,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       next: {
         commands: [
           this.suggest({ id: "deployment:list" }),
-          ...(configUncommitted ? [commitConfig(this.cwd, message)] : []),
+          ...(configUncommitted ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
         ],
       },
     });
