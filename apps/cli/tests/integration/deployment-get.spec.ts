@@ -67,6 +67,65 @@ describe("deployment get", () => {
     });
   });
 
+  describe("--fields", () => {
+    it("judges the fields by the record's shape", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      const deployed = await app.deployData();
+
+      const refused = await app.run([
+        "deployment",
+        "get",
+        deployed.deployment_id ?? "",
+        "--fields",
+        "no_such_field",
+        "--json",
+      ]);
+
+      expect(refused).toFailWith("E_VALIDATION");
+      expect(JSON.parse(refused.stdout).hint).toContain("release_id");
+    });
+
+    it("cuts the data to the fields chosen", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      const deployed = await app.deployData();
+
+      const result = await app.run([
+        "deployment",
+        "get",
+        deployed.deployment_id ?? "",
+        "--fields",
+        "id,metadata.reason",
+        "--json",
+      ]);
+
+      expect(app.envelopeOf(result).data).toEqual({
+        title: `Read ${deployed.deployment_id}`,
+        id: deployed.deployment_id,
+        metadata: { reason: "deploy" },
+      });
+    });
+
+    it("prints only the fields chosen", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      const deployed = await app.deployData();
+
+      const result = await app.run([
+        "deployment",
+        "get",
+        deployed.deployment_id ?? "",
+        "--fields",
+        "status",
+      ]);
+
+      expect(result).toPrintRow("status", "live");
+      expect(result).not.toPrintRow("release_id");
+      expect(result).not.toPrint("variables");
+    });
+  });
+
   describe("against a valid server", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();

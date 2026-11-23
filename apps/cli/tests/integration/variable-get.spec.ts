@@ -8,6 +8,58 @@ import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures
 const platform = usePlatformMock();
 
 describe("variable get", () => {
+  describe("--fields", () => {
+    it("judges the fields by the record's shape", async () => {
+      const app = await aSetUpApp();
+      expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+      const accepted = await app.run(["variable", "get", "FOO", "--fields", "value", "--json"]);
+      const refused = await app.run([
+        "variable",
+        "get",
+        "FOO",
+        "--fields",
+        "no_such_field",
+        "--json",
+      ]);
+
+      expect(accepted).toSucceed();
+      expect(refused).toFailWith("E_VALIDATION");
+      expect(JSON.parse(refused.stdout).hint).toContain("name, secret, value");
+    });
+
+    it("cuts the data to the fields chosen", async () => {
+      const app = await aSetUpApp();
+      expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+      const result = await app.run(["variable", "get", "FOO", "--fields", "value", "--json"]);
+
+      expect(app.envelopeOf(result).data).toEqual({
+        title: "Read FOO",
+        value: "bar",
+      });
+    });
+
+    it("prints only the fields chosen", async () => {
+      const app = await aSetUpApp();
+      expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+      const result = await app.run(["variable", "get", "FOO", "--fields", "name"]);
+
+      expect(result).toPrintRow("name", "FOO");
+      expect(result).not.toPrintRow("value");
+    });
+
+    it("never carries a secret's value", async () => {
+      const app = await aSetUpApp();
+      expect(await app.setVariable("FOO", "hunter2", { secret: true })).toSucceed();
+
+      const result = await app.run(["variable", "get", "FOO", "--fields", "name,secret,value"]);
+
+      expect(result.stdout + result.stderr).not.toContain("hunter2");
+    });
+  });
+
   describe("a name the platform cannot accept", () => {
     // Every command that names a variable refuses the name itself, so neither a
     // dry run nor a confirmation can report work the platform would never do.

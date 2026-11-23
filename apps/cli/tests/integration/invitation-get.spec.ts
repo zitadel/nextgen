@@ -9,6 +9,55 @@ const UNKNOWN = "inv_missing";
 const platform = usePlatformMock();
 
 describe("invitation get", () => {
+  describe("--fields", () => {
+    it("judges the fields by the record's shape", async () => {
+      const app = await aSetUpApp();
+      const invitation = await app.invite();
+
+      const refused = await app.run([
+        "invitation",
+        "get",
+        invitation,
+        "--fields",
+        "no_such_field",
+        "--json",
+      ]);
+
+      expect(refused).toFailWith("E_VALIDATION");
+      expect(JSON.parse(refused.stdout).hint).toContain("status");
+    });
+
+    it("cuts the data to the fields chosen", async () => {
+      const app = await aSetUpApp();
+      const invitation = await app.invite();
+
+      const result = await app.run([
+        "invitation",
+        "get",
+        invitation,
+        "--fields",
+        "id,status",
+        "--json",
+      ]);
+
+      expect(app.envelopeOf(result).data).toEqual({
+        title: `Read ${invitation}`,
+        id: invitation,
+        status: "pending",
+      });
+    });
+
+    it("prints only the fields chosen", async () => {
+      const app = await aSetUpApp();
+      const invitation = await app.invite();
+
+      const result = await app.run(["invitation", "get", invitation, "--fields", "status"]);
+
+      expect(result).toPrintRow("status", "pending");
+      expect(result).not.toPrintRow("role");
+    });
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {

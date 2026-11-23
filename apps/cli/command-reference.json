@@ -1836,6 +1836,11 @@
       ],
       "flags": [
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "server",
           "char": "s",
           "description": "Override the resolved server URL.",
@@ -3531,6 +3536,11 @@
           "type": "boolean"
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "server",
           "char": "s",
           "description": "Override the resolved server URL.",
@@ -4323,6 +4333,11 @@
         }
       ],
       "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
         {
           "name": "server",
           "char": "s",

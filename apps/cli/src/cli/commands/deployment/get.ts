@@ -2,11 +2,13 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
-import { GetDeploymentParams } from "@/lib/backend/schemas";
+import { GetDeploymentParams, GetDeploymentResponse } from "@/lib/backend/schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { chosenColumns } from "@/lib/oclif/columns";
+import { fieldPaths } from "@/lib/oclif/crud";
+import { fieldsFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
@@ -31,7 +33,8 @@ const DEPLOYMENT_ID: Refused<string> = {
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
  * release it made live, the origins it went to, when, and the variables it
- * froze.
+ * froze. `--fields` cuts the data and the rows to the dot-paths it names,
+ * judged by the deployment's shape, and leaves the frozen variables out.
  */
 export default class DeploymentGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
   static override description = "Read one deployment by id.";
@@ -48,14 +51,22 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
     }),
   };
 
-  protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
+  static override flags = {
+    fields: fieldsFlag({
+      shape: fieldPaths(GetDeploymentResponse),
+    }),
+  };
+
+  protected async execute({ args, flags }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
     const [deployment, variables] = await Promise.all([
       deploymentService.get(args.deploymentId),
-      this.forHumans(() => {
-        return deploymentService.variables(args.deploymentId);
-      }),
+      flags.fields === undefined
+        ? this.forHumans(() => {
+            return deploymentService.variables(args.deploymentId);
+          })
+        : undefined,
     ]);
 
     const listed =
@@ -80,21 +91,27 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
     const title = `Read ${escapeControlCharacters(deployment.id)}`;
     return this.emit({
       status: "ok",
-      data: deployment,
+      data: flags.fields === undefined ? deployment : this.pickFields(deployment, flags.fields),
       summary: {
         title,
         sections: [],
         lines: [
           ...this.tabulateDetail(
             undefined,
-            ["id", "release_id", "reason", "origins", "deployed_at"],
-            {
-              id: deployment.id,
-              release_id: deployment.release_id,
-              reason: deployment.reason ?? "deploy",
-              origins: deployment.origins.join(", "),
-              deployed_at: deployment.deployed_at,
-            },
+            chosenColumns(
+              flags.fields,
+              ["id", "release_id", "reason", "origins", "deployed_at"],
+              [],
+            ),
+            flags.fields === undefined
+              ? {
+                  id: deployment.id,
+                  release_id: deployment.release_id,
+                  reason: deployment.reason ?? "deploy",
+                  origins: deployment.origins.join(", "),
+                  deployed_at: deployment.deployed_at,
+                }
+              : this.pickFields(deployment, flags.fields),
           ).split("\n"),
           ...(frozen === undefined ? [] : ["", ...frozen]),
         ],
