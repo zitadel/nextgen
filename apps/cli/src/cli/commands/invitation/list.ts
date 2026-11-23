@@ -6,6 +6,7 @@ import {
   invitationRole,
   type InvitationStatus,
   type InvitationType,
+  UNACCEPTED_INVITATION_STATUSES,
 } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
@@ -21,12 +22,6 @@ const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
 
 /** The statuses `--status` narrows to, as the API declares them. */
 const STATUSES = ListInvitationsQueryParams.shape.status.unwrap().element.options;
-
-/**
- * What `list` shows without `--status`: every status but accepted, as the
- * console does. Whoever accepted is a member now, which `grant list` shows.
- */
-const OPEN_STATUSES: readonly InvitationStatus[] = ["pending", "expired", "rejected"];
 
 /** The types `--type` narrows to, as the API declares them. */
 const TYPES = ListInvitationsQueryParams.shape.type.unwrap().options;
@@ -103,7 +98,7 @@ export default class InvitationList extends Tabulatable(ServerCommand(Environmen
     const invitationService = new InvitationService(client, projectId);
     const listed = await invitationService.page(
       {
-        status: [...(flags.status ?? OPEN_STATUSES)],
+        status: [...(flags.status ?? UNACCEPTED_INVITATION_STATUSES)],
         type: flags.type,
         limit: flags.limit,
         page_token: flags.pageToken,

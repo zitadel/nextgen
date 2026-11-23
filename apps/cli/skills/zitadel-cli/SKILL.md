@@ -227,10 +227,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
     repeat `--status` to pick statuses (`--status accepted` lists them).
     `invitation get <invitation_id>` reads one; `responded_by` and
     `responded_at` say who accepted or declined it, and when.
-  - `invitation cancel <invitation_id>` stops a pending link, or removes a
-    declined invitation, and needs `--force` when non-interactive; its
-    `--dry-run` needs the id. An accepted or expired one fails with
-    `E_VALIDATION`.
+  - `invitation cancel <invitation_id>` stops a pending link, or removes an
+    expired or declined invitation, and needs `--force` when non-interactive;
+    its `--dry-run` needs the id. An accepted one fails with `E_VALIDATION`.
   - A project nobody has claimed refuses invitations until it is claimed
     (`zitadel claim`). Existing members are read with `grant list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
