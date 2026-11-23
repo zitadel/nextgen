@@ -2,11 +2,13 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { LocalRuntime } from "@/lib/server";
-import { ServerCommand } from "@/cli/commands/server/base";
+import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted, prose } from "@/lib/oclif/rendering";
+import { BaseCommand } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -48,8 +50,8 @@ const NOT_STARTED_REFUSAL = {
  * in the folder `start` ran in, or one inside it: the server is found from the
  * nearest `.zitadel/local/` on the way up.
  */
-export default class Logs extends ServerCommand {
-  static override folderRule = "nearest" as const;
+export default class Logs extends LocalServerCommand(ServerCommand(BaseCommand), "nearest") {
+  static override group = CommandGroups.localServer;
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
   static override groupOrder = 4;
@@ -71,6 +73,15 @@ export default class Logs extends ServerCommand {
       description: "Number of lines to show, counting only those --level shows.",
     }),
   };
+
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
     if (flags.follow && this.isJson) {

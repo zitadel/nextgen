@@ -112,7 +112,7 @@ describe("Ui", () => {
 
     it("says where the command ran, as the last line of its summary", ({ terminal }) => {
       const ui = watched();
-      ui.ranAgainst("proj-1", "api.zitadel.cloud");
+      ui.ranAgainst("proj-1", "preview.zitadel.com");
       ui.finish({
         title: "Removed the origin",
         sections: [],
@@ -121,7 +121,7 @@ describe("Ui", () => {
       });
 
       expect(printed(terminal)).toContain(
-        "Using project proj-1 on your Zitadel server at api.zitadel.cloud.",
+        "Using project proj-1 on your Zitadel server at preview.zitadel.com.",
       );
     });
 
@@ -130,11 +130,11 @@ describe("Ui", () => {
     // ever writes "Using".
     it("says it in the footer's words for a normal command", ({ terminal }) => {
       const ui = normally();
-      ui.ranAgainst("proj-1", "api.zitadel.cloud");
+      ui.ranAgainst("proj-1", "preview.zitadel.com");
       ui.finish({ title: "Removed the origin", sections: [] });
 
       expect(printed(terminal)).toContain(
-        "Removed the origin · project proj-1 on api.zitadel.cloud",
+        "Removed the origin · project proj-1 on preview.zitadel.com",
       );
     });
 

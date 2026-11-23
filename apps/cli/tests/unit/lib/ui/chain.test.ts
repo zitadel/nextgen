@@ -117,17 +117,19 @@ describe("Chain", () => {
   it("names where it ran in the footer's words for a normal command", ({ terminal }) => {
     const chain = normally();
     chain.describe("Removing an origin");
-    chain.ranAgainst("proj-1", "api.zitadel.cloud");
+    chain.ranAgainst("proj-1", "preview.zitadel.com");
     chain.finish({ title: "Removed the origin", sections: [] });
 
-    expect(printed(terminal)).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
+    expect(printed(terminal)).toContain(
+      "Removed the origin · project proj-1 on preview.zitadel.com",
+    );
     expect(printed(terminal)).not.toContain("╭");
   });
 
   it("says where it ran as the last line of a summary it does have", ({ terminal }) => {
     const chain = watching();
     chain.describe("Deploying the configuration");
-    chain.ranAgainst("proj-1", "api.zitadel.cloud");
+    chain.ranAgainst("proj-1", "preview.zitadel.com");
     chain.finish({
       title: "Deployed it",
       sections: [],

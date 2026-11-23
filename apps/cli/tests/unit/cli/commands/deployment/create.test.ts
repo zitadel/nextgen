@@ -70,7 +70,7 @@ describe("--release", () => {
 });
 
 describe("deployment create at a terminal", () => {
-  const SERVER = "https://api.zitadel.cloud";
+  const SERVER = "https://preview.zitadel.com";
 
   /**
    * A project directory holding a secret, with the server answering a deployment with the origins.

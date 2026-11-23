@@ -2,11 +2,14 @@ package zlog_test
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/zitadel/sloggcp"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -58,4 +61,18 @@ func TestHandler_Streams(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestHandler_WithoutAttrs_KeepsErrorValue checks that a marked context leaves
+// an error with nothing to drop as an error: the GCP handler refuses a group.
+func TestHandler_WithoutAttrs_KeepsErrorValue(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(zlog.NewHandler(slog.LevelDebug, nil, sloggcp.NewErrorReportingHandler(&buf, nil)))
+	var err error = domain.ErrInternal(errors.New("cause"))
+
+	logger.ErrorContext(zlog.WithoutAttrs(t.Context(), "state"), "api error", slog.Any(zlog.ErrorAttributeKey, err), slog.Group("request", "state", "s", "id", "1"))
+
+	assert.NotContains(t, buf.String(), "sloggcp: unsupported type")
+	assert.NotContains(t, buf.String(), `"state"`)
+	assert.Contains(t, buf.String(), `"request":{"id":"1"}`)
 }

@@ -94,6 +94,7 @@ type gateCodes struct{ denied, readMiss, writeMiss string }
 
 var (
 	brandingCodes   = gateCodes{domain.ErrBrandingPermissionDenied().Code, domain.ErrBrandingNotFound().Code, domain.ErrBrandingInvalid("", nil).Code}
+	oauthSetCodes   = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsNotFound().Code}
 	deploymentCodes = gateCodes{domain.ErrDeploymentPermissionDenied().Code, domain.ErrDeploymentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code}
 	eventCodes      = gateCodes{domain.ErrEventPermissionDenied().Code, domain.ErrEventNotFound().Code, domain.ErrEventNotFound().Code}
 	flowDefCodes    = gateCodes{domain.ErrFlowDefinitionPermissionDenied().Code, domain.ErrFlowDefinitionNotFound().Code, domain.ErrFlowDefinitionInvalid("", nil).Code}
@@ -138,6 +139,7 @@ var gateRows = []gateRow{
 	{op: "ListBranding", cookie: true, relation: viewer, target: onProject, list: true, miss: brandingCodes.readMiss},
 	{op: "PublishBranding", relation: editor, target: onProject, denied: brandingCodes.denied, miss: brandingCodes.writeMiss},
 	{op: "GetBranding", cookie: true, relation: viewer, target: onResource, idField: "BrandingID", kind: domain.ResourceKindBranding, denied: brandingCodes.denied, miss: brandingCodes.readMiss},
+	{op: "GetOAuthSettings", cookie: true, relation: viewer, target: onResource, idField: "OAuthSettingsID", kind: domain.ResourceKindOAuthSettings, denied: oauthSetCodes.denied, miss: oauthSetCodes.readMiss},
 
 	// Deployments and previews.
 	{op: "ListDeployments", cookie: true, relation: viewer, target: onProject, list: true, miss: deploymentCodes.readMiss},
@@ -200,11 +202,12 @@ var gateRows = []gateRow{
 	{op: "GetPolicy", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 	{op: "ListPolicyRevisions", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 
-	// Projects, their admins, claim and origins.
+	// Projects, their admins and members, claim and origins.
 	{op: "QueryProjects", relation: viewer, why: whyQuery, target: onOwnProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "GetProject", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "UpdateProject", cookie: true, relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "ListProjectAdmins", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
+	{op: "ListProjectMembers", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "CreateProjectClaim", relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "GetProjectClaimStatus", relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "AddProjectOrigin", cookie: true, relation: editor, target: onProject, denied: originCodes.denied, miss: originCodes.writeMiss},

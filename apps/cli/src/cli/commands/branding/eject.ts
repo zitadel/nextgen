@@ -34,6 +34,7 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { Project } from "@/lib/project";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The shipped designs, as a list for a hint to offer. */
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
@@ -112,7 +113,7 @@ function isRetiredDesign(value: string): boolean {
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends Promptable(BaseCommand) {
+export default class BrandingEject extends Promptable(ServerCommand(BaseCommand)) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override group = CommandGroups.signIn;
@@ -133,9 +134,14 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     }),
   };
 
-  static override meta = {
-    resolveServer: false,
-  };
+  /**
+   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
 
   protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
     if (flags.design !== undefined && !isBrandingDesign(flags.design)) {

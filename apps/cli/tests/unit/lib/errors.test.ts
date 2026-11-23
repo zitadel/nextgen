@@ -321,15 +321,15 @@ describe("toZitadelError", () => {
   it("flags a non-enveloped 404 as a likely wrong server", () => {
     const err = responseFailure(
       404,
-      "https://api.zitadel.cloud/projects",
+      "https://preview.zitadel.com/projects",
       { message: "not found" },
-      "POST https://api.zitadel.cloud/projects returned 404",
+      "POST https://preview.zitadel.com/projects returned 404",
     );
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NOT_FOUND");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe(
-      "not found — https://api.zitadel.cloud/projects has no such endpoint; is this a Zitadel platform API?",
+      "not found — https://preview.zitadel.com/projects has no such endpoint; is this a Zitadel platform API?",
     );
   });
 

@@ -201,6 +201,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetProjectOperation:          true,
 	api.UpdateProjectOperation:       true,
 	api.ListProjectAdminsOperation:   true,
+	api.ListProjectMembersOperation:  true,
 	api.LookupInvitationOperation:    true,
 	api.AcceptInvitationOperation:    true,
 	api.RejectInvitationOperation:    true,
@@ -226,6 +227,9 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.QueryIdpsOperation:             true,
 	api.GetIdpOperation:                true,
 	api.GetIdpRevisionOperation:        true,
+	// The application detail page reads one application. Registering one
+	// stays with the project secret.
+	api.GetApplicationOperation: true,
 	// The Releases screens read a project's releases and where each went,
 	// deploy one, roll a deployment back and revoke a release.
 	api.ListReleasesOperation:       true,

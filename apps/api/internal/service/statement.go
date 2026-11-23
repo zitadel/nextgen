@@ -45,12 +45,14 @@ type AllStatements interface {
 	TokenStatements
 	SessionStatements
 	AuthAttemptStatements
+	AuthRequestStatements
 	UserStatements
 	UserPasswordStatements
 	UserTOTPStatements
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	OAuthSettingsStatements
 	VariableStatements
 	VariableSetStatements
 	ClaimStatements
@@ -744,6 +746,15 @@ type BrandingStatements interface {
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
 }
 
+// OAuthSettingsStatements persist the immutable OAuth settings revisions a
+// release pins. Revisions are create-only, like branding.
+type OAuthSettingsStatements interface {
+	Statements
+	CreateOAuthSettings(ctx context.Context, entity *domain.OAuthSettings) error
+	GetOAuthSettingsByID(ctx context.Context, projectID, id string) (*domain.OAuthSettings, error)
+	ListOAuthSettings(ctx context.Context, filter *database.ListOptions[domain.OAuthSettingsField]) (*database.ListResult[*domain.OAuthSettings], error)
+}
+
 // TODO(IAM-marco): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type ClaimPool interface {
 // 	Statementer[ClaimStatements]
@@ -800,6 +811,18 @@ type VariableSetStatements interface {
 	// deployment that was never linked -- or does not exist, or belongs to
 	// another project -- returns NoRowFoundError.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
+}
+
+// AuthRequestStatements persists the authorization requests the endpoint
+// hands to the login (ADR 081 §8). Rows are never updated.
+type AuthRequestStatements interface {
+	Statements
+	// CreateAuthRequest inserts request, generates its id when empty, and sets
+	// created_at.
+	CreateAuthRequest(ctx context.Context, request *domain.AuthRequest) error
+	// GetAuthRequest returns the request, expired or not, or a
+	// [database.NoRowFoundError].
+	GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error)
 }
 
 // InvitationStatements persists invitations (ADR 086). A pending invitation
@@ -931,14 +954,13 @@ type AuthzAssignmentStatements interface {
 	// Keyed on the principal alone: a platform user's grants sit on the
 	// projects they were granted on, not on the user's own (ADR 053).
 	RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error)
-	// ListProjectAdmins returns a page of the people, by user id, who
-	// administer the project: as active members of the owning team, as active
-	// members of a team with an unexpired admin grant, or as existing users
-	// with an unexpired admin grant. Only people viewerUserID may see are
-	// listed: those with a grant of their own, or members of one of the
-	// project's admin teams that viewerUserID is also an active member of.
-	// Each carries every way they administer the project.
-	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
+	// ListProjectMembers returns a page of the people, by user id, who hold a
+	// role at least as strong as minRelation ("" for any) on the project: as
+	// active members of the owning team, which holds admin, as active members
+	// of a team with an unexpired grant, or as existing users with an
+	// unexpired grant. Each carries their strongest role and every way they
+	// hold it.
+	ListProjectMembers(ctx context.Context, projectID, minRelation string, page database.Page[domain.ProjectMemberField]) (*database.ListResult[*domain.ProjectMemberRecord], error)
 	// ListProjectsOwnedThroughMember returns the projects, ordered by project
 	// id, whose active owning team has userID as an active member (a
 	// membership edge). Admin grants, platform operators and the project

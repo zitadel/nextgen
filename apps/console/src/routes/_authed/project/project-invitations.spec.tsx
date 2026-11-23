@@ -263,8 +263,11 @@ describe("project invitations", () => {
     await openInvitations();
 
     await openMenu("Lena Becker");
-    expect(screen.queryByRole("menuitem", { name: "Cancel invitation" })).not.toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove invitation" }));
+    // Remove is all a declined row offers: the person said no, so there is no
+    // link to make again, and nothing left to cancel.
+    const remove = await screen.findByRole("menuitem", { name: "Remove invitation" });
+    expect(screen.getAllByRole("menuitem")).toEqual([remove]);
+    await userEvent.click(remove);
     const confirm = within(await screen.findByRole("alertdialog"));
     expect(confirm.getByText("Remove declined invitation?")).toBeInTheDocument();
     const before = reads.length;
@@ -272,6 +275,8 @@ describe("project invitations", () => {
 
     expect(await screen.findByText("Invitation removed")).toBeInTheDocument();
     expect(removed).toEqual(["inv_1"]);
+    // The link was already dead: nothing was cancelled.
+    expect(trackEvent).not.toHaveBeenCalled();
     await waitFor(() => expect(reads.length).toBeGreaterThan(before));
   });
 
@@ -446,6 +451,10 @@ describe("managing an invitation", () => {
 
     expect(await screen.findByText("Invitation cancelled")).toBeInTheDocument();
     expect(cancelled).toEqual([{ id: "inv_1", projectId: PROJECT_ID }]);
+    expect(trackEvent).toHaveBeenCalledWith("invitation_cancelled", {
+      role: "project_editor",
+      invitation_journey_id: "journey_1",
+    });
     await waitFor(() => expect(reads.length).toBeGreaterThan(before));
   });
 

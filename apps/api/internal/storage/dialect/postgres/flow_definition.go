@@ -77,7 +77,6 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 		).Scan(&entity.CreatedAt, &entity.UpdatedAt); err != nil {
 			return wrapError(err)
 		}
-		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
 		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID)); err != nil {
 			return err
