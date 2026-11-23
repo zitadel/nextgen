@@ -71,13 +71,15 @@ Add `--force` when the run is non-interactive.
 
 Grant a role when you already know the principal.
 
-By user identifier (email). The response is an opaque `202` with no body, so the call cannot be used to discover whether the account exists:
+By user identifier (email). The CLI prints `Command completed` and the API answers an opaque `202` with no body, so the call cannot be used to discover whether the account exists:
 
 ```sh
 npx @zitadel/cli@latest grant create --relation viewer --user-identifier alex@example.com
 ```
 
-By user ID, or by team ID or name, the response is `201` with the grant:
+When the identifier matches a platform user, `grant list` shows the new grant. A miss still looks like success.
+
+By user ID (`--user-user-id`), or by team ID (`--team-team-id`) or team name, the response is `201` with the grant. When the server has a platform project, the user or team must live there — a team you created in your app project will not resolve:
 
 ```sh
 npx @zitadel/cli@latest grant create --relation editor --team-name platform-ops
