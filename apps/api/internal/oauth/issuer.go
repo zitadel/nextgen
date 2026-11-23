@@ -46,9 +46,12 @@ type Settings struct {
 	ReleaseID    string
 }
 
-// SettingsSource reads the OAuth settings that apply to an issuer.
+// SettingsSource reads the OAuth settings that apply to an issuer, or, for
+// an endpoint no issuer scopes, those of the project's newest primary
+// deployment.
 type SettingsSource interface {
 	Get(ctx context.Context, issuer Issuer) (Settings, error)
+	GetForNewestPrimaryDeployment(ctx context.Context, projectID string) (Settings, error)
 }
 
 // issuerKey is the context key of the issuerState withIssuer records.

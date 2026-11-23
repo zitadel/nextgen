@@ -20,13 +20,22 @@ type SigningKeys interface {
 // token it issued may still be signed with (ADR 039 §1). The tenant alone
 // names the project, so the back-channel request on the public base, which
 // derives no issuer, gets the same set as a request through the app. The
-// keys are public, and the set is the same at every origin, so a shared
-// cache may keep it for the configured max age.
+// project's newest primary deployment must have OAuth enabled, as every
+// primary origin serves it; otherwise the set answers 404 like a project
+// that does not exist. The keys are public, and the set is the same at
+// every origin, so a shared cache may keep it for the configured max age.
 func (s opServer) Keys(ctx context.Context, _ *op.Request[struct{}]) (_ *op.Response, err error) {
 	defer func() { keepError(ctx, err) }()
 	projectID, err := tenantProject(op.TenantFromContext(ctx), s.platformEnabled)
 	if err != nil {
 		return nil, metadataError(err)
+	}
+	settings, err := s.settings.GetForNewestPrimaryDeployment(ctx, projectID)
+	if err != nil {
+		return nil, metadataError(err)
+	}
+	if !settings.Enabled {
+		return nil, noMetadata()
 	}
 	keys, err := s.signingKeys.GetProjectPublicSigningKeys(ctx, projectID, domain.SigningKeyPurposeToken)
 	if err != nil {

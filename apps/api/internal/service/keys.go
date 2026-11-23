@@ -1,8 +1,10 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -299,6 +301,11 @@ func (s *keyService) GetProjectPublicSigningKeys(ctx context.Context, projectID 
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to list signing keys from the database")
 	}
+	// Oldest first, so the set is the same bytes on every read and a cached
+	// copy revalidates.
+	slices.SortFunc(keys, func(a, b *domain.SigningKey) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
+	})
 	public := make([]jose.JSONWebKey, 0, len(keys))
 	for _, key := range keys {
 		jwk, err := s.publicSigningKey(ctx, key)

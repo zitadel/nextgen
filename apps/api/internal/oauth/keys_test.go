@@ -122,15 +122,33 @@ func TestKeysOfThePlatformProject(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code, "no platform project, no platform keys")
 }
 
+// A project whose newest primary deployment has OAuth off has no set, the
+// same answer a project that does not exist gets, so the set does not tell
+// which projects exist. Its keys are not read.
+func TestKeysNeedOAuthEnabled(t *testing.T) {
+	t.Parallel()
+	_, key := newSigningKey(t, "sig_key_app")
+	keys := &signingKeys{keys: map[string][]jose.JSONWebKey{"proj_app": {key}}}
+
+	off := send(t, newMux(t, Config{SigningKeys: keys, Settings: settings{}}), http.MethodGet, "/oauth/proj_app/jwks", "api.example.com", https)
+	unknown := send(t, newMux(t, Config{SigningKeys: &signingKeys{}}), http.MethodGet, "/oauth/proj_unknown/jwks", "api.example.com", https)
+
+	assert.Equal(t, http.StatusNotFound, off.Code)
+	assert.Equal(t, unknown.Code, off.Code)
+	assert.JSONEq(t, unknown.Body.String(), off.Body.String())
+	assert.Empty(t, keys.asked)
+}
+
 func TestKeysRefusals(t *testing.T) {
 	t.Parallel()
 	_, key := newSigningKey(t, "sig_key_platform")
 
 	for _, tt := range []struct {
-		name   string
-		path   string
-		keys   *signingKeys
-		status int
+		name     string
+		path     string
+		keys     *signingKeys
+		settings SettingsSource
+		status   int
 	}{
 		{name: "a project without keys", path: "/oauth/proj_unknown/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
 		{name: "a tenant that is no project ID", path: "/oauth/evil/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
@@ -141,10 +159,17 @@ func TestKeysRefusals(t *testing.T) {
 			status: http.StatusNotFound,
 		},
 		{name: "a fault reading the keys", path: "/oauth/proj_app/jwks", keys: &signingKeys{err: domain.ErrUnavailable()}, status: http.StatusInternalServerError},
+		{
+			name:     "a fault reading the settings",
+			path:     "/oauth/proj_app/jwks",
+			keys:     &signingKeys{},
+			settings: settings{err: domain.ErrUnavailable()},
+			status:   http.StatusInternalServerError,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			rec := send(t, newMux(t, Config{SigningKeys: tt.keys, PlatformEnabled: true}), http.MethodGet, tt.path, "api.example.com", https)
+			rec := send(t, newMux(t, Config{SigningKeys: tt.keys, Settings: tt.settings, PlatformEnabled: true}), http.MethodGet, tt.path, "api.example.com", https)
 			assert.Equal(t, tt.status, rec.Code)
 			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"), "a refusal is never cached")
 		})

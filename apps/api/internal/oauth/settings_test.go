@@ -82,6 +82,30 @@ func TestReleaseSettingsPlatformUsesThePrimaryDeployment(t *testing.T) {
 	assert.Equal(t, []string{domain.PlatformProjectID + "|"}, rt.resolved)
 }
 
+// GetForNewestPrimaryDeployment reads a customer project's newest primary
+// deployment, which the resolver serves as the default, with no issuer
+// origin to match.
+func TestReleaseSettingsGetForNewestPrimaryDeployment(t *testing.T) {
+	t.Parallel()
+	served := releaseWith(oauthPin("oauthset_on"))
+	served.Source = "default"
+	served.Origin = ""
+	served.Target = ""
+	rt := &runtime{resolution: served}
+	source := NewReleaseSettings(rt, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
+
+	got, err := source.GetForNewestPrimaryDeployment(t.Context(), "proj_app")
+	require.NoError(t, err)
+	assert.Equal(t, Settings{Enabled: true, DeploymentID: "dep_1", ReleaseID: "rel_1"}, got)
+	assert.Equal(t, []string{"proj_app|"}, rt.resolved)
+
+	for _, err := range []error{domain.ErrReleaseNoDefault(), domain.ErrProjectNotFound()} {
+		got, gotErr := NewReleaseSettings(&runtime{err: err}, revisions{}).GetForNewestPrimaryDeployment(t.Context(), "proj_app")
+		require.NoError(t, gotErr)
+		assert.False(t, got.Enabled, "%v is off", err)
+	}
+}
+
 func TestReleaseSettingsOff(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {

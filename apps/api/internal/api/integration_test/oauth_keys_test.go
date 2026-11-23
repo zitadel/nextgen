@@ -13,21 +13,34 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestOAuthJWKS signs with a project's token signing key, as the token
 // endpoint does, and verifies the signature against the JWKS the project's
 // jwks_uri serves: it verifies against that project's set and not against
-// another project's. A project that does not exist has no set.
+// another project's. A project whose release does not enable OAuth has no
+// set, just as a project that does not exist.
 func TestOAuthJWKS(t *testing.T) {
 	t.Parallel()
 	projects := harness.EnsureProjectService(t)
-	project, err := projects.Create(t.Context(), helpers.ProjectName(), nil, false)
-	require.NoError(t, err)
-	other, err := projects.Create(t.Context(), helpers.ProjectName(), nil, false)
-	require.NoError(t, err)
+	newProject := func(oauthEnabled bool) string {
+		t.Helper()
+		project, err := projects.Create(t.Context(), helpers.ProjectName(), []domain.Origin{
+			{Pattern: oauthAppOrigin, Kind: domain.OriginKindPrimary},
+		}, false)
+		require.NoError(t, err)
+		deployBundle(t, project.ID, service.BuildReleaseInput{
+			ProjectID: project.ID,
+			OAuth:     &service.CreateOAuthSettingsInput{ProjectID: project.ID, Enabled: oauthEnabled},
+		})
+		return project.ID
+	}
+	project := newProject(true)
+	other := newProject(true)
+	off := newProject(false)
 
-	signer, err := harness.EnsureKeyService(t).GetProjectSigner(t.Context(), project.ID, domain.SigningKeyPurposeToken)
+	signer, err := harness.EnsureKeyService(t).GetProjectSigner(t.Context(), project, domain.SigningKeyPurposeToken)
 	require.NoError(t, err)
 	jws, err := signer.Sign([]byte(`{"sub":"user_1"}`))
 	require.NoError(t, err)
@@ -54,9 +67,11 @@ func TestOAuthJWKS(t *testing.T) {
 		return err
 	}
 
-	assert.NoError(t, verify(t, project.ID))
-	assert.Error(t, verify(t, other.ID))
+	assert.NoError(t, verify(t, project))
+	assert.Error(t, verify(t, other))
 
-	resp, body := getMetadata(t, "/oauth/proj_doesnotexist/jwks", nil)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
+	for _, projectID := range []string{off, "proj_doesnotexist"} {
+		resp, body := getMetadata(t, "/oauth/"+projectID+"/jwks", nil)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode, "%s: %s", projectID, body)
+	}
 }

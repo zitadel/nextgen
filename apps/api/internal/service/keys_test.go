@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
@@ -898,6 +899,37 @@ func TestKeyService_GetProjectPublicSigningKeys(t *testing.T) {
 			_, err = jws.Verify(public[i])
 			assert.NoError(t, err)
 		}
+	})
+
+	t.Run("lists the keys oldest first, whatever order storage returns", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, masterKey := newMockedKeyService(t)
+		kek := newActiveKEK(t, "proj-1", masterKey)
+		kekCrypter, err := kek.Crypter(masterKey)
+		require.NoError(t, err)
+
+		created := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		var keys []*domain.SigningKey
+		for _, k := range []struct {
+			id  string
+			age time.Duration
+		}{{"sig_key_b", 0}, {"sig_key_new", -time.Hour}, {"sig_key_a", 0}} {
+			key, err := domain.NewSigningKey("proj-1", domain.SigningKeyPurposeToken, jose.EdDSA, kekCrypter)
+			require.NoError(t, err)
+			key.ID = k.id
+			key.CreatedAt = created.Add(-k.age)
+			keys = append(keys, key)
+		}
+		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return(keys, nil)
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil)
+
+		public, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		require.NoError(t, err)
+		var ids []string
+		for _, key := range public {
+			ids = append(ids, key.KeyID)
+		}
+		assert.Equal(t, []string{"sig_key_a", "sig_key_b", "sig_key_new"}, ids)
 	})
 
 	t.Run("no keys is an empty list", func(t *testing.T) {
