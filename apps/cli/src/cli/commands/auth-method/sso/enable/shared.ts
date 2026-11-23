@@ -12,7 +12,6 @@ import type {
   ProviderChoice,
   PublishedCredentials,
 } from "@/lib/idp";
-import { log } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/lib/oclif";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Again, Suggest, SuggestedCommand } from "@/lib/suggestion";
@@ -289,6 +288,15 @@ export type EnableServices = Readonly<{
   report(change: Change): void;
 
   /**
+   * What a change did, as the lines of a result.
+   *
+   * @param change - The change.
+   * @param written - The files it wrote.
+   * @returns The lines.
+   */
+  said(change: Change, written?: readonly string[]): string[];
+
+  /**
    * Writes the change to the project's files.
    *
    * @param target - What the run read.
@@ -385,24 +393,13 @@ export function payload(
 }
 
 /**
- * Print what the connection maps: which claim fills each user
- * attribute and what verifies it, the scopes it asks for, the attributes no
- * claim fills, the schemas that sign in through it, and where to change it.
+ * Word what the connection maps: which claim fills each user attribute and
+ * what verifies it, the scopes it asks for, the attributes no claim fills, the
+ * schemas that sign in through it, and where to change it.
  *
  * @remarks
  * Every value read from a file is escaped on its own, newlines included, so a
  * name cannot drive the terminal or forge a line of the notice.
- *
- * @param change - The change that adds the connection.
- */
-export function drawMapping(change: DocumentChange<Connection>): void {
-  log.info(mappingLines(change).join("\n"));
-}
-
-/**
- * Words what the connection maps: which claim fills each user attribute and
- * what verifies it, the scopes it asks for, the attributes no claim fills, the
- * schemas that sign in through it, and where to change it.
  *
  * @param change - The change that adds the connection.
  * @returns The lines, with a blank line between each part.
@@ -474,7 +471,9 @@ export function mappingLines(change: DocumentChange<Connection>): string[] {
 
 /**
  * Words what the run addresses and what to register with the provider: the
- * schema edited, each callback URI, and where to create the application.
+ * schema edited, each callback URI, and where to create the application. The
+ * wizard says it as it asks, and the result says it again for whoever reads
+ * only the result.
  *
  * @remarks
  * A custom provider has no console to send the developer to: it is theirs, and
@@ -483,56 +482,34 @@ export function mappingLines(change: DocumentChange<Connection>): string[] {
  * @param needs - What was read and decided.
  * @returns The lines, one per statement.
  */
-export function introductionLines(needs: Fact<"target" | "provider" | "summary">): string[] {
-  const lines = [
-    `Editing ${escapeControlCharacters(needs.target.schema.path)}${needs.target.schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(needs.target.schema.methods.join(", "))}` : ""}`,
+export function registrationLines(needs: Fact<"target" | "provider" | "summary">): string[] {
+  const { schema } = needs.target;
+  const { summary, provider } = needs;
+
+  return [
+    `Editing ${escapeControlCharacters(schema.path)}${schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(schema.methods.join(", "))}` : ""}`,
+    ...(summary.reused
+      ? []
+      : [
+          `${escapeControlCharacters(provider.displayName, { keepLayout: false })} needs an OAuth application.`,
+        ]),
+    ...[summary.callbackUri, ...summary.deployedCallbackUris].map((uri) => {
+      return `Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`;
+    }),
+    ...(summary.previewCallbackUris.length > 0
+      ? [
+          "Each preview URL needs its own callback URI at the provider, since it takes no wildcards:",
+          ...summary.previewCallbackUris.map((uri) => {
+            return `  ${escapeControlCharacters(uri, { keepLayout: false })}`;
+          }),
+        ]
+      : []),
+    ...(summary.reused
+      ? []
+      : [
+          provider.consoleUrl === undefined
+            ? `Register it as a client at ${escapeControlCharacters(provider.issuer)}, with the callback URI above.`
+            : `Create it at   ${escapeControlCharacters(provider.consoleUrl)}`,
+        ]),
   ];
-  if (!needs.summary.reused) {
-    lines.push(
-      `${escapeControlCharacters(needs.provider.displayName, { keepLayout: false })} needs an OAuth application.`,
-    );
-  }
-  lines.push(
-    `Callback URI   ${escapeControlCharacters(needs.summary.callbackUri, { keepLayout: false })}`,
-  );
-  for (const uri of needs.summary.deployedCallbackUris) {
-    lines.push(`Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`);
-  }
-  if (needs.summary.previewCallbackUris.length > 0) {
-    lines.push(
-      "Each preview URL needs its own callback URI at the provider, since it takes no wildcards:",
-      ...needs.summary.previewCallbackUris.map((uri) => {
-        return `  ${escapeControlCharacters(uri, { keepLayout: false })}`;
-      }),
-    );
-  }
-  if (!needs.summary.reused && needs.provider.consoleUrl === undefined) {
-    lines.push(
-      `Register it as a client at ${escapeControlCharacters(needs.provider.issuer)}, with the callback URI above.`,
-    );
-  }
-  if (!needs.summary.reused && needs.provider.consoleUrl !== undefined) {
-    lines.push(`Create it at   ${escapeControlCharacters(needs.provider.consoleUrl)}`);
-  }
-
-  return lines;
-}
-
-/**
- * Words which credentials reached the project.
- *
- * @param published - What became of each credential.
- * @param names - The variables the credentials go to.
- * @returns One line for each credential that was stored.
- */
-export function publishedLines(published: PublishedCredentials, names: CredentialNames): string[] {
-  const lines: string[] = [];
-  if (published.clientId === "stored" && names.clientId !== undefined) {
-    lines.push(`Published ${escapeControlCharacters(names.clientId)} to the project`);
-  }
-  if (published.secret?.published === "stored") {
-    lines.push(`Published ${escapeControlCharacters(published.secret.name)} to the project`);
-  }
-
-  return lines;
 }

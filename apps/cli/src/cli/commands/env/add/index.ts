@@ -553,7 +553,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
     projectSecret: string;
     suggest: Suggest;
   }): Promise<InitialDeployment | undefined> {
-    log.info("Deploying .zitadel/ to the new environment");
+    log.start("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await Environment.deployInitialRelease({
         client: createZitadelClient({

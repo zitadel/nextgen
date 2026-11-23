@@ -9,7 +9,6 @@ import type {
 import { log } from "@/lib/ui/log";
 import { warnings } from "@/lib/ui/warnings";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The project variable a connection reads one of its credentials from.
@@ -242,7 +241,6 @@ function reportPublished(
 ): void {
   switch (state) {
     case "stored": {
-      log.done(`Published ${escapeControlCharacters(name)} to the project`);
       return;
     }
     case "deferred": {

@@ -1,6 +1,5 @@
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import { log, warnings } from "@/lib/ui";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -53,11 +52,6 @@ export class WriteFiles extends WizardStep<"write", Fact<"written">, Needs> {
     if (endpointIssuer !== undefined && endpointIssuer !== needs.provider.issuer) {
       warnings.report(
         `${needs.provider.displayName} points at ${endpointIssuer}, not the provider`,
-      );
-    }
-    if (written.length === 0 && needs.change.notices.length === 0) {
-      log.info(
-        `${escapeControlCharacters(needs.target.schema.name)} and its login flow already offer ${escapeControlCharacters(needs.provider.displayName, { keepLayout: false })}`,
       );
     }
     return {

@@ -1,16 +1,13 @@
-import { noticeLines } from "@/cli/commands/auth-method/command";
 import {
-  drawMapping,
+  mappingLines,
+  registrationLines,
   type EnableServices,
   type Fact,
-  introductionLines,
-  mappingLines,
   payload,
 } from "@/cli/commands/auth-method/sso/enable/shared";
 import type { PublishedCredentials } from "@/lib/idp";
 import type { CommandResult } from "@/lib/oclif";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { Output } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
 
 /**
@@ -34,7 +31,7 @@ type Needs = Fact<"flags" | "summary" | "preview" | "delivery" | "target" | "pro
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "realRun" | "report">;
+type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "realRun" | "report" | "said">;
 
 /**
  * Ends a dry run with what would be written and stored, before anything is
@@ -86,7 +83,6 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
   async run(needs: Needs): Promise<CommandResult> {
     const real = await this.deps.realRun();
     this.deps.report(needs.preview);
-    drawMapping(needs.preview);
     const toStore = !needs.summary.reused
       ? [needs.delivery.names.clientId, needs.delivery.names.clientSecret].filter((name) => {
           return name !== undefined;
@@ -121,14 +117,9 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
         title,
         sections: [],
         lines: [
-          ...(Output.screen
-            ? []
-            : [
-                ...introductionLines(needs),
-                ...noticeLines(needs.preview),
-                ...mappingLines(needs.preview),
-                "",
-              ]),
+          ...registrationLines(needs),
+          ...this.deps.said(needs.preview),
+          ...mappingLines(needs.preview),
           ...said.slice(1).map((line) => {
             return escapeControlCharacters(line);
           }),

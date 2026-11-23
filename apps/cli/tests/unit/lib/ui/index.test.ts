@@ -53,7 +53,15 @@ describe("which shape a command draws", () => {
 
 describe("the UI package", () => {
   it("hands out the ways to draw, and nothing it draws with", async () => {
-    expect(Object.keys(ui).sort()).toEqual(["Output", "Ui", "log", "section", "style", "warnings"]);
+    expect(Object.keys(ui).sort()).toEqual([
+      "Output",
+      "Ui",
+      "announce",
+      "log",
+      "section",
+      "style",
+      "warnings",
+    ]);
   });
 
   // The package is the only place the CLI draws. Everything else returns what

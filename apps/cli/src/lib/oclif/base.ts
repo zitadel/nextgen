@@ -586,24 +586,6 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
   }
 
   /**
-   * The text {@link narrate} says to a terminal, as the lines a script is
-   * given in the result, since a script is never given a log line.
-   *
-   * @param notices - What the publish step produced.
-   * @returns The lines, then a blank line; nothing on a terminal, which was shown them.
-   */
-  protected narrated(notices: readonly string[]): string[] {
-    const lines = notices.flatMap((notice) => {
-      return notice.replace(/\n+$/, "").split("\n");
-    });
-    if (Output.screen || lines.length === 0) {
-      return [];
-    }
-
-    return [...lines, ""];
-  }
-
-  /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
    * new frozen bag replaces the previous one, so no shared object is ever
    * mutated. `step` advances by re-recording it at each milestone.

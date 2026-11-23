@@ -1,15 +1,11 @@
-import { noticeLines, writtenLines } from "@/cli/commands/auth-method/command";
 import {
-  drawMapping,
+  mappingLines,
+  registrationLines,
   type EnableServices,
   type Fact,
-  introductionLines,
-  mappingLines,
   payload,
-  publishedLines,
 } from "@/cli/commands/auth-method/sso/enable/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { Output } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -22,7 +18,7 @@ type Needs = Fact<
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "followUps" | "suggest">;
+type Deps = Pick<EnableServices, "followUps" | "said" | "suggest">;
 
 /**
  * Words what the run did as the command's result.
@@ -44,36 +40,6 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
   constructor(deps: Deps) {
     super();
     this.deps = deps;
-  }
-
-  /**
-   * What the run told the person while it worked, as the lines a script reads.
-   *
-   * @remarks
-   * A terminal was shown these as they happened, so it is given none of them
-   * again.
-   *
-   * @param needs - What the run did.
-   * @returns The lines, then a blank line, or nothing when there is none.
-   */
-  private said(needs: Needs): string[] {
-    const lines = [
-      ...introductionLines(needs),
-      ...(needs.summary.reused
-        ? [`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`]
-        : []),
-      ...publishedLines(needs.published, needs.delivery.names),
-      ...writtenLines(needs.change, needs.written),
-      ...noticeLines(needs.change),
-      ...(needs.written.length === 0 && needs.change.notices.length === 0
-        ? [
-            `${escapeControlCharacters(needs.target.schema.name)} and its login flow already offer ${escapeControlCharacters(needs.provider.displayName, { keepLayout: false })}`,
-          ]
-        : []),
-      ...mappingLines(needs.change),
-    ];
-
-    return [...lines, ""];
   }
 
   /**
@@ -101,7 +67,6 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
         });
       }),
     );
-    drawMapping(needs.change);
     const title = unpublished
       ? `${name} sign-in is configured locally`
       : `${name} sign-in is already configured locally`;
@@ -122,7 +87,26 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
           title: escapeControlCharacters(title),
           sections: [],
           lines: [
-            ...(Output.screen ? [] : this.said(needs)),
+            ...registrationLines(needs),
+            ...(needs.summary.reused
+              ? [`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`]
+              : []),
+            ...(needs.published.clientId === "stored" && needs.delivery.names.clientId !== undefined
+              ? [
+                  `Published ${escapeControlCharacters(needs.delivery.names.clientId)} to the project`,
+                ]
+              : []),
+            ...(needs.published.secret?.published === "stored"
+              ? [`Published ${escapeControlCharacters(needs.published.secret.name)} to the project`]
+              : []),
+            ...this.deps.said(needs.change, needs.written),
+            ...(needs.written.length === 0 && needs.change.notices.length === 0
+              ? [
+                  `${escapeControlCharacters(needs.target.schema.name)} and its login flow already offer ${escapeControlCharacters(needs.provider.displayName, { keepLayout: false })}`,
+                ]
+              : []),
+            ...mappingLines(needs.change),
+            "",
             ...(unpublished && needs.delivery.areStored(needs.published)
               ? ["Its credentials are stored in your project."]
               : []),

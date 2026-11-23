@@ -1,13 +1,12 @@
 import { Flags } from "@oclif/core";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { AuthMethodCommand, noticeLines, writtenLines } from "@/cli/commands/auth-method/command";
+import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import { CANCELLED } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { Output } from "@/lib/ui";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -127,7 +126,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         summary: {
           title: wouldTitle,
           sections: [],
-          lines: Output.screen ? [] : noticeLines(change),
+          lines: this.said(change),
         },
         next: { commands: [real] },
       });
@@ -152,7 +151,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       summary: {
         title,
         sections: [],
-        lines: Output.screen ? [] : [...writtenLines(change, written), ...noticeLines(change)],
+        lines: this.said(change, written),
       },
       next:
         actions.length > 0

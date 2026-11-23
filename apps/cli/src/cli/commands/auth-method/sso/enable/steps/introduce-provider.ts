@@ -1,4 +1,4 @@
-import { type Fact, introductionLines } from "@/cli/commands/auth-method/sso/enable/shared";
+import { type Fact, registrationLines } from "@/cli/commands/auth-method/sso/enable/shared";
 import { log } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
@@ -31,7 +31,7 @@ export class IntroduceProvider extends WizardStep<"introduce", object, Needs> {
    * @returns Nothing is added.
    */
   async run(needs: Needs): Promise<object> {
-    for (const line of introductionLines(needs)) {
+    for (const line of registrationLines(needs)) {
       log.info(line);
     }
 

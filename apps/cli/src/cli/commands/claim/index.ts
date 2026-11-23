@@ -7,7 +7,7 @@ import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schem
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
 import { ZitadelError } from "@/lib/errors";
-import { log, Output, section, warnings } from "@/lib/ui";
+import { announce, log, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -326,9 +326,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
       // The link is what the person must act on while this command waits, so
       // it is written as the command goes, to a pipe as to a terminal, and a
       // script reading the pipe can open it before the claim completes.
-      if (!Output.json) {
-        process.stdout.write(`${escapeControlCharacters(challenge.claim_url)}\n`);
-      }
+      announce(escapeControlCharacters(challenge.claim_url));
 
       if (flags.noWait) {
         return this.linkIssued(projectId, challenge);
@@ -358,7 +356,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         }),
       };
     }
-    log.info("Waiting for the browser step to finish");
+    log.start("Waiting for the browser step to finish");
 
     const completed = await this.poll(
       claimService,
