@@ -1,6 +1,7 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { describe, expect, it, onTestFinished } from "vitest";
+import { describe, expect, onTestFinished } from "vitest";
 
+import { it } from "@tests/fixtures";
 import { log } from "@/lib/ui";
 import { MARK } from "@/lib/ui/marks";
 import { Narration } from "@/lib/ui/narration";
@@ -101,5 +102,54 @@ describe("Narration", () => {
     expect(() => {
       new Narration(new Collected()).restore();
     }).not.toThrow();
+  });
+  describe("when no chain is drawn", () => {
+    it("writes a progress line on a terminal", ({ terminal }) => {
+      terminal.tty(true);
+      drawn(new Collected(false));
+
+      log.progress("GET https://example.test/");
+
+      expect(terminal.plain()).toContain("GET https://example.test/");
+    });
+
+    it("leaves a progress line out off a terminal, so stdout holds only what a script reads", ({
+      terminal,
+    }) => {
+      terminal.tty(false);
+      drawn(new Collected(false));
+
+      log.progress("GET https://example.test/");
+
+      expect(terminal.plain()).toBe("");
+    });
+
+    it.for<[string, () => void]>([
+      ["info", () => log.info("a statement")],
+      ["done", () => log.done("a result")],
+      ["start", () => log.start("a beginning")],
+      ["plain", () => log.plain("a link")],
+    ])(
+      "still writes a %s line off a terminal, which can be the command's answer",
+      ([, say], { terminal }) => {
+        terminal.tty(false);
+        drawn(new Collected(false));
+
+        say();
+
+        expect(terminal.plain()).not.toBe("");
+      },
+    );
+
+    it("draws a progress line into a chain whether or not stdout is a terminal", ({ terminal }) => {
+      terminal.tty(false);
+      const { chain } = drawn();
+
+      log.progress("Waiting for the browser step to finish");
+
+      expect(chain.lines).toEqual([
+        `${stripAnsi(MARK.started)} Waiting for the browser step to finish`,
+      ]);
+    });
   });
 });

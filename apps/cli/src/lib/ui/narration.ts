@@ -1,5 +1,6 @@
 import { log, type LogLevel } from "./log";
 import { GUIDE, MARK } from "./marks";
+import { Output } from "./output";
 import { writePlain } from "./plain";
 import { DrawnSpinner } from "./spinner";
 
@@ -27,6 +28,7 @@ const MARKS: Readonly<Record<LogLevel, string>> = {
   done: MARK.done,
   info: MARK.info,
   start: MARK.started,
+  progress: MARK.started,
   warn: MARK.warning,
   fail: MARK.failed,
   plain: GUIDE,
@@ -78,6 +80,9 @@ export class Narration {
     }
     if (this.chain.chained) {
       this.chain.narrate(MARKS[level], text);
+      return;
+    }
+    if (level === "progress" && !Output.screen) {
       return;
     }
     // A line written while a spinner draws would be glued to its frame.

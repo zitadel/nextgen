@@ -382,11 +382,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
       });
     }
 
-    // As the resource commands do: say which server is called, on a terminal
-    // only, so a pipe receives the response alone.
-    if (Output.screen) {
-      log.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
-    }
+    log.progress(`${operation.method} ${escapeControlCharacters(String(url))}`);
     const destructive = request.operation.destructive;
     const consent = destructive
       ? await this.consent({

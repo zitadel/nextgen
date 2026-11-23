@@ -21,6 +21,7 @@ describe("log", () => {
     ["info", () => log.info("a")],
     ["done", () => log.done("a")],
     ["start", () => log.start("a")],
+    ["progress", () => log.progress("a")],
     ["warn", () => log.warn("a")],
     ["fail", () => log.fail("a")],
     ["plain", () => log.plain("a")],

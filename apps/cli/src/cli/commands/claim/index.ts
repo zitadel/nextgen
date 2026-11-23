@@ -353,7 +353,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         }),
       };
     }
-    log.start("Waiting for the browser step to finish");
+    log.progress("Waiting for the browser step to finish");
 
     const completed = await this.poll(
       claimService,
