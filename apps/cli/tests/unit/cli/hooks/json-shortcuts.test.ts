@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 describe("the json-shortcuts hook", () => {
-  it("answers --version --json as the version envelope, with no line after it", async () => {
+  it("answers --version --json as the version envelope", async () => {
     const result = await runCliForTest(["--version", "--json"]);
 
     expect(result).toSucceed();
