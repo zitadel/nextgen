@@ -1524,7 +1524,6 @@ function presentedFailure(error: ZitadelError, help: SuggestedCommand): ZitadelE
   return new ZitadelError(error.code, sentence, {
     hint: error.hint,
     nextCommands: error.nextCommands?.length ? error.nextCommands : [help],
-    details: error.details,
   });
 }
 

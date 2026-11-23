@@ -12,6 +12,7 @@ import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { EXIT_CODES } from "@/lib/errors";
 import { parseJsonOrUndefined } from "@/lib/json";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
@@ -2640,6 +2641,13 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   expect(envelope.status, `${where}: status missing or unknown`).toMatch(/^(ok|skipped|error)$/);
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
+    expect(
+      Object.keys(EXIT_CODES),
+      `${where}: error code ${envelope.code} is not one the CLI documents`,
+    ).toContain(envelope.code);
+    expect(result.stdout, `${where}: a framework's own wording reached the envelope`).not.toContain(
+      "See more help with",
+    );
   }
   const contract = ContractEnvelope.parse(parsed);
   assertRunnableSuggestions(where, contract);

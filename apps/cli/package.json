@@ -39,7 +39,8 @@
     "helpClass": "./dist/cli/help",
     "hooks": {
       "command_not_found": "./dist/hooks/command-not-found",
-      "finally": "./dist/hooks/version-notice"
+      "finally": "./dist/hooks/version-notice",
+      "init": "./dist/hooks/json-shortcuts"
     },
     "additionalHelpFlags": [
       "-h"

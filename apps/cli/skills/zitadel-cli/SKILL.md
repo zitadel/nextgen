@@ -283,7 +283,7 @@ output names the singular. A wrong guess costs a failed call and a round of
 recovery; one cheap lookup up front avoids it. `zitadel --help` lists each
 family of commands (`user`, `release`) as one row, so it stays short;
 `zitadel commands` is the flat list of every command, verbs included, and
-`zitadel <family> --help` lists one family's verbs. Treat the CLI's own output as authoritative over anything you remember:
+`zitadel <family> --help` lists one family's verbs. `commands`, `version`, `which`, `help` and `autocomplete` answer `--json` like any command: the usual envelope, with what the command prints as `data` (a list as `data.result`). Treat the CLI's own output as authoritative over anything you remember:
 
 ```sh
 npx @zitadel/cli@latest --help               # every command family, grouped by purpose

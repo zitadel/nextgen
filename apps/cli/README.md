@@ -141,7 +141,7 @@ which ships in this package.
 * [`zitadel auth-method password enable`](#zitadel-auth-method-password-enable)
 * [`zitadel auth-method sso disable`](#zitadel-auth-method-sso-disable)
 * [`zitadel auth-method sso enable`](#zitadel-auth-method-sso-enable)
-* [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
+* [`zitadel autocomplete`](#zitadel-autocomplete)
 * [`zitadel branding eject`](#zitadel-branding-eject)
 * [`zitadel branding get ID`](#zitadel-branding-get-id)
 * [`zitadel branding list`](#zitadel-branding-list)
@@ -166,7 +166,7 @@ which ships in this package.
 * [`zitadel grant delete ID`](#zitadel-grant-delete-id)
 * [`zitadel grant get ID`](#zitadel-grant-get-id)
 * [`zitadel grant list`](#zitadel-grant-list)
-* [`zitadel help [COMMAND]`](#zitadel-help-command)
+* [`zitadel help`](#zitadel-help)
 * [`zitadel idp create`](#zitadel-idp-create)
 * [`zitadel idp get ID`](#zitadel-idp-get-id)
 * [`zitadel idp list`](#zitadel-idp-list)
@@ -274,6 +274,8 @@ EXAMPLES
   $ zitadel api queryUsers -F limit=5
 
   $ zitadel api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
+
+  $ zitadel api updateUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W -F attributes.age=1
 
   $ zitadel api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json
 
@@ -523,36 +525,30 @@ EXAMPLES
   $ zitadel auth-method sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example --scopes 'openid profile email groups' --client-id abc123 --non-interactive < secret.txt
 ```
 
-## `zitadel autocomplete [SHELL]`
+## `zitadel autocomplete`
 
 Display autocomplete installation instructions.
 
 ```
 USAGE
-  $ zitadel autocomplete [SHELL] [-r]
-
-ARGUMENTS
-  [SHELL]  (zsh|bash|powershell) Shell type
+  $ zitadel autocomplete [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-r]
 
 FLAGS
-  -r, --refresh-cache  Refresh cache (ignores displaying instructions)
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -r, --refresh-cache    Refresh cache (ignores displaying instructions).
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Display autocomplete installation instructions.
-
-EXAMPLES
-  $ zitadel autocomplete
-
-  $ zitadel autocomplete bash
-
-  $ zitadel autocomplete zsh
-
-  $ zitadel autocomplete powershell
-
-  $ zitadel autocomplete --refresh-cache
 ```
-
-_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v3.2.50/src/commands/autocomplete/index.ts)_
 
 ## `zitadel branding eject`
 
@@ -716,18 +712,25 @@ List all zitadel commands.
 
 ```
 USAGE
-  $ zitadel commands [--json] [-c id|plugin|summary|type... | --tree] [--deprecated] [-x | ] [--hidden]
-    [--no-truncate | ] [--sort id|plugin|summary|type | ]
+  $ zitadel commands [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [--columns
+    id|plugin|summary|type...] [--deprecated] [-x] [--hidden] [--no-truncate] [--sort id|plugin|summary|type] [--tree]
 
 FLAGS
-  -c, --columns=<option>...  Only show provided columns (comma-separated).
-                             <options: id|plugin|summary|type>
+  -c, --cwd=<value>          Project directory to operate on.
+  -n, --non-interactive      Disable prompts. Required when scripting or running as an agent.
+  -v, --verbose              Verbose logging.
   -x, --extended             Show extra columns.
+      --[no-]color           Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --columns=<option>...  Only show provided columns (comma-separated).
+                             <options: id|plugin|summary|type>
+      --debug                Debug logging.
       --deprecated           Show deprecated commands.
+      --dry-run              Preview without mutating files or the platform.
       --hidden               Show hidden commands.
       --no-truncate          Do not truncate output.
       --sort=<option>        [default: id] Property to sort by.
                              <options: id|plugin|summary|type>
+      --[no-]telemetry       Send anonymous usage analytics. Disable with --no-telemetry.
       --tree                 Show tree of commands.
 
 GLOBAL FLAGS
@@ -736,8 +739,6 @@ GLOBAL FLAGS
 DESCRIPTION
   List all zitadel commands.
 ```
-
-_See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/4.1.55/src/commands/commands.ts)_
 
 ## `zitadel console`
 
@@ -1591,25 +1592,31 @@ EXAMPLES
   $ zitadel grant list --filter created_at=equals:<value> --sort created_at:desc
 ```
 
-## `zitadel help [COMMAND]`
+## `zitadel help`
 
 Display help for zitadel.
 
 ```
 USAGE
-  $ zitadel help [COMMAND...] [-n]
-
-ARGUMENTS
-  [COMMAND...]  Command to show help for.
+  $ zitadel help [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+    [--nested-commands]
 
 FLAGS
-  -n, --nested-commands  Include all nested commands in the output.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --nested-commands  Include all nested commands in the output.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Display help for zitadel.
 ```
-
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.49/src/commands/help.ts)_
 
 ## `zitadel idp create`
 
@@ -2888,7 +2895,7 @@ DESCRIPTION
   Once you select a command, hit enter and it will show the help for that command.
 ```
 
-_See code: [@oclif/plugin-search](https://github.com/oclif/plugin-search/blob/v1.2.50/src/commands/search.ts)_
+_See code: [@oclif/plugin-search](https://github.com/oclif/plugin-search/blob/v1.3.0/src/commands/search.ts)_
 
 ## `zitadel session get ID`
 
@@ -4054,23 +4061,27 @@ EXAMPLES
 
 ## `zitadel version`
 
+Show the CLI version.
+
 ```
 USAGE
-  $ zitadel version [--json] [--verbose]
+  $ zitadel version [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
 
 FLAGS
-  --verbose  Show additional information about the CLI.
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
-FLAG DESCRIPTIONS
-  --verbose  Show additional information about the CLI.
-
-    Additionally shows the architecture, node version, operating system, and versions of plugins that the CLI is using.
+DESCRIPTION
+  Show the CLI version.
 ```
-
-_See code: [@oclif/plugin-version](https://github.com/oclif/plugin-version/blob/2.2.46/src/commands/version.ts)_
 
 ## `zitadel which`
 
@@ -4078,33 +4089,23 @@ Show which plugin a command is in.
 
 ```
 USAGE
-  $ zitadel which [--json]
+  $ zitadel which [--json] [-c <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
   Show which plugin a command is in.
-
-EXAMPLES
-  See which plugin the `help` command is in:
-
-    $ zitadel which help
-
-  Use colon separators.
-
-    $ zitadel which foo:bar:baz
-
-  Use spaces as separators.
-
-    $ zitadel which foo bar baz
-
-  Wrap command in quotes to use spaces as separators.
-
-    $ zitadel which "foo bar baz"
 ```
-
-_See code: [@oclif/plugin-which](https://github.com/oclif/plugin-which/blob/3.2.55/src/commands/which.ts)_
 <!-- commandsstop -->
 
 </details>

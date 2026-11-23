@@ -135,6 +135,9 @@
     needs through its constructor, which the command's `execute` fills when it builds the wizard,
     and the command keeps its flags, refusals and telemetry (recorded through the observer given
     to `.step(...)`) and emits the one result the wizard returns.
+- `version`, `commands`, `which`, `help` and `autocomplete` extend `Wrapped(BaseCommand)`
+  (`src/cli/commands/built-in.ts`).
+- Declare a wrapped command's plugin flags on its class, so it still takes them.
 - Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
   `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
