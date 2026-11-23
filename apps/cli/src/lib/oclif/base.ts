@@ -10,7 +10,7 @@ import { nonBlankString } from "./flags";
 import { inputFlag } from "./input";
 import { Documented } from "./documented";
 import { Interruptible } from "./interruptible";
-import { log, Output, style, warnings } from "@/lib/ui";
+import { log, Output, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
@@ -39,9 +39,8 @@ import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { Runtime } from "@/lib/runtime";
 import { Skills } from "@/lib/skills";
 import type { Presentation, Summary } from "@/lib/ui";
-import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
+import { NEXT_LABEL } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
-import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import {
   CLI_COMMAND_COMPLETED,
@@ -55,16 +54,13 @@ import {
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
 import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
-import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
-import { painted } from "./rendering";
+import { normalizeCommandResult, Presenter, withWarnings } from "./presenter";
 import type {
   CommandResult,
   ErrorEnvelope,
-  EnvelopeMeta,
   FlagVariable,
   GlobalOptions,
   JsonEnvelope,
-  SkippedEnvelope,
 } from "./types";
 
 /** The variable the server is named by when `--server` is not given. */
@@ -884,168 +880,21 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
         ),
       );
     }
-    const next =
-      normalized.status === "ok" && normalized.nextShown !== undefined
-        ? ""
-        : renderNextSteps(normalized.next ?? {});
-    // Output a script reads keeps stdout to itself, so the next steps go
-    // beside it on stderr rather than into what the script is reading.
-    const beside = normalized.status === "ok" && normalized.pretty?.kind === "piped";
-    // The rendering is the CLI's own, painted by it: what the server wrote was
-    // spelled out as it entered, so escaping the whole of it here would spell
-    // out the colour too.
-    // An empty rendering is written as nothing, not as a blank line: a piped
-    // list of no records must leave stdout empty, so `wc -l` reports 0.
-    const rendered = renderPretty(normalized, beside ? "" : next, !beside);
-    const footer = normalized.status === "ok" ? normalized.footer : undefined;
-    const ending = this.endingOf(normalized, footer);
-    if (beside) {
-      if (rendered !== "") {
-        this.log(stripColumnMarks(rendered));
-      }
-      if (next !== "") {
-        // Set apart from the result only when both share a screen; a piped
-        // result is not on screen to be set apart from.
-        this.logAside(rendered !== "" && Output.screen ? `\n${next}` : next);
-      }
-      // Only the script's own output stays on stdout; what the CLI adds goes beside it.
-      for (const warning of warningsOf(normalized)) {
-        this.logAside(warningLine(warning));
-      }
-      if (footer !== undefined) {
-        this.logAside(`\n${stripColumnMarks(footer)}`);
-      }
-    } else if (this.ui.interactive) {
-      this.ui.finish(ending);
-    } else if (this.rendersForAMachine()) {
-      if (rendered !== "") {
-        this.log(stripColumnMarks(rendered));
-      }
-      if (footer !== undefined) {
-        this.log(`\n${stripColumnMarks(footer)}`);
-      }
-    } else if (!Output.json) {
-      const text = this.ui.written(ending).replace(/\n+$/, "");
-      if (text !== "") {
+    return new Presenter({
+      meta: this.meta,
+      ui: this.ui,
+      version: this.config.version,
+      wizard: (this.constructor as typeof BaseCommand).wizard === true,
+      skillsOffered: this.skillsOffered,
+      dryRun: this.dryRun,
+      suggest: this.suggest,
+      log: (text) => {
         this.log(text);
-      }
-    }
-    // Reported warnings were printed when they happened, so they join the
-    // envelope only: printing them again here would show them twice.
-    const reported = warnings.take();
-    const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
-    return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
-  }
-
-  /**
-   * How this command ends, as the one {@link Summary} both renderings are
-   * built from: the one the command stated. It is settled here rather than per
-   * rendering, so a run that is drawn and a run that is written cannot end on
-   * different words.
-   *
-   * The next steps are the result's own, stated once; the ending draws the same
-   * ones unless the summary names steps of its own, or the command already
-   * showed them in output of its own.
-   */
-  private endingOf(result: CommandResult, footer: string | undefined): Summary {
-    const own = result.summary;
-    const steps =
-      own.next ??
-      (result.status === "ok" && result.nextShown !== undefined ? [] : stepsOf(result.next));
-    const ran = own.ran ?? this.serverRanOn();
-    const extras = [
-      ...(own.extras ?? []),
-      ...(footer === undefined ? [] : footer.split("\n")),
-      ...(result.status === "ok" && !result.warningsShown
-        ? (result.warnings ?? []).map(warningLine)
-        : []),
-    ];
-    return this.withOverview(
-      {
-        ...own,
-        ...(extras.length === 0 ? {} : { extras }),
-        ...(steps.length === 0 ? {} : { next: steps }),
-        ...(ran === undefined ? {} : { ran }),
       },
-      result.status === "ok",
-    );
-  }
-
-  /**
-   * The server this run spoke to, when it is not the default one, so an ending
-   * that knows no project can still say where it ran.
-   */
-  private serverRanOn(): string | undefined {
-    if (this.dryRun) {
-      return undefined;
-    }
-
-    return ZitadelRuntime.fromUrl(this.meta.source).hostUnlessDefault();
-  }
-
-  /**
-   * Whether what this command rendered is for a machine rather than a person,
-   * in which case it is written as it is and the ending never decorates it.
-   *
-   * Two things make it so. A command that took its own ending away as text
-   * (`setup`, through `Ui.ending`) has already said everything an ending
-   * says. And off a terminal a normal command's answer is the machine form it
-   * chose for itself — `--plain` is implied there, so a list is tab-separated
-   * rows and a record is the record — which `cut`, `awk` and `wc -l` read and
-   * which a count or a footer under it would break. A wizard has no such
-   * form: what it writes is prose for a person however it is read, so it ends
-   * the way it always ends.
-   */
-  private rendersForAMachine(): boolean {
-    return this.ui.reported || (!this.summarises() && !Output.screen);
-  }
-
-  /**
-   * The command overview as the last step of a summary that has steps, so every
-   * box ends the same way and the overview can be found from anywhere without
-   * already knowing it exists. A summary that names it already keeps its own.
-   *
-   * @param summary - The ending as the command stated it.
-   * @param changed - Whether the run did its work. Only one that did spends the
-   * skills offer, which a machine gets once: a skip or a no leaves it for the
-   * next run that changes something.
-   */
-  private withOverview(summary: Summary, changed: boolean): Summary {
-    const steps = summary.next ?? [];
-    if (!this.summarises()) {
-      return {
-        ...summary,
-        boxed: false,
-      };
-    }
-    const overview = steps.some((step) => {
-      return step.text === OVERVIEW;
-    })
-      ? []
-      : [
-          {
-            text: OVERVIEW,
-            command: Spelling.at(this.config.version).command(""),
-          },
-        ];
-    const skills =
-      this.skillsOffered && changed
-        ? [
-            new Skills(process.env, !this.meta.nonInteractive).claim(
-              this.suggest({ id: "skills:add" }),
-            ),
-          ]
-        : [];
-    return {
-      ...summary,
-      next: [
-        ...steps,
-        ...overview,
-        ...skills.filter((step) => {
-          return step !== undefined;
-        }),
-      ],
-    };
+      logAside: (text) => {
+        this.logAside(text);
+      },
+    }).present(normalized);
   }
 
   /** Which of the two shapes this command draws. See {@link BaseCommand.wizard}. */
@@ -1316,97 +1165,6 @@ function asRaised(error: unknown): unknown {
   });
 }
 
-/** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
-function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
-  const stated =
-    result.pretty === undefined && result.summary !== undefined
-      ? {
-          ...result,
-          pretty: painted(textOf(result.summary)),
-        }
-      : result;
-  if (stated.next?.commands === undefined) {
-    return stated as CommandResult;
-  }
-
-  return {
-    ...stated,
-    next: {
-      ...stated.next,
-      commands: Spelling.at(meta.cliVersion).normalizeCommands(stated.next.commands),
-    },
-  } as CommandResult;
-}
-
-/**
- * The data with the headline the terminal draws as its `title`, so a script
- * reads the very words a person does (see {@link CommandResult.summary}).
- * Data that is not an object, or that already has a `title` of its own, is
- * left as it is.
- */
-function withHeadline(data: unknown, title: string): unknown {
-  // An entity answers the record it stands for through `toJSON`, which spreading it would lose.
-  const record = isObject(data) && typeof data.toJSON === "function" ? data.toJSON() : data;
-
-  return isObject(record) && !("title" in record) && title !== "" ? { title, ...record } : data;
-}
-
-/**
- * The data with its next steps written in. Data that is not an object (a
- * write the server answered without a body) has nowhere to hold them.
- */
-function withNextSteps(data: unknown, next: NextSteps | undefined): unknown {
-  return next === undefined || !isObject(data) ? data : { ...data, ...nextStepsData(next) };
-}
-
-/** Add the warnings reported while the command ran to an ok result. */
-function withReportedWarnings(result: CommandResult, reported: readonly string[]): CommandResult {
-  if (result.status !== "ok" || reported.length === 0) {
-    return result;
-  }
-
-  return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
-}
-
-/**
- * Add reported warnings to a skipped or error envelope. Those envelopes carry
- * `warnings` only when there are some, so their shape is otherwise unchanged.
- */
-function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
-  envelope: T,
-  warnings: readonly string[],
-): T {
-  return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
-}
-
-/** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
-function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
-  const base: EnvelopeMeta = {
-    cli_version: meta.cliVersion,
-    command: meta.command,
-    source: meta.source,
-  };
-  if (result.status === "ok") {
-    return {
-      ...base,
-      status: "ok",
-      data: withNextSteps(
-        result.verbatim === true ? result.data : withHeadline(result.data, result.summary.title),
-        result.next,
-      ),
-      warnings: result.warnings ? [...result.warnings] : [],
-    };
-  }
-
-  return {
-    ...base,
-    status: "skipped",
-    reason: result.reason,
-    data: withHeadline(result.data ?? {}, result.summary.title),
-    next_commands: result.next?.commands ? [...result.next.commands] : undefined,
-  };
-}
-
 /**
  * A failure's follow-ups, each rendered by `renderedFailure` before the failure
  * is reported.
@@ -1437,34 +1195,6 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     next_commands: error.nextCommands === undefined ? undefined : renderedCommands(error),
     details: error.details,
   };
-}
-
-/**
- * Renders a {@link CommandResult} as human-facing text for non-JSON mode: the
- * command's own rendering, or the one its summary gives (`normalizeCommandResult`
- * settles which). `next` is the rendered next-step block, which follows the
- * rendering, and comes before the warnings, which `withWarnings` leaves out for
- * output a script reads.
- */
-function renderPretty(result: CommandResult, next: string, withWarnings: boolean): string {
-  // A command's own rendering arrives spelled out, because the factory that
-  // made it knew which spelling its shape takes, so interpolating what the
-  // server answered is safe wherever a command does it.
-  const own = result.pretty?.text ?? "";
-  return [
-    next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`,
-    next,
-    ...(withWarnings ? warningsOf(result).map(warningLine) : []),
-  ]
-    .filter((line) => {
-      return line !== "";
-    })
-    .join("\n");
-}
-
-/** The warnings a result still has to show: those its own output did not. */
-function warningsOf(result: CommandResult): readonly string[] {
-  return result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
 }
 
 /**
@@ -1523,16 +1253,4 @@ function presentedFailure(error: ZitadelError, help: SuggestedCommand): ZitadelE
   });
 }
 
-/**
- * One warning, as a person reads it: a coloured label and the warning itself.
- *
- * A warning names what the server answered as readily as a rendering does, so
- * it is spelled out here — the one place a warning becomes a line — and only
- * the label is coloured, so there is nothing for the spelling to undo.
- */
-function warningLine(warning: string): string {
-  return `${style.statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
-}
-
 /** The last step of every box: where to find every command. */
-const OVERVIEW = "Explore all commands:";
