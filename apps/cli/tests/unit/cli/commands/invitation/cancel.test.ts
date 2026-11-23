@@ -32,7 +32,7 @@ describe("invitation cancel", () => {
         parseArg(InvitationCancel.args.invitation_id, value, "invitation_id"),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
-        hint: "Find one with `zitadel invitation list --status pending --status expired --status rejected`.",
+        hint: "Find one with `zitadel invitation list`.",
       });
     });
   });

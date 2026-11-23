@@ -18,8 +18,8 @@ const INVITATION_ID: Refused<string> = {
   schema: invitationIdSchema,
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel invitation list --status pending --status expired --status rejected`.",
-    next: [{ id: "invitation:list", flags: { status: ["pending", "expired", "rejected"] } }],
+    hint: "Find one with `zitadel invitation list`.",
+    next: [{ id: "invitation:list" }],
     details: {
       argument: "{input}",
     },
@@ -35,15 +35,15 @@ const INVITATION_CANCELLED = "invitation_cancelled";
  */
 const NO_ID_REFUSAL = {
   message: "Name the invitation to cancel",
-  hint: "Pass its id; find one with `zitadel invitation list --status pending --status expired --status rejected`.",
-  next: [{ id: "invitation:list", flags: { status: ["pending", "expired", "rejected"] } }],
+  hint: "Pass its id; find one with `zitadel invitation list`.",
+  next: [{ id: "invitation:list" }],
 } as const satisfies Refusal;
 
 /** How a cancel of an accepted invitation is refused. */
 const NOT_CANCELLABLE_REFUSAL = {
   message: "{id} is {status}, so there is nothing to cancel",
   hint: "An accepted invitation can't be cancelled.",
-  next: [{ id: "invitation:list", flags: { status: ["pending", "expired", "rejected"] } }],
+  next: [{ id: "invitation:list" }],
 } as const satisfies Refusal;
 
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
@@ -164,10 +164,7 @@ export default class InvitationCancel extends Destructive(ServerCommand(Environm
     return this.ask.select({
       name: "invitation id",
       message: "Which invitation would you like to cancel?",
-      retry: this.suggest({
-        id: "invitation:list",
-        flags: { status: ["pending", "expired", "rejected"] },
-      }),
+      retry: this.suggest({ id: "invitation:list" }),
       options: cancellable.map((invitation) => {
         return {
           value: invitation,
@@ -211,13 +208,17 @@ function describe(invitation: Invitation): string {
 function cancellableHint(invitation: Invitation): string {
   const whom = invitation.metadata?.name;
   // The name is whatever an administrator typed; the picker draws hints as given.
-  return escapeControlCharacters(
-    `${whom === undefined ? "" : `${whom}, `}${
-      invitation.status === "pending"
-        ? `expires ${invitation.expires_at}`
-        : invitation.status === "expired"
-          ? `expired ${invitation.expires_at}`
-          : "declined"
-    }`,
-  );
+  return escapeControlCharacters(`${whom === undefined ? "" : `${whom}, `}${standing(invitation)}`);
+}
+
+/** Where a cancellable invitation stands: when it expires, expired, or declined. */
+function standing(invitation: Invitation): string {
+  switch (invitation.status) {
+    case "pending":
+      return `expires ${invitation.expires_at}`;
+    case "expired":
+      return `expired ${invitation.expires_at}`;
+    default:
+      return "declined";
+  }
 }

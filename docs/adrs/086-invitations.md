@@ -535,6 +535,8 @@ amendments.
   expired invitation and its metadata without making a new link, before the
   cleanup job exists.
 - An accepted invitation still answers the same `404` as an unknown id.
-- **Cancelling an expired invitation sends no `invitation_cancelled`,** as for
-  a declined one: its journey already counts as not accepted, and the
-  72-hour acceptance rate leaves out cancelled journeys.
+- **Cancelling an expired invitation sends no product event
+  `invitation_cancelled`** (§9), as for a declined one: its journey already
+  counts as not accepted, and the 72-hour acceptance rate leaves out
+  cancelled journeys. The audit event `invitation.cancelled` (§5) is still
+  written for every cancel.

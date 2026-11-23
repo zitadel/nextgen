@@ -16,6 +16,16 @@ export type CreatedInvitation = Readonly<CreateInvitation201>;
 /** The lifecycle states an invitation can be in. */
 export type InvitationStatus = Invitation["status"];
 
+/**
+ * Every status but accepted: what the console and `invitation list` show by
+ * default, and what a cancel deletes. Whoever accepted is a member now.
+ */
+export const UNACCEPTED_INVITATION_STATUSES: readonly InvitationStatus[] = [
+  "pending",
+  "expired",
+  "rejected",
+];
+
 /** The kinds of invitation the API declares. */
 export type InvitationType = Invitation["type"];
 
@@ -129,7 +139,7 @@ export class InvitationService extends ApiService {
   async cancellable(): Promise<readonly Invitation[]> {
     return this.client.listInvitations.all({
       project_id: this.projectId,
-      status: ["pending", "expired", "rejected"],
+      status: [...UNACCEPTED_INVITATION_STATUSES],
     });
   }
 
