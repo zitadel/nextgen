@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
 import { Flags, type Command, type Interfaces, Parser } from "@oclif/core";
@@ -31,6 +31,29 @@ const NOTHING_PIPED_REFUSAL = {
 const EMPTY_REFUSAL = {
   message: "--input is empty",
   hint: "Pass a JSON object, '@path' to a file holding one, or '-' to read one from stdin.",
+} as const satisfies Refusal;
+
+/**
+ * A key that points the command at a server or a project, which only the
+ * command line may do, so a document read from elsewhere cannot send the
+ * run's credentials somewhere the person did not type.
+ */
+const POINTING_REFUSAL = {
+  message: '--input has "{key}", which points the command at a server or project',
+  hint: "Type it on the command line, beside --input.",
+} as const satisfies Refusal;
+
+/**
+ * The flags that point a command at a server or a project.
+ */
+const POINTING = new Set(["server", "env", "env-file", "cwd"]);
+
+/**
+ * A file that is not a regular file, or is too large to be a document.
+ */
+const NOT_A_SMALL_FILE_REFUSAL = {
+  message: "--input cannot read {path}: it is not a regular file of at most 8 MB",
+  hint: "Pass a path to a JSON file, '@path', '-' for stdin, or the JSON itself.",
 } as const satisfies Refusal;
 
 /**
@@ -314,16 +337,17 @@ export class Input {
     try {
       await this.check(await Input.textOf(source));
     } catch (error) {
-      throw error instanceof ZitadelError
-        ? error
-        : refusalError(NOT_A_DOCUMENT_REFUSAL, {
-            problem:
-              error instanceof SyntaxError
-                ? `--input is not valid JSON: ${error.message}`
-                : error instanceof Error
-                  ? error.message
-                  : String(error),
-          });
+      if (error instanceof ZitadelError) {
+        throw error;
+      }
+      if (error instanceof SyntaxError) {
+        throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
+          problem: "--input is not valid JSON",
+        });
+      }
+      throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
+        problem: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -338,7 +362,7 @@ export class Input {
   private async check(body: string, given: readonly string[] = []): Promise<Words> {
     const { args, ...rest } = parseJsonObject(body, "--input");
     const flags: string[] = [];
-    const named: Record<string, unknown> = {};
+    const named: Record<string, unknown> = Object.create(null);
     for (const [key, value] of Object.entries(rest)) {
       const flag = this.byName.get(key) ?? this.byName.get(kebab(key));
       const argument = this.argNames.find((name) => {
@@ -350,6 +374,9 @@ export class Input {
       }
       if (flag === undefined || Input.names.has(flag.name)) {
         throw refusalError(UNKNOWN_KEY_REFUSAL, { key });
+      }
+      if (POINTING.has(flag.name)) {
+        throw refusalError(POINTING_REFUSAL, { key });
       }
       if (value === null || given.includes(flag.name)) {
         continue;
@@ -459,6 +486,15 @@ export class Input {
       return piped.replace(/^\uFEFF/u, "");
     }
     const path = trimmed.replace(/^@|^file:\/\//u, "");
+    const found = await stat(path).catch((error: unknown) => {
+      throw refusalError(UNREADABLE_REFUSAL, {
+        path,
+        problem: error instanceof Error ? error.message : String(error),
+      });
+    });
+    if (!found.isFile() || found.size > 8_000_000) {
+      throw refusalError(NOT_A_SMALL_FILE_REFUSAL, { path });
+    }
     const content = await readFile(path, "utf8").catch((error: unknown) => {
       throw refusalError(UNREADABLE_REFUSAL, {
         path,

@@ -125,9 +125,19 @@ export class ApiCall {
           },
         );
       }
-      return parseJsonObject(await text(process.stdin), "stdin");
     }
-    return parseJsonObject(await readFile(source, "utf8"), source);
+    const name = source === "-" ? "stdin" : source;
+    const contents = source === "-" ? await text(process.stdin) : await readFile(source, "utf8");
+    try {
+      return parseJsonObject(contents, name);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new ZitadelError("E_VALIDATION", `${name} is not valid JSON`, {
+          hint: "Pass one JSON object with --file.",
+        });
+      }
+      throw error;
+    }
   }
 
   /**

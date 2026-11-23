@@ -1,4 +1,4 @@
-import type { FieldPaths } from "../columns";
+import type { FieldPaths } from "@/lib/oclif/columns";
 import type { Schema } from "./types";
 import { unwrap, type ZodLike } from "./zod";
 

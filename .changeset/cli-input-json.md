@@ -2,4 +2,4 @@
 "@zitadel/cli": minor
 ---
 
-Every command now takes its whole invocation as one JSON document with `--input` (inline JSON, `@file.json` or `-` for stdin), also spelled `--flags-file` and `--cli-input-json`. The keys are the command's flag names, `args` holds the positionals, and only the global flags may stand beside it, so a document is never mixed with typed flags. It is done once, by the base command before it parses (and an `init` hook for `--version`), so no command knows about it, and every flag is still checked by its own declaration.
+Every command now takes its whole invocation as one JSON document with `--input` (inline JSON, `@file.json` or `-` for stdin), also spelled `--flags-file` and `--cli-input-json`. The keys are the command's flag names, `args` holds the positionals, and only the global flags may stand beside it, so a document is never mixed with typed flags. It is done once, by the `Documented` mixin before oclif parses (and an `init` hook only for `--version --json`), so no command knows about it, and every flag is still checked by its own declaration.

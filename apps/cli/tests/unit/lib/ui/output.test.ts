@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Output } from "@/lib/ui";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 describe("Output", () => {
   beforeEach(() => {
@@ -21,10 +22,26 @@ describe("Output", () => {
     expect(fresh.color).toBe(false);
   });
 
-  it("reports what the base command settled", () => {
+  it("reads back what was settled", () => {
     Output.settle({ json: true, color: false });
 
     expect(Output.json).toBe(true);
     expect(Output.color).toBe(false);
+  });
+
+  it("is a screen when stdout is a terminal", async () => {
+    const screen = await asTerminal(async () => {
+      return Output.screen;
+    });
+
+    expect(screen).toBe(true);
+  });
+
+  it("is not a screen when stdout is a pipe", async () => {
+    const screen = await offTerminal(async () => {
+      return Output.screen;
+    });
+
+    expect(screen).toBe(false);
   });
 });

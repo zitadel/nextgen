@@ -46,29 +46,26 @@ export const plainFlag = Flags.boolean({
 });
 
 /**
- * The `--fields` flag every list command declares beside `--plain`: the
- * dot-paths of a record to show in the table and to return under `--json`.
- * One definition, so every list takes and words it the same way; the paths are
- * judged against the records when the list is emitted.
- */
-const fieldsOption = Flags.custom<
-  readonly string[],
-  Readonly<{ fallback?: readonly string[]; shape?: FieldPaths }>
->({
-  delimiter: ",",
-  parse: async (input, _command, flag) => {
-    return readColumns(input, flag.fallback ?? ["id"], flag.shape);
-  },
-});
-
-/**
+ * The `--fields` flag of a list: comma-separated dot-paths of a record to show
+ * in the table and to return under `--json`. One definition, so every list
+ * takes and words it the same way; the paths are judged against the records
+ * when the list is emitted.
+ *
  * @param options - What the list knows of its records: the `fallback` columns
  *   the refusal's example shows, and the `shape` of a record when a schema
  *   knows it, so a field is judged before any request is made.
  * @returns The flag.
  */
 export const fieldsFlag = (options: { fallback?: readonly string[]; shape?: FieldPaths } = {}) => {
-  return fieldsOption({
+  return Flags.custom<
+    readonly string[],
+    Readonly<{ fallback?: readonly string[]; shape?: FieldPaths }>
+  >({
+    delimiter: ",",
+    parse: async (input, _command, flag) => {
+      return readColumns(input, flag.fallback ?? ["id"], flag.shape);
+    },
+  })({
     description:
       "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
     ...options,

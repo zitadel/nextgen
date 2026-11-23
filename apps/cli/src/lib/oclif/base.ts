@@ -84,7 +84,8 @@ const NO_COLOR: FlagVariable = {
 const FORCE_COLOR: FlagVariable = {
   name: "FORCE_COLOR",
   flag: "color",
-  description: "Turns color on where it would be off, such as in a pipe, as `--color` does.",
+  description:
+    "Turns color on where it would be off, such as in a pipe, as `--color` does; `0` or `false` turns it off.",
   precedence: "`--no-color` and `NO_COLOR` win over it.",
 };
 

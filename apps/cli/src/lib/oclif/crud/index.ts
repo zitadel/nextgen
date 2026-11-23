@@ -25,7 +25,7 @@ import type {
 
 export type { Assignment } from "./assign";
 export { readAssignment, readAssignments } from "./assign";
-export { chosenColumns } from "../columns";
+export { chosenColumns } from "@/lib/oclif/columns";
 export { describeRegistry } from "./describe";
 export { jsonValue, mergeDocuments, setAt, typedValue, valueAt } from "./document";
 export type { BodyField, DescribeOptions, FieldKind } from "./fields";
@@ -44,7 +44,7 @@ export type {
   OperationStatics,
 } from "./ops/command";
 export { bindOperation, definitionOf, ResourceCommand, type ServerMixin } from "./ops/command";
-export { allows, type FieldPaths, observedPaths, suggestable } from "../columns";
+export { allows, type FieldPaths, observedPaths, suggestable } from "@/lib/oclif/columns";
 export { fieldPaths } from "./paths";
 export { parseFilter, parseSort } from "./query";
 export type { Credential, CredentialContext, References } from "./secrets";

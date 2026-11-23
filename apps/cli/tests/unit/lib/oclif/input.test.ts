@@ -6,6 +6,7 @@ import { describe, expect } from "vitest";
 
 import { Input, inputFlag } from "@/lib/oclif/input";
 import { test as it } from "@tests/fixtures";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /**
  * A command declaring one of each kind of flag and two arguments, to read documents against.
@@ -314,10 +315,83 @@ describe("Input", () => {
       expect(await expanded(["--input", path])).toEqual(["--limit=5"]);
     });
 
+    it("refuses - when stdin is a terminal, saying nothing is piped in", async () => {
+      const refused = asTerminal(() => {
+        return new Input(Declaring).verify("-");
+      });
+
+      await expect(refused).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining("nothing is piped in"),
+      });
+    });
+
+    it.for([
+      { what: "nothing", piped: "" },
+      { what: "only whitespace", piped: " \n" },
+    ])("refuses - when $what is piped in", async (row, { terminal }) => {
+      terminal.stdin(row.piped);
+
+      const refused = new Input(Declaring).verify("-");
+
+      await expect(refused).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining("nothing is piped in"),
+      });
+    });
+
+    it("reads a document piped in that starts with a byte-order mark", async ({ terminal }) => {
+      terminal.stdin('\uFEFF{"limit":5}');
+
+      const words = await expanded(["--input", "-"]);
+
+      expect(words).toEqual(["--limit=5"]);
+    });
+
     it("refuses text that is not JSON, saying so", async () => {
       await expect(new Input(Declaring).verify("{bad")).rejects.toThrow(
         "--input is not valid JSON",
       );
+    });
+
+    it.each(["server", "env", "env-file", "cwd"])(
+      "refuses %s in a document, which only the command line may set",
+      async (key) => {
+        const Pointing = class extends Command {
+          static override baseFlags = {
+            cwd: Flags.string(),
+            server: Flags.string(),
+            env: Flags.string(),
+            "env-file": Flags.string(),
+          };
+          static override flags = { input: inputFlag };
+
+          public run(): Promise<void> {
+            return Promise.resolve();
+          }
+        };
+
+        await expect(new Input(Pointing).verify(JSON.stringify({ [key]: "x" }))).rejects.toThrow(
+          "points the command at a server or project",
+        );
+      },
+    );
+
+    it("never echoes the text of a document that is not JSON", async ({ dir }) => {
+      const path = join(dir, "secret.json");
+      await writeFile(path, '{"password": sk_live_ABCDEFGH1234567890 secret');
+
+      await expect(new Input(Declaring).verify(path)).rejects.toThrow(/not valid JSON$/u);
+    });
+
+    it("refuses a path that is not a regular file", async ({ dir }) => {
+      await expect(new Input(Declaring).verify(dir)).rejects.toThrow("not a regular file");
+    });
+
+    it("treats a __proto__ argument as an argument the command lacks", async () => {
+      await expect(
+        new Input(Declaring).verify('{"args":{"__proto__":{"name":"x"}}}'),
+      ).rejects.toThrow("which this command lacks");
     });
 
     it("refuses an empty document, saying it is empty", async () => {

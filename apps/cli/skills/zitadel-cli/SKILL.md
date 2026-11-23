@@ -129,7 +129,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   document. Keys are the flag names without dashes
   (`dry_run`, `dry-run` and `dryRun` all work), a list is a repeated flag,
   `args` holds the positionals by name or in order (a key that names an
-  argument works too). The document is the whole invocation: only the global
+  argument works too). A document cannot set `server`, `env`, `env-file` or
+  `cwd`, which point the run at a server or project: type those beside it. The document is the whole invocation: only the global
   flags (`--json`, `--non-interactive`, `--cwd` and the like) may stand beside
   `--input`, and any other word is refused. A document that is no JSON object,
   or names something the command lacks, is refused as `E_VALIDATION` before the

@@ -57,7 +57,8 @@
 - Suggest a package manager's command with `suggestedCommandOf`, chain commands
   with `shellSteps`, and wrap one with `pipedFrom`, `readingFrom` or `andTheRest`.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
-  in its data: `emit` writes them to the envelope and prints every one.
+  in its data: `emit` hands them to the `Presenter`
+  (`src/lib/oclif/presenter.ts`), which writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
   hand-written `next_commands:` or `next_actions:` key under `apps/cli/src`.
 - Set `nextShown` only when the result's own output showed the steps
@@ -222,15 +223,15 @@
 - Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
 - Pick the command's base by what it does with a server (all from
-  `src/cli/commands/server-command.ts`, wrapping what a command extends the way
-  `Promptable` does); a command never resolves, parses or normalises a server
-  address itself:
+  `src/cli/commands/server-command.ts`, wrapping what a command extends); a
+  command never resolves, parses or normalises a server address itself. No base
+  wraps another mixin: a command that asks composes `Promptable` itself:
 
   | The command | It extends |
   | --- | --- |
   | never talks to a server | `BaseCommand` |
   | talks to one through `--server` or its environment | `ServerCommand(Base)` |
-  | may have to ask which server | `ChoosingServerCommand(Base)` |
+  | may have to ask which server | `Promptable(ChoosingServerCommand(Base))` |
   | is about the local server | `LocalServerCommand(Base, folderRule)` |
   | is destructive | `Destructive(...)`, outermost |
 

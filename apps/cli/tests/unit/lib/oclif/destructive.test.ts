@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Consent } from "@/lib/consent";
 import { BaseCommand } from "@/lib/oclif/base";
 import { Destructive, type DestructiveChange, Settled } from "@/lib/oclif/destructive";
+import { Promptable } from "@/lib/oclif/promptable";
 import type { CommandResult } from "@/lib/oclif/types";
 import { answering } from "@tests/helpers/keyboard";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -347,5 +348,29 @@ describe("Destructive", () => {
         nextCommands: ["npx @zitadel/cli@1.2.3 API_URL --force"],
       });
     });
+  });
+});
+
+/**
+ * A command built on the destructive gate alone.
+ */
+abstract class OnlyDestructive extends Destructive(ServerCommand(BaseCommand)) {}
+
+/**
+ * A command built on the destructive gate over the questions.
+ */
+abstract class DestructiveAndAsking extends Destructive(Promptable(ServerCommand(BaseCommand))) {}
+
+describe("Destructive and Promptable", () => {
+  it("leaves a destructive command without the questions", () => {
+    expect("ask" in OnlyDestructive.prototype).toBe(false);
+  });
+
+  it("keeps the gate when a destructive command is built over the questions", () => {
+    expect("confirmed" in DestructiveAndAsking.prototype).toBe(true);
+  });
+
+  it("keeps the questions when a destructive command is built over them", () => {
+    expect("ask" in DestructiveAndAsking.prototype).toBe(true);
   });
 });
