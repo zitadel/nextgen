@@ -644,14 +644,17 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
     // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
-    const useColor = flags.color !== false && !process.env[NO_COLOR.name];
+    const useColor =
+      flags.color !== false &&
+      !process.env[NO_COLOR.name] &&
+      !["0", "false"].includes(process.env[FORCE_COLOR.name] ?? "");
     // Colour is about where the output goes, so it asks stdout alone. `isTTY`
     // is about whether a person can be asked something and needs stdin too: a
     // run with its stdin redirected still writes to a terminal that reads
     // colour.
     const colored =
       useColor &&
-      (Boolean(process.env[FORCE_COLOR.name]) ||
+      (!["", "0", "false"].includes(process.env[FORCE_COLOR.name] ?? "") ||
         (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
     this.meta = {
       cwd,
@@ -858,10 +861,12 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
   }
 
   /**
-   * Final step of every command: in human mode it prints the rendered result,
-   * then the result's next steps, then its footer (oclif suppresses
-   * {@link Command.log} under `--json`); it returns the envelope so oclif's
-   * `--json` path serialises it.
+   * Final step of every command: records the run's telemetry and hands the
+   * result to a {@link Presenter}, which writes it for the reader the run has
+   * and returns the envelope oclif serialises under `--json`.
+   *
+   * @param result - What the command returned.
+   * @returns The envelope.
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
@@ -935,7 +940,9 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    */
   private logAside(text: string): void {
     this.logToStderr(
-      process.stderr.isTTY || process.env[FORCE_COLOR.name] ? text : stripVTControlCharacters(text),
+      process.stderr.isTTY || !["", "0", "false"].includes(process.env[FORCE_COLOR.name] ?? "")
+        ? text
+        : stripVTControlCharacters(text),
     );
   }
 

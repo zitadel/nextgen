@@ -301,11 +301,23 @@ describe("Input", () => {
       expect(await expanded(["--cli-input-json", `file://${path}`])).toEqual(["--limit=5"]);
     });
 
+    it("leaves a line with two documents as it was, for the flag to refuse", async () => {
+      const line = ["--input", '{"limit":1}', "--input", '{"limit":2}'];
+
+      expect(await expanded(line)).toEqual(line);
+    });
+
     it("reads a file that starts with a byte-order mark", async ({ dir }) => {
       const path = join(dir, "bom.json");
       await writeFile(path, '\uFEFF{"limit":5}');
 
       expect(await expanded(["--input", path])).toEqual(["--limit=5"]);
+    });
+
+    it("refuses text that is not JSON, saying so", async () => {
+      await expect(new Input(Declaring).verify("{bad")).rejects.toThrow(
+        "--input is not valid JSON",
+      );
     });
 
     it("refuses an empty document, saying it is empty", async () => {

@@ -41,6 +41,14 @@ describe("ApiCall.pathValues", () => {
     });
   });
 
+  it("sends an id trimmed, as the id arguments of the resource commands do", () => {
+    const target = resolveTarget("getSession");
+
+    expect(ApiCall.to(target).pathValues(["  sess_1\t"], undefined).values).toEqual({
+      session_id: "sess_1",
+    });
+  });
+
   it("names the parameters still missing", () => {
     const target = resolveTarget("completeUserPasskeyRegistration");
 

@@ -263,7 +263,7 @@ export class Input {
   public async rewrite(argv: readonly string[]): Promise<readonly string[]> {
     const line = await this.scan(argv);
     const [source] = line.sources;
-    if (source === undefined) {
+    if (source === undefined || line.sources.length > 1) {
       return argv;
     }
     const body = await Input.textOf(source).catch(() => {
@@ -317,7 +317,12 @@ export class Input {
       throw error instanceof ZitadelError
         ? error
         : refusalError(NOT_A_DOCUMENT_REFUSAL, {
-            problem: error instanceof Error ? error.message : String(error),
+            problem:
+              error instanceof SyntaxError
+                ? `--input is not valid JSON: ${error.message}`
+                : error instanceof Error
+                  ? error.message
+                  : String(error),
           });
     }
   }

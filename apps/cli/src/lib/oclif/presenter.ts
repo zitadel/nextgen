@@ -2,7 +2,7 @@ import { ZitadelRuntime } from "@/lib/server";
 import { Spelling } from "@/lib/suggestion";
 import { Skills } from "@/lib/skills";
 import { isObject } from "@/lib/json";
-import { Output, type Presentation, style, type Summary, type Ui, warnings } from "@/lib/ui";
+import { Output, style, type Summary, type Ui, warnings } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { textOf } from "@/lib/ui/summary";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -26,18 +26,41 @@ import type {
  * is composed.
  */
 export type PresentedRun = Readonly<{
+  /**
+   * The options the run settled.
+   */
   meta: GlobalOptions;
+  /**
+   * What the run draws with.
+   */
   ui: Ui;
+  /**
+   * The release of the CLI that is running.
+   */
   version: string;
-  /** Whether the command draws a chain and ends on a summary box. */
+  /**
+   * Whether the command draws a chain and ends on a summary box.
+   */
   wizard: boolean;
-  /** Whether the skills offer has not been made yet on this machine. */
+  /**
+   * Whether the skills offer has not been made yet on this machine.
+   */
   skillsOffered: boolean;
+  /**
+   * Whether the run only plans its changes.
+   */
   dryRun: boolean;
+  /**
+   * Renders a suggested command with the run's own scope.
+   */
   suggest: Suggest;
-  /** Writes a line to stdout. */
+  /**
+   * Writes a line to stdout.
+   */
   log: (text: string) => void;
-  /** Writes a line to stderr. */
+  /**
+   * Writes a line to stderr.
+   */
   logAside: (text: string) => void;
 }>;
 
@@ -47,8 +70,16 @@ export type PresentedRun = Readonly<{
  * so no command, mixin or the base command decides that.
  */
 export class Presenter {
+  /**
+   * The run this presenter writes for.
+   */
   private readonly context: PresentedRun;
 
+  /**
+   * Builds the presenter of one run.
+   *
+   * @param context - What the run settled and how it writes.
+   */
   constructor(context: PresentedRun) {
     this.context = context;
   }
@@ -122,6 +153,10 @@ export class Presenter {
    * The next steps are the result's own, stated once; the ending draws the same
    * ones unless the summary names steps of its own, or the command already
    * showed them in output of its own.
+   *
+   * @param result - The result, as it was normalised.
+   * @param footer - The line the command printed after everything else, if any.
+   * @returns The ending, with its steps, extras and the server it ran on settled.
    */
   private endingOf(result: CommandResult, footer: string | undefined): Summary {
     const own = result.summary;
@@ -150,6 +185,8 @@ export class Presenter {
   /**
    * The server this run spoke to, when it is not the default one, so an ending
    * that knows no project can still say where it ran.
+   *
+   * @returns The server's host, or `undefined` when it is the default or the run only planned.
    */
   private serverRanOn(): string | undefined {
     if (this.context.dryRun) {
@@ -171,6 +208,8 @@ export class Presenter {
    * which a count or a footer under it would break. A wizard has no such
    * form: what it writes is prose for a person however it is read, so it ends
    * the way it always ends.
+   *
+   * @returns True when what the command rendered is written as it is.
    */
   private rendersForAMachine(): boolean {
     return this.context.ui.reported || (!this.summarises() && !Output.screen);
@@ -185,6 +224,7 @@ export class Presenter {
    * @param changed - Whether the run did its work. Only one that did spends the
    * skills offer, which a machine gets once: a skip or a no leaves it for the
    * next run that changes something.
+   * @returns The summary with its overview and, once, the skills offer.
    */
   private withOverview(summary: Summary, changed: boolean): Summary {
     const steps = summary.next ?? [];
@@ -224,18 +264,24 @@ export class Presenter {
     };
   }
 
-  /** Which of the two shapes this command draws. See {@link BaseCommand.wizard}. */
-  private presentation(): Presentation {
-    return this.context.wizard ? "wizard" : "plain";
-  }
-
-  /** Whether this command ends on a summary box, which only a wizard does. */
+  /**
+   * Whether this command ends on a summary box, which only a wizard does.
+   *
+   * @returns True for a wizard.
+   */
   private summarises(): boolean {
-    return this.presentation() === "wizard";
+    return this.context.wizard;
   }
 }
 
-/** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
+/**
+ * Settles the rendering a result is printed with, and rewrites each suggested
+ * `zitadel …` command to the public form the reader can run.
+ *
+ * @param result - What the command returned.
+ * @param meta - The options the run settled.
+ * @returns The result, with its rendering and its commands settled.
+ */
 export function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
   const stated =
     result.pretty === undefined && result.summary !== undefined
@@ -262,43 +308,85 @@ export function normalizeCommandResult(result: CommandResult, meta: GlobalOption
  * reads the very words a person does (see {@link CommandResult.summary}).
  * Data that is not an object, or that already has a `title` of its own, is
  * left as it is.
+ *
+ * @param data - What the command answered.
+ * @param title - The headline the terminal draws.
+ * @returns The data, with the headline in it when it can hold one.
  */
 function withHeadline(data: unknown, title: string): unknown {
   // An entity answers the record it stands for through `toJSON`, which spreading it would lose.
   const record = isObject(data) && typeof data.toJSON === "function" ? data.toJSON() : data;
 
-  return isObject(record) && !("title" in record) && title !== "" ? { title, ...record } : data;
+  return isObject(record) && !("title" in record) && title !== ""
+    ? {
+        title,
+        ...record,
+      }
+    : data;
 }
 
 /**
  * The data with its next steps written in. Data that is not an object (a
  * write the server answered without a body) has nowhere to hold them.
+ *
+ * @param data - What the command answered.
+ * @param next - The result's next steps.
+ * @returns The data, with the steps in it when it can hold them.
  */
 function withNextSteps(data: unknown, next: NextSteps | undefined): unknown {
-  return next === undefined || !isObject(data) ? data : { ...data, ...nextStepsData(next) };
+  return next === undefined || !isObject(data)
+    ? data
+    : {
+        ...data,
+        ...nextStepsData(next),
+      };
 }
 
-/** Add the warnings reported while the command ran to an ok result. */
+/**
+ * Adds the warnings reported while the command ran to an ok result.
+ *
+ * @param result - The result.
+ * @param reported - The warnings reported while it ran.
+ * @returns The result, with the warnings first among its own.
+ */
 function withReportedWarnings(result: CommandResult, reported: readonly string[]): CommandResult {
   if (result.status !== "ok" || reported.length === 0) {
     return result;
   }
 
-  return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
+  return {
+    ...result,
+    warnings: [...reported, ...(result.warnings ?? [])],
+  };
 }
 
 /**
  * Add reported warnings to a skipped or error envelope. Those envelopes carry
  * `warnings` only when there are some, so their shape is otherwise unchanged.
+ *
+ * @param envelope - The envelope.
+ * @param warnings - The warnings reported while the command ran.
+ * @returns The envelope, with its warnings when there are any.
  */
 export function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
   envelope: T,
   warnings: readonly string[],
 ): T {
-  return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
+  return warnings.length === 0
+    ? envelope
+    : {
+        ...envelope,
+        warnings: [...warnings],
+      };
 }
 
-/** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
+/**
+ * Wraps a {@link CommandResult} with the invocation metadata into the final envelope.
+ *
+ * @param result - The result.
+ * @param meta - The options the run settled.
+ * @returns The envelope.
+ */
 function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
   const base: EnvelopeMeta = {
     cli_version: meta.cliVersion,
@@ -332,6 +420,11 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
  * settles which). `next` is the rendered next-step block, which follows the
  * rendering, and comes before the warnings, which `withWarnings` leaves out for
  * output a script reads.
+ *
+ * @param result - The result.
+ * @param next - The rendered next-step block.
+ * @param withWarnings - Whether the warnings follow the rendering.
+ * @returns The text, without empty lines.
  */
 function renderPretty(result: CommandResult, next: string, withWarnings: boolean): string {
   // A command's own rendering arrives spelled out, because the factory that
@@ -349,7 +442,12 @@ function renderPretty(result: CommandResult, next: string, withWarnings: boolean
     .join("\n");
 }
 
-/** The warnings a result still has to show: those its own output did not. */
+/**
+ * The warnings a result still has to show: those its own output did not.
+ *
+ * @param result - The result.
+ * @returns The warnings still to be said.
+ */
 function warningsOf(result: CommandResult): readonly string[] {
   return result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
 }
@@ -360,9 +458,15 @@ function warningsOf(result: CommandResult): readonly string[] {
  * A warning names what the server answered as readily as a rendering does, so
  * it is spelled out here — the one place a warning becomes a line — and only
  * the label is coloured, so there is nothing for the spelling to undo.
+ *
+ * @param warning - What the warning says.
+ * @returns The line a person reads.
  */
 export function warningLine(warning: string): string {
   return `${style.statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
 }
 
+/**
+ * The label of the step that points at the command index.
+ */
 const OVERVIEW = "Explore all commands:";

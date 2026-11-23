@@ -172,11 +172,12 @@ export class ApiCall {
     if (values.project_id === undefined && names.includes("project_id") && projectId) {
       values.project_id = projectId;
     }
+    const checked: Record<string, string> = {};
     for (const [name, value] of Object.entries(values)) {
-      read(SAFE_ID, value, name);
+      checked[name] = read(SAFE_ID, value, name);
     }
     return {
-      values,
+      values: checked,
       missing: names.filter((name) => {
         return values[name] === undefined;
       }),
