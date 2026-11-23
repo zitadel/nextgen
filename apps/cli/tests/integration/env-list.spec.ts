@@ -8,6 +8,12 @@ import { offTerminal } from "@tests/fixtures/terminal";
 const platform = usePlatformMock();
 
 describe("env list", () => {
+  it("judges --fields by the records' shape, whatever the page holds", async () => {
+    const app = await aSetUpApp();
+
+    await app.judgesFieldsByTheShape(["env", "list"], "name");
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("still succeeds, as it never asks the server", async () => {
@@ -34,6 +40,7 @@ describe("env list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -67,6 +74,7 @@ describe("env list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -122,6 +130,7 @@ describe("env list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -153,6 +162,7 @@ describe("env list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -194,6 +204,7 @@ describe("env list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "production", source: "--env" },
           },
@@ -231,6 +242,7 @@ describe("env list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -253,6 +265,7 @@ describe("env list", () => {
             title: "No environments found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
             next_commands: [expectedPublicCliCommand(`env add '<name>' --cwd ${app.path}`)],

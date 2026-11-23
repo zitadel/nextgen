@@ -19,6 +19,12 @@ const DEPLOYMENT_ID = /^dep_[a-zA-Z0-9_-]+$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
 describe("deployment list", () => {
+  it("judges --fields by the records' shape, whatever the page holds", async () => {
+    const app = await aSetUpApp();
+
+    await app.judgesFieldsByTheShape(["deployment", "list"], "id");
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -97,6 +103,7 @@ describe("deployment list", () => {
             title: "No deployments found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -153,6 +160,7 @@ describe("deployment list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -185,6 +193,7 @@ describe("deployment list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -224,6 +233,7 @@ describe("deployment list", () => {
               },
             ],
             count: 1,
+            truncated: true,
             next_page_token: "1",
             next_commands: [
               expectedPublicCliCommand(
@@ -325,6 +335,7 @@ describe("deployment list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],

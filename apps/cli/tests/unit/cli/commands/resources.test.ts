@@ -1214,9 +1214,8 @@ describe("chosen columns", () => {
 
     const res = await run(cwd, ["user", "list", "--fields", "id,attributes.email"]);
     expect(res.exitCode).toBe(0);
-    // --json is unaffected by --fields; the rows are the human rendering.
-    const json = parseJson(res.stdout) as { data: { items: Array<{ schema: string }> } };
-    expect(json.data.items[0]?.schema).toBe("sch_default");
+    const json = parseJson(res.stdout) as { data: { items: Array<Record<string, unknown>> } };
+    expect(Object.keys(json.data.items[0] ?? {}).sort()).toEqual(["attributes", "id"]);
 
     const rows = await runCliForTest([
       "user",
@@ -2912,5 +2911,128 @@ describe("the id of a resource whose id has a format", () => {
         hint: "List them to find one.",
       });
     }
+  });
+});
+
+describe("a record read with --fields", () => {
+  it("is cut to the fields named under --json", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
+
+    const res = await run(cwd, ["user", "get", "user_1", "--fields", "id", "--json"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ data: { id: "user_1" } });
+    expect(res.stdout).not.toContain('"attributes"');
+  });
+});
+
+describe("an update that removes fields", () => {
+  const removing = ["user", "update", "user_1", "--set", "attributes.nickname:=null"];
+
+  it("is refused without --force when nothing can be asked, and sends nothing", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    const res = await run(cwd, removing);
+
+    expect(res).toFailWith("E_CONFIRMATION_REQUIRED");
+    expect(bodies).toEqual([]);
+  });
+
+  it("is sent with --force", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    const res = await run(cwd, [...removing, "--force"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(bodies).toEqual([{ attributes: { nickname: null } }]);
+  });
+
+  it("is previewed by --dry-run without asking", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+    );
+
+    const res = await run(cwd, [...removing, "--dry-run", "--json"]);
+
+    expect(res).toSucceed();
+    expect(parseJson(res.stdout)).toMatchObject({ data: { dry_run: true } });
+  });
+
+  it("is warned about by --dry-run, which suggests the real run with --force", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+    );
+
+    const res = await run(cwd, [...removing, "--dry-run", "--json"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      status: "ok",
+      warnings: [expect.stringContaining("nickname")],
+      data: { next_commands: [expect.stringContaining("--force")] },
+    });
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { next_commands: [expect.not.stringContaining("--dry-run")] },
+    });
+  });
+
+  it("is not warned about by --dry-run when the update removes nothing", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+    );
+
+    const res = await run(cwd, [
+      "user",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--dry-run",
+      "--json",
+    ]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { next_commands: [expect.not.stringContaining("--force")] },
+    });
+    expect(parseJson(res.stdout)).not.toHaveProperty(
+      "warnings",
+      expect.arrayContaining([expect.anything()]),
+    );
+  });
+
+  it("is not asked about when the update removes nothing", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+    );
+
+    const res = await run(cwd, ["user", "update", "user_1", "--set", "attributes.givenName=Ada"]);
+
+    expect(res.exitCode).toBe(0);
   });
 });

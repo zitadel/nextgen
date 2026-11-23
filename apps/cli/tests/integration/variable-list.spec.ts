@@ -8,6 +8,12 @@ import { asTerminal, offTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 const platform = usePlatformMock();
 
 describe("variable list", () => {
+  it("judges --fields by the records' shape, whatever the page holds", async () => {
+    const app = await aSetUpApp();
+
+    await app.judgesFieldsByTheShape(["variable", "list"], "name");
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -140,6 +146,7 @@ describe("variable list", () => {
             title: "No variables found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -178,6 +185,7 @@ describe("variable list", () => {
               { name: "TOKEN", secret: true },
             ],
             count: 3,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -202,6 +210,7 @@ describe("variable list", () => {
             title: "Found 1 variable",
             items: [{ name: "API_URL", secret: false, value: "https://preview.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -223,6 +232,7 @@ describe("variable list", () => {
             title: "No preview variables found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -251,6 +261,7 @@ describe("variable list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -272,6 +283,7 @@ describe("variable list", () => {
             title: "Found 1 variable",
             items: [{ name: "TOKEN", secret: true }],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],

@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, MOCK_SERVER_URL, PASSWORD_POLICY } from "@tests/helpers/project";
-import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
+import {
+  cliVersion,
+  expectedPublicCliCommand,
+  parseJson,
+  pressCtrlC,
+  runCliForTest,
+} from "@tests/helpers/run-cli";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],
@@ -58,6 +64,23 @@ const WRONG_KIND: readonly { args: string[]; list: string; message: string }[] =
 ];
 
 describe("resources", () => {
+  describe("--fields", () => {
+    it("cuts each record under --json to the fields named", async () => {
+      const result = await runCliForTest(["resources", "--fields", "topic", "--json"]);
+
+      expect(result).toSucceed();
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { items: expect.arrayContaining([{ topic: expect.any(String) }]) },
+      });
+    });
+
+    it("refuses a field the records do not carry", async () => {
+      const result = await runCliForTest(["resources", "--fields", "nope", "--json"]);
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("still succeeds", async () => {
@@ -76,6 +99,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -100,6 +124,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -124,6 +149,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -209,6 +235,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -471,6 +498,7 @@ describe("resources", () => {
             title: "Found 1 user",
             items: [{ id: "usr_1", attributes: {} }],
             count: 1,
+            truncated: true,
             next_page_token: cursor,
             next_commands: [
               expectedPublicCliCommand(
@@ -495,8 +523,9 @@ describe("resources", () => {
           status: "ok",
           data: {
             title: "Found 1 user",
-            items: [{ id: "usr_1", attributes: {} }],
+            items: [{ id: "usr_1" }],
             count: 1,
+            truncated: true,
             next_page_token: "cur-\u001b[2Jwiped",
             next_commands: [
               expectedPublicCliCommand(

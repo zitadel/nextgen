@@ -192,6 +192,25 @@ describe("a list for a person", () => {
     });
   });
 
+  it("refuses --fields for a list that carries no records to choose from", async () => {
+    await expect(
+      draw().drawList(
+        {
+          plain: false,
+          fields: ["id"],
+        },
+        {
+          ...view,
+          items: undefined,
+          data: {},
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "This list has no fields to choose from",
+    });
+  });
+
   it("builds the table once, and prints no second rendering of it", async () => {
     const result = await asTerminal(() => draw().drawList({ plain: false }, view));
 
@@ -622,6 +641,202 @@ describe("Tabulatable", () => {
       if (!file.endsWith(".ts")) continue;
       const source = await readFile(join(root, file), "utf8");
       if (source.includes("emitList(") && !source.includes("const COLUMNS")) {
+        without.push(file);
+      }
+    }
+
+    expect(without).toEqual([]);
+  });
+});
+
+describe("--fields", () => {
+  const items = [
+    {
+      id: "a",
+      name: "Ann",
+      attributes: {
+        email: "ann@example.com",
+        age: 3,
+      },
+    },
+    {
+      id: "b",
+      name: "Bob",
+      attributes: {
+        email: "bob@example.com",
+        age: 4,
+      },
+    },
+  ];
+  const view = {
+    columns: ["id", "name"],
+    rows: items.map(({ id, name }) => ({ id, name })),
+    items,
+    singular: "user",
+    empty: "No users found",
+    footer: [],
+    page: null,
+    extra: {},
+  };
+
+  const dataOf = async (fields: readonly string[] | undefined) => {
+    const result = await draw(["--json"]).drawList(
+      {
+        plain: false,
+        fields,
+      },
+      view,
+    );
+    return result.status === "ok" ? result.data : undefined;
+  };
+
+  it("cuts each record under --json to the paths named, nested as they were", async () => {
+    expect(await dataOf(["id", "attributes.email"])).toMatchObject({
+      items: [
+        {
+          id: "a",
+          attributes: { email: "ann@example.com" },
+        },
+        {
+          id: "b",
+          attributes: { email: "bob@example.com" },
+        },
+      ],
+      count: 2,
+    });
+  });
+
+  it("returns the whole record under --json without it", async () => {
+    expect(await dataOf(undefined)).toMatchObject({ items });
+  });
+
+  it("draws the rows of a script from the paths named, read from the records", async () => {
+    const result = await offTerminal(() => {
+      return draw().drawList(
+        {
+          plain: true,
+          fields: ["name", "attributes.age"],
+        },
+        view,
+      );
+    });
+
+    expect(result.status === "ok" ? result.pretty?.text : undefined).toBe("Ann\t3\nBob\t4");
+  });
+
+  it("refuses a path the records do not carry, and names the ones they do", async () => {
+    await expect(dataOf(["nope"])).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("refuses a list whose whole data is fixed, which has no records to cut", async () => {
+    await expect(
+      draw(["--json"]).drawList(
+        {
+          plain: false,
+          fields: ["id"],
+        },
+        {
+          ...view,
+          items: undefined,
+          data: { operations: [] },
+          page: null,
+          extra: {},
+        },
+      ),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+});
+
+describe("--fields cutting a record", () => {
+  it("keeps the paths named, nested, and leaves out what the record lacks", async () => {
+    expect(
+      draw().cut(
+        {
+          a: 1,
+          b: {
+            c: 2,
+            d: 3,
+          },
+        },
+        ["a", "b.c", "x.y"],
+      ),
+    ).toEqual({
+      a: 1,
+      b: { c: 2 },
+    });
+  });
+
+  it("reads a record as --json prints it, through its toJSON", async () => {
+    class Held {
+      readonly id = "dep_1";
+      private readonly record = {
+        project_id: "proj_1",
+        status: "live",
+      };
+
+      toJSON(): Record<string, unknown> {
+        return {
+          id: this.id,
+          ...this.record,
+        };
+      }
+    }
+
+    expect(draw().cut(new Held(), ["id", "project_id", "status"])).toEqual({
+      id: "dep_1",
+      project_id: "proj_1",
+      status: "live",
+    });
+  });
+
+  it("leaves out what a record only inherits", async () => {
+    expect(
+      draw().cut(
+        {
+          id: "a",
+          attributes: { x: 1 },
+        },
+        ["attributes.constructor", "id"],
+      ),
+    ).toEqual({
+      id: "a",
+    });
+  });
+
+  it("ignores a path that names a prototype", async () => {
+    expect(Object.keys(draw().cut({ a: 1 }, ["__proto__.polluted", "a"]) as object)).toEqual(["a"]);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
+describe("every list command", () => {
+  it("declares --fields beside --plain, so every list takes it", async () => {
+    const root = fileURLToPath(new URL("../../../../src", import.meta.url));
+    const without: string[] = [];
+
+    for (const file of await readdir(root, { recursive: true })) {
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
+        continue;
+      }
+      const source = await readFile(join(root, file), "utf8");
+      if (/plain: plainFlag/.test(source) && !/fields: fieldsFlag/.test(source)) {
+        without.push(file);
+      }
+    }
+
+    expect(without).toEqual([]);
+  });
+
+  it("gives --fields a shape, so a field is judged without a record to look at", async () => {
+    const root = fileURLToPath(new URL("../../../../src", import.meta.url));
+    const without: string[] = [];
+
+    for (const file of await readdir(root, { recursive: true })) {
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
+        continue;
+      }
+      const source = await readFile(join(root, file), "utf8");
+      if (/fields: fieldsFlag\(\)/.test(source)) {
         without.push(file);
       }
     }

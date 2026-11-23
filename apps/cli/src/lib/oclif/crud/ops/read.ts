@@ -1,10 +1,9 @@
-import { Flags } from "@oclif/core";
-
-import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
-import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import { chosenColumns } from "@/lib/oclif/columns";
+import { fieldPaths } from "@/lib/oclif/crud/paths";
 import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
 import type { GetSpec } from "@/lib/oclif/crud/types";
 import { json, painted } from "@/lib/oclif/rendering";
+import { fieldsFlag } from "@/lib/oclif/tabulatable";
 import type { CommandResult } from "@/lib/oclif/types";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -42,16 +41,7 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
         `<%= config.bin %> ${topic} get <${idName(resource)}> --json`,
       ],
       flags: {
-        fields: Flags.custom<
-          readonly string[],
-          Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
-        >({
-          parse: async (input, _command, flag) => {
-            return readColumns(input, flag.fallback, flag.shape);
-          },
-        })({
-          description:
-            "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+        fields: fieldsFlag({
           fallback: resource.detail ?? resource.columns,
           shape: fieldPaths(spec.response),
         }),
@@ -69,11 +59,12 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
     const heading = headingOf(resource.heading ?? resource.idField, item);
     const title = `Read ${escapeControlCharacters(heading ?? resource.singular, { keepLayout: false })}`;
 
+    const record = flags.fields === undefined ? item : this.pickFields(item, flags.fields);
     if (!this.isOnScreen) {
       return {
         status: "ok",
-        data: item,
-        pretty: json(item),
+        data: record,
+        pretty: json(record),
         summary: {
           title,
           sections: [],
@@ -86,20 +77,20 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
             return this.tabulate(columns, rows);
           })) ?? [])
         : [];
-    const record = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
+    const rendered = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
 
     return {
       status: "ok",
-      data: item,
+      data: record,
       pretty: painted(
-        [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), record].join(
+        [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), rendered].join(
           "\n",
         ),
       ),
       summary: {
         title,
         sections: [],
-        lines: record.split("\n"),
+        lines: rendered.split("\n"),
       },
     };
   }

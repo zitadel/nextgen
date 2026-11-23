@@ -121,6 +121,11 @@ export type DryRun = Readonly<{
   body?: Json;
   /** What the server answered when asked to check the write; absent when it was not asked. */
   checked?: Json;
+  /**
+   * What the real run does that the preview does not show, such as the fields
+   * it removes.
+   */
+  warnings?: readonly string[];
   context?: CredentialContext;
   /** The real command: this run again without `--dry-run`, which the command builds (`realRun`). */
   next: SuggestedCommand;
@@ -134,6 +139,7 @@ export const dryRunResult = ({
   clause,
   body,
   checked,
+  warnings,
   context,
   next,
 }: DryRun): CommandResult => {
@@ -159,6 +165,7 @@ export const dryRunResult = ({
 
   return {
     status: "ok",
+    ...(warnings === undefined || warnings.length === 0 ? {} : { warnings: [...warnings] }),
     data: {
       dry_run: true,
       title,

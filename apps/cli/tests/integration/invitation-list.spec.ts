@@ -8,6 +8,12 @@ const LIST = ["invitation", "list"];
 const platform = usePlatformMock();
 
 describe("invitation list", () => {
+  it("judges --fields by the records' shape, whatever the page holds", async () => {
+    const app = await aSetUpApp();
+
+    await app.judgesFieldsByTheShape(["invitation", "list"], "id");
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -123,6 +129,7 @@ describe("invitation list", () => {
 
         expect(app.envelopeOf(result).data).toMatchObject({
           count: 1,
+          truncated: true,
           next_page_token: expect.any(String),
         });
       });

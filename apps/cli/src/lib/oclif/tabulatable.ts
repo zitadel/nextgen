@@ -1,4 +1,5 @@
 import { Flags, type Interfaces } from "@oclif/core";
+import { getProperty, hasProperty, setProperty } from "dot-prop";
 
 import { Cmd } from "@/lib/cmd";
 import { isObject } from "@/lib/json";
@@ -6,8 +7,10 @@ import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text
 import type { Summary } from "@/lib/ui";
 
 import type { BaseCommand } from "./base";
+import { chosenColumns, type FieldPaths, readColumns } from "./columns";
 import { listData } from "./envelope";
 import { painted, rows } from "./rendering";
+import { type Refusal, refusalError } from "./refusal";
 import type { CommandResult, JsonEnvelope } from "./types";
 import type { CommandClass } from "./command-class";
 
@@ -26,6 +29,13 @@ type PagingFlags = Readonly<{
 export type Tabulate = (columns: readonly string[], items: readonly unknown[]) => Promise<string>;
 
 /**
+ * `--fields` given to a list that carries no records to choose fields from.
+ */
+const NO_FIELDS_REFUSAL = {
+  message: "This list has no fields to choose from",
+} as const satisfies Refusal;
+
+/**
  * The `--plain` flag every list command declares, as the last entry of its
  * `flags`. One definition, so the help reads the same on all of them.
  */
@@ -35,11 +45,44 @@ export const plainFlag = Flags.boolean({
 });
 
 /**
- * What a list command hands {@link Tabulatable}'s `emitList`: its parsed flags,
- * which must carry `plain`, so a list that forgot to declare `--plain` does not
- * compile.
+ * The `--fields` flag every list command declares beside `--plain`: the
+ * dot-paths of a record to show in the table and to return under `--json`.
+ * One definition, so every list takes and words it the same way; the paths are
+ * judged against the records when the list is emitted.
  */
-export type ListFlags = { readonly plain: boolean | undefined };
+const fieldsOption = Flags.custom<
+  readonly string[],
+  Readonly<{ fallback?: readonly string[]; shape?: FieldPaths }>
+>({
+  delimiter: ",",
+  parse: async (input, _command, flag) => {
+    return readColumns(input, flag.fallback ?? ["id"], flag.shape);
+  },
+});
+
+/**
+ * @param options - What the list knows of its records: the `fallback` columns
+ *   the refusal's example shows, and the `shape` of a record when a schema
+ *   knows it, so a field is judged before any request is made.
+ * @returns The flag.
+ */
+export const fieldsFlag = (options: { fallback?: readonly string[]; shape?: FieldPaths } = {}) => {
+  return fieldsOption({
+    description:
+      "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+    ...options,
+  });
+};
+
+/**
+ * What a list command hands {@link Tabulatable}'s `emitList`: its parsed flags,
+ * which must carry `plain` and `fields`, so a list that forgot to declare
+ * either does not compile.
+ */
+export type ListFlags = {
+  readonly plain: boolean | undefined;
+  readonly fields?: readonly string[] | undefined;
+};
 
 /**
  * The next page of a paged list. A page token only works with the flags that
@@ -75,6 +118,12 @@ export type ListView = {
   columns: readonly string[];
   /** What is drawn: one record per row. */
   rows: readonly unknown[];
+  /**
+   * The paths a record of this list can carry, when its schema knows them, so
+   * `--fields` is judged by the shape and not by how many records a page held.
+   * Without it the records in hand judge.
+   */
+  shape?: FieldPaths;
   singular: string;
   plural?: string;
   /** Said to a person when there is nothing to list; a pipe gets nothing. */
@@ -214,8 +263,63 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       return this.emit(await this.listResult(flags, view));
     }
 
-    /** {@link emitList}, for a caller that returns the result instead of emitting it. */
-    protected async listResult(flags: ListFlags, view: ListView): Promise<CommandResult> {
+    /**
+     * The record reduced to the dot-paths named, nested as they were: `id` and
+     * `attributes.email` give `{ id, attributes: { email } }`. The record is
+     * read as `--json` prints it, through its `toJSON` when it has one, and
+     * only by the keys it holds itself. A path the record does not carry, or
+     * that names a prototype, is left out.
+     *
+     * @param item - A record.
+     * @param paths - The dot-paths to keep.
+     * @returns A new record holding only those paths.
+     */
+    protected pickFields(item: unknown, paths: readonly string[]): Record<string, unknown> {
+      const record: Record<string, unknown> = JSON.parse(JSON.stringify(item ?? {}));
+      const picked: Record<string, unknown> = {};
+      for (const path of paths) {
+        if (hasProperty(record, path)) {
+          setProperty(picked, path, getProperty(record, path));
+        }
+      }
+
+      return picked;
+    }
+
+    /**
+     * {@link emitList}, for a caller that returns the result instead of
+     * emitting it.
+     *
+     * `--fields` names paths of the records `--json` carries, so a table of
+     * them is read from those records, and the records are cut to the paths.
+     * The paths are judged by the shape the `fields` flag was declared with.
+     *
+     * @param flags - The list command's flags.
+     * @param given - What the command lists.
+     * @returns The result to emit.
+     * @throws {ZitadelError} When `--fields` is given for a list that carries no records.
+     */
+    protected async listResult(flags: ListFlags, given: ListView): Promise<CommandResult> {
+      if (flags.fields !== undefined && given.items === undefined) {
+        throw refusalError(NO_FIELDS_REFUSAL, {});
+      }
+      const view: ListView =
+        flags.fields === undefined || given.items === undefined
+          ? given
+          : {
+              ...given,
+              columns: chosenColumns(
+                flags.fields,
+                given.columns,
+                given.items,
+                given.shape ??
+                  (this.ctor.flags?.fields as { shape?: FieldPaths } | undefined)?.shape,
+              ),
+              rows: given.items,
+              items: given.items.map((item) => {
+                return this.pickFields(item, flags.fields ?? []);
+              }),
+            };
       // A list is for a script when `--plain` asks, or when nothing is on
       // screen to draw a table on.
       const plain = flags.plain === true || !this.isOnScreen;

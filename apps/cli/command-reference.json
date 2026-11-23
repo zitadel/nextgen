@@ -743,7 +743,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -802,7 +802,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -900,6 +900,12 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
         },
         {
           "name": "server",
@@ -1051,7 +1057,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1110,7 +1116,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1201,6 +1207,12 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
         },
         {
           "name": "server",
@@ -1387,7 +1399,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1446,7 +1458,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1509,7 +1521,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1568,7 +1580,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -1762,6 +1774,11 @@
           "exclusive": [
             "page-token"
           ]
+        },
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
         },
         {
           "name": "plain",
@@ -2335,7 +2352,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2394,7 +2411,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2457,7 +2474,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2516,7 +2533,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2600,7 +2617,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2659,7 +2676,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2708,7 +2725,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2767,7 +2784,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2825,7 +2842,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2884,7 +2901,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -2991,7 +3008,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -3050,7 +3067,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -3200,6 +3217,12 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "server",
           "char": "s",
           "description": "Override the resolved server URL.",
@@ -3312,6 +3335,11 @@
       "args": [],
       "flags": [
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
@@ -3398,6 +3426,11 @@
       "description": "List the origin patterns on the project.",
       "args": [],
       "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
         {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
@@ -3534,6 +3567,11 @@
           "type": "boolean"
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
@@ -3582,6 +3620,11 @@
         {
           "name": "origin",
           "description": "The origin whose live deployment to read.",
+          "type": "option"
+        },
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -3904,6 +3947,11 @@
           ]
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
@@ -4077,7 +4125,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -4136,7 +4184,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -4332,6 +4380,11 @@
           ]
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
@@ -4436,7 +4489,7 @@
       "flags": [
         {
           "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -4495,7 +4548,7 @@
         },
         {
           "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
           "type": "option"
         },
         {
@@ -4644,6 +4697,11 @@
           "type": "option"
         },
         {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
@@ -4676,6 +4734,11 @@
       "description": "List the resources this CLI manages.\n\nShows what can be done to each.",
       "args": [],
       "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
         {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",

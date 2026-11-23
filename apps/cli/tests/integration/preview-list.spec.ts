@@ -26,6 +26,12 @@ async function anAppWithTwoPreviews() {
 }
 
 describe("preview list", () => {
+  it("judges --fields by the records' shape, whatever the page holds", async () => {
+    const app = await aSetUpApp();
+
+    await app.judgesFieldsByTheShape(["preview", "list"], "origin");
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -160,6 +166,7 @@ describe("preview list", () => {
             title: "No previews found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -186,6 +193,7 @@ describe("preview list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -217,6 +225,7 @@ describe("preview list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -243,6 +252,7 @@ describe("preview list", () => {
               },
             ],
             count: 1,
+            truncated: true,
             next_page_token: "1",
             next_commands: [
               expectedPublicCliCommand(

@@ -2,12 +2,14 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { type Deployment, DeploymentService } from "@/lib/backend";
+import { ListDeploymentsResponse } from "@/lib/backend/schemas";
+import { fieldPaths } from "@/lib/oclif/crud";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
@@ -80,6 +82,9 @@ export default class DeploymentList extends Tabulatable(ServerCommand(Environmen
       all: Flags.boolean({
         char: "a",
         description: "Fetch every page instead of one.",
+      }),
+      fields: fieldsFlag({
+        shape: fieldPaths(ListDeploymentsResponse.shape.deployments.element),
       }),
       plain: plainFlag,
     },

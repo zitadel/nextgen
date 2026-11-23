@@ -8,6 +8,12 @@ import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 const platform = usePlatformMock();
 
 describe("origin list", () => {
+  it("judges --fields by the records' shape, whatever the page holds", async () => {
+    const app = await aSetUpApp();
+
+    await app.judgesFieldsByTheShape(["origin", "list"], "pattern");
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -158,6 +164,7 @@ describe("origin list", () => {
             title: "Found 1 origin",
             items: [SETUP_ORIGIN],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -179,6 +186,7 @@ describe("origin list", () => {
             title: "No origins found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -205,6 +213,7 @@ describe("origin list", () => {
               { pattern: PREVIEW_PATTERN, kind: "preview" },
             ],
             count: 3,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -226,6 +235,7 @@ describe("origin list", () => {
             title: "Found 1 origin",
             items: [{ pattern: "https://admitted.acme.com\u001b[2Jwiped", kind: "primary" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],

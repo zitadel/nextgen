@@ -11,6 +11,12 @@ const platform = usePlatformMock();
 const LIVE_ORIGINS = ["http://localhost:3000", "https://app.example.com"];
 
 describe("variable resolve", () => {
+  it("judges --fields by the records' shape, whatever the page holds", async () => {
+    const app = await aSetUpApp();
+
+    await app.judgesFieldsByTheShape(["variable", "resolve"], "name");
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -170,6 +176,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -197,6 +204,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -238,6 +246,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "TOKEN", secret: true }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -263,6 +272,7 @@ describe("variable resolve", () => {
             title: `${deployed.deployment_id} froze no variables for ${LIVE_ORIGINS.join(", ")}`,
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -288,6 +298,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "BANNER", secret: false, value: "a\u001b[2Jwiped" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -313,6 +324,7 @@ describe("variable resolve", () => {
             title: expect.stringMatching(/^dep_\w+ froze no variables for /),
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             deployment_id: expect.stringMatching(/^dep_/),
             origins: [origin],
@@ -439,6 +451,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deploymentId,
           },
@@ -460,6 +473,7 @@ describe("variable resolve", () => {
             title: `${firstDeploymentId} froze no variables`,
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             deployment_id: firstDeploymentId,
           },

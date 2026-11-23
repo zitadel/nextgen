@@ -27,6 +27,10 @@ class Listing extends Tabulatable(BaseCommand) {
   drawList(...args: Parameters<Listing["listResult"]>) {
     return this.listResult(...args);
   }
+
+  cut(...args: Parameters<Listing["pickFields"]>) {
+    return this.pickFields(...args);
+  }
 }
 
 class Drawing extends Listing {

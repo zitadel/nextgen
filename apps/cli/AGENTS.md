@@ -268,6 +268,9 @@
   `--json`, and a unit test fails on any other import of `@oclif/table`.
 - A list command declares `plain: plainFlag` last in its `flags` and names its
   columns in a `COLUMNS` constant.
+- A list declares `fields: fieldsFlag({ shape })`, so `--fields` is judged by the record's shape
+  and cuts the table and `--json`; `tabulatable.test.ts` fails on a list without one.
+- `listData` reports `truncated` beside `next_page_token`.
 - A list command ends with the locals `items`, `rows`, `columns`, `empty`,
   `footer`, `page` and `extra`, empty values spelled out, passed to
   `this.emitList(flags, {...})`.
@@ -279,8 +282,9 @@
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
 - Every destructive operation takes a `Consent` (`src/lib/consent/consent.ts`); the
   client withholds the spec's destructive operations until `consent.unlock`.
-- Updates are not guarded, though a merge-patch `null` removes what it names;
-  guarding them needs a follow-up of its own, not a `Consent`.
+- An update that sets a field to `null` removes it, so it asks as a deletion does and
+  refuses without `--force` when nothing can ask.
+- The dry run of such an update warns and suggests the real run with `--force`.
 - A plain yes or no is `this.ask.yesNo(...)`, which `--force` never answers; only
   `Consent` asks a `confirm`, so a command whose `--force` means something else
   (`setup` overwriting files) needs no asker of its own.

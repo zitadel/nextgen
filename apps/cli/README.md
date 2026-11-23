@@ -293,7 +293,7 @@ List the operations of the Zitadel API that the api command calls.
 ```
 USAGE
   $ zitadel api ls [FILTER] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--tag <value>] [--plain]
+    [--telemetry] [--tag <value>] [--fields <value>] [--plain]
 
 ARGUMENTS
   [FILTER]  Only operations whose id, path, summary or tag contains this text.
@@ -306,6 +306,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                         id,attributes.email). Defaults to the command's own columns.
       --plain            Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --tag=<value>      Only the operations of this part of the API (Users, Teams, …).
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
@@ -602,8 +604,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -641,8 +643,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -898,7 +900,7 @@ List the project's deployments, newest first.
 USAGE
   $ zitadel deployment list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--live] [--limit <value>] [-a | --page-token
-    <value>] [--plain]
+    <value>] [--fields <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -913,6 +915,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --limit=<value>       Page size (server default 20, max 100).
       --live                What each target serves now, not the full history.
       --origin=<value>      Only deployments that targeted this origin.
@@ -1130,7 +1134,7 @@ List the environments bound in this directory's .env files.
 ```
 USAGE
   $ zitadel env list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--plain]
+    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1144,6 +1148,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -1183,8 +1189,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1243,8 +1249,8 @@ FLAGS
       directory, not from --cwd. Cannot be combined with --env.
 
   --fields=<value>
-      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns;
-      `--json` is unaffected.
+      Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
+      command's own columns.
 
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values
@@ -1306,8 +1312,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1345,8 +1351,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: name (equals),
                             purpose (equals), revisions (equals; values all|latest).
       --limit=<value>       Page size (server default 20, max 100).
@@ -1491,8 +1497,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1551,8 +1557,8 @@ FLAGS
       directory, not from --cwd. Cannot be combined with --env.
 
   --fields=<value>
-      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns;
-      `--json` is unaffected.
+      Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
+      command's own columns.
 
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields: created_at
@@ -1733,8 +1739,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1772,8 +1778,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equ
                             als|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
                             created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_tha
@@ -1925,7 +1931,7 @@ List the project's invitations, newest first.
 USAGE
   $ zitadel invitation list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--status pending|accepted|rejected|expired...] [--type
-    project_member|team_member] [--limit <value>] [-a | --page-token <value>] [--plain]
+    project_member|team_member] [--limit <value>] [-a | --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -1940,6 +1946,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2051,7 +2059,7 @@ List the origin patterns on the project.
 ```
 USAGE
   $ zitadel origin list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--plain]
+    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -2065,6 +2073,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -2143,8 +2153,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2182,8 +2192,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: operation (equals).
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
@@ -2307,7 +2317,8 @@ List the project's live previews, newest first.
 ```
 USAGE
   $ zitadel preview list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--plain]
+    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
+    [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -2322,6 +2333,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2404,8 +2417,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2443,8 +2456,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: created_at
                             (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_t
                             han_or_equal).
@@ -2479,7 +2492,7 @@ USAGE
     argon2i|argon2id|bcrypt|scrypt|pbkdf2|sha2] [--password-hash-params-time <value>] [--password-hash-params-memory
     <value>] [--password-hash-params-threads <value>] [--password-hash-params-cost <value>]
     [--password-hash-params-rounds <value>] [--password-hash-params-hash sha1|sha224|sha256|sha384|sha512] [--data
-    <value> | --file <value>] [--set <value>...]
+    <value> | --file <value>] [--set <value>...] [-f]
 
 ARGUMENTS
   ID  project id
@@ -2488,6 +2501,7 @@ FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Remove the fields set to null without the confirmation prompt. Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
@@ -2634,8 +2648,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2673,8 +2687,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2766,7 +2780,7 @@ List the resources this CLI manages.
 ```
 USAGE
   $ zitadel resources [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--plain]
+    [--telemetry] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2776,6 +2790,8 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                         id,attributes.email). Defaults to the command's own columns.
       --plain            Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -2819,8 +2835,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2858,8 +2874,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: object_type
                             (equals), kind (equals), revisions (equals; values all|latest).
       --limit=<value>       Page size (server default 20, max 100).
@@ -2921,8 +2937,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2981,8 +2997,8 @@ FLAGS
       directory, not from --cwd. Cannot be combined with --env.
 
   --fields=<value>
-      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns;
-      `--json` is unaffected.
+      Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
+      command's own columns.
 
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields: created_at
@@ -3360,8 +3376,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3399,8 +3415,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
                             read from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                            resource's own columns; `--json` is unaffected.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: created_at
                             (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_t
                             han_or_equal), name (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|gr
@@ -3434,7 +3450,7 @@ Update a team by id.
 USAGE
   $ zitadel team update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
-    <value>...]
+    <value>...] [-f]
 
 ARGUMENTS
   ID  team id
@@ -3443,6 +3459,7 @@ FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Remove the fields set to null without the confirmation prompt. Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
@@ -3690,8 +3707,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
-                          unaffected.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3750,8 +3767,8 @@ FLAGS
       directory, not from --cwd. Cannot be combined with --env.
 
   --fields=<value>
-      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns;
-      `--json` is unaffected.
+      Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
+      command's own columns.
 
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields: created_at
@@ -3802,7 +3819,7 @@ Update a user by id.
 USAGE
   $ zitadel user update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
-    --file <value>] [--set <value>...]
+    --file <value>] [--set <value>...] [-f]
 
 ARGUMENTS
   ID  user id
@@ -3811,6 +3828,7 @@ FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Remove the fields set to null without the confirmation prompt. Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
@@ -3894,7 +3912,7 @@ List the variables entered on the project.
 ```
 USAGE
   $ zitadel variable list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--preview] [--plain]
+    [--telemetry] [-e <value>] [--env-file <value>] [--preview] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3908,6 +3926,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --preview           List the preview values instead of the primary ones.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -3933,7 +3953,7 @@ Show the variables a deployment froze, the live one by default.
 ```
 USAGE
   $ zitadel variable resolve [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--plain]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--fields <value>] [--plain]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to read; the live one when omitted.
@@ -3950,6 +3970,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
       --origin=<value>    The origin whose live deployment to read.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.

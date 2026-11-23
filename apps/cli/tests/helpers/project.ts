@@ -1422,6 +1422,22 @@ export class ScaffoldedApp {
   }
 
   /**
+   * Holds a list command to taking `--fields` for a field its records carry
+   * and refusing one they cannot, before it reads anything, so the verdict
+   * never depends on what a page holds.
+   *
+   * @param list - The list command's words, without `--fields`.
+   * @param field - A field the list's records carry.
+   */
+  async judgesFieldsByTheShape(list: string[], field: string): Promise<void> {
+    const accepted = await this.run([...list, "--fields", field, "--json"]);
+    const refused = await this.run([...list, "--fields", "no_such_field", "--json"]);
+
+    expect(accepted, `${list.join(" ")} --fields ${field}`).not.toFailWith("E_VALIDATION");
+    expect(refused, `${list.join(" ")} --fields no_such_field`).toFailWith("E_VALIDATION");
+  }
+
+  /**
    * The same run in each way a reader sees it, held to the fixture's invariants
    * in every one: as a script reads it, piped, and on a terminal in colour and
    * without.
@@ -2787,7 +2803,7 @@ type ContractEnvelope = z.infer<typeof ContractEnvelope>;
  * a positional argument that happens to be the word `list` (e.g. `variable get
  * list`) is never misread as a list command. A `list` command (and `resources`,
  * the one collection not named `… list`) must use the canonical
- * `{ items, count, next_page_token }` envelope (`listData`); any command that
+ * `{ items, count, truncated, next_page_token }` envelope (`listData`); any command that
  * emits `items` must carry `count` and `next_page_token`; a delete command must
  * confirm with `deleted: true` (`deletedData`), and no command anywhere may use
  * `removed`. A dry run has its own preview shape, so it is exempt. A divergent
@@ -2825,6 +2841,11 @@ function assertDataShape(where: string, envelope: ContractEnvelope): void {
       token === null || typeof token === "string",
       `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
     ).toBe(true);
+    const truncated = "truncated" in data ? data.truncated : undefined;
+    expect(
+      truncated,
+      `${where}: a list envelope says whether more remain in \`truncated\`, true exactly when it has a cursor`,
+    ).toBe(token !== null);
   }
   if (verb === "rm" || verb === "delete" || verb === "remove") {
     expect(

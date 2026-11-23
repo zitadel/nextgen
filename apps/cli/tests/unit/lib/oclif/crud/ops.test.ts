@@ -184,11 +184,14 @@ describe("operation statics", () => {
   });
 
   it("create and update expose the schema's fields alongside the raw-body flags", () => {
-    for (const statics of [
-      CreateOperation.describe(definition(create)),
-      UpdateOperation.describe(definition(update)),
-    ]) {
-      expect(Object.keys(statics.flags)).toEqual(["name", "data", "file", "set", "extra"]);
+    for (const [statics, names] of [
+      [CreateOperation.describe(definition(create)), ["name", "data", "file", "set", "extra"]],
+      [
+        UpdateOperation.describe(definition(update)),
+        ["name", "data", "file", "set", "force", "extra"],
+      ],
+    ] as const) {
+      expect(Object.keys(statics.flags)).toEqual(names);
       const flags = statics.flags as Record<string, { helpGroup?: string }>;
       expect(flags.name?.helpGroup).toBe("REQUIRED FIELD");
       expect(flags.data?.helpGroup).toBe("RAW BODY");
@@ -1084,5 +1087,98 @@ describe("delete confirmation", () => {
     await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
 
     expect(talk.plain()).toContain("Cancelled");
+  });
+});
+
+describe("update confirmation", () => {
+  const removing = ["team_1", "--set", "name:=null"];
+  const updating = (call: UpdateSpec<Ctx>["call"]) =>
+    Object.assign(
+      inCli(
+        bindOperationOnly(
+          UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+          definition<UpdateSpec<Ctx>>({ schema: z.object({ name: z.string().nullable() }), call }),
+          ServerCommand,
+        ),
+        "team:update",
+      ),
+      { wizard: true },
+    ) as unknown as { run(argv: string[]): Promise<unknown> };
+
+  beforeEach(() => {
+    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_proj_env");
+  });
+
+  it("is refused without --force when nothing can ask, and sends nothing", async () => {
+    const call = vi.fn(async () => ({ id: "team_1" }));
+
+    const { stdout } = await printing(() => {
+      return updating(call)
+        .run([...removing, "--json"])
+        .catch(() => undefined);
+    });
+
+    expect(JSON.parse(stdout)).toMatchObject({
+      code: "E_CONFIRMATION_REQUIRED",
+      next_commands: [expect.stringContaining("--force")],
+    });
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("is sent with --force, without asking", async () => {
+    const call = vi.fn(async () => ({ id: "team_1" }));
+    const talk = answering(true);
+
+    await asTerminal(() => updating(call).run([...removing, "--force"]));
+
+    expect(talk.asked()).toEqual([]);
+    expect(call).toHaveBeenCalledWith({ token: "t" }, "team_1", { name: null });
+  });
+
+  it("is previewed by --dry-run, which warns and suggests the real run with --force", async () => {
+    const call = vi.fn(async () => ({ id: "team_1" }));
+
+    const envelope = await updating(call).run([...removing, "--dry-run", "--json"]);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      warnings: [expect.stringContaining("name")],
+      data: {
+        dry_run: true,
+        next_commands: [expect.stringContaining("--force")],
+      },
+    });
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("asks what it removes, and sends the update when the answer is yes", async () => {
+    const call = vi.fn(async () => ({ id: "team_1" }));
+    const talk = answering(true);
+
+    await asTerminal(() => updating(call).run(removing));
+
+    expect(talk.asked()).toEqual(["Remove name from team team_1?"]);
+    expect(call).toHaveBeenCalledWith({ token: "t" }, "team_1", { name: null });
+  });
+
+  it("sends nothing when the answer is no", async () => {
+    const call = vi.fn(async () => ({ id: "team_1" }));
+    const talk = answering(false);
+
+    await asTerminal(() => updating(call).run(removing));
+
+    expect(talk.plain()).toContain("Cancelled");
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing when the update removes nothing", async () => {
+    const call = vi.fn(async () => ({ id: "team_1" }));
+    const talk = answering(true);
+
+    await asTerminal(() => updating(call).run(["team_1", "--name", "a"]));
+
+    expect(talk.asked()).toEqual([]);
+    expect(call).toHaveBeenCalled();
   });
 });
