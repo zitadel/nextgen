@@ -187,13 +187,17 @@ describe("root help", () => {
   it("keeps each family of commands in one group, and describes it with a topic", async () => {
     const { stdout } = await runCliForTest(["commands", "--json"]);
     const commands = (
-      parseJson(stdout) as Array<{
-        id: string;
-        aliases: string[];
-        pluginName?: string;
-        group?: string;
-      }>
-    )
+      parseJson(stdout) as {
+        data: {
+          result: Array<{
+            id: string;
+            aliases: string[];
+            pluginName?: string;
+            group?: string;
+          }>;
+        };
+      }
+    ).data.result
       .filter((command) => command.pluginName === "@zitadel/cli")
       .filter((command) => !command.aliases.includes(command.id));
     const groupsOf = new Map<string, Set<string | undefined>>();
@@ -216,13 +220,17 @@ describe("root help", () => {
     expect(exitCode).toBe(0);
     const groups: readonly string[] = COMMAND_GROUPS;
     const ungrouped = (
-      parseJson(stdout) as Array<{
-        id: string;
-        aliases: string[];
-        pluginName?: string;
-        group?: unknown;
-      }>
-    )
+      parseJson(stdout) as {
+        data: {
+          result: Array<{
+            id: string;
+            aliases: string[];
+            pluginName?: string;
+            group?: unknown;
+          }>;
+        };
+      }
+    ).data.result
       .filter((command) => command.pluginName === "@zitadel/cli")
       .filter((command) => !command.aliases.includes(command.id))
       .filter((command) => typeof command.group !== "string" || !groups.includes(command.group))

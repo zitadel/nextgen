@@ -43,6 +43,61 @@ describe("invitation get", () => {
     });
 
     describe("--json", () => {
+      it("refuses a field the record lacks", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run([
+          "invitation",
+          "get",
+          invitation,
+          "--fields",
+          "no_such_field",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("cuts the data to the fields chosen", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run([
+          "invitation",
+          "get",
+          invitation,
+          "--fields",
+          "id,status",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toEqual({
+          title: `Read ${invitation}`,
+          id: invitation,
+          status: "pending",
+        });
+      });
+
+      it("carries a field the platform reports as null, as null", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run([
+          "invitation",
+          "get",
+          invitation,
+          "--fields",
+          "responded_by",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toEqual({
+          title: `Read ${invitation}`,
+          responded_by: null,
+        });
+      });
+
       it("reads one invitation", async () => {
         const app = await aSetUpApp();
         const invitation = await app.invite();
@@ -94,13 +149,33 @@ describe("invitation get", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("prints the invitation as JSON when piped", async () => {
+      it("prints only the fields chosen", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run(["invitation", "get", invitation, "--fields", "status"]);
+
+        expect(result).toPrintRow("status", "pending");
+        expect(result).not.toPrintRow("role");
+      });
+
+      it("leaves a field the platform reports as null out of the rows", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+
+        const result = await app.run(["invitation", "get", invitation, "--fields", "responded_by"]);
+
+        expect(result).toSucceed();
+        expect(result).not.toPrintRow("responded_by");
+      });
+
+      it("prints the invitation as plain text when piped", async () => {
         const app = await aSetUpApp();
         const invitation = await app.invite();
 
         const result = await app.run(["invitation", "get", invitation]);
 
-        expect(result).toPrint('"status": "pending"');
+        expect(result).toPrintRow("status", "pending");
       });
 
       it.each(RENDERINGS)("shows the invitation's role, %s", async (_how, colour) => {

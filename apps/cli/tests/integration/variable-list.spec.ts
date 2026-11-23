@@ -126,6 +126,22 @@ describe("variable list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "list", "--fields", "name", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("lists nothing when no variable is entered", async () => {
         const app = await aSetUpApp();
 
@@ -140,6 +156,7 @@ describe("variable list", () => {
             title: "No variables found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -178,6 +195,7 @@ describe("variable list", () => {
               { name: "TOKEN", secret: true },
             ],
             count: 3,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -202,6 +220,7 @@ describe("variable list", () => {
             title: "Found 1 variable",
             items: [{ name: "API_URL", secret: false, value: "https://preview.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -223,6 +242,7 @@ describe("variable list", () => {
             title: "No preview variables found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -251,6 +271,7 @@ describe("variable list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -272,6 +293,7 @@ describe("variable list", () => {
             title: "Found 1 variable",
             items: [{ name: "TOKEN", secret: true }],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],

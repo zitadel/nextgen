@@ -61,6 +61,7 @@ export type { Audience } from "./audience";
 export type { BoxAction } from "./box";
 export type { LogLevel, LogSink } from "./log";
 export { log } from "./log";
+export { Output } from "./output";
 export type { Presentation } from "./presentation";
 export type { Report, Step } from "./progress";
 export type {

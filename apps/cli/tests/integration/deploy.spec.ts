@@ -1312,12 +1312,6 @@ describe("deploy", () => {
           code: "E_VALIDATION",
           message: "Nonexistent flag: --origin",
           next_commands: [expectedPublicCliCommand("deploy --help")],
-          details: {
-            original: {
-              name: "Error",
-              message: "Nonexistent flag: --origin\nSee more help with --help",
-            },
-          },
         });
       });
 

@@ -10,9 +10,10 @@ import {
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { ListInvitationsQueryParams } from "@/lib/backend/schemas";
+import { ListInvitationsQueryParams, ListInvitationsResponse } from "@/lib/backend/schemas";
+import { fieldPaths } from "@/lib/oclif/crud";
 import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The columns `list` renders, in order. */
@@ -87,6 +88,9 @@ export default class InvitationList extends Tabulatable(ServerCommand(Environmen
       all: Flags.boolean({
         char: "a",
         description: "Fetch every page instead of one.",
+      }),
+      fields: fieldsFlag({
+        shape: fieldPaths(ListInvitationsResponse.shape.invitations.element),
       }),
       plain: plainFlag,
     },

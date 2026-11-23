@@ -15,7 +15,7 @@ type Needs = Fact<"summary" | "change" | "written" | "published" | "delivery">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "followUps" | "isJson" | "suggest">;
+type Deps = Pick<EnableServices, "followUps" | "suggest">;
 
 /**
  * Words what the run did as the command's result.
@@ -64,9 +64,7 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
         });
       }),
     );
-    if (!this.deps.isJson) {
-      drawMapping(needs.change);
-    }
+    drawMapping(needs.change);
     const title = unpublished
       ? `${name} sign-in is configured locally`
       : `${name} sign-in is already configured locally`;

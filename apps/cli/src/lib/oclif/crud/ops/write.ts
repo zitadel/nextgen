@@ -25,7 +25,6 @@ import { nonBlankString } from "@/lib/oclif/flags";
 import { named } from "@/lib/names";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { helpOf } from "@/lib/suggestion";
-import { json } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
 import { resourceSuggestion } from "@/lib/suggestion";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
@@ -122,6 +121,9 @@ const exampleFile = (singular: string): string => {
  * flag per schema field, from `--set`, or from any mix of them. It is
  * validated against the request schema before the call, and the resource is
  * echoed back with a `next_commands` hint at the matching `get`.
+ *
+ * A merge-patch removes what it sets to `null`, so an update takes `--force`,
+ * its way past the confirmation a deletion is asked for.
  */
 const describeWrite = <
   Ctx,
@@ -150,6 +152,15 @@ const describeWrite = <
     flags: {
       ...bodyFieldFlags(fields),
       ...rawBodyFlags(document, fields),
+      ...(verb === "update"
+        ? {
+            force: Flags.boolean({
+              char: "f",
+              description:
+                "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+            }),
+          }
+        : {}),
       ...options.flags,
     },
     args: verb === "create" ? {} : idArg(resource, topic),
@@ -216,7 +227,18 @@ abstract class WriteOperation<
     );
     const idKey = named(idName(resource));
     const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
-    if (this.dryRun) {
+    const removed: string[] = [];
+    if (this.verb === "update") {
+      JSON.stringify(body, function (key, value) {
+        if (value === null && key !== "" && !Array.isArray(this)) {
+          removed.push(key);
+        }
+
+        return value;
+      });
+    }
+    const what = `${removed.join(", ")} from ${resource.singular} ${id ?? ""}`.trim();
+    const preview = async (): Promise<CommandResult> => {
       return dryRunResult({
         verb: this.verb,
         topic,
@@ -228,48 +250,69 @@ abstract class WriteOperation<
           schema: spec.schema as ZodLike,
           references: options.references,
         },
-        next: await this.realRun(),
+        warnings: removed.length === 0 ? [] : [`The real run removes ${what}`],
+        next:
+          removed.length === 0
+            ? await this.realRun()
+            : await this.rerun<{
+                force: Interfaces.BooleanFlag<boolean>;
+                dryRun: Interfaces.BooleanFlag<boolean>;
+              }>({
+                with: { force: true },
+                without: ["dryRun"],
+              }),
       });
+    };
+    const apply = async (): Promise<CommandResult> => {
+      // Some writes answer without a body (`grant create` by identifier answers
+      // 202), so there is no record to get, and `data` is still an object.
+      const result = await this.send(await this.context(), body, id);
+      const summary: Summary =
+        result === undefined
+          ? {
+              title: "Command completed",
+              sections: [],
+            }
+          : {
+              title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
+              sections: [],
+              lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+            };
+
+      return {
+        status: "ok",
+        data: result ?? {},
+        // A write that answered no body has no record to print, so it keeps the
+        // generic rendering that says the command completed. Printing `{}` would
+        // be the record the write did not make.
+        summary,
+        ...(result && resource.get
+          ? {
+              next: {
+                commands: [
+                  this.suggest(
+                    resourceSuggestion(topic, "get", {
+                      args: { [named(idName(resource))]: String(resource.idOf(result)) },
+                      flags: { json: true },
+                    }),
+                  ),
+                ],
+              },
+            }
+          : {}),
+      };
+    };
+    if (removed.length === 0) {
+      return this.dryRun ? preview() : apply();
     }
 
-    // Some writes answer without a body (`grant create` by identifier answers
-    // 202), so there is no record to get, and `data` is still an object.
-    const result = await this.send(await this.context(), body, id);
-    const summary: Summary =
-      result === undefined
-        ? {
-            title: "Command completed",
-            sections: [],
-          }
-        : {
-            title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
-            sections: [],
-            lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
-          };
-
-    return {
-      status: "ok",
-      data: result ?? {},
-      // A write that answered no body has no record to print, so it keeps the
-      // generic rendering that says the command completed. Printing `{}` would
-      // be the record the write did not make.
-      ...(result === undefined || this.isOnScreen ? {} : { pretty: json(result) }),
-      summary,
-      ...(result && resource.get
-        ? {
-            next: {
-              commands: [
-                this.suggest(
-                  resourceSuggestion(topic, "get", {
-                    args: { [named(idName(resource))]: String(resource.idOf(result)) },
-                    flags: { json: true },
-                  }),
-                ),
-              ],
-            },
-          }
-        : {}),
-    };
+    return this.confirmed({
+      verb: "remove",
+      name: `remove ${what}`,
+      message: `Remove ${what}?`,
+      preview,
+      apply,
+    });
   }
 
   protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult>;

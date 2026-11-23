@@ -8,6 +8,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Promptable } from "@/lib/oclif/promptable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -58,7 +59,9 @@ const NOTHING_CANCELLABLE_REFUSAL = {
  * so its link can no longer be redeemed, or remove a declined one. Without an
  * id it offers the pending and declined invitations to pick from.
  */
-export default class InvitationCancel extends Destructive(ServerCommand(EnvironmentCommand)) {
+export default class InvitationCancel extends Destructive(
+  Promptable(ServerCommand(EnvironmentCommand)),
+) {
   static override description =
     "Cancel a pending invitation so its link stops working, or remove a declined one.";
   static override group = CommandGroups.usersAndAccess;
