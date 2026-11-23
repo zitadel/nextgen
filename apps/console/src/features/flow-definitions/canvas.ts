@@ -4,8 +4,8 @@ import type { FlowDefinition, FlowStep } from "./model";
 
 /**
  * Geometry for the read-only flow canvas: one card per step, laid out left to
- * right, an arrow per transition. Computed from the definition on every render;
- * nothing about the drawing is stored.
+ * right, an arrow per transition. A pure function of the definition and the
+ * measured card sizes; nothing about the drawing is stored.
  */
 
 export const CANVAS_CARD_WIDTH = 240;
@@ -19,23 +19,31 @@ const LABEL_CHAR = 6.7;
 
 const ROW_HEIGHT = { field: 52, button: 32, divider: 16, provider: 32, link: 20 } as const;
 
+export const MIN_ZOOM = 0.1;
+export const MAX_ZOOM = 1.5;
+export const ZOOM_STEP = 0.1;
+
 export type SketchRowKind = keyof typeof ROW_HEIGHT;
 
-/** One control of a step's screen, placed from the card's top edge. */
+/** One control of a step's screen. `action` names the action it fires. */
 export interface SketchRow {
   kind: SketchRowKind;
   label: string;
   primary?: boolean;
-  top: number;
-  height: number;
+  action?: string;
 }
 
-/** A step drawn as the screen it renders. `ports` maps an action to its control's centre. */
+/** A card's height, and each action's control centre from the card's top edge. */
+export interface CardSize {
+  height: number;
+  ports: Record<string, number>;
+}
+
+/** A step drawn as the screen it renders, with a size to place it by until it is measured. */
 export interface StepSketch {
   rows: SketchRow[];
-  height: number;
   footer?: { label: string; value: string };
-  ports: Record<string, number>;
+  estimate: CardSize;
 }
 
 export type CanvasEdgeKind = "action" | "outcome" | "purpose" | "entry";
@@ -48,6 +56,9 @@ export interface CanvasPoint {
 export interface CanvasEdge {
   id: string;
   kind: CanvasEdgeKind;
+  /** Node ids: a step's name, or a pill's {@link CanvasPill.id}. */
+  from: string;
+  to: string;
   /** SVG path data. */
   path: string;
   /** The transition's name; an entry arrow has none. */
@@ -55,17 +66,19 @@ export interface CanvasEdge {
   labelAt?: CanvasPoint;
 }
 
-/** A card's top-left corner and its sketch. */
+/** A card's top-left corner, its height and its sketch. */
 export interface CanvasCard {
   name: string;
   x: number;
   y: number;
+  height: number;
   sketch: StepSketch;
 }
 
 /** A purpose's entry pill, by its top-left corner. */
 export interface CanvasPill {
   purpose: string;
+  id: string;
   x: number;
   y: number;
   width: number;
@@ -84,53 +97,62 @@ export interface FlowCanvasLayout {
 export function stepSketch(step: FlowStep): StepSketch {
   const actions = step.actions ?? [];
   const providers = step.sso_providers ?? [];
-  const buttons = actions.filter((action) => action.kind !== "navigate");
-  const links = actions.filter((action) => action.kind === "navigate");
-  const specs: { kind: SketchRowKind; label: string; primary?: boolean; action?: string }[] = [
+  const rows: SketchRow[] = [
     ...(step.fields ?? []).map((field) => ({ kind: "field" as const, label: field })),
-    ...buttons.map((action) => ({
-      kind: "button" as const,
-      label: action.name,
-      primary: action.primary ?? false,
-      action: action.name,
-    })),
+    ...actions
+      .filter((action) => action.kind !== "navigate")
+      .map((action) => ({
+        kind: "button" as const,
+        label: action.name,
+        primary: action.primary ?? false,
+        action: action.name,
+      })),
   ];
-  if (providers.length > 0 && specs.length > 0) specs.push({ kind: "divider", label: "or" });
-  specs.push(...providers.map((provider) => ({ kind: "provider" as const, label: provider })));
-  specs.push(
-    ...links.map((action) => ({ kind: "link" as const, label: action.name, action: action.name })),
+  if (providers.length > 0 && rows.length > 0) rows.push({ kind: "divider", label: "or" });
+  rows.push(...providers.map((provider) => ({ kind: "provider" as const, label: provider })));
+  rows.push(
+    ...actions
+      .filter((action) => action.kind === "navigate")
+      .map((action) => ({ kind: "link" as const, label: action.name, action: action.name })),
   );
-
-  const rows: SketchRow[] = [];
-  const ports: Record<string, number> = {};
-  let y = HEADER_HEIGHT + BODY_INSET;
-  for (const { action, ...spec } of specs) {
-    const height = ROW_HEIGHT[spec.kind];
-    rows.push({ ...spec, top: y, height });
-    if (action) ports[action] = y + height / 2;
-    y += height + ROW_GAP;
-  }
   const footer = step.on_success
     ? { label: "on success", value: step.on_success }
     : step.complete
       ? { label: "complete", value: step.complete }
       : undefined;
+  return { rows, footer, estimate: estimateSize(rows, footer !== undefined) };
+}
+
+function estimateSize(rows: SketchRow[], footer: boolean): CardSize {
+  const ports: Record<string, number> = {};
+  let y = HEADER_HEIGHT + BODY_INSET;
+  for (const row of rows) {
+    const height = ROW_HEIGHT[row.kind];
+    if (row.action) ports[row.action] = y + height / 2;
+    y += height + ROW_GAP;
+  }
   const body = rows.length > 0 ? y - ROW_GAP + BODY_INSET : HEADER_HEIGHT;
-  return { rows, height: body + (footer ? FOOTER_HEIGHT : 0), footer, ports };
+  return { height: body + (footer ? FOOTER_HEIGHT : 0), ports };
 }
 
 const pillId = (purpose: string) => `purpose:${purpose}`;
 
 /**
- * Positions for every card, pill and arrow. Purpose transitions stay out of the
- * ranking: they may point left, and the cycle would pull a pill away from its
- * entry step. They are routed by hand once the rest is placed.
+ * Positions for every card, pill and arrow. A step missing from `sizes` is
+ * placed by its estimate. Purpose transitions stay out of the ranking: they
+ * may point left, and the cycle would pull a pill away from its entry step.
+ * They are routed by hand once the rest is placed.
  */
-export function layoutFlowCanvas(definition: FlowDefinition): FlowCanvasLayout {
+export function layoutFlowCanvas(
+  definition: FlowDefinition,
+  sizes: Readonly<Record<string, CardSize>> = {},
+): FlowCanvasLayout {
   const steps = definition.steps ?? [];
   const purposes = Object.entries(definition.purposes ?? {});
   const stepNames = new Set(steps.map((step) => step.name));
   const sketches = new Map(steps.map((step) => [step.name, stepSketch(step)]));
+  const sizeOf = (name: string): CardSize | undefined =>
+    sizes[name] ?? sketches.get(name)?.estimate;
 
   const graph = new graphlib.Graph({ multigraph: true });
   graph.setGraph({
@@ -145,13 +167,13 @@ export function layoutFlowCanvas(definition: FlowDefinition): FlowCanvasLayout {
   for (const [purpose] of purposes) {
     graph.setNode(pillId(purpose), { width: pillWidth(purpose), height: PILL_HEIGHT });
   }
-  for (const [name, sketch] of sketches) {
-    graph.setNode(name, { width: CANVAS_CARD_WIDTH, height: sketch.height });
+  for (const name of sketches.keys()) {
+    graph.setNode(name, { width: CANVAS_CARD_WIDTH, height: sizeOf(name)?.height ?? 0 });
   }
 
   const meta = new Map<string, { kind: CanvasEdgeKind; label?: string }>();
   for (const [purpose, entry] of purposes) {
-    if (!stepNames.has(entry)) continue;
+    if (!entry || !stepNames.has(entry)) continue;
     const id = `entry:${purpose}`;
     meta.set(id, { kind: "entry" });
     graph.setEdge(pillId(purpose), entry, {}, id);
@@ -191,8 +213,9 @@ export function layoutFlowCanvas(definition: FlowDefinition): FlowCanvasLayout {
     const { kind, label } = meta.get(id) ?? { kind: "entry" as const };
     const edge = graph.edge(ref);
     const points: CanvasPoint[] = (edge.points ?? []).map(({ x, y }: CanvasPoint) => ({ x, y }));
-    // An action's arrow leaves from its control, on the side it heads to.
-    const port = label === undefined ? undefined : sketches.get(ref.v)?.ports[label];
+    // An action's arrow leaves from its control, on the side it heads to; one
+    // whose control was not found leaves from the card's edge.
+    const port = label === undefined ? undefined : sizeOf(ref.v)?.ports[label];
     if (kind === "action" && port !== undefined && points.length > 1) {
       const from = node(ref.v);
       const side = (points[1]?.x ?? from.x) >= from.x ? 1 : -1;
@@ -204,6 +227,8 @@ export function layoutFlowCanvas(definition: FlowDefinition): FlowCanvasLayout {
     return {
       id,
       kind,
+      from: ref.v,
+      to: ref.w,
       path: spline(points),
       label,
       labelAt: label === undefined ? undefined : { x: edge.x ?? 0, y: edge.y ?? 0 },
@@ -217,10 +242,9 @@ export function layoutFlowCanvas(definition: FlowDefinition): FlowCanvasLayout {
     const from = node(jump.from);
     const pill = node(pillId(jump.purpose));
     const top = from.y - from.height / 2;
-    const port = top + (sketches.get(jump.from)?.ports[jump.label] ?? from.height / 2);
+    const port = top + (sizeOf(jump.from)?.ports[jump.label] ?? from.height / 2);
     const right = from.x + CANVAS_CARD_WIDTH / 2;
     const pillLeft = pill.x - pill.width / 2;
-    const id = `${jump.from}.${jump.label}`;
     let path: string;
     let labelAt: CanvasPoint;
     if (pillLeft >= right) {
@@ -246,7 +270,15 @@ export function layoutFlowCanvas(definition: FlowDefinition): FlowCanvasLayout {
       labelAt = { x: (from.x + pill.x) / 2, y: lane };
       height = lane + 24;
     }
-    edges.push({ id, kind: "purpose", path, label: jump.label, labelAt });
+    edges.push({
+      id: `${jump.from}.${jump.label}`,
+      kind: "purpose",
+      from: jump.from,
+      to: pillId(jump.purpose),
+      path,
+      label: jump.label,
+      labelAt,
+    });
   }
 
   return {
@@ -258,15 +290,83 @@ export function layoutFlowCanvas(definition: FlowDefinition): FlowCanvasLayout {
         name: step.name,
         x: x - CANVAS_CARD_WIDTH / 2,
         y: y - cardHeight / 2,
+        height: cardHeight,
         sketch: sketches.get(step.name) as StepSketch,
       };
     }),
     pills: purposes.map(([purpose]) => {
       const { x, y, width } = node(pillId(purpose));
-      return { purpose, x: x - width / 2, y: y - PILL_HEIGHT / 2, width, height: PILL_HEIGHT };
+      return {
+        purpose,
+        id: pillId(purpose),
+        x: x - width / 2,
+        y: y - PILL_HEIGHT / 2,
+        width,
+        height: PILL_HEIGHT,
+      };
     }),
     edges,
   };
+}
+
+/** What stays lit while a step is hovered or focused; everything else dims. */
+export interface CanvasHighlight {
+  nodes: Set<string>;
+  edges: Set<string>;
+}
+
+/**
+ * The step, its outgoing transitions and their targets. A purpose transition
+ * also lights the pill's entry arrow and the entry step.
+ */
+export function highlightStep(canvas: FlowCanvasLayout, step: string): CanvasHighlight {
+  const nodes = new Set([step]);
+  const edges = new Set<string>();
+  for (const edge of canvas.edges) {
+    if (edge.kind === "entry" || edge.from !== step) continue;
+    edges.add(edge.id);
+    nodes.add(edge.to);
+  }
+  for (const edge of canvas.edges) {
+    if (edge.kind !== "entry" || !nodes.has(edge.from)) continue;
+    edges.add(edge.id);
+    nodes.add(edge.to);
+  }
+  return { nodes, edges };
+}
+
+/** Whether two measurements agree to the pixel, so a re-measure that changes nothing re-lays nothing. */
+export function sameCardSizes(
+  current: Readonly<Record<string, CardSize>>,
+  next: Readonly<Record<string, CardSize>>,
+): boolean {
+  const names = Object.keys(next);
+  if (names.length !== Object.keys(current).length) return false;
+  return names.every((name) => {
+    const [a, b] = [current[name], next[name]];
+    if (!a || !b || Math.round(a.height) !== Math.round(b.height)) return false;
+    const ports = Object.keys(b.ports);
+    return (
+      ports.length === Object.keys(a.ports).length &&
+      ports.every((port) => Math.round(a.ports[port] ?? -1) === Math.round(b.ports[port] ?? -1))
+    );
+  });
+}
+
+/** A zoom level kept within the steps the controls offer. */
+export function clampZoom(zoom: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(zoom * 100) / 100));
+}
+
+/** The zoom that shows the whole canvas in the viewport, never above 100%. */
+export function fitZoom(
+  viewport: { width: number; height: number },
+  canvas: { width: number; height: number },
+): number {
+  if (canvas.width <= 0 || canvas.height <= 0 || viewport.width <= 0 || viewport.height <= 0) {
+    return 1;
+  }
+  return clampZoom(Math.min(1, viewport.width / canvas.width, viewport.height / canvas.height));
 }
 
 function pillWidth(purpose: string): number {

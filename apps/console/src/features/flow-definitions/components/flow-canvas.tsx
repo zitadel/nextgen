@@ -1,21 +1,39 @@
-import { Maximize2, Minimize2 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2, Minus, Plus } from "lucide-react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
+import { resolveLogoUrl } from "@zitadel/components";
 
 import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
 import { SECTION_HEADING } from "@/components/typography";
 import { Button } from "@/components/ui/button";
+import type { BrandingRevision } from "@/features/branding/branding-palette";
+import { brandingVariables } from "@/features/branding/branding-variables";
+import { useDocumentTheme } from "@/hooks/use-document-theme";
+import { useDragToPan } from "@/hooks/use-drag-to-pan";
 import { cn } from "@/lib/utils";
 
 import {
-  CANVAS_CARD_WIDTH,
-  type CanvasCard,
   type CanvasEdgeKind,
+  type CanvasHighlight,
+  type CardSize,
   type FlowCanvasLayout,
-  type SketchRow,
+  ZOOM_STEP,
+  clampZoom,
+  fitZoom,
+  highlightStep,
   layoutFlowCanvas,
+  sameCardSizes,
 } from "../canvas";
 import type { FlowDefinition } from "../model";
+import { StepCard } from "./step-card";
 
 const EDGE_KINDS: CanvasEdgeKind[] = ["action", "outcome", "purpose", "entry"];
 
@@ -32,14 +50,46 @@ const LEGEND: { kind: CanvasEdgeKind; text: string }[] = [
   { kind: "purpose", text: "To a purpose" },
 ];
 
+const DIM = "transition-opacity motion-reduce:transition-none";
+
 /**
- * The definition drawn read-only: a card per step sketching its screen, an
- * arrow per transition. Full screen lifts the viewport over the app shell.
+ * The definition drawn read-only: a card per step sketching its screen in the
+ * project's branding, an arrow per transition. In the card it opens fitted;
+ * full screen lifts it over the app shell at 100%.
  */
-export function FlowCanvas({ definition, name }: { definition: FlowDefinition; name: string }) {
-  const canvas = useMemo(() => layoutFlowCanvas(definition), [definition]);
+export function FlowCanvas({
+  definition,
+  name,
+  branding,
+}: {
+  definition: FlowDefinition;
+  name: string;
+  branding?: BrandingRevision;
+}) {
+  const [sizes, setSizes] = useState<Record<string, CardSize>>({});
+  const canvas = useMemo(() => layoutFlowCanvas(definition, sizes), [definition, sizes]);
   const [full, setFull] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const viewport = useRef<HTMLElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
+
+  const onMeasure = useCallback((next: Record<string, CardSize>) => {
+    setSizes((current) => (sameCardSizes(current, next) ? current : next));
+  }, []);
+  const fit = useCallback(() => {
+    const element = viewport.current;
+    if (!element) return;
+    setZoom(fitZoom({ width: element.clientWidth, height: element.clientHeight }, canvas));
+  }, [canvas]);
+
+  useLayoutEffect(() => {
+    if (!full) return;
+    setZoom(1);
+    viewport.current?.scrollTo?.(0, 0);
+  }, [full]);
+  useLayoutEffect(() => {
+    if (!full) fit();
+  }, [full, fit]);
 
   useEffect(() => {
     if (!full) return;
@@ -53,20 +103,35 @@ export function FlowCanvas({ definition, name }: { definition: FlowDefinition; n
     };
   }, [full]);
 
+  const zoomControls = <ZoomControls zoom={zoom} onZoom={setZoom} onFit={fit} />;
+  const stage = (
+    <Viewport
+      canvas={canvas}
+      zoom={zoom}
+      viewport={viewport}
+      branding={branding}
+      onMeasure={onMeasure}
+      className={full ? "min-h-0 flex-1" : "h-105 rounded-md border"}
+    />
+  );
+
   return (
     <DetailSection
       title="Canvas"
       action={
-        <Button
-          ref={toggle}
-          variant="secondary"
-          size="sm"
-          className={CARD_ACTION_BUTTON}
-          onClick={() => setFull(true)}
-        >
-          <Maximize2 aria-hidden />
-          Full screen
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {zoomControls}
+          <Button
+            ref={toggle}
+            variant="secondary"
+            size="sm"
+            className={CARD_ACTION_BUTTON}
+            onClick={() => setFull(true)}
+          >
+            <Maximize2 aria-hidden />
+            Full screen
+          </Button>
+        </div>
       }
     >
       {full ? (
@@ -79,6 +144,7 @@ export function FlowCanvas({ definition, name }: { definition: FlowDefinition; n
             <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
               <h2 className={cn(SECTION_HEADING, "mr-auto")}>{name}</h2>
               <Legend />
+              {zoomControls}
               <Button
                 autoFocus
                 variant="secondary"
@@ -90,13 +156,13 @@ export function FlowCanvas({ definition, name }: { definition: FlowDefinition; n
                 Exit full screen
               </Button>
             </div>
-            <Viewport canvas={canvas} className="min-h-0 flex-1" />
+            {stage}
           </div>,
           document.body,
         )
       ) : (
         <>
-          <Viewport canvas={canvas} className="h-105 rounded-md border" />
+          {stage}
           <Legend />
         </>
       )}
@@ -104,162 +170,215 @@ export function FlowCanvas({ definition, name }: { definition: FlowDefinition; n
   );
 }
 
-/** Scrolls both ways when the flow outgrows it; focusable so the keyboard can scroll it too. */
-function Viewport({ canvas, className }: { canvas: FlowCanvasLayout; className: string }) {
+function ZoomControls({
+  zoom,
+  onZoom,
+  onFit,
+}: {
+  zoom: number;
+  onZoom: (zoom: number) => void;
+  onFit: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        variant="secondary"
+        size="icon-sm"
+        aria-label="Zoom out"
+        onClick={() => onZoom(clampZoom(zoom - ZOOM_STEP))}
+      >
+        <Minus aria-hidden />
+      </Button>
+      <output aria-label="Zoom" className="w-12 text-center text-xs tabular-nums">
+        {Math.round(zoom * 100)}%
+      </output>
+      <Button
+        variant="secondary"
+        size="icon-sm"
+        aria-label="Zoom in"
+        onClick={() => onZoom(clampZoom(zoom + ZOOM_STEP))}
+      >
+        <Plus aria-hidden />
+      </Button>
+      <Button variant="secondary" size="sm" className={CARD_ACTION_BUTTON} onClick={onFit}>
+        Fit
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Scrolls both ways and pans by drag. Cards are measured after each render
+ * and reported, so the layout places them by their real size.
+ */
+function Viewport({
+  canvas,
+  zoom,
+  viewport,
+  branding,
+  onMeasure,
+  className,
+}: {
+  canvas: FlowCanvasLayout;
+  zoom: number;
+  viewport: RefObject<HTMLElement | null>;
+  branding?: BrandingRevision;
+  onMeasure: (sizes: Record<string, CardSize>) => void;
+  className: string;
+}) {
+  const dragging = useDragToPan(viewport);
+  const side = useDocumentTheme();
+  const variables = useMemo(() => brandingVariables(branding, side), [branding, side]);
+  const logo = resolveLogoUrl(branding, side);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const highlight = useMemo(
+    () => (highlighted ? highlightStep(canvas, highlighted) : null),
+    [canvas, highlighted],
+  );
+  const cards = useRef(new Map<string, HTMLElement>());
+
+  const measure = useRef(() => {});
+  measure.current = () => {
+    const next: Record<string, CardSize> = {};
+    for (const [name, element] of cards.current) {
+      // Unlaid out (a test's DOM) reads zero: keep the estimate.
+      if (element.offsetHeight === 0) continue;
+      const ports: Record<string, number> = {};
+      for (const control of element.querySelectorAll<HTMLElement>("[data-port]")) {
+        const port = control.dataset.port;
+        if (port) ports[port] = control.offsetTop + control.offsetHeight / 2;
+      }
+      next[name] = { height: element.offsetHeight, ports };
+    }
+    if (Object.keys(next).length > 0) onMeasure(next);
+  };
+  useLayoutEffect(() => measure.current());
+  // Fonts and the logo land after the first paint.
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measure.current());
+    for (const element of cards.current.values()) observer.observe(element);
+    return () => observer.disconnect();
+  }, [canvas.cards]);
+
   return (
     <section
+      ref={viewport}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region needs focus to scroll
       tabIndex={0}
       aria-label="Flow canvas"
-      className={cn("overflow-auto bg-background outline-none focus-visible:ring-2", className)}
+      className={cn(
+        "overflow-auto bg-background outline-none focus-visible:ring-2",
+        dragging ? "cursor-grabbing select-none" : "cursor-grab",
+        className,
+      )}
     >
-      <div className="relative" style={{ width: canvas.width, height: canvas.height }}>
-        <svg
-          aria-hidden
-          className="absolute inset-0"
-          width={canvas.width}
-          height={canvas.height}
-          viewBox={`0 0 ${canvas.width} ${canvas.height}`}
+      <div style={{ width: canvas.width * zoom, height: canvas.height * zoom }}>
+        <div
+          className="relative origin-top-left"
+          style={{ width: canvas.width, height: canvas.height, transform: `scale(${zoom})` }}
         >
-          <defs>
-            {EDGE_KINDS.map((kind) => (
-              <marker
-                key={kind}
-                id={`flow-arrow-${kind}`}
-                viewBox="0 0 10 10"
-                refX="9"
-                refY="5"
-                markerWidth="8"
-                markerHeight="8"
-                orient="auto-start-reverse"
-              >
-                <path d="M0,1 L10,5 L0,9 Z" className={cn("fill-current", EDGE_TONE[kind])} />
-              </marker>
-            ))}
-          </defs>
-          {canvas.edges.map((edge) => (
-            <g key={edge.id} className={EDGE_TONE[edge.kind]}>
-              <path
-                d={edge.path}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.5}
-                strokeDasharray={edge.kind === "purpose" ? "5 4" : undefined}
-                markerEnd={`url(#flow-arrow-${edge.kind})`}
-              />
-              {edge.label && edge.labelAt && (
-                <text
-                  x={edge.labelAt.x}
-                  y={edge.labelAt.y - 6}
-                  textAnchor="middle"
-                  className="fill-current stroke-background font-mono text-[11px] [paint-order:stroke]"
-                  strokeWidth={5}
-                  strokeLinejoin="round"
-                >
-                  {edge.label}
-                </text>
+          <Edges canvas={canvas} highlight={highlight} />
+          {canvas.pills.map((pill) => (
+            <div
+              key={pill.purpose}
+              className={cn(
+                "absolute flex items-center justify-center rounded-full border border-primary bg-background font-mono text-[11px] text-primary",
+                DIM,
+                highlight && !highlight.nodes.has(pill.id) && "opacity-15",
               )}
-            </g>
+              style={{ left: pill.x, top: pill.y, width: pill.width, height: pill.height }}
+            >
+              <span className="absolute -top-4 left-0 font-sans text-[9px] tracking-widest text-muted-foreground uppercase">
+                Purpose
+              </span>
+              {pill.purpose}
+            </div>
           ))}
-        </svg>
-        {canvas.pills.map((pill) => (
-          <div
-            key={pill.purpose}
-            className="absolute flex items-center justify-center rounded-full border border-primary bg-background font-mono text-[11px] text-primary"
-            style={{ left: pill.x, top: pill.y, width: pill.width, height: pill.height }}
-          >
-            <span className="absolute -top-4 left-0 font-sans text-[9px] tracking-widest text-muted-foreground uppercase">
-              Purpose
-            </span>
-            {pill.purpose}
-          </div>
-        ))}
-        {canvas.cards.map((card) => (
-          <StepCard key={card.name} card={card} />
-        ))}
+          {canvas.cards.map((card) => (
+            <StepCard
+              key={card.name}
+              card={card}
+              logo={logo}
+              style={variables}
+              dimmed={highlight !== null && !highlight.nodes.has(card.name)}
+              onHighlight={setHighlighted}
+              ref={(element) => {
+                if (element) cards.current.set(card.name, element);
+                else cards.current.delete(card.name);
+              }}
+            />
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
-/** The step's screen as a sketch: its parts at the offsets the layout routed arrows to. */
-function StepCard({ card }: { card: CanvasCard }) {
-  const { sketch } = card;
+function Edges({
+  canvas,
+  highlight,
+}: {
+  canvas: FlowCanvasLayout;
+  highlight: CanvasHighlight | null;
+}) {
   return (
-    <div
-      className="absolute overflow-hidden rounded-md border bg-card text-card-foreground"
-      style={{ left: card.x, top: card.y, width: CANVAS_CARD_WIDTH, height: sketch.height }}
+    <svg
+      aria-hidden
+      className="absolute inset-0"
+      width={canvas.width}
+      height={canvas.height}
+      viewBox={`0 0 ${canvas.width} ${canvas.height}`}
     >
-      <div className="flex h-8 items-center border-b bg-muted px-3 font-mono text-xs text-muted-foreground">
-        <span className="truncate">{card.name}</span>
-      </div>
-      {sketch.rows.map((row) => (
-        <div
-          key={`${row.kind}:${row.label}`}
-          className="absolute inset-x-3"
-          style={{ top: row.top, height: row.height }}
+      <defs>
+        {EDGE_KINDS.map((kind) => (
+          <marker
+            key={kind}
+            id={`flow-arrow-${kind}`}
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="8"
+            markerHeight="8"
+            orient="auto-start-reverse"
+          >
+            <path d="M0,1 L10,5 L0,9 Z" className={cn("fill-current", EDGE_TONE[kind])} />
+          </marker>
+        ))}
+      </defs>
+      {canvas.edges.map((edge) => (
+        <g
+          key={edge.id}
+          className={cn(
+            EDGE_TONE[edge.kind],
+            DIM,
+            highlight && !highlight.edges.has(edge.id) && "opacity-15",
+          )}
         >
-          <SketchControl row={row} />
-        </div>
+          <path
+            d={edge.path}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            strokeDasharray={edge.kind === "purpose" ? "5 4" : undefined}
+            markerEnd={`url(#flow-arrow-${edge.kind})`}
+          />
+          {edge.label && edge.labelAt && (
+            <text
+              x={edge.labelAt.x}
+              y={edge.labelAt.y - 6}
+              textAnchor="middle"
+              className="fill-current stroke-background font-mono text-[11px] [paint-order:stroke]"
+              strokeWidth={5}
+              strokeLinejoin="round"
+            >
+              {edge.label}
+            </text>
+          )}
+        </g>
       ))}
-      {sketch.footer && (
-        <div className="absolute inset-x-0 bottom-0 flex h-7 items-center gap-2 border-t bg-muted px-3 text-[11px] text-muted-foreground">
-          {sketch.footer.label}
-          <span className="font-mono text-foreground">{sketch.footer.value}</span>
-        </div>
-      )}
-    </div>
+    </svg>
   );
-}
-
-const CONTROL = "flex h-8 items-center justify-center truncate rounded-md px-2 text-xs font-medium";
-
-function SketchControl({ row }: { row: SketchRow }): ReactNode {
-  switch (row.kind) {
-    case "field":
-      return (
-        <>
-          <div className="truncate text-[11px] leading-4 font-medium">{row.label}</div>
-          <div className="mt-1 h-8 rounded-md border bg-background" />
-        </>
-      );
-    case "button":
-      return (
-        <div
-          className={cn(
-            CONTROL,
-            row.primary ? "bg-primary text-primary-foreground" : "border bg-background",
-          )}
-        >
-          {row.label}
-        </div>
-      );
-    case "provider":
-      return (
-        <div
-          className={cn(
-            CONTROL,
-            "border border-provider-border bg-provider text-provider-foreground",
-          )}
-        >
-          {row.label}
-        </div>
-      );
-    case "divider":
-      return (
-        <div className="flex h-full items-center gap-2 text-[11px] text-muted-foreground">
-          <span className="h-px flex-1 bg-border" />
-          {row.label}
-          <span className="h-px flex-1 bg-border" />
-        </div>
-      );
-    case "link":
-      return (
-        <div className="truncate text-center text-xs leading-5 text-link underline underline-offset-2">
-          {row.label}
-        </div>
-      );
-  }
 }
 
 function Legend() {
@@ -281,6 +400,7 @@ function Legend() {
           {text}
         </span>
       ))}
+      <span>Hover or focus a step to isolate its transitions</span>
     </div>
   );
 }

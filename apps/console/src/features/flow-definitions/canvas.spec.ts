@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { CANVAS_CARD_WIDTH, layoutFlowCanvas, stepSketch } from "./canvas";
+import {
+  CANVAS_CARD_WIDTH,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  clampZoom,
+  fitZoom,
+  highlightStep,
+  layoutFlowCanvas,
+  stepSketch,
+} from "./canvas";
 import type { FlowDefinition, FlowStep } from "./model";
 
 /** The shipped `default-login`, as `packages/config/defaults/default-login.json` writes it. */
@@ -82,18 +91,12 @@ describe("stepSketch", () => {
       ["provider", "google"],
       ["link", "register"],
     ]);
-    // Rows stack top to bottom inside the card.
-    for (const [index, row] of sketch.rows.entries()) {
-      const next = sketch.rows[index + 1];
-      if (next) expect(next.top).toBeGreaterThanOrEqual(row.top + row.height);
-    }
-    expect(sketch.height).toBeGreaterThan(sketch.rows.at(-1)?.top ?? 0);
   });
 
-  it("puts each action's port at the centre of its control", () => {
-    const sketch = stepSketch(DEFAULT_LOGIN.steps[0] as FlowStep);
-    const link = sketch.rows.find((row) => row.kind === "link");
-    expect(sketch.ports.register).toBe((link?.top ?? 0) + (link?.height ?? 0) / 2);
+  it("estimates a port for each action, in screen order", () => {
+    const { estimate } = stepSketch(DEFAULT_LOGIN.steps[0] as FlowStep);
+    expect(estimate.ports.submit).toBeLessThan(estimate.ports.register ?? 0);
+    expect(estimate.height).toBeGreaterThan(estimate.ports.register ?? 0);
   });
 
   it("gives on_success and complete a footer", () => {
@@ -156,12 +159,31 @@ describe("layoutFlowCanvas", () => {
     const from = card("identifier");
     const at = start(edge("identifier.submit").path);
     expect(at.x).toBe(from.x + CANVAS_CARD_WIDTH);
-    expect(at.y).toBe(from.y + (from.sketch.ports.submit ?? 0));
+    expect(at.y).toBe(from.y + (from.sketch.estimate.ports.submit ?? 0));
+  });
+
+  it("places cards by their measured size and control", () => {
+    const measured = layoutFlowCanvas(DEFAULT_LOGIN, {
+      identifier: { height: 400, ports: { submit: 300 } },
+    });
+    const from = measured.cards.find((entry) => entry.name === "identifier");
+    expect(from?.height).toBe(400);
+    const at = start(measured.edges.find((entry) => entry.id === "identifier.submit")?.path ?? "");
+    expect(at.y).toBe((from?.y ?? 0) + 300);
+  });
+
+  it("leaves from the card's edge when the control was not found", () => {
+    const measured = layoutFlowCanvas(DEFAULT_LOGIN, { identifier: { height: 400, ports: {} } });
+    const from = measured.cards.find((entry) => entry.name === "identifier");
+    const at = start(measured.edges.find((entry) => entry.id === "identifier.submit")?.path ?? "");
+    expect(at.y).not.toBe((from?.y ?? 0) + (from?.sketch.estimate.ports.submit ?? 0));
+    expect(at.y).toBeGreaterThan(from?.y ?? 0);
+    expect(at.y).toBeLessThan((from?.y ?? 0) + 400);
   });
 
   it("routes a purpose transition that points left under every card", () => {
     const back = edge("register.sign_in");
-    const bottom = Math.max(...canvas.cards.map((entry) => entry.y + entry.sketch.height));
+    const bottom = Math.max(...canvas.cards.map((entry) => entry.y + entry.height));
     expect(Math.max(...ys(back.path))).toBeGreaterThan(bottom);
     expect(canvas.height).toBeGreaterThan(Math.max(...ys(back.path)));
   });
@@ -183,5 +205,38 @@ describe("layoutFlowCanvas", () => {
       ],
     });
     expect(sparse.edges.map((entry) => entry.kind)).toEqual(["entry"]);
+  });
+});
+
+describe("highlightStep", () => {
+  const canvas = layoutFlowCanvas(DEFAULT_LOGIN);
+
+  it("lights the step, its outgoing transitions and their targets", () => {
+    const lit = highlightStep(canvas, "password");
+    expect([...lit.nodes].sort()).toEqual(["done", "password"]);
+    expect([...lit.edges]).toEqual(["password.submit"]);
+  });
+
+  it("follows a purpose transition through its pill to the entry step", () => {
+    const lit = highlightStep(canvas, "register");
+    expect(lit.nodes).toContain("purpose:login");
+    expect(lit.nodes).toContain("identifier");
+    expect(lit.edges).toContain("register.sign_in");
+    expect(lit.edges).toContain("entry:login");
+    expect(lit.edges).not.toContain("entry:register");
+  });
+});
+
+describe("zoom", () => {
+  it("keeps a level within the controls' range", () => {
+    expect(clampZoom(0)).toBe(MIN_ZOOM);
+    expect(clampZoom(9)).toBe(MAX_ZOOM);
+    expect(clampZoom(0.1 + 0.2)).toBe(0.3);
+  });
+
+  it("fits the canvas into the viewport, never above 100%", () => {
+    expect(fitZoom({ width: 500, height: 400 }, { width: 1000, height: 400 })).toBe(0.5);
+    expect(fitZoom({ width: 2000, height: 2000 }, { width: 1000, height: 400 })).toBe(1);
+    expect(fitZoom({ width: 0, height: 0 }, { width: 1000, height: 400 })).toBe(1);
   });
 });

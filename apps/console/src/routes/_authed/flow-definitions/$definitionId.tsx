@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
+import { fetchLatestBranding } from "@/features/branding/api";
 import { FlowCanvas } from "@/features/flow-definitions/components/flow-canvas";
 import {
   type FlowDefinition,
@@ -33,12 +34,14 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
     const entry = await api.getFlowDefinition(params.definitionId);
     // Structurally the list's `flow_definition`; orval renames per operation.
     const definition: FlowDefinition = entry.flow_definition;
-    return {
-      definition,
-      createdAt: entry.created_at,
+    const projectId = requireProjectScope(deps.project);
+    const [schema, branding] = await Promise.all([
       // No `expand` on this endpoint, so the badge costs a second call.
-      ...(await resolveSchema(definition.user_schema, requireProjectScope(deps.project))),
-    };
+      resolveSchema(definition.user_schema, projectId),
+      // The canvas paints the maintained defaults without it.
+      fetchLatestBranding(projectId).catch(() => undefined),
+    ]);
+    return { definition, createdAt: entry.created_at, branding, ...schema };
   },
   component: FlowDefinitionDetail,
 });
@@ -65,7 +68,7 @@ async function resolveSchema(
 }
 
 function FlowDefinitionDetail() {
-  const { definition, createdAt, schemaName, schemaId } = Route.useLoaderData();
+  const { definition, createdAt, branding, schemaName, schemaId } = Route.useLoaderData();
   const { definitionId } = Route.useParams();
   const name = flowDisplayName(definition);
   const steps = definition.steps ?? [];
@@ -130,7 +133,7 @@ function FlowDefinitionDetail() {
           <DocumentViewer document={definition} noun="definition" />
         </DetailSection>
 
-        <FlowCanvas definition={definition} name={name} />
+        <FlowCanvas definition={definition} name={name} branding={branding} />
       </div>
     </Page>
   );
