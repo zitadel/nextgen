@@ -114,6 +114,7 @@ describe("whether a run's output is coloured", () => {
     ["for FORCE_COLOR off a terminal", [], { FORCE_COLOR: "1" }, true],
     ["for FORCE_COLOR=0, which means off", [], { FORCE_COLOR: "0" }, false],
     ["for FORCE_COLOR=false, which means off", [], { FORCE_COLOR: "false" }, false],
+    ["for FORCE_COLOR=False, in any case", [], { FORCE_COLOR: "False" }, false],
     ["on a dumb terminal", [], { TERM: "dumb" }, false],
     ["for --json, which carries no colour", ["--json"], { TERM: "xterm" }, false],
   ])("is %s", async (_case, argv, env, expected) => {

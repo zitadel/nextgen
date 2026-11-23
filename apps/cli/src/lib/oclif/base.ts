@@ -646,16 +646,14 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
     const useColor =
-      flags.color !== false &&
-      !process.env[NO_COLOR.name] &&
-      !["0", "false"].includes(process.env[FORCE_COLOR.name] ?? "");
+      flags.color !== false && !process.env[NO_COLOR.name] && forcedColour(process.env) !== false;
     // Colour is about where the output goes, so it asks stdout alone. `isTTY`
     // is about whether a person can be asked something and needs stdin too: a
     // run with its stdin redirected still writes to a terminal that reads
     // colour.
     const colored =
       useColor &&
-      (!["", "0", "false"].includes(process.env[FORCE_COLOR.name] ?? "") ||
+      (forcedColour(process.env) === true ||
         (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
     this.meta = {
       cwd,
@@ -939,7 +937,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    */
   private logAside(text: string): void {
     this.logToStderr(
-      process.stderr.isTTY || !["", "0", "false"].includes(process.env[FORCE_COLOR.name] ?? "")
+      process.stderr.isTTY || forcedColour(process.env) === true
         ? text
         : stripVTControlCharacters(text),
     );
@@ -1234,6 +1232,23 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
         }),
     failed: true,
   };
+}
+
+/**
+ * What `FORCE_COLOR` says about colour: on for any value but `0` and `false`
+ * (in any case), off for those two, and nothing when it is unset or empty.
+ *
+ * @param env - The environment the run reads.
+ * @returns True when colour is forced on, false when forced off, and
+ * `undefined` when the variable says nothing.
+ */
+function forcedColour(env: NodeJS.ProcessEnv): boolean | undefined {
+  const value = (env[FORCE_COLOR.name] ?? "").toLowerCase();
+  if (value === "") {
+    return undefined;
+  }
+
+  return !["0", "false"].includes(value);
 }
 
 /**
