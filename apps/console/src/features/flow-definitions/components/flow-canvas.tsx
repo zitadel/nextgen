@@ -85,19 +85,21 @@ export function FlowCanvas({
     setZoom(fitZoom({ width: element.clientWidth, height: element.clientHeight }, canvas));
   }, [canvas]);
 
-  const current = useRef(zoom);
-  current.current = zoom;
+  const current = useRef({ zoom, canvas });
+  current.current = { zoom, canvas };
   const onWheel = useCallback((event: WheelEvent) => {
     const element = viewport.current;
     if (!element) return;
     event.preventDefault();
-    const from = current.current;
+    const from = current.current.zoom;
     const to = wheelZoom(from, event);
     if (to === from) return;
     const box = element.getBoundingClientRect();
     const scroll = anchoredScroll(
       { left: element.scrollLeft, top: element.scrollTop },
       { x: event.clientX - box.left, y: event.clientY - box.top },
+      { width: element.clientWidth, height: element.clientHeight },
+      current.current.canvas,
       from,
       to,
     );
@@ -297,12 +299,13 @@ function Viewport({
       tabIndex={0}
       aria-label="Flow canvas"
       className={cn(
-        "overflow-auto bg-background outline-none focus-visible:ring-2",
+        "grid overflow-auto bg-background outline-none focus-visible:ring-2",
         dragging ? "cursor-grabbing select-none" : "cursor-grab",
         className,
       )}
     >
-      <div style={{ width: canvas.width * zoom, height: canvas.height * zoom }}>
+      {/* Auto margins in a grid centre what fits and start what overflows, so both ends stay reachable. */}
+      <div className="m-auto" style={{ width: canvas.width * zoom, height: canvas.height * zoom }}>
         <div
           className="relative origin-top-left"
           style={{ width: canvas.width, height: canvas.height, transform: `scale(${zoom})` }}

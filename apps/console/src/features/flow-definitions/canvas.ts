@@ -379,19 +379,35 @@ export function wheelZoom(
 }
 
 /**
+ * Where the canvas starts in the viewport along one axis: centred while it
+ * fits, at the start once it overflows and scrolls.
+ */
+export function centringInset(viewport: number, canvas: number, zoom: number): number {
+  return Math.max(0, (viewport - canvas * zoom) / 2);
+}
+
+/**
  * The scroll offsets that keep the canvas point under `pointer` (relative to
- * the viewport's corner) under it when the zoom goes `from` → `to`.
+ * the viewport's corner) under it when the zoom goes `from` → `to`, with the
+ * canvas centred in any axis where it fits. In an axis where it still fits at
+ * `to` there is nothing to scroll, so the centring places it instead.
  */
 export function anchoredScroll(
   scroll: { left: number; top: number },
   pointer: CanvasPoint,
+  viewport: { width: number; height: number },
+  canvas: { width: number; height: number },
   from: number,
   to: number,
 ): { left: number; top: number } {
-  const scale = to / from;
+  const axis = (offset: number, at: number, view: number, size: number) => {
+    const point = (offset + at - centringInset(view, size, from)) / from;
+    const end = Math.max(0, size * to - view);
+    return Math.min(end, Math.max(0, point * to + centringInset(view, size, to) - at));
+  };
   return {
-    left: (scroll.left + pointer.x) * scale - pointer.x,
-    top: (scroll.top + pointer.y) * scale - pointer.y,
+    left: axis(scroll.left, pointer.x, viewport.width, canvas.width),
+    top: axis(scroll.top, pointer.y, viewport.height, canvas.height),
   };
 }
 

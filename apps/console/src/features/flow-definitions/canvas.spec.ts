@@ -5,6 +5,7 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   anchoredScroll,
+  centringInset,
   clampZoom,
   fitZoom,
   highlightStep,
@@ -254,13 +255,45 @@ describe("zoom", () => {
     expect(wheelZoom(1, wheel(-1))).not.toBe(1);
   });
 
-  it("keeps the point under the pointer in place", () => {
-    const scroll = { left: 100, top: 40 };
+  it("centres a canvas that fits and starts one that overflows", () => {
+    expect(centringInset(800, 1000, 0.5)).toBe(150);
+    expect(centringInset(800, 1000, 1)).toBe(0);
+  });
+
+  it("keeps the point under the pointer in place, centred or scrolled", () => {
+    const viewport = { width: 800, height: 400 };
+    const canvas = { width: 2000, height: 600 };
     const pointer = { x: 200, y: 150 };
-    const next = anchoredScroll(scroll, pointer, 0.5, 1);
-    // Canvas point under the pointer before and after.
-    expect((next.left + pointer.x) / 1).toBeCloseTo((scroll.left + pointer.x) / 0.5);
-    expect((next.top + pointer.y) / 1).toBeCloseTo((scroll.top + pointer.y) / 0.5);
+    // The canvas point under the pointer, given a scroll offset at a zoom.
+    const under = (scroll: { left: number; top: number }, zoom: number) => ({
+      x: (scroll.left + pointer.x - centringInset(viewport.width, canvas.width, zoom)) / zoom,
+      y: (scroll.top + pointer.y - centringInset(viewport.height, canvas.height, zoom)) / zoom,
+    });
+
+    // Overflowing both before and after.
+    const scrolled = { left: 300, top: 40 };
+    const deeper = anchoredScroll(scrolled, pointer, viewport, canvas, 1, 1.5);
+    expect(under(deeper, 1.5).x).toBeCloseTo(under(scrolled, 1).x);
+    expect(under(deeper, 1.5).y).toBeCloseTo(under(scrolled, 1).y);
+
+    // Vertically centred at 0.5 (300px of 400), overflowing at 1: the inset
+    // it leaves is counted, so the point holds.
+    const centred = { left: 100, top: 0 };
+    const grown = anchoredScroll(centred, pointer, viewport, canvas, 0.5, 1);
+    expect(under(grown, 1).y).toBeCloseTo(under(centred, 0.5).y);
+    expect(under(grown, 1).x).toBeCloseTo(under(centred, 0.5).x);
+  });
+
+  it("asks for no scroll in an axis where the canvas fits", () => {
+    const next = anchoredScroll(
+      { left: 0, top: 0 },
+      { x: 10, y: 10 },
+      { width: 800, height: 400 },
+      { width: 400, height: 200 },
+      1,
+      0.5,
+    );
+    expect(next).toEqual({ left: 0, top: 0 });
   });
 
   it("fits the canvas into the viewport, never above 100%", () => {
