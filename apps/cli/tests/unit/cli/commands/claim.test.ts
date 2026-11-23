@@ -194,6 +194,10 @@ describe("claim", () => {
     const output = `${res.stdout}${res.stderr}`;
     expect(output).toContain("/claim/ch_");
     expect(output).toContain("Your project is now permanent");
+    // Written as the command goes, so a script can open it before the claim is done.
+    expect(output.indexOf("/claim/ch_")).toBeLessThan(
+      output.indexOf("Your project is now permanent"),
+    );
     expect(output).toContain("Manage your project and collaborate in the Console:");
     // The team stays in the envelope and the secret, not in the prose. The
     // mock's dashboard_url embeds the team id in its path, so assert on the
