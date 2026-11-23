@@ -15,12 +15,18 @@ import (
 // [domain.ErrApplicationNotFound].
 type ClientResolver interface {
 	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
+	// AuthenticateClient finds the client like Client, when secret is one of
+	// its secrets. A wrong or empty secret is
+	// [domain.ErrApplicationClientSecretInvalid].
+	AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (domain.ApplicationClientDocument, error)
 }
 
-// client is a client as the library reads it, for one authorization request.
+// client is a client as the library reads it, for one request.
 // Phase 1 has only confidential web clients on the authorization code grant.
 type client struct {
-	id           string
+	id string
+	// projectID is the project a token request authenticated the client in.
+	projectID    string
 	redirectURIs []string
 	grantTypes   []oidc.GrantType
 	// settings are the issuer's, read when the client was resolved, so

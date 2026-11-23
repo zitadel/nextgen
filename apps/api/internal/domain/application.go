@@ -123,6 +123,12 @@ func ErrApplicationNotFound() Error {
 	return newError(PrefixApplication.ErrorCodePrefix("not_found"), "application: not found", nil, nil)
 }
 
+// ErrApplicationClientSecretInvalid refuses a client that sent no secret, or
+// one that matches none of its secrets.
+func ErrApplicationClientSecretInvalid() Error {
+	return newError(PrefixApplication.ErrorCodePrefix("client_secret_invalid"), "application: the client secret is invalid", nil, nil)
+}
+
 // ErrApplicationClientIDTaken rejects a new client whose client_id another
 // client of the project holds.
 func ErrApplicationClientIDTaken() Error {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"slices"
 
@@ -31,6 +32,11 @@ type ApplicationService interface {
 	// Client returns the newest document of the client holding clientID. An
 	// unknown client is [domain.ErrApplicationNotFound].
 	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
+	// AuthenticateClient returns the newest document of the client holding
+	// clientID when secret is one of its secrets. An unknown client is
+	// [domain.ErrApplicationNotFound]; an empty or wrong secret is
+	// [domain.ErrApplicationClientSecretInvalid].
+	AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (domain.ApplicationClientDocument, error)
 }
 
 type applicationService struct {
@@ -79,30 +85,66 @@ func (s *applicationService) Client(ctx context.Context, projectID, _, clientID 
 	ctx, end := startSpan(ctx, "ApplicationService.Client")
 	defer end(&err)
 
-	row, err := s.v2Pool.Statements().GetApplicationClientByClientID(ctx, projectID, clientID)
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-		return domain.ApplicationClientDocument{}, domain.ErrApplicationNotFound()
+	_, doc, err := s.client(ctx, projectID, clientID)
+	return doc, err
+}
+
+// AuthenticateClient implements [ApplicationService]. Any of the client's
+// secrets passes, so a client keeps working while its secret is rotated.
+func (s *applicationService) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (_ domain.ApplicationClientDocument, err error) {
+	ctx, end := startSpan(ctx, "ApplicationService.AuthenticateClient")
+	defer end(&err)
+
+	if secret == "" {
+		return domain.ApplicationClientDocument{}, domain.ErrApplicationClientSecretInvalid()
 	}
+	row, doc, err := s.client(ctx, projectID, clientID)
+	if err != nil {
+		return domain.ApplicationClientDocument{}, err
+	}
+	stored, err := s.v2Pool.Statements().ListApplicationClientSecrets(ctx, projectID, row.ID)
 	if _, ok := errors.AsType[*database.UnavailableError](err); ok {
 		return domain.ApplicationClientDocument{}, domain.ErrUnavailable().WithParent(err)
 	}
 	if err != nil {
-		return domain.ApplicationClientDocument{}, domain.ErrInternal(err).WithMessage("failed to get application client")
+		return domain.ApplicationClientDocument{}, domain.ErrInternal(err).WithMessage("failed to list application client secrets")
+	}
+	hash := []byte(domain.HashSecret(secret))
+	for _, candidate := range stored {
+		if subtle.ConstantTimeCompare(hash, []byte(candidate.SecretHash)) == 1 {
+			return doc, nil
+		}
+	}
+	return domain.ApplicationClientDocument{}, domain.ErrApplicationClientSecretInvalid()
+}
+
+// client returns the row and the newest document of the client holding
+// clientID.
+func (s *applicationService) client(ctx context.Context, projectID, clientID string) (*domain.ApplicationClient, domain.ApplicationClientDocument, error) {
+	row, err := s.v2Pool.Statements().GetApplicationClientByClientID(ctx, projectID, clientID)
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return nil, domain.ApplicationClientDocument{}, domain.ErrApplicationNotFound()
+	}
+	if _, ok := errors.AsType[*database.UnavailableError](err); ok {
+		return nil, domain.ApplicationClientDocument{}, domain.ErrUnavailable().WithParent(err)
+	}
+	if err != nil {
+		return nil, domain.ApplicationClientDocument{}, domain.ErrInternal(err).WithMessage("failed to get application client")
 	}
 	application, err := s.get(ctx, projectID, domain.ApplicationFieldID, row.ApplicationID)
 	if err != nil {
-		return domain.ApplicationClientDocument{}, err
+		return nil, domain.ApplicationClientDocument{}, err
 	}
 	doc, err := domain.ParseApplicationDocument(application.Document)
 	if err != nil {
-		return domain.ApplicationClientDocument{}, domain.ErrInternal(err).WithMessage("failed to parse application document")
+		return nil, domain.ApplicationClientDocument{}, domain.ErrInternal(err).WithMessage("failed to parse application document")
 	}
 	// A revision cannot remove a client, so its slug is always in the newest one.
 	i := slices.IndexFunc(doc.Clients, func(client domain.ApplicationClientDocument) bool { return client.Slug == row.Slug })
 	if i < 0 {
-		return domain.ApplicationClientDocument{}, domain.ErrInternal(nil).WithMessage("application client missing from its document")
+		return nil, domain.ApplicationClientDocument{}, domain.ErrInternal(nil).WithMessage("application client missing from its document")
 	}
-	return doc.Clients[i], nil
+	return row, doc.Clients[i], nil
 }
 
 // validate checks the document against the application.json schema, then against

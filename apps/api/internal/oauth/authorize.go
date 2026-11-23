@@ -22,6 +22,7 @@ import (
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 const (
@@ -50,9 +51,11 @@ const (
 )
 
 // AuthRequestStore stores an authorization request with its expiry and
-// binding, and returns the nonce the browser's binding cookie holds.
+// binding, and returns the nonce the browser's binding cookie holds. It
+// redeems the code the login issued for a request.
 type AuthRequestStore interface {
 	Create(ctx context.Context, request *domain.AuthRequest) (bindingNonce string, err error)
+	RedeemCode(ctx context.Context, input service.RedeemCodeInput) (accessToken string, err error)
 }
 
 // answeredErrorKey is the context key of the error an opServer method
@@ -64,7 +67,10 @@ type answeredErrorKey struct{}
 // place.
 type errorWriter struct {
 	http.ResponseWriter
-	page   bool
+	page bool
+	// token is set at the token endpoint, the only one that authenticates
+	// clients with HTTP Basic.
+	token  bool
 	status int
 	body   bytes.Buffer
 }
@@ -94,10 +100,8 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("the method must be GET or POST"), http.StatusBadRequest)
 	}
-	for name, values := range r.Form {
-		if len(values) > 1 {
-			return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("a parameter is repeated").WithParent(fmt.Errorf("the parameter %.100q is repeated", name)), http.StatusBadRequest)
-		}
+	if err := repeatedParameter(r.Form); err != nil {
+		return nil, err
 	}
 	unknownClient := op.NewStatusError(oidc.ErrInvalidClient().WithDescription("unknown client"), http.StatusBadRequest)
 	// A lookup with text a dialect cannot hold fails as a 500.
@@ -327,7 +331,7 @@ func withErrorPages(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Accept")
 		var answered error
-		ew := &errorWriter{ResponseWriter: w, page: errorpage.Wants(r)}
+		ew := &errorWriter{ResponseWriter: w, page: errorpage.Wants(r), token: strings.HasSuffix(r.URL.Path, TokenPath)}
 		next.ServeHTTP(ew, r.WithContext(context.WithValue(r.Context(), answeredErrorKey{}, &answered)))
 		refusal := new(oidc.Error)
 		// A body that is not the library's JSON leaves the line and the page without a description.
@@ -345,6 +349,10 @@ func withErrorPages(next http.Handler) http.Handler {
 }
 
 func (w *errorWriter) WriteHeader(status int) {
+	// RFC 6749 §5.2: a 401 names the scheme the client authenticates with.
+	if status == http.StatusUnauthorized && w.token {
+		w.Header().Set("WWW-Authenticate", `Basic realm="oauth"`)
+	}
 	if status >= http.StatusBadRequest {
 		w.status = status
 		if w.page {

@@ -467,6 +467,7 @@ func TestValidationFieldPaths(t *testing.T) {
 // by client input or a caller's mistake. A service span keeps status Unset for
 // them. Map such a code to its 4xx when it reaches a handler, then drop it here.
 var unmappedClientCodes = map[string]bool{
+	"app.client_secret_invalid":        true,
 	"att.sso_state_invalid":            true,
 	"auth.csrf_invalid":                true,
 	"authreq.code_invalid":             true,
