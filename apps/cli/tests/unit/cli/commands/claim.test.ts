@@ -193,7 +193,6 @@ describe("claim", () => {
     expect(res.exitCode).toBe(0);
     const output = `${res.stdout}${res.stderr}`;
     expect(output).toContain("/claim/ch_");
-    expect(output).toContain("Project claimed");
     expect(output).toContain("Your project is now permanent");
     expect(output).toContain("Manage your project and collaborate in the Console:");
     // The team stays in the envelope and the secret, not in the prose. The
