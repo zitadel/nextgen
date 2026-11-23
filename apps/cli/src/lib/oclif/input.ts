@@ -47,7 +47,7 @@ const POINTING_REFUSAL = {
 /**
  * The flags that point a command at a server or a project.
  */
-const POINTING = new Set(["server", "env", "env-file", "cwd"]);
+const POINTING = new Set(["server", "env", "env-file", "cwd", "project"]);
 
 /**
  * A file that is not a regular file, or is too large to be a document.

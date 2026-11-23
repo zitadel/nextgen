@@ -363,7 +363,7 @@ describe("Input", () => {
       );
     });
 
-    it.each(["server", "env", "env-file", "cwd"])(
+    it.each(["server", "env", "env-file", "cwd", "project"])(
       "refuses %s in a document, which only the command line may set",
       async (key) => {
         const Pointing = class extends Command {
@@ -373,7 +373,7 @@ describe("Input", () => {
             env: Flags.string(),
             "env-file": Flags.string(),
           };
-          static override flags = { input: inputFlag };
+          static override flags = { input: inputFlag, project: Flags.string() };
 
           public run(): Promise<void> {
             return Promise.resolve();
