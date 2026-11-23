@@ -9,6 +9,7 @@ import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { JsonEnvelope } from "@/lib/oclif/types";
+import { Promptable } from "@/lib/oclif/promptable";
 import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -334,7 +335,9 @@ const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"
  * credentials. Every other edit is local, and `deploy` publishes it like any
  * configuration change.
  */
-export abstract class AuthMethodCommand extends Destructive(ServerCommand(EnvironmentCommand)) {
+export abstract class AuthMethodCommand extends Destructive(
+  Promptable(ServerCommand(EnvironmentCommand)),
+) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.

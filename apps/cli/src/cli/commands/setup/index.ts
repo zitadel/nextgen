@@ -42,6 +42,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { accepts, parses, reads } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Promptable } from "@/lib/oclif/promptable";
 import { createOrca } from "@/lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
@@ -187,7 +188,7 @@ const RENDERER_FLAG_DESCRIPTION =
  * `--design` is hidden so scripts and agents passing it get a targeted error
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
-export default class Setup extends Destructive(ServerCommand(BaseCommand)) {
+export default class Setup extends Destructive(Promptable(ServerCommand(BaseCommand))) {
   /**
    * What `--help` says the command does.
    */

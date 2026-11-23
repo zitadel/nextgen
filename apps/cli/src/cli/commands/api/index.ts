@@ -29,6 +29,7 @@ import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { Suggested } from "@/lib/suggestion";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
+import { Promptable } from "@/lib/oclif/promptable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
@@ -222,7 +223,7 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Destructive(ServerCommand(EnvironmentCommand)) {
+export default class Api extends Destructive(Promptable(ServerCommand(EnvironmentCommand))) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override group = CommandGroups.apiAndEvents;
