@@ -9,7 +9,7 @@ import { ciFlag } from "./dimensions/ci-flag";
  * the channel that decides whether a run is production traffic.
  *
  * Each Mixpanel project's token is baked in with the region it lives in: a
- * production run sends to the production project (US), and a development run
+ * production run sends to the production project (EU), and a development run
  * (CI, the CLI's own development mode, a source checkout) to the development
  * project (EU), so test traffic never reaches customer data.
  * `ZITADEL_TELEMETRY_TOKEN` overrides both. Lifecycle events also go to
@@ -100,9 +100,9 @@ export function installedFromPackage(): boolean {
 type Project = Readonly<{ token: string; region: TelemetryRegion }>;
 
 /**
- * The production project, which lives in the US region.
+ * The production project, which lives in the EU region.
  */
-const PRODUCTION: Project = { token: "f56fd7315ccd614fba8eecb2a8966152", region: "us" };
+const PRODUCTION: Project = { token: "76dd7b7a353e3c5d83cf04d4244f5424", region: "eu" };
 
 /**
  * The development project, which lives in the EU region.

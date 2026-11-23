@@ -44,7 +44,7 @@ describe("resolveChannel", () => {
   });
 });
 
-const PRODUCTION_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";
+const PRODUCTION_TOKEN = "76dd7b7a353e3c5d83cf04d4244f5424";
 const DEVELOPMENT_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
 
 describe("resolveTelemetryToken", () => {
@@ -73,8 +73,8 @@ const CLOUD_PROXY = { host: "preview.zitadel.com", path: "/telemetry/mixpanel" }
 const US_DIRECT = { host: "api.mixpanel.com", path: "" };
 
 describe("resolveTelemetryEndpoint", () => {
-  it("sends each project's events to the region it lives in: production US, development EU", () => {
-    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_ENV: "production" })).toEqual(US_DIRECT);
+  it("sends each project's events to the region it lives in: both are EU", () => {
+    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_ENV: "production" })).toEqual(CLOUD_PROXY);
     expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_ENV: "development" })).toEqual(CLOUD_PROXY);
   });
 
@@ -106,9 +106,9 @@ describe("resolveTelemetryEndpoint", () => {
     expect(
       resolveTelemetryEndpoint({
         ZITADEL_TELEMETRY_ENV: "production",
-        ZITADEL_TELEMETRY_REGION: "eu",
+        ZITADEL_TELEMETRY_REGION: "us",
       }),
-    ).toEqual(US_DIRECT);
+    ).toEqual(CLOUD_PROXY);
   });
 
   // Released CLIs send to this path, so the cloud has to keep forwarding it.
