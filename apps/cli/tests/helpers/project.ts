@@ -1433,7 +1433,7 @@ export class ScaffoldedApp {
     const accepted = await this.run([...list, "--fields", field, "--json"]);
     const refused = await this.run([...list, "--fields", "no_such_field", "--json"]);
 
-    expect(accepted, `${list.join(" ")} --fields ${field}`).not.toFailWith("E_VALIDATION");
+    expect(accepted, `${list.join(" ")} --fields ${field}`).toSucceed();
     expect(refused, `${list.join(" ")} --fields no_such_field`).toFailWith("E_VALIDATION");
   }
 
@@ -1554,6 +1554,13 @@ export class ScaffoldedApp {
     return this.pipingStdin(stdin, () =>
       this.cli(["variable", "set", "--input", source, "--json"]),
     );
+  }
+
+  /**
+   * `variable set --input <document>` with `words` typed beside it, as a person mixing the two would.
+   */
+  setVariableFromBeside(document: string, ...words: string[]): Promise<CliResult> {
+    return this.cli(["variable", "set", "--input", document, ...words, "--json"]);
   }
 
   /**

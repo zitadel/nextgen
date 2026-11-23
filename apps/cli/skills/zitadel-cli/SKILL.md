@@ -110,6 +110,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   while a piped or redirected run (or `--plain`) gets one tab-separated record
   per line and nothing else. If you ever read human output, set `NO_COLOR=1`
   once in the environment rather than repeating `--no-color` per command.
+  A single record (`variable get`, `invitation get`, a resource's `get`, and a
+  created or updated resource) is plain text off a terminal, never JSON: ask for
+  `--json` whenever a script parses it.
 - **One id per line:** `user list --plain --fields id` (any resource family's
   `list`) prints the ids alone, one per line with no header, for a loop or
   `xargs`; there is no separate quiet flag. Lists of other records take their
@@ -612,7 +615,7 @@ commands to run next under `Next:`, `Explore all commands:` and where it
 ran. Every other command ends on its result, with any next steps under `Next:`
 and one dim footer line saying what it amounts to and where it ran; `status`
 also ends on `Explore all commands:`. Where stdout is data a script reads (a
-piped or `--plain` list, a resource's created or updated JSON) the next steps go
+piped or `--plain` list, an `api` response) the next steps go
 to stderr under `Next:`, so stdout holds only that data; so do a piped list's footer
 and its empty-list line. A list's next-page command carries `--json` only when
 the run was `--json`. A failure is written to
@@ -650,12 +653,11 @@ names the first word that is no command where it was typed, as typed, and
 never a word after that one. A stray extra word after a
 real command is that command refusing an argument it does not take: an
 `E_VALIDATION` envelope that exits 3, like any other refusal. Asking for help
-on such a name is the one exception: the help layer answers, with nothing on stdout. With `--help`
-among the arguments, even with `--json`, and as `zitadel help <name>`, it is a
-plain `Command … not found` on stderr and exit 2. `zitadel help <name> --json`
-is the help layer refusing `--json`, which it does not take: `Nonexistent
-flag: --json` and a stack trace on stderr, and exit 1. Treat an empty stdout as
-either case, never as an envelope. Everything else answers with an envelope
+on such a name is the one exception: with `--help` among the arguments, with
+`--json` among them, and as `zitadel help <name>`, the failure is written to
+stderr as text (`<words> is not a zitadel command`, with a `Next:` block) and
+the exit is 127, with nothing on stdout. Treat an empty stdout as that case,
+never as an envelope. Everything else answers with an envelope
 too, errors included — an unknown flag, a missing argument and a resource that
 is not found are all `status: "error"` objects on stdout.
 

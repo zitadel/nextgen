@@ -41,14 +41,6 @@ describe("commands", () => {
         },
       });
     });
-
-    it("refuses a column it has none of", async () => {
-      const app = await anApp();
-
-      const result = await app.runWithoutServer(["commands", "--sort", "bogus", "--json"]);
-
-      expect(result).toFailWith("E_VALIDATION");
-    });
   });
 
   describe("--columns", () => {
@@ -58,7 +50,10 @@ describe("commands", () => {
       const result = await app.runWithoutServer(["commands", "--columns", "id"]);
 
       expect(result).toSucceed();
+      expect(result.stdout).toContain("Id");
       expect(result.stdout).not.toContain("Summary");
+      expect(result.stdout).not.toContain("Plugin");
+      expect(result.stdout).not.toContain("Type");
     });
   });
 

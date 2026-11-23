@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
@@ -56,7 +55,6 @@ export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCo
     return this.emit({
       status: "ok",
       data: variable,
-      piped: json(variable),
       summary: {
         title,
         sections: [],

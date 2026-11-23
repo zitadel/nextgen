@@ -29,12 +29,14 @@ describe("help", () => {
       });
     });
 
-    it("takes --nested-commands", async () => {
+    it("lists the nested commands the plain help leaves out with --nested-commands", async () => {
       const app = await anApp();
 
       const result = await app.runWithoutServer(["help", "--nested-commands", "--json"]);
 
-      expect(result).toSucceed();
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { output: expect.stringMatching(/^ {2}variables +/m) },
+      });
     });
   });
 });

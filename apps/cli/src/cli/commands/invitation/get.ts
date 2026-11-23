@@ -5,7 +5,6 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { json } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -55,7 +54,6 @@ export default class InvitationGet extends Tabulatable(ServerCommand(Environment
     return this.emit({
       status: "ok",
       data: invitation,
-      piped: json(invitation),
       summary: {
         title,
         sections: [],

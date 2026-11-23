@@ -8,7 +8,7 @@ import { afterEach, describe, expect, vi } from "vitest";
 import { BaseCommand } from "@/lib/oclif/base";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { COLUMN_MARK } from "@/lib/ui/layout";
-import { json, painted, rows } from "@/lib/oclif/rendering";
+import { painted, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import { it } from "@tests/fixtures";
 import { printing } from "@tests/helpers/run-cli";
@@ -343,27 +343,5 @@ describe("the ending of a result with warnings", () => {
     });
 
     expect(shown).not.toContain("the server is older than the CLI");
-  });
-});
-
-describe("the rendering of a result that states one for a pipe", () => {
-  const RECORD: CommandResult = {
-    status: "ok",
-    data: { id: "1" },
-    piped: json({ id: "1" }),
-    summary: { title: "Read 1", sections: [], lines: ["id  1"] },
-  };
-
-  it("is written off a terminal, in place of the summary", async () => {
-    const shown = await written(RECORD, { plain: true });
-
-    expect(JSON.parse(shown)).toEqual({ id: "1" });
-  });
-
-  it("is not written at a terminal, where the summary is drawn", async () => {
-    const shown = await written(RECORD, { plain: true, terminal: true });
-
-    expect(shown).toContain("id  1");
-    expect(shown).not.toContain('"id"');
   });
 });

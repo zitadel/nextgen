@@ -69,6 +69,22 @@ describe("variable set", () => {
       expect(result).toFailWith("E_VALIDATION");
     });
 
+    it("refuses a flag typed beside it that is not global", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFromBeside(DOCUMENT, "--secret");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("refuses a positional argument typed beside it", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFromBeside(DOCUMENT, "OTHER");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
     it("refuses a file that is not there", async () => {
       const app = await aSetUpApp();
 

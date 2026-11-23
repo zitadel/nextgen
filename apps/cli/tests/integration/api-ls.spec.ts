@@ -133,7 +133,10 @@ describe("api ls", () => {
         operations: Array<Record<string, unknown>>;
       };
 
-      for (const field of Object.keys(listed.operations[0] ?? {})) {
+      const fields = Object.keys(listed.operations[0] ?? {});
+
+      expect(fields.length).toBeGreaterThan(0);
+      for (const field of fields) {
         expect(await app.apiOperations("getLive", "--fields", field), field).toSucceed();
       }
     });

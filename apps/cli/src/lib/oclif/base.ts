@@ -879,7 +879,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    * `--json` path serialises it.
    */
   protected emit(result: CommandResult): JsonEnvelope {
-    const normalized = normalizeCommandResult(result, this.meta, this.isOnScreen);
+    const normalized = normalizeCommandResult(result, this.meta);
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_COMPLETED,
@@ -1327,32 +1327,15 @@ function asRaised(error: unknown): unknown {
   });
 }
 
-/**
- * Settles the rendering a result is printed with, and rewrites each suggested
- * `zitadel …` command to the public form the reader can run.
- *
- * Off a terminal a result's `piped` rendering is the one printed, when it has
- * one; otherwise the rendering is its own, or the one its summary gives.
- */
-function normalizeCommandResult(
-  result: CommandResult,
-  meta: GlobalOptions,
-  onScreen: boolean,
-): CommandResult {
-  const chosen =
-    result.status === "ok" && !onScreen && result.piped !== undefined
+/** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
+function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
+  const stated =
+    result.pretty === undefined && result.summary !== undefined
       ? {
           ...result,
-          pretty: result.piped,
+          pretty: painted(textOf(result.summary)),
         }
       : result;
-  const stated =
-    chosen.pretty === undefined && chosen.summary !== undefined
-      ? {
-          ...chosen,
-          pretty: painted(textOf(chosen.summary)),
-        }
-      : chosen;
   if (stated.next?.commands === undefined) {
     return stated as CommandResult;
   }

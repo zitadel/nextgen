@@ -2,7 +2,7 @@ import { chosenColumns } from "@/lib/oclif/columns";
 import { fieldPaths } from "@/lib/oclif/crud/paths";
 import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
 import type { GetSpec } from "@/lib/oclif/crud/types";
-import { json, painted } from "@/lib/oclif/rendering";
+import { painted } from "@/lib/oclif/rendering";
 import { fieldsFlag } from "@/lib/oclif/tabulatable";
 import type { CommandResult } from "@/lib/oclif/types";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -71,7 +71,6 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
     return {
       status: "ok",
       data: record,
-      piped: json(record),
       pretty: painted(
         [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), rendered].join(
           "\n",

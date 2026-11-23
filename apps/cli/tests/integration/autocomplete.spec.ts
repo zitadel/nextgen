@@ -32,7 +32,7 @@ describe("autocomplete", () => {
       });
     });
 
-    it("takes --refresh-cache", async () => {
+    it("only rebuilds the cache with --refresh-cache, leaving the setup instructions out", async () => {
       const app = await anApp();
 
       const result = await app.runWithoutServer([
@@ -42,7 +42,10 @@ describe("autocomplete", () => {
         "--json",
       ]);
 
-      expect(result).toSucceed();
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "ok",
+        data: { output: "" },
+      });
     });
   });
 });

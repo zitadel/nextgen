@@ -502,7 +502,10 @@ describe("get rendering", () => {
     expect(res.stdout).not.toContain('"metadata": {');
   });
 
-  it("still prints the whole object when piped", async ({ server, dir: cwd }) => {
+  it("prints the whole object as plain text when piped, and JSON only with --json", async ({
+    server,
+    dir: cwd,
+  }) => {
     await makeProject(cwd);
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
@@ -518,7 +521,11 @@ describe("get rendering", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(JSON.parse(res.stdout)).toMatchObject({ id: "user_1", schema: "sch_default" });
+    expect(res.stdout).toMatch(/id\s+user_1/);
+    expect(res.stdout).toMatch(/schema\s+sch_default/);
+    expect(() => {
+      JSON.parse(res.stdout);
+    }).toThrow();
   });
 
   it("takes --fields on a terminal too", async ({ server, dir: cwd, terminal }) => {
@@ -2914,6 +2921,37 @@ describe("the id of a resource whose id has a format", () => {
   });
 });
 
+describe("an id no verb that takes one accepts", () => {
+  const VERBS = Object.entries(COMMANDS).flatMap(([id, command]) => {
+    const arg = command.args?.id;
+    return /:(get|update|delete)$/.test(id) && arg !== undefined ? [[id, arg] as const] : [];
+  });
+
+  it("is found on get, update and delete commands", () => {
+    const verbs = new Set(
+      VERBS.map(([id]) => {
+        return id.split(":").pop();
+      }),
+    );
+
+    expect([...verbs].sort()).toEqual(["delete", "get", "update"]);
+  });
+
+  it.each([
+    ["blank", ""],
+    ["a dot", "."],
+    ["two dots", ".."],
+    ["a control character", "user_1\u001b[2J"],
+    ["a line break", "user_1\nx"],
+  ])("is refused when it is %s", async (_, value) => {
+    for (const [id, arg] of VERBS) {
+      await expect(parseArg(arg, value, "id"), id).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
+    }
+  });
+});
+
 describe("an id the CLI refuses", () => {
   it("keeps the details its refusal carries in the failure envelope", async ({ dir: cwd }) => {
     await makeProject(cwd);
@@ -2977,14 +3015,19 @@ describe("an update that removes fields", () => {
 
   it("is previewed by --dry-run without asking", async ({ server, dir: cwd }) => {
     await makeProject(cwd);
+    const bodies: unknown[] = [];
     server.use(
-      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
     );
 
     const res = await run(cwd, [...removing, "--dry-run", "--json"]);
 
     expect(res).toSucceed();
     expect(parseJson(res.stdout)).toMatchObject({ data: { dry_run: true } });
+    expect(bodies).toEqual([{ attributes: { nickname: null }, dry_run: true }]);
   });
 
   it("is warned about by --dry-run, which suggests the real run with --force", async ({

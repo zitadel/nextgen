@@ -328,7 +328,7 @@ describe("variable get", () => {
     });
 
     describe("piped", () => {
-      it("gives a pipe a body that parses back to the value that was stored", async () => {
+      it("gives a pipe the value with its control characters spelled out", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("BANNER", "a\u009bb")).toSucceed();
 
@@ -336,11 +336,7 @@ describe("variable get", () => {
 
         expect(result).toSucceed();
         expect(result.stdout).not.toContain("\u009b");
-        expect(JSON.parse(result.stdout)).toEqual({
-          name: "BANNER",
-          secret: false,
-          value: "a\u009bb",
-        });
+        expect(result.stdout).toContain("value  a\\x9bb");
       });
 
       it("names the variable and says it is a secret, never its value", async () => {
@@ -349,7 +345,7 @@ describe("variable get", () => {
 
         const result = await offTerminal(() => app.getVariable("TOKEN", { json: false }));
 
-        expect(JSON.parse(result.stdout)).toEqual({ name: "TOKEN", secret: true });
+        expect(result.stdout).toContain("value  (secret)");
         expect(result.stdout + result.stderr).not.toContain("s3cret");
       });
 

@@ -25,7 +25,6 @@ import { nonBlankString } from "@/lib/oclif/flags";
 import { named } from "@/lib/names";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { helpOf } from "@/lib/suggestion";
-import { json } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
 import { resourceSuggestion } from "@/lib/suggestion";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
@@ -286,7 +285,6 @@ abstract class WriteOperation<
         // A write that answered no body has no record to print, so it keeps the
         // generic rendering that says the command completed. Printing `{}` would
         // be the record the write did not make.
-        ...(result === undefined ? {} : { piped: json(result) }),
         summary,
         ...(result && resource.get
           ? {

@@ -94,13 +94,13 @@ describe("invitation get", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("prints the invitation as JSON when piped", async () => {
+      it("prints the invitation as plain text when piped", async () => {
         const app = await aSetUpApp();
         const invitation = await app.invite();
 
         const result = await app.run(["invitation", "get", invitation]);
 
-        expect(result).toPrint('"status": "pending"');
+        expect(result).toPrintRow("status", "pending");
       });
 
       it.each(RENDERINGS)("shows the invitation's role, %s", async (_how, colour) => {

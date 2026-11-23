@@ -2,6 +2,8 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Command } from "@oclif/core";
+import { HttpResponse, http } from "msw";
+import type { SetupServer } from "msw/node";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { z } from "zod";
 
@@ -713,7 +715,7 @@ describe("output a script reads", () => {
     expect(stderr.join("\n")).toContain("team list --plain --fields name --page-token p2");
   });
 
-  it("leaves a created resource's JSON body as the only thing on stdout", async () => {
+  it("prints a created resource as plain text off a terminal", async () => {
     const command = bindOperation(
       CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
       definition(created),
@@ -721,7 +723,8 @@ describe("output a script reads", () => {
 
     const { stdout } = await printed(command, ["--name", "a"]);
 
-    expect(stdout).toEqual([JSON.stringify({ id: "team_1", name: "a" }, null, 2)]);
+    expect(stdout.join("\n")).toContain("Created team team_1");
+    expect(stdout.join("\n")).not.toMatch(/^\{/);
   });
 });
 
@@ -1132,18 +1135,54 @@ describe("delete confirmation", () => {
 
 describe("update confirmation", () => {
   const removing = ["team_1", "--set", "name:=null"];
-  const updating = (call: UpdateSpec<Ctx>["call"]) =>
-    Object.assign(
-      inCli(
-        bindOperationOnly(
-          UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
-          definition<UpdateSpec<Ctx>>({ schema: z.object({ name: z.string().nullable() }), call }),
-          ServerCommand,
-        ),
-        "team:update",
+  const ENDPOINT = "https://api.zitadel.example/teams/team_1";
+  const updating = Object.assign(
+    inCli(
+      bindOperationOnly(
+        UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+        definition<UpdateSpec<Ctx>>({
+          schema: z.object({ name: z.string().nullable() }),
+          call: async (_ctx, id, body) => {
+            const response = await fetch(`https://api.zitadel.example/teams/${id}`, {
+              method: "PATCH",
+              body: JSON.stringify(body),
+            });
+            return { id: String((await response.json()).id) };
+          },
+        }),
+        ServerCommand,
       ),
-      { wizard: true },
-    ) as unknown as { run(argv: string[]): Promise<unknown> };
+      "team:update",
+    ),
+    { wizard: true },
+  );
+
+  /**
+   * Runs the update command, as the CLI would.
+   *
+   * @param argv - The words after `team update`.
+   * @returns What the command resolved to.
+   */
+  function run(argv: string[]): Promise<unknown> {
+    return Reflect.apply(updating.run, updating, [argv]);
+  }
+
+  /**
+   * Answers the team endpoint and records every body the command sent to it.
+   *
+   * @param server - The test's request interceptor.
+   * @returns The bodies, in the order they arrived.
+   */
+  function recordingSends(server: SetupServer): unknown[] {
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(ENDPOINT, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: "team_1" });
+      }),
+    );
+    return bodies;
+  }
 
   beforeEach(() => {
     vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
@@ -1151,36 +1190,36 @@ describe("update confirmation", () => {
     vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_proj_env");
   });
 
-  it("is refused without --force when nothing can ask, and sends nothing", async () => {
-    const call = vi.fn(async () => ({ id: "team_1" }));
+  it("is refused without --force when nothing can ask, and sends nothing", async ({ server }) => {
+    const bodies = recordingSends(server);
 
     const { stdout } = await printing(() => {
-      return updating(call)
-        .run([...removing, "--json"])
-        .catch(() => undefined);
+      return run([...removing, "--json"]).catch(() => undefined);
     });
 
     expect(JSON.parse(stdout)).toMatchObject({
       code: "E_CONFIRMATION_REQUIRED",
       next_commands: [expect.stringContaining("--force")],
     });
-    expect(call).not.toHaveBeenCalled();
+    expect(bodies).toEqual([]);
   });
 
-  it("is sent with --force, without asking", async () => {
-    const call = vi.fn(async () => ({ id: "team_1" }));
+  it("is sent with --force, without asking", async ({ server }) => {
+    const bodies = recordingSends(server);
     const talk = answering(true);
 
-    await asTerminal(() => updating(call).run([...removing, "--force"]));
+    await asTerminal(() => run([...removing, "--force"]));
 
     expect(talk.asked()).toEqual([]);
-    expect(call).toHaveBeenCalledWith({ token: "t" }, "team_1", { name: null });
+    expect(bodies).toEqual([{ name: null }]);
   });
 
-  it("is previewed by --dry-run, which warns and suggests the real run with --force", async () => {
-    const call = vi.fn(async () => ({ id: "team_1" }));
+  it("is previewed by --dry-run, which warns and suggests the real run with --force", async ({
+    server,
+  }) => {
+    const bodies = recordingSends(server);
 
-    const envelope = await updating(call).run([...removing, "--dry-run", "--json"]);
+    const envelope = await run([...removing, "--dry-run", "--json"]);
 
     expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
       warnings: [expect.stringContaining("name")],
@@ -1189,36 +1228,36 @@ describe("update confirmation", () => {
         next_commands: [expect.stringContaining("--force")],
       },
     });
-    expect(call).not.toHaveBeenCalled();
+    expect(bodies).toEqual([]);
   });
 
-  it("asks what it removes, and sends the update when the answer is yes", async () => {
-    const call = vi.fn(async () => ({ id: "team_1" }));
+  it("asks what it removes, and sends the update when the answer is yes", async ({ server }) => {
+    const bodies = recordingSends(server);
     const talk = answering(true);
 
-    await asTerminal(() => updating(call).run(removing));
+    await asTerminal(() => run(removing));
 
     expect(talk.asked()).toEqual(["Remove name from team team_1?"]);
-    expect(call).toHaveBeenCalledWith({ token: "t" }, "team_1", { name: null });
+    expect(bodies).toEqual([{ name: null }]);
   });
 
-  it("sends nothing when the answer is no", async () => {
-    const call = vi.fn(async () => ({ id: "team_1" }));
+  it("sends nothing when the answer is no", async ({ server }) => {
+    const bodies = recordingSends(server);
     const talk = answering(false);
 
-    await asTerminal(() => updating(call).run(removing));
+    await asTerminal(() => run(removing));
 
     expect(talk.plain()).toContain("Cancelled");
-    expect(call).not.toHaveBeenCalled();
+    expect(bodies).toEqual([]);
   });
 
-  it("asks nothing when the update removes nothing", async () => {
-    const call = vi.fn(async () => ({ id: "team_1" }));
+  it("asks nothing when the update removes nothing", async ({ server }) => {
+    const bodies = recordingSends(server);
     const talk = answering(true);
 
-    await asTerminal(() => updating(call).run(["team_1", "--name", "a"]));
+    await asTerminal(() => run(["team_1", "--name", "a"]));
 
     expect(talk.asked()).toEqual([]);
-    expect(call).toHaveBeenCalled();
+    expect(bodies).toEqual([{ name: "a" }]);
   });
 });
