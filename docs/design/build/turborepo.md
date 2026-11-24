@@ -347,8 +347,8 @@ lanes, so a lane starts once its own dependencies are done) on GitHub's
 32-core arm64 runner, with `--concurrency=100%` (a task per core; the script
 keeps turbo's default of 10, which a laptop can take), measured from the pull request's or the merge group's base; a
 dispatch and the nightly run on `main` measure from the repository's first
-commit, so they run every task, and the nightly reads no cache. It keeps setup-go's and setup-node's caches
-and reads and writes Vercel's remote cache over OIDC; a fork's pull request
+commit, so they run every task, and the nightly reads no cache. It restores the Go caches the nightly saves,
+caches no pnpm store (ci.yml says why), and reads and writes Vercel's remote cache over OIDC; a fork's pull request
 gets no token and runs with the local cache only. A Changesets version PR
 runs like any other: the release checks are tasks of the graph
 (`@zitadel/release#check-npm` and `#check-changesets` under `test`, `pack`
