@@ -284,6 +284,20 @@ func FieldsFromStrings(s []string) []Field {
 	return out
 }
 
+// FlowDefinitionPurposesFromStrings lifts wire-format purpose names, mapped
+// to their entry steps, into typed purposes; an unknown name is refused.
+func FlowDefinitionPurposesFromStrings(entrySteps map[string]string) (map[FlowDefinitionPurpose]string, error) {
+	out := make(map[FlowDefinitionPurpose]string, len(entrySteps))
+	for name, entryStep := range entrySteps {
+		purpose, err := FlowDefinitionPurposeString(name)
+		if err != nil {
+			return nil, ErrFlowDefinitionInvalid("invalid purpose", nil)
+		}
+		out[purpose] = entryStep
+	}
+	return out, nil
+}
+
 // FieldsToStrings lowers typed [Field] values back to wire-format
 // strings at the API/repository boundary.
 func FieldsToStrings(f []Field) []string {

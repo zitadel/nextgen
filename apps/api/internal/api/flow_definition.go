@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"slices"
 
+	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -153,108 +153,11 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 		svcReq.FlowSchemaURI = u.String()
 	}
 
-	if definition.GetAudience().IsSet() {
-		svcReq.Audience = domain.FlowDefinitionAudience{
-			AppIDs:  definition.Audience.Value.AppIds,
-			TeamIDs: definition.Audience.Value.TeamIds,
-		}
-	}
+	svcReq.Audience = flow_definitions.AudienceFromAPI(definition.GetAudience())
 
-	// map steps to domain
-	steps := make([]domain.FlowDefinitionStep, 0, len(definition.GetSteps()))
-	for _, step := range definition.GetSteps() {
-		s := domain.FlowDefinitionStep{
-			Name:   step.GetName(),
-			Fields: domain.FieldsFromStrings(step.GetFields()),
-		}
-		// actions
-		actions := make([]domain.FlowStepAction, 0, len(step.GetActions()))
-		for _, apiAction := range step.GetActions() {
-			kind, err := domain.FlowActionKindString(string(apiAction.GetKind()))
-			if err != nil {
-				return svcReq, fmt.Errorf("step %q: action %q has invalid kind %q: %w", step.GetName(), apiAction.GetName(), apiAction.GetKind(), err)
-			}
-			actions = append(actions, domain.FlowStepAction{
-				Name:    apiAction.GetName(),
-				Kind:    kind,
-				Primary: apiAction.GetPrimary().Value,
-				TextKey: apiAction.GetTextKey().Value,
-			})
-		}
-		s.Actions = actions
-
-		// gates
-		if step.GetGates().IsSet() {
-			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
-			for name, apiGate := range step.GetGates().Value {
-				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo (grvijayan): validate in the domain layer
-
-				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
-				for k, v := range apiGate.GetConfig().Value {
-					var val any
-					if err := json.Unmarshal(v, &val); err == nil {
-						cfg[k] = val
-					}
-				}
-				gates[name] = domain.FlowStepGate{
-					Kind:     kind,
-					Provider: apiGate.GetProvider(),
-					Config:   cfg,
-				}
-			}
-			s.Gates = gates
-		}
-
-		// sso providers: connection slugs, stored as given
-		s.SSOProviders = slices.Clone(step.GetSSOProviders())
-
-		// transitions
-		if step.GetTransitions().IsSet() {
-			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
-			for name, apiTransition := range step.GetTransitions().Value {
-				// Get() is false for both absent and explicit-null values;
-				// IsSet() alone would map an explicit `null` to the zero
-				// enum. Non-null strings are enum-validated by the
-				// generated request decoder.
-				var transitionAction *domain.FlowDefinitionTransitionAction
-				if value, ok := apiTransition.Action.Get(); ok {
-					a, _ := domain.FlowDefinitionTransitionActionString(string(value))
-					transitionAction = &a
-				}
-				var transitionPurpose *domain.FlowDefinitionPurpose
-				if value, ok := apiTransition.Purpose.Get(); ok {
-					p, _ := domain.FlowDefinitionPurposeString(string(value))
-					transitionPurpose = &p
-				}
-
-				t := domain.FlowStepTransition{
-					Action:  transitionAction,
-					Purpose: transitionPurpose,
-					Target:  apiTransition.GetTarget().Or(""),
-				}
-				transitions[name] = t
-			}
-			s.Transitions = transitions
-		}
-
-		// complete
-		if step.GetComplete().IsSet() {
-			complete, err := domain.FlowStepCompleteString(string(step.GetComplete().Value))
-			if err != nil {
-				return svcReq, fmt.Errorf("step %q: invalid complete %q: %w", step.GetName(), step.GetComplete().Value, err)
-			}
-			s.Complete = &complete
-		}
-
-		// on_success
-		if step.GetOnSuccess().IsSet() {
-			onSuccess, err := domain.FlowOnSuccessString(string(step.GetOnSuccess().Value))
-			if err != nil {
-				return svcReq, fmt.Errorf("step %q: invalid on_success %q: %w", step.GetName(), step.GetOnSuccess().Value, err)
-			}
-			s.OnSuccess = &onSuccess
-		}
-		steps = append(steps, s)
+	steps, err := flow_definitions.StepsFromAPI(definition.GetSteps())
+	if err != nil {
+		return svcReq, err
 	}
 	svcReq.Steps = steps
 	return svcReq, nil
