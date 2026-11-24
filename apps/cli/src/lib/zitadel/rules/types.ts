@@ -73,6 +73,7 @@ export const RULE_IDS = [
   "sso/orphaned-verification-key",
   "sso/inert-connection",
   "sso/dead-capability",
+  "sso/unreferenced-typo-guard",
 ] as const;
 
 /**
