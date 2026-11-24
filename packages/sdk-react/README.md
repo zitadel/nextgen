@@ -44,6 +44,27 @@ export function ProfilePage() {
 The signed-in session card is `<ZitadelSession project={project} />` (exported
 as `ZitadelSession`).
 
+## Reading the session in your own UI
+
+`useSession()` tells your own components (header navigation, account menus, route guards) whether a user is signed in, and who. It asks the server once per page, with the same `GET /sessions/me` read the `ZitadelSession` card performs, and every component using the same project shares that read.
+
+```tsx
+import { useSession } from '@zitadel/sdk-react';
+
+export function AccountMenu() {
+  const { status, session } = useSession({ project });
+  if (status === 'loading') return null;
+  if (status === 'error') return <span role="alert">Session unavailable</span>;
+  return status === 'authenticated'
+    ? <a href="/profile">{session?.display ?? session?.identifier ?? 'Account'}</a>
+    : <a href="/login">Sign in</a>;
+}
+```
+
+`status` is `loading`, `authenticated`, `unauthenticated` or `error`. `error` means the read failed (often a misrouted proxy), so treat it as unknown, not signed out. `session` holds `userId`, `identifier`, `identifierProperty` and `display`, never a token. The hook takes the widgets' `project`, `projectId` and `proxyPath`, and falls back to `configureZitadel(...)`.
+
+Sign-in and sign-out navigate, so the next page reads the session again. To update in place, call the hook's `refresh()` from `onFlowComplete` or `onSignout`. Outside React, `getSession({ projectId, proxyPath })` returns the same answer as a promise of `{ isAuthenticated, session }`.
+
 ## Widget props and events
 
 `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.

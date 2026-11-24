@@ -39,6 +39,16 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types.js";
 
+export { getSession } from "@zitadel/sdk-core/session";
+export type {
+  ClientAuthResult,
+  ClientAuthState,
+  ClientSession,
+  GetSessionOptions,
+} from "@zitadel/sdk-core/session";
+export { useSession } from "./session.js";
+export type { SessionStatus, UseSessionOptions, UseSessionResult } from "./session.js";
+
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";

@@ -43,6 +43,11 @@
       "@zitadel/source": "./src/middleware.ts",
       "types": "./dist/middleware.d.mts",
       "import": "./dist/middleware.mjs"
+    },
+    "./session": {
+      "@zitadel/source": "./src/session.ts",
+      "types": "./dist/session.d.mts",
+      "import": "./dist/session.mjs"
     }
   },
   "publishConfig": {
