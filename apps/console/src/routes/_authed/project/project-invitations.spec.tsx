@@ -507,12 +507,32 @@ describe("managing an invitation", () => {
     });
   });
 
-  it("offers an expired invitation a new link but no cancel", async () => {
-    stubPage(listing(invitation({ status: "expired", expires_at: "2026-11-01T10:00:00Z" })));
+  it("offers an expired invitation a new link, and removes it rather than cancels it", async () => {
+    const reads = stubPage(
+      listing(invitation({ status: "expired", expires_at: "2026-11-01T10:00:00Z" })),
+    );
+    const removed: string[] = [];
+    server.use(
+      http.delete(`${INVITATIONS_URL}/:id`, ({ params }) => {
+        removed.push(params.id as string);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
     await openInvitations();
 
     await openMenu("Lena Becker");
     expect(await screen.findByRole("menuitem", { name: "Regenerate link" })).toBeInTheDocument();
+    // The link is already dead: there is nothing left to cancel.
     expect(screen.queryByRole("menuitem", { name: "Cancel invitation" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Remove invitation" }));
+    const confirm = within(await screen.findByRole("alertdialog"));
+    expect(confirm.getByText("Remove expired invitation?")).toBeInTheDocument();
+    const before = reads.length;
+    await userEvent.click(confirm.getByRole("button", { name: "Remove invitation" }));
+
+    expect(await screen.findByText("Invitation removed")).toBeInTheDocument();
+    expect(removed).toEqual(["inv_1"]);
+    expect(trackEvent).not.toHaveBeenCalled();
+    await waitFor(() => expect(reads.length).toBeGreaterThan(before));
   });
 });
