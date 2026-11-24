@@ -391,12 +391,6 @@
       "args": [],
       "flags": [
         {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
-        },
-        {
           "name": "dry-run",
           "description": "Preview without mutating files or the platform.",
           "type": "boolean"
@@ -427,12 +421,6 @@
           "name": "skip-install",
           "description": "Do not install the new dev dependencies.",
           "type": "boolean"
-        },
-        {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
         },
         {
           "name": "dry-run",
@@ -684,12 +672,6 @@
       ],
       "args": [],
       "flags": [
-        {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
-        },
         {
           "name": "dry-run",
           "description": "Preview without mutating files or the platform.",
@@ -2791,12 +2773,6 @@
           "type": "option"
         },
         {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
-        },
-        {
           "name": "dry-run",
           "description": "Preview without mutating files or the platform.",
           "type": "boolean"
@@ -4030,12 +4006,6 @@
       "description": "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.",
       "args": [],
       "flags": [
-        {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
-        },
         {
           "name": "dry-run",
           "description": "Preview without mutating files or the platform.",

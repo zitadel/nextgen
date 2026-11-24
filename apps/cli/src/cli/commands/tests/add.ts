@@ -18,7 +18,6 @@ import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { TestKit } from "@/lib/test-kit";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { BaseCommand } from "@/cli/core";
 
@@ -86,7 +85,7 @@ function runsTheSuite(ownScript: unknown): boolean {
  * that no longer matches this CLI's template, edited or written by another
  * version, is refused unless `--force` replaces it.
  */
-export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
+export default class TestsAdd extends Previewable(BaseCommand) {
   static override description =
     `Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to ${TestKit.PACKAGE}. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.`;
   static override group = CommandGroups.gettingStarted;
@@ -105,15 +104,6 @@ export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
       description: "Do not install the new dev dependencies.",
     }),
   };
-
-  /**
-   * Legacy: `--server` is accepted and ignored, so the run names no server.
-   *
-   * @returns No server.
-   */
-  protected override async resolveServer(): Promise<string> {
-    return "";
-  }
 
   /**
    * Says which files the test suite would add, without writing any.

@@ -13,15 +13,7 @@ import { stripAnsi } from "@tests/helpers/run-cli";
 import { ManagedFile } from "@/lib/orca/managed-file";
 
 function eject(cwd: string, extra: string[] = []) {
-  return runCliForTest([
-    "eject",
-    "--cwd",
-    cwd,
-    "--json",
-    "--server",
-    "https://preview.zitadel.com",
-    ...extra,
-  ]);
+  return runCliForTest(["eject", "--cwd", cwd, "--json", ...extra]);
 }
 
 async function exists(path: string): Promise<boolean> {

@@ -34,7 +34,6 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { Project } from "@/lib/project";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Promptable } from "@/cli/core/promptable";
 import { Previewable } from "@/cli/core/previewable";
 import { BaseCommand } from "@/cli/core";
@@ -92,7 +91,7 @@ function isBrandingDesign(value: string): value is BrandingDesign {
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends Promptable(Previewable(ServerCommand(BaseCommand))) {
+export default class BrandingEject extends Promptable(Previewable(BaseCommand)) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override group = CommandGroups.signIn;
@@ -133,15 +132,6 @@ export default class BrandingEject extends Promptable(Previewable(ServerCommand(
       description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
   };
-
-  /**
-   * Legacy: `--server` is accepted and ignored, so the run names no server.
-   *
-   * @returns No server.
-   */
-  protected override async resolveServer(): Promise<string> {
-    return "";
-  }
 
   /**
    * Says which files ejecting the design would write, without writing.

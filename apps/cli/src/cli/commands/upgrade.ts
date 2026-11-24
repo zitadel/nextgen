@@ -23,7 +23,6 @@ import {
   type UpgradeResult,
 } from "@/lib/upgrade";
 import { Project } from "@/lib/project";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { BaseCommand } from "@/cli/core";
 
@@ -45,22 +44,13 @@ type Plan = Awaited<ReturnType<Upgrader["plan"]>>;
  * choice the user made, as `doctor`'s `dependency-version` check also holds, so
  * it is reported and left alone.
  */
-export default class Upgrade extends Previewable(ServerCommand(BaseCommand)) {
+export default class Upgrade extends Previewable(BaseCommand) {
   static override description =
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 5;
 
   static override examples = ["<%= config.bin %> upgrade", "<%= config.bin %> upgrade --dry-run"];
-
-  /**
-   * Legacy: `--server` is accepted and ignored, so the run names no server.
-   *
-   * @returns No server.
-   */
-  protected override async resolveServer(): Promise<string> {
-    return "";
-  }
 
   /**
    * Upgrades the project in four steps, in an order that lets a person stop:

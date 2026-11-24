@@ -22,7 +22,6 @@ import {
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { BaseCommand } from "@/cli/core";
@@ -370,7 +369,7 @@ function ejected(
  * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
  */
 export default class Eject extends Destructive(
-  Previewable(ServerCommand(BaseCommand)),
+  Previewable(BaseCommand),
   "Remove the managed files and local state without the confirmation prompt. Required when non-interactive.",
 ) {
   static override description = "Remove managed files and local Zitadel state.";
@@ -384,15 +383,6 @@ export default class Eject extends Destructive(
   ];
 
   static override aliases = ["uninstall"];
-  /**
-   * Legacy: `--server` is accepted and ignored, so the run names no server.
-   *
-   * @returns No server.
-   */
-  protected override async resolveServer(): Promise<string> {
-    return "";
-  }
-
   /**
    * Says what ejecting would remove, without removing it.
    *
