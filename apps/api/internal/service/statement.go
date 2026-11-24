@@ -332,6 +332,9 @@ type ApplicationStatements interface {
 	// GetApplicationRevision returns the application at revisionID, newest or
 	// not, as a release pins it. No match returns *database.NoRowFoundError.
 	GetApplicationRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error)
+	// ListApplicationRevisions returns at most limit of the application's
+	// revisions, newest first. An unknown application returns none.
+	ListApplicationRevisions(ctx context.Context, projectID, applicationID string, limit uint32) ([]*domain.Application, error)
 	// ListApplicationClients returns the application's clients ordered by
 	// slug. An unknown application returns none.
 	ListApplicationClients(ctx context.Context, projectID, applicationID string) ([]*domain.ApplicationClient, error)

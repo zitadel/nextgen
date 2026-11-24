@@ -374,13 +374,13 @@ func (s *applicationService) declaredWriteRefusals(ctx context.Context, stmts Al
 
 // resolveOrCreateDeclared writes the application a release declares, on stmts
 // inside the build's transaction: a new slug creates it, a document equal to
-// its newest revision reuses that revision, and any other appends one. Each
+// one of its revisions reuses that revision, and any other appends one. Each
 // client's secret variable is claimed for that client. The caller validated
 // document and found no declaredWriteRefusals.
 func (s *applicationService) resolveOrCreateDeclared(ctx context.Context, stmts AllStatements, projectID string, next domain.ApplicationDocument, document []byte) (*domain.Application, error) {
 	existing, err := stmts.GetApplication(ctx, applicationBy(projectID, domain.ApplicationFieldSlug, next.Slug))
 	if err == nil {
-		return s.reviseDeclared(ctx, stmts, existing.ProjectID, existing.ID, next, document)
+		return s.resolveExistingDeclared(ctx, stmts, existing, next, document)
 	}
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 		return nil, applicationReadError(err)
@@ -416,7 +416,51 @@ func (s *applicationService) createDeclared(ctx context.Context, stmts AllStatem
 	if err != nil {
 		return nil, declaredWriteError(err)
 	}
+	return s.resolveExistingDeclared(ctx, stmts, existing, next, document)
+}
+
+// resolveExistingDeclared reuses the newest revision of existing whose
+// document equals document, so a release rebuilt from an older bundle keeps
+// its id. Otherwise it locks and revises. A registered application is never
+// reused: reviseDeclared refuses it.
+func (s *applicationService) resolveExistingDeclared(ctx context.Context, stmts AllStatements, existing *domain.Application, next domain.ApplicationDocument, document []byte) (*domain.Application, error) {
+	if existing.IsDeclared {
+		match, err := matchingApplicationRevision(ctx, stmts, existing, document)
+		if err != nil {
+			return nil, err
+		}
+		if match != nil {
+			return match, nil
+		}
+	}
 	return s.reviseDeclared(ctx, stmts, existing.ProjectID, existing.ID, next, document)
+}
+
+// matchingApplicationRevision returns the newest revision of app whose
+// document equals want, or nil when none of the newest maxHistoricalRevisions
+// match.
+func matchingApplicationRevision(ctx context.Context, stmts AllStatements, app *domain.Application, want []byte) (*domain.Application, error) {
+	same, err := domain.JSONEqual(app.Document, want)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to compare application documents")
+	}
+	if same {
+		return app, nil
+	}
+	revisions, err := stmts.ListApplicationRevisions(ctx, app.ProjectID, app.ID, maxHistoricalRevisions)
+	if err != nil {
+		return nil, applicationReadError(err)
+	}
+	for _, revision := range revisions {
+		same, err := domain.JSONEqual(revision.Document, want)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to compare application documents")
+		}
+		if same {
+			return revision, nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *applicationService) reviseDeclared(ctx context.Context, stmts AllStatements, projectID string, applicationID string, newDoc domain.ApplicationDocument, newDocBs []byte) (*domain.Application, error) {

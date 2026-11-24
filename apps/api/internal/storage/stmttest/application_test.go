@@ -198,6 +198,47 @@ func TestApplicationStatements_DeclaredAndPinnedRevisions(t *testing.T) {
 	})
 }
 
+func TestApplicationStatements_ListRevisionsNewestFirst(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		slug := "shop-" + uniqueSuffix(t)
+		web := &domain.ApplicationClient{Slug: "web"}
+		application := createApplication(t, d.stmts, projectID, slug, web)
+		first := application.RevisionID
+		api := &domain.ApplicationClient{Slug: "api"}
+		application.Document = applicationDocument(slug, web, api)
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), application, []*domain.ApplicationClient{api}))
+		second := application.RevisionID
+		application.Document = applicationDocument(slug, web)
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), application, nil))
+		third := application.RevisionID
+
+		revisions, err := d.stmts.ListApplicationRevisions(t.Context(), projectID, application.ID, 10)
+		require.NoError(t, err)
+		ids := make([]string, len(revisions))
+		for i, revision := range revisions {
+			ids[i] = revision.RevisionID
+			assert.Equal(t, application.ID, revision.ID)
+			assert.Equal(t, slug, revision.Slug)
+		}
+		assert.Equal(t, []string{third, second, first}, ids)
+		assert.JSONEq(t, string(applicationDocument(slug, web, api)), string(revisions[1].Document))
+
+		limited, err := d.stmts.ListApplicationRevisions(t.Context(), projectID, application.ID, 2)
+		require.NoError(t, err)
+		require.Len(t, limited, 2)
+		assert.Equal(t, third, limited[0].RevisionID)
+		assert.Equal(t, second, limited[1].RevisionID)
+
+		missing, err := d.stmts.ListApplicationRevisions(t.Context(), projectID, "app_unknown", 10)
+		require.NoError(t, err)
+		assert.Empty(t, missing)
+		crossProject, err := d.stmts.ListApplicationRevisions(t.Context(), ensureProject(t, d.stmts), application.ID, 10)
+		require.NoError(t, err)
+		assert.Empty(t, crossProject, "revisions are listed only in their own project")
+	})
+}
+
 // A secret variable name is claimed once per project, by one client.
 func TestApplicationStatements_SecretVariableClaims(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {

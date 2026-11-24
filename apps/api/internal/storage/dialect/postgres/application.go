@@ -188,15 +188,34 @@ func (s applicationStatements) getOne(ctx context.Context, filter database.Filte
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	entity, err := pgx.CollectExactlyOneRow(rows, func(row pgx.CollectableRow) (*domain.Application, error) {
-		entity := new(domain.Application)
-		if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.IsDeclared, &entity.RevisionID, &entity.Document, &entity.CreatedAt, &entity.UpdatedAt); err != nil {
-			return nil, err
-		}
-		return entity, nil
-	})
+	entity, err := pgx.CollectExactlyOneRow(rows, scanApplication)
 	if err != nil {
 		return nil, wrapError(err)
+	}
+	return entity, nil
+}
+
+// ListApplicationRevisions implements [service.ApplicationStatements].
+func (s applicationStatements) ListApplicationRevisions(ctx context.Context, projectID, applicationID string, limit uint32) ([]*domain.Application, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, applicationQuery, application.RevisionsListOptions(projectID, applicationID, limit), application.Schema); err != nil {
+		return nil, err
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	revisions, err := pgx.CollectRows(rows, scanApplication)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return revisions, nil
+}
+
+func scanApplication(row pgx.CollectableRow) (*domain.Application, error) {
+	entity := new(domain.Application)
+	if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.IsDeclared, &entity.RevisionID, &entity.Document, &entity.CreatedAt, &entity.UpdatedAt); err != nil {
+		return nil, err
 	}
 	return entity, nil
 }

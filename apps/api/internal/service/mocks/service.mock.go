@@ -5655,6 +5655,45 @@ func (c *MockAllStatementsListApplicationClientsCall) DoAndReturn(f func(context
 	return c
 }
 
+// ListApplicationRevisions mocks base method.
+func (m *MockAllStatements) ListApplicationRevisions(ctx context.Context, projectID, applicationID string, limit uint32) ([]*domain.Application, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListApplicationRevisions", ctx, projectID, applicationID, limit)
+	ret0, _ := ret[0].([]*domain.Application)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListApplicationRevisions indicates an expected call of ListApplicationRevisions.
+func (mr *MockAllStatementsMockRecorder) ListApplicationRevisions(ctx, projectID, applicationID, limit any) *MockAllStatementsListApplicationRevisionsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListApplicationRevisions", reflect.TypeOf((*MockAllStatements)(nil).ListApplicationRevisions), ctx, projectID, applicationID, limit)
+	return &MockAllStatementsListApplicationRevisionsCall{Call: call}
+}
+
+// MockAllStatementsListApplicationRevisionsCall wrap *gomock.Call
+type MockAllStatementsListApplicationRevisionsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListApplicationRevisionsCall) Return(arg0 []*domain.Application, arg1 error) *MockAllStatementsListApplicationRevisionsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListApplicationRevisionsCall) Do(f func(context.Context, string, string, uint32) ([]*domain.Application, error)) *MockAllStatementsListApplicationRevisionsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListApplicationRevisionsCall) DoAndReturn(f func(context.Context, string, string, uint32) ([]*domain.Application, error)) *MockAllStatementsListApplicationRevisionsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListAuthorizedProjects mocks base method.
 func (m *MockAllStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	m.ctrl.T.Helper()

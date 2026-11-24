@@ -210,6 +210,23 @@ func (s applicationStatements) getOne(ctx context.Context, filter database.Filte
 	return entity, nil
 }
 
+// ListApplicationRevisions implements [service.ApplicationStatements].
+func (s applicationStatements) ListApplicationRevisions(ctx context.Context, projectID, applicationID string, limit uint32) ([]*domain.Application, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, applicationQuery, application.RevisionsListOptions(projectID, applicationID, limit), application.Schema); err != nil {
+		return nil, err
+	}
+	var revisions []*domain.Application
+	if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		revisions, err = collectRows(iter, scanApplication)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return revisions, nil
+}
+
 // ListApplicationClients implements [service.ApplicationStatements].
 func (s applicationStatements) ListApplicationClients(ctx context.Context, projectID, applicationID string) ([]*domain.ApplicationClient, error) {
 	var clients []*domain.ApplicationClient

@@ -122,6 +122,14 @@ func TestDeclaredApplication(t *testing.T) {
 		assert.Equal(t, []string{"https://shop.example.com/auth/callback"}, served.Document.RedirectURIs)
 	})
 
+	t.Run("rebuilding an older bundle reuses its revision and release", func(t *testing.T) {
+		again := f.build(t, shop)
+		require.IsType(t, &api.BuildReleaseOK{}, again, helpers.MustMarshal(t, again))
+		rebuilt := api.Release(*again.(*api.BuildReleaseOK))
+		assert.Equal(t, v1.ID, rebuilt.ID)
+		assert.Equal(t, v1.Pointers[0].RevisionID, rebuilt.Pointers[0].RevisionID)
+	})
+
 	t.Run("a deployment whose release does not pin the application does not serve its client", func(t *testing.T) {
 		deployed := f.deploy(t, f.release.ID)
 		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
@@ -135,7 +143,8 @@ func TestDeclaredApplication(t *testing.T) {
 
 	t.Run("a release may drop a client an earlier build added", func(t *testing.T) {
 		dropped := f.build(t, moved)
-		require.IsType(t, &api.BuildReleaseCreated{}, dropped, helpers.MustMarshal(t, dropped))
+		require.IsType(t, &api.BuildReleaseOK{}, dropped, helpers.MustMarshal(t, dropped))
+		assert.Equal(t, v2.ID, api.Release(*dropped.(*api.BuildReleaseOK)).ID, "the revision without the client is reused")
 	})
 
 	t.Run("a dropped client keeps its client_id and its variable", func(t *testing.T) {
