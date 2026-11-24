@@ -188,10 +188,13 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 	if err != nil {
 		return nil, nil, nil, ErrInternal(err).WithMessage("failed to parse stored application")
 	}
-	removed := removedClients(oldDoc.Clients, newDoc.Clients)
-	modifiedClientIDs := modifiedClientIDs(oldDoc.Clients, newDoc.Clients)
-	if len(removed) > 0 || len(modifiedClientIDs) > 0 {
-		return nil, nil, nil, ErrApplicationFieldImmutable(append(modifiedClientIDs, removed...))
+	immutable := linq.FromSlice(removedClientIndexes(oldDoc.Clients, newDoc.Clients)).
+		Select(func(i int) string { return "/clients/" + oldDoc.Clients[i].Slug }).
+		Concat(linq.FromSlice(changedClientIDIndexes(oldDoc.Clients, newDoc.Clients)).
+			Select(func(i int) string { return fmt.Sprintf("/clients/%d/client_id", i) })).
+		ToSlice()
+	if len(immutable) > 0 {
+		return nil, nil, nil, ErrApplicationFieldImmutable(immutable)
 	}
 
 	toAdd := linq.FromSlice(newDoc.Clients).
@@ -263,8 +266,11 @@ func (app *Application) ReviseDeclaredApplication(stored []*ApplicationClient, n
 		}).
 		ToSlice()
 
-	if modifiedClientIDs := modifiedClientIDs(oldClients, newDoc.Clients); len(modifiedClientIDs) > 0 {
-		return nil, nil, ErrApplicationFieldImmutable(modifiedClientIDs)
+	immutable := linq.FromSlice(changedClientIDIndexes(oldClients, newDoc.Clients)).
+		Select(func(i int) string { return fmt.Sprintf("/clients/%d/client_id", i) }).
+		ToSlice()
+	if len(immutable) > 0 {
+		return nil, nil, ErrApplicationFieldImmutable(immutable)
 	}
 
 	toAdd, _ := slice_util.DiffFunc(oldClients, newDoc.Clients, func(a ApplicationClientDocument, b ApplicationClientDocument) bool { return a.Slug == b.Slug })
@@ -289,19 +295,15 @@ func (app *Application) ReviseDeclaredApplication(stored []*ApplicationClient, n
 }
 
 // ErrApplicationFieldImmutable rejects a revision that changes a client's
-// client_id or omits a stored client. details lists the location of each: the
+// client_id or omits a stored client. fields lists the location of each: the
 // client's index in the new document, or its slug for an omitted client, which
 // has no index there.
 // todo (@grvijayan) : denying removal of a client is temporary until the deletion semantics are defined.
-func ErrApplicationFieldImmutable(violatingClients []ApplicationClientDocument) Error {
+func ErrApplicationFieldImmutable(fields []string) Error {
 	return newError(
 		PrefixApplication.ErrorCodePrefix("field_immutable"),
 		"application: a revision may not change a client's client_id or remove a client",
-		map[string][]string{
-			"fields": linq.FromSlice(violatingClients).
-				Select(func(c ApplicationClientDocument) string { return "/clients/" + gu.Value(c.ClientID) }).
-				ToSlice(),
-		},
+		map[string][]string{"fields": fields},
 		nil)
 }
 
@@ -425,28 +427,28 @@ func validateApplicationDocument(doc ApplicationDocument) map[string]string {
 	return failures
 }
 
-func removedClients(oldClients, newClients []ApplicationClientDocument) []ApplicationClientDocument {
-	return linq.FromSlice(oldClients).
-		Where(func(oc ApplicationClientDocument) bool {
-			return !slices.ContainsFunc(newClients, func(c ApplicationClientDocument) bool {
-				return oc.Slug == c.Slug
-			})
-		}).
-		ToSlice()
+func removedClientIndexes(oldClients, newClients []ApplicationClientDocument) []int {
+	var indexes []int
+	for i, oldClient := range oldClients {
+		if !slices.ContainsFunc(newClients, func(c ApplicationClientDocument) bool { return c.Slug == oldClient.Slug }) {
+			indexes = append(indexes, i)
+		}
+	}
+	return indexes
 }
 
-func modifiedClientIDs(newClients, oldClients []ApplicationClientDocument) []ApplicationClientDocument {
-	return linq.FromSlice(oldClients).
-		Where(func(client ApplicationClientDocument) bool {
-			if client.ClientID == nil {
-				return false
-			}
-			oldClient, ok := slice_util.FindFunc(newClients, func(c ApplicationClientDocument) bool {
-				return c.Slug == client.Slug
-			})
-			return ok && !sameString(oldClient.ClientID, client.ClientID)
-		}).
-		ToSlice()
+func changedClientIDIndexes(oldClients, newClients []ApplicationClientDocument) []int {
+	var indexes []int
+	for i, newClient := range newClients {
+		if newClient.ClientID == nil {
+			continue
+		}
+		oldClient, ok := slice_util.FindFunc(oldClients, func(c ApplicationClientDocument) bool { return c.Slug == newClient.Slug })
+		if ok && !sameString(oldClient.ClientID, newClient.ClientID) {
+			indexes = append(indexes, i)
+		}
+	}
+	return indexes
 }
 
 func validateNoReservedClientIDs(doc ApplicationDocument, added []ApplicationClientDocument) error {

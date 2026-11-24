@@ -229,14 +229,14 @@ func TestReviseRegisteredApplication(t *testing.T) {
 			current:     current,
 			document:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("other")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/other"}},
+			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
 		},
 		{
 			name:        "an omitted client",
 			current:     current,
 			document:    []domain.ApplicationClientDocument{{Slug: "api"}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/client_01KWH3B"}},
+			wantDetails: map[string][]string{"fields": {"/clients/web"}},
 		},
 		{
 			name: "every omitted client and changed client_id",
@@ -247,7 +247,7 @@ func TestReviseRegisteredApplication(t *testing.T) {
 			}},
 			document:    []domain.ApplicationClientDocument{{Slug: "cli", ClientID: new("other")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/other", "/clients/client_01KWH3B", "/clients/client_01KWH3C"}},
+			wantDetails: map[string][]string{"fields": {"/clients/web", "/clients/api", "/clients/0/client_id"}},
 		},
 		{
 			name:     "every new client with a reserved prefix",
@@ -322,7 +322,14 @@ func TestReviseDeclaredApplication(t *testing.T) {
 			old:         declared,
 			document:    []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api-2")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string][]string{"fields": {"/clients/shop-api-2"}},
+			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
+		},
+		{
+			name:        "the location is the client's index in the new document",
+			old:         declared,
+			document:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}, {Slug: "api", ClientID: new("shop-api-2")}},
+			wantErr:     domain.ErrApplicationFieldImmutable(nil),
+			wantDetails: map[string][]string{"fields": {"/clients/1/client_id"}},
 		},
 		{
 			name:     "a new client with a reserved prefix",
