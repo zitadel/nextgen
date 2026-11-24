@@ -71,7 +71,7 @@ type ApplicationClientDocument struct {
 	// Secret is the `${{ NAME }}` reference to the variable holding a
 	// declared client's secret; a registered client has none.
 	Secret       *string `json:"secret"`
-	IsFirstParty *bool   `json:"is_first_party"`
+	IsFirstParty *bool   `json:"first_party"`
 }
 
 func (c ApplicationClientDocument) IsConfidential() bool {
