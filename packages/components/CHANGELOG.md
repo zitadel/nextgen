@@ -1,5 +1,19 @@
 # @zitadel/components
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/config@0.9.0
+
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [[`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8), [`a242dac`](https://github.com/zitadel/nextgen/commit/a242dacc9badeac3a451b89d2c6ef1e81031ccbf)]:
+  - @zitadel/config@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

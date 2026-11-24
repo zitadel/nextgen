@@ -1,0 +1,72 @@
+get:
+  operationId: getApplicationRevision
+  summary: Get a revision of an application
+  description: |
+    Returns one revision of an application that authenticates its users via
+    Zitadel, by its `revision_id`, the value a release pins. A declared
+    application is served at the revision its deployment's release pins, so
+    this is how to read what a release serves. It never returns a client
+    secret.
+
+    The lookup is scoped to the project in `project_id`.
+  tags:
+    - Applications
+  security:
+    - oauth2:
+        - application.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/application-revision-id.yaml
+  responses:
+    '200':
+      description: The revision.
+      content:
+        application/json:
+          schema:
+            $ref: ../../application-response.yaml
+          examples:
+            declared:
+              summary: A revision of an application a release declares
+              value:
+                id: app_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
+                slug: shop
+                declared: true
+                created_at: '2026-11-06T09:11:00Z'
+                updated_at: '2026-11-06T09:11:00Z'
+                definition:
+                  slug: shop
+                  name: Shop
+                  clients:
+                    - slug: web
+                      client_id: shop-web
+                      type: confidential
+                      secret: '${{ SHOP_WEB_CLIENT_SECRET }}'
+                      grant_types:
+                        - authorization_code
+                        - refresh_token
+                      redirect_uris:
+                        - https://shop.example.com/callback
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: |
+        No revision with this ID exists in the given project
+        (`app.not_found`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: getApplicationRevision-error-response.yaml

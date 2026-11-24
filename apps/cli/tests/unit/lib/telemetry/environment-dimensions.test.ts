@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
  * reason as in `variables-dimensions.test.ts`: consent gates the transport, so
  * a command test cannot see what a dimension is called.
  */
-const source = join(import.meta.dirname, "../../../../src/lib/oclif/environment-command.ts");
+const source = join(import.meta.dirname, "../../../../src/cli/core/environment-command.ts");
 const catalogDoc = join(
   import.meta.dirname,
   "../../../../../../docs/product-analytics-events.yaml",

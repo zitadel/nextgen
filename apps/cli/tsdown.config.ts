@@ -29,6 +29,7 @@ export default defineConfig({
     "cli/help": "src/cli/help.ts",
     "hooks/command-not-found": "src/cli/hooks/command-not-found.ts",
     "hooks/version-notice": "src/cli/hooks/version-notice.ts",
+    "hooks/json-shortcuts": "src/cli/hooks/json-shortcuts.ts",
   },
   outDir: "dist",
   tsconfig: "tsconfig.app.json",

@@ -23,10 +23,7 @@ type Needs = Fact<"answers" | "project">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "cwd" | "dryRun" | "env" | "isColored" | "isJson" | "narrate" | "signal" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "cwd" | "dryRun" | "env" | "narrate" | "signal" | "suggest" | "ui">;
 
 /**
  * Publishes what setup scaffolded, after the commit so the release records it,
@@ -84,8 +81,6 @@ export class DoInitialDeploy extends WizardStep<"deploy", Fact<"deployment">, Ne
         projectId: needs.project.id,
         cwd: this.deps.cwd,
         env: this.deps.env,
-        json: this.deps.isJson,
-        color: this.deps.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
         narrate: this.deps.narrate,
       });

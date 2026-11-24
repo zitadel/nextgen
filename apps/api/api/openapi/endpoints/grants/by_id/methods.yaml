@@ -14,10 +14,10 @@ get:
     Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
     (`relation=team`) rows and grants of another project all return `404`.
 
-    `expand=principal` adds envelope fields on `user` or `team`. For project
-    secrets it requires `user.read` and `team.read` in addition to `project.read`.
-    A user-bound console session that already passed the project check may expand
-    without those scopes.
+    `expand=principal` adds envelope fields on `user` or `team`. Expanding
+    requires read access to the principal's home project (the platform project
+    when the server has one), for project secrets and for console sessions alike.
+    A caller without it gets `403` `user.permission_denied`.
 
     Authenticate with a project secret (`oauth2`) or a console session cookie
     (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.

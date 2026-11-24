@@ -16,8 +16,9 @@ properties:
   client_ids:
     type: array
     description: |
-      The `client_id` of each client the write created. Each of them got a new
-      secret.
+      The `client_id` of each client the write created. A registered
+      application's new client got a new secret; a declared one's names the
+      variable holding its secret.
     items:
       type: string
   revision_id:

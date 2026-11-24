@@ -20,6 +20,7 @@ description: |
   - two schemas with the same `objectType`;
   - two flow definitions with the same `name`;
   - two IdP connections with the same `slug`;
+  - two applications with the same `slug`;
   - two policies for the same `operation`;
   - a schema without an `objectType`.
 
@@ -74,6 +75,42 @@ properties:
       carries no credentials.
     items:
       $ref: ../../idps/idp-connection.yaml
+  applications:
+    type: array
+    maxItems: 50
+    description: |
+      Declared applications, one per `.zitadel/applications/<slug>.json`,
+      each the document `POST /applications` takes as `application`. The
+      handle is `slug`. A release is the only writer of a declared
+      application: the build refuses a slug an application registered
+      through `POST /applications` holds, with an `app.registered` entry.
+
+      A declared application differs from a registered one in three ways,
+      each refused with an `app.invalid` entry naming the setting:
+      - every client sets its `client_id`, so the id is known before any
+        deploy;
+      - every confidential client names its secret as a `${{ NAME }}`
+        reference to a variable in `secret`, and no two clients in the
+        bundle name the same variable;
+      - no two clients in the bundle share a `client_id`.
+      Every client on either side of such a clash is refused.
+
+      A `client_id` another client of the project holds, or once held, gets
+      an `app.client_id_taken` entry, and a variable another client of the
+      project names, or once named, an `app.invalid` entry: a variable stays
+      the client's that first named it, so no other client is handed its
+      secret. A revision may not change a client's `client_id`
+      (`app.field_immutable`), even for a client an earlier release dropped.
+      Unlike on `POST /applications`, a revision may drop a client: the
+      deployments of that release stop serving it. A deploy is refused while
+      a variable a client names has no value for the target
+      (`dep.variables_missing`), or holds a plain value instead of a secret
+      (`dep.variables_not_secret`).
+
+      A declared application's clients are first-party unless their
+      `first_party` says otherwise.
+    items:
+      $ref: ../../schemas/application.yaml
   policies:
     type: array
     maxItems: 50

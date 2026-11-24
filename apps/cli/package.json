@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -39,7 +39,8 @@
     "helpClass": "./dist/cli/help",
     "hooks": {
       "command_not_found": "./dist/hooks/command-not-found",
-      "finally": "./dist/hooks/version-notice"
+      "finally": "./dist/hooks/version-notice",
+      "init": "./dist/hooks/json-shortcuts"
     },
     "additionalHelpFlags": [
       "-h"
@@ -155,6 +156,7 @@
     "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
+    "dot-prop": "catalog:",
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",
     "fastest-levenshtein": "catalog:",

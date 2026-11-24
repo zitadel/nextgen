@@ -128,6 +128,16 @@ export function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * A JSON value as one word on a command line.
+ *
+ * @param value - The value.
+ * @returns A string as it is, anything else as the JSON it is.
+ */
+export function wordOf(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+/**
  * @param target - The object to lay a patch over. It is not changed.
  * @param patch - What to lay over it.
  * @returns A new object: `target` with `patch` over it, where objects found at

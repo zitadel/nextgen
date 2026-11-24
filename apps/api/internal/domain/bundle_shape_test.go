@@ -73,6 +73,25 @@ func TestValidateBundleShape(t *testing.T) {
 		assert.False(t, domain.BundleEmpty(input))
 	})
 
+	t.Run("two applications with one slug are both refused", func(t *testing.T) {
+		t.Parallel()
+		input := domain.BundleShapeInput{
+			Applications: []domain.BundleShapeApplication{
+				{Index: 0, Document: []byte(`{"slug":"shop"}`)},
+				{Index: 1, Document: []byte(`{"slug":"shop"}`)},
+			},
+		}
+		failures := domain.ValidateBundleShape(input)
+		require.Len(t, failures, 2)
+		for i, failure := range failures {
+			assert.Equal(t, domain.ReleasePointerKindApplication, failure.Kind)
+			assert.Equal(t, "shop", failure.Handle)
+			assert.Equal(t, i, failure.Index)
+			assert.Contains(t, failure.Err.Details, "appears twice")
+		}
+		assert.False(t, domain.BundleEmpty(input))
+	})
+
 	t.Run("schema URL entries skip objectType checks", func(t *testing.T) {
 		t.Parallel()
 		failures := domain.ValidateBundleShape(domain.BundleShapeInput{

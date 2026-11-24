@@ -11,37 +11,27 @@ import (
 // IDs. Identifier no-match and password failure surface as
 // [ErrAuthAttemptProofRejected] (use [errors.Is]).
 //
-// Passkey is the exception: it is a two-phase WebAuthn ceremony, so it
-// cannot collapse issue+verify into one call. [IssuePasskeyChallenge]
-// mints the options the browser signs; [SubmitPasskey] verifies the
-// returned assertion. The state machine threads the challenge id between
-// the two via [FlowState.PendingChallenge].
+// A two-phase ceremony (a passkey sign-in or registration) cannot collapse
+// issue and verify into one call: [IssueChallenge] mints what the client
+// runs, and [VerifyChallenge] checks the proof it returns. Both are generic
+// over the check type, so a new ceremony adds a [FlowChallengeParams], not a
+// method. The state machine threads the challenge id between the two via
+// [FlowState.PendingChallenge].
 type FlowAuthAttemptService interface {
 	Start(ctx context.Context, in FlowCreateAttemptInput) (attemptID string, err error)
 	SubmitIdentifier(ctx context.Context, in FlowSubmitIdentifierInput) (userID string, err error)
 	SubmitPassword(ctx context.Context, in FlowSubmitPasswordInput) error
-	// IssuePasskeyChallenge mints a WebAuthn assertion challenge and
-	// returns its id plus the PublicKeyCredentialRequestOptions the
-	// browser passes to navigator.credentials.get().
-	IssuePasskeyChallenge(ctx context.Context, in FlowIssuePasskeyChallengeInput) (FlowPasskeyChallengeOutput, error)
-	// SubmitPasskey verifies the assertion against the issued challenge
-	// and returns the authenticated user id. For a discoverable login the
-	// user is resolved from the assertion; for an identified login it is
-	// the already-pinned user. Rejection surfaces as
-	// [ErrAuthAttemptProofRejected].
-	SubmitPasskey(ctx context.Context, in FlowSubmitPasskeyInput) (userID string, err error)
-	// IssuePasskeyRegistrationChallenge mints a WebAuthn registration
-	// challenge on the attempt and returns its id plus the
-	// PublicKeyCredentialCreationOptions the browser passes to
-	// navigator.credentials.create(). Enrollment rides the same two-phase
-	// ceremony shape as [IssuePasskeyChallenge]/[SubmitPasskey].
-	IssuePasskeyRegistrationChallenge(ctx context.Context, in FlowIssuePasskeyRegistrationChallengeInput) (FlowPasskeyRegistrationChallengeOutput, error)
-	// SubmitPasskeyRegistration verifies the attestation against the issued
-	// challenge and persists the new credential; for a provisional ceremony
-	// the user row is created in the same transaction. Rejection surfaces as
-	// [ErrAuthAttemptProofRejected]; a conflicting user as
-	// [ErrUserAlreadyExists].
-	SubmitPasskeyRegistration(ctx context.Context, in FlowSubmitPasskeyRegistrationInput) error
+	// IssueChallenge mints a challenge of the params' check type on the
+	// attempt and returns its id plus the options the client runs the
+	// ceremony with.
+	IssueChallenge(ctx context.Context, in FlowIssueChallengeInput) (FlowIssuedChallenge, error)
+	// VerifyChallenge verifies the proof against the issued challenge and
+	// returns the user it authenticated; a check whose user is bound at
+	// issue returns none. Rejection surfaces as
+	// [ErrAuthAttemptProofRejected], an expired challenge as
+	// [ErrAuthAttemptStaleChallenge], and a ceremony whose new user
+	// conflicts with an existing one as [ErrUserAlreadyExists].
+	VerifyChallenge(ctx context.Context, in FlowVerifyChallengeInput) (userID string, err error)
 	// Handoff mints the single-use token the client exchanges for a
 	// session. Called by the state machine on the terminal step.
 	Handoff(ctx context.Context, in FlowHandoffInput) (FlowHandoffOutput, error)
@@ -80,44 +70,38 @@ type FlowSubmitPasswordInput struct {
 	Plain     string
 }
 
-// FlowIssuePasskeyChallengeInput carries the WebAuthn relying-party
-// parameters the engine derives from the request. RPOrigins are the
-// allowed origins; UserVerification is the requirement (empty defaults
-// to the library default). RP params are needed only at issue time —
-// verification re-reads them from the persisted challenge.
-type FlowIssuePasskeyChallengeInput struct {
-	ProjectID        string
-	AttemptID        string
+// FlowIssueChallengeInput names the attempt a ceremony runs on and what the
+// challenge is issued with.
+type FlowIssueChallengeInput struct {
+	ProjectID string
+	AttemptID string
+	Params    FlowChallengeParams
+}
+
+// FlowChallengeParams is what one check type's ceremony is issued with.
+type FlowChallengeParams interface {
+	CheckType() AuthCheckType
+}
+
+// FlowPasskeyChallengeParams carries the WebAuthn relying-party parameters
+// the engine derives from the request. RPOrigins are the allowed origins;
+// UserVerification is the requirement (empty defaults to the library
+// default). RP params are needed only at issue time — verification re-reads
+// them from the persisted challenge.
+type FlowPasskeyChallengeParams struct {
 	RPID             string
 	RPOrigins        []string
 	UserVerification string
 }
 
-// FlowPasskeyChallengeOutput is the issued challenge. Options is the
-// PublicKeyCredentialRequestOptions JSON the client hands to the
-// authenticator; ChallengeID binds the later assertion to this issue.
-type FlowPasskeyChallengeOutput struct {
-	ChallengeID string
-	Options     []byte
-}
+func (FlowPasskeyChallengeParams) CheckType() AuthCheckType { return AuthCheckTypePasskey }
 
-// FlowSubmitPasskeyInput carries the signed assertion (Proof) plus the
-// ChallengeID returned by [FlowAuthAttemptService.IssuePasskeyChallenge].
-type FlowSubmitPasskeyInput struct {
-	ProjectID   string
-	AttemptID   string
-	ChallengeID string
-	Assertion   []byte
-}
-
-// FlowIssuePasskeyRegistrationChallengeInput carries the relying-party
+// FlowPasskeyRegistrationChallengeParams carries the relying-party
 // parameters and the user context needed to begin a registration ceremony.
 // UserID is the stable WebAuthn user handle (empty on a fresh sign-up: the
 // attempt service mints a provisional one); Username and DisplayName are
 // browser-visible labels when the flow has a collected identifier.
-type FlowIssuePasskeyRegistrationChallengeInput struct {
-	ProjectID   string
-	AttemptID   string
+type FlowPasskeyRegistrationChallengeParams struct {
 	UserID      string
 	Username    string
 	DisplayName string
@@ -125,27 +109,38 @@ type FlowIssuePasskeyRegistrationChallengeInput struct {
 	RPOrigins   []string
 }
 
-// FlowPasskeyRegistrationChallengeOutput is the issued challenge.
-// UserID is the WebAuthn user handle (minted by the attempt service when
-// the issue input had none).
-type FlowPasskeyRegistrationChallengeOutput struct {
+func (FlowPasskeyRegistrationChallengeParams) CheckType() AuthCheckType {
+	return AuthCheckTypePasskeyRegistration
+}
+
+// FlowIssuedChallenge is the issued challenge. Options is the JSON the client
+// hands to its authenticator (for passkey, the PublicKeyCredential request or
+// creation options); ChallengeID binds the later proof to this issue. UserID
+// is the user a check binds at issue: a registration's WebAuthn user handle,
+// minted by the attempt service when the params had none.
+type FlowIssuedChallenge struct {
 	ChallengeID string
 	UserID      string
 	Options     []byte
 }
 
-// FlowSubmitPasskeyRegistrationInput carries the attestation plus the
-// ChallengeID returned by IssuePasskeyRegistrationChallenge. UserSchemaURL
-// and UserAttributes feed the user creation that runs inside the verify
+// FlowVerifyChallengeInput carries the client's Proof for the challenge
+// ChallengeID of type Check. SignUp is set for a check whose verification may
+// create the attempt's user.
+type FlowVerifyChallengeInput struct {
+	ProjectID   string
+	AttemptID   string
+	Check       AuthCheckType
+	ChallengeID string
+	Proof       []byte
+	SignUp      *FlowChallengeSignUp
+}
+
+// FlowChallengeSignUp feeds the user creation that runs inside the verify
 // transaction when the ceremony is provisional. That creation is a sign-up:
-// it first spends the proof submitted under [SignupGate] in GateProofs,
-// bound to the flow in State.
-type FlowSubmitPasskeyRegistrationInput struct {
-	ProjectID      string
-	AttemptID      string
-	UserID         string
-	ChallengeID    string
-	Attestation    []byte
+// it first spends the proof submitted under [SignupGate] in GateProofs, bound
+// to the flow in State.
+type FlowChallengeSignUp struct {
 	UserSchemaURL  string
 	UserAttributes map[string]any
 	State          *FlowState

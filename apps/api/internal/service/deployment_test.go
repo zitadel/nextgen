@@ -300,10 +300,37 @@ func TestDeploymentServiceCreateMissingVariableWritesNothing(t *testing.T) {
 
 	_, err := svc.Create(t.Context(), deploymentInput())
 	de := assertServiceDomainCode(t, err, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code)
-	assert.Equal(t, domain.DeploymentVariablesMissingDetails{
+	assert.Equal(t, domain.DeploymentVariablesDetails{
 		Kind:  "primary",
 		Names: []string{"MISSING"},
 	}, de.Details)
+}
+
+// An identity provider's client secret must be a secret variable: a plain
+// one refuses the deploy rather than failing every sign-in.
+func TestDeploymentServiceCreatePlainIDPClientSecretWritesNothing(t *testing.T) {
+	svc, statements := newStrictDeploymentService(t)
+	expectPrimaryLock(statements)
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+		ID: "rel_1",
+		Pointers: []domain.ReleasePointer{{
+			Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_1",
+		}},
+	}, nil)
+	statements.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj_1"}, domain.DeploymentOriginKindPrimary).
+		Return([]*domain.Variable{
+			{Name: "GOOGLE_CLIENT_ID", Value: "client"},
+			{Name: "GOOGLE_CLIENT_SECRET", Value: "plain"},
+		}, nil)
+	statements.EXPECT().GetIDPConnectionRevision(gomock.Any(), "proj_1", "idprev_1").
+		Return(&domain.IDPConnection{Document: []byte(`{"oidc":{"client_id":"${{ GOOGLE_CLIENT_ID }}","client_secret":"${{ GOOGLE_CLIENT_SECRET }}"}}`)}, nil)
+
+	_, err := svc.Create(t.Context(), deploymentInput())
+	de := assertServiceDomainCode(t, err, domain.ErrDeploymentVariablesNotSecret(domain.DeploymentOriginKindPrimary, nil).Code)
+	assert.Equal(t, domain.DeploymentVariablesDetails{
+		Kind:  "primary",
+		Names: []string{"GOOGLE_CLIENT_SECRET"},
+	}, de.Details, "a plain client_id is fine")
 }
 
 // A policy pointer is part of the release. Its config is scanned like any
@@ -324,7 +351,7 @@ func TestDeploymentServiceCreateScansPolicyConfig(t *testing.T) {
 
 	_, err := svc.Create(t.Context(), deploymentInput())
 	de := assertServiceDomainCode(t, err, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code)
-	assert.Equal(t, domain.DeploymentVariablesMissingDetails{
+	assert.Equal(t, domain.DeploymentVariablesDetails{
 		Kind:  "primary",
 		Names: []string{"MISSING"},
 	}, de.Details)

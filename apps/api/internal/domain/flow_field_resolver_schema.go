@@ -45,7 +45,7 @@ func NewSchemaFieldResolver() *SchemaFieldResolver {
 var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
 
 func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string, fieldNames []Field) (FlowResolvedFields, error) {
-	root := newSchemaReader(schema)
+	root := NewSchemaReader(schema)
 	authMethods, err := root.AuthMethods()
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow field resolver: read x-auth-methods: %w", err)
@@ -88,7 +88,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 // [ErrFlowFieldNotScalar] when it lands on an object or array, and
 // [ErrFlowFieldUnsupportedType] when the JSON `type` keyword is an
 // ambiguous union.
-func resolveUserPropertyField(root schemaReader, field Field, stepName, identifier string) (FlowField, error) {
+func resolveUserPropertyField(root SchemaReader, field Field, stepName, identifier string) (FlowField, error) {
 	prop, required, err := walkUserProperty(root, field)
 	if err != nil {
 		return FlowField{}, err
@@ -99,7 +99,7 @@ func resolveUserPropertyField(root schemaReader, field Field, stepName, identifi
 		return FlowField{}, err
 	}
 
-	unique := deriveUnique(prop)
+	unique := DeriveUnique(prop)
 
 	ff := FlowField{
 		Name:      field.String(),
@@ -121,12 +121,12 @@ func resolveUserPropertyField(root schemaReader, field Field, stepName, identifi
 // missing segment — or an intermediate one that holds no `properties`,
 // so the path cannot continue through it — yields
 // [ErrFlowFieldUnknown] naming the whole path.
-func walkUserProperty(root schemaReader, field Field) (schemaReader, bool, error) {
+func walkUserProperty(root SchemaReader, field Field) (SchemaReader, bool, error) {
 	parent, required := root, true
 	for _, segment := range AttributeKey(field.String()).Nodes() {
 		prop, ok := parent.Property(segment)
 		if !ok {
-			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
+			return SchemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
 		}
 		if !parent.Requires(segment) {
 			required = false
@@ -171,7 +171,7 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 // [ErrFlowFieldUnsupportedType] when the JSON `type` is an ambiguous
 // union the resolver cannot reduce to a single kind, and
 // [ErrFlowFieldNotScalar] when the property has no field-shaped input.
-func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, error) {
+func deriveUserPropertyType(prop SchemaReader, field Field) (FlowFieldType, error) {
 	jsonType, err := prop.JSONType()
 	if err != nil {
 		return "", err
@@ -227,11 +227,13 @@ func deriveIdentifierChallenge(field Field, identifier string) FlowFieldChalleng
 	return FlowFieldChallengeNone
 }
 
-func deriveUnique(prop schemaReader) AttributeUniqueness {
+// DeriveUnique returns the uniqueness scope the property's x-unique
+// annotation declares.
+func DeriveUnique(prop SchemaReader) AttributeUniqueness {
 	return UniqueScopeOf(prop.String(SchemaAnnotationUnique))
 }
 
-func buildValidation(prop schemaReader) *FlowFieldValidation {
+func buildValidation(prop SchemaReader) *FlowFieldValidation {
 	v := FlowFieldValidation{
 		Format:    prop.String("format"),
 		MinLength: prop.Int("minLength"),
@@ -247,18 +249,20 @@ func buildValidation(prop schemaReader) *FlowFieldValidation {
 	return &v
 }
 
-// schemaReader is a thin reader over a [*jsonschema.Schema] that
+// SchemaReader is a thin reader over a [*jsonschema.Schema] that
 // centralizes the keyword-shape quirks (PartString vs PartAny,
 // nullable type unions, x-* extensions) so callers stay focused on
 // translation. Used both at root level (Properties, RequiredSet,
 // AuthMethods) and at property level (JSONType, String, Int,
 // StringEnum).
-type schemaReader struct {
-	s *jsonschema.Schema
+type SchemaReader struct {
+	// Schema is the schema or subschema the reader reads.
+	Schema *jsonschema.Schema
 }
 
-func newSchemaReader(s *jsonschema.Schema) schemaReader {
-	return schemaReader{s: s}
+// NewSchemaReader returns a [SchemaReader] over the given schema.
+func NewSchemaReader(s *jsonschema.Schema) SchemaReader {
+	return SchemaReader{Schema: s}
 }
 
 // JSONType returns the property's single JSON `type` keyword. JSON
@@ -267,8 +271,8 @@ func newSchemaReader(s *jsonschema.Schema) schemaReader {
 // Any other multi-entry union yields [ErrFlowFieldUnsupportedType],
 // since the resolver has no rule for picking one input kind over the
 // other.
-func (r schemaReader) JSONType() (string, error) {
-	v, ok := r.s.LookupKeyword("type")
+func (r SchemaReader) JSONType() (string, error) {
+	v, ok := r.Schema.LookupKeyword("type")
 	if !ok {
 		return "", nil
 	}
@@ -299,8 +303,8 @@ func (r schemaReader) JSONType() (string, error) {
 // string entries. Non-string entries are skipped: the user meta-schema
 // surfaces enums only for closed text choices today; numeric/boolean
 // enums (if ever added) would need a richer wire type.
-func (r schemaReader) StringEnum() []string {
-	v, ok := r.s.LookupKeyword("enum")
+func (r SchemaReader) StringEnum() []string {
+	v, ok := r.Schema.LookupKeyword("enum")
 	if !ok {
 		return nil
 	}
@@ -326,8 +330,8 @@ func (r schemaReader) StringEnum() []string {
 
 // String returns the string value of the given keyword, or "" when
 // absent or shaped differently.
-func (r schemaReader) String(keyword string) string {
-	v, ok := r.s.LookupKeyword(keyword)
+func (r SchemaReader) String(keyword string) string {
+	v, ok := r.Schema.LookupKeyword(keyword)
 	if !ok {
 		return ""
 	}
@@ -344,8 +348,8 @@ func (r schemaReader) String(keyword string) string {
 
 // Const returns the property's `const` value and true when present. The
 // value keeps its JSON-decoded type (bool, string, float64, ...).
-func (r schemaReader) Const() (any, bool) {
-	v, ok := r.s.LookupKeyword("const")
+func (r SchemaReader) Const() (any, bool) {
+	v, ok := r.Schema.LookupKeyword("const")
 	if !ok {
 		return nil, false
 	}
@@ -357,8 +361,8 @@ func (r schemaReader) Const() (any, bool) {
 }
 
 // Int returns the int value of the given keyword, or 0 when absent.
-func (r schemaReader) Int(keyword string) int {
-	v, ok := r.s.LookupKeyword(keyword)
+func (r SchemaReader) Int(keyword string) int {
+	v, ok := r.Schema.LookupKeyword(keyword)
 	if !ok {
 		return 0
 	}
@@ -369,39 +373,39 @@ func (r schemaReader) Int(keyword string) int {
 }
 
 // Properties returns each property listed in this level's `properties`
-// keyword as its own [schemaReader], or nil when the keyword is absent
+// keyword as its own [SchemaReader], or nil when the keyword is absent
 // or malformed.
-func (r schemaReader) Properties() map[string]schemaReader {
+func (r SchemaReader) Properties() map[string]SchemaReader {
 	m, ok := r.propertyMap()
 	if !ok {
 		return nil
 	}
-	out := make(map[string]schemaReader, len(m))
+	out := make(map[string]SchemaReader, len(m))
 	for name, prop := range m {
-		out[name] = newSchemaReader(prop)
+		out[name] = NewSchemaReader(prop)
 	}
 	return out
 }
 
-// Property answers for one name what [schemaReader.Properties] answers
+// Property answers for one name what [SchemaReader.Properties] answers
 // for every name, without materializing a reader per sibling. The walk
 // down a field's path runs on every render, so it takes this route.
-func (r schemaReader) Property(name string) (schemaReader, bool) {
+func (r SchemaReader) Property(name string) (SchemaReader, bool) {
 	m, ok := r.propertyMap()
 	if !ok {
-		return schemaReader{}, false
+		return SchemaReader{}, false
 	}
 	prop, ok := m[name]
 	if !ok {
-		return schemaReader{}, false
+		return SchemaReader{}, false
 	}
-	return newSchemaReader(prop), true
+	return NewSchemaReader(prop), true
 }
 
 // Requires reports whether name is listed in this level's `required`
-// keyword — the single-name counterpart of [schemaReader.RequiredSet].
-func (r schemaReader) Requires(name string) bool {
-	v, ok := r.s.LookupKeyword("required")
+// keyword — the single-name counterpart of [SchemaReader.RequiredSet].
+func (r SchemaReader) Requires(name string) bool {
+	v, ok := r.Schema.LookupKeyword("required")
 	if !ok {
 		return false
 	}
@@ -415,20 +419,20 @@ func (r schemaReader) Requires(name string) bool {
 // HasProperties reports whether this level carries a well-formed
 // `properties` keyword, which marks it an object even when the `type`
 // keyword is absent.
-func (r schemaReader) HasProperties() bool {
+func (r SchemaReader) HasProperties() bool {
 	_, ok := r.propertyMap()
 	return ok
 }
 
 // HasItems reports whether this level carries an `items` keyword, the
-// array counterpart of [schemaReader.HasProperties].
-func (r schemaReader) HasItems() bool {
-	_, ok := r.s.LookupKeyword("items")
+// array counterpart of [SchemaReader.HasProperties].
+func (r SchemaReader) HasItems() bool {
+	_, ok := r.Schema.LookupKeyword("items")
 	return ok
 }
 
-func (r schemaReader) propertyMap() (types.PartMapSchema, bool) {
-	v, ok := r.s.LookupKeyword("properties")
+func (r SchemaReader) propertyMap() (types.PartMapSchema, bool) {
+	v, ok := r.Schema.LookupKeyword("properties")
 	if !ok {
 		return nil, false
 	}
@@ -438,9 +442,9 @@ func (r schemaReader) propertyMap() (types.PartMapSchema, bool) {
 
 // RequiredSet returns the names listed in this level's `required`
 // keyword as a set.
-func (r schemaReader) RequiredSet() map[string]struct{} {
+func (r SchemaReader) RequiredSet() map[string]struct{} {
 	out := map[string]struct{}{}
-	v, ok := r.s.LookupKeyword("required")
+	v, ok := r.Schema.LookupKeyword("required")
 	if !ok {
 		return out
 	}
@@ -465,13 +469,13 @@ func (r schemaReader) RequiredSet() map[string]struct{} {
 // in materialized. It only exists in the document because something
 // beneath it was collected, and from that point document validation
 // enforces the rest of its `required` list.
-func (r schemaReader) RequiredPaths(materialized map[string]struct{}) map[string]struct{} {
+func (r SchemaReader) RequiredPaths(materialized map[string]struct{}) map[string]struct{} {
 	out := map[string]struct{}{}
 	r.collectRequiredPaths("", materialized, out)
 	return out
 }
 
-func (r schemaReader) collectRequiredPaths(prefix AttributeKey, materialized, out map[string]struct{}) {
+func (r SchemaReader) collectRequiredPaths(prefix AttributeKey, materialized, out map[string]struct{}) {
 	properties := r.Properties()
 	required := r.RequiredSet()
 
@@ -503,8 +507,8 @@ func (r schemaReader) collectRequiredPaths(prefix AttributeKey, materialized, ou
 // keyword. An empty (no-op) reader is returned when the keyword is
 // absent. An error is returned only when the keyword is present but
 // shaped differently than expected.
-func (r schemaReader) AuthMethods() (xAuthMethodsReader, error) {
-	v, ok := r.s.LookupKeyword(SchemaAnnotationAuthMethods)
+func (r SchemaReader) AuthMethods() (xAuthMethodsReader, error) {
+	v, ok := r.Schema.LookupKeyword(SchemaAnnotationAuthMethods)
 	if !ok {
 		return xAuthMethodsReader{}, nil
 	}
@@ -560,10 +564,10 @@ var requirednessKeywords = map[string]bool{
 }
 
 // ComposesRequiredness reports whether this level or any subschema below it
-// carries a keyword in [requirednessKeywords], so [schemaReader.RequiredPaths]
+// carries a keyword in [requirednessKeywords], so [SchemaReader.RequiredPaths]
 // would not see every requirement.
-func (r schemaReader) ComposesRequiredness() bool {
-	return composesRequiredness(r.s)
+func (r SchemaReader) ComposesRequiredness() bool {
+	return composesRequiredness(r.Schema)
 }
 
 func composesRequiredness(s *jsonschema.Schema) bool {
