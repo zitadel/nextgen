@@ -325,9 +325,10 @@ Anonymous product analytics: a copy of each event to Vercel Web Analytics
   `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
   email, name, IP, URL, project id, file path, secret or free text. Allowed
-  values are enums, booleans, counts and versions, and one exception:
+  values are enums, booleans, counts and versions, and two exceptions:
   `invitation_journey_id`, a random id that only ties one invitation's events
-  together (ADR 086 §9).
+  together (ADR 086 §9), and `project_hash`, a one-way hash of the project id
+  that lets the server's events about a project be matched to the CLI's.
 - Send a product event of its own (`this.trackEvent`) only where an ADR names
   one, as ADR 086 does for its invitation events; `catalog.test.ts` holds its
   properties to the catalog. Anything else is a dimension (next section).

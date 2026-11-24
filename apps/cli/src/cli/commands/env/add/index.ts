@@ -20,6 +20,7 @@ import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
 import { Project } from "@/lib/project";
+import { projectHash } from "@/lib/telemetry/dimensions/project-hash";
 import { ChoosingServerCommand } from "@/cli/commands/server-command";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
@@ -256,6 +257,7 @@ export default class EnvAdd extends Telemetered(Promptable(ChoosingServerCommand
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     this.ui.ranAgainst(projectId, server);
+    this.annotate({ project_hash: projectHash.value(projectId) });
 
     const values: Record<string, string> = {
       ZITADEL_URL: server,

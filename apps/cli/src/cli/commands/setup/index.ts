@@ -83,6 +83,7 @@ import { ShowResult } from "./steps/show-result";
 import { WriteConfiguration } from "./steps/write-configuration";
 import { WriteManifest } from "./steps/write-manifest";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { projectHash } from "@/lib/telemetry/dimensions/project-hash";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
@@ -537,8 +538,11 @@ export default class Setup extends Telemetered(
             suggest: this.suggest,
             ui: this.ui,
           }),
-          () => {
-            this.annotate({ setup_stage: "project_created" });
+          (state) => {
+            this.annotate({
+              setup_stage: "project_created",
+              project_hash: projectHash.value(state.project.id),
+            });
           },
         )
         .step(
