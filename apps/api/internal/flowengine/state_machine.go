@@ -128,9 +128,11 @@ var purposeChangeNotices = map[string]string{
 // the deferred pivot work.
 type StateMachine interface {
 	Start(ctx context.Context, in StartInput) (StepResult, error)
-	Process(ctx context.Context, def *domain.FlowDefinition, state *State, in SubmitInput) (StepResult, error)
+	// Process and Render read the flow's definition through
+	// [ActiveDefinition] on defs.
+	Process(ctx context.Context, defs Definitions, state *State, in SubmitInput) (StepResult, error)
 	// Render re-emits the current step without advancing. Backs GET /flows/{flow_id}.
-	Render(ctx context.Context, def *domain.FlowDefinition, state *State) (StepResult, error)
+	Render(ctx context.Context, defs Definitions, state *State) (StepResult, error)
 }
 
 // StartInput carries everything the state machine needs to
@@ -138,7 +140,9 @@ type StateMachine interface {
 type StartInput struct {
 	// ID is the flow handle the caller minted. The attempt the flow creates
 	// records it, so the handoff exchange's events join the flow's.
-	ID            string
+	ID string
+	// Definition is the flow's entry definition. The state Start returns
+	// names it, and later requests read it through [ActiveDefinition].
 	Definition    *domain.FlowDefinition
 	Purpose       domain.FlowDefinitionPurpose
 	Session       SessionRef
@@ -438,7 +442,8 @@ func (r *Runtime) Start(ctx context.Context, in StartInput) (StepResult, error) 
 // processCtx carries the per-submission context threaded through the
 // action kind handlers and their helpers.
 type processCtx struct {
-	ctx         context.Context
+	ctx context.Context
+	// def is the active flow's definition, as [ActiveDefinition] returned it.
 	def         *domain.FlowDefinition
 	state       *State
 	currentStep *domain.FlowDefinitionStep
@@ -447,9 +452,13 @@ type processCtx struct {
 
 // Process advances the flow one step by dispatching the submission to
 // the handler for its action kind (see [actionKindHandlers]).
-func (r *Runtime) Process(ctx context.Context, def *domain.FlowDefinition, state *State, in SubmitInput) (StepResult, error) {
-	if def == nil || state == nil {
+func (r *Runtime) Process(ctx context.Context, defs Definitions, state *State, in SubmitInput) (StepResult, error) {
+	if defs == nil || state == nil {
 		return StepResult{}, fmt.Errorf("%w: process without definition or state", domain.ErrFlowIntegrity())
+	}
+	def, err := ActiveDefinition(ctx, defs, state)
+	if err != nil {
+		return StepResult{}, err
 	}
 
 	currentStep, ok := def.FindStep(state.CurrentStep)

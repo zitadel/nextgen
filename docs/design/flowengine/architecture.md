@@ -92,8 +92,13 @@ The use-case surface the HTTP handler depends on. Four methods:
 |---|---|
 | `Resolve` | Pick the `FlowDefinition` to run from the revisions the release pins. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
 | `Start` | Mint a fresh `flowengine.State`, ask the state machine to bootstrap it, mint and attach `flow_*` and `sess_*` ids. |
-| `Submit` | Re-fetch the definition from `state.DefinitionID`, hand to `stateMachine.Process`. |
-| `GetStep` | Re-fetch the definition, hand to `stateMachine.Render` (no advancement). |
+| `Submit` | Load the definition `state.DefinitionID` names, hand the request's `flowengine.Definitions` to `stateMachine.Process`. |
+| `GetStep` | Hand the request's `flowengine.Definitions` to `stateMachine.Render` (no advancement). |
+
+The engine and the sign-up gate read the running flow's definition through
+`flowengine.ActiveDefinition`. The request's `flowengine.Definitions` loads each
+revision once, by the id the state names, which the release the flow started
+under pins.
 
 Service holds `*service.DB` (v2 statements), the `flowengine.StateMachine` interface,
 and the `idgen.Generator`. Flow definitions are loaded via

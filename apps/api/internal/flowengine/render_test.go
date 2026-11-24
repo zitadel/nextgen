@@ -135,7 +135,7 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 	assert.Equal(t, domain.AutocompleteUsername, start.Step.Fields[0].Autocomplete)
 	assert.Nil(t, start.Step.Identifier)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -182,7 +182,7 @@ func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T
 	})
 	require.NoError(t, err)
 
-	advanced, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	advanced, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -192,7 +192,7 @@ func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T
 	// Re-render the same state, as a page reload does. Every render reads
 	// the attempt for a parked SSO identity; there is none here.
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(nil, nil)
-	reloaded, err := w.sm.Render(t.Context(), def, advanced.State)
+	reloaded, err := w.sm.Render(t.Context(), served(def), advanced.State)
 	require.NoError(t, err)
 	require.NotNil(t, reloaded.Step)
 	require.Equal(t, "password", reloaded.Step.Name)
@@ -235,7 +235,7 @@ func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testin
 	require.NoError(t, err)
 	require.Equal(t, "profile", start.Step.Name)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})

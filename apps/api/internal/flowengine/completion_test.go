@@ -91,7 +91,7 @@ func TestCompletion_RefusalHoldsEveryProcessPath(t *testing.T) {
 				w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Return(nil)
 				def := loginDefinition()
 				state := w.startFlow(t, def, domain.FlowDefinitionPurposeLogin)
-				result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+				result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 					Action: flowengine.ActionSubmit,
 					Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "secret-password"},
 				})
@@ -106,7 +106,7 @@ func TestCompletion_RefusalHoldsEveryProcessPath(t *testing.T) {
 				w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Return("", domain.ErrAuthAttemptProofRejected(nil))
 				def := loginDefinition()
 				state := w.startFlow(t, def, domain.FlowDefinitionPurposeLogin)
-				result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+				result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 					Action: flowengine.ActionSubmit,
 					Fields: map[string]any{"email": "nobody@example.com", "x-auth-methods#password": "secret-password"},
 				})
@@ -122,7 +122,7 @@ func TestCompletion_RefusalHoldsEveryProcessPath(t *testing.T) {
 				w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Return(flowengine.OnSuccessResult{UserID: userID, Irreversible: true}, nil)
 				def := signupDefinition()
 				state := w.startFlow(t, def, domain.FlowDefinitionPurposeRegister)
-				result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+				result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 					Action: flowengine.ActionSubmit,
 					Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "secret-password"},
 				})
@@ -135,9 +135,9 @@ func TestCompletion_RefusalHoldsEveryProcessPath(t *testing.T) {
 				w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
 				def := navigateOnlyDefinition()
 				state := w.startFlow(t, def, domain.FlowDefinitionPurposeLogin)
-				mid, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{Action: "go"})
+				mid, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{Action: "go"})
 				require.NoError(t, err)
-				result, err := w.sm.Process(t.Context(), def, mid.State, flowengine.SubmitInput{Action: "go"})
+				result, err := w.sm.Process(t.Context(), served(def), mid.State, flowengine.SubmitInput{Action: "go"})
 				return result, err, "step2"
 			},
 		},
@@ -151,12 +151,12 @@ func TestCompletion_RefusalHoldsEveryProcessPath(t *testing.T) {
 				w.authAttemptService.EXPECT().VerifyChallenge(gomock.Any(), gomock.Any()).Return(userID, nil)
 				def := passkeyLoginDefinition()
 				state := w.startFlow(t, def, domain.FlowDefinitionPurposeLogin)
-				issued, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+				issued, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 					Action:    flowengine.ActionPasskey,
 					PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 				})
 				require.NoError(t, err)
-				result, err := w.sm.Process(t.Context(), def, issued.State, flowengine.SubmitInput{
+				result, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
 					Action:            flowengine.ActionPasskey,
 					ChallengeResponse: &flowengine.ChallengeResponse{ChallengeID: "ch-1", Method: flowengine.ChallengeMethodPasskey, Proof: []byte(`{}`)},
 				})
@@ -173,12 +173,12 @@ func TestCompletion_RefusalHoldsEveryProcessPath(t *testing.T) {
 				w.authAttemptService.EXPECT().VerifyChallenge(gomock.Any(), gomock.Any()).Return("", nil)
 				def := passkeyRegisterDefinition()
 				state := w.startFlow(t, def, domain.FlowDefinitionPurposeLogin)
-				issued, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+				issued, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 					Action:    flowengine.ActionPasskeyRegister,
 					PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 				})
 				require.NoError(t, err)
-				result, err := w.sm.Process(t.Context(), def, issued.State, flowengine.SubmitInput{
+				result, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
 					Action:            flowengine.ActionPasskeyRegister,
 					ChallengeResponse: &flowengine.ChallengeResponse{ChallengeID: "reg-1", Method: flowengine.ChallengeMethodPasskeyRegister, Proof: []byte(`{}`)},
 				})
@@ -207,7 +207,7 @@ func TestCompletion_RefusalHoldsEveryRenderPath(t *testing.T) {
 			tt.expect(w)
 			w.refuseCompletion()
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			assertCompletionRefused(t, result, err, "credentials")
 		})
 	}
@@ -216,7 +216,7 @@ func TestCompletion_RefusalHoldsEveryRenderPath(t *testing.T) {
 		w, def, state := boundCollectionStepWorld(t)
 		w.refuseCompletion()
 
-		result, err := w.sm.Render(t.Context(), def, state)
+		result, err := w.sm.Render(t.Context(), served(def), state)
 		assertCompletionRefused(t, result, err, "sso-register")
 	})
 }
@@ -244,7 +244,7 @@ func TestCompletion_ProceedCompletes(t *testing.T) {
 
 	def := loginDefinition()
 	state := w.startFlow(t, def, domain.FlowDefinitionPurposeLogin)
-	result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "secret-password"},
 	})
@@ -268,8 +268,8 @@ func TestCompletion_PolicyErrorFailsTheSubmission(t *testing.T) {
 
 	def := navigateOnlyDefinition()
 	state := w.startFlow(t, def, domain.FlowDefinitionPurposeLogin)
-	mid, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{Action: "go"})
+	mid, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
-	_, err = w.sm.Process(t.Context(), def, mid.State, flowengine.SubmitInput{Action: "go"})
+	_, err = w.sm.Process(t.Context(), served(def), mid.State, flowengine.SubmitInput{Action: "go"})
 	require.ErrorIs(t, err, unavailable)
 }

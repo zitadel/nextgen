@@ -84,7 +84,7 @@ func TestFlowStateMachine_Back_InjectedAfterAdvance(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{Action: "go"})
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
 	require.Equal(t, "step2", result.Step.Name)
 	require.Len(t, result.State.BackStack, 1)
@@ -113,9 +113,9 @@ func TestFlowStateMachine_Back_OmittedOnTerminalStep(t *testing.T) {
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	mid, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{Action: "go"})
+	mid, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
-	term, err := w.sm.Process(t.Context(), def, mid.State, flowengine.SubmitInput{Action: "go"})
+	term, err := w.sm.Process(t.Context(), served(def), mid.State, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
 
 	require.Equal(t, "done", term.Step.Name)
@@ -138,11 +138,11 @@ func TestFlowStateMachine_Back_PopsAndRendersPreviousStep(t *testing.T) {
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	advanced, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{Action: "go"})
+	advanced, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
 	require.Equal(t, "step2", advanced.Step.Name)
 
-	back, err := w.sm.Process(t.Context(), def, advanced.State, flowengine.SubmitInput{Action: "back"})
+	back, err := w.sm.Process(t.Context(), served(def), advanced.State, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	require.Equal(t, "step1", back.Step.Name)
 	assert.Empty(t, back.State.BackStack, "back-stack pops on back submission")
@@ -167,7 +167,7 @@ func TestFlowStateMachine_Back_EmptyBackStackRejected(t *testing.T) {
 	require.NoError(t, err)
 
 	// Client-synthesized back on the initial step must be rejected.
-	_, err = w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{Action: "back"})
+	_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{Action: "back"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrFlowInvalidAction())
 }
@@ -201,7 +201,7 @@ func TestFlowStateMachine_Back_RestoresPurposeAfterFlip(t *testing.T) {
 	require.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
 
 	// Submit unknown email → user_not_found flips CurrentPurpose to register.
-	afterSubmit, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterSubmit, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "ghost@example.com"},
 	})
@@ -210,7 +210,7 @@ func TestFlowStateMachine_Back_RestoresPurposeAfterFlip(t *testing.T) {
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, afterSubmit.State.CurrentPurpose)
 
 	// Back must restore the identifier step AND the login purpose.
-	afterBack, err := w.sm.Process(t.Context(), def, afterSubmit.State, flowengine.SubmitInput{Action: "back"})
+	afterBack, err := w.sm.Process(t.Context(), served(def), afterSubmit.State, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	assert.Equal(t, "identifier", afterBack.Step.Name)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, afterBack.State.CurrentPurpose, "back must restore the pre-flip purpose")
@@ -250,7 +250,7 @@ func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
@@ -300,20 +300,20 @@ func TestFlowStateMachine_Back_MultiHopPopsProgressively(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	s2, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{Action: "go"})
+	s2, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
-	s3, err := w.sm.Process(t.Context(), def, s2.State, flowengine.SubmitInput{Action: "go"})
+	s3, err := w.sm.Process(t.Context(), served(def), s2.State, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
 	require.Equal(t, "step3", s3.Step.Name)
 	require.Len(t, s3.State.BackStack, 2)
 
-	back1, err := w.sm.Process(t.Context(), def, s3.State, flowengine.SubmitInput{Action: "back"})
+	back1, err := w.sm.Process(t.Context(), served(def), s3.State, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	assert.Equal(t, "step2", back1.Step.Name)
 	require.Len(t, back1.State.BackStack, 1)
 	assert.NotNil(t, findBackAction(back1.Step))
 
-	back2, err := w.sm.Process(t.Context(), def, back1.State, flowengine.SubmitInput{Action: "back"})
+	back2, err := w.sm.Process(t.Context(), served(def), back1.State, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	assert.Equal(t, "step1", back2.Step.Name)
 	assert.Empty(t, back2.State.BackStack)
@@ -346,14 +346,14 @@ func TestFlowStateMachine_Back_PreservesCollectedData(t *testing.T) {
 	require.NoError(t, err)
 
 	const email = "ghost@example.com"
-	afterSubmit, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterSubmit, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "register", afterSubmit.Step.Name)
 
-	afterBack, err := w.sm.Process(t.Context(), def, afterSubmit.State, flowengine.SubmitInput{Action: "back"})
+	afterBack, err := w.sm.Process(t.Context(), served(def), afterSubmit.State, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	require.Equal(t, "identifier", afterBack.Step.Name)
 	// The email survives back so the previous form pre-fills.
@@ -378,7 +378,7 @@ func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	advanced, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{Action: "go"})
+	advanced, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{Action: "go"})
 	require.NoError(t, err)
 
 	// Simulate a ceremony pending on step2. The challenge id is bound to
@@ -386,7 +386,7 @@ func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 	// against a different step.
 	advanced.State.PendingChallenge = &flowengine.PendingChallenge{ID: "ch-1", Method: flowengine.ChallengeMethodPasskey}
 
-	afterBack, err := w.sm.Process(t.Context(), def, advanced.State, flowengine.SubmitInput{Action: "back"})
+	afterBack, err := w.sm.Process(t.Context(), served(def), advanced.State, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	assert.Equal(t, "step1", afterBack.Step.Name)
 	assert.Nil(t, afterBack.State.PendingChallenge, "back must drop the pending challenge")
@@ -414,13 +414,13 @@ func TestFlowStateMachine_Process_BackRestoresPurposeAcrossSwitch(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	toRegister, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	toRegister, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: "register",
 	})
 	require.NoError(t, err)
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
 
-	back, err := w.sm.Process(t.Context(), def, toRegister.State, flowengine.SubmitInput{
+	back, err := w.sm.Process(t.Context(), served(def), toRegister.State, flowengine.SubmitInput{
 		Action: "back",
 	})
 	require.NoError(t, err)
@@ -476,7 +476,7 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -486,7 +486,7 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 
 	// A rejected password holds the user on the step — this is what sends
 	// them looking for the back action in the first place.
-	afterWrongPassword, err := w.sm.Process(t.Context(), def, afterIdentify.State, flowengine.SubmitInput{
+	afterWrongPassword, err := w.sm.Process(t.Context(), served(def), afterIdentify.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "not-the-password"},
 	})
@@ -499,7 +499,7 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 	// next.
 	require.Empty(t, afterWrongPassword.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
 
-	back, err := w.sm.Process(t.Context(), def, afterWrongPassword.State, flowengine.SubmitInput{
+	back, err := w.sm.Process(t.Context(), served(def), afterWrongPassword.State, flowengine.SubmitInput{
 		Action: "back",
 	})
 	require.NoError(t, err)
@@ -515,7 +515,7 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 
 	// The whole point: re-identifying now lands on the rotated attempt
 	// instead of dying on "The user was already authenticated".
-	reIdentified, err := w.sm.Process(t.Context(), def, back.State, flowengine.SubmitInput{
+	reIdentified, err := w.sm.Process(t.Context(), served(def), back.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -600,14 +600,14 @@ func TestFlowStateMachine_Back_WithinVerificationKeepsAuthAttempt(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "password", afterIdentify.State.CurrentStep)
 
-	afterPassword, err := w.sm.Process(t.Context(), def, afterIdentify.State, flowengine.SubmitInput{
+	afterPassword, err := w.sm.Process(t.Context(), served(def), afterIdentify.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "very-good-password-1"},
 	})
@@ -615,7 +615,7 @@ func TestFlowStateMachine_Back_WithinVerificationKeepsAuthAttempt(t *testing.T) 
 	require.Equal(t, "confirm", afterPassword.State.CurrentStep)
 	require.Equal(t, "user_alice", afterPassword.State.CollectedData.UserID)
 
-	back, err := w.sm.Process(t.Context(), def, afterPassword.State, flowengine.SubmitInput{
+	back, err := w.sm.Process(t.Context(), served(def), afterPassword.State, flowengine.SubmitInput{
 		Action: "back",
 	})
 	require.NoError(t, err)
@@ -667,7 +667,7 @@ func TestFlowStateMachine_Back_AfterUserAlreadyExistsRotatesAuthAttempt(t *testi
 	require.NoError(t, err)
 	require.Equal(t, "register", start.State.CurrentStep)
 
-	flipped, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	flipped, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": taken},
 	})
@@ -677,7 +677,7 @@ func TestFlowStateMachine_Back_AfterUserAlreadyExistsRotatesAuthAttempt(t *testi
 	require.Equal(t, "user_alice", flipped.State.CollectedData.UserID,
 		"user_already_exists pins the user on the attempt, so the flow must record it")
 
-	back, err := w.sm.Process(t.Context(), def, flipped.State, flowengine.SubmitInput{
+	back, err := w.sm.Process(t.Context(), served(def), flipped.State, flowengine.SubmitInput{
 		Action: "back",
 	})
 	require.NoError(t, err)
@@ -688,7 +688,7 @@ func TestFlowStateMachine_Back_AfterUserAlreadyExistsRotatesAuthAttempt(t *testi
 
 	// A different address on the rotated attempt resolves normally; on the
 	// old one it would have died on "The user was already authenticated".
-	retried, err := w.sm.Process(t.Context(), def, back.State, flowengine.SubmitInput{
+	retried, err := w.sm.Process(t.Context(), served(def), back.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": fresh},
 	})
@@ -724,14 +724,14 @@ func TestFlowStateMachine_Back_WithoutResolvedUserMintsNoAttempt(t *testing.T) {
 	require.NoError(t, err)
 
 	// user_not_found routes on to register with nothing resolved.
-	flipped, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	flipped, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "ghost@example.com"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "register", flipped.State.CurrentStep)
 
-	back, err := w.sm.Process(t.Context(), def, flipped.State, flowengine.SubmitInput{
+	back, err := w.sm.Process(t.Context(), served(def), flipped.State, flowengine.SubmitInput{
 		Action: "back",
 	})
 	require.NoError(t, err)

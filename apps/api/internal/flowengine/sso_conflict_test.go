@@ -70,9 +70,9 @@ func conflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *flowe
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	toRegister, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{Action: "register"})
+	toRegister, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{Action: "register"})
 	require.NoError(t, err)
-	conflict, err := w.sm.Process(t.Context(), def, toRegister.State, flowengine.SubmitInput{
+	conflict, err := w.sm.Process(t.Context(), served(def), toRegister.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "alice@example.com"},
 	})
@@ -93,7 +93,7 @@ func TestFlowStateMachine_Process_ConflictBackAfterSignInAsksToSignIn(t *testing
 	w.authAttemptService.EXPECT().Start(gomock.Any(), attemptFor(testProjectID, "sess-1")).Return("attempt-2", nil)
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
 
-	identifier, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{Action: "sign_in"})
+	identifier, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{Action: "sign_in"})
 	require.NoError(t, err)
 	assert.Equal(t, "identifier", identifier.State.CurrentStep)
 	assert.Empty(t, identifier.State.CollectedData.UserID)
@@ -103,12 +103,12 @@ func TestFlowStateMachine_Process_ConflictBackAfterSignInAsksToSignIn(t *testing
 	// pins that the way back ends in a step error, not an API error.
 	require.NotNil(t, findBackAction(identifier.Step))
 
-	back, err := w.sm.Process(t.Context(), def, identifier.State, flowengine.SubmitInput{Action: "back"})
+	back, err := w.sm.Process(t.Context(), served(def), identifier.State, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	require.Equal(t, "sso-conflict", back.State.CurrentStep)
 	assert.Empty(t, back.State.CollectedData.UserID)
 
-	result, err := w.sm.Process(t.Context(), def, back.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), back.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -151,7 +151,7 @@ func bankedRegisterPassword(t *testing.T) (*flowTestWorld, *domain.FlowDefinitio
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	banked, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	banked, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "new@example.com", "x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -168,7 +168,7 @@ func TestFlowStateMachine_Process_RePurposeDropsBankedRegisterPassword(t *testin
 	t.Parallel()
 	w, def, state := bankedRegisterPassword(t)
 
-	result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{Action: "sign_in"})
+	result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{Action: "sign_in"})
 	require.NoError(t, err)
 	assert.Equal(t, "identifier", result.State.CurrentStep)
 	assert.Empty(t, result.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
@@ -180,7 +180,7 @@ func TestFlowStateMachine_Process_BackToIdentificationDropsBankedPassword(t *tes
 	t.Parallel()
 	w, def, state := bankedRegisterPassword(t)
 
-	result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{Action: "back"})
+	result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{Action: "back"})
 	require.NoError(t, err)
 	assert.Equal(t, "register", result.State.CurrentStep)
 	assert.Empty(t, result.State.CollectedData.AuthMethods[domain.AuthMethodPassword])
@@ -198,7 +198,7 @@ func TestFlowStateMachine_Process_ConflictPasswordSignsInAndDropsPassword(t *tes
 		Return(nil)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.HandoffOutput{Token: "handoff_01TEST"}, nil)
 
-	result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -230,7 +230,7 @@ func TestFlowStateMachine_Process_ConflictPasskeySignsInBoundUser(t *testing.T) 
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.HandoffOutput{Token: "handoff_01TEST"}, nil)
 
-	issued, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+	issued, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 		Action:    flowengine.ActionPasskey,
 		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
@@ -238,7 +238,7 @@ func TestFlowStateMachine_Process_ConflictPasskeySignsInBoundUser(t *testing.T) 
 	require.NotNil(t, issued.Step.Challenge)
 	assert.Equal(t, "sso-conflict", issued.State.CurrentStep)
 
-	verified, err := w.sm.Process(t.Context(), def, issued.State, flowengine.SubmitInput{
+	verified, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
 		Action:            flowengine.ActionPasskey,
 		ChallengeResponse: &flowengine.ChallengeResponse{ChallengeID: challengeID, Method: "passkey", Proof: []byte(proof)},
 	})
@@ -309,7 +309,7 @@ func TestFlowStateMachine_Render_SSOConflictNamesVerifiedAccountAndDropsCollidin
 	w.expectBindCollision("user-9", nil)
 	w.ssoIdentities.EXPECT().UserHasPasskey(gomock.Any(), testProjectID, "user-9").Return(false, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "sso-conflict", result.Step.Name)
 	require.NotNil(t, result.Step.Identifier)
@@ -330,7 +330,7 @@ func TestFlowStateMachine_Render_SSOConflictDoesNotNameUnverifiedAccount(t *test
 	w.expectBindCollision("user-9", nil)
 	w.ssoIdentities.EXPECT().UserHasPasskey(gomock.Any(), testProjectID, "user-9").Return(true, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Nil(t, result.Step.Identifier)
@@ -349,7 +349,7 @@ func TestFlowStateMachine_Render_SSOConflictDropsOtherTypedIdentifier(t *testing
 	w.expectBindCollision("user-9", nil)
 	w.ssoIdentities.EXPECT().UserHasPasskey(gomock.Any(), testProjectID, "user-9").Return(true, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Nil(t, result.Step.Identifier)
@@ -362,7 +362,7 @@ func TestFlowStateMachine_Process_SSOConflictClearedWithBoundUser(t *testing.T) 
 	state.CollectedData.SSOConflictConnectionID = "idp-1"
 	w.authAttemptService.EXPECT().Start(gomock.Any(), attemptFor(testProjectID, "sess-1")).Return("attempt-2", nil)
 
-	result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{Action: "sign_in"})
+	result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{Action: "sign_in"})
 	require.NoError(t, err)
 	assert.Empty(t, result.State.CollectedData.SSOConflictConnectionID)
 }

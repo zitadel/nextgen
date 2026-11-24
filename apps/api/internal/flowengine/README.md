@@ -7,7 +7,9 @@ collects step fields, and runs the passkey and SSO ceremonies.
 
 It does not own:
 
-- flow definitions and their validation, which live in `domain`;
+- flow definitions and their validation, which live in `domain`; it reads the
+  running flow's definition through `ActiveDefinition` (`state.go`), from the
+  `Definitions` the service builds per request;
 - persistence, policy and side effects, which it calls through the ports it
   declares (`port_<subject>.go`) and `service` implements;
 - keeping flow state: it takes and returns the `State` it declares

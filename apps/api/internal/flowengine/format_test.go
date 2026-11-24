@@ -91,7 +91,7 @@ func TestFlowStateMachine_Process_IdentifierFailingItsFormat(t *testing.T) {
 			def := flowFormatDefinition(purpose)
 			state := startFormatFlow(t, w, def, purpose)
 
-			result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+			result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 				Action: flowengine.ActionSubmit,
 				Fields: map[string]any{"employee": legacyIdentifier},
 			})
@@ -115,7 +115,7 @@ func TestFlowStateMachine_Process_SSOCollectionHoldsIdentifierToItsFormat(t *tes
 	verified["email"] = false
 	w.expectCollected(unlinkedParked(claims, verified), nil).AnyTimes()
 
-	result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(fields map[string]any) {
+	result, err := w.sm.Process(t.Context(), served(def), state, collectionSubmit(func(fields map[string]any) {
 		fields["email"] = "not-an-email"
 	}))
 	require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 		t.Parallel()
 		w, def, state := build(t)
 		state.CollectedData.UserData = map[string]any{"homepage": "https://stale.example.com"}
-		result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+		result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 			Action: flowengine.ActionSubmit,
 			Fields: map[string]any{"employee": uuidIdentifier, "homepage": "", "seen": ""},
 		})
@@ -169,7 +169,7 @@ func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 	t.Run("a filled one is held to the format on its own step", func(t *testing.T) {
 		t.Parallel()
 		w, def, state := build(t)
-		result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+		result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 			Action: flowengine.ActionSubmit,
 			Fields: map[string]any{"employee": uuidIdentifier, "homepage": "no scheme"},
 		})

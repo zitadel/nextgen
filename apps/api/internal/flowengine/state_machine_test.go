@@ -88,6 +88,18 @@ func findAction(actions []flowengine.StepAction, name string) (flowengine.StepAc
 	return flowengine.StepAction{}, false
 }
 
+// servedDefinition answers every id with one definition, as a request's
+// definitions do for a flow that runs on one.
+type servedDefinition struct{ def *domain.FlowDefinition }
+
+func (s servedDefinition) Definition(context.Context, string) (*domain.FlowDefinition, error) {
+	return s.def, nil
+}
+
+func served(def *domain.FlowDefinition) flowengine.Definitions {
+	return servedDefinition{def: def}
+}
+
 // flowTestWorld is the wiring a flow test exercises: resolver +
 // registry + handlers + state machine, sharing the fakes the test
 // inspects after a run.
@@ -334,7 +346,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
@@ -402,7 +414,7 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
@@ -445,7 +457,7 @@ func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   "ghost@example.com",
@@ -489,7 +501,7 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
@@ -549,7 +561,7 @@ func TestFlowStateMachine_Process_RegisterCollisionVerifiesPassword(t *testing.T
 	})
 	require.NoError(t, err)
 
-	collided, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	collided, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   "alice@example.com",
@@ -560,7 +572,7 @@ func TestFlowStateMachine_Process_RegisterCollisionVerifiesPassword(t *testing.T
 	require.Equal(t, "password", collided.State.CurrentStep)
 	require.Equal(t, domain.FlowDefinitionPurposeLogin, collided.State.CurrentPurpose)
 
-	result, err := w.sm.Process(t.Context(), def, collided.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), collided.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "wrong-password"},
 	})
@@ -594,7 +606,7 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: "not_declared",
 		Fields: map[string]any{
 			"email":                   "alice@example.com",
@@ -651,7 +663,7 @@ func TestFlowStateMachine_Process_UndeclaredActionRefusedBeforeIdentifierLookup(
 			})
 			require.NoError(t, err)
 
-			_, err = w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+			_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 				Action: tt.action,
 				Fields: map[string]any{"email": "alice@example.com"},
 			})
