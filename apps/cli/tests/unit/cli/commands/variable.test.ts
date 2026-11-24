@@ -980,7 +980,7 @@ describe("variable set --as", () => {
     expect(bodies).toEqual([]);
     expect(stdin.wasRead).toBe(false);
     const json = parseJson(res.stdout) as { message: string };
-    expect(json.message).toContain("A secret is stored as a string");
+    expect(json.message).toBe("--as=number cannot also be provided when using --secret");
   });
 
   it("keeps --as in the retry it suggests", async ({ dir: cwd, terminal }) => {

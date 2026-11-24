@@ -1,6 +1,6 @@
 import type { ServerAddresses } from "@/lib/environment";
-import { serverFlag } from "@/lib/oclif/flags";
-import type { BaseCommand } from "@/lib/oclif";
+import { serverFlag } from "@/cli/core/flags";
+import type { BaseCommand } from "@/cli/core";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import {
   LocalRuntime,
@@ -36,6 +36,11 @@ export const SERVER_FLAG = serverFlag({
  * may have to ask for one. A command that names its own server returns it from
  * `sourceOf`, which wins over what this resolves.
  *
+ * oclif reads a command's statics up the chain of classes only while each
+ * declares a static of its own, so the class this returns declares the two it
+ * passes on, `baseFlags` and `enableJsonFlag`. `--server` sits after `--cwd`,
+ * where the help and the reference list it.
+ *
  * @param Base - The command class to extend.
  * @returns The class, taking a server.
  */
@@ -45,10 +50,11 @@ export function ServerCommand<
 >(Base: TBase) {
   const { cwd, ...others } = Base.baseFlags;
   abstract class ServerResolving extends Base {
-    // oclif reads a command's statics up the chain of classes only while each
-    // declares a static of its own, so this mixin declares the two it passes on.
-    // `--server` sits after `--cwd`, where the help and the reference list it.
-    static override baseFlags = { cwd: cwd, server: SERVER_FLAG, ...others };
+    static override baseFlags = {
+      cwd: cwd,
+      server: SERVER_FLAG,
+      ...others,
+    };
     static override enableJsonFlag = Base.enableJsonFlag;
 
     /**
@@ -65,22 +71,6 @@ export function ServerCommand<
       serverFlag: string | undefined,
     ): Promise<string> {
       return (await this.servers().resolve({ cwd, serverFlag })).value;
-    }
-
-    /**
-     * @param flags - The parsed flags.
-     * @returns What `--server` was given as, if it was.
-     */
-    protected override serverFlagOf(flags: Record<string, unknown>): string | undefined {
-      return typeof flags.server === "string" ? flags.server : undefined;
-    }
-
-    /**
-     * @returns What `--server` was typed as on the command line, for a failure
-     *   that came before the flags were parsed.
-     */
-    protected override serverFlagFromArgv(): string | undefined {
-      return this.argvFlag("--server", "-s");
     }
 
     /**
@@ -193,6 +183,17 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
 ) {
   abstract class LocalServerManaging extends Base {
     static folderRule = folderRule;
+
+    /**
+     * Legacy: `--server` is accepted and ignored, so the run names no server.
+     * The server this command is about is read from its folder, by `sourceOf`,
+     * once the flags are parsed.
+     *
+     * @returns No server.
+     */
+    protected override async resolveServer(): Promise<string> {
+      return "";
+    }
 
     /**
      * The server of exactly the folder the command runs in. It may not have been

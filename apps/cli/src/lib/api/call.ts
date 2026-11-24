@@ -2,16 +2,16 @@ import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
 import { ZitadelError } from "@/lib/errors";
-import { read } from "@/lib/oclif/flags";
-import { SAFE_ID } from "@/lib/oclif/crud/shared";
+import { read } from "@/cli/core/flags";
+import { SAFE_ID } from "@/cli/core/crud/shared";
 import { parseJsonObject } from "@/lib/json";
 import type { ApiRequest, Operation, Target } from "@/lib/backend";
 import * as schemas from "@/lib/backend/schemas";
-import { fragmentOf, readAssignment } from "@/lib/oclif/crud/assign";
-import { mergeDocuments, typedValue } from "@/lib/oclif/crud/document";
-import { describeBody } from "@/lib/oclif/crud/fields";
-import type { Schema } from "@/lib/oclif/crud/types";
-import { nodeAt, unwrap, type ZodLike } from "@/lib/oclif/crud/zod";
+import { fragmentOf, readAssignment } from "@/cli/core/crud/assign";
+import { mergeDocuments, typedValue } from "@/cli/core/crud/document";
+import { describeBody } from "@/cli/core/crud/fields";
+import type { Schema } from "@/cli/core/crud/types";
+import { nodeAt, unwrap, type ZodLike } from "@/cli/core/crud/zod";
 import type { Suggested } from "@/lib/suggestion";
 
 /** The flag a field is given with, which errors name. */

@@ -20,8 +20,8 @@ export const RELATIONS: unique symbol = Symbol("relations");
  * it must be given at all. Names are the CLI spelling.
  */
 export type FlagRelation<Name extends string> = Readonly<{
-  exclusive?: readonly Name[];
-  dependsOn?: readonly Name[];
+  exclusive?: readonly (Name | "json")[];
+  dependsOn?: readonly (Name | "json")[];
   required?: true;
 }>;
 
@@ -58,7 +58,7 @@ export type Requiring<Defs, Relations> = {
  * once, typed against the flags beside them, and applied to the flags handed
  * to oclif, so the parser and the compiler read the same declaration. A
  * relation written inline on a flag instead is refused by a unit test
- * (`tests/unit/lib/oclif/flags-declared.test.ts`).
+ * (`tests/unit/cli/core/flags-declared.test.ts`).
  *
  * @param defs - The flags, as `Flags.*` declares them, by CLI spelling.
  * @param relations - What each flag requires of the others, by CLI spelling.

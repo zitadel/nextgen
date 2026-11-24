@@ -753,8 +753,8 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
-          message: "A secret is stored as a string.",
-          hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
+          message: "--as=number cannot also be provided when using --secret",
+          next_commands: [expectedPublicCliCommand("variable set --help")],
         });
       });
 

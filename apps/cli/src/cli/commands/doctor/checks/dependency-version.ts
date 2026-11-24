@@ -29,13 +29,24 @@ export class DependencyVersionCheck implements SanityCheck {
   readonly name = "dependency-version";
   readonly path = "package.json";
 
+  /**
+   * Compares each exact pin with the CLI's version. A dev or placeholder CLI
+   * version has no train to compare against, and a missing or unparsable
+   * package.json is the dependency check's failure to report, so
+   * double-flagging the same root cause helps nobody. The repair uses the
+   * project's own package manager with an exact-save flag: a bare
+   * `npm install` would switch managers on a pnpm/yarn/bun project and write a
+   * caret range, exactly the float this check ignores.
+   *
+   * @param ctx - The project to check.
+   * @returns A pass, or a warning naming each mismatched pin with its remedy.
+   */
   async run(ctx: CheckContext): Promise<CheckOutcome> {
     const base = {
       name: this.name,
       path: this.path,
     };
     if (semver.valid(ctx.cliVersion) === null) {
-      // A dev or placeholder CLI version has no train to compare against.
       return {
         ...base,
         status: "pass",
@@ -46,8 +57,6 @@ export class DependencyVersionCheck implements SanityCheck {
       return undefined;
     });
     if (dependencies === undefined) {
-      // A missing or unparsable package.json is the dependency check's
-      // failure to report; double-flagging the same root cause helps nobody.
       return {
         ...base,
         status: "pass",
@@ -79,9 +88,6 @@ export class DependencyVersionCheck implements SanityCheck {
             };
           }),
         },
-        // Repair with the project's own package manager and an exact-save flag:
-        // a bare `npm install` would switch managers on a pnpm/yarn/bun project
-        // and write a caret range — exactly the float this check ignores.
         remedy: suggestedCommandOf(
           (await PM.detect(ctx.cwd)).addExact(
             mismatched.map((dependency) => {

@@ -1,0 +1,221 @@
+import { Args } from "@oclif/core";
+import { z } from "zod";
+
+import { ZitadelError } from "@/lib/errors";
+import { type Refused, taken } from "@/cli/core/flags";
+import { named } from "@/lib/names";
+import { regularPlural } from "@/lib/plural";
+import { prose } from "@/lib/oclif/rendering";
+import type { CommandResult } from "@/cli/core/types";
+import { resourceSuggestion, type SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+
+import { type CredentialContext, redactCredentials } from "./secrets";
+import type { Json, ResourceDescriptor, Schema } from "./types";
+
+/**
+ * What an id may be, which a path value in `api` may be too: not blank, not `.`
+ * or `..`, which a URL resolves as a step up the path, and without a control
+ * character.
+ */
+export const SAFE_ID = {
+  schema: z
+    .string()
+    .trim()
+    .refine((id) => {
+      return id !== "" && id !== "." && id !== ".." && !/\p{Cc}/u.test(id);
+    }, "it must be an id: not blank, not . or .., and no control character"),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Pass the id exactly as it was listed.",
+    details: {
+      argument: "{input}",
+    },
+  },
+} as const satisfies Refused<string>;
+
+/** Helpers shared by more than one verb builder. */
+
+/** The name of a resource's positional argument. */
+export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => {
+  return resource.idArg ?? "id";
+};
+
+/**
+ * The single positional argument the id-taking verbs share. Given the
+ * resource's `topic`, a refused id points at `<topic> list` when it has one.
+ */
+export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) => {
+  const name = idName(resource);
+  const description = resource.idDescription ?? `${resource.singular} ${name}`;
+  const lists = topic !== undefined && resource.list !== undefined;
+  const take =
+    resource.idSchema === undefined
+      ? Args.custom<string>({
+          parse: taken(SAFE_ID),
+        })
+      : Args.custom<string>({
+          parse: taken({
+            schema: z.string().trim().pipe(resource.idSchema),
+            refusal: {
+              message: "Invalid {input}: {problem}",
+              hint: lists ? "List them to find one." : "Pass the id exactly as it was listed.",
+              next: lists ? [resourceSuggestion(topic, "list")] : undefined,
+              details: {
+                argument: "{input}",
+              },
+            },
+          }),
+        });
+
+  return { [name]: take({ required: true, description }) };
+};
+
+/** The value the caller passed for that argument, read as a command reads it. */
+export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string => {
+  return String(args[named(idName(resource))]);
+};
+
+/**
+ * Words spelled with a vowel but said with a "yoo" sound, so they take "a":
+ * "a user", "a unique id". Add one here when a resource noun needs it.
+ */
+const YOO_SOUND = /^(?:user|unique|unit|usage)/i;
+
+/**
+ * The indefinite article for a noun phrase, so a generated description reads
+ * as English: "an identity provider connection", not "a identity provider
+ * connection". A vowel letter takes "an", except a word in {@link YOO_SOUND}.
+ * A silent "h" ("an hour") is not handled; no resource noun starts with one.
+ */
+export const article = (phrase: string): string => {
+  return /^[aeiou]/i.test(phrase) && !YOO_SOUND.test(phrase) ? "an" : "a";
+};
+
+export const capitalize = (word: string): string => {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+};
+
+/**
+ * What a list calls its rows: the resource's own plural, else the regular
+ * plural of its singular. Never the topic, which is the command's name and
+ * singular.
+ */
+export const pluralOf = <Ctx>(resource: ResourceDescriptor<Ctx>): string => {
+  return resource.plural ?? regularPlural(resource.singular);
+};
+
+/**
+ * Validate with a generated schema, translating a failure into the CLI's
+ * `E_VALIDATION` envelope with the issues attached — the same shape
+ * `toZitadelError` produces for a thrown Zod error, with a message and hint
+ * that name the flag the user got wrong.
+ */
+export const parseOrThrow = <B>(
+  schema: Schema<B>,
+  value: unknown,
+  message: string,
+  hint?: string,
+): B => {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    throw new ZitadelError("E_VALIDATION", message, {
+      hint,
+      details: { issues: parsed.error.issues },
+    });
+  }
+
+  return parsed.data;
+};
+
+/**
+ * What a command says it would do, for {@link dryRunResult}. `clause` ends the
+ * subject line, so a command that says where the change lands says it here
+ * rather than splicing the rendering it was handed.
+ */
+type DryRun = Readonly<{
+  verb: string;
+  topic: string;
+  /** What the subject line calls the resource, as the prompt does; the topic when absent. */
+  noun?: string;
+  id?: string;
+  /** What the subject line ends with: "from the project", "on the project (secret)". */
+  clause?: string;
+  body?: Json;
+  /** What the server answered when asked to check the write; absent when it was not asked. */
+  checked?: Json;
+  /**
+   * What the real run does that the preview does not show, such as the fields
+   * it removes.
+   */
+  warnings?: readonly string[];
+  context?: CredentialContext;
+  /**
+   * The real command: this run again without `--dry-run`, which the command builds
+   * (`realRun`). Absent when there is nothing to run for real.
+   */
+  next?: SuggestedCommand;
+}>;
+
+/**
+ * The envelope of a dry run: what would be done, with the body that would be
+ * sent. A body that came from a file may legitimately hold a credential, and a
+ * preview of it must not put that value on screen or into a CI log, so only the
+ * credentials are masked: the rest is what would be sent, so the preview can be
+ * checked, and `--dry-run --json` is the template generator a document to send
+ * later comes from (ADR 071 section 8).
+ *
+ * The printed document keeps the spelling JSON spells a control character with,
+ * as the cells of a table are spelled where they are read: the line around it is
+ * prose, but the block itself is a document a reader copies, and the terminal
+ * spelling would write `\x9b`, which is not an escape JSON has. By the time the
+ * line is handed to `prose` nothing in the block is left for it to spell, so
+ * the two do not fight over it.
+ *
+ * @param dryRun - What the dry run would do.
+ * @returns The `ok` result of the dry run.
+ */
+export const dryRunResult = ({
+  verb,
+  topic,
+  noun,
+  id,
+  clause,
+  body,
+  checked,
+  warnings,
+  context,
+  next,
+}: DryRun): CommandResult => {
+  const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
+  const result = checked === undefined ? undefined : (redactCredentials(checked, context) as Json);
+  const subject = [noun ?? topic, id, clause].filter(Boolean).join(" ");
+  const printed =
+    shown === undefined ? "" : `\n${escapeJsonControlCharacters(JSON.stringify(shown, null, 2))}`;
+  const verdict = result === undefined ? "" : "\nThe server would accept this. Nothing changed.";
+
+  const title = `Would ${verb} ${escapeControlCharacters(subject, { keepLayout: false })} (dry run)`;
+
+  return {
+    status: "ok",
+    ...(warnings === undefined || warnings.length === 0 ? {} : { warnings: [...warnings] }),
+    data: {
+      dry_run: true,
+      title,
+      verb,
+      topic,
+      id,
+      body: shown,
+      ...(result === undefined ? {} : { result }),
+    },
+    pretty: prose(`Would ${verb} ${subject} (dry run)${printed}${verdict}`),
+    ...(next === undefined ? {} : { next: { commands: [next] } }),
+    summary: {
+      title,
+      sections: [],
+      lines: [...printed.split("\n"), ...verdict.split("\n")].filter((line) => {
+        return line !== "";
+      }),
+    },
+  };
+};

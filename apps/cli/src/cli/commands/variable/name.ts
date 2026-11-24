@@ -1,8 +1,8 @@
 import { Args } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
-import { filled } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { filled } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 
 /** What a name holding anything but letters, digits and underscores is refused for. */
 const VARIABLE_NAME_INVALID_REFUSAL = {
@@ -26,11 +26,14 @@ const VARIABLE_NAME_EMPTY_REFUSAL = {
  * The variable name `input` holds, trimmed as the one a prompt would have
  * accepted. Refuses a blank value, naming `input`, and one the platform would
  * refuse — each with its own wording, which is why this reads the grammar
- * itself rather than declaring one {@link import("@/lib/oclif/flags").Refused}.
+ * itself rather than declaring one {@link import("@/cli/core/flags").Refused}.
  *
  * What the platform accepts is {@link VariableService.nameProblem}'s to say, so
  * the grammar has one home and a name is refused here against the same rule the
  * write is checked against.
+ *
+ * A refused name is quoted but raw: the envelope carries it as it was typed,
+ * and the terminal rendering spells out a newline or escape sequence in it.
  */
 function readVariableName(input: string, label: string): string {
   const name = filled.safeParse(input);
@@ -47,8 +50,6 @@ function readVariableName(input: string, label: string): string {
   throw refusalError(
     problem === "too-long" ? VARIABLE_NAME_TOO_LONG_REFUSAL : VARIABLE_NAME_INVALID_REFUSAL,
     {
-      // Quoted but raw: the envelope carries the name as it was typed, and the
-      // terminal rendering spells out a newline or escape sequence in it.
       value: `"${value}"`,
       length: value.length,
       max: VariableService.nameMaxLength,

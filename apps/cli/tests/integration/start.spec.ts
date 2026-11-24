@@ -393,6 +393,8 @@ describe("start", () => {
           data: {
             dry_run: true,
             title: "Would start the local Zitadel server (dry run)",
+            verb: "start",
+            topic: "server",
             runtime: { backend: "binary", port: 8080 },
             urls: {
               api: "http://localhost:8080",
@@ -427,6 +429,8 @@ describe("start", () => {
           data: {
             dry_run: true,
             title: "Would start the local Zitadel server (dry run)",
+            verb: "start",
+            topic: "server",
             runtime: { backend: "binary", port: 9000 },
             urls: {
               api: "http://localhost:9000",
@@ -463,6 +467,8 @@ describe("start", () => {
           data: {
             dry_run: true,
             title: "Would start the local Zitadel server (dry run)",
+            verb: "start",
+            topic: "server",
             runtime: {
               backend: "docker",
               container_name: expect.stringMatching(/^zitadel-server-[0-9a-f]{12}$/),

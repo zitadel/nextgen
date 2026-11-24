@@ -19,6 +19,10 @@ import { CliPackage } from "@/lib/upgrade";
  * is part of the plan again, for example). Schema and flow config are
  * user-editable sync resources, not patcher inputs, so nothing here reads
  * them.
+ *
+ * The posture is restored as setup recorded it: a manifest-less scaffold
+ * cannot answer the fresh-vs-pre-existing hinge, and it is always full-page
+ * (ADR 044).
  */
 export async function loadPatchContext(
   cwd: string,
@@ -38,8 +42,6 @@ export async function loadPatchContext(
     cliVersion,
     sdkVersion: CliPackage.at(cliVersion).selector(),
     scaffoldedFramework: scaffold?.scaffolded_framework,
-    // Restore the posture setup recorded: a manifest-less scaffold cannot answer
-    // the fresh-vs-pre-existing hinge, and it is always full-page (ADR 044).
     posture: scaffold?.posture ?? "page",
     preset: config.preset,
     useCase: config.useCase,
@@ -89,9 +91,17 @@ export async function configuredIssuer(cwd: string): Promise<string | undefined>
   );
 }
 
+/**
+ * The issuer for the rebuilt plan: the one setup configured, else the one the
+ * scaffold's dev port implies, else the framework's own URL. A file the
+ * resolver cannot read leaves the issuer to those fallbacks rather than
+ * failing the repair.
+ *
+ * @param cwd - The project directory.
+ * @param facts - What framework detection found.
+ * @returns The issuer URL.
+ */
 async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
-  // A file the resolver cannot read leaves the issuer to the fallbacks below
-  // rather than failing the repair.
   const issuer = await configuredIssuer(cwd);
   if (issuer !== undefined) {
     return issuer;

@@ -1,4 +1,4 @@
-import type { FlagVariable } from "@/lib/oclif/types";
+import type { FlagVariable } from "@/cli/core/types";
 
 /**
  * Outcome of resolving whether telemetry may run for this invocation. `reason`

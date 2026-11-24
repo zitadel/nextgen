@@ -8,6 +8,8 @@ import { Config, Errors } from "@oclif/core";
 
 import { readSchemaTarget, type SchemaTarget } from "@/cli/commands/auth-method/command";
 import AuthMethodPasskeyDisable from "@/cli/commands/auth-method/passkey/disable";
+import AuthMethodPasskeyEnable from "@/cli/commands/auth-method/passkey/enable";
+import AuthMethodPasswordEnable from "@/cli/commands/auth-method/password/enable";
 import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
@@ -599,6 +601,54 @@ describe("AuthMethodCommand", () => {
         },
       });
     });
+  });
+});
+
+describe("MethodEnableCommand", () => {
+  it("previews turning on the method its subclass names, and writes nothing", async ({ dir }) => {
+    const cwd = await makeProject(dir, {
+      schemas: {
+        "default-human-user": aSchema({ password: { enabled: true }, passkey: { enabled: false } }),
+      },
+    });
+
+    const result = await AuthMethodPasskeyEnable.run(
+      ["--cwd", cwd, "--no-telemetry", "--dry-run"],
+      CONFIG,
+    );
+
+    expect(result).toMatchObject({ status: "ok", data: { dry_run: true } });
+    expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
+      enabled: false,
+    });
+  });
+
+  it("turns on the method its subclass names", async ({ dir }) => {
+    const cwd = await makeProject(dir, {
+      schemas: {
+        "default-human-user": aSchema({ password: { enabled: true }, passkey: { enabled: false } }),
+      },
+    });
+
+    await AuthMethodPasskeyEnable.run(["--cwd", cwd, "--no-telemetry"], CONFIG);
+
+    expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
+      enabled: true,
+    });
+  });
+
+  it("turns on another method for another subclass, and leaves passkey alone", async ({ dir }) => {
+    const cwd = await makeProject(dir, {
+      schemas: {
+        "default-human-user": aSchema({ password: { enabled: false }, passkey: { enabled: true } }),
+      },
+    });
+
+    await AuthMethodPasswordEnable.run(["--cwd", cwd, "--no-telemetry"], CONFIG);
+
+    const methods = await readJson(cwd, SCHEMA_FILE);
+    expect(methods).toHaveProperty(["x-auth-methods", "password"], { enabled: true });
+    expect(methods).toHaveProperty(["x-auth-methods", "passkey"], { enabled: true });
   });
 });
 

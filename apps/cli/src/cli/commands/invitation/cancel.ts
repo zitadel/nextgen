@@ -1,20 +1,23 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 
 import { type Invitation, InvitationService, invitationGrant, invitationRole } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { dryRunResult } from "@/lib/oclif/crud/shared";
-import { Destructive } from "@/lib/oclif/destructive";
-import { deletedData } from "@/lib/oclif/envelope";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Promptable } from "@/lib/oclif/promptable";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { deletedData } from "@/cli/core/envelope";
+import { type Refused, taken } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { Promptable } from "@/cli/core/promptable";
+import { Destructive } from "@/cli/core/destructive";
+import { ChangeCommand } from "@/cli/commands/bases";
 
-/** The invitation `invitation cancel` cancels, as the API spells an invitation id. */
-// Annotated: its `next` names this topic's list, which would make the type circular.
+/**
+ * The invitation `invitation cancel` cancels, as the API spells an invitation
+ * id. It is annotated because its `next` names this topic's list, which would
+ * make the type circular.
+ */
 const INVITATION_ID: Refused<string> = {
   schema: invitationIdSchema,
   refusal: {
@@ -54,6 +57,36 @@ const NOTHING_CANCELLABLE_REFUSAL = {
   next: [{ id: "invitation:list" }],
 } as const satisfies Refusal;
 
+/** The invitation as the question names it: its id, who it is for, and the role. */
+function describe(invitation: Invitation): string {
+  const whom = invitation.metadata?.name;
+  const role = invitationRole(invitation);
+  return whom === undefined
+    ? `${invitation.id} (${role})`
+    : `${invitation.id} for ${whom} (${role})`;
+}
+
+/**
+ * Who an invitation is for and where it stands, beside its id in the picker.
+ * The name is whatever an administrator typed; the picker draws hints as given.
+ */
+function cancellableHint(invitation: Invitation): string {
+  const whom = invitation.metadata?.name;
+  return escapeControlCharacters(`${whom === undefined ? "" : `${whom}, `}${standing(invitation)}`);
+}
+
+/** Where a cancellable invitation stands: when it expires, expired, or declined. */
+function standing(invitation: Invitation): string {
+  switch (invitation.status) {
+    case "pending":
+      return `expires ${invitation.expires_at}`;
+    case "expired":
+      return `expired ${invitation.expires_at}`;
+    default:
+      return "declined";
+  }
+}
+
 /**
  * `zitadel invitation cancel [invitation_id]` — cancel a pending invitation,
  * so its link can no longer be redeemed, or remove an expired or declined one.
@@ -61,12 +94,14 @@ const NOTHING_CANCELLABLE_REFUSAL = {
  * pick from.
  */
 export default class InvitationCancel extends Destructive(
-  Promptable(ServerCommand(EnvironmentCommand)),
+  Promptable(ChangeCommand),
+  "Cancel the invitation without the confirmation prompt. Required when non-interactive.",
 ) {
   static override description =
     "Cancel a pending invitation so its link stops working, or remove an expired or declined one.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 8;
+
   static override examples = [
     "<%= config.bin %> invitation cancel",
     "<%= config.bin %> invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J",
@@ -77,80 +112,83 @@ export default class InvitationCancel extends Destructive(
       description: "The invitation to cancel. Omit it to pick a pending, expired or declined one.",
     }),
   };
-  static override flags = {
-    force: Flags.boolean({
-      char: "f",
-      description:
-        "Cancel the invitation without the confirmation prompt. Required when non-interactive.",
-    }),
-  };
 
-  protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
-    if (args.invitationId === undefined && (this.dryRun || this.nonInteractive)) {
+  /**
+   * Says which invitation would be cancelled, without cancelling it.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The dry run's envelope.
+   */
+  protected async preview({ args }: Admitted<typeof InvitationCancel>): Promise<CommandResult> {
+    if (args.invitationId === undefined) {
+      throw refusalError(NO_ID_REFUSAL, {});
+    }
+
+    return dryRunResult({
+      verb: "cancel",
+      topic: "invitation",
+      id: args.invitationId,
+      next: await this.realRun(),
+    });
+  }
+
+  /**
+   * Cancels the invitation, after asking. A bare cancel picked its invitation,
+   * which a retry must name. Only a pending invitation counts as cancelled in
+   * telemetry: a declined journey already ended with invitation_rejected, and
+   * an expired one counts as not accepted.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The run's envelope.
+   */
+  protected async apply({ args }: Admitted<typeof InvitationCancel>): Promise<CommandResult> {
+    if (args.invitationId === undefined && this.nonInteractive) {
       throw refusalError(NO_ID_REFUSAL, {});
     }
     const target = args.invitationId ?? (await this.pickCancellable());
     const invitationId = typeof target === "string" ? target : target.id;
 
-    return this.emit(
-      await this.confirmed({
-        verb: "cancel",
-        name: `cancel ${invitationId}`,
-        message: ({ invitation }) => {
-          return invitation.status === "pending"
-            ? `Cancel ${describe(invitation)} so its link stops working?`
-            : `Cancel ${describe(invitation)} and remove its record?`;
-        },
-        // A bare cancel picked its invitation, which a retry must name.
-        arguments: [invitationId],
-        preview: async () => {
-          return dryRunResult({
-            verb: "cancel",
-            topic: "invitation",
-            id: invitationId,
-            next: await this.realRun(),
+    return await this.confirmed({
+      verb: "cancel",
+      name: `cancel ${invitationId}`,
+      message: ({ invitation }) => {
+        return invitation.status === "pending"
+          ? `Cancel ${describe(invitation)} so its link stops working?`
+          : `Cancel ${describe(invitation)} and remove its record?`;
+      },
+      arguments: [invitationId],
+      prepare: async () => {
+        const invitation =
+          typeof target === "string"
+            ? await this.readCancellable(await this.service(InvitationService), target)
+            : target;
+
+        return { invitation };
+      },
+      apply: async (consent, { invitation }) => {
+        const unlocked = await this.service(InvitationService, consent);
+        await unlocked.cancel(invitation.id);
+        if (invitation.status === "pending") {
+          this.trackEvent(INVITATION_CANCELLED, {
+            role: invitationGrant(invitation),
+            invitation_journey_id: invitation.journey_id,
           });
-        },
-        // A dry run stops before this, so it needs no connection: the read
-        // that names a named invitation in the question happens here.
-        prepare: async () => {
-          const connection = await this.connect();
-          const invitation =
-            typeof target === "string"
-              ? await this.readCancellable(
-                  new InvitationService(connection.client, connection.projectId),
-                  target,
-                )
-              : target;
-          return { ...connection, invitation };
-        },
-        apply: async (consent, { client, projectId, invitation }) => {
-          const unlocked = new InvitationService(consent.unlock(client), projectId);
-          await unlocked.cancel(invitation.id);
-          // A declined journey already ended with invitation_rejected, and an
-          // expired one counts as not accepted.
-          if (invitation.status === "pending") {
-            this.trackEvent(INVITATION_CANCELLED, {
-              role: invitationGrant(invitation),
-              invitation_journey_id: invitation.journey_id,
-            });
-          }
-          const id = escapeControlCharacters(invitation.id);
-          const title =
-            invitation.status === "pending"
-              ? `Cancelled ${id}; its link no longer works`
-              : `Cancelled ${id}; its record is removed`;
-          return {
-            status: "ok",
-            data: deletedData({ title, id: invitation.id }),
-            summary: {
-              title,
-              sections: [],
-            },
-          };
-        },
-      }),
-    );
+        }
+        const id = escapeControlCharacters(invitation.id);
+        const title =
+          invitation.status === "pending"
+            ? `Cancelled ${id}; its link no longer works`
+            : `Cancelled ${id}; its record is removed`;
+        return {
+          status: "ok",
+          data: deletedData({ title, id: invitation.id }),
+          summary: {
+            title,
+            sections: [],
+          },
+        };
+      },
+    });
   }
 
   /**
@@ -159,8 +197,8 @@ export default class InvitationCancel extends Destructive(
    * A script is told to name one instead.
    */
   private async pickCancellable(): Promise<Invitation> {
-    const { client, projectId } = await this.connect();
-    const cancellable = await new InvitationService(client, projectId).cancellable();
+    const invitationService = await this.service(InvitationService);
+    const cancellable = await invitationService.cancellable();
     if (cancellable.length === 0) {
       throw refusalError(NOTHING_CANCELLABLE_REFUSAL, {});
     }
@@ -195,33 +233,5 @@ export default class InvitationCancel extends Destructive(
       });
     }
     return invitation;
-  }
-}
-
-/** The invitation as the question names it: its id, who it is for, and the role. */
-function describe(invitation: Invitation): string {
-  const whom = invitation.metadata?.name;
-  const role = invitationRole(invitation);
-  return whom === undefined
-    ? `${invitation.id} (${role})`
-    : `${invitation.id} for ${whom} (${role})`;
-}
-
-/** Who an invitation is for and where it stands, beside its id in the picker. */
-function cancellableHint(invitation: Invitation): string {
-  const whom = invitation.metadata?.name;
-  // The name is whatever an administrator typed; the picker draws hints as given.
-  return escapeControlCharacters(`${whom === undefined ? "" : `${whom}, `}${standing(invitation)}`);
-}
-
-/** Where a cancellable invitation stands: when it expires, expired, or declined. */
-function standing(invitation: Invitation): string {
-  switch (invitation.status) {
-    case "pending":
-      return `expires ${invitation.expires_at}`;
-    case "expired":
-      return `expired ${invitation.expires_at}`;
-    default:
-      return "declined";
   }
 }

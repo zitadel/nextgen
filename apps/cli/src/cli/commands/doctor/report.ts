@@ -1,6 +1,6 @@
 import wrapAnsi from "wrap-ansi";
 
-import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
+import { type NextSteps, renderNextSteps } from "@/cli/core/next-steps";
 import type { Suggest } from "@/lib/suggestion";
 import { style } from "@/lib/ui/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -82,7 +82,9 @@ export function categoryOf(checkName: string): CheckCategory {
 /**
  * The checks as the envelope carries them: each with its category, and a
  * warning's remedy written into its details as `remedy_command`, after what
- * the check found.
+ * the check found. Each branch destructures the check it narrowed: a remedy
+ * comes only with details that are an object, which destructuring both at once
+ * would forget.
  *
  * @param checks - The checks, as they ran.
  * @returns The checks for the envelope.
@@ -90,8 +92,6 @@ export function categoryOf(checkName: string): CheckCategory {
 export function withCategories(
   checks: readonly CheckOutcome[],
 ): Array<Omit<CheckOutcome, "remedy"> & { category: CheckCategory }> {
-  // Each branch destructures the check it narrowed: a remedy comes only with
-  // details that are an object, which destructuring both at once would forget.
   return checks.map((check) => {
     const category = categoryOf(check.name);
     if (check.remedy === undefined) {
@@ -99,7 +99,11 @@ export function withCategories(
       return { ...found, category };
     }
     const { remedy, ...found } = check;
-    return { ...found, details: { ...found.details, remedy_command: remedy }, category };
+    return {
+      ...found,
+      details: { ...found.details, remedy_command: remedy },
+      category,
+    };
   });
 }
 
@@ -145,6 +149,8 @@ export type DoctorReport = {
  * collapsed when everything in it passed, with what needs attention indented
  * below its row and the command that repairs it pulled out to copy. `--verbose`
  * expands every row. Only for people: the envelope carries the same checks.
+ * A run that passed closes on its title, so only a failure, which has none,
+ * says its verdict at the end.
  */
 export function doctorReport(input: DoctorReportInput): DoctorReport {
   const lines: string[] = [];
@@ -174,8 +180,6 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
       }
     }
   }
-  // A run that passed closes on its title, so only a failure, which has
-  // none, says its verdict here.
   const failed = input.checks.some((check) => {
     return check.status === "fail";
   });
@@ -308,7 +312,10 @@ function detailsOf(check: CheckOutcome | undefined): Record<string, unknown> | u
 /**
  * What a row expands to. Several checks can fail for one cause, as every check
  * that reads a missing `.zitadel/secret` does, so a collapsed row says a message
- * only once; `--verbose` lists every check, by name.
+ * only once; `--verbose` lists every check, by name. Each line's control
+ * characters are spelled out because only a passing check's line is dimmed, and
+ * a check that failed names what it read — a server's answer, a registry's
+ * version, a path — in a line nothing else would spell out.
  */
 function detailLines(
   checks: readonly CheckOutcome[],
@@ -325,9 +332,6 @@ function detailLines(
       continue;
     }
     seen.add(check.message);
-    // Spelled out here because only a passing check's line is dimmed, and a
-    // check that failed names what it read — a server's answer, a registry's
-    // version, a path — in a line nothing else would spell out.
     const text = escapeControlCharacters(
       input.verbose ? `${check.name}: ${check.message}` : check.message,
     );

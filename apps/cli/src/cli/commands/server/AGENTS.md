@@ -15,8 +15,8 @@ server package they call is described in
 ## The base: `LocalServerCommand` (`src/cli/commands/server-command.ts`)
 
 `LocalServerCommand(Base, folderRule)` is the one base for every command about
-the local server, so none repeats the same things (a `sourceOf`, and the `ps`
-seam). It is a mixin like `Promptable`; the rest of the server family
+the local server, so none repeats the same things (a `sourceOf`, the `ps` seam,
+and the legacy `resolveServer` that names no server). It is a mixin like `Promptable`; the rest of the server family
 (`ServerCommand`, `ChoosingServerCommand`) is in the same module and described
 in [`apps/cli/AGENTS.md`](../../../../AGENTS.md).
 

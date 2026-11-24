@@ -6,9 +6,10 @@ import { GetDeploymentParams, GetReleaseParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { type Refused, taken } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { PublishedConfiguration } from "@/lib/publish";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -22,7 +23,7 @@ import {
   type Schemas,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ChangeCommand } from "@/cli/commands/bases";
 
 /**
  * A release id, as the platform mints it.
@@ -173,19 +174,40 @@ type PulledResource = PinnedResource & {
 const FETCH_CONCURRENCY = 8;
 
 /**
- * One pinned resource's attempt: what became of it, or what stopped it.
- */
-type Attempt =
-  | { readonly kind: "done"; readonly outcome: PullOutcome }
-  | { readonly kind: "failed"; readonly error: unknown };
-
-/**
  * What became of one pinned resource: the file it goes in and the change that
  * writes it, or why nothing is written.
  */
 type PullOutcome =
   | { readonly kind: "pulled"; readonly resource: PulledResource; readonly change: Change }
   | { readonly kind: "skipped"; readonly resource: PinnedResource };
+
+/**
+ * The paths under the line that says what they are, for the lines under the
+ * closing sentence. Listed bare in the summary box they are file names with
+ * nothing naming them, so a reader has to guess whether they were written,
+ * skipped or found. Empty for a pull that wrote nothing, which has no list.
+ */
+export function fileList(paths: readonly string[], dryRun: boolean): string[] {
+  return paths.length === 0
+    ? []
+    : [
+        dryRun ? "Files it would write:" : "Files written:",
+        ...paths.map((p) => {
+          return escapeControlCharacters(`  ${p}`);
+        }),
+      ];
+}
+
+/**
+ * Warn that a release pins a resource `pull` cannot rebuild on disk yet. A
+ * reported warning rides the envelope (BaseCommand merges them), so a `--json`
+ * caller sees it too.
+ */
+function reportSkipped(resource: PinnedResource): void {
+  warnings.report(
+    `The release pins ${resource.kind} "${resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
+  );
+}
 
 /**
  * `zitadel pull [target]` — rebuild `.zitadel/` from the revisions a released
@@ -202,7 +224,7 @@ type PullOutcome =
  * resource by handle, so files are written by handle and the next `deploy`
  * rebuilds the same release.
  */
-export default class Pull extends ServerCommand(EnvironmentCommand) {
+export default class Pull extends ChangeCommand {
   static override description =
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
   static override group = CommandGroups.releases;
@@ -227,58 +249,13 @@ export default class Pull extends ServerCommand(EnvironmentCommand) {
   };
 
   /**
-   * Write each revision the target's release pins into `.zitadel/`.
+   * Says which files the pull would write, without writing any.
    *
-   * @param input.args - The target.
-   * @returns The release, what was written, and what was skipped.
-   * @throws {@link ZitadelError} With `E_NOT_FOUND` when `latest` is asked for
-   *   and nothing is deployed.
+   * @param input - The target.
+   * @returns The envelope of the dry run.
    */
-  protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const store = new DiskStore(this.cwd);
-    const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
-
-    const configuration = new PublishedConfiguration(client, projectId);
-    const releaseId = await this.resolveReleaseId(configuration, args.target);
-    const release = await configuration.fetchRelease(releaseId);
-
-    // Fetched together, but kept in the order the release pins them, so the
-    // files land in that order and the first failure in it is the one raised.
-    const attempts = await mapBounded(
-      release.pointers,
-      FETCH_CONCURRENCY,
-      async (pointer): Promise<Attempt> => {
-        try {
-          return {
-            kind: "done",
-            outcome: await this.fetchOne(configuration, config, pointer),
-          };
-        } catch (error) {
-          return {
-            kind: "failed",
-            error,
-          };
-        }
-      },
-    );
-    const outcomes: PullOutcome[] = [];
-    for (const attempt of attempts) {
-      if (attempt.kind === "failed") {
-        throw attempt.error;
-      }
-      outcomes.push(attempt.outcome);
-    }
-    this.refuseSharedFiles(outcomes);
-    if (!this.dryRun) {
-      for (const outcome of outcomes) {
-        if (outcome.kind === "pulled") {
-          // The server's canonical form, written whole over the file that holds
-          // the handle, so what lands is exactly what the release pinned.
-          await outcome.change.save(store, { overwrite: true });
-        }
-      }
-    }
+  protected async preview({ args }: Admitted<typeof Pull>): Promise<CommandResult> {
+    const { release, outcomes } = await this.gathered(args.target);
     const pulled = outcomes.flatMap((outcome) => {
       if (outcome.kind !== "pulled") {
         return [];
@@ -298,20 +275,80 @@ export default class Pull extends ServerCommand(EnvironmentCommand) {
 
     const files = `${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"}`;
 
-    const title = escapeControlCharacters(
-      this.dryRun
-        ? `Would write ${files} from ${release.id} (dry run)`
-        : `Pulled ${files} from ${release.id}`,
-    );
+    const result = dryRunResult({
+      verb: "write",
+      topic: "pull",
+      noun: files,
+      clause: `from ${release.id}`,
+      next: await this.realRun(),
+    });
 
-    return this.emit({
+    return {
+      ...result,
+      pretty: undefined,
+      data: {
+        ...(result.data as object),
+        release_id: release.id,
+        pulled,
+        skipped,
+      },
+      summary: {
+        title: result.summary.title,
+        sections: [],
+        lines: fileList(
+          pulled.map((entry) => {
+            return entry.path;
+          }),
+          true,
+        ),
+      },
+    };
+  }
+
+  /**
+   * Writes the release's files over the working copy. Each file is written in
+   * the server's canonical form, whole over the file that holds the handle, so
+   * what lands is exactly what the release pinned.
+   *
+   * @param input - The target.
+   * @returns The envelope of the run.
+   */
+  protected async apply({ args }: Admitted<typeof Pull>): Promise<CommandResult> {
+    const { store, release, outcomes } = await this.gathered(args.target);
+    for (const outcome of outcomes) {
+      if (outcome.kind === "pulled") {
+        await outcome.change.save(store, { overwrite: true });
+      }
+    }
+
+    const pulled = outcomes.flatMap((outcome) => {
+      if (outcome.kind !== "pulled") {
+        return [];
+      }
+      return [outcome.resource];
+    });
+    const skipped = outcomes.flatMap((outcome) => {
+      if (outcome.kind !== "skipped") {
+        return [];
+      }
+      return [outcome.resource];
+    });
+
+    for (const resource of skipped) {
+      reportSkipped(resource);
+    }
+
+    const files = `${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"}`;
+
+    const title = `Pulled ${files} from ${escapeControlCharacters(release.id)}`;
+
+    return {
       status: "ok",
       data: {
         title,
         release_id: release.id,
         pulled,
         skipped,
-        ...(this.dryRun ? { dry_run: true } : {}),
       },
       summary: {
         title,
@@ -320,17 +357,80 @@ export default class Pull extends ServerCommand(EnvironmentCommand) {
           pulled.map((entry) => {
             return entry.path;
           }),
-          this.dryRun,
+          false,
         ),
       },
       next: {
-        commands: this.dryRun
-          ? [await this.again("pull", { without: ["dryRun"] })]
-          : args.target.kind !== "latest"
+        commands:
+          args.target.kind !== "latest"
             ? []
-            : [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
+            : [
+                this.suggest({
+                  id: "deploy",
+                  flags: { message: WHAT_CHANGED },
+                }),
+              ],
       },
+    };
+  }
+
+  /**
+   * Write each revision the target's release pins into `.zitadel/`. The
+   * revisions are fetched together but kept in the order the release pins them,
+   * so the files land in that order and the first failure in it is the one
+   * raised.
+   *
+   * @param target - What to pull.
+   * @returns The store, the release, and what became of each pinned resource.
+   * @throws {@link ZitadelError} With `E_NOT_FOUND` when `latest` is asked for
+   *   and nothing is deployed.
+   */
+  private async gathered(target: PullTarget) {
+    const store = new DiskStore(this.cwd);
+    const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
+
+    const configuration = await this.service(PublishedConfiguration);
+    const releaseId = await this.resolveReleaseId(configuration, target);
+    const release = await configuration.fetchRelease(releaseId);
+
+    const attempts = await mapBounded(
+      release.pointers,
+      FETCH_CONCURRENCY,
+      async (
+        pointer,
+      ): Promise<
+        | { readonly kind: "done"; readonly outcome: PullOutcome }
+        | { readonly kind: "failed"; readonly error: unknown }
+      > => {
+        try {
+          return {
+            kind: "done",
+            outcome: await this.fetchOne(configuration, config, pointer),
+          };
+        } catch (error) {
+          return {
+            kind: "failed",
+            error,
+          };
+        }
+      },
+    );
+    const failed = attempts.find((attempt) => {
+      return attempt.kind === "failed";
     });
+    if (failed !== undefined) {
+      throw failed.error;
+    }
+    const outcomes: PullOutcome[] = attempts.flatMap((attempt) => {
+      return attempt.kind === "done" ? [attempt.outcome] : [];
+    });
+    this.refuseSharedFiles(outcomes);
+
+    return {
+      store,
+      release,
+      outcomes,
+    };
   }
 
   /**
@@ -404,7 +504,10 @@ export default class Pull extends ServerCommand(EnvironmentCommand) {
     const change = collection.placeRevision(pointer.handle, body);
     return {
       kind: "pulled",
-      resource: { ...resource, path: collection.locate(pointer.handle) },
+      resource: {
+        ...resource,
+        path: collection.locate(pointer.handle),
+      },
       change,
     };
   }
@@ -439,39 +542,14 @@ export default class Pull extends ServerCommand(EnvironmentCommand) {
         const releaseId = await configuration.fetchLiveReleaseId();
         if (releaseId === undefined) {
           throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
-            hint: `Deploy first with ${this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })}, then pull.`,
+            hint: `Deploy first with ${this.suggest({
+              id: "deploy",
+              flags: { message: WHAT_CHANGED },
+            })}, then pull.`,
           });
         }
         return releaseId;
       }
     }
   }
-}
-
-/**
- * The paths under the line that says what they are, for the lines under the
- * closing sentence. Listed bare in the summary box they are file names with
- * nothing naming them, so a reader has to guess whether they were written,
- * skipped or found. Empty for a pull that wrote nothing, which has no list.
- */
-export function fileList(paths: readonly string[], dryRun: boolean): string[] {
-  return paths.length === 0
-    ? []
-    : [
-        dryRun ? "Files it would write:" : "Files written:",
-        ...paths.map((p) => {
-          return escapeControlCharacters(`  ${p}`);
-        }),
-      ];
-}
-
-/**
- * Warn that a release pins a resource `pull` cannot rebuild on disk yet. A
- * reported warning rides the envelope (BaseCommand merges them), so a `--json`
- * caller sees it too.
- */
-function reportSkipped(resource: PinnedResource): void {
-  warnings.report(
-    `The release pins ${resource.kind} "${resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
-  );
 }

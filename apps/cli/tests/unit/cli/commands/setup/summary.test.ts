@@ -10,7 +10,7 @@ import {
 } from "@/cli/commands/setup/shared";
 import type { InitialCommitOutcome } from "@/cli/commands/setup/steps/make-initial-commit";
 import { ShowResult } from "@/cli/commands/setup/steps/show-result";
-import type { CommandResult } from "@/lib/oclif";
+import type { CommandResult } from "@/cli/core";
 import { type Section, Ui, style } from "@/lib/ui";
 import type { ScaffoldedProvider } from "@/lib/zitadel";
 import { it } from "@tests/fixtures";

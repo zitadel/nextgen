@@ -304,7 +304,9 @@ describe("release create", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: "Validated 4 resources and created no release (dry run)",
+              title: "Would create release (dry run)",
+              verb: "create",
+              topic: "release",
               resources: 4,
               next_commands: [expectedPublicCliCommand(app.againAsRun("release create"))],
             },
@@ -332,7 +334,9 @@ describe("release create", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: "Validated 4 resources and created no release (dry run)",
+              title: "Would create release (dry run)",
+              verb: "create",
+              topic: "release",
               resources: 4,
               next_commands: [
                 expectedPublicCliCommand(
@@ -400,7 +404,7 @@ describe("release create", () => {
 
         const result = await app.run(["release", "create", "--dry-run", "--non-interactive"]);
 
-        expect(result).toPrint("Validated 4 resources and created no release (dry run)");
+        expect(result).toPrint("Would create release (dry run)");
       });
 
       it("suggests the real command after a dry run once", async () => {

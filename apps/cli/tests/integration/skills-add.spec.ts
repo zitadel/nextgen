@@ -132,6 +132,8 @@ describe("skills add", () => {
           data: {
             title: WOULD_ADD,
             dry_run: true,
+            verb: "add",
+            topic: "skills",
             skills: SKILLS,
             directories: DIRECTORIES,
             next_commands: [

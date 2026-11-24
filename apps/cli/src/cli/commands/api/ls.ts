@@ -2,9 +2,11 @@ import { Args } from "@oclif/core";
 
 import { Operation } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Tabulatable } from "@/cli/core/tabulatable";
+import { BaseCommand } from "@/cli/core";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
@@ -83,7 +85,13 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
     return "";
   }
 
-  protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<JsonEnvelope> {
+  /**
+   * Lists the operations the CLI can call, narrowed by a filter and a tag.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The operations as a list.
+   */
+  protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<CommandResult> {
     const items = Operation.all({
       filter: args.filter,
       tag: flags.tag,
@@ -100,7 +108,7 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
       page: null,
     };
 
-    const listed = await this.listResult(
+    const result = await this.listed(
       flags,
       flags.fields === undefined
         ? {
@@ -118,15 +126,18 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
           },
     );
 
-    return this.emit({
-      ...listed,
+    return {
+      ...result,
       next: {
         commands: [
           items.length === 0
             ? this.suggest({ id: "api:ls" })
-            : this.suggest({ id: "api", args: { operation: "<operation-id>" } }),
+            : this.suggest({
+                id: "api",
+                args: { operation: "<operation-id>" },
+              }),
         ],
       },
-    });
+    };
   }
 }

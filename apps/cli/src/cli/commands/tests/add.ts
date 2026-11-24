@@ -5,9 +5,10 @@ import { pathExists } from "@/lib/fs";
 import { isObject } from "@/lib/json";
 import { log } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
 import { prose } from "@/lib/oclif/rendering";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
@@ -18,6 +19,8 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { TestKit } from "@/lib/test-kit";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Previewable } from "@/cli/core/previewable";
+import { BaseCommand } from "@/cli/core";
 
 /** Where the guide to the kit lives, for a refusal to point at. */
 const GUIDE_URL = "https://preview.zitadel.com/docs/guides/test-your-app";
@@ -55,7 +58,11 @@ const INSTALL_REFUSAL = {
   message: "Dependency install failed: {command}",
   hint: "The test files are written. Run {command} in {cwd} to install their dependencies.",
   next: ["{install}"],
-  details: { command: "{command}", cwd: "{cwd}", message: "{message}" },
+  details: {
+    command: "{command}",
+    cwd: "{cwd}",
+    message: "{message}",
+  },
 } as const satisfies Refusal;
 
 /** What the app's `package.json` declares, as far as the suite cares. */
@@ -63,6 +70,11 @@ type Manifest = Readonly<{
   dependencies: ReadonlySet<string>;
   scripts: Readonly<Record<string, unknown>>;
 }>;
+
+/** Whether the app's `test:e2e` runs the suite: absent, it is the one this command adds. */
+function runsTheSuite(ownScript: unknown): boolean {
+  return ownScript === undefined || ownScript === TestKit.SCRIPT.command;
+}
 
 /**
  * `zitadel tests add` — add end-to-end tests to an app setup wired up.
@@ -74,12 +86,16 @@ type Manifest = Readonly<{
  * that no longer matches this CLI's template, edited or written by another
  * version, is refused unless `--force` replaces it.
  */
-export default class TestsAdd extends ServerCommand(BaseCommand) {
+export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
   static override description =
     `Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to ${TestKit.PACKAGE}. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.`;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 5;
 
+  static override examples = [
+    "<%= config.bin %> tests add",
+    "<%= config.bin %> tests add --skip-install",
+  ];
   static override flags = {
     force: Flags.boolean({
       char: "f",
@@ -90,11 +106,6 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
     }),
   };
 
-  static override examples = [
-    "<%= config.bin %> <%= command.id %>",
-    "<%= config.bin %> <%= command.id %> --skip-install",
-  ];
-
   /**
    * Legacy: `--server` is accepted and ignored, so the run names no server.
    *
@@ -104,24 +115,19 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
     return "";
   }
 
-  protected async execute({ flags }: Admitted<typeof TestsAdd>): Promise<JsonEnvelope> {
-    const framework = await this.projectFramework();
-    await this.refuseAnotherPlaywrightConfig();
-    const manifest = await this.manifest();
-    const plan = new TestKit(framework).plan({
-      cliVersion: this.cliVersion,
-      declared: manifest.dependencies,
-      scripts: new Set(Object.keys(manifest.scripts)),
-    });
-
-    // A dry run first, so a conflict refuses the run before any file is written.
-    const planned = await this.scaffold(plan, true);
-    const result = this.dryRun ? planned : await this.scaffold(plan, false);
+  /**
+   * Says which files the test suite would add, without writing any.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The envelope of the dry run.
+   */
+  protected async preview({ flags }: Admitted<typeof TestsAdd>): Promise<CommandResult> {
+    const { framework, manifest, planned } = await this.planned();
     const packageManager = await PM.detect(this.cwd);
-    const { install, command: installCommand } = await packageManager.installDependencies(
+    const { install } = await packageManager.installDependencies(
       {
-        needed: result.depsAdded.length > 0,
-        dryRun: this.dryRun,
+        needed: planned.depsAdded.length > 0,
+        dryRun: true,
         skipInstall: flags.skipInstall,
       },
       {
@@ -134,29 +140,34 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
         failed: (error, command) => {
           return refusalError(
             INSTALL_REFUSAL,
-            { command: command.display, cwd: this.cwd, message: String(error) },
+            {
+              command: command.display,
+              cwd: this.cwd,
+              message: String(error),
+            },
             { install: this.shown(command, flags.cwd) },
           );
         },
       },
     );
 
-    const written = result.filesWritten.map((file) => {
+    const written = planned.filesWritten.map((file) => {
       return relative(this.cwd, file).split(sep).join("/");
     });
     const suite = `${createOrca(LocalRuntime.DIR).displayName(framework)} test suite on ${TestKit.PACKAGE}`;
-    const title = this.dryRun
-      ? `Would add a ${suite} (dry run)`
-      : written.length === 0
-        ? `The ${suite} is already in place`
-        : `Added a ${suite}`;
+    const result = dryRunResult({
+      verb: "add",
+      topic: "tests",
+      noun: `a ${suite}`,
+      next: await this.realRun(),
+    });
     const ownScript = manifest.scripts[TestKit.SCRIPT.name];
     const lines = [
-      title,
+      result.summary.title,
       ...(written.length === 0
         ? []
         : [
-            this.dryRun ? "Would write:" : "Wrote:",
+            "Would write:",
             ...written.map((file) => {
               return `  ${file}`;
             }),
@@ -167,36 +178,142 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
       "Each run boots its own Zitadel server; the browser it drives is Chromium.",
     ];
 
-    return this.emit({
-      status: "ok",
+    return {
+      ...result,
       data: {
-        title,
-        ...(this.dryRun ? { dry_run: true } : {}),
+        ...(result.data as object),
         framework,
         files_written: written,
         install,
       },
       pretty: prose(lines.join("\n")),
       summary: {
-        title: escapeControlCharacters(title),
+        ...result.summary,
+        lines: lines.slice(1).map((line) => {
+          return escapeControlCharacters(line);
+        }),
+      },
+    };
+  }
+
+  /**
+   * Writes the test suite and installs what it needs.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The envelope of the run.
+   */
+  protected async apply({ flags }: Admitted<typeof TestsAdd>): Promise<CommandResult> {
+    const { framework, manifest, plan } = await this.planned();
+    const result = await new FileWriter({
+      cwd: this.cwd,
+      dryRun: false,
+      force: this.force,
+    }).scaffold(plan);
+    const packageManager = await PM.detect(this.cwd);
+    const { install, command: installCommand } = await packageManager.installDependencies(
+      {
+        needed: result.depsAdded.length > 0,
+        dryRun: false,
+        skipInstall: flags.skipInstall,
+      },
+      {
+        cwd: this.cwd,
+        env: this.env,
+        task: (label, work, done) => {
+          return this.ui.task(label, work, done);
+        },
+        log,
+        failed: (error, command) => {
+          return refusalError(
+            INSTALL_REFUSAL,
+            {
+              command: command.display,
+              cwd: this.cwd,
+              message: String(error),
+            },
+            { install: this.shown(command, flags.cwd) },
+          );
+        },
+      },
+    );
+
+    const written = result.filesWritten.map((file) => {
+      return relative(this.cwd, file).split(sep).join("/");
+    });
+    const suite = `${createOrca(LocalRuntime.DIR).displayName(framework)} test suite on ${TestKit.PACKAGE}`;
+    const title = written.length === 0 ? `The ${suite} is already in place` : `Added a ${suite}`;
+    const ownScript = manifest.scripts[TestKit.SCRIPT.name];
+    const lines = [
+      title,
+      ...(written.length === 0
+        ? []
+        : [
+            "Wrote:",
+            ...written.map((file) => {
+              return `  ${file}`;
+            }),
+          ]),
+      ...(ownScript === undefined || ownScript === TestKit.SCRIPT.command
+        ? []
+        : [`Left the app's own ${TestKit.SCRIPT.name} script as it is: ${String(ownScript)}`]),
+      "Each run boots its own Zitadel server; the browser it drives is Chromium.",
+    ];
+
+    return {
+      status: "ok",
+      data: {
+        title,
+        framework,
+        files_written: written,
+        install,
+      },
+      pretty: prose(lines.join("\n")),
+      summary: {
+        title,
         sections: [],
         lines: lines.slice(1).map((line) => {
           return escapeControlCharacters(line);
         }),
       },
-      next: this.dryRun
-        ? { commands: [await this.realRun()] }
-        : {
-            actions: this.nextActions(ownScript),
-            commands: this.nextCommands(
-              packageManager,
-              install,
-              installCommand,
-              ownScript,
-              flags.cwd,
-            ),
-          },
+      next: {
+        actions: this.nextActions(ownScript),
+        commands: this.nextCommands(packageManager, install, installCommand, ownScript, flags.cwd),
+      },
+    };
+  }
+
+  /**
+   * Plans the test suite against the project: both runs judge the same plan,
+   * so a conflict refuses either before a file is written.
+   *
+   * @returns The project's framework and manifest, the plan, and what writing it would do.
+   */
+  private async planned(): Promise<{
+    framework: string;
+    manifest: Manifest;
+    plan: ScaffoldPlan;
+    planned: ScaffoldResult;
+  }> {
+    const framework = await this.projectFramework();
+    await this.refuseAnotherPlaywrightConfig();
+    const manifest = await this.manifest();
+    const plan = new TestKit(framework).plan({
+      cliVersion: this.cliVersion,
+      declared: manifest.dependencies,
+      scripts: new Set(Object.keys(manifest.scripts)),
     });
+    const planned = await new FileWriter({
+      cwd: this.cwd,
+      dryRun: true,
+      force: this.force,
+    }).scaffold(plan);
+
+    return {
+      framework,
+      manifest,
+      plan,
+      planned,
+    };
   }
 
   /**
@@ -254,10 +371,6 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
     };
   }
 
-  private scaffold(plan: ScaffoldPlan, dryRun: boolean): Promise<ScaffoldResult> {
-    return new FileWriter({ cwd: this.cwd, dryRun, force: this.force }).scaffold(plan);
-  }
-
   /**
    * The steps no suggested command may take: a package manager's suggestion
    * only installs, removes or runs a project's script, so installing
@@ -299,9 +412,4 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
   private shown(command: PackageCommand, cwdFlag: string | undefined): SuggestedCommand {
     return suggestedCommandOf(command.inDirectory(cwdFlag, this.cwd));
   }
-}
-
-/** Whether the app's `test:e2e` runs the suite: absent, it is the one this command adds. */
-function runsTheSuite(ownScript: unknown): boolean {
-  return ownScript === undefined || ownScript === TestKit.SCRIPT.command;
 }

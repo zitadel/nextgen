@@ -6,7 +6,7 @@ import {
   payload,
 } from "@/cli/commands/auth-method/sso/enable/shared";
 import type { PublishedCredentials } from "@/lib/idp";
-import type { CommandResult } from "@/lib/oclif";
+import type { CommandResult } from "@/cli/core";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { EndStep } from "@/lib/wizard";
 

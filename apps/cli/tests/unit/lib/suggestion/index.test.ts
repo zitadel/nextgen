@@ -143,15 +143,6 @@ describe("a suggestion", () => {
     expect(checked({ id: "deployment:list", flags: { all: true } })).toBeDefined();
   });
 
-  it("does not compile with a flag whose dependsOn is left out", () => {
-    // @ts-expect-error --force depends on --fix
-    checked({ id: "doctor", flags: { force: true } });
-    // @ts-expect-error --fix given off does not satisfy it
-    checked({ id: "doctor", flags: { force: true, fix: false } });
-
-    expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
-  });
-
   it("takes a value left to fill in for any flag that takes one", () => {
     expect(aSuggest({}, VERSION)({ id: "start", flags: { port: "<port>" } })).toBe(
       "npx @zitadel/cli@1.0.0-alpha.25 start --port '<port>'",

@@ -381,7 +381,7 @@ describe("the cli", () => {
        * real process streams, so a run in this harness emits no escape byte
        * whatever the flags say — a check for their absence would hold against
        * any implementation, broken ones included. What a run decides is pinned
-       * in `tests/unit/lib/oclif/base-source.test.ts`, and that no command
+       * in `tests/unit/cli/core/base-source.test.ts`, and that no command
        * decides for itself is enforced by `biome-plugins/no-own-colour.grit`.
        */
       it("accepts --no-color", async () => {

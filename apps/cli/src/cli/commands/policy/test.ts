@@ -4,7 +4,7 @@ import { type PolicyEvaluation, PolicyService, ReleaseService } from "@/lib/back
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
@@ -20,7 +20,7 @@ import {
   USER_CREATE_POLICY_OPERATION,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ProjectCommand } from "@/cli/commands/bases";
 
 /**
  * Where a tested config came from: a policy file, a release's revision, or
@@ -45,21 +45,6 @@ export type PolicyUnderTest = {
    * Where the rules came from.
    */
   readonly source: PolicySource;
-};
-
-/**
- * A release's policies, and whether anything can still serve them.
- */
-type ReleasePolicies = {
-  /**
-   * The policies the release pins, by operation.
-   */
-  readonly policies: ReadonlyMap<string, PolicyUnderTest>;
-
-  /**
-   * Whether the release is revoked, so its policies serve no origin.
-   */
-  readonly revoked: boolean;
 };
 
 /**
@@ -118,42 +103,6 @@ type CaseRun = {
 };
 
 /**
- * One case's outcome, and the test file it belongs to.
- */
-type CaseOutcome = {
-  /**
-   * The test file's position among the files.
-   */
-  readonly suite: number;
-
-  /**
-   * The outcome.
-   */
-  readonly result: PolicyCaseResult;
-};
-
-/**
- * A decision as {@link PolicyTestCommand} words it: whether it allows, and the
- * code and rules of a refusal, each when known.
- */
-type DescribedDecision = {
-  /**
-   * Whether the operation goes ahead.
-   */
-  readonly allowed: boolean;
-
-  /**
-   * The error code of a refusal, when known.
-   */
-  readonly code?: string | undefined;
-
-  /**
-   * The names of the rules a refusal failed, when known.
-   */
-  readonly violations?: PolicyExpectation["violations"] | undefined;
-};
-
-/**
  * How many evaluate requests a run keeps in flight at once.
  */
 const EVALUATE_CONCURRENCY = 8;
@@ -172,7 +121,7 @@ const EVALUATE_CONCURRENCY = 8;
  * nothing is read from or written to the project's policies. A failing case
  * fails the command with `E_VALIDATION`, carrying the full results.
  */
-export default class PolicyTestCommand extends ServerCommand(EnvironmentCommand) {
+export default class PolicyTestCommand extends ProjectCommand {
   static override description = `Run the test cases in .zitadel/policies/ against the policies.
 
 A policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.
@@ -201,7 +150,9 @@ The server evaluates every case, so the command needs a connection to it. By def
   };
 
   /**
-   * Evaluate the test cases and report each one.
+   * Evaluate the test cases and report each one. When a case fails the results
+   * are the explanation: the hint shows them on a terminal, and under `--json`
+   * they travel in the error's details.
    *
    * @param input.args - The operation to test, if only one.
    * @param input.flags - `--release`.
@@ -212,7 +163,7 @@ The server evaluates every case, so the command needs a connection to it. By def
   protected async execute({
     args,
     flags,
-  }: Admitted<typeof PolicyTestCommand>): Promise<JsonEnvelope> {
+  }: Admitted<typeof PolicyTestCommand>): Promise<CommandResult> {
     const operations = args.operation === undefined ? [] : [args.operation];
     const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["policies"]);
     const selected = config.policies.selectTests(operations);
@@ -226,7 +177,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     if (tests.length === 0) {
       const directory = CONFIG_DIRECTORIES.policies;
 
-      return this.emit({
+      return {
         status: "skipped",
         reason: "no-policy-tests",
         pretty: prose(
@@ -237,12 +188,11 @@ The server evaluates every case, so the command needs a connection to it. By def
           sections: [],
           lines: [`Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`],
         },
-      });
+      };
     }
 
-    const { client, projectId } = await this.connect();
-    const policyService = new PolicyService(client, projectId);
-    const releaseService = new ReleaseService(client, projectId);
+    const policyService = await this.service(PolicyService);
+    const releaseService = await this.service(ReleaseService);
     const policies = await this.policiesUnderTest(
       config,
       operations,
@@ -274,8 +224,6 @@ The server evaluates every case, so the command needs a connection to it. By def
     };
     const pretty = this.renderPolicyTestResults(results, flags.release);
     if (failed > 0) {
-      // The results are the explanation: the hint shows them on a terminal,
-      // and under --json they travel in the error's details.
       throw new ZitadelError(
         "E_VALIDATION",
         `${failed} of ${cases.length} policy test cases failed`,
@@ -286,16 +234,18 @@ The server evaluates every case, so the command needs a connection to it. By def
       );
     }
 
-    return this.emit({
+    const title = `${cases.length} passed`;
+
+    return {
       status: "ok",
-      data,
+      data: { title, ...data },
       pretty: prose(pretty),
       summary: {
-        title: `${cases.length} passed`,
+        title,
         sections: [],
         lines: escapeControlCharacters(pretty).split("\n").slice(0, -2),
       },
-    });
+    };
   }
 
   /**
@@ -377,7 +327,17 @@ The server evaluates every case, so the command needs a connection to it. By def
     releases: ReleaseService,
     service: PolicyService,
     releaseId: string,
-  ): Promise<ReleasePolicies> {
+  ): Promise<{
+    /**
+     * The policies the release pins, by operation.
+     */
+    readonly policies: ReadonlyMap<string, PolicyUnderTest>;
+
+    /**
+     * Whether the release is revoked, so its policies serve no origin.
+     */
+    readonly revoked: boolean;
+  }> {
     const release = await releases.get(releaseId);
     const pinned = release.pointers.filter((pointer) => {
       return pointer.kind === "policy";
@@ -403,6 +363,9 @@ The server evaluates every case, so the command needs a connection to it. By def
    * shape: the input, the facts where the operation has any, and the rules.
    *
    * @remarks
+   * A case without facts sends none: the key is dropped on the wire. The case
+   * holds its facts read-only, so the request takes its own copy of the list.
+   *
    * The rules were read for this operation, which the policies are keyed by,
    * so they hold this operation's settings, and the server checks them as a
    * deploy would.
@@ -431,13 +394,13 @@ The server evaluates every case, so the command needs a connection to it. By def
               operation,
               config: settings,
               input: testCase.input,
-              // A case without facts sends none: the key is dropped on the
-              // wire. The case holds its facts read-only, so the request takes
-              // its own copy of the list.
               facts:
                 facts === undefined
                   ? undefined
-                  : { ...facts, history_matches: facts.history_matches?.slice() },
+                  : {
+                      ...facts,
+                      history_matches: facts.history_matches?.slice(),
+                    },
             },
           };
         });
@@ -449,7 +412,11 @@ The server evaluates every case, so the command needs a connection to it. By def
           return {
             suite,
             testCase,
-            request: { operation, config: settings, input: testCase.input },
+            request: {
+              operation,
+              config: settings,
+              input: testCase.input,
+            },
           };
         });
       }
@@ -481,7 +448,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     const outcomes = await mapBounded(
       runs,
       EVALUATE_CONCURRENCY,
-      async (run): Promise<CaseOutcome> => {
+      async (run): Promise<{ readonly suite: number; readonly result: PolicyCaseResult }> => {
         const actual = await service.evaluate(run.request);
         return {
           suite: run.suite,
@@ -591,7 +558,11 @@ The server evaluates every case, so the command needs a connection to it. By def
    * @returns `allowed`, or refused with its code and its rules, each when known,
    *   so a mismatch in either shows on the line.
    */
-  private describeDecision(decision: DescribedDecision): string {
+  private describeDecision(decision: {
+    readonly allowed: boolean;
+    readonly code?: string | undefined;
+    readonly violations?: PolicyExpectation["violations"] | undefined;
+  }): string {
     if (decision.allowed) {
       return "allowed";
     }

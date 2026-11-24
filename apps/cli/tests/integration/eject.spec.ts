@@ -317,6 +317,8 @@ describe("eject", () => {
           status: "ok",
           data: {
             dry_run: true,
+            verb: "remove",
+            topic: "zitadel",
             title: WOULD_REMOVE_TITLE,
             files_removed: REMOVED,
             files_preserved: [],

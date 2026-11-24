@@ -10,15 +10,18 @@ import {
   ServerStartError,
   ServerStopError,
 } from "@/lib/server";
-import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
-import { type Admitted, type CommandResult, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { type Refused, reads, whole } from "@/lib/oclif/flags";
-import type { NextSteps } from "@/lib/oclif/next-steps";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { reads, type Refused, whole } from "@/cli/core/flags";
+import type { NextSteps } from "@/cli/core/next-steps";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Guidance, shellCommand, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import { section } from "@/lib/ui";
-import { BaseCommand } from "@/lib/oclif";
 import { CommandGroups } from "@/cli/commands/groups";
+import { ServerCommand } from "@/cli/commands/server-command";
+import { Previewable } from "@/cli/core/previewable";
+import { LocalServerCommand } from "@/cli/commands/server-command";
+import { BaseCommand } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
 
 /**
  * How an image beside the binary runtime is refused: an image is a container's,
@@ -64,8 +67,18 @@ const PORT_IN_USE_REFUSAL = {
   code: "E_PORT_IN_USE",
   message: "Port {port} is already in use",
   hint: "Stop the process using {url}, run `zitadel stop --all` for managed local runtimes, or choose another port.",
-  next: [{ id: "stop", flags: { all: true } }, "{alternate}"],
-  details: { port: "{port}", server_url: "{url}", listeners: "{listeners}" },
+  next: [
+    {
+      id: "stop",
+      flags: { all: true },
+    },
+    "{alternate}",
+  ],
+  details: {
+    port: "{port}",
+    server_url: "{url}",
+    listeners: "{listeners}",
+  },
 } as const satisfies Refusal;
 
 /** How a start is refused when every port it would try is held. */
@@ -73,7 +86,12 @@ const NO_FREE_PORT_REFUSAL = {
   code: "E_PORT_IN_USE",
   message: "{message}",
   hint: "Free a port, or choose one with --port.",
-  next: [{ id: "start", flags: { port: 9080 } }],
+  next: [
+    {
+      id: "start",
+      flags: { port: 9080 },
+    },
+  ],
   details: { first_port: "{first}" },
 } as const satisfies Refusal;
 
@@ -82,7 +100,13 @@ const SERVER_NOT_READY_REFUSAL = {
   code: "E_NETWORK",
   message: "{message}",
   hint: "{hint}",
-  next: [{ id: "logs" }, { id: "reset", flags: { force: true } }],
+  next: [
+    { id: "logs" },
+    {
+      id: "reset",
+      flags: { force: true },
+    },
+  ],
   details: "{details}",
 } as const satisfies Refusal;
 
@@ -96,11 +120,21 @@ const SERVER_NOT_READY_AND_RUNNING_REFUSAL = {
   hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
   next: [
     { id: "logs" },
-    { id: "reset", flags: { force: true } },
-    { id: "stop", flags: { all: true } },
+    {
+      id: "reset",
+      flags: { force: true },
+    },
+    {
+      id: "stop",
+      flags: { all: true },
+    },
   ],
   details: {
-    startup_error: { code: "E_NETWORK", message: "{message}", details: "{details}" },
+    startup_error: {
+      code: "E_NETWORK",
+      message: "{message}",
+      details: "{details}",
+    },
     stop_result: "{stop}",
   },
 } as const satisfies Refusal;
@@ -125,194 +159,6 @@ const NOT_READY_REASONS = {
 } as const;
 
 /**
- * `zitadel start`: starts this folder's server, or finds it already running.
- * The envelope's `source` names the port the run asked for before a server
- * exists, and the port it actually got afterwards, so an agent that follows it
- * targets the server that was started.
- */
-export default class Start extends LocalServerCommand(ServerCommand(BaseCommand), "exact") {
-  static override group = CommandGroups.localServer;
-  static override description = "Start a local Zitadel server.";
-  static override groupOrder = 1;
-
-  static override flags = {
-    image: nonBlankString({ description: "Container image to run." }),
-    port: Flags.custom<number>({
-      parse: reads(PORT),
-    })({
-      description:
-        "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
-    }),
-    runtime: Flags.option({
-      description: "Local runtime backend.",
-      options: LocalRuntime.BACKENDS,
-    })(),
-  };
-
-  protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
-    const plan = await this.serverInThisFolder(cwd).plan({
-      port: z.number().optional().catch(undefined).parse(flags.port),
-      shell: process.env,
-    });
-
-    return plan.apiUrl;
-  }
-
-  /**
-   * Legacy: `--server` is accepted and ignored, so the run names no server.
-   *
-   * @returns No server.
-   */
-  protected override async resolveServer(): Promise<string> {
-    return "";
-  }
-
-  protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {
-    if (flags.runtime === "binary" && flags.image !== undefined) {
-      throw refusalError(IMAGE_NEEDS_DOCKER_REFUSAL, {});
-    }
-
-    const server = this.serverInThisFolder();
-    const request = {
-      port: flags.port,
-      backend: flags.runtime,
-      image: flags.image,
-      shell: this.env,
-    };
-    const plan = await server.plan(request);
-    const { apiUrl, consoleUrl } = plan;
-    this.recordTelemetry({ runtime: plan.backend });
-
-    if (this.dryRun) {
-      const title = "Would start the local Zitadel server (dry run)";
-      const urls = { api: apiUrl, console: consoleUrl };
-      const next = { commands: [await this.realRun()] };
-
-      if (plan.backend === "docker") {
-        return this.emit({
-          status: "ok",
-          data: {
-            dry_run: true,
-            title,
-            runtime: {
-              backend: "docker",
-              container_name: plan.containerName,
-              image: plan.image,
-              port: plan.port,
-            },
-            urls,
-          },
-          summary: {
-            title,
-            sections: [
-              section(
-                undefined,
-                ["Runtime", "docker"],
-                ["Image", plan.image],
-                ["Port", String(plan.port)],
-                ["API", apiUrl],
-                ["Console", consoleUrl],
-              ),
-            ],
-          },
-          next,
-        });
-      } else {
-        return this.emit({
-          status: "ok",
-          data: {
-            dry_run: true,
-            title,
-            runtime: { backend: "binary", port: plan.port },
-            urls,
-          },
-          summary: {
-            title,
-            sections: [
-              section(
-                undefined,
-                ["Runtime", "binary"],
-                ["Port", String(plan.port)],
-                ["API", apiUrl],
-                ["Console", consoleUrl],
-              ),
-            ],
-          },
-          next,
-        });
-      }
-    } else {
-      const retry = await this.again("start", {});
-      const { runtime: record, alreadyRunning } = await server
-        .launch(request)
-        .catch(async (error: unknown) => {
-          if (error instanceof DockerUnavailableError) {
-            throw refusalError(
-              DOCKER_UNAVAILABLE_REFUSAL,
-              { detail: error.detail },
-              { check: shellCommand("docker", "version"), retry },
-            );
-          } else if (error instanceof PortInUseError) {
-            const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
-              return port !== error.port;
-            });
-
-            throw refusalError(
-              PORT_IN_USE_REFUSAL,
-              {
-                port: error.port,
-                url: LocalRuntime.urlOf(error.port),
-                listeners: await this.machine().listeners(error.port, { timeoutMs: 5000 }),
-              },
-              { alternate: this.suggest({ id: "start", flags: { port: alternatePort } }) },
-            );
-          } else if (error instanceof NoFreePortError) {
-            throw refusalError(NO_FREE_PORT_REFUSAL, {
-              message: error.message,
-              first: error.firstPort,
-            });
-          } else if (error instanceof ServerStartError) {
-            const details = {
-              ...error.details,
-              server_url: error.record.server_url,
-              log_tail: error.logTail || undefined,
-            };
-            const reason = NOT_READY_REASONS[error.reason];
-
-            if (error.cleanup.status === "failed") {
-              throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
-                message: reason.message,
-                details,
-                stop: error.cleanup,
-              });
-            } else {
-              throw refusalError(SERVER_NOT_READY_REFUSAL, {
-                message: reason.message,
-                hint: reason.hint,
-                details,
-              });
-            }
-          } else if (error instanceof ServerStopError) {
-            throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
-              runtime: error.record,
-              stop: error.outcome,
-            });
-          } else {
-            throw error;
-          }
-        });
-      this.meta = { ...this.meta, source: record.server_url };
-
-      if (alreadyRunning) {
-        return this.emit(started("Local Zitadel server is already running", record, this.suggest));
-      } else {
-        return this.emit(started("Local Zitadel server is ready", record, this.suggest));
-      }
-    }
-  }
-}
-
-/**
  * What a start that ended with a running server reports.
  *
  * @param title - The headline: ready, or already running.
@@ -321,14 +167,22 @@ export default class Start extends LocalServerCommand(ServerCommand(BaseCommand)
  * @returns The result to emit.
  */
 function started(title: string, record: RuntimeMetadata, suggest: Suggest): CommandResult {
-  const urls = { api: record.server_url, console: `${record.server_url}/ui/console/` };
+  const urls = {
+    api: record.server_url,
+    console: `${record.server_url}/ui/console/`,
+  };
   const next: NextSteps<SuggestedCommand> = {
     actions: [
       "Create an app with authentication. Run setup in this directory or a subdirectory.",
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
       new Guidance(suggest).serverLog(),
     ],
-    commands: [suggest({ id: "setup", flags: { server: "local" } })],
+    commands: [
+      suggest({
+        id: "setup",
+        flags: { server: "local" },
+      }),
+    ],
   };
 
   if (record.backend === "binary") {
@@ -391,6 +245,240 @@ function started(title: string, record: RuntimeMetadata, suggest: Suggest): Comm
         ],
       },
       next,
+    };
+  }
+}
+
+/**
+ * `zitadel start`: starts this folder's server, or finds it already running.
+ * The envelope's `source` names the port the run asked for before a server
+ * exists, and the port it actually got afterwards, so an agent that follows it
+ * targets the server that was started.
+ */
+export default class Start extends LocalServerCommand(
+  Previewable(ServerCommand(BaseCommand)),
+  "exact",
+) {
+  static override description = "Start a local Zitadel server.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 1;
+
+  static override examples = [
+    "<%= config.bin %> start",
+    "<%= config.bin %> start --port 8080",
+    "<%= config.bin %> start --runtime docker",
+  ];
+  static override flags = {
+    image: nonBlankString({ description: "Container image to run." }),
+    port: Flags.custom<number>({
+      parse: reads(PORT),
+    })({
+      description:
+        "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
+    }),
+    runtime: Flags.option({
+      description: "Local runtime backend.",
+      options: LocalRuntime.BACKENDS,
+    })(),
+  };
+
+  /**
+   * The server a start is about: the one this folder's plan names, known before
+   * the run has a context so that every event and refusal names it.
+   *
+   * @param flags - The flags as parsed.
+   * @param cwd - The directory the run addresses.
+   * @returns The API URL of the planned server.
+   */
+  protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
+    const plan = await this.serverInThisFolder(cwd).plan({
+      port: z.number().optional().catch(undefined).parse(flags.port),
+      shell: process.env,
+    });
+
+    return plan.apiUrl;
+  }
+
+  /**
+   * Says what the command would do, without doing it.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The result of the dry run.
+   */
+  protected async preview({ flags }: Admitted<typeof Start>): Promise<CommandResult> {
+    const { plan } = await this.planned(flags);
+    const { apiUrl, consoleUrl } = plan;
+    const dryRun = dryRunResult({
+      verb: "start",
+      topic: "server",
+      noun: "the local Zitadel server",
+      next: await this.realRun(),
+    });
+    const urls = { api: apiUrl, console: consoleUrl };
+
+    if (plan.backend === "docker") {
+      return {
+        ...dryRun,
+        pretty: undefined,
+        data: {
+          ...(dryRun.data as object),
+          runtime: {
+            backend: "docker",
+            container_name: plan.containerName,
+            image: plan.image,
+            port: plan.port,
+          },
+          urls,
+        },
+        summary: {
+          ...dryRun.summary,
+          sections: [
+            section(
+              undefined,
+              ["Runtime", "docker"],
+              ["Image", plan.image],
+              ["Port", String(plan.port)],
+              ["API", apiUrl],
+              ["Console", consoleUrl],
+            ),
+          ],
+        },
+      };
+    } else {
+      return {
+        ...dryRun,
+        pretty: undefined,
+        data: {
+          ...(dryRun.data as object),
+          runtime: { backend: "binary", port: plan.port },
+          urls,
+        },
+        summary: {
+          ...dryRun.summary,
+          sections: [
+            section(
+              undefined,
+              ["Runtime", "binary"],
+              ["Port", String(plan.port)],
+              ["API", apiUrl],
+              ["Console", consoleUrl],
+            ),
+          ],
+        },
+      };
+    }
+  }
+
+  /**
+   * Starts the local server, or says it is already running.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The result of the run.
+   */
+  protected async apply({ flags }: Admitted<typeof Start>): Promise<CommandResult> {
+    const { server, request } = await this.planned(flags);
+    const retry = await this.again("start", {});
+    const { runtime: record, alreadyRunning } = await server
+      .launch(request)
+      .catch(async (error: unknown) => {
+        if (error instanceof DockerUnavailableError) {
+          throw refusalError(
+            DOCKER_UNAVAILABLE_REFUSAL,
+            { detail: error.detail },
+            {
+              check: shellCommand("docker", "version"),
+              retry,
+            },
+          );
+        } else if (error instanceof PortInUseError) {
+          const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
+            return port !== error.port;
+          });
+
+          throw refusalError(
+            PORT_IN_USE_REFUSAL,
+            {
+              port: error.port,
+              url: LocalRuntime.urlOf(error.port),
+              listeners: await this.machine().listeners(error.port, { timeoutMs: 5000 }),
+            },
+            {
+              alternate: this.suggest({
+                id: "start",
+                flags: { port: alternatePort },
+              }),
+            },
+          );
+        } else if (error instanceof NoFreePortError) {
+          throw refusalError(NO_FREE_PORT_REFUSAL, {
+            message: error.message,
+            first: error.firstPort,
+          });
+        } else if (error instanceof ServerStartError) {
+          const details = {
+            ...error.details,
+            server_url: error.record.server_url,
+            log_tail: error.logTail || undefined,
+          };
+          const reason = NOT_READY_REASONS[error.reason];
+
+          if (error.cleanup.status === "failed") {
+            throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+              message: reason.message,
+              details,
+              stop: error.cleanup,
+            });
+          } else {
+            throw refusalError(SERVER_NOT_READY_REFUSAL, {
+              message: reason.message,
+              hint: reason.hint,
+              details,
+            });
+          }
+        } else if (error instanceof ServerStopError) {
+          throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
+            runtime: error.record,
+            stop: error.outcome,
+          });
+        } else {
+          throw error;
+        }
+      });
+    this.meta = { ...this.meta, source: record.server_url };
+
+    if (alreadyRunning) {
+      return started("Local Zitadel server is already running", record, this.suggest);
+    } else {
+      return started("Local Zitadel server is ready", record, this.suggest);
+    }
+  }
+
+  /**
+   * Refuses a runtime the image does not fit and plans the local server, which
+   * both a dry run and a start begin with.
+   *
+   * @param flags - The flags the command accepts.
+   * @returns The server of this folder, the request that starts it, and the plan.
+   */
+  private async planned(flags: Admitted<typeof Start>["flags"]) {
+    if (flags.runtime === "binary" && flags.image !== undefined) {
+      throw refusalError(IMAGE_NEEDS_DOCKER_REFUSAL, {});
+    }
+
+    const server = this.serverInThisFolder();
+    const request = {
+      port: flags.port,
+      backend: flags.runtime,
+      image: flags.image,
+      shell: this.env,
+    };
+    const plan = await server.plan(request);
+    this.recordTelemetry({ runtime: plan.backend });
+
+    return {
+      server,
+      request,
+      plan,
     };
   }
 }

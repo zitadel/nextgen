@@ -278,6 +278,8 @@ describe("branding eject", () => {
           data: {
             dry_run: true,
             title: "Would eject the minimal design into .zitadel/branding/ (dry run)",
+            verb: "eject",
+            topic: "design",
             design: "minimal",
             files_would_write: EJECTED_FILES,
             next_commands: [
@@ -303,6 +305,8 @@ describe("branding eject", () => {
           data: {
             dry_run: true,
             title: "Would eject the minimal design into .zitadel/branding/ (dry run)",
+            verb: "eject",
+            topic: "design",
             design: "minimal",
             files_would_write: EJECTED_FILES,
             next_commands: [
