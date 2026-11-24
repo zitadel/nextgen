@@ -655,5 +655,43 @@
       "sectionTitleGapMd": 16,
       "sectionTitleGapSm": 16
     }
+  },
+  "palette": {
+    "brand": {
+      "purple.100": "#401889",
+      "purple.200": "#461ca9",
+      "purple.300": "#5a23bd",
+      "purple.400": "#7241c8",
+      "purple.500": "#9066da",
+      "purple.600": "#9e7ed8",
+      "purple.700": "#bba5e4",
+      "purple.800": "#d9ccf0",
+      "orange.100": "#9c2316",
+      "orange.200": "#bd2514",
+      "orange.300": "#e84331",
+      "orange.400": "#f25543",
+      "orange.500": "#f37d6d",
+      "orange.600": "#fa9e93",
+      "orange.700": "#ffbcb5",
+      "orange.800": "#fcd8d4",
+      "pink.100": "#9b233e",
+      "pink.200": "#c52247",
+      "pink.300": "#dc4567",
+      "pink.400": "#e25f7d",
+      "pink.500": "#ea8aa0",
+      "pink.600": "#f5acbd",
+      "pink.700": "#f2bcc8",
+      "pink.800": "#fae1e6",
+      "gray.100": "#0f0f11",
+      "gray.200": "#252528",
+      "gray.300": "#484a57",
+      "gray.400": "#686883",
+      "gray.500": "#82829c",
+      "gray.600": "#9e9eb2",
+      "gray.700": "#bfbfcf",
+      "gray.800": "#cfcfde",
+      "gray.900": "#e1e1e7",
+      "gray.1000": "#f4f4f6"
+    }
   }
 }

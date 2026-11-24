@@ -22,6 +22,11 @@ export type CollectionRole =
   | "viewport"
   /** Single-mode source of the primitive groups (`radius`, `text`, `font`, `font-weight`, `container`). */
   | "primitives"
+  /**
+   * Single-mode colour ramps, one value in both themes:
+   * `palette.<group>["<hue>.<step>"]` -> `--zl-<group>-<hue>-<step>`.
+   */
+  | "palette"
   /** Ingested only so `{alias}` chains resolve through it. Surfaces nothing itself. */
   | "registry-only";
 
@@ -36,8 +41,9 @@ export const collectionRoles: Record<string, CollectionRole> = {
   "3. Mode": "semantic",
   "4. Custom": "viewport",
   "5--icon-library": "registry-only",
-  // Brand palette. Only reached through `{brand.*}` aliases from `Syntax`.
-  brand: "registry-only",
+  // The brand guide's UI colour palette (orange, purple, pink, gray), as
+  // `--zl-brand-*`. `Syntax` also aliases into it.
+  brand: "palette",
   "Gradient Colors": "themed",
   // Restates `font/font-serif` as a literal per heading size; nothing consumes
   // it. Left registry-only rather than dropped, so the sync stays green while

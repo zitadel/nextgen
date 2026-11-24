@@ -382,6 +382,29 @@ function buildThemedGroups(
   return { groups, skipped };
 }
 
+/**
+ * Project a single-mode colour collection (`brand`) into `palette.<group>`,
+ * where `<group>` is the leaves' first segment and the rest stays a dotted key:
+ * `brand.orange.400` -> `palette.brand["orange.400"]`. Step names are data, so
+ * nothing is camel-cased. Leaves that are not a hex colour are skipped.
+ */
+function buildPaletteGroups(
+  c: ParsedCollection,
+  registry: Registry,
+): Record<string, Record<string, string>> {
+  const groups: Record<string, Record<string, string>> = {};
+  for (const path of c.leaves.get(NO_MODE)?.keys() ?? []) {
+    const value = String(registry.resolve(path, NO_MODE));
+    const [head, ...tail] = path.split(".");
+    if (!HEX.test(value) || !head || tail.length === 0) continue;
+    const group = kebab([head]);
+    const bucket = groups[group] ?? {};
+    bucket[tail.map((s) => kebab([s])).join(".")] = value.toLowerCase();
+    groups[group] = bucket;
+  }
+  return groups;
+}
+
 /** Nest a dotted path into `target`, camel-casing each segment. */
 function setNested(target: Record<string, unknown>, path: string, value: Raw): void {
   const parts = path
@@ -474,6 +497,12 @@ export interface SyncedTokens {
    */
   themed: Record<string, Record<string, ThemedColor>>;
   typography: Record<string, Record<string, unknown>>;
+  /**
+   * Single-mode colour ramps, namespaced by group, keyed by the dotted rest of
+   * the path: `palette.brand["orange.400"]`. `build.ts` emits these as
+   * `--zl-<group>-<hue>-<step>`, one value in both themes.
+   */
+  palette: Record<string, Record<string, string>>;
 }
 
 /**
@@ -537,6 +566,24 @@ export function syncTokens(
     }
   }
 
+  // Palettes share the CSS namespace with the themed groups (`--zl-<group>-…`),
+  // so one owner map keeps a palette group off a themed group's name.
+  const palette: Record<string, Record<string, string>> = {};
+  for (const c of withRole(assigned, "palette")) {
+    const groups = buildPaletteGroups(c, registry);
+    if (Object.keys(groups).length === 0) {
+      throw new Error(
+        `Palette collection ${c.name} (${c.file}) produced no colours` +
+          (c.modes[0] === NO_MODE
+            ? ""
+            : `; it declares modes (${c.modes.join(", ")}), so classify it "themed"`),
+      );
+    }
+    for (const [group, entries] of Object.entries(groups)) {
+      claim(palette, themedOwners, group, `palette.${group}`, c.name, entries);
+    }
+  }
+
   // Primitive groups (radius/text/font/…) are merged across the collections
   // declared to own them, so they surface regardless of which file they sit in.
   // `Registry.add` has already rejected genuinely conflicting concrete values.
@@ -591,6 +638,7 @@ export function syncTokens(
     container: buildGroup("container", singleMode, registry),
     themed,
     typography,
+    palette,
   };
 }
 
@@ -615,13 +663,15 @@ async function main(): Promise<void> {
 
   const out = syncTokens(files);
   await writeFile(TOKENS_FILE, `${JSON.stringify(out, null, 2)}\n`);
-  const themedGroups = Object.entries(out.themed).map(
-    ([g, e]) => `${g} (${Object.keys(e).length})`,
-  );
+  const count = (groups: Record<string, object>): string[] =>
+    Object.entries(groups).map(([g, e]) => `${g} (${Object.keys(e).length})`);
+  const themedGroups = count(out.themed);
+  const paletteGroups = count(out.palette);
   console.log(
     `design-tokens sync-export: resolved ${out.$source.resolvedLeaves} leaves across ${out.$source.collections.length} collections; ` +
       `surfaced ${Object.keys(out.color).length} colours` +
       (themedGroups.length > 0 ? ` + themed groups ${themedGroups.join(", ")}` : "") +
+      (paletteGroups.length > 0 ? ` + palette groups ${paletteGroups.join(", ")}` : "") +
       ` -> ${TOKENS_FILE}`,
   );
   const { unclassifiedCollections, staleCollectionRoles } = out.$source;

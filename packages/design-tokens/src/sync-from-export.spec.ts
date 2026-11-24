@@ -230,6 +230,70 @@ describe("syncTokens resolver", () => {
     ).toThrow(/both project themed\.syntax/);
   });
 
+  it("projects a palette collection's ramps under its group, step names as data", () => {
+    const out = syncTokens(
+      [
+        mode,
+        {
+          name: "brand.json",
+          data: {
+            brand: {
+              orange: { 400: leaf("#F25543"), 800: leaf("#fcd8d4") },
+              gray: { 1000: leaf("#f4f4f6") },
+              radius: leaf(4, "number"),
+            },
+          },
+        },
+      ],
+      { Mode: "semantic", brand: "palette" },
+    );
+
+    // Lower-cased, the non-colour leaf skipped, and `1000` not camel-cased away.
+    expect(out.palette).toEqual({
+      brand: { "orange.400": "#f25543", "orange.800": "#fcd8d4", "gray.1000": "#f4f4f6" },
+    });
+    expect(out.themed).toEqual({});
+  });
+
+  it("throws when a palette group takes a themed group's name", () => {
+    expect(() =>
+      syncTokens(
+        [
+          mode,
+          {
+            name: "syntax.json",
+            data: {
+              $metadata: { collection: "Syntax", modes: ["Light", "Dark"] },
+              Light: { syntax: { key: leaf("#401889") } },
+              Dark: { syntax: { key: leaf("#9066da") } },
+            },
+          },
+          { name: "ramps.json", data: { syntax: { purple: { 100: leaf("#401889") } } } },
+        ],
+        { Mode: "semantic", Syntax: "themed", ramps: "palette" },
+      ),
+    ).toThrow(/both project palette\.syntax/);
+  });
+
+  it("throws when a Light/Dark collection is classified as a palette", () => {
+    expect(() =>
+      syncTokens(
+        [
+          mode,
+          {
+            name: "gradient-colors.json",
+            data: {
+              $metadata: { collection: "Gradient Colors", modes: ["Light", "Dark"] },
+              Light: { gradient: { red: { start: leaf("#f25543") } } },
+              Dark: { gradient: { red: { start: leaf("#e84331") } } },
+            },
+          },
+        ],
+        { Mode: "semantic", "Gradient Colors": "palette" },
+      ),
+    ).toThrow(/declares modes \(Light, Dark\), so classify it "themed"/);
+  });
+
   it("throws when two viewport collections project the same mode", () => {
     expect(() =>
       syncTokens(
@@ -345,6 +409,17 @@ describe("syncTokens against real figma-export/", () => {
     expect(out.themed.gradient!["lavender-start"]).toEqual({ dark: "#bba5e4", light: "#bba5e4" });
 
     expect(out.themed.syntax!.key).toEqual({ dark: "#9066da", light: "#401889" });
+  });
+
+  it("surfaces the brand palette's four ramps", () => {
+    const brand = syncTokens(files).palette.brand ?? {};
+    const hues = new Set(Object.keys(brand).map((key) => key.split(".")[0]));
+
+    expect([...hues].sort()).toEqual(["gray", "orange", "pink", "purple"]);
+    // The brand guide's foundation and its one highlight colour.
+    expect(brand["orange.400"]).toBe("#f25543");
+    expect(brand["gray.100"]).toBe("#0f0f11");
+    expect(brand["gray.1000"]).toBe("#f4f4f6");
   });
 
   it("keeps typography to the viewport axis", () => {

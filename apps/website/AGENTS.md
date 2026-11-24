@@ -66,8 +66,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   copies; change the copies together.
 - `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the docs
   link the same set, so a change here reaches them. `apps/console/public/favicons/`
-  is a copy; change the copies together. A single `/favicon.ico` cannot replace
-  the light/dark set.
+  is a copy; change the copies together. `light/` and `dark/` hold the same
+  orange mark; keep both, since the console, docs and error page link them.
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
