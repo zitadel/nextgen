@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -447,6 +448,28 @@ func webhookBackoff(failingFor time.Duration) time.Duration {
 	return min(max(failingFor, 0)+webhookBackoffMin, webhookBackoffMax)
 }
 
+// webhookRetryAfter is how long an endpoint asked to be left alone, counted
+// from at: the Retry-After of a 429 or a 503 (ADR 090 §4), in seconds or as
+// an HTTP date, and at most webhookBackoffMax. It is zero for any other
+// answer, and for a header that is missing, malformed or already past.
+func webhookRetryAfter(resp *http.Response, at time.Time) time.Duration {
+	if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode != http.StatusServiceUnavailable {
+		return 0
+	}
+	value := strings.TrimSpace(resp.Header.Get("Retry-After"))
+	if value == "" {
+		return 0
+	}
+	var wait time.Duration
+	if seconds, err := strconv.ParseInt(value, 10, 64); err == nil {
+		// Capped before it is a duration: a large count would overflow one.
+		wait = time.Duration(min(max(seconds, 0), int64(webhookBackoffMax/time.Second))) * time.Second
+	} else if until, err := http.ParseTime(value); err == nil {
+		wait = until.Sub(at)
+	}
+	return min(max(wait, 0), webhookBackoffMax)
+}
+
 // webhookFailure is one delivery that failed: the endpoint's answer, or the
 // reason there was none.
 type webhookFailure struct {
@@ -454,7 +477,9 @@ type webhookFailure struct {
 	eventID string
 	// status is the HTTP status of the answer, nil when there was none.
 	status *int32
-	cause  error
+	// retryAfter is what webhookRetryAfter read from the answer.
+	retryAfter time.Duration
+	cause      error
 }
 
 // reason is the failure for a log line. An error of the HTTP client is cut
@@ -525,6 +550,7 @@ func (s *WebhookShipper) send(ctx context.Context, hook *domain.Webhook, ev *dom
 	defer resp.Body.Close()
 	_, _ = io.CopyN(io.Discard, resp.Body, webhookResponseLimit)
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		failure.retryAfter = webhookRetryAfter(resp, at)
 		return failure
 	}
 	return nil
@@ -553,8 +579,11 @@ func (s *WebhookShipper) fail(ctx context.Context, hook *domain.Webhook, failure
 	case failingFor >= domain.WebhookDisableAfter:
 		reason = domain.WebhookDisabledReasonFailing
 	default:
+		// The longer of the two: an endpoint may ask for more time than the
+		// backoff gives it, never for less.
+		wait := max(webhookBackoff(failingFor), failure.retryAfter)
 		zlog.Info(ctx, "webhook shipper: delivery failed", attrs...)
-		nextAttemptAt := failure.at.Add(webhookBackoff(failingFor))
+		nextAttemptAt := failure.at.Add(wait)
 		err := s.write(ctx, func(ctx context.Context) error {
 			return s.src.RecordWebhookFailure(ctx, hook, s.holder, failure.at, failure.status, nextAttemptAt)
 		})

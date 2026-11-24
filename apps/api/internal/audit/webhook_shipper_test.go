@@ -120,6 +120,39 @@ func TestWebhookBackoff_Schedule(t *testing.T) {
 	assert.Equal(t, 5*time.Second, webhookBackoff(-time.Minute), "a clock that stepped back")
 }
 
+// Retry-After counts on a 429 and a 503 only, in seconds or as a date, and
+// never for more than the longest backoff (ADR 090 §4).
+func TestWebhookRetryAfter(t *testing.T) {
+	at := webhookT0
+	for _, tc := range []struct {
+		name   string
+		status int
+		header string
+		want   time.Duration
+	}{
+		{"seconds on a 429", http.StatusTooManyRequests, "120", 2 * time.Minute},
+		{"seconds on a 503", http.StatusServiceUnavailable, "30", 30 * time.Second},
+		{"a date", http.StatusTooManyRequests, at.Add(90 * time.Second).Format(http.TimeFormat), 90 * time.Second},
+		{"a date already past", http.StatusTooManyRequests, at.Add(-time.Minute).Format(http.TimeFormat), 0},
+		{"more than the longest backoff", http.StatusTooManyRequests, "86400", time.Hour},
+		{"a date further than the longest backoff", http.StatusServiceUnavailable, at.Add(48 * time.Hour).Format(http.TimeFormat), time.Hour},
+		{"a count too large for a duration", http.StatusTooManyRequests, "9223372036854775807", time.Hour},
+		{"negative seconds", http.StatusTooManyRequests, "-5", 0},
+		{"no header", http.StatusTooManyRequests, "", 0},
+		{"not a number or a date", http.StatusTooManyRequests, "soon", 0},
+		{"another failure", http.StatusInternalServerError, "120", 0},
+		{"a redirect", http.StatusFound, "120", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := &http.Response{StatusCode: tc.status, Header: http.Header{}}
+			if tc.header != "" {
+				resp.Header.Set("Retry-After", tc.header)
+			}
+			assert.Equal(t, tc.want, webhookRetryAfter(resp, at))
+		})
+	}
+}
+
 // A failure's log line names no URL: the HTTP client's error holds the whole
 // one, whose path or query may be a token.
 func TestWebhookFailure_ReasonHoldsNoURL(t *testing.T) {
@@ -364,6 +397,8 @@ type webhookEndpoint struct {
 	mu       sync.Mutex
 	received []receivedDelivery
 	respond  func(eventID string) int
+	// retryAfter is the Retry-After header of every answer, when set.
+	retryAfter string
 }
 
 func newWebhookEndpoint(t *testing.T) *webhookEndpoint {
@@ -373,11 +408,14 @@ func newWebhookEndpoint(t *testing.T) *webhookEndpoint {
 		body, _ := io.ReadAll(r.Body)
 		e.mu.Lock()
 		e.received = append(e.received, receivedDelivery{path: r.URL.Path, header: r.Header.Clone(), body: body})
-		respond := e.respond
+		respond, retryAfter := e.respond, e.retryAfter
 		e.mu.Unlock()
 		status := http.StatusNoContent
 		if respond != nil {
 			status = respond(r.Header.Get(webhookIDHeader))
+		}
+		if retryAfter != "" {
+			w.Header().Set("Retry-After", retryAfter)
 		}
 		w.WriteHeader(status)
 	}))
@@ -404,6 +442,12 @@ func (e *webhookEndpoint) answer(respond func(eventID string) int) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.respond = respond
+}
+
+func (e *webhookEndpoint) askToRetryAfter(value string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.retryAfter = value
 }
 
 var webhookT0 = time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
@@ -625,6 +669,43 @@ func TestWebhookShipper_HeadOfLineStopsAtAFailure(t *testing.T) {
 	stored = src.get("hook_1")
 	assert.Equal(t, "evt_3", stored.CursorEventID)
 	assert.Nil(t, stored.FailingSince, "a success ends the failing state")
+}
+
+// An endpoint that answers 429 with Retry-After is left alone until the time
+// it names, which is longer than the backoff here; a shorter one does not
+// cut the backoff short.
+func TestWebhookShipper_WaitsForRetryAfter(t *testing.T) {
+	endpoint := newWebhookEndpoint(t)
+	endpoint.answer(func(string) int { return http.StatusTooManyRequests })
+	endpoint.askToRetryAfter("120")
+	src := newFakeWebhookSource(testWebhook("hook_1", "proj_a", endpoint.URL))
+	src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
+	clock := &fakeClock{t: webhookT0.Add(time.Minute)}
+	shipper := newTestWebhookShipper(src, endpoint.Client(), clock)
+
+	_, err := shipper.runOnce(t.Context(), "")
+	require.NoError(t, err)
+
+	failedAt := clock.Now()
+	stored := src.get("hook_1")
+	assert.Equal(t, new(int32(429)), stored.LastErrorStatus)
+	assert.Equal(t, new(failedAt.Add(2*time.Minute)), stored.NextAttemptAt, "what the endpoint asked for, not the 5 seconds of a first failure")
+
+	clock.Set(failedAt.Add(2*time.Minute - time.Second))
+	n, err := shipper.runOnce(t.Context(), "")
+	require.NoError(t, err)
+	assert.Zero(t, n, "not due before the time the endpoint named")
+	assert.Equal(t, []string{"evt_1"}, endpoint.eventIDs())
+
+	// Due now. The endpoint asks for 1 second, less than the backoff of a
+	// webhook that has been failing for 2 minutes.
+	endpoint.askToRetryAfter("1")
+	clock.Set(failedAt.Add(2 * time.Minute))
+	_, err = shipper.runOnce(t.Context(), "")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"evt_1", "evt_1"}, endpoint.eventIDs())
+	stored = src.get("hook_1")
+	assert.Equal(t, new(clock.Now().Add(webhookBackoff(2*time.Minute))), stored.NextAttemptAt)
 }
 
 // An endpoint that keeps failing is retried after 5 seconds, then twice as
