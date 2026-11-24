@@ -7,6 +7,7 @@ import type { JsonEnvelope } from "@/lib/oclif/types";
 import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { onTerminalReadingAFile } from "@tests/fixtures/terminal";
+import { Output } from "@/lib/ui";
 
 const config = await Config.load(cliPackageRoot);
 
@@ -91,7 +92,7 @@ class Coloured extends BaseCommand {
   }
 
   protected async execute(): Promise<JsonEnvelope> {
-    this.answer = this.isColored;
+    this.answer = Output.color;
     return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
@@ -111,6 +112,9 @@ describe("whether a run's output is coloured", () => {
     ["for NO_COLOR over FORCE_COLOR", [], { NO_COLOR: "1", FORCE_COLOR: "1" }, false],
     ["for --no-color over FORCE_COLOR", ["--no-color"], { FORCE_COLOR: "1" }, false],
     ["for FORCE_COLOR off a terminal", [], { FORCE_COLOR: "1" }, true],
+    ["for FORCE_COLOR=0, which means off", [], { FORCE_COLOR: "0" }, false],
+    ["for FORCE_COLOR=false, which means off", [], { FORCE_COLOR: "false" }, false],
+    ["for FORCE_COLOR=False, in any case", [], { FORCE_COLOR: "False" }, false],
     ["on a dumb terminal", [], { TERM: "dumb" }, false],
     ["for --json, which carries no colour", ["--json"], { TERM: "xterm" }, false],
   ])("is %s", async (_case, argv, env, expected) => {

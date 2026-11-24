@@ -754,14 +754,14 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.Len(t, grants(t, colleagueID)["editor"], 1)
 	})
 
-	t.Run("an expired invitation answers as unknown", func(t *testing.T) {
+	t.Run("an expired invitation answers as unknown, and its administrator removes it", func(t *testing.T) {
 		t.Parallel()
 		token, tokenHash, err := domain.NewInvitationToken()
 		require.NoError(t, err)
 		journeyID, err := domain.NewInvitationJourneyID()
 		require.NoError(t, err)
 		// Seeded below the API, which only creates invitations that expire later.
-		require.NoError(t, stmts.CreateInvitation(t.Context(), &domain.Invitation{
+		expired := &domain.Invitation{
 			ProjectID:     project.ID,
 			Type:          domain.InvitationTypeProjectMember,
 			ProjectMember: &domain.InvitationProjectMember{Relation: "viewer"},
@@ -769,13 +769,22 @@ func TestInvitationRedeem(t *testing.T) {
 			ExpiresAt:     time.Now().Add(-time.Minute),
 			JourneyID:     journeyID,
 			TokenHash:     tokenHash,
-		}))
+		}
+		require.NoError(t, stmts.CreateInvitation(t.Context(), expired))
 		colleagueID, colleague := newColleague(t)
 
 		require.IsType(t, &api.LookupInvitationNotFound{}, lookup(t, colleague, token))
 		require.IsType(t, &api.AcceptInvitationNotFound{}, accept(t, colleague, token))
 		require.IsType(t, &api.RejectInvitationNotFound{}, reject(t, colleague, token))
 		assert.Empty(t, grants(t, colleagueID))
+
+		// The administrator removes the expired invitation, and its metadata with it.
+		cancelled, err := owner.CancelInvitation(t.Context(), api.CancelInvitationParams{InvitationID: api.InvitationID(expired.ID), ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.CancelInvitationNoContent{}, cancelled, helpers.MustMarshal(t, cancelled))
+		gone, err := owner.GetInvitation(t.Context(), api.GetInvitationParams{InvitationID: api.InvitationID(expired.ID), ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetInvitationNotFound{}, gone, helpers.MustMarshal(t, gone))
 	})
 
 	t.Run("a project secret's invitation", func(t *testing.T) {

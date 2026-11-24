@@ -104,6 +104,7 @@ catalog:
   cookie-parser: ^1.4.7
   culori: ^4.0.2
   dompurify: ^3.4.16
+  dot-prop: ^10.2.0
   escape-string-regexp: ^5.0.0
   execa: ^9.6.1
   express: ^4.22.3

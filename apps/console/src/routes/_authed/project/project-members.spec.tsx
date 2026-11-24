@@ -106,6 +106,10 @@ function stubProject(
       grantReads.push(new URL(request.url).searchParams.get("project_id"));
       return HttpResponse.json({ grants });
     }),
+    // The Invitations tab is read with the page; its own spec covers it.
+    http.get("http://localhost/api/v1/invitations", () =>
+      HttpResponse.json({ invitations: [], next_page_token: null }),
+    ),
   );
   return { memberReads, grantReads };
 }
@@ -360,18 +364,18 @@ describe("project members", () => {
     stubProject({ grants: [grant()] });
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () =>
-        HttpResponse.json({ code: "grant.not_found", message: "no such grant" }, { status: 404 }),
+        HttpResponse.json({ code: "grant.not_found", message: "No such grant" }, { status: 404 }),
       ),
     );
     await renderProject();
 
     const dialog = await openRemove("Maya Patel");
     await userEvent.click(dialog.getByRole("button", { name: "Remove access" }));
-    expect(await screen.findByText("no such grant")).toBeInTheDocument();
+    expect(await screen.findByText("No such grant")).toBeInTheDocument();
 
     await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
     await openRemove("Maya Patel");
-    expect(screen.queryByText("no such grant")).not.toBeInTheDocument();
+    expect(screen.queryByText("No such grant")).not.toBeInTheDocument();
   });
 
   it("reloads what is left when one of a row's grants fails to go", async () => {
@@ -386,7 +390,7 @@ describe("project members", () => {
       http.delete(`${GRANTS_URL}/:id`, ({ params }) =>
         params.id === "asgn_2"
           ? HttpResponse.json(
-              { code: "grant.not_found", message: "no such grant" },
+              { code: "grant.not_found", message: "No such grant" },
               { status: 404 },
             )
           : new HttpResponse(null, { status: 204 }),
@@ -397,11 +401,11 @@ describe("project members", () => {
     const dialog = await openRemove("Maya Patel");
     const reads = memberReads.length;
     await userEvent.click(dialog.getByRole("button", { name: "Remove access" }));
-    expect(await screen.findByText("no such grant")).toBeInTheDocument();
+    expect(await screen.findByText("No such grant")).toBeInTheDocument();
     await waitFor(() => expect(memberReads.length).toBeGreaterThan(reads));
     expect(screen.queryByText("Access removed")).not.toBeInTheDocument();
     // The reload leaves the dialog and its error in place.
-    expect(screen.getByText("no such grant")).toBeInTheDocument();
+    expect(screen.getByText("No such grant")).toBeInTheDocument();
   });
 
   it("keeps the row when the removal is cancelled", async () => {
@@ -546,7 +550,7 @@ describe("project members", () => {
     await userEvent.click(submit);
 
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "you cannot grant access to yourself",
+      "You cannot grant access to yourself",
     );
   });
 });

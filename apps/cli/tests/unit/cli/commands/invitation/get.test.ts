@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import InvitationGet from "@/cli/commands/invitation/get";
-import { parseArg } from "@tests/helpers/inputs";
+import { parseArg, parseFlag } from "@tests/helpers/inputs";
 
 const INVITATION = "inv_01JCQK5R7T9V1X3Z5B7D9F1H3J";
 
@@ -22,6 +22,17 @@ describe("invitation get", () => {
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         hint: "Find one with `zitadel invitation list`.",
+      });
+    });
+  });
+
+  describe("--fields", () => {
+    it("refuses a field an invitation does not carry, naming the ones it does", async () => {
+      await expect(
+        parseFlag(InvitationGet.flags.fields, "no_such_field", "fields"),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        hint: expect.stringContaining("status"),
       });
     });
   });

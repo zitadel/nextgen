@@ -602,6 +602,9 @@ describe("platform root", () => {
       http.get("*/api/v1/variables", () => HttpResponse.json({ variables: [] })),
       http.get("*/api/v1/projects/proj_platform/members", () => HttpResponse.json({ members: [] })),
       http.post("*/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+      http.get("*/api/v1/invitations", () =>
+        HttpResponse.json({ invitations: [], next_page_token: null }),
+      ),
     );
     renderShell("/project/members?project=proj_platform");
 
@@ -938,6 +941,9 @@ describe("project settings view", () => {
     server.use(
       http.get(`${PROJECT_1}/members`, () => HttpResponse.json({ members: [] })),
       http.post("*/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+      http.get("*/api/v1/invitations", () =>
+        HttpResponse.json({ invitations: [], next_page_token: null }),
+      ),
       http.get("*/api/v1/variables", () => HttpResponse.json({})),
     );
   });

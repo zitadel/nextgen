@@ -13,6 +13,78 @@ const PREVIEW_ACTION =
   "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.";
 
 describe("variable set", () => {
+  describe("its whole invocation as JSON", () => {
+    const DOCUMENT = '{"args":{"name":"FOO","value":"bar"},"dry_run":true}';
+
+    it("is read from the --input given inline", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFrom(DOCUMENT);
+
+      expect(app.envelopeOf(result).data).toMatchObject({
+        dry_run: true,
+        id: "FOO",
+        name: "FOO",
+      });
+    });
+
+    it("is read from stdin with --input -", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFrom("-", DOCUMENT);
+
+      expect(app.envelopeOf(result).data).toMatchObject({
+        dry_run: true,
+        id: "FOO",
+        name: "FOO",
+      });
+    });
+
+    it("is read from a file with --input @file", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFromFile("variable.json", DOCUMENT);
+
+      expect(app.envelopeOf(result).data).toMatchObject({
+        dry_run: true,
+        id: "FOO",
+        name: "FOO",
+      });
+    });
+
+    it("refuses a document piped in that names a flag the command lacks", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFrom("-", '{"nope":1}');
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("refuses a flag typed beside it that is not global", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFromBeside(DOCUMENT, "--secret");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("refuses a positional argument typed beside it", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFromBeside(DOCUMENT, "OTHER");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("refuses a file that is not there", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariableFrom("@/no/such/variable.json");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
   describe("a name the platform cannot accept", () => {
     // Every command that names a variable refuses the name itself, so neither a
     // dry run nor a confirmation can report work the platform would never do.

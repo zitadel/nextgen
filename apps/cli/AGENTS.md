@@ -57,7 +57,8 @@
 - Suggest a package manager's command with `suggestedCommandOf`, chain commands
   with `shellSteps`, and wrap one with `pipedFrom`, `readingFrom` or `andTheRest`.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
-  in its data: `emit` writes them to the envelope and prints every one.
+  in its data: `emit` hands them to the `Presenter`
+  (`src/lib/oclif/presenter.ts`), which writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
   hand-written `next_commands:` or `next_actions:` key under `apps/cli/src`.
 - Set `nextShown` only when the result's own output showed the steps
@@ -135,6 +136,14 @@
     needs through its constructor, which the command's `execute` fills when it builds the wizard,
     and the command keeps its flags, refusals and telemetry (recorded through the observer given
     to `.step(...)`) and emits the one result the wizard returns.
+- `--input` (also `--flags-file`, `--cli-input-json`) passes a whole invocation as one JSON document,
+  read by the `Documented` mixin (`src/lib/oclif/documented.ts`), which `BaseCommand` extends.
+- Beside `--input` only the global flags may stand, so a command never knows about it.
+- An id argument without its own `idSchema` refuses empty, `.`, `..` and control characters in
+  `idArg` (`crud/shared.ts`); `api` does the same for its path values in `ApiCall.pathValues`.
+- `version`, `commands`, `which`, `help` and `autocomplete` extend `Wrapped(BaseCommand)`
+  (`src/cli/commands/built-in.ts`).
+- Declare a wrapped command's plugin flags on its class, so it still takes them.
 - Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
   `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
@@ -149,10 +158,18 @@
 - Keep the CLI spelling in three places only: the definition key, oclif's own
   cross-references (`char`, `aliases`, `exclusive`, `dependsOn`,
   `relationships`) and the flag as a refusal's message names it.
-- Ask the run, never the process: `this.cwd`, `this.env`, `this.isJson`,
-  `this.isColored`, `this.isOnScreen` (output on a screen) and `this.isTTY`
-  (someone there to ask). A command that reads `process.stdout` or recomputes
-  colour has its own answer to a question the run already settled.
+- Ask the run, never the process: `this.cwd`, `this.env` and `this.isTTY`
+  (someone there to ask). The output mode (`--json`, colour, a terminal on
+  stdout) is read from `Output` (`src/lib/ui/output.ts`): the base command
+  settles `json` and `color` once, and `screen` follows stdout. Only the base
+  command and the `Tabulatable` and `Wrapped` mixins ask oclif's own
+  `jsonEnabled()`, which `--json` sets. A command that reads `process.stdout` or
+  recomputes colour has its own answer to a question the run already settled.
+- To find where a flag's meaning is decided: `--json` and colour in `Output`,
+  `--fields` in `fieldsFlag` and `src/lib/oclif/columns.ts`, `--input` in
+  `inputFlag` and the `Documented` mixin.
+- JSON is for `--json` alone: off a terminal a command prints its plain summary,
+  never JSON, so a command does not choose its output by the mode.
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - Group `src/lib` by area: a directory whose `index.ts` exports one entry class (plus its
@@ -165,11 +182,13 @@
   utilities `tests/unit/lib/upgrade/layering.test.ts` lists.
 - `src/lib/upgrade` takes each of Zitadel's defaults (`defaults.ts`, `config.ts`) as an option, so a
   test or another product can swap it; the `upgrade` command does the CLI's part, `doctor --fix` too.
-- Say what a command is doing with `log` (`src/lib/ui/log.ts`) from a command or a
-  library alike, never a logger or stream of your own: the running command's
-  sink decides the look, and `--json` installs one that draws nothing; with no
-  sink installed, a line is written plainly. A unit test fails on a
-  `consola` import.
+- Say what a command is doing with `this.info`, `this.warn`, `this.fail` and `this.debug`
+  (`src/lib/oclif/loggable.ts`).
+- Say it from a wizard step or a library with `log` (`src/lib/ui/log.ts`), never a logger or
+  stream of your own. A unit test fails on a `consola` import.
+- A `log` line is for a person at a terminal: a terminal draws it, `--json` and a pipe drop it.
+  `warn` and `fail` stay, and `debug` with `--debug` goes to stderr.
+- Put anything a script reads in the command's result, never a `log` line.
 - Report a warning through `warnings.report` (`src/lib/ui/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.
@@ -211,15 +230,15 @@
 - Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
 - Pick the command's base by what it does with a server (all from
-  `src/cli/commands/server-command.ts`, wrapping what a command extends the way
-  `Promptable` does); a command never resolves, parses or normalises a server
-  address itself:
+  `src/cli/commands/server-command.ts`, wrapping what a command extends); a
+  command never resolves, parses or normalises a server address itself. No base
+  wraps another mixin: a command that asks composes `Promptable` itself:
 
   | The command | It extends |
   | --- | --- |
   | never talks to a server | `BaseCommand` |
   | talks to one through `--server` or its environment | `ServerCommand(Base)` |
-  | may have to ask which server | `ChoosingServerCommand(Base)` |
+  | may have to ask which server | `Promptable(ChoosingServerCommand(Base))` |
   | is about the local server | `LocalServerCommand(Base, folderRule)` |
   | is destructive | `Destructive(...)`, outermost |
 
@@ -265,6 +284,9 @@
   `--json`, and a unit test fails on any other import of `@oclif/table`.
 - A list command declares `plain: plainFlag` last in its `flags` and names its
   columns in a `COLUMNS` constant.
+- A list declares `fields: fieldsFlag({ shape })`, so `--fields` is judged by the record's shape
+  and cuts the table and `--json`; `tabulatable.test.ts` fails on a list without one.
+- `listData` reports `truncated` beside `next_page_token`.
 - A list command ends with the locals `items`, `rows`, `columns`, `empty`,
   `footer`, `page` and `extra`, empty values spelled out, passed to
   `this.emitList(flags, {...})`.
@@ -276,8 +298,9 @@
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
 - Every destructive operation takes a `Consent` (`src/lib/consent/consent.ts`); the
   client withholds the spec's destructive operations until `consent.unlock`.
-- Updates are not guarded, though a merge-patch `null` removes what it names;
-  guarding them needs a follow-up of its own, not a `Consent`.
+- An update that sets a field to `null` removes it, so it asks as a deletion does and
+  refuses without `--force` when nothing can ask.
+- The dry run of such an update warns and suggests the real run with `--force`.
 - A plain yes or no is `this.ask.yesNo(...)`, which `--force` never answers; only
   `Consent` asks a `confirm`, so a command whose `--force` means something else
   (`setup` overwriting files) needs no asker of its own.

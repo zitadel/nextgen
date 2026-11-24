@@ -2,7 +2,7 @@ import type { Hook } from "@oclif/core";
 
 /** Whether these arguments print the version: oclif's `--version`, or `version` for a person. */
 export function isVersionRun(argv: readonly string[]): boolean {
-  return argv[0] === "--version" || (argv[0] === "version" && !argv.includes("--json"));
+  return (argv[0] === "--version" || argv[0] === "version") && !argv.includes("--json");
 }
 
 /**

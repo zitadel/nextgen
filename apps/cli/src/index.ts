@@ -1,5 +1,6 @@
 import type { Command } from "@oclif/core";
 
+import { Autocomplete, Commands, Help, Version, Which } from "./cli/commands/built-in";
 import Api from "./cli/commands/api/index";
 import ApiLs from "./cli/commands/api/ls";
 import AuthMethodPasskeyDisable from "./cli/commands/auth-method/passkey/disable";
@@ -62,6 +63,11 @@ import { answeringToPlurals } from "./lib/oclif/plural-aliases";
  * backend resource is one registry entry.
  */
 export const WORKFLOW_COMMANDS = {
+  autocomplete: Autocomplete,
+  commands: Commands,
+  help: Help,
+  version: Version,
+  which: Which,
   api: Api,
   claim: Claim,
   console: Console,

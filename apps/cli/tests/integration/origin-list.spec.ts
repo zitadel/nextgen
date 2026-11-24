@@ -118,6 +118,22 @@ describe("origin list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["origin", "list", "--fields", "pattern", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["origin", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("refuses an environment holding only the preview token", async () => {
         const app = await anApp();
         await app.bindEnvironment("ci", {
@@ -158,6 +174,7 @@ describe("origin list", () => {
             title: "Found 1 origin",
             items: [SETUP_ORIGIN],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -179,6 +196,7 @@ describe("origin list", () => {
             title: "No origins found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -205,6 +223,7 @@ describe("origin list", () => {
               { pattern: PREVIEW_PATTERN, kind: "preview" },
             ],
             count: 3,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -226,6 +245,7 @@ describe("origin list", () => {
             title: "Found 1 origin",
             items: [{ pattern: "https://admitted.acme.com\u001b[2Jwiped", kind: "primary" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],

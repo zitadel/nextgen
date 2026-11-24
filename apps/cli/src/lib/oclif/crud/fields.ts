@@ -1,7 +1,7 @@
 import { Flags, type Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import { named } from "@/lib/names";
+import { kebab, named } from "@/lib/names";
 
 import { decimalValue, jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { Json, Schema } from "./types";
@@ -103,10 +103,6 @@ const RESERVED = new Set([
  * it is still reachable through `--set`.
  */
 const MAX_DEPTH = 6;
-
-const kebab = (name: string): string => {
-  return name.replaceAll("_", "-");
-};
 
 /**
  * One-line flag help from a schema description: newlines collapsed, the first
@@ -214,7 +210,7 @@ const leavesOf = (
 
 /** The flag a leaf would get, before collisions are settled. */
 const candidateFlag = (leaf: Leaf): string | undefined => {
-  return leaf.kind === "json" ? undefined : leaf.path.map(kebab).join("-");
+  return leaf.kind === "json" ? undefined : leaf.path.map((segment) => kebab(segment)).join("-");
 };
 
 /** The flag names a leaf occupies: its own, and `--no-<flag>` for a boolean. */

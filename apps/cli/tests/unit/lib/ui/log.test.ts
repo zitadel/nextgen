@@ -8,7 +8,7 @@ describe("log", () => {
   it("writes a line plainly when no command has installed a sink, so code outside a command is heard", ({
     terminal,
   }) => {
-    log.plain("the skills offer");
+    log.info("the skills offer");
     log.info("a statement");
     log.warn("a warning");
     log.debug("a detail nobody asked for");
@@ -19,11 +19,8 @@ describe("log", () => {
 
   it.each([
     ["info", () => log.info("a")],
-    ["done", () => log.done("a")],
-    ["start", () => log.start("a")],
     ["warn", () => log.warn("a")],
     ["fail", () => log.fail("a")],
-    ["plain", () => log.plain("a")],
     ["debug", () => log.debug("a")],
   ])("hands a %s line to the sink with its level", (level, say) => {
     const recorded = recordLog();

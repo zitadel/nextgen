@@ -8,7 +8,10 @@ import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
   RESOURCE_MENU_CELL_NARROW,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
   RESOURCE_TABLE_FIXED,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
   ResourceHeaderRow,
@@ -39,10 +42,13 @@ import {
   initials,
   toMemberRows,
 } from "@/features/project-settings/members";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { formatDate } from "@/lib/date";
 import { titleCase } from "@/lib/text";
 
 const MEMBER_CELL = `${RESOURCE_CELL} text-sm`;
+/** The row menu's cell, pinned to the card's right edge. */
+const MENU_CELL = `${RESOURCE_MENU_CELL_NARROW} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`;
 /** The member cell's avatar and name block, 8px apart. */
 const MEMBER_BLOCK = "flex min-w-0 items-center gap-2";
 const NAME = "text-foreground truncate text-sm font-medium";
@@ -73,6 +79,7 @@ export function ProjectMembers({
   onChanged: () => void;
 }) {
   const rows = toMemberRows(members, grants, viewerUserId);
+  const scroll = useScrollEdges();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = (key: string) =>
     setOpen((current) => {
@@ -82,8 +89,16 @@ export function ProjectMembers({
     });
 
   return (
-    // Labelled so the section is a landmark assistive tech can jump to.
-    <section aria-label="Members" className={RESOURCE_TABLE_WRAP}>
+    // Labelled so the section is a landmark assistive tech can jump to. The row
+    // menu stays at the card's right edge while the rest scrolls under it, so
+    // it is reachable on a phone.
+    <section
+      aria-label="Members"
+      ref={scroll.ref}
+      data-scroll-start={scroll.edges.start || undefined}
+      data-scroll-end={scroll.edges.end || undefined}
+      className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_SCROLL}`}
+    >
       {rows.length === 0 ? (
         // The card's empty state: 24px around the block, 16px between its
         // parts, a 16px title and a 24px glyph, and one line of guidance where
@@ -107,7 +122,7 @@ export function ProjectMembers({
               {/* The design's 200 and 248 of 976px, so the member column keeps the rest. */}
               <ResourceHeadCell className="w-[20%]">Role</ResourceHeadCell>
               <ResourceHeadCell className="w-[25%]">Expires at</ResourceHeadCell>
-              <ResourceMenuHead narrow />
+              <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -115,7 +130,7 @@ export function ProjectMembers({
               const expanded = row.kind === "team" && open.has(row.key);
               return (
                 <Fragment key={row.key}>
-                  <ResourceRow>
+                  <ResourceRow className="group">
                     <TableCell className={MEMBER_CELL}>
                       {row.kind === "user" ? (
                         <PersonBlock person={row} self={row.self} />
@@ -134,7 +149,7 @@ export function ProjectMembers({
                     <TableCell className={`${RESOURCE_CELL} text-foreground text-sm`}>
                       <ExpiryCell expiry={row.expiry} />
                     </TableCell>
-                    <TableCell className={RESOURCE_MENU_CELL_NARROW}>
+                    <TableCell className={MENU_CELL}>
                       {row.action && (
                         <RowActions
                           projectId={projectId}
@@ -147,7 +162,7 @@ export function ProjectMembers({
                   </ResourceRow>
                   {expanded &&
                     row.members.map((person) => (
-                      <ResourceRow key={`${row.key}:${person.userId}`}>
+                      <ResourceRow key={`${row.key}:${person.userId}`} className="group">
                         <TableCell className={MEMBER_CELL}>
                           {/* Under its team: the avatar starts 24px in. */}
                           <span className="flex min-w-0 items-center pl-6">
@@ -158,7 +173,7 @@ export function ProjectMembers({
                           Via team
                         </TableCell>
                         <TableCell className={RESOURCE_CELL} />
-                        <TableCell className={RESOURCE_MENU_CELL_NARROW} />
+                        <TableCell className={MENU_CELL} />
                       </ResourceRow>
                     ))}
                 </Fragment>
@@ -276,7 +291,8 @@ function RowActions({
 }
 
 /**
- * The page's one action, drawn on its heading's row rather than in the table.
+ * Add admin, drawn on the tabs' row of the Members page rather than in the table:
+ * the secondary small button the design placed beside the tabs.
  */
 export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
   return (

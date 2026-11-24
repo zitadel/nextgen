@@ -15,6 +15,7 @@ import {
 } from "@/lib/backend";
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
 import { isCancellation, ZitadelError } from "@/lib/errors";
+import { Output } from "@/lib/ui";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
@@ -69,8 +70,8 @@ export type PrepareRequest = {
   /**
    * Colour and stray stdout are both suppressed under `--json`.
    */
-  readonly json: boolean;
-  readonly color: boolean;
+  readonly json?: boolean;
+  readonly color?: boolean;
 };
 
 /**
@@ -299,8 +300,8 @@ export class Publisher {
       env: request.env,
       mode: request.mode,
       dryRun: request.dryRun,
-      json: request.json,
-      color: request.color,
+      json: request.json ?? Output.json,
+      color: request.color ?? Output.color,
       config,
       deployedUnknown: known.deployedUnknown,
       store,

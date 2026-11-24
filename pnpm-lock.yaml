@@ -386,6 +386,9 @@ catalogs:
     dompurify:
       specifier: ^3.4.16
       version: 3.4.17
+    dot-prop:
+      specifier: ^10.2.0
+      version: 10.2.0
     escape-string-regexp:
       specifier: ^5.0.0
       version: 5.0.0
@@ -745,6 +748,9 @@ importers:
       ajv:
         specifier: 'catalog:'
         version: 8.20.0
+      dot-prop:
+        specifier: 'catalog:'
+        version: 10.2.0
       escape-string-regexp:
         specifier: 'catalog:'
         version: 5.0.0

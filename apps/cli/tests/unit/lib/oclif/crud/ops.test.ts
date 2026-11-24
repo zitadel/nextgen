@@ -2,6 +2,8 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Command } from "@oclif/core";
+import { HttpResponse, http } from "msw";
+import type { SetupServer } from "msw/node";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { z } from "zod";
 
@@ -108,12 +110,24 @@ const options = {
   operations: ["equals"],
   flags: { extra: { type: "boolean" as const } },
 } as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
-const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
+const definition = <Spec>(
+  spec: Spec,
+  described: ResourceDescriptor<Ctx> = resource,
+): OperationDefinition<Ctx, Spec> => ({
   topic: "team",
-  resource,
+  resource: described,
   spec,
   options,
 });
+
+/**
+ * A resource whose own id schema takes any text, so an id reaches the command
+ * as typed and what the command does with a control character is observable.
+ */
+const freeTextIds: ResourceDescriptor<Ctx> = {
+  ...resource,
+  idSchema: z.string(),
+};
 
 describe("operation statics", () => {
   it("list (query) exposes paging, filter, sort, and the extra flags", () => {
@@ -184,11 +198,14 @@ describe("operation statics", () => {
   });
 
   it("create and update expose the schema's fields alongside the raw-body flags", () => {
-    for (const statics of [
-      CreateOperation.describe(definition(create)),
-      UpdateOperation.describe(definition(update)),
-    ]) {
-      expect(Object.keys(statics.flags)).toEqual(["name", "data", "file", "set", "extra"]);
+    for (const [statics, names] of [
+      [CreateOperation.describe(definition(create)), ["name", "data", "file", "set", "extra"]],
+      [
+        UpdateOperation.describe(definition(update)),
+        ["name", "data", "file", "set", "force", "extra"],
+      ],
+    ] as const) {
+      expect(Object.keys(statics.flags)).toEqual(names);
       const flags = statics.flags as Record<string, { helpGroup?: string }>;
       expect(flags.name?.helpGroup).toBe("REQUIRED FIELD");
       expect(flags.data?.helpGroup).toBe("RAW BODY");
@@ -698,7 +715,7 @@ describe("output a script reads", () => {
     expect(stderr.join("\n")).toContain("team list --plain --fields name --page-token p2");
   });
 
-  it("leaves a created resource's JSON body as the only thing on stdout", async () => {
+  it("prints a created resource as plain text off a terminal", async () => {
     const command = bindOperation(
       CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
       definition(created),
@@ -706,7 +723,8 @@ describe("output a script reads", () => {
 
     const { stdout } = await printed(command, ["--name", "a"]);
 
-    expect(stdout).toEqual([JSON.stringify({ id: "team_1", name: "a" }, null, 2)]);
+    expect(stdout.join("\n")).toContain("Created team team_1");
+    expect(stdout.join("\n")).not.toMatch(/^\{/);
   });
 });
 
@@ -952,12 +970,16 @@ describe("delete confirmation", () => {
     revoke: "session:revoke",
     deactivate: "team:deactivate",
   } as const;
-  const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
+  const deleting = (
+    verb: "delete" | "revoke" | "deactivate",
+    call = async () => undefined,
+    described: ResourceDescriptor<Ctx> = resource,
+  ) =>
     Object.assign(
       inCli(
         bindOperationOnly(
           DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
-          definition<DeleteSpec<Ctx>>({ verb, call }),
+          definition<DeleteSpec<Ctx>>({ verb, call }, described),
           ServerCommand,
         ),
         DELETING[verb],
@@ -1022,7 +1044,11 @@ describe("delete confirmation", () => {
 
   it("keeps the id exact in the question a --json refusal carries", async () => {
     const failure = JSON.parse(
-      (await printedByFailing(() => deleting("delete").run(["team\u001bx", "--json"]))).stdout,
+      (
+        await printedByFailing(() =>
+          deleting("delete", undefined, freeTextIds).run(["team\u001bx", "--json"]),
+        )
+      ).stdout,
     );
 
     expect(failure.details.question).toBe(
@@ -1052,7 +1078,9 @@ describe("delete confirmation", () => {
   it("spells out a control character in the id it asks about", async () => {
     const talk = answering(true);
 
-    await asTerminal(() => deleting("delete").run(["team\u001b]0;x\u0007"]));
+    await asTerminal(() =>
+      deleting("delete", undefined, freeTextIds).run(["team\u001b]0;x\u0007"]),
+    );
 
     expect(talk.asked()).toEqual([
       "Delete team team\\x1b]0;x\\x07 in project proj_env on api.zitadel.example?",
@@ -1062,10 +1090,28 @@ describe("delete confirmation", () => {
   it("closes on what it deleted as one line when the id has a line break in it", async () => {
     const talk = answering(true);
 
-    await asTerminal(() => deleting("delete").run(["a\nb"]));
+    await asTerminal(() => deleting("delete", undefined, freeTextIds).run(["a\nb"]));
 
     expect(talk.plain()).toContain("Deleted team a\\x0ab");
   });
+
+  it.each(["team\u001b]0;x\u0007", "a\nb"])(
+    "refuses an id holding a control character, %j, before it asks",
+    async (id) => {
+      const talk = answering(true);
+
+      const failure = JSON.parse(
+        (await printedByFailing(() => deleting("delete").run([id, "--json"]))).stdout,
+      );
+
+      expect(failure).toMatchObject({
+        status: "error",
+        code: "E_VALIDATION",
+      });
+      expect(failure.message).toContain("control character");
+      expect(talk.asked()).toEqual([]);
+    },
+  );
 
   it("is skipped when the answer is no", async () => {
     answering(false);
@@ -1084,5 +1130,182 @@ describe("delete confirmation", () => {
     await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
 
     expect(talk.plain()).toContain("Cancelled");
+  });
+});
+
+describe("update confirmation", () => {
+  const removing = ["team_1", "--set", "name:=null"];
+  const ENDPOINT = "https://api.zitadel.example/teams/team_1";
+  const updating = Object.assign(
+    inCli(
+      bindOperationOnly(
+        UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+        definition<UpdateSpec<Ctx>>({
+          schema: z.object({ name: z.string().nullable() }),
+          call: async (_ctx, id, body) => {
+            const response = await fetch(`https://api.zitadel.example/teams/${id}`, {
+              method: "PATCH",
+              body: JSON.stringify(body),
+            });
+            return { id: String((await response.json()).id) };
+          },
+        }),
+        ServerCommand,
+      ),
+      "team:update",
+    ),
+    { wizard: true },
+  );
+
+  /**
+   * Runs the update command, as the CLI would.
+   *
+   * @param argv - The words after `team update`.
+   * @returns What the command resolved to.
+   */
+  function run(argv: string[]): Promise<unknown> {
+    return Reflect.apply(updating.run, updating, [argv]);
+  }
+
+  /**
+   * Answers the team endpoint and records every body the command sent to it.
+   *
+   * @param server - The test's request interceptor.
+   * @returns The bodies, in the order they arrived.
+   */
+  function recordingSends(server: SetupServer): unknown[] {
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(ENDPOINT, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: "team_1" });
+      }),
+    );
+    return bodies;
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_proj_env");
+  });
+
+  it("is refused without --force when nothing can ask, and sends nothing", async ({ server }) => {
+    const bodies = recordingSends(server);
+
+    const { stdout } = await printing(() => {
+      return run([...removing, "--json"]).catch(() => undefined);
+    });
+
+    expect(JSON.parse(stdout)).toMatchObject({
+      code: "E_CONFIRMATION_REQUIRED",
+      next_commands: [expect.stringContaining("--force")],
+    });
+    expect(bodies).toEqual([]);
+  });
+
+  it("is sent with --force, without asking", async ({ server }) => {
+    const bodies = recordingSends(server);
+    const talk = answering(true);
+
+    await asTerminal(() => run([...removing, "--force"]));
+
+    expect(talk.asked()).toEqual([]);
+    expect(bodies).toEqual([{ name: null }]);
+  });
+
+  it("is previewed by --dry-run, which warns and suggests the real run with --force", async ({
+    server,
+  }) => {
+    const bodies = recordingSends(server);
+
+    const envelope = await run([...removing, "--dry-run", "--json"]);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      warnings: [expect.stringContaining("name")],
+      data: {
+        dry_run: true,
+        next_commands: [expect.stringContaining("--force")],
+      },
+    });
+    expect(bodies).toEqual([]);
+  });
+
+  it("asks what it removes, and sends the update when the answer is yes", async ({ server }) => {
+    const bodies = recordingSends(server);
+    const talk = answering(true);
+
+    await asTerminal(() => run(removing));
+
+    expect(talk.asked()).toEqual(["Remove name from team team_1?"]);
+    expect(bodies).toEqual([{ name: null }]);
+  });
+
+  it("sends nothing when the answer is no", async ({ server }) => {
+    const bodies = recordingSends(server);
+    const talk = answering(false);
+
+    await asTerminal(() => run(removing));
+
+    expect(talk.plain()).toContain("Cancelled");
+    expect(bodies).toEqual([]);
+  });
+
+  it("asks nothing when the update removes nothing", async ({ server }) => {
+    const bodies = recordingSends(server);
+    const talk = answering(true);
+
+    await asTerminal(() => run(["team_1", "--name", "a"]));
+
+    expect(talk.asked()).toEqual([]);
+    expect(bodies).toEqual([{ name: "a" }]);
+  });
+});
+
+describe("list truncation", () => {
+  const pages: ListSpec<Ctx, Json, { teams: readonly unknown[]; next_page_token?: string }> = {
+    ...list,
+    body: z.object({}).passthrough(),
+    call: async (_ctx, body) => {
+      const token = (body as { page_token?: string }).page_token;
+
+      return token === undefined
+        ? { teams: [{ id: "team_1", name: "a" }], next_page_token: "p2" }
+        : { teams: [{ id: "team_2", name: "b" }] };
+    },
+  };
+
+  /**
+   * Runs the list command and reads the `data` of the envelope it answered.
+   *
+   * @param spec - How the resource lists.
+   * @param argv - The words after `team list`.
+   * @returns The envelope's `data`.
+   */
+  async function listed(
+    spec: ListSpec<Ctx, Json, { teams: readonly unknown[]; next_page_token?: string }>,
+    argv: string[],
+  ): Promise<{ truncated: boolean; count: number }> {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(spec as ListSpec<Ctx>),
+    );
+    const envelope = await Reflect.apply(command.run, command, [argv]);
+
+    return JSON.parse(JSON.stringify(envelope)).data;
+  }
+
+  it("says more remain when the page ends with a next page token", async () => {
+    expect(await listed(pages, ["--json"])).toMatchObject({
+      truncated: true,
+      count: 1,
+    });
+  });
+
+  it("says nothing remains once --all has drained every page", async () => {
+    expect(await listed(pages, ["--all", "--json"])).toMatchObject({
+      truncated: false,
+      count: 2,
+    });
   });
 });

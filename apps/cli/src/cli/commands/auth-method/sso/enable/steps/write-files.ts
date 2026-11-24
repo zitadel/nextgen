@@ -56,7 +56,7 @@ export class WriteFiles extends WizardStep<"write", Fact<"written">, Needs> {
       );
     }
     if (written.length === 0 && needs.change.notices.length === 0) {
-      log.info(
+      log.debug(
         `${escapeControlCharacters(needs.target.schema.name)} and its login flow already offer ${escapeControlCharacters(needs.provider.displayName, { keepLayout: false })}`,
       );
     }

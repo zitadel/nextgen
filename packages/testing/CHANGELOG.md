@@ -1,5 +1,15 @@
 # @zitadel/testing
 
+## 0.8.0
+
+### Patch Changes
+
+- [#3211](https://github.com/zitadel/nextgen/pull/3211) [`627149b`](https://github.com/zitadel/nextgen/commit/627149bdb38849b89e05c9952592ca5f4bc9b09f) - `bootLocalServer` retries on a fresh port, up to five times, when another process takes the port it picked before the server binds it, so booting many servers at once no longer fails with `E_PORT_IN_USE`. A port passed explicitly is still taken as asked or refused.
+- Updated dependencies [[`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`8adf043`](https://github.com/zitadel/nextgen/commit/8adf04326b745d92f37b8de7c0dd07630525a4d5), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`0d82cf5`](https://github.com/zitadel/nextgen/commit/0d82cf5f8cde4697b8a53e6d456eb34a6533e605), [`8884826`](https://github.com/zitadel/nextgen/commit/888482697cb5539700206d9c037a25d2be7a6a3c), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`7f682da`](https://github.com/zitadel/nextgen/commit/7f682da73d3f38f8fd5f9268b7fafe3e6d13abdb), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`ac397d4`](https://github.com/zitadel/nextgen/commit/ac397d4e1c059b0f77bda6b9edc79a73e05cdffc), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`5901843`](https://github.com/zitadel/nextgen/commit/590184327aaa72270f71d0096b8d525ed6f1b77c), [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8), [`a242dac`](https://github.com/zitadel/nextgen/commit/a242dacc9badeac3a451b89d2c6ef1e81031ccbf), [`2cd806d`](https://github.com/zitadel/nextgen/commit/2cd806d52f52252ab9de9b4736a1259eed33fb4a), [`179776f`](https://github.com/zitadel/nextgen/commit/179776fcc6efff5b5b7d128f726e6a372fd03b26), [`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c), [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d), [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1), [`055c0d5`](https://github.com/zitadel/nextgen/commit/055c0d5d1222ab7294dad865d3c5a3e273bc9c74), [`caf1506`](https://github.com/zitadel/nextgen/commit/caf1506f461ffa52996f3811e4aeb3bf25778afe), [`ac397d4`](https://github.com/zitadel/nextgen/commit/ac397d4e1c059b0f77bda6b9edc79a73e05cdffc), [`1ed5058`](https://github.com/zitadel/nextgen/commit/1ed50580301384f552a1ffdd7083f422883667c5)]:
+  - @zitadel/cli@0.8.0
+  - @zitadel/config@0.8.0
+  - @zitadel/api@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

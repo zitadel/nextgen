@@ -1,5 +1,21 @@
 # @zitadel/config
 
+## 0.8.0
+
+### Minor Changes
+
+- [#3076](https://github.com/zitadel/nextgen/pull/3076) [`a242dac`](https://github.com/zitadel/nextgen/commit/a242dacc9badeac3a451b89d2c6ef1e81031ccbf) - `@zitadel/config` exports `webApplication()`, which builds an application document for a web app: one confidential OAuth client that signs users in with the authorization code grant and returns them to the redirect URIs you pass. `APPLICATION_PRESETS` lists the preset names. Both are also exported from `@zitadel/config/application-presets`, which runs in the browser.
+
+### Patch Changes
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - `zitadel api` reads its JSON body from `--file <path>` (or `--file -` for stdin), matching the body flag on the create and update commands and freeing `--input` for a whole invocation as JSON. The flows README that ships into customer projects names the new flag.
+  
+  **Breaking:** `api --input <path>` is now `api --file <path>`.
+
+- [#3179](https://github.com/zitadel/nextgen/pull/3179) [`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8) - A branding `typography.font_url` without a `typography.font_family` is now refused with the spec's own wording, "font_family is required when font_url is present", reported at `typography.font_family`. The rule is generated from the spec's `dependentRequired` instead of repeated by hand.
+- Updated dependencies [[`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c), [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d), [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1)]:
+  - @zitadel/api@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

@@ -1,7 +1,7 @@
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
-import { describeRegistry } from "@/lib/oclif/crud";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { describeRegistry, observedPaths } from "@/lib/oclif/crud";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 import { RESOURCES } from "./resources";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -31,6 +31,10 @@ export default class ResourcesList extends Tabulatable(ServerCommand(BaseCommand
     '<%= config.bin %> resources --json | jq -r \'.data.items[] | "\\(.topic): \\(.verbs | join(", "))"\'',
   ];
   static override flags = {
+    fields: fieldsFlag({
+      fallback: ["topic"],
+      shape: observedPaths(describeRegistry(RESOURCES)),
+    }),
     plain: plainFlag,
   };
 
