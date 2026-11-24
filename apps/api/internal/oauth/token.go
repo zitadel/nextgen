@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -65,6 +66,12 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 	case errors.Is(err, domain.ErrApplicationNotFound()), errors.Is(err, domain.ErrApplicationClientNotFound()),
 		errors.Is(err, domain.ErrApplicationClientSecretInvalid()):
 		return nil, refused(err)
+	// A declared client's secret is a variable of the deployment that serves
+	// it, and a token request names no deployment, so the lookup finds no
+	// release. Until that is decided, the client is refused like an unknown
+	// one.
+	case errors.Is(err, domain.ErrReleaseNotDeployed(nil)):
+		return nil, refused(err)
 	case errors.Is(err, domain.ErrUnavailable()):
 		return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
 	case err != nil:
@@ -80,7 +87,7 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 func (s opServer) CodeExchange(ctx context.Context, r *op.ClientRequest[oidc.AccessTokenRequest]) (_ *op.Response, err error) {
 	defer func() { keepError(ctx, err) }()
 	c := r.Client.(*client)
-	token, _, err := s.authRequests.RedeemCode(ctx, service.RedeemCodeInput{
+	token, expiresIn, err := s.authRequests.RedeemCode(ctx, service.RedeemCodeInput{
 		ProjectID:    c.projectID,
 		ClientID:     c.id,
 		Code:         r.Data.Code,
@@ -93,7 +100,9 @@ func (s opServer) CodeExchange(ctx context.Context, r *op.ClientRequest[oidc.Acc
 	return op.NewResponse(&oidc.AccessTokenResponse{
 		AccessToken: token,
 		TokenType:   oidc.BearerToken,
-		ExpiresIn:   uint64(domain.AccessTokenTTL.Seconds()),
+		// Whole seconds, rounded down, so a client never holds the token
+		// longer than its session.
+		ExpiresIn: uint64(expiresIn / time.Second),
 	}), nil
 }
 

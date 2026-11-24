@@ -103,6 +103,13 @@ func TestDeclaredApplication(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrApplicationClientSecretInvalid())
 	})
 
+	// The token endpoint authenticates a client before it knows a deployment,
+	// and refuses this error like an unknown client.
+	t.Run("without a deployment a declared client is not served", func(t *testing.T) {
+		_, err := applications.AuthenticateClient(t.Context(), f.project, "shop-web", "s3cr3t")
+		assert.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
+	})
+
 	moved := shopApplication(declaredClient("web", "shop-web", "SHOP_WEB_SECRET"))
 	moved.Clients[0].RedirectUris = []string{"https://shop.example.com/auth/callback"}
 	second := f.build(t, moved)

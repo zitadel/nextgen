@@ -136,8 +136,21 @@ func TestTokenExchangesACode(t *testing.T) {
 		set            map[string]string
 		user, password string
 		wantProjectID  string
+		// expiresIn is what the store answers; the token lives AccessTokenTTL
+		// when unset.
+		expiresIn     time.Duration
+		wantExpiresIn float64
 	}{
 		{name: "client_secret_basic", user: "shop", password: clientSecret},
+		{
+			// The session expires first: expires_in is its rest, in whole
+			// seconds rounded down.
+			name:          "session_expires_first",
+			user:          "shop",
+			password:      clientSecret,
+			expiresIn:     2*time.Minute + 999*time.Millisecond,
+			wantExpiresIn: 120,
+		},
 		{name: "client_secret_post", set: map[string]string{"client_id": "shop", "client_secret": clientSecret}},
 		{name: "without_pkce", set: map[string]string{"code_verifier": ""}, user: "shop", password: clientSecret},
 		// The empty tenant is the platform project's issuer.
@@ -146,7 +159,7 @@ func TestTokenExchangesACode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			store := &codes{token: "the-access-token", expiresIn: domain.AccessTokenTTL}
+			store := &codes{token: "the-access-token", expiresIn: cmp.Or(tt.expiresIn, domain.AccessTokenTTL)}
 			resolver := &recording{clients: shop}
 			mux := newMux(t, Config{PlatformEnabled: tt.platform, Clients: resolver, AuthRequests: store})
 			path := tokenPath
@@ -167,7 +180,7 @@ func TestTokenExchangesACode(t *testing.T) {
 			assert.Equal(t, map[string]any{
 				"access_token": "the-access-token",
 				"token_type":   "Bearer",
-				"expires_in":   float64(300),
+				"expires_in":   cmp.Or(tt.wantExpiresIn, 300),
 			}, body, "no scope, refresh_token or id_token")
 			wantVerifier := verifier
 			if _, ok := tt.set["code_verifier"]; ok {
@@ -231,6 +244,16 @@ func TestTokenRefusesTheClient(t *testing.T) {
 			name:       "client_id_too_long",
 			set:        map[string]string{"client_id": strings.Repeat("a", 256), "client_secret": clientSecret},
 			clients:    failing{err: errors.New("the resolver must not be called")},
+			wantStatus: http.StatusUnauthorized,
+			want:       refused,
+		},
+		{
+			// A declared client needs a deployment, which a token request does
+			// not name yet: it is refused like an unknown client.
+			name:       "declared_client",
+			user:       "shop",
+			password:   clientSecret,
+			clients:    failing{err: domain.ErrReleaseNotDeployed(nil)},
 			wantStatus: http.StatusUnauthorized,
 			want:       refused,
 		},

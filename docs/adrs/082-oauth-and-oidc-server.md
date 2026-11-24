@@ -43,7 +43,8 @@
 > `code_verifier` for a request that sent no `code_challenge`, and its
 > response has no `scope` while the server grants none. §7 lists what it
 > checks before a code becomes an access token. A replayed code revokes
-> nothing (zitadel/nextgen#2796).
+> nothing, and an access token never outlives its session
+> (zitadel/nextgen#2796).
 
 ## TL;DR
 
@@ -367,6 +368,10 @@ order:
 - the session the code was issued for is still active and belongs to the
   code's user;
 - that user is active.
+
+The access token expires after five minutes or when the session expires,
+whichever is earlier, and `expires_in` says when. An authorization request
+that has expired gets no code.
 
 An unknown code, or a code sent to another project's token endpoint, is
 refused without being used up or recorded. The token endpoint does not read
