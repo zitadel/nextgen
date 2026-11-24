@@ -130,6 +130,10 @@ function stubProject(
       queries.push({ projectId, body: (await request.json()) as Record<string, unknown> });
       return HttpResponse.json({ grants });
     }),
+    // The Invitations tab is read with the page; its own spec covers it.
+    http.get("http://localhost/api/v1/invitations", () =>
+      HttpResponse.json({ invitations: [], next_page_token: null }),
+    ),
   );
   return { adminReads, queries };
 }
@@ -177,10 +181,10 @@ function admins() {
   return within(screen.getByRole("region", { name: "Admins" }));
 }
 
-/** Opens the Admins page from the project's Settings list, where the list and the Add button live. */
+/** Opens the Members page from the project's Settings list, where the list and the Add button live. */
 async function openAdmins() {
   const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
-  await userEvent.click(nav.getByRole("link", { name: "Admins" }));
+  await userEvent.click(nav.getByRole("link", { name: "Members" }));
   return within(await screen.findByRole("region", { name: "Admins" }));
 }
 
@@ -585,7 +589,7 @@ describe("project admins", () => {
     await userEvent.click(submit);
 
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "you cannot grant access to yourself",
+      "You cannot grant access to yourself",
     );
   });
 
@@ -624,11 +628,11 @@ describe("project admins", () => {
 
     const dialog = await openRemove("Maya Patel");
     await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
-    expect(await screen.findByText("no such grant")).toBeInTheDocument();
+    expect(await screen.findByText("No such grant")).toBeInTheDocument();
 
     await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
     await openRemove("Maya Patel");
-    expect(screen.queryByText("no such grant")).not.toBeInTheDocument();
+    expect(screen.queryByText("No such grant")).not.toBeInTheDocument();
   });
 
   it("keeps the row when the removal is cancelled", async () => {
@@ -647,14 +651,14 @@ describe("project admins", () => {
 });
 
 describe("project settings nav", () => {
-  it("lists Admins among the project's Settings, not its screens", async () => {
-    // Admins is a page of the project's Settings (D40), not a list screen
+  it("lists Members among the project's Settings, not its screens", async () => {
+    // Members is a page of the project's Settings (D40), not a list screen
     // beside Users: the project's list is not drawn while its Settings are.
     stubProject();
     await renderProject();
 
     const nav = await screen.findByRole("navigation", { name: "Project settings" });
-    expect(within(nav).getByRole("link", { name: "Admins" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Members" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
   });
 });

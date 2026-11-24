@@ -7,6 +7,10 @@ import { type Removable, RemoveAdminDialog } from "./remove-admin-dialog";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
@@ -19,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { joinAnd, titleCase } from "@/lib/text";
 
 import type { api } from "@/api/zitadel";
@@ -29,11 +34,11 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 /**
  * A project's admins: who administers it, how each of them holds that access,
- * and how it is given and taken away (#1025, journey in #769). The Admins page
+ * and how it is given and taken away (#1025, journey in #769). The Members tab
  * of the project's Settings (D40), because a grant is project-level data
  * (#1238): the project id comes from the route, and every request made from
  * here carries it. The Add button is `AddAdminButton`, which the page draws on
- * its heading's row.
+ * the tabs' row.
  *
  * **People come from `GET /projects/{id}/admins`** (#1462). It lists each person
  * once with every way they hold admin access: membership in the owning team,
@@ -87,10 +92,18 @@ export function ProjectAdmins({
   onChanged: () => void;
 }) {
   const rows = toRows(admins, grants, viewerUserId);
+  const scroll = useScrollEdges();
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <section aria-label="Admins" className="flex flex-col gap-4">
-      <div className={RESOURCE_TABLE_WRAP}>
+      {/* The row menu stays at the card's right edge while the rest scrolls
+          under it, so it is reachable on a phone. */}
+      <div
+        ref={scroll.ref}
+        data-scroll-start={scroll.edges.start || undefined}
+        data-scroll-end={scroll.edges.end || undefined}
+        className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_SCROLL}`}
+      >
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
@@ -100,7 +113,7 @@ export function ProjectAdmins({
                 say nothing about any of them. `Access` says what the design's
                 `Level` did and where it comes from. */}
               <ResourceHeadCell>Access</ResourceHeadCell>
-              <ResourceMenuHead className="w-15" />
+              <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -108,7 +121,7 @@ export function ProjectAdmins({
               <ResourceEmptyRow colSpan={3}>No admins to show.</ResourceEmptyRow>
             ) : (
               rows.map((row) => (
-                <ResourceRow key={row.key}>
+                <ResourceRow key={row.key} className="group">
                   <TableCell className={`${RESOURCE_CELL} text-foreground text-sm`}>
                     {/* No person/team glyph: the two look alike at 16px, so a team
                         row carries a label instead. */}
@@ -119,7 +132,9 @@ export function ProjectAdmins({
                     </span>
                   </TableCell>
                   <TableCell className={RESOURCE_CELL_MUTED}>{row.access}</TableCell>
-                  <TableCell className={RESOURCE_CELL}>
+                  <TableCell
+                    className={`${RESOURCE_MENU_CELL_NARROW} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`}
+                  >
                     {row.removable && (
                       <RowActions
                         projectId={projectId}
@@ -140,7 +155,7 @@ export function ProjectAdmins({
 }
 
 /**
- * The page's one action, drawn on its heading's row rather than in the table:
+ * Add admin, drawn on the tabs' row of the Members page rather than in the table:
  * the secondary small button the design placed beside the tabs.
  */
 export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {

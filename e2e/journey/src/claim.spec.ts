@@ -107,7 +107,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     await page.goto(projectUrl);
     await page
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
     await page.getByRole("button", { name: "Add admin", exact: true }).click();
@@ -127,7 +127,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     await colleaguePage.goto(projectUrl);
     await colleaguePage
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
     await expect(colleaguePage.getByRole("region", { name: "Admins" })).toBeVisible();
 

@@ -186,7 +186,7 @@ describe("project policies", () => {
 
     expect(screen.getByRole("heading", { name: "River" })).toBeInTheDocument();
     expect(policies.getByText("Password policy")).toBeInTheDocument();
-    expect(policies.getByText("policy store unavailable")).toBeInTheDocument();
+    expect(policies.getByText("Policy store unavailable")).toBeInTheDocument();
     expect(policies.queryByText("Warning")).not.toBeInTheDocument();
   });
 });

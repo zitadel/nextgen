@@ -129,7 +129,7 @@ describe("login flows list", () => {
       await renderAt("/flow-definitions");
       expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
       expect(screen.getByText("Error 500")).toBeInTheDocument();
-      expect(screen.getByText("boom")).toBeInTheDocument();
+      expect(screen.getByText("Boom")).toBeInTheDocument();
       // The reference to quote is the request ID from the response; the code
       // would only repeat the sentence.
       expect(screen.getByText("req_01TEST")).toBeInTheDocument();
