@@ -600,7 +600,7 @@ describe("platform root", () => {
   it("draws the platform project's Settings pages under the root's Settings list", async () => {
     server.use(
       http.get("*/api/v1/variables", () => HttpResponse.json({ variables: [] })),
-      http.get("*/api/v1/projects/proj_platform/admins", () => HttpResponse.json({ admins: [] })),
+      http.get("*/api/v1/projects/proj_platform/members", () => HttpResponse.json({ members: [] })),
       http.post("*/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
       http.get("*/api/v1/invitations", () =>
         HttpResponse.json({ invitations: [], next_page_token: null }),
@@ -939,7 +939,7 @@ describe("events view", () => {
 describe("project settings view", () => {
   beforeEach(() => {
     server.use(
-      http.get(`${PROJECT_1}/admins`, () => HttpResponse.json({ admins: [] })),
+      http.get(`${PROJECT_1}/members`, () => HttpResponse.json({ members: [] })),
       http.post("*/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
       http.get("*/api/v1/invitations", () =>
         HttpResponse.json({ invitations: [], next_page_token: null }),
@@ -2394,8 +2394,8 @@ describe("search", () => {
       expect(rows(dialog.getByRole("listbox"))).toEqual(["Users · Choose a project"]),
     );
 
-    // A person's name: no page is called that ("admin" would find the
-    // project's Members page), and the server finds nobody by it here.
+    // A person's name: no page is called that, and the server finds nobody by
+    // it here.
     await userEvent.clear(field);
     await userEvent.type(field, "ada");
     expect(await dialog.findByText("Nothing matches “ada”")).toBeInTheDocument();

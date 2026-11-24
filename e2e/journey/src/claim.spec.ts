@@ -132,7 +132,7 @@ test("the setup admin can invite a colleague and remove them, and the colleague 
     await page.getByRole("tab", { name: "Members", exact: true }).click();
     const row = page.getByRole("row").filter({ hasText: email });
     await expect(row).toBeVisible();
-    await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
+    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
 
     // And the grant is what the colleague's own session can now open.
     await colleaguePage.goto(projectUrl);
@@ -143,10 +143,10 @@ test("the setup admin can invite a colleague and remove them, and the colleague 
     await expect(colleaguePage.getByRole("region", { name: "Members" })).toBeVisible();
 
     await row.getByRole("button", { name: `Actions for ${email}` }).click();
-    await page.getByRole("menuitem", { name: "Remove grant" }).click();
+    await page.getByRole("menuitem", { name: "Remove access" }).click();
     await page
       .getByRole("alertdialog")
-      .getByRole("button", { name: "Remove grant", exact: true })
+      .getByRole("button", { name: "Remove access", exact: true })
       .click();
     // The region is asserted again rather than only the row's absence: the
     // table is gone from a not-found state, an unauthorized one and a redirect
