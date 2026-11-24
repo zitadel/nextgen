@@ -18,7 +18,7 @@ export function writePlain(level: LogLevel, text: string): void {
     process.stderr.write(`Warning: ${text}\n`);
     return;
   }
-  (level === "fail" ? process.stderr : process.stdout).write(`${text}\n`);
+  (level === "fail" || level === "debug" ? process.stderr : process.stdout).write(`${text}\n`);
 }
 
 /**

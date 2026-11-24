@@ -74,7 +74,12 @@ export class Narration {
     if (this.silent || (level === "debug" && !this.debug)) {
       return;
     }
-    if (!Output.screen && level !== "warn" && level !== "fail" && level !== "debug") {
+    if (!Output.screen && level === "debug") {
+      // Diagnostics go beside the answer, so a script reading stdout never gets them.
+      writePlain(level, text);
+      return;
+    }
+    if (!Output.screen && level !== "warn" && level !== "fail") {
       return;
     }
     if (this.chain.chained) {

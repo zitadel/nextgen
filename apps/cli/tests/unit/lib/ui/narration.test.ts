@@ -72,7 +72,8 @@ describe("Narration", () => {
     expect(chain.lines).toEqual([]);
   });
 
-  it("keeps debug detail back unless it was asked for", () => {
+  it("keeps debug detail back unless it was asked for", ({ terminal }) => {
+    terminal.tty(true);
     const quiet = drawn();
     log.debug("an internal detail");
     quiet.narration.restore();
@@ -126,6 +127,18 @@ describe("Narration", () => {
 
       expect(chain.lines).toEqual([]);
     });
+  });
+
+  it("writes debug detail beside the answer, not into it, when stdout is a pipe", ({
+    terminal,
+  }) => {
+    terminal.tty(false);
+    drawn(new Collected(false), { debug: true });
+
+    log.debug("an internal detail");
+
+    expect(terminal.shown()).toBe("");
+    expect(terminal.errors()).toBe("an internal detail\n");
   });
 
   describe("on a terminal", () => {

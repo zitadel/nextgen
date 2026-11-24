@@ -188,7 +188,8 @@
   sink installed, a line is written plainly. A unit test fails on a
   `consola` import.
 - A `log` line is for a person at a terminal: a terminal draws it, `--json` and a pipe drop it
-  (`warn` and `fail` stay). Put anything a script reads in the command's result, never a `log` line.
+  (`warn` and `fail` stay, and `debug` with `--debug` goes to stderr). Put anything a script reads in
+  the command's result, never a `log` line.
 - Report a warning through `warnings.report` (`src/lib/ui/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.
