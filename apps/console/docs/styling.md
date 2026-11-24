@@ -52,13 +52,13 @@ overridden in `src/components/ui/`.
 ## Sidebar navigation states — UI polishing (design-approved, code pending)
 
 This section defines the **visual state treatment only** for Console navigation.
-It does not change routes, navigation order, the Projects home, or the project
-switcher. Navigation architecture changes remain in [#2607](https://github.com/zitadel/nextgen/issues/2607).
-The currently documented D24 Projects-home behavior is unchanged pending that
-separate decision.
+It does not change routes, navigation order, the Projects list, or the project
+switcher: the one frame and its sidebar are decided in D27, D29 and D40 of the
+[decisions log](../../../docs/design/decisions.md). Navigation architecture
+changes remain in [#2607](https://github.com/zitadel/nextgen/issues/2607).
 
-**Design source:** [ZITADEL design-system SidebarZitadelv2](https://www.figma.com/design/HToNyqKwShDmqVurU7Xbld/?node-id=28971-5411);
-[Console Profile sidebar example](https://www.figma.com/design/j3qqriDab6WQfrlgLujf4Y/?node-id=1602-28329).
+**Design source:** the design system's `SidebarZitadelv2` component, and the
+Console Profile screen as an example of it in use.
 
 | State | Menu label | Leading icon | Row appearance |
 | --- | --- | --- | --- |
