@@ -1083,4 +1083,43 @@ export const SSO_RULES: readonly Rule[] = [
       return `${where}: verified_claims of ${quote(fact.slug)} (${fact.connection.path}) names nothing ${fact.schema.path} defines, so no sign-in can verify anything for this user type. Verify a property of ${fact.schema.path} in ${fact.connection.path}, or remove verified_claims.`;
     },
   }),
+
+  defineRule({
+    id: "sso/impossible-registration",
+    severity: "warning",
+    // Only the register purpose's entry step counts, and not when the login
+    // journey also reaches it: there the button can still sign someone in.
+    each: (config) => {
+      return config.flows.offers.flatMap((offer) => {
+        const connection = offer.connection;
+        if (connection === undefined || connection.createsUsers) {
+          return [];
+        }
+        if (offer.flow.registerEntry?.name !== offer.step.name) {
+          return [];
+        }
+        const signsIn = offer.flow.loginJourney.some((step) => {
+          return step.name === offer.step.name;
+        });
+        if (signsIn) {
+          return [];
+        }
+        return [{ ...offer, connection }];
+      });
+    },
+    file: (fact) => {
+      return fact.flow.path;
+    },
+    steps: {
+      step: (fact) => {
+        return fact.step.name;
+      },
+      cause: (fact) => {
+        return fact.slug;
+      },
+    },
+    says: (fact, where) => {
+      return `${where}: ${quote(fact.slug)} offers registration, but provisioning.creation of ${fact.connection.path} is "disabled", so it can sign existing users in and can never register a new one. Set creation to "auto" in ${fact.connection.path}, or offer it on a login step instead.`;
+    },
+  }),
 ];

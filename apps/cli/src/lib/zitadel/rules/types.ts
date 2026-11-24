@@ -76,6 +76,7 @@ export const RULE_IDS = [
   "sso/unreferenced-typo-guard",
   "sso/missing-mapping-target",
   "sso/empty-verified-claims",
+  "sso/impossible-registration",
 ] as const;
 
 /**
