@@ -293,10 +293,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     await expect(page.getByRole("row").filter({ hasText: team.name })).toHaveCount(0);
     // The operator's own grant is untouched.
     await expect(
-      page
-        .getByRole("row")
-        .filter({ hasText: operator.email })
-        .getByText("You", { exact: true }),
+      page.getByRole("row").filter({ hasText: operator.email }).getByText("You", { exact: true }),
     ).toBeVisible();
     await expectNoErrorBoundary(page);
   } finally {
