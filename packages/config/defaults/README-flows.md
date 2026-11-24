@@ -21,8 +21,6 @@ flow definition lists it.
   the next step.
 - `user_schema` — the user schema the flow runs against, named by its
   `objectType`. The flow always uses that schema's newest revision.
-- `audience` (optional) — scopes the flow definition to specific apps or
-  teams.
 
 ## Making changes
 
@@ -38,7 +36,7 @@ revision, and the deployed release pins it. Earlier revisions stay
 readable by id, but only the pinned one is served. A login that pins the
 flow definition's name serves that revision. A login without a pin serves
 the project default: of the flow definitions the release pins, the newest
-unscoped one for its purpose, whatever its name, so revising a flow
+one for its purpose, whatever its name, so revising a flow
 definition can make it the project default.
 
 ### Collect another field
@@ -204,8 +202,8 @@ After an automatic switch the login shows a notice saying why
 Drop a new JSON file with its own `purposes` and a distinct `name` (for
 example a kiosk login). See
 [Multiple flow definitions](#multiple-flow-definitions) for how it gets
-selected at runtime, and give it an `audience` before its first deploy
-unless it should become the project default.
+selected at runtime: once it deploys it becomes the project default for
+the purposes it serves.
 
 ## Multiple flow definitions
 
@@ -214,29 +212,17 @@ follows exactly one flow definition. Which one:
 
 - **By name** — give the flow definition a distinct `name` and pass it as
   `flowName` on `ZitadelLogin` (the `flow-name` attribute on
-  `<zitadel-login>`). The server resolves that definition directly,
-  whatever its `audience`; an unknown name or wrong purpose surfaces as
-  a startup error in the widget.
+  `<zitadel-login>`). The server resolves that definition directly; an
+  unknown name or wrong purpose surfaces as a startup error in the widget.
 - **By the project default** — without `flowName`, the server serves the
   project default: of the flow definitions the deployed release pins, the
-  newest that serves the requested purpose and has no `audience`. Only the
-  pinned revision counts, so adding an `audience` to a flow definition takes
-  it out of the running once you deploy.
+  newest that serves the requested purpose. Only the pinned revision
+  counts.
 
-`audience.app_ids` / `audience.team_ids` select a flow definition only
-for callers of the flow API that send a matching `hint` (app match beats
-team match). `<zitadel-login>` sends no hint, so for the widget an
-`audience` does one thing: it keeps the flow definition out of the
-project default. A scoped flow definition is still served when no
-unscoped one serves the purpose.
-
-The flip side: a **new flow definition without an `audience`, or a
-new revision of one, becomes the newest unscoped definition, i.e. the
-project default for the purposes it serves**, the moment it deploys.
-So an experiment can't silently take over `/login`, give the flow
-definition an `audience` before its first `deploy` and select it by
-`flowName`, or pin `flow-name` on the pages that should keep the current
-project default.
+So **a new flow definition, or a new revision of one, becomes the project
+default for the purposes it serves** the moment it deploys. Pin `flowName`
+(`flow-name`) on the pages that must keep a specific flow definition, so a
+new one can't silently take over `/login`.
 
 ## Presets
 

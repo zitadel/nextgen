@@ -8287,7 +8287,7 @@
                 "text": "string"
               },
               "default": "\"\"",
-              "description": "Name of the flow definition to run, matching the `name` in its flow\nfile. When set, the server resolves that definition directly instead\nof picking one by audience. Omit to run the project's default flow.",
+              "description": "Name of the flow definition to run, matching the `name` in its flow\nfile. When set, the server resolves that definition directly. Omit to\nrun the project's default flow.",
               "attribute": "flow-name"
             },
             {
@@ -9463,7 +9463,7 @@
                 "text": "string"
               },
               "default": "\"\"",
-              "description": "Name of the flow definition to run, matching the `name` in its flow\nfile. When set, the server resolves that definition directly instead\nof picking one by audience. Omit to run the project's default flow.",
+              "description": "Name of the flow definition to run, matching the `name` in its flow\nfile. When set, the server resolves that definition directly. Omit to\nrun the project's default flow.",
               "fieldName": "flowName"
             },
             {

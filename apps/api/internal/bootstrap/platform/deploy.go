@@ -192,7 +192,6 @@ func platformBundle(builtinBase string, oauthEnabled bool) (service.BuildRelease
 				SchemaVersion: "1.0.0",
 				UserSchema:    flow.UserSchema,
 				Purposes:      purposes,
-				Audience:      flow.Audience,
 				Steps:         flow.Steps,
 			},
 		})

@@ -31,13 +31,7 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 			Name:       "login-flow",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
-			Audience: api.OptFlowAudience{
-				Value: api.FlowAudience{
-					TeamIds: []string{"team-1", "team-2"},
-					AppIds:  []string{"app-1", "app-2"},
-				},
-			},
-			Steps: validSteps(),
+			Steps:      validSteps(),
 		},
 	})
 	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
@@ -88,14 +82,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Name:       "login-flow",
 					UserSchema: userSchemaObjectType,
 					Purposes:   map[string]string{"login": "step_1"},
-					Audience: api.OptFlowAudience{
-						Value: api.FlowAudience{
-							TeamIds: []string{"team-1", "team-2"},
-							AppIds:  []string{"app-1", "app-2"},
-						},
-						Set: true,
-					},
-					Steps: validSteps(),
+					Steps:      validSteps(),
 				},
 			},
 		},
@@ -151,13 +138,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Name:       "invalid-flow",
 					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "collect_identifier"},
-					Audience: api.OptFlowAudience{
-						Value: api.FlowAudience{
-							TeamIds: []string{"team-1", "team-2"},
-							AppIds:  []string{"app-1", "app-2"},
-						},
-						Set: true,
-					},
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
@@ -197,13 +177,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Name:       "invalid-flow",
 					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "step_1"},
-					Audience: api.OptFlowAudience{
-						Value: api.FlowAudience{
-							TeamIds: []string{"team-1", "team-2"},
-							AppIds:  []string{"app-1", "app-2"},
-						},
-						Set: true,
-					},
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
@@ -243,13 +216,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Name:       "invalid-flow",
 					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "step_1"},
-					Audience: api.OptFlowAudience{
-						Value: api.FlowAudience{
-							TeamIds: []string{"team-1", "team-2"},
-							AppIds:  []string{"app-1", "app-2"},
-						},
-						Set: true,
-					},
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
@@ -307,14 +273,7 @@ func newFlowDefinitionFixture(name string, userSchemaURI string) api.FlowDefinit
 		Name:       name,
 		UserSchema: userSchemaURI,
 		Purposes:   map[string]string{"login": "step_1"},
-		Audience: api.OptFlowAudience{
-			Value: api.FlowAudience{
-				TeamIds: []string{"team-1", "team-2"},
-				AppIds:  []string{"app-1", "app-2"},
-			},
-			Set: true,
-		},
-		Steps: validSteps(),
+		Steps:      validSteps(),
 	}
 }
 
@@ -439,21 +398,13 @@ func TestGetFlowDefinition(t *testing.T) {
 			Name:       "existing-flow",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
-			Audience: api.OptFlowAudience{
-				Value: api.FlowAudience{
-					TeamIds: []string{"team-1", "team-2"},
-					AppIds:  []string{"app-1", "app-2"},
-				},
-				Set: true,
-			},
-			Steps: validSteps(),
+			Steps:      validSteps(),
 		},
 	})
 	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
 	flowDef := createResp.(*api.FlowDefinitionResponse)
 
 	emptyCollections := newFlowDefinitionFixture("empty-collections", userSchemaURI)
-	emptyCollections.Audience.Value.AppIds = []string{}
 	emptyCollections.Steps[1].Actions = []api.StepAction{}
 	emptyCollections.Steps[1].Fields = []string{}
 	createResp, err = client.PublishFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(api.ProjectID(project.ID), emptyCollections))
@@ -778,14 +729,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			Name:       "flow-1",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
-			Audience: api.OptFlowAudience{
-				Value: api.FlowAudience{
-					TeamIds: []string{"team-1", "team-2"},
-					AppIds:  []string{"app-1", "app-2"},
-				},
-				Set: true,
-			},
-			Steps: validSteps(),
+			Steps:      validSteps(),
 		},
 	})
 	require.IsType(t, &api.FlowDefinitionResponse{}, resp1, helpers.MustMarshal(t, resp1))
@@ -798,14 +742,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			Name:       "flow-2",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"profiling": "step_1"},
-			Audience: api.OptFlowAudience{
-				Value: api.FlowAudience{
-					TeamIds: []string{"team-1", "team-2"},
-					AppIds:  []string{"app-1", "app-2"},
-				},
-				Set: true,
-			},
-			Steps: validSteps(),
+			Steps:      validSteps(),
 		},
 	})
 	require.IsType(t, &api.FlowDefinitionResponse{}, resp2, helpers.MustMarshal(t, resp2))
@@ -832,14 +769,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			Name:       "flow-3",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
-			Audience: api.OptFlowAudience{
-				Value: api.FlowAudience{
-					TeamIds: []string{"team-1", "team-2"},
-					AppIds:  []string{"app-1", "app-2"},
-				},
-				Set: true,
-			},
-			Steps: validSteps(),
+			Steps:      validSteps(),
 		},
 	})
 	require.IsType(t, &api.FlowDefinitionResponse{}, resp3, helpers.MustMarshal(t, resp3))
@@ -979,7 +909,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			}
 			assert.Equal(t, tt.wantDefault, gotDefault)
 			// The list and the by-id read describe a flow definition the
-			// same way (#939): document, purposes, audience, steps and
+			// same way (#939): document, purposes, steps and
 			// timestamps all match the create response.
 			assert.Equal(t, tt.want, others)
 		})

@@ -29,9 +29,6 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "identifier",
 		},
-		Audience: domain.FlowDefinitionAudience{
-			AppIDs: []string{"app-1"},
-		},
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identifier",

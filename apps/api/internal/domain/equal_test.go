@@ -20,7 +20,6 @@ func TestFlowDefinition_Equal(t *testing.T) {
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "credentials",
 		},
-		Audience: domain.FlowDefinitionAudience{AppIDs: []string{"app_1"}},
 		Steps: []domain.FlowDefinitionStep{
 			{Name: "credentials", Fields: []domain.Field{"email"}},
 		},
@@ -45,15 +44,6 @@ func TestFlowDefinition_Equal(t *testing.T) {
 		a.Purposes = nil
 		b := *base
 		b.Purposes = map[domain.FlowDefinitionPurpose]string{}
-		assert.True(t, a.Equal(&b))
-	})
-
-	t.Run("nil and empty audience slices match", func(t *testing.T) {
-		t.Parallel()
-		a := *base
-		a.Audience = domain.FlowDefinitionAudience{}
-		b := *base
-		b.Audience = domain.FlowDefinitionAudience{AppIDs: []string{}, TeamIDs: []string{}}
 		assert.True(t, a.Equal(&b))
 	})
 

@@ -138,3 +138,10 @@ It needs, first:
 - Root ADR 024: team membership versus lifecycle ownership.
 - Root ADR 040: branding revisions and the app → team → project ladder.
 - Root ADR 066: operation policies, with the audience in #1264.
+
+## Amendment (2026-11-24): flow definitions carry no audience
+
+Flow definitions no longer carry an `audience`, so a team cannot override a
+login flow: the Login flows row of the table above is a project resource with
+no team override, like IdPs. A team owns no configuration yet, and §2 waits
+for one to gain a team audience.

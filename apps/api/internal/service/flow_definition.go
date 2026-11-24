@@ -31,7 +31,6 @@ type FlowDefinitionRequest struct {
 	FlowSchemaURI string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
 	UserSchema    string
 	Purposes      map[string]string
-	Audience      domain.FlowDefinitionAudience
 	Steps         []domain.FlowDefinitionStep
 }
 
@@ -118,7 +117,6 @@ func (fd *flowDefinitionService) prepareFlowDefinition(
 		req.SchemaVersion,
 		*userSchema.ObjectType,
 		purposes,
-		req.Audience,
 		req.Steps,
 	)
 	if err != nil {

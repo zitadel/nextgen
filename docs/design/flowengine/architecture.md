@@ -90,7 +90,7 @@ The use-case surface the HTTP handler depends on. Four methods:
 
 | Method | Responsibility |
 |---|---|
-| `Resolve` | Pick the `FlowDefinition` to run from the revisions the release pins. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
+| `Resolve` | Pick the `FlowDefinition` to run from the revisions the release pins. `Name` → direct lookup; otherwise the newest pinned definition serving the purpose, narrowed by `Hint.UserSchemaID`. |
 | `Start` | Mint a fresh `FlowState`, ask the state machine to bootstrap it, mint and attach `flow_*` and `sess_*` ids. |
 | `Submit` | Re-fetch the definition from `state.DefinitionID`, hand to `stateMachine.Process`. |
 | `GetStep` | Re-fetch the definition, hand to `stateMachine.Render` (no advancement). |

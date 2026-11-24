@@ -585,3 +585,10 @@ project's newest primary deployment
 ([ADR 085](085-which-release-serves-a-request.md)). The rest of §10 stands: the
 code carries the deployment for an authorization code grant, and a refresh and
 userinfo resolve the newest deployment to the token's issuer.
+
+## Amendment (2026-11-24): flow definitions carry no audience
+
+Flow definitions no longer carry an `audience`, so §8 item 6's requesting app
+selects no flow definition: the engine takes only the app's branding from it.
+`POST /flows` takes no `hint.team_id` or `hint.app_id`, so §11's team sign-in
+providers need another way to name the request's team.

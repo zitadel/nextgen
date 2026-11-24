@@ -296,8 +296,8 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Name of the flow definition to run, matching the `name` in its flow
-   * file. When set, the server resolves that definition directly instead
-   * of picking one by audience. Omit to run the project's default flow.
+   * file. When set, the server resolves that definition directly. Omit to
+   * run the project's default flow.
    */
   @property({ type: String, attribute: "flow-name" }) accessor flowName = "";
 

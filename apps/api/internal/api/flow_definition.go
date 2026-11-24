@@ -153,13 +153,6 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 		svcReq.FlowSchemaURI = u.String()
 	}
 
-	if definition.GetAudience().IsSet() {
-		svcReq.Audience = domain.FlowDefinitionAudience{
-			AppIDs:  definition.Audience.Value.AppIds,
-			TeamIDs: definition.Audience.Value.TeamIds,
-		}
-	}
-
 	// map steps to domain
 	steps := make([]domain.FlowDefinitionStep, 0, len(definition.GetSteps()))
 	for _, step := range definition.GetSteps() {
@@ -287,13 +280,6 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 
 func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
-	audience := api.OptFlowAudience{
-		Value: api.FlowAudience{
-			TeamIds: nilIfEmpty(flowDefinition.Audience.TeamIDs),
-			AppIds:  nilIfEmpty(flowDefinition.Audience.AppIDs),
-		},
-		Set: true,
-	}
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
 	return &api.FlowDefinitionResponse{
@@ -303,7 +289,6 @@ func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefi
 			Name:       flowDefinition.Name,
 			Steps:      steps,
 			Purposes:   purposes,
-			Audience:   audience,
 			UserSchema: flowDefinition.UserSchema,
 		},
 		CreatedAt: flowDefinition.CreatedAt,

@@ -55,10 +55,6 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string) ([]*domain.
 			new(url.URL(req.GetSchemaURI().Value)).String(),
 			req.FlowDefinition.GetUserSchema(),
 			purposes,
-			domain.FlowDefinitionAudience{
-				AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
-				TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
-			},
 			steps,
 		)
 		if err != nil {

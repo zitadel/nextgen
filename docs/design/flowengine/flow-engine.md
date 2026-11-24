@@ -42,9 +42,7 @@ POST /flows
 | `auth_request_id` | Stored for future OIDC/SAML integration; the flow service does not resolve an auth request or requested ACR today |
 | `redirect_uri` | Where to send the user on completion (from the auth request or explicit) |
 | `hint.login_name` | Reserved for OIDC `login_hint`; accepted by the wire schema but not consumed by today's handler |
-| `hint.team_id` | Scopes flow resolution to a team |
 | `hint.user_schema_id` | Scopes to a specific user type |
-| `hint.app_id` | Scopes to a specific application |
 
 ### Flow Resolution
 
@@ -52,9 +50,8 @@ The server resolves which flow definition to use:
 
 1. Filter the definitions the release pins whose `purposes` map has an entry for the requested purpose.
 2. If `hint.user_schema_id` is set, discard definitions for other schemas.
-3. Score the remaining definitions: matching app > matching team > project-wide > a definition scoped to a different app or team.
-4. Pick the highest score; ties go to the newest `created_at`, then the highest ID.
-5. Enter at the step named by `purposes[<purpose>]` in the matched definition.
+3. Pick the newest `created_at`; ties go to the highest ID.
+4. Enter at the step named by `purposes[<purpose>]` in the matched definition.
 
 Project creation provisions the shipped default definition as a normal stored
 definition. `POST /flows` does not synthesize an in-memory fallback when no
@@ -77,9 +74,9 @@ POST   /flow_definitions/{flow_definition_id}/simulate    Dry-run with mock inpu
 A definition is an immutable revision: every `POST` assigns a new id, and a
 repeated `name` is a new revision of that flow, not a conflict. There is no
 update or delete. Resolution by `name` picks the revision of that name the
-release pins. Audience resolution (steps 1-4 above) ranks every definition the
-release pins regardless of name, so a new revision of an unscoped flow becomes
-the project default the same way a new flow does.
+release pins. Resolution without a name (steps 1-3 above) considers every
+definition the release pins regardless of name, so a new revision of a flow
+becomes the project default the same way a new flow does.
 
 ## Schema-Driven Steps
 

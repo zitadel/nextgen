@@ -131,11 +131,12 @@ func TestCoerceSliceAsAnyJSON(t *testing.T) {
 func TestCoerceJSONValueStruct(t *testing.T) {
 	t.Parallel()
 	raw := map[string]any{
-		"AppIDs": []any{"app1"},
+		"Name":         "login",
+		"SSOProviders": []any{"idp_1"},
 	}
-	got, err := database.CoerceJSONValue[domain.FlowDefinitionAudience](raw)
+	got, err := database.CoerceJSONValue[domain.FlowDefinitionStep](raw)
 	require.NoError(t, err)
-	assert.Equal(t, domain.FlowDefinitionAudience{AppIDs: []string{"app1"}}, got)
+	assert.Equal(t, domain.FlowDefinitionStep{Name: "login", SSOProviders: []string{"idp_1"}}, got)
 }
 
 func TestCoerceEnumKeyMap(t *testing.T) {

@@ -167,16 +167,9 @@ func SchemaCreatedPayloadSnapshot(schema *JSONSchema) SchemaCreatedPayload {
 // FlowdefPayload is the flowdef.created snapshot. Retired flowdef.updated rows
 // carry a delta in the same shape. Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {
-	Name       string                  `json:"name,omitempty"`
-	UserSchema string                  `json:"user_schema,omitempty"`
-	Purposes   map[string]string       `json:"purposes,omitempty"`
-	Audience   *FlowdefAudiencePayload `json:"audience,omitempty"`
-}
-
-// FlowdefAudiencePayload is the allowlisted audience snapshot for flowdef events.
-type FlowdefAudiencePayload struct {
-	AppIDs  []string `json:"app_ids,omitempty"`
-	TeamIDs []string `json:"team_ids,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	UserSchema string            `json:"user_schema,omitempty"`
+	Purposes   map[string]string `json:"purposes,omitempty"`
 }
 
 // FlowdefPayloadSnapshot is the allowlisted create snapshot for flowdef events.
@@ -188,7 +181,6 @@ func FlowdefPayloadSnapshot(fd *FlowDefinition) FlowdefPayload {
 		Name:       fd.Name,
 		UserSchema: fd.UserSchema,
 		Purposes:   flowdefPurposesWire(fd.Purposes),
-		Audience:   flowdefAudiencePayload(fd.Audience),
 	}
 }
 
@@ -201,16 +193,6 @@ func flowdefPurposesWire(in map[FlowDefinitionPurpose]string) map[string]string 
 		out[purpose.String()] = step
 	}
 	return out
-}
-
-func flowdefAudiencePayload(a FlowDefinitionAudience) *FlowdefAudiencePayload {
-	if len(a.AppIDs) == 0 && len(a.TeamIDs) == 0 {
-		return nil
-	}
-	return &FlowdefAudiencePayload{
-		AppIDs:  append([]string(nil), a.AppIDs...),
-		TeamIDs: append([]string(nil), a.TeamIDs...),
-	}
 }
 
 type BrandingPayload struct {

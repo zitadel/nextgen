@@ -97,10 +97,6 @@ func TestExampleFlowDefinitions(t *testing.T) {
 				schemaURI.String(),
 				userSchemaRef,
 				purposes,
-				domain.FlowDefinitionAudience{
-					AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
-					TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
-				},
 				steps,
 			)
 			require.NoError(t, err, "domain NewFlowDefinition")

@@ -111,7 +111,7 @@ graph TD
 | Is this session usable for token exchange? | **OIDC/SAML endpoint** | Compares session `assurance_levels[]` against requested `acr_values`; triggers step-up if insufficient |
 | Is captcha/bot detection needed? | **Risk Evaluator → Policy Engine** | Composable signals (fingerprint, telemetry, rate limits) → risk score → policy decides |
 | Where is flow state stored? | **Encrypted cookie** | Client-held, server-stateless. Only factor changes touch the DB. |
-| Which flow definition to use? | **Flow resolution** | `purpose` + `audience` matching with specificity ranking |
+| Which flow definition to use? | **Flow resolution** | The named definition, or the newest pinned one serving the `purpose` |
 
 ## Design Principles
 
@@ -121,7 +121,7 @@ graph TD
 
 3. **auth_attempts are the mutation primitive.** A session accumulates verified factors, but never accepts direct mutations from a client. The flow engine drives `auth_attempts` internally; direct-API clients drive them explicitly. On completion, an `auth_attempt` writes factors into the session and updates the assurance level. The client then reads the session to observe the result.
 
-4. **Flows are configurable per audience.** Flow definitions are API resources that describe step graphs. An admin can create different flows for different teams, applications, or user types. One team gets SSO-first login; another gets email + password. The flow engine resolves which definition to use based on the request context.
+4. **Flows are configurable.** Flow definitions are API resources that describe step graphs. An admin can create different flows for different purposes or user types, and a client picks one by name; one app gets SSO-first login, another gets email + password. Without a name, the flow engine runs the newest definition the release pins for the purpose.
 
 5. **User schemas drive forms.** Registration fields, validation rules, and progressive profiling steps come from JSON Schema definitions — not hardcoded templates. When a schema adds a new field, every flow that references it picks it up automatically.
 

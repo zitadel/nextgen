@@ -36,26 +36,6 @@ function declaredDefaults(
 }
 
 describe("normalizeFlowBody", () => {
-  it("drops an empty audience in both wire shapes", () => {
-    expect(normalizeFlowBody({ name: "login", audience: {} })).toEqual({ name: "login" });
-    expect(normalizeFlowBody({ name: "login", audience: { team_ids: [], app_ids: [] } })).toEqual({
-      name: "login",
-    });
-    expect(normalizeFlowBody({ name: "login", audience: { team_ids: null } })).toEqual({
-      name: "login",
-    });
-  });
-
-  it("keeps a non-empty audience verbatim", () => {
-    const body = { name: "login", audience: { team_ids: ["team_1"] } };
-    expect(normalizeFlowBody(body)).toEqual(body);
-  });
-
-  it("keeps an audience with unknown keys", () => {
-    const body = { name: "login", audience: { org_ids: [] } };
-    expect(normalizeFlowBody(body)).toEqual(body);
-  });
-
   it("strips detail-envelope keys", () => {
     expect(
       normalizeFlowBody({
@@ -75,9 +55,9 @@ describe("normalizeFlowBody", () => {
   });
 
   it("does not mutate its input and is idempotent", () => {
-    const body = { name: "login", audience: {} };
+    const body = { id: "flow_1", name: "login" };
     const once = normalizeFlowBody(body);
-    expect(body).toEqual({ name: "login", audience: {} });
+    expect(body).toEqual({ id: "flow_1", name: "login" });
     expect(normalizeFlowBody(once)).toEqual(once);
   });
 

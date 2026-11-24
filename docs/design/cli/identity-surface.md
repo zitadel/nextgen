@@ -148,7 +148,6 @@ zitadel app metadata web-frontend   # emits metadata for the counterparty (SAML)
 [Flow definitions](../flowengine/flow-engine.md) are `.zitadel/flows/<slug>.json` files shaped like `FlowDefinition` (canonical spec: [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/)). `fields` and `actions` are ordered arrays whose entries carry a `name` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)); `gates` is keyed by gate type; every user-visible label is a `text_key` resolved client-side via LiquidJS's `| t` filter (see [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md)). Steps reference identity resources:
 
 - An `identifier` step's `sso_providers` list resolves against `.zitadel/idps/`.
-- An `app`'s `audience` (via the flow's `audience.app_ids`) scopes which flow runs for which token consumer.
 - Gates (`captcha`, `passkey`) are built-in; external-factor gates are deferred until the upstream contract lands.
 
 **Cross-resource references are validated on `zitadel apply`.** If a flow names an `idp` slug that has no file, apply errors with `E_VALIDATION` and `next_commands: ["zitadel idp add --preset okta"]`.
@@ -171,8 +170,8 @@ Why `_env` in the file rather than `.env.local` mapping in one place: agents edi
 
 1. Schemas (no dependencies).
 2. IdPs (no internal dependencies, but referenced by flows).
-3. Apps (referenced by flows via audience).
-4. Flow definitions (reference all of the above).
+3. Apps.
+4. Flow definitions (reference schemas and IdPs).
 5. Locales (`.zitadel/locales/*.json`) and Liquid templates (`.zitadel/templates/*.liquid`) — validated and uploaded alongside the bundle.
 
 Within each stage: `diff` → `plan` → `apply`, atomic per resource. If one resource fails, the CLI stops before processing dependents and reports the failing resource; already-applied resources stay applied (idempotent). This matches Terraform's partial-apply semantics and is the model agents understand.
