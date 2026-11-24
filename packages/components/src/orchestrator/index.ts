@@ -20,6 +20,7 @@ export { ZitadelLogout } from "./zitadel-logout.js";
 export { ZitadelSession } from "./zitadel-session.js";
 export {
   applyBrandingTokens,
+  brandingDeclarations,
   buildBrandingStylesheet,
   resolveTheme,
 } from "./branding-to-tokens.js";

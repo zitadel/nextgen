@@ -186,7 +186,7 @@ export const RESOURCE_STICKY_END =
  * own `transition-colors`, or it would snap while the rest of the row fades.
  */
 export const RESOURCE_STICKY_BODY =
-  "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
+  "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-[[aria-haspopup][aria-expanded=true]]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
 
 /**
  * How tall a table's rows are, set once on its card (`RESOURCE_TABLE_WRAP`)
@@ -326,8 +326,9 @@ export function ResourceMenuHead({
 }
 
 /**
- * A body row. With `onOpen` the whole row is a pointer target for its
- * first-cell link, and `opensRow` keeps it out of that link's way.
+ * A body row. With `onOpen` the whole row opens what its first cell opens (a
+ * link, or a disclosure), and `opensRow` keeps it out of that control's way.
+ * Clicks from a dialog or menu the row portals out do not open it.
  */
 export function ResourceRow({
   onOpen,
@@ -340,7 +341,9 @@ export function ResourceRow({
       onClick={
         onOpen &&
         ((event) => {
-          if (opensRow(event)) onOpen();
+          // A dialog or menu the row renders sits in a portal, but its clicks
+          // still bubble here through React's tree.
+          if (event.currentTarget.contains(event.target as Node) && opensRow(event)) onOpen();
         })
       }
       {...props}

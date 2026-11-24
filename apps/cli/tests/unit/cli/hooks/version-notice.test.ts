@@ -8,6 +8,7 @@ describe("isVersionRun", () => {
     [["version"], true],
     [["version", "--verbose"], true],
     [["version", "--json"], false],
+    [["--version", "--json"], false],
     [["doctor"], false],
     [["doctor", "--version"], false],
     [[], false],

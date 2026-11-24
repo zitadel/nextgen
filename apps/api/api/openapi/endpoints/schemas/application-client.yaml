@@ -43,7 +43,8 @@ properties:
       share an id, and an id is never reused once a client has held it. A
       new client may not supply an id that starts with `client_` or `dcr_`:
       those prefixes mark ids the server generates. A server-generated id
-      sent back unchanged in a revision is accepted.
+      sent back unchanged in a revision is accepted. A client declared in a
+      release must set it.
     examples:
       - 289374592837459283@shop
   type:
@@ -88,9 +89,27 @@ properties:
       exactly; a loopback URI matches on any port (RFC 8252 §7.3).
     examples:
       - - https://shop.example.com/callback
+  secret:
+    type: string
+    pattern: '^\$\{\{ *[A-Za-z0-9_]{1,255} *\}\}$'
+    x-zitadel-pattern-message: "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself, naming a variable of at most 255 characters"
+    description: |
+      A reference to the project variable holding the client's secret, never
+      the secret itself, for a confidential client declared in a release.
+      Required there. A variable stays the client's that first named it, so
+      no other client in the project can name it. The server reads the value
+      the deployment serving the request froze, and a deploy is refused while
+      the variable has no value or holds a plain value instead of a secret.
+
+      A client registered through `POST /applications` leaves it out: the
+      server generates that client's secret and returns it once.
+    examples:
+      - '${{ SHOP_WEB_CLIENT_SECRET }}'
   first_party:
     type: boolean
     description: |
       A first-party client belongs to the project's own product and skips
-      consent unless the request asks for it. An application registered
-      through the API is third-party unless this says otherwise.
+      consent unless the request asks for it. A client declared in a release
+      is first-party, and one registered through the API third-party, unless
+      this says otherwise. The server stores the value in effect, so a
+      response always carries it.

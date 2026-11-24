@@ -61,7 +61,10 @@ export class IssuerOriginCheck implements SanityCheck {
       message:
         `The project has no primary origin to deploy to: it holds ${finding.pattern} as a ` +
         "preview origin, as setup 0.1.0 registered it. Run " +
-        `${ctx.suggest({ id: "doctor", flags: { fix: true } })} to make it primary.`,
+        `${ctx.suggest({
+          id: "doctor",
+          flags: { fix: true },
+        })} to make it primary.`,
       details: {
         pattern: finding.pattern,
         server: finding.server,
@@ -124,6 +127,19 @@ export class IssuerOriginCheck implements SanityCheck {
   }
 }
 
+/**
+ * Reads the project's recorded origins and the server's, and finds whether the
+ * configured issuer is held as a preview origin. A missing or unparseable
+ * secret or config is the `secret` and `config` checks' to report, with a
+ * repair path, so it passes here as skipped. Cancelling is not a check that
+ * could not read: the person asked `doctor` to stop, so it stops rather than
+ * passing a check it skipped.
+ *
+ * @param cwd - The project folder.
+ * @param signal - The run's cancellation.
+ * @returns The finding.
+ * @throws The cancellation, when the person stopped the run.
+ */
 async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   const records = await Project.at(cwd)
     .secret()
@@ -137,8 +153,6 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
       return undefined;
     });
   if (records === undefined) {
-    // A missing or unparseable secret or config is the `secret` and `config`
-    // checks' to report, with a repair path.
     return {
       status: "pass",
       message: "Skipped: could not read the project files that record its origins",
@@ -186,8 +200,6 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
       return { origins };
     })
     .catch((error: unknown) => {
-      // Cancelling is not a check that could not read: the person asked
-      // `doctor` to stop, so it stops rather than passing a check it skipped.
       if (isCancellation(error)) {
         throw error;
       }

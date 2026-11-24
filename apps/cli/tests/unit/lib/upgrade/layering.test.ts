@@ -11,7 +11,8 @@ const LIBRARY = join(import.meta.dirname, "../../../../src/lib/upgrade");
  * name Zitadel, but it must not reach into commands, oclif or the rest of the
  * CLI. This checks direct imports only.
  */
-const ALLOWED = /^(\.\/|node:|semver$|execa$|@\/lib\/(ci|fs|json|pm|telemetry\/identity)$)/;
+const ALLOWED =
+  /^(\.\/|node:|semver$|execa$|@\/lib\/(ci|fs|json|pm|telemetry\/identity|ui\/output)$)/;
 
 /** Every module a source imports: `from "x"`, `import "x"` and `import("x")`. */
 function importsIn(source: string): string[] {
@@ -40,8 +41,8 @@ describe("lib/upgrade", () => {
  */
 const TRANSITIVE: Readonly<Record<string, readonly string[]>> = {
   "pm/manifest.ts": ["@/lib/fs", "@/lib/json"],
-  "pm/pm.ts": ["@/lib/fs", "./manifest", "./package-command"],
-  "pm/package-command.ts": ["@/lib/cmd", "./pm"],
+  "pm/pm.ts": ["@/lib/fs", "@/lib/ui/output", "./manifest", "./package-command"],
+  "pm/package-command.ts": ["@/lib/cmd", "@/lib/ui/output", "./pm"],
 };
 
 describe("what lib/upgrade reaches through lib/pm", () => {

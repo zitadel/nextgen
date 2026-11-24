@@ -36,6 +36,7 @@ import { PASSWORD_FIELD } from "./fixtures/login.js";
 import { setupMockHandlers } from "./handlers.js";
 import {
   acceptInvitation,
+  expireInvitation,
   expireClaimChallenge,
   expireClaimWindow,
   snapshotPlatformStore,
@@ -2122,6 +2123,59 @@ describe("api-mock releases and deployments", () => {
     expect(again.idps).toHaveLength(1);
   });
 
+  test("pins a bundled application and serves the revision it pins", async () => {
+    const project = await newProject("release-build-application");
+    const application = (redirect: string) => ({
+      slug: "shop",
+      name: "Shop",
+      clients: [
+        {
+          slug: "web",
+          client_id: "shop-web",
+          type: "confidential",
+          secret: "${{ SHOP_WEB_SECRET }}",
+          grant_types: ["authorization_code"],
+          redirect_uris: [redirect],
+        },
+      ],
+    });
+    const build = async (redirect: string) => {
+      const res = await fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ bundle: { applications: [application(redirect)] } }),
+      });
+      expect(res.status).toBe(201);
+      const pointers = (
+        (await res.json()) as {
+          pointers: { kind: string; handle: string; revision_id: string }[];
+        }
+      ).pointers;
+      const pointer = pointers.find((candidate) => candidate.kind === "application");
+      expect(pointer).toMatchObject({ handle: "shop" });
+      return pointer?.revision_id as string;
+    };
+    const read = async (revisionId: string) =>
+      fetch(`${BASE}/applications/revisions/${revisionId}?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      });
+
+    // A bundle of only an application is a release, as on the server.
+    const first = await build("https://shop.example.com/callback");
+    const second = await build("https://shop.example.com/cb");
+
+    expect(second).not.toBe(first);
+    const pinned = await read(first);
+    expect(pinned.status).toBe(200);
+    expect(await pinned.json()).toMatchObject({
+      revision_id: first,
+      slug: "shop",
+      declared: true,
+      definition: { clients: [{ redirect_uris: ["https://shop.example.com/callback"] }] },
+    });
+    expect((await read("apprev_missing")).status).toBe(404);
+  });
+
   test("refuses a build that would change a connection's fixed field", async () => {
     const project = await newProject("release-build-idp-immutable");
     const connection = (issuer: string) => ({
@@ -3954,6 +4008,18 @@ describe("api-mock invitations", () => {
   test("cancels a pending invitation", async () => {
     const projectId = await newProject("invitations-cancel");
     const created = await invited(projectId);
+
+    const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(204);
+  });
+
+  test("cancels an expired invitation", async () => {
+    const projectId = await newProject("invitations-cancel-expired");
+    const created = await invited(projectId);
+    expireInvitation(created.id);
 
     const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
       method: "DELETE",

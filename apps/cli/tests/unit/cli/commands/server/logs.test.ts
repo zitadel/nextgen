@@ -76,9 +76,7 @@ describe("--follow beside --json", () => {
     const logs = new Logs(["--no-telemetry", "--cwd", dir, "--follow", "--json"], config);
 
     await expect(logs.run()).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: "Cannot stream logs with --json",
-      hint: "Run without --json, or omit --follow.",
+      message: expect.stringMatching(/--json[^\n]*cannot also be provided[^\n]*--follow/),
     });
   });
 

@@ -13,8 +13,8 @@ import {
   deviceProfileProperties,
   VERCEL_COMMAND_DIMENSIONS,
   vercelEventKeys,
-} from "@/lib/oclif/command-telemetry";
-import type { GlobalOptions } from "@/lib/oclif/types";
+} from "@/cli/core/command-telemetry";
+import type { GlobalOptions } from "@/cli/core/types";
 import { VERCEL_MAX_PROPERTIES } from "@/lib/telemetry/vercel";
 import { keysOf } from "@tests/helpers/declarations";
 
@@ -31,7 +31,7 @@ const catalogPath = join(
 );
 const srcDir = join(import.meta.dirname, "../../../../src");
 const commandsDir = join(srcDir, "cli", "commands");
-const baseCommand = join(srcDir, "lib/oclif/base.ts");
+const runTelemetry = join(srcDir, "cli/core/run-telemetry.ts");
 
 type PropertyDef = {
   type: string;
@@ -212,7 +212,7 @@ const LIFECYCLE_EVENTS = [
 /** The properties `BaseCommand` adds to `commandEventProperties` where it tracks `constant`. */
 async function lifecycleExtras(constant: string): Promise<string[]> {
   const tracks = await callsIn(
-    baseCommand,
+    runTelemetry,
     (call) =>
       calls("track")(call) &&
       call.arguments[0] !== undefined &&
@@ -222,7 +222,7 @@ async function lifecycleExtras(constant: string): Promise<string[]> {
   return tracks.flatMap((track) => {
     const bag = track.arguments[1];
     if (bag && ts.isCallExpression(bag)) {
-      return keysOf(bag.arguments[3]);
+      return keysOf(bag.arguments[1]);
     }
     return [];
   });
@@ -231,8 +231,6 @@ async function lifecycleExtras(constant: string): Promise<string[]> {
 function meta(): GlobalOptions {
   return {
     cwd: "/work/app",
-    colored: false,
-    json: false,
     nonInteractive: true,
     dryRun: false,
     force: false,
