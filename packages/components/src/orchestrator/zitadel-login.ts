@@ -37,7 +37,7 @@ import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
-import { resolveApi } from "./resolve-api.js";
+import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
@@ -206,10 +206,14 @@ const PROJECT_ID_FIX =
  * with nothing deployed produces with the deploy that fixes it, keeping the
  * envelope as `cause`; every other error passes through.
  */
-function describeStartError(error: unknown, request: CreateFlowBody): unknown {
+function describeStartError(error: unknown, request: CreateFlowBody, release?: string): unknown {
   const { project_id: projectId, purpose, flow_definition_name: flowName } = request;
   const described = (message: string) => new Error(`<zitadel-login> ${message}`, { cause: error });
   const code = apiErrorCode(error);
+  if (release) {
+    const pinned = describePinError(code, release);
+    if (pinned) return described(pinned);
+  }
   if (code === "req.invalid") {
     const fields = apiErrorFields(error);
     if (fields.includes("purpose")) {
@@ -260,6 +264,33 @@ function describeStartError(error: unknown, request: CreateFlowBody): unknown {
 }
 
 /**
+ * Why the server refused the release this bundle pins, with the fix, or ""
+ * when the refusal is not about the pin. Every one of them means the bundle
+ * and the project's deployments are out of step, which only a rebuild or a
+ * reload fixes.
+ */
+function describePinError(code: string, release: string): string {
+  switch (code) {
+    case "rel.reference_invalid":
+      return (
+        `release="${release}" is not a release id. Set it to the value \`zitadel deploy\` ` +
+        `or \`zitadel preview\` printed for this build.`
+      );
+    case "rel.not_found":
+      return `release="${release}" names no release of this project. Rebuild the app against the current release.`;
+    case "rel.not_deployed":
+      return (
+        `release="${release}" was never deployed to this page's origin. Rebuild the app ` +
+        `against the release deployed here, or deploy this one (\`zitadel deploy\`).`
+      );
+    case "rel.revoked":
+      return `release="${release}" was revoked. Reload the page to get a newer build.`;
+    default:
+      return "";
+  }
+}
+
+/**
  * Orchestrator element `<zitadel-login>` — drives a login flow end to end and
  * surfaces its progress through the public `zitadel-*` events.
  *
@@ -300,6 +331,21 @@ export class ZitadelLogin extends ZitadelSurface {
    * of picking one by audience. Omit to run the project's default flow.
    */
   @property({ type: String, attribute: "flow-name" }) accessor flowName = "";
+
+  /**
+   * The release this bundle was built against, as `zitadel deploy` or
+   * `zitadel preview` printed it, sent as `X-Zitadel-Release` when the flow
+   * starts. The server serves it only when it was deployed to this page's
+   * origin and is not revoked; it never deploys one. Unset, the origin's
+   * newest deployment is served. A `project` handle or `configureZitadel()`
+   * carries its own `release` instead.
+   */
+  @property({ type: String }) accessor release = "";
+
+  /** Declarative config read from this element's attributes, the pin included. */
+  protected override get projectAttrs(): ProjectAttrs {
+    return { ...super.projectAttrs, release: this.release };
+  }
 
   /**
    * URL to navigate to after a successful embedded sign-in. When set, the
@@ -936,8 +982,8 @@ export class ZitadelLogin extends ZitadelSurface {
           purpose: this.purpose,
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
         };
-        wire = await apiStartFlow(api, request).catch((error: unknown) => {
-          throw describeStartError(error, request);
+        wire = await apiStartFlow(api, request, cfg.release).catch((error: unknown) => {
+          throw describeStartError(error, request, cfg.release);
         });
       }
       if (this.restarting) {
@@ -1984,7 +2030,12 @@ export class ZitadelLogin extends ZitadelSurface {
           : "Unexpected error contacting the Flow API.";
     this.startupError = message;
     console.error("[zitadel-login]", error);
-    emit(this, "zitadel-flow-error", { message });
+    // The envelope's code, also behind a described start error, so a host can
+    // branch on it (a revoked pinned release asks for a reload).
+    const code =
+      apiErrorCode(error) ||
+      (error instanceof Error ? apiErrorCode((error as Error & { cause?: unknown }).cause) : "");
+    emit(this, "zitadel-flow-error", { message, ...(code ? { code } : {}) });
   }
 }
 

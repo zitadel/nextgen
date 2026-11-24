@@ -59,6 +59,11 @@ export interface ZitadelFlowRedirectDetail extends ZitadelNavigationDetail {
 /** Payload of the `zitadel-flow-error` event. */
 export interface ZitadelFlowErrorDetail {
   readonly message: string;
+  /**
+   * The server's error code when the API refused the flow, such as
+   * `rel.revoked` for a pinned release that was revoked; absent otherwise.
+   */
+  readonly code?: string;
 }
 
 /** Payload of the `zitadel-signout` event. */

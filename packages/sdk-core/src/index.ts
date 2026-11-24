@@ -54,12 +54,19 @@ export type ZitadelRuntime = {
   projectId: string;
   environment: ZitadelEnvironment;
   issuer?: string;
+  /**
+   * The release the build was made against, sent as `X-Zitadel-Release` so
+   * the server serves it among the releases deployed to the request's
+   * origin. Unset, the origin's newest deployment is served.
+   */
+  release?: string;
 };
 
 export type ZitadelRuntimeInput = {
   projectId?: string;
   environment?: ZitadelEnvironment;
   issuer?: string;
+  release?: string;
 };
 
 export class ZitadelRuntimeError extends Error {
@@ -79,6 +86,7 @@ export function resolveZitadelRuntimeEnv(
     projectId: env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? env.ZITADEL_PROJECT_ID,
     environment: parseEnvironment(env.NEXT_PUBLIC_ZITADEL_ENVIRONMENT ?? env.ZITADEL_ENVIRONMENT),
     issuer: env.NEXT_PUBLIC_ZITADEL_ISSUER ?? env.ZITADEL_ISSUER,
+    release: env.NEXT_PUBLIC_ZITADEL_RELEASE ?? env.ZITADEL_RELEASE,
   });
 }
 
@@ -97,6 +105,7 @@ export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntim
     projectId: input.projectId,
     environment,
     issuer: input.issuer,
+    ...(input.release ? { release: input.release } : {}),
   };
 }
 

@@ -41,6 +41,7 @@ export default defineNuxtPlugin(() => {
     (publicConfig.nextgenApiBase as string | undefined) ??
     "/__nextgen";
   const projectId = (publicConfig.zitadelProjectId as string | undefined) ?? "";
+  const release = (publicConfig.zitadelRelease as string | undefined) || undefined;
   // `runtimeConfig.nextgen` is private, so it exists only on the server;
   // reading it in the browser makes Nuxt warn (NUXT_E1003). The browser keeps
   // the default, as it always did.
@@ -48,6 +49,6 @@ export default defineNuxtPlugin(() => {
   const url = import.meta.server ? resolveUrl(privateConfig) : DEFAULT_URL;
 
   if (proxyPath && projectId) {
-    configureZitadel({ proxyPath, projectId, url });
+    configureZitadel({ proxyPath, projectId, url, release });
   }
 });

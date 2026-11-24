@@ -133,6 +133,8 @@ const HANDLE_REASONS: Record<string, string> = {
 const LOGIN_ELEMENT_ONLY: Record<string, string> = {
   url: URL_REASON,
   ...HANDLE_REASONS,
+  release:
+    "declarative form of the project handle's release, which SPA wrappers pass inside project",
   previewState: "operator preview mode, not part of the shared login config",
   previewSuccessStep: "operator preview mode, not part of the shared login config",
 };

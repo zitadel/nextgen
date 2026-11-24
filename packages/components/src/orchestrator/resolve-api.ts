@@ -10,13 +10,15 @@ const DEFAULT_PROXY_PATH = "/__nextgen";
 
 /**
  * Declarative configuration read from an element's HTML attributes
- * (`project-id` / `proxy-path` / `url` / `publishable-key`). Empty strings mean "unset".
+ * (`project-id` / `proxy-path` / `url` / `publishable-key`, and `release` on
+ * `<zitadel-login>`). Empty strings mean "unset".
  */
 export interface ProjectAttrs {
   readonly projectId: string;
   readonly proxyPath: string;
   readonly url: string;
   readonly publishableKey: string;
+  readonly release?: string;
 }
 
 /**
@@ -42,12 +44,20 @@ function projectFromAttrs({
   proxyPath,
   url,
   publishableKey,
+  release,
 }: ProjectAttrs): ZitadelProject | undefined {
   if (!projectId) return undefined;
   const resolvedProxyPath = proxyPath || DEFAULT_PROXY_PATH;
   const resolvedUrl = url || undefined;
   const resolvedKey = publishableKey || undefined;
-  const key = JSON.stringify([projectId, resolvedProxyPath, resolvedUrl ?? "", resolvedKey ?? ""]);
+  const resolvedRelease = release || undefined;
+  const key = JSON.stringify([
+    projectId,
+    resolvedProxyPath,
+    resolvedUrl ?? "",
+    resolvedKey ?? "",
+    resolvedRelease ?? "",
+  ]);
   let project = syntheticProjects.get(key);
   if (!project) {
     project = Object.freeze({
@@ -55,6 +65,7 @@ function projectFromAttrs({
       proxyPath: resolvedProxyPath,
       url: resolvedUrl,
       publishableKey: resolvedKey,
+      release: resolvedRelease,
     });
     if (syntheticProjects.size >= MAX_SYNTHETIC_PROJECTS) {
       const oldest = syntheticProjects.keys().next().value;

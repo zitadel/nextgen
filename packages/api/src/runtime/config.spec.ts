@@ -34,6 +34,12 @@ describe("configureZitadel", () => {
     expect(p1).toBe(p2);
   });
 
+  test("carries the release a build pins, and pins nothing for an empty one", () => {
+    expect(configureZitadel({ projectId: "proj_1", release: "rel_01" }).release).toBe("rel_01");
+    _resetConfigForTesting();
+    expect(configureZitadel({ projectId: "proj_1", release: "" }).release).toBeUndefined();
+  });
+
   test("different-value re-call warns and is ignored", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(vi.fn());
     const p1 = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });

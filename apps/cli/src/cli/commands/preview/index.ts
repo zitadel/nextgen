@@ -217,8 +217,8 @@ export async function refusePrimaryOrigins(
  * into a failure for a trusted build that expects the token. Outside a preview
  * or development environment there is nothing to preview — even with an explicit
  * `--origin` — so it says so and exits cleanly without writing. The last line it
- * prints is the release digest as `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build
- * to pin.
+ * prints is the release id as `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build to
+ * pin.
  */
 export default class Preview extends Previewable(ServerCommand(PreviewCommand)) {
   static override description =
@@ -388,7 +388,7 @@ export default class Preview extends Previewable(ServerCommand(PreviewCommand)) 
         content_hash: release.content_hash,
         deployment_id: deployment.id,
         previews,
-        release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+        release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.id}`,
       },
       pretty: prose(
         [
@@ -398,7 +398,7 @@ export default class Preview extends Previewable(ServerCommand(PreviewCommand)) 
               ? `  - ${preview.url}`
               : `  - ${preview.url} (until ${preview.expires_at})`;
           }),
-          `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${release.id}`,
         ].join("\n"),
       ),
       summary: {
@@ -410,7 +410,7 @@ export default class Preview extends Previewable(ServerCommand(PreviewCommand)) 
               ? `  - ${escapeControlCharacters(preview.url)}`
               : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
           }),
-          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.id)}`,
         ],
       },
     };
