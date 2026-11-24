@@ -131,6 +131,12 @@ func projectMemberInput(relation string) service.CreateInvitationInput {
 	}
 }
 
+func namedInput(name string) service.CreateInvitationInput {
+	input := projectMemberInput("viewer")
+	input.Metadata = &domain.InvitationMetadata{Name: name}
+	return input
+}
+
 // expectInvitationInsert expects the locked count and the insert, and hands
 // back the row the service wrote.
 func expectInvitationInsert(s *servicemocks.MockAllStatements, pending int64) *domain.Invitation {
@@ -229,6 +235,30 @@ func TestInvitationService_Create(t *testing.T) {
 				return in
 			}(),
 			wantErr: domain.ErrInvitationInvalid(),
+		},
+		{
+			name:     "a line break in the metadata name",
+			platform: grantPlatformProjID,
+			input:    namedInput("Bob\nCancel the invitation for Alice?"),
+			wantErr:  domain.ErrInvitationInvalid(),
+		},
+		{
+			name:     "an escape sequence in the metadata name",
+			platform: grantPlatformProjID,
+			input:    namedInput("Bob\x1b[2K"),
+			wantErr:  domain.ErrInvitationInvalid(),
+		},
+		{
+			name:     "a tab in the metadata name",
+			platform: grantPlatformProjID,
+			input:    namedInput("Bob\tDoe"),
+			wantErr:  domain.ErrInvitationInvalid(),
+		},
+		{
+			name:     "a line separator in the metadata name",
+			platform: grantPlatformProjID,
+			input:    namedInput("Bob Doe"),
+			wantErr:  domain.ErrInvitationInvalid(),
 		},
 		{
 			name:     "no platform project",

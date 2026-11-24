@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -569,8 +570,18 @@ func validateCreateInvitation(input *CreateInvitationInput) error {
 		if input.Metadata.Name == "" || len([]rune(input.Metadata.Name)) > invitationMetadataMaxLen {
 			return domain.ErrInvitationInvalid().WithDetails("metadata.name must be 1 to 200 characters")
 		}
+		// The name is shown in other administrators' terminals.
+		if strings.ContainsFunc(input.Metadata.Name, isControlOrLineBreak) {
+			return domain.ErrInvitationInvalid().WithDetails("metadata.name must not contain control characters or line breaks")
+		}
 	}
 	return nil
+}
+
+// isControlOrLineBreak matches control characters and the Unicode line and
+// paragraph separators.
+func isControlOrLineBreak(r rune) bool {
+	return unicode.IsControl(r) || r == ' ' || r == ' '
 }
 
 func (s *InvitationService) encryptMetadata(ctx context.Context, projectID string, metadata *domain.InvitationMetadata) (*string, error) {
