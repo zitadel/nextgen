@@ -234,6 +234,12 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
     for (const warning of prepared.warnings) {
       warnings.report(warning);
     }
+    // Said now, before the steps that can fail or be declined, and kept for a
+    // result that a pipe reads.
+    this.narrate(prepared.notices);
+    const diff = prepared.notices.flatMap((notice, at) => {
+      return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
+    });
     if (!(await this.confirmLockouts(prepared.lockouts))) {
       return this.emit({
         status: "skipped",
@@ -271,9 +277,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
         summary: {
           title,
           sections: [],
-          lines: prepared.notices.flatMap((notice) => {
-            return [...notice.replace(/\n+$/, "").split("\n"), ""];
-          }),
+          lines: diff,
         },
         next: {
           commands: [await again()],
@@ -361,12 +365,7 @@ export default class Deploy extends Destructive(ServerCommand(EnvironmentCommand
       summary: {
         title,
         sections: [],
-        lines: [
-          ...prepared.notices.flatMap((notice) => {
-            return [...notice.replace(/\n+$/, "").split("\n"), ""];
-          }),
-          live,
-        ],
+        lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
       },
       next: {
         commands: [

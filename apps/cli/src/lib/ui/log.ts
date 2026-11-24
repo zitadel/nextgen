@@ -3,8 +3,10 @@ import { format } from "node:util";
 import { writePlain } from "./plain";
 
 /**
- * What a line of narration is. The level decides the mark it carries in a
- * wizard's chain; a normal command draws every level as a plain line.
+ * What a line of narration is. Only `warn` and `fail` are written when stdout is
+ * not a terminal; `debug` is shown under `--debug`, on stderr off a terminal. A
+ * wizard's chain marks an `info` line as a status, and a block of text without
+ * a mark; a normal command draws every level as a plain line.
  */
 export type LogLevel = "info" | "warn" | "fail" | "debug";
 
@@ -16,7 +18,8 @@ export type LogSink = (level: LogLevel, text: string) => void;
  *
  * It names no look: the sink installed by the running command decides whether
  * a line is a chain line with its mark, a plain line, or nothing at all
- * (`--json` installs a sink that draws nothing). Code that logs therefore never
+ * (`--json` installs a sink that draws nothing, and a pipe is given only `warn`
+ * and `fail`). Code that logs therefore never
  * needs to know which kind of command it is running under, or be handed the UI
  * to talk to. With no sink installed, a line is written plainly.
  *

@@ -108,8 +108,8 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
         });
       }
 
-      log.info("The console of this project's server:");
-      log.info(escapeControlCharacters(consoleUrl));
+      log.debug("The console of this project's server:");
+      log.debug(escapeControlCharacters(consoleUrl));
       const skipLaunch = flags.noOpen || this.nonInteractive;
       const opened = skipLaunch ? false : (await openInBrowser(consoleUrl)).opened;
 
@@ -160,8 +160,8 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
     const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
     const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
-    log.info(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
-    log.info(escapeControlCharacters(signInUrl));
+    log.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
+    log.debug(escapeControlCharacters(signInUrl));
     const skipLaunch = flags.noOpen || this.nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
 

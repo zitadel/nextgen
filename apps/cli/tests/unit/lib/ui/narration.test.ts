@@ -3,7 +3,7 @@ import { describe, expect, onTestFinished } from "vitest";
 
 import { it } from "@tests/fixtures";
 import { log } from "@/lib/ui";
-import { MARK } from "@/lib/ui/marks";
+import { GUIDE, MARK } from "@/lib/ui/marks";
 import { Narration } from "@/lib/ui/narration";
 
 /** A chain that collects what was narrated into it, as `mark text`. */
@@ -142,6 +142,17 @@ describe("Narration", () => {
   });
 
   describe("on a terminal", () => {
+    it("draws a block of text in a chain without a mark", ({ terminal }) => {
+      terminal.tty(true);
+      const { chain } = drawn();
+
+      log.info("Using an AI coding agent?\nInstall the skill.");
+
+      expect(chain.lines).toEqual([
+        `${stripAnsi(GUIDE)} Using an AI coding agent?\nInstall the skill.`,
+      ]);
+    });
+
     it("writes a line", ({ terminal }) => {
       terminal.tty(true);
       drawn(new Collected(false));

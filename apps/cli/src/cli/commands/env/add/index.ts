@@ -223,6 +223,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
       });
     }
 
+    log.info(`Adding the ${args.name} environment`);
     const project =
       flags.project === undefined
         ? await new ProjectService(
@@ -251,7 +252,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
     if (flags.project === undefined) {
-      log.info(`Created project ${escapeControlCharacters(project.id)}`);
+      log.debug(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     this.ui.ranAgainst(projectId, server);
@@ -267,7 +268,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await Project.envFile(environment.path).write(values);
-    log.info(`Wrote ${escapeControlCharacters(environment.file)}`);
+    log.debug(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
       {
@@ -575,7 +576,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
           this.narrate(notices);
         },
       });
-      log.info(
+      log.debug(
         `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;

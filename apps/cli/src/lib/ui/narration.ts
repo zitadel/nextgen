@@ -1,5 +1,5 @@
 import { log, type LogLevel } from "./log";
-import { MARK } from "./marks";
+import { GUIDE, MARK } from "./marks";
 import { Output } from "./output";
 import { writePlain } from "./plain";
 import { DrawnSpinner } from "./spinner";
@@ -76,14 +76,17 @@ export class Narration {
     }
     if (!Output.screen && level === "debug") {
       // Diagnostics go beside the answer, so a script reading stdout never gets them.
-      writePlain(level, text);
+      DrawnSpinner.around(() => {
+        process.stderr.write(`${text}\n`);
+      });
       return;
     }
     if (!Output.screen && level !== "warn" && level !== "fail") {
       return;
     }
     if (this.chain.chained) {
-      this.chain.narrate(MARKS[level], text);
+      // A paragraph or a diff is a block, not a status, so it has no mark.
+      this.chain.narrate(level === "info" && text.includes("\n") ? GUIDE : MARKS[level], text);
       return;
     }
     // A line written while a spinner draws would be glued to its frame.

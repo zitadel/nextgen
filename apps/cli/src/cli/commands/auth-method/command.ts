@@ -534,16 +534,19 @@ export abstract class AuthMethodCommand extends Destructive(
     ) {
       Consent.assert(consent);
     }
+    if (change.changed) {
+      log.info("Updating the project's files");
+    }
     const written = await change.save(target.store);
     for (const path of written) {
       if (change.createdPaths.includes(path)) {
-        log.info(`Wrote ${escapeControlCharacters(path)}`);
+        log.debug(`Wrote ${escapeControlCharacters(path)}`);
       } else {
-        log.info(`Updated ${escapeControlCharacters(path)}`);
+        log.debug(`Updated ${escapeControlCharacters(path)}`);
       }
     }
     for (const path of change.removedPaths) {
-      log.info(`Removed ${escapeControlCharacters(path)}`);
+      log.debug(`Removed ${escapeControlCharacters(path)}`);
     }
     return written;
   }
@@ -562,7 +565,7 @@ export abstract class AuthMethodCommand extends Destructive(
       if (notice.severity === "warning") {
         warnings.report(notice.message);
       } else {
-        log.info(escapeControlCharacters(notice.message));
+        log.debug(escapeControlCharacters(notice.message));
       }
     }
   }
@@ -572,18 +575,19 @@ export abstract class AuthMethodCommand extends Destructive(
    * removed, and each notice the configuration gave that is not a warning.
    *
    * @param change - The change.
-   * @param written - The files it wrote.
+   * @param written - The files it wrote; leave it out for a dry run, which says
+   *   what it would remove and writes nothing.
    * @returns The lines, in the order a person reads them.
    */
-  protected said(change: Change, written: readonly string[] = []): string[] {
+  protected said(change: Change, written?: readonly string[]): string[] {
     return [
-      ...written.map((path) => {
+      ...(written ?? []).map((path) => {
         return change.createdPaths.includes(path)
           ? `Wrote ${escapeControlCharacters(path)}`
           : `Updated ${escapeControlCharacters(path)}`;
       }),
       ...change.removedPaths.map((path) => {
-        return `Removed ${escapeControlCharacters(path)}`;
+        return `${written === undefined ? "Would remove" : "Removed"} ${escapeControlCharacters(path)}`;
       }),
       ...change.notices
         .filter((notice) => {

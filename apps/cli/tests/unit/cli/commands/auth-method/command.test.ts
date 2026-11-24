@@ -137,7 +137,7 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
    * @param written - The paths it wrote.
    * @returns The lines.
    */
-  saying(change: Change, written: readonly string[]): string[] {
+  saying(change: Change, written?: readonly string[]): string[] {
     return this.said(change, written);
   }
 
@@ -634,6 +634,15 @@ describe("AuthMethodCommand.write", () => {
     const written = await writer.writeChange(read, change);
 
     expect(writer.saying(change, written)).toEqual([`Removed ${SCHEMA_FILE}`]);
+  });
+
+  it("says it would remove a file the change deletes, when nothing is written", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
+    const read = await target(cwd);
+    const writer = new ChangeWriter([], CONFIG);
+    const change = read.config.schemas.remove(SCHEMA_FILE);
+
+    expect(writer.saying(change)).toEqual([`Would remove ${SCHEMA_FILE}`]);
   });
 
   it("writes the change to the Project", async ({ dir }) => {
