@@ -263,7 +263,8 @@ describe("invitation page", () => {
     stubLookup();
     stubVerb("accept", () =>
       HttpResponse.json(
-        { code: "inv.self_accept", message: "You can't accept your own invitation." },
+        // The server's own wording, which starts in lower case.
+        { code: "inv.self_accept", message: "the inviter cannot accept their own invitation" },
         { status: 409 },
       ),
     );
@@ -271,7 +272,10 @@ describe("invitation page", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Join project" }));
 
-    expect(await screen.findByText("You can't accept your own invitation.")).toBeInTheDocument();
+    // Shown as the start of a sentence; the rest is the server's.
+    expect(
+      await screen.findByText("The inviter cannot accept their own invitation"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Join project" })).toBeEnabled();
     expect(readInvitationToken()).toBe(TOKEN);
     expect(trackEvent).not.toHaveBeenCalled();
