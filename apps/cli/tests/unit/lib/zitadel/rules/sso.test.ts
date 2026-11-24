@@ -610,6 +610,19 @@ describe("SSO_RULES", () => {
         message: `claim_mapping target "email" is not a property of ${NO_EMAIL_PATH}, which list "acme" in sso.providers`,
       },
       {
+        rule: "sso/empty-verified-claims",
+        severity: "warning",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email", phone: "phone" },
+            verified_claims: { phone: true },
+          }),
+          { schemas: twoSchemas() },
+        ),
+        file: FLOW_PATH,
+        message: `verified_claims of "acme" (${CONNECTION_PATH}) names nothing ${SCHEMA_PATH} defines`,
+      },
+      {
         rule: "sso/orphaned-mapping-target",
         severity: "error",
         documents: agreeing(
@@ -734,6 +747,28 @@ describe("SSO_RULES", () => {
         documents: agreeing(anOidcConnection({ claim_mapping: { emial: "email" } }), {
           schemas: twoSchemas(),
         }),
+      },
+      { rule: "sso/empty-verified-claims", documents: agreeing(ACME) },
+      {
+        rule: "sso/empty-verified-claims",
+        documents: agreeing(
+          anOidcConnection({ claim_mapping: { email: "email" }, verified_claims: { email: true } }),
+        ),
+      },
+      {
+        rule: "sso/empty-verified-claims",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email", phone: "phone" },
+            verified_claims: { phone: true },
+            provisioning: { creation: "disabled" },
+          }),
+          { schemas: twoSchemas() },
+        ),
+      },
+      {
+        rule: "sso/empty-verified-claims",
+        documents: agreeing(anOidcConnection({ verified_claims: { emial: true } })),
       },
       { rule: "sso/inert-connection", documents: agreeing(ACME) },
       {
