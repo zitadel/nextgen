@@ -131,6 +131,16 @@ describe("Progress", () => {
       expect(stripAnsi(terminal.shown()).startsWith("┌")).toBe(true);
     });
 
+    it("narrates nothing when nobody is watching and stdout is not a terminal", async ({
+      terminal,
+    }) => {
+      terminal.tty(false);
+
+      await new Progress(chain(false)).run("Fetching users", async () => {});
+
+      expect(terminal.shown()).toBe("");
+    });
+
     it("narrates as plain lines when nobody is watching", async ({ terminal }) => {
       terminal.tty(true);
       await new Progress(chain(false)).run("Fetching users", async (report) => {

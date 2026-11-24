@@ -5,7 +5,6 @@ import { Once } from "@/lib/once";
 import { stripColumnMarks } from "./layout";
 import { log as cliLog } from "./log";
 import { GUIDE, MARK } from "./marks";
-import { Output } from "./output";
 import { DrawnSpinner } from "./spinner";
 
 /**
@@ -209,16 +208,13 @@ export class Progress {
   }
 
   /**
-   * Says one line of a run nobody is watching, in the chain with its mark. A
-   * pipe is given the result, not the progress, and `--json` is given neither.
+   * Says one line of a run nobody is watching, in the chain with its mark, or
+   * as a plain line outside a chain.
    *
    * @param symbol - The mark the line carries in a chain.
    * @param text - The line.
    */
   private narrate(symbol: string, text: string): void {
-    if (Output.json || !Output.screen) {
-      return;
-    }
     if (this.drawing.chained) {
       this.drawing.narrate(symbol, text);
       return;
