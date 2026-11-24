@@ -19,7 +19,7 @@ It prints `Local Zitadel server is ready.` (`Local Zitadel server is already run
 
 By default the runtime starts with the platform project and a local admin, `admin@zitadel.localhost`, so you exist on your own server without signing up. The admin's password is generated, kept in `.zitadel/local/admin.json`, and never printed. Projects that `zitadel setup --server local` creates are attached to the admin's team, so they are owned from the start. A project is created first and claimed later, which attaches it to a team ([Claim](/docs/concepts/project-team-user#claim)).
 
-Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, or pinning another project, starts a bare server with neither. That also disables project claim and invitations; invitation create then answers `inv.platform_required` ([Access and memberships](/docs/concepts/access-and-memberships#the-platform-project-and-claiming)).
+Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, or pinning another project, starts a bare server with neither. That also disables project claim and invitations; invitation create then answers `inv.platform_required` ([Access and memberships](/docs/concepts/access-and-memberships#project-access)).
 
 The runtime keeps its state in the directory you started it in:
 

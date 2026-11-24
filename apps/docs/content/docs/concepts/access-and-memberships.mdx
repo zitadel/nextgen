@@ -3,72 +3,18 @@ title: Access and memberships
 description: How people get project roles through owning teams, grants and invitations, and how team membership differs from user lifecycle ownership.
 ---
 
-Two kinds of membership sit side by side in Zitadel. **Project membership** is who can administer or read a [project](/docs/concepts/project-team-user#project). **Team membership** is which [users](/docs/concepts/project-team-user#user) belong to a [team](/docs/concepts/project-team-user#team) inside a project. This page explains both. The guides show the commands.
+Two kinds of membership sit side by side in Zitadel. **Project membership** is who can administer or read a [project](/docs/concepts/project-team-user#project). **Team membership** is which [users](/docs/concepts/project-team-user#user) belong to a [team](/docs/concepts/project-team-user#team) inside a project. [Manage project access](/docs/guides/manage-project-access) shows the commands.
 
-## The platform project and claiming
+## Project access
 
-Console accounts and the teams that own customer projects live in a reserved **platform project**. A customer project must be [claimed](/docs/concepts/project-team-user#claim) before it can invite collaborators or create grants when the server has a platform project. Claim attaches an owning team. Local `zitadel setup --server local` claims against the local admin's team automatically. Hosted projects use `zitadel claim`.
+Console accounts and the teams that own customer projects live in a reserved **platform project**. A customer project must be [claimed](/docs/concepts/project-team-user#claim) before it can invite collaborators or create grants when the server has a platform project. Claim attaches an owning team. Today every active member of that team inherits `admin` on the project.
 
-A server started with `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` has no platform project. Invitations then fail with `inv.platform_required`, and claim is unavailable the same way.
+A project role is one of `viewer`, `editor`, or `admin`. Roles are additive: `admin` includes `editor`, and `editor` includes `viewer`. The strongest role wins when several paths apply. Roles are project-scoped, not per origin or environment.
 
-## Project roles
-
-A project role is one of `viewer`, `editor`, or `admin`. Roles are additive and monotonic: `admin` includes `editor`, and `editor` includes `viewer`. When several paths grant roles to the same person, the strongest role wins. Roles are project-scoped. They are not per origin or per environment.
-
-| Role | Typical use |
-| --- | --- |
-| `viewer` | Read project data and configuration |
-| `editor` | Change configuration and users the project manages |
-| `admin` | Manage grants, invitations, and other admin-only actions |
-
-## How project access is granted
-
-Three paths can give someone a project role. Effective access is their union.
-
-### Owning team
-
-Claim attaches an owning team to the project. Today every active member of that team inherits `admin`. That access is not a grant you can revoke with `DELETE /grants`. It ends only when the person leaves the team. Safeguards block deleting the last active member of an owning team (`proj.last_owner`) and deactivating a team that still owns a project (`team.owns_project`).
-
-### Direct and team grants
-
-A [grant](/docs/reference/api/grants) binds a user or a team to `viewer`, `editor`, or `admin` on a project. A team grant covers every active member of that team. When someone leaves the team, their access through that grant ends. Optional `expires_at` stops authorizing after that time; the row still holds the unique binding until you revoke it, so create the same binding again only after `deleteGrant`.
-
-There is no operation to change a grant's role in place. Revoke and create again, or add a stronger grant and let the strongest role win.
-
-### Effective members
-
-`GET /projects/{project_id}/members` lists each person once with their strongest role and the `sources` that produced it (`owning_team` or `grant`, direct or via a team). Prefer that list when you need every role. `GET /projects/{project_id}/admins` returns only admins and remains available while the console uses it.
-
-### Platform operators
-
-A deployment can configure platform operators who hold standing `admin` on every project. That access comes from server configuration, not from a project grant, and those people do not appear in the project's members list.
-
-## Invitations
-
-An [invitation](/docs/reference/api/invitations) is a 72-hour bearer link of the form `{console}/invitations/accept#token=…`. Whoever opens it while signed in on the platform project can accept or decline the offered role. Links are unaddressed: you share them out of band. There is no email or SMS delivery yet.
-
-Optional `metadata.name` (1–200 characters, encrypted at rest) only reminds administrators who a link was meant for. It is never matched against an account or email. On accept the metadata is cleared. On decline it stays until the invitation is cancelled or replaced. Audit events never carry the token or the metadata.
-
-### Lifecycle
-
-An invitation starts as `pending`. It becomes `accepted` or `rejected`, or is treated as `expired` once `expires_at` passes. Cancel deletes a `pending` or `rejected` invitation. Replace (`replaces_invitation_id`) deletes any unaccepted original in the same transaction, keeps `journey_id`, and carries forward metadata when the new request omits it. Accepted invitations cannot be cancelled or replaced.
-
-### Security invariants
-
-- The cleartext token appears only in the create response. The server stores a SHA-256 hash.
-- The token stays in the URL fragment or POST body, never in the query string.
-- The creator cannot accept or decline their own invitation (`inv.self_accept`, `inv.self_reject`).
-- Accept re-checks that the creator still has project `admin`, unless the invitation was created with a project secret (`created_by` null).
-- A project may hold at most 100 pending unexpired invitations.
-
-### Scope today
-
-Only `type: "project_member"` with `relation` `viewer`, `editor`, or `admin` is implemented. `type: "team_member"` is reserved in the contract and answers `501` `not_implemented`.
+Besides the owning team, access comes from [grants](/docs/reference/api/grants) and [invitations](/docs/reference/api/invitations). A grant binds a user or a team on the platform project to a role. An invitation is a 72-hour shareable link that offers a role to whoever opens it while signed in; you share the link out of band. Effective members are the union of these paths. A deployment can also configure platform operators with standing `admin` on every project; they are not listed as project members.
 
 ## Team memberships vs. lifecycle ownership
 
-A team membership is a many-to-many roster entry inside a project. Statuses are `pending`, `active`, and `inactive`. Removed rows are omitted from reads. Membership answers "is this user in this team right now?"
+A team membership is a roster entry inside a project: whether a user belongs to that team right now. [User lifecycle ownership](/docs/concepts/project-team-user#user) is separate: which team may deprovision the user. Belonging to a team does not give that team lifecycle control over a self-owned user.
 
-[User lifecycle ownership](/docs/concepts/project-team-user#user) is separate. `metadata.lifecycle_owner_team_id` names which team may deprovision the user (ADR 024). Belonging to a team does not give that team lifecycle control over a self-owned user.
-
-Today memberships are created when you create a user with `POST /users?team_id=…`, or when the platform bootstraps a personal team for a console account. You read them with `GET /users/{user_id}/teams`, `GET /users/me/teams`, and `POST /users/query` filtered by `team_id`. There is no standalone endpoint yet to add an existing user to a team, remove a membership without deleting the user, or invite someone into a team.
+Today a membership is created when you create a user with a team, or when the platform bootstraps a personal team for a console account. There is no standalone endpoint yet to add or remove an existing user from a team, or to invite someone into a team.
