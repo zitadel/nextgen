@@ -144,7 +144,7 @@ Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `src/components/typography.ts`.
 
 - `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
-  and section title, the project page's Project Detail, Origins and Variables
+  and section title, the project page's Project details, Origins and Variables
   and Secrets cards included. `DetailSection` renders it as an `h2`; so do
   Field definitions, a login flow's User schema, Release content and the
   settings sections.

@@ -88,7 +88,9 @@ describe("project variables", () => {
     // A plain value is shown in full and copyable, per kind.
     const id = within(idRow!);
     expect(id.getByText("Variable")).toBeInTheDocument();
-    expect(id.getByText("prod-client-123")).toBeInTheDocument();
+    // A value is set in the monospace face; the name beside it is not.
+    expect(id.getByText("prod-client-123")).toHaveClass("font-mono");
+    expect(id.getByText("GOOGLE_CLIENT_ID")).not.toHaveClass("font-mono");
     expect(
       id.getByRole("button", { name: "Copy GOOGLE_CLIENT_ID primary value" }),
     ).toBeInTheDocument();
