@@ -447,80 +447,41 @@ func (c *MockFlowAuthAttemptServiceHandoffCall) DoAndReturn(f func(context.Conte
 	return c
 }
 
-// IssuePasskeyChallenge mocks base method.
-func (m *MockFlowAuthAttemptService) IssuePasskeyChallenge(ctx context.Context, in domain.FlowIssuePasskeyChallengeInput) (domain.FlowPasskeyChallengeOutput, error) {
+// IssueChallenge mocks base method.
+func (m *MockFlowAuthAttemptService) IssueChallenge(ctx context.Context, in domain.FlowIssueChallengeInput) (domain.FlowIssuedChallenge, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IssuePasskeyChallenge", ctx, in)
-	ret0, _ := ret[0].(domain.FlowPasskeyChallengeOutput)
+	ret := m.ctrl.Call(m, "IssueChallenge", ctx, in)
+	ret0, _ := ret[0].(domain.FlowIssuedChallenge)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// IssuePasskeyChallenge indicates an expected call of IssuePasskeyChallenge.
-func (mr *MockFlowAuthAttemptServiceMockRecorder) IssuePasskeyChallenge(ctx, in any) *MockFlowAuthAttemptServiceIssuePasskeyChallengeCall {
+// IssueChallenge indicates an expected call of IssueChallenge.
+func (mr *MockFlowAuthAttemptServiceMockRecorder) IssueChallenge(ctx, in any) *MockFlowAuthAttemptServiceIssueChallengeCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IssuePasskeyChallenge", reflect.TypeOf((*MockFlowAuthAttemptService)(nil).IssuePasskeyChallenge), ctx, in)
-	return &MockFlowAuthAttemptServiceIssuePasskeyChallengeCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IssueChallenge", reflect.TypeOf((*MockFlowAuthAttemptService)(nil).IssueChallenge), ctx, in)
+	return &MockFlowAuthAttemptServiceIssueChallengeCall{Call: call}
 }
 
-// MockFlowAuthAttemptServiceIssuePasskeyChallengeCall wrap *gomock.Call
-type MockFlowAuthAttemptServiceIssuePasskeyChallengeCall struct {
+// MockFlowAuthAttemptServiceIssueChallengeCall wrap *gomock.Call
+type MockFlowAuthAttemptServiceIssueChallengeCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockFlowAuthAttemptServiceIssuePasskeyChallengeCall) Return(arg0 domain.FlowPasskeyChallengeOutput, arg1 error) *MockFlowAuthAttemptServiceIssuePasskeyChallengeCall {
+func (c *MockFlowAuthAttemptServiceIssueChallengeCall) Return(arg0 domain.FlowIssuedChallenge, arg1 error) *MockFlowAuthAttemptServiceIssueChallengeCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowAuthAttemptServiceIssuePasskeyChallengeCall) Do(f func(context.Context, domain.FlowIssuePasskeyChallengeInput) (domain.FlowPasskeyChallengeOutput, error)) *MockFlowAuthAttemptServiceIssuePasskeyChallengeCall {
+func (c *MockFlowAuthAttemptServiceIssueChallengeCall) Do(f func(context.Context, domain.FlowIssueChallengeInput) (domain.FlowIssuedChallenge, error)) *MockFlowAuthAttemptServiceIssueChallengeCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowAuthAttemptServiceIssuePasskeyChallengeCall) DoAndReturn(f func(context.Context, domain.FlowIssuePasskeyChallengeInput) (domain.FlowPasskeyChallengeOutput, error)) *MockFlowAuthAttemptServiceIssuePasskeyChallengeCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// IssuePasskeyRegistrationChallenge mocks base method.
-func (m *MockFlowAuthAttemptService) IssuePasskeyRegistrationChallenge(ctx context.Context, in domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IssuePasskeyRegistrationChallenge", ctx, in)
-	ret0, _ := ret[0].(domain.FlowPasskeyRegistrationChallengeOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IssuePasskeyRegistrationChallenge indicates an expected call of IssuePasskeyRegistrationChallenge.
-func (mr *MockFlowAuthAttemptServiceMockRecorder) IssuePasskeyRegistrationChallenge(ctx, in any) *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IssuePasskeyRegistrationChallenge", reflect.TypeOf((*MockFlowAuthAttemptService)(nil).IssuePasskeyRegistrationChallenge), ctx, in)
-	return &MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall{Call: call}
-}
-
-// MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall wrap *gomock.Call
-type MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall) Return(arg0 domain.FlowPasskeyRegistrationChallengeOutput, arg1 error) *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall) Do(f func(context.Context, domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error)) *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall) DoAndReturn(f func(context.Context, domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error)) *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall {
+func (c *MockFlowAuthAttemptServiceIssueChallengeCall) DoAndReturn(f func(context.Context, domain.FlowIssueChallengeInput) (domain.FlowIssuedChallenge, error)) *MockFlowAuthAttemptServiceIssueChallengeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -603,83 +564,6 @@ func (c *MockFlowAuthAttemptServiceSubmitIdentifierCall) DoAndReturn(f func(cont
 	return c
 }
 
-// SubmitPasskey mocks base method.
-func (m *MockFlowAuthAttemptService) SubmitPasskey(ctx context.Context, in domain.FlowSubmitPasskeyInput) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubmitPasskey", ctx, in)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SubmitPasskey indicates an expected call of SubmitPasskey.
-func (mr *MockFlowAuthAttemptServiceMockRecorder) SubmitPasskey(ctx, in any) *MockFlowAuthAttemptServiceSubmitPasskeyCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitPasskey", reflect.TypeOf((*MockFlowAuthAttemptService)(nil).SubmitPasskey), ctx, in)
-	return &MockFlowAuthAttemptServiceSubmitPasskeyCall{Call: call}
-}
-
-// MockFlowAuthAttemptServiceSubmitPasskeyCall wrap *gomock.Call
-type MockFlowAuthAttemptServiceSubmitPasskeyCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockFlowAuthAttemptServiceSubmitPasskeyCall) Return(userID string, err error) *MockFlowAuthAttemptServiceSubmitPasskeyCall {
-	c.Call = c.Call.Return(userID, err)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockFlowAuthAttemptServiceSubmitPasskeyCall) Do(f func(context.Context, domain.FlowSubmitPasskeyInput) (string, error)) *MockFlowAuthAttemptServiceSubmitPasskeyCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowAuthAttemptServiceSubmitPasskeyCall) DoAndReturn(f func(context.Context, domain.FlowSubmitPasskeyInput) (string, error)) *MockFlowAuthAttemptServiceSubmitPasskeyCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// SubmitPasskeyRegistration mocks base method.
-func (m *MockFlowAuthAttemptService) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubmitPasskeyRegistration", ctx, in)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SubmitPasskeyRegistration indicates an expected call of SubmitPasskeyRegistration.
-func (mr *MockFlowAuthAttemptServiceMockRecorder) SubmitPasskeyRegistration(ctx, in any) *MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitPasskeyRegistration", reflect.TypeOf((*MockFlowAuthAttemptService)(nil).SubmitPasskeyRegistration), ctx, in)
-	return &MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall{Call: call}
-}
-
-// MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall wrap *gomock.Call
-type MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall) Return(arg0 error) *MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall) Do(f func(context.Context, domain.FlowSubmitPasskeyRegistrationInput) error) *MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall) DoAndReturn(f func(context.Context, domain.FlowSubmitPasskeyRegistrationInput) error) *MockFlowAuthAttemptServiceSubmitPasskeyRegistrationCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // SubmitPassword mocks base method.
 func (m *MockFlowAuthAttemptService) SubmitPassword(ctx context.Context, in domain.FlowSubmitPasswordInput) error {
 	m.ctrl.T.Helper()
@@ -714,6 +598,45 @@ func (c *MockFlowAuthAttemptServiceSubmitPasswordCall) Do(f func(context.Context
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockFlowAuthAttemptServiceSubmitPasswordCall) DoAndReturn(f func(context.Context, domain.FlowSubmitPasswordInput) error) *MockFlowAuthAttemptServiceSubmitPasswordCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// VerifyChallenge mocks base method.
+func (m *MockFlowAuthAttemptService) VerifyChallenge(ctx context.Context, in domain.FlowVerifyChallengeInput) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyChallenge", ctx, in)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// VerifyChallenge indicates an expected call of VerifyChallenge.
+func (mr *MockFlowAuthAttemptServiceMockRecorder) VerifyChallenge(ctx, in any) *MockFlowAuthAttemptServiceVerifyChallengeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyChallenge", reflect.TypeOf((*MockFlowAuthAttemptService)(nil).VerifyChallenge), ctx, in)
+	return &MockFlowAuthAttemptServiceVerifyChallengeCall{Call: call}
+}
+
+// MockFlowAuthAttemptServiceVerifyChallengeCall wrap *gomock.Call
+type MockFlowAuthAttemptServiceVerifyChallengeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowAuthAttemptServiceVerifyChallengeCall) Return(userID string, err error) *MockFlowAuthAttemptServiceVerifyChallengeCall {
+	c.Call = c.Call.Return(userID, err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowAuthAttemptServiceVerifyChallengeCall) Do(f func(context.Context, domain.FlowVerifyChallengeInput) (string, error)) *MockFlowAuthAttemptServiceVerifyChallengeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowAuthAttemptServiceVerifyChallengeCall) DoAndReturn(f func(context.Context, domain.FlowVerifyChallengeInput) (string, error)) *MockFlowAuthAttemptServiceVerifyChallengeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
