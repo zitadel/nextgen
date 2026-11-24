@@ -1,5 +1,17 @@
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 
+/**
+ * A flow step offers sso_providers although the schema it is pinned to does not enable SSO.
+ *
+ * @remarks
+ * Why it matters: The step offers buttons the schema's authentication methods do not allow, so they
+ * cannot work.
+ *
+ * Fix: Enable sso as an authentication method in the schema, or remove sso_providers from the step.
+ *
+ * Origin: #1703 (Flow enables SSO, issue #1044); moved to the CLI by #2889;
+ * docs/design/idp/2-auth-method-selection.md#validation-rules.
+ */
 export const FLOW_ENABLES_SSO: Rule = defineRule({
   id: "sso/flow-enables-sso",
   severity: "error",

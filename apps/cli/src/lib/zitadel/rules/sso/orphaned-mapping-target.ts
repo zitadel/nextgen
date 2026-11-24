@@ -2,6 +2,21 @@ import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { didYouMean } from "@/lib/zitadel/utils/spelling";
 import { quote, readableProperties, standing, unreadable } from "@/lib/zitadel/rules/sso/shared";
 
+/**
+ * A claim_mapping row maps into a property that no schema listing the connection defines.
+ *
+ * @remarks
+ * Why it matters: The mapping is never read, which usually means a mistyped property name.
+ *
+ * Reported once: Judged only for a connection some schema lists, since one no schema lists has
+ * nothing to be judged against. The message names the property it most likely meant, and what
+ * follows from the typo is not reported again.
+ *
+ * Fix: Fix the property name, or remove the row.
+ *
+ * Origin: #1703 (Orphaned Mapping Target, issue #1044); moved to the CLI by #2889;
+ * docs/design/idp/1-resource-model.md#validator-rules.
+ */
 export const ORPHANED_MAPPING_TARGET: Rule = defineRule({
   id: "sso/orphaned-mapping-target",
   severity: "error",
@@ -19,8 +34,7 @@ export const ORPHANED_MAPPING_TARGET: Rule = defineRule({
     return fact.entry.connection.path;
   },
   says: (fact) => {
-    // What a mistyped name could have meant: the properties of the schemas
-    // that list this connection, less the ones already mapped.
+    // Candidates for the typo: the schemas' properties not already mapped.
     const nameable = readableProperties(fact.entry).filter((name) => {
       return !fact.entry.connection.maps(name);
     });

@@ -30,6 +30,25 @@ function unroutedOutcomes(config: ZitadelConfig, step: Step): readonly ProviderO
   });
 }
 
+/**
+ * A flow step that offers sso_providers does not route every outcome of a provider sign-in.
+ *
+ * @remarks
+ * Why it matters: A sign-in that ends in an outcome with no transition has nowhere to go, so the
+ * user is stranded at that step.
+ *
+ * Reported once: A step that offers only providers that never create users needs only
+ * sso_authenticated, since such a provider never returns an unknown identity. A user_already_exists
+ * transition that carries an action is followed by nothing, so the message asks for the action to
+ * be removed.
+ *
+ * Fix: Add a transition for each outcome named, and remove the action from a user_already_exists
+ * transition.
+ *
+ * Origin: #1703 (Full outcome routing, issue #1044, with the engine's outcome names
+ * sso_authenticated and sso_user_not_found); moved to the CLI by #2889;
+ * docs/design/idp/2-auth-method-selection.md#validation-rules and 1-resource-model.md#provisioning.
+ */
 export const OUTCOME_ROUTING: Rule = defineRule({
   id: "sso/outcome-routing",
   severity: "error",

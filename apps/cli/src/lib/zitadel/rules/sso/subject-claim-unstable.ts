@@ -8,12 +8,26 @@ import { quote, standing } from "@/lib/zitadel/rules/sso/shared";
  */
 const MUTABLE_SUBJECTS: ReadonlySet<string> = new Set(["login", "username"]);
 
+/**
+ * The subject_claim of a connection is a profile claim or an account name that the user can change.
+ *
+ * @remarks
+ * Why it matters: Identity keys on the subject, so if the value changes the user is signed in as a
+ * stranger, or the next holder of the value inherits the account. It is only a warning because the
+ * connection works until the value changes.
+ *
+ * Reported once: Only before the first deploy of the connection. The server keeps a connection's
+ * subject once it has it, so the advice could not be followed after.
+ *
+ * Fix: Use a claim that never changes, such as sub, or a provider-specific one such as oid.
+ *
+ * Origin: #2889; the Mutable Subject Claim of #1083;
+ * docs/design/idp/2-auth-method-selection.md#validation-rules and
+ * 1-resource-model.md#validator-rules.
+ */
 export const SUBJECT_CLAIM_UNSTABLE: Rule = defineRule({
   id: "sso/subject-claim-unstable",
   severity: "warning",
-  // Identity keys on the subject, so it has to be a value that never
-  // changes. Only before the first deploy: the server keeps a connection's
-  // subject once it has it, so the advice could not be followed after.
   each: (config) => {
     return standing(config).flatMap((entry) => {
       const subject = entry.connection.subjectClaim;

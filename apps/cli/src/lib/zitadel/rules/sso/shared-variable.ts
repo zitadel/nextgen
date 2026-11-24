@@ -1,5 +1,20 @@
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 
+/**
+ * Two connections name the same project variable for a client id or a client secret.
+ *
+ * @remarks
+ * Why it matters: One connection's value would overwrite the other's, so one provider signs in with
+ * the other's credentials.
+ *
+ * Reported once: Reported on the later file only, naming the file that first uses the variable and
+ * which of its fields does.
+ *
+ * Fix: Give each connection its own variable.
+ *
+ * Origin: #1703 (part of #1043); moved to the CLI by #2889;
+ * docs/design/idp/4-cli-provider-setup.md.
+ */
 export const SHARED_VARIABLE: Rule = defineRule({
   id: "sso/shared-variable",
   severity: "error",
