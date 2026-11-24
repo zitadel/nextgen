@@ -1,0 +1,10 @@
+{"t": 2.065, "o": "\u2819"}
+{"t": 2.145, "o": "\u001b[1G"}
+{"t": 2.145, "o": "\u001b[0K\u2839"}
+{"t": 2.225, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 2.246, "o": "\u001b[1G"}
+{"t": 2.246, "o": "\u001b[0K"}
+{"t": 4.554, "o": "\u001b[2mProcess\u001b[22m   81132\r\n\u001b[2mAPI    \u001b[22m   http://localhost:8080\r\n\u001b[2mConsole\u001b[22m   http://localhost:8080/ui/console/\r\n\u001b[2mData   \u001b[22m   ~/myapp/.zitadel/local/nextgen-data\r\n\r\n\u001b[1mNext:\u001b[22m\r\n  Create an app with authentication. Run setup in this directory or a subdirectory.\r\n  Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.\r\n  When a sign-in or a request fails, the server's log says why: run npx @zitadel/cli@0.9.0 logs --follow in another terminal to watch it.\r\n  \u001b[2m$\u001b[22m \u001b[1m\u001b[36mnpx @zitadel/cli@0.9.0 setup --server local\u001b[39m\u001b[22m\r\n\r\n\u001b[2mLocal Zitadel server is ready \u00b7 on localhost:8080\u001b[22m\r\n"}
+{"t": 4.564, "o": "\u2819"}
+{"t": 4.564, "o": "\u001b[1G\u001b[0K"}
+{"t": 4.569, "exit": 0}

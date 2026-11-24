@@ -1,0 +1,26 @@
+{"t": 0, "epoch": 1795546142.4687412}
+{"t": 0.076, "o": "\r\n> myapp@0.1.0 dev\r\n> next dev --port 3000\r\n\r\n"}
+{"t": 0.395, "o": "\u001b[1m\u001b[38;2;173;127;168m\u25b2 Next.js 16.4.6\u001b[39m\u001b[22m (Turbopack)\r\n"}
+{"t": 0.395, "o": "- Local:         http://localhost:3000\r\n"}
+{"t": 0.396, "o": "- Network:       http://192.168.1.20:3000\r\n"}
+{"t": 0.396, "o": "- Environments: .env.development.local, .env.local\r\n"}
+{"t": 0.396, "o": "\u001b[32m\u001b[1m\u2713\u001b[22m\u001b[39m Ready in 144ms\r\n"}
+{"t": 0.901, "o": "\u001b[32m\u001b[1m\u2713\u001b[22m\u001b[39m Running next.config.ts took 504ms\r\n"}
+{"t": 2.732, "o": "- Cache Components enabled\r\n"}
+{"t": 2.732, "o": "- Partial Prefetching enabled\r\n"}
+{"t": 2.732, "o": "\r\n"}
+{"t": 3.738, "o": " GET /register \u001b[32m200\u001b[39m in 1002ms\u001b[2m (next.js: 929ms, proxy.ts: 18ms, application-code: 55ms)\u001b[22m\r\n"}
+{"t": 38.509, "o": " GET /register \u001b[32m200\u001b[39m in 26ms\u001b[2m (next.js: 6ms, proxy.ts: 2ms, application-code: 18ms)\u001b[22m\r\n"}
+{"t": 54.982, "o": " GET /register \u001b[32m200\u001b[39m in 28ms\u001b[2m (next.js: 11ms, proxy.ts: 1.5ms, application-code: 15ms)\u001b[22m\r\n"}
+{"t": 58.03, "o": " GET /profile \u001b[32m200\u001b[39m in 184ms\u001b[2m (next.js: 162ms, proxy.ts: 3ms, application-code: 18ms)\u001b[22m\r\n"}
+{"t": 191.856, "o": " GET /login \u001b[32m200\u001b[39m in 94ms\u001b[2m (next.js: 78ms, proxy.ts: 1.5ms, application-code: 15ms)\u001b[22m\r\n"}
+{"t": 279.848, "o": " GET /login \u001b[32m200\u001b[39m in 17ms\u001b[2m (next.js: 3ms, proxy.ts: 1.1ms, application-code: 13ms)\u001b[22m\r\n"}
+{"t": 306.446, "o": " GET /login \u001b[32m200\u001b[39m in 21ms\u001b[2m (next.js: 6ms, proxy.ts: 1.3ms, application-code: 13ms)\u001b[22m\r\n"}
+{"t": 339.95, "o": " GET /login \u001b[32m200\u001b[39m in 14ms\u001b[2m (next.js: 1.4ms, proxy.ts: 1.0ms, application-code: 12ms)\u001b[22m\r\n"}
+{"t": 359.481, "o": " GET /login \u001b[32m200\u001b[39m in 20ms\u001b[2m (next.js: 5ms, proxy.ts: 1.1ms, application-code: 14ms)\u001b[22m\r\n"}
+{"t": 394.523, "o": "\u001b[?25h"}
+{"t": 394.524, "o": "\r\n"}
+{"t": 394.527, "o": "\u2819"}
+{"t": 394.528, "o": "\u001b[1G"}
+{"t": 394.528, "o": "\u001b[0K"}
+{"t": 394.53, "exit": 143}

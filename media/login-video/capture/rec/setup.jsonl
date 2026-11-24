@@ -1,0 +1,215 @@
+{"t": 1.52, "o": "\u2819"}
+{"t": 1.602, "o": "\u001b[1G"}
+{"t": 1.602, "o": "\u001b[0K\u2839"}
+{"t": 1.681, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 1.763, "o": "\u001b[1G\u001b[0K"}
+{"t": 1.763, "o": "\u283c"}
+{"t": 1.79, "o": "\u001b[1G\u001b[0K"}
+{"t": 2.11, "o": "\u001b[90m\u250c\u001b[39m  Setting up Zitadel\r\n"}
+{"t": 2.11, "o": "\u001b[?25l"}
+{"t": 2.11, "o": "\u001b[90m\u2502\u001b[39m\r\n"}
+{"t": 2.111, "o": "\u001b[?25h"}
+{"t": 2.111, "o": "\u001b[32m\u2714\u001b[39m  Fresh app directory \u2014 setup scaffolds a new project\r\n"}
+{"t": 2.114, "o": "\u001b[?25l\u001b[90m\u2502\u001b[39m\r\n\u001b[36m\u25c6\u001b[39m  Which fields should registration collect? You can change them later.\r\n\u001b[36m\u2502\u001b[39m  \u001b[32m\u25cf\u001b[39m Email only\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u25cb\u001b[22m \u001b[2mEmail, first name and last name\u001b[22m\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u25cb\u001b[22m \u001b[2mEmail, first name, last name and company name\u001b[22m\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u2191/\u2193\u001b[22m to navigate \u2022 \u001b[2mEnter:\u001b[22m confirm\r\n\u001b[36m\u2514\u001b[39m\r\n"}
+{"t": 2.939, "i": "\r"}
+{"t": 2.94, "o": "\u001b[999D\u001b[7A"}
+{"t": 2.941, "o": "\u001b[1B\u001b[J\u001b[32m\u25c7\u001b[39m  Which fields should registration collect? You can change them later.\r\n\u001b[90m\u2502\u001b[39m  \u001b[2mEmail only\u001b[22m"}
+{"t": 2.941, "o": "\r\n"}
+{"t": 2.941, "o": "\u001b[?25h"}
+{"t": 2.941, "o": "\u001b[?25l\u001b[90m\u2502\u001b[39m\r\n\u001b[36m\u25c6\u001b[39m  Which sign-in method would you like your users to see first?\r\n\u001b[36m\u2502\u001b[39m  \u001b[32m\u25cf\u001b[39m Email and password, with passkeys enabled but not shown at sign-in\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u25cb\u001b[22m \u001b[2mPasskey, with email and password shown as the alternative\u001b[22m\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u2191/\u2193\u001b[22m to navigate \u2022 \u001b[2mEnter:\u001b[22m confirm\r\n\u001b[36m\u2514\u001b[39m\r\n"}
+{"t": 3.756, "i": "\r"}
+{"t": 3.757, "o": "\u001b[999D\u001b[6A\u001b[1B\u001b[J\u001b[32m\u25c7\u001b[39m  Which sign-in method would you like your users to see first?\r\n\u001b[90m\u2502\u001b[39m  \u001b[2mEmail and password, with passkeys enabled but not shown at sign-in\u001b[22m"}
+{"t": 3.757, "o": "\r\n"}
+{"t": 3.757, "o": "\u001b[?25h"}
+{"t": 3.758, "o": "\u001b[?25l"}
+{"t": 3.759, "o": "\u001b[90m\u2502\u001b[39m\r\n\u001b[36m\u25c6\u001b[39m  Which minimum length should passwords have? You can change it later.\r\n\u001b[36m\u2502\u001b[39m  \u001b[32m\u25cf\u001b[39m 15 characters \u2014 recommended \u001b[2m(NIST minimum for password-only sign-in)\u001b[22m\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u25cb\u001b[22m \u001b[2m8 characters\u001b[22m\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u25cb\u001b[22m \u001b[2mNo minimum\u001b[22m\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u2191/\u2193\u001b[22m to navigate \u2022 \u001b[2mEnter:\u001b[22m confirm\r\n\u001b[36m\u2514\u001b[39m\r\n"}
+{"t": 4.569, "i": "\r"}
+{"t": 4.57, "o": "\u001b[999D\u001b[7A"}
+{"t": 4.57, "o": "\u001b[1B\u001b[J\u001b[32m\u25c7\u001b[39m  Which minimum length should passwords have? You can change it later.\r\n\u001b[90m\u2502\u001b[39m  \u001b[2m15 characters \u2014 recommended\u001b[22m\r\n"}
+{"t": 4.571, "o": "\u001b[?25h"}
+{"t": 4.572, "o": "\u001b[?25l\u001b[90m\u2502\u001b[39m\r\n\u001b[36m\u25c6\u001b[39m  Which external sign-in providers would you like to add? Use Space to select and Enter to continue.\r\n\u001b[36m\u2502\u001b[39m  \u001b[36m\u25fb\u001b[39m Google \u2014 requires a Google OAuth app\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u25fb\u001b[22m \u001b[2mAnother OpenID Connect (OIDC) provider \u2014 requires provider configuration\u001b[22m\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u2191/\u2193\u001b[22m to navigate \u2022 \u001b[2mSpace:\u001b[22m select \u2022 \u001b[2mEnter:\u001b[22m confirm\r\n\u001b[36m\u2514\u001b[39m\r\n"}
+{"t": 5.392, "i": "\r"}
+{"t": 5.393, "o": "\u001b[999D\u001b[6A"}
+{"t": 5.393, "o": "\u001b[1B\u001b[J\u001b[32m\u25c7\u001b[39m  Which external sign-in providers would you like to add? Use Space to select and Enter to continue.\r\n\u001b[90m\u2502\u001b[39m  \u001b[2mnone\u001b[22m\r\n"}
+{"t": 5.394, "o": "\u001b[?25h"}
+{"t": 5.394, "o": "\u001b[?25l\u001b[90m\u2502\u001b[39m\r\n\u001b[36m\u25c6\u001b[39m  Would you like to continue without setting up SSO?\r\n\u001b[36m\u2502\u001b[39m  \u001b[2m\u25cb\u001b[22m \u001b[2mYes\u001b[22m \u001b[2m/\u001b[22m \u001b[32m\u25cf\u001b[39m No\r\n\u001b[36m\u2514\u001b[39m\r\n"}
+{"t": 6.199, "i": "\u001b[D\r"}
+{"t": 6.2, "o": "\u001b[999D\u001b[4A"}
+{"t": 6.2, "o": "\u001b[2B"}
+{"t": 6.2, "o": "\u001b[2K\u001b[G\u001b[36m\u2502\u001b[39m  \u001b[32m\u25cf\u001b[39m Yes \u001b[2m/\u001b[22m \u001b[2m\u25cb\u001b[22m \u001b[2mNo\u001b[22m"}
+{"t": 6.2, "o": "\u001b[2B"}
+{"t": 6.2, "o": "\u001b[999D\u001b[4A"}
+{"t": 6.2, "o": "\u001b[1B\u001b[J\u001b[32m\u25c7\u001b[39m  Would you like to continue without setting up SSO?\r\n\u001b[90m\u2502\u001b[39m  \u001b[2mYes\u001b[22m"}
+{"t": 6.2, "o": "\r\n"}
+{"t": 6.201, "o": "\u001b[?25h"}
+{"t": 6.24, "o": "\u001b[?25l"}
+{"t": 6.24, "o": "\u001b[90m\u2502\u001b[39m\r\n"}
+{"t": 9.849, "o": "\u001b[35m\u25d2\u001b[39m  Scaffolding a new next project"}
+{"t": 9.854, "o": "\u001b[1G\u001b[J\u001b[?25h"}
+{"t": 9.854, "o": "\u001b[32m\u2714\u001b[39m  Scaffolded next skeleton\r\n"}
+{"t": 9.862, "o": "\u001b[?25l"}
+{"t": 9.862, "o": "\u001b[90m\u2502\u001b[39m\r\n"}
+{"t": 9.874, "o": "\u001b[?25h"}
+{"t": 9.875, "o": "\u001b[32m\u2714\u001b[39m  Created project proj_01M87E6RQC42M3X8T4Y3RW3KV7\r\n"}
+{"t": 9.875, "o": "\u001b[?25l"}
+{"t": 9.875, "o": "\u001b[90m\u2502\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[?25h"}
+{"t": 9.892, "o": "\u001b[32m\u2714\u001b[39m  Patched 38 files (1 unchanged)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the project's .gitignore additions (\u001b[36m.gitignore\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the local project secret (\u001b[36m.zitadel/secret\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the Zitadel project configuration (\u001b[36mzitadel.json\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the .env example template (\u001b[36m.env.example\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the local development environment variables (\u001b[36m.env.local\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the environment variables the CLI reads (\u001b[36m.env.development.local\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the scaffold state file (\u001b[36m.zitadel/state.json\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the agent guidance (golden journey + config dialect) (\u001b[36mAGENTS.md\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the README's Zitadel section (\u001b[36mREADME.md\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the home page redirect (\u001b[36mapp/page.tsx\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the login page (\u001b[36mapp/login/page.tsx\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the registration page (\u001b[36mapp/register/page.tsx\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the profile page (\u001b[36mapp/profile/page.tsx\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote \u001b[36mapp/login/layout.tsx\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote \u001b[36mapp/register/layout.tsx\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote \u001b[36mapp/profile/layout.tsx\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the Next.js proxy (\u001b[36mproxy.ts\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the web-component type declarations (\u001b[36mcustom-elements.d.ts\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote package.json with the SDK dependency (\u001b[36mpackage.json\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the flow dialect spec (editor $schema) (\u001b[36m.zitadel/meta/flow-definition.json\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the user-schema dialect spec (\u001b[36m.zitadel/meta/user-schema.json\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the user-property dialect spec (\u001b[36m.zitadel/meta/user-property.json\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote \u001b[36m.zitadel/meta/property-name.json\u001b[39m\r\n\u001b[90m\u2502\u001b[39m  Wrote \u001b[36m.zitadel/meta/auth-methods.json\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote \u001b[36m.zitadel/meta/auth-method.json\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote \u001b[36m.zitadel/meta/sso-auth-method.json\u001b[39m\r\n\u001b[90m\u2502\u001b[39m  Wrote \u001b[36m.zitadel/meta/idp-connection.json\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the branding dialect spec (\u001b[36m.zitadel/meta/branding.json\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the policy dialect spec (editor $schema) (\u001b[36m.zitadel/meta/policy.json\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote \u001b[36m.zitadel/meta/policy-test.json\u001b[39m\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the zitadel.json spec (editor $schema) (\u001b[36m.zitadel/meta/project.json\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Left .zitadel unchanged (already matches target)\r\n\u001b[90m\u2502\u001b[39m  Wrote the editable default human user schema (\u001b[36m.zitadel/schemas/default-human-user.json\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the editable default login flow (\u001b[36m.zitadel/flows/default-login.json\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the editable password policy (\u001b[36m.zitadel/policies/auth.factor.password.set.json\u001b[39m)\r\n"}
+{"t": 9.892, "o": "\u001b[90m\u2502\u001b[39m  Wrote the editable sign-up policy (\u001b[36m.zitadel/policies/user.create.json\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the schemas folder README (\u001b[36m.zitadel/schemas/README.md\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the flows folder README (\u001b[36m.zitadel/flows/README.md\u001b[39m)\r\n\u001b[90m\u2502\u001b[39m  Wrote the policies folder README (\u001b[36m.zitadel/policies/README.md\u001b[39m)\r\n"}
+{"t": 9.894, "o": "\u001b[36m\u2139\u001b[39m  Installing dependencies with npm install\r\n"}
+{"t": 11.643, "o": "\u2819"}
+{"t": 11.724, "o": "\u001b[1G"}
+{"t": 11.724, "o": "\u001b[0K\u2839"}
+{"t": 11.804, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 11.885, "o": "\u001b[1G"}
+{"t": 11.885, "o": "\u001b[0K\u283c"}
+{"t": 11.966, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 12.13, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 12.211, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 12.292, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 12.398, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 12.478, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 12.559, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 12.645, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 12.724, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 12.804, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 12.885, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 12.977, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 13.057, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 13.138, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 13.219, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 13.303, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 13.384, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 13.464, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 13.546, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 13.647, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 13.729, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 13.81, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 13.892, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 13.971, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 14.052, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 14.133, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 14.213, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 14.293, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 14.405, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 14.486, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 14.568, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 14.652, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 14.78, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 14.859, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 14.94, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 15.028, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 15.107, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 15.188, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 15.268, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 15.348, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 15.429, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 15.51, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 15.594, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 15.675, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 15.755, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 15.836, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 15.918, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 15.997, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 16.089, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 16.17, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 16.251, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 16.334, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 16.472, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 16.584, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 16.836, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 16.918, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 16.999, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 17.106, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 17.906, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 17.986, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 18.066, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 18.146, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 18.226, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 18.306, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 18.387, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 18.466, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 18.51, "o": "\u001b[1G\u001b[0K\u001b[1mnpm\u001b[22m \u001b[33mwarn\u001b[39m \u001b[94mdeprecated\u001b[39m eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.\r\n"}
+{"t": 18.51, "o": "\u280b"}
+{"t": 18.59, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 18.67, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 18.75, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 18.83, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 18.91, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 18.99, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 19.07, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 19.15, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 19.23, "o": "\u001b[1G\u001b[0K\u280f"}
+{"t": 19.31, "o": "\u001b[1G\u001b[0K\u280b"}
+{"t": 19.39, "o": "\u001b[1G\u001b[0K\u2819"}
+{"t": 19.47, "o": "\u001b[1G\u001b[0K\u2839"}
+{"t": 19.55, "o": "\u001b[1G\u001b[0K\u2838"}
+{"t": 19.63, "o": "\u001b[1G\u001b[0K\u283c"}
+{"t": 19.71, "o": "\u001b[1G\u001b[0K\u2834"}
+{"t": 19.79, "o": "\u001b[1G\u001b[0K\u2826"}
+{"t": 19.87, "o": "\u001b[1G\u001b[0K\u2827"}
+{"t": 19.96, "o": "\u001b[1G\u001b[0K\u2807"}
+{"t": 19.978, "o": "\u001b[1G\u001b[0K\r\nadded 389 packages, and audited 390 packages in 10s\r\n"}
+{"t": 19.978, "o": "\u2807\u001b[1G\u001b[0K\r\n\u2807"}
+{"t": 19.978, "o": "\u001b[1G\u001b[0K"}
+{"t": 19.978, "o": "152 packages are looking for funding\r\n\u2807"}
+{"t": 19.978, "o": "\u001b[1G\u001b[0K"}
+{"t": 19.978, "o": "  run `npm fund` for details\r\n\u2807"}
+{"t": 19.979, "o": "\u001b[1G\u001b[0K"}
+{"t": 19.979, "o": "\r\nfound \u001b[32m\u001b[1m0\u001b[22m\u001b[39m vulnerabilities\r\n"}
+{"t": 19.979, "o": "\u2807"}
+{"t": 19.979, "o": "\u001b[1G"}
+{"t": 19.979, "o": "\u001b[0K"}
+{"t": 20.018, "o": "\u001b[36m\u2139\u001b[39m  Installed dependencies\r\n"}
+{"t": 20.019, "o": "\u001b[?25l"}
+{"t": 20.019, "o": "\u001b[90m\u2502\u001b[39m\r\n"}
+{"t": 20.098, "o": "\u001b[35m\u25d2\u001b[39m  Committing the scaffolded project"}
+{"t": 20.179, "o": "\u001b[1G\u001b[J"}
+{"t": 20.179, "o": "\u001b[35m\u25d0\u001b[39m  Committing the scaffolded project"}
+{"t": 20.195, "o": "\u001b[1G\u001b[J\u001b[?25h"}
+{"t": 20.195, "o": "\u001b[32m\u2714\u001b[39m  Committed the project as a71ef14\r\n"}
+{"t": 20.195, "o": "\u001b[?25l"}
+{"t": 20.195, "o": "\u001b[90m\u2502\u001b[39m\r\n"}
+{"t": 20.224, "o": "\u001b[?25h"}
+{"t": 20.224, "o": "\u001b[32m\u2714\u001b[39m  Deployed sha256:1d595d5411b7 to 1 origin\r\n"}
+{"t": 20.289, "o": "\u001b[?25l\u001b[90m\u2502\u001b[39m\r\n"}
+{"t": 20.289, "o": "\u001b[?25h"}
+{"t": 20.289, "o": "\u001b[32m\u2714\u001b[39m  Project owned by admin@zitadel.localhost (team team_localadmin)\r\n"}
+{"t": 20.293, "o": "\u001b[90m\u2502\u001b[39m\r\n\u001b[90m\u2514\u001b[39m  Set up Zitadel in this app\r\n\r\n"}
+{"t": 20.295, "o": "\r\n \u001b[32m\u256d\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32mSummary\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u256e\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                    "}
+{"t": 20.295, "o": "                         \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1mDetected\u001b[22m                                                                   \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mFramework\u001b[22m   Next.js 16.4.6 \u001b[2m\u00b7\u001b[22m TypeScript \u001b[2m\u00b7\u001b[22m npm                              \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mScaffold \u001b[22m   new project                                                    \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1mInstalled\u001b[22m                                                                  \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mPackage      \u001b[22m   @zitadel/sdk-next \u001b[2m(\u001b[22m\u001b[36mpackage.json\u001b[39m\u001b[2m)\u001b[22m                           \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mHome redirect\u001b[22m   \u001b[36mapp/page.tsx\u001b[39m                                               \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mLogin page   \u001b[22m   \u001b[36mapp/login/page.tsx\u001b[39m                                         \u001b[32m\u2502\u001b[39m\r\n \u001b[32"}
+{"t": 20.295, "o": "m\u2502\u001b[39m  \u001b[2mRegister page\u001b[22m   \u001b[36mapp/register/page.tsx\u001b[39m                                      \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mProfile page \u001b[22m   \u001b[36mapp/profile/page.tsx\u001b[39m                                       \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mRequest proxy\u001b[22m   \u001b[36mproxy.ts\u001b[39m                                                   \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mEnv vars     \u001b[22m   \u001b[36m.env.local\u001b[39m                                                 \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1mSign-in\u001b[22m                                                                    \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mStarts with \u001b[22m   password                                                    \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mMethods     \u001b[22m   password, passkey                                           \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mRegistration\u001b[22m   email                                 "}
+{"t": 20.295, "o": "                      \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mPasswords   \u001b[22m   at least 15 characters                                      \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1mCustomize\u001b[22m                                                                  \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mUser schema    \u001b[22m   \u001b[36m.zitadel/schemas/\u001b[39m \u001b[2m(\u001b[22msee its README.md\u001b[2m)\u001b[22m                    \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mLogin flow     \u001b[22m   \u001b[36m.zitadel/flows/\u001b[39m \u001b[2m(\u001b[22msee its README.md\u001b[2m)\u001b[22m                      \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mPassword policy\u001b[22m   \u001b[36m.zitadel/policies/\u001b[39m \u001b[2m(\u001b[22msee its README.md\u001b[2m)\u001b[22m                   \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1mProject\u001b[22m                                                                    \u001b[32m\u2502\u001b[39m\r\n "}
+{"t": 20.296, "o": "\u001b[32m\u2502\u001b[39m  \u001b[2mProject id  \u001b[22m   proj_01M87E6RQC42M3X8T4Y3RW3KV7                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mServer      \u001b[22m   \u001b[36mhttp://localhost:8080\u001b[39m                                       \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mApp will run\u001b[22m   \u001b[36mhttp://localhost:3000\u001b[39m                                       \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  Start your project (then open http://localhost:3000/register):             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1m\u001b[36m  npm run dev\u001b[39m\u001b[22m                                                              \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  Verify auth in the browser: register a user, sign out, sign in again with  \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  the same user, and confirm /profile shows Signed in.                       \u001b[32m\u2502\u001b[39m\r\n \u001b[32"}
+{"t": 20.296, "o": "m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  The dev server keeps its terminal busy. Open a second terminal in this     \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  directory for further commands.                                            \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  Once login works, this shows your next steps:                              \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1m\u001b[36m  npx @zitadel/cli@0.9.0 status --env-file .env.development.local\u001b[39m\u001b[22m          \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  Customizing the login is covered in your README's Zitadel section.         \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  Manage the project in the local console,"}
+{"t": 20.296, "o": " signed in as                      \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  admin@zitadel.localhost:                                                   \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1m\u001b[36m  npx @zitadel/cli@0.9.0 console\u001b[39m\u001b[22m                                           \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  Add social sign-in, such as Google, whenever you are ready:                \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1m\u001b[36m  npx @zitadel/cli@0.9.0 auth-method sso enable --provider google \\\u001b[39m\u001b[22m        \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1m\u001b[36m  --env-file .env.development.local\u001b[39m\u001b[22m                                        \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  Explore all commands:                                                      \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[1m\u001b[36m  npx @zitadel/cli@0.9.0\u001b[39m\u001b[22m          "}
+{"t": 20.296, "o": "                                         \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mUsing project proj_01M87E6RQC42M3X8T4Y3RW3KV7 on your local Zitadel\u001b[22m        \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m  \u001b[2mserver at localhost:8080.\u001b[22m                                                  \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2502\u001b[39m                                                                             \u001b[32m\u2502\u001b[39m\r\n \u001b[32m\u2570\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m"}
+{"t": 20.296, "o": "\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u2500\u001b[39m\u001b[32m\u256f\u001b[39m\r\n\r\n"}
+{"t": 20.312, "o": "\u2819"}
+{"t": 20.312, "o": "\u001b[1G"}
+{"t": 20.313, "o": "\u001b[0K"}
+{"t": 20.317, "exit": 0}

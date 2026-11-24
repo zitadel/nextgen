@@ -1,0 +1,186 @@
+{
+ "email_submit_to_password_step_s": 0.068,
+ "signup_submit_to_profile_s": 0.607,
+ "shots": [
+  {
+   "file": "000-register-empty.png",
+   "label": "register-empty",
+   "at": 0.854,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "001-email-typing.png",
+   "label": "email-typing",
+   "at": 0.937,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "002-email-typing.png",
+   "label": "email-typing",
+   "at": 1.002,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "003-email-typing.png",
+   "label": "email-typing",
+   "at": 1.066,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "004-email-typing.png",
+   "label": "email-typing",
+   "at": 1.133,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "005-email-typing.png",
+   "label": "email-typing",
+   "at": 1.201,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "006-email-typing.png",
+   "label": "email-typing",
+   "at": 1.267,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "007-email-typing.png",
+   "label": "email-typing",
+   "at": 1.334,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "008-email-typing.png",
+   "label": "email-typing",
+   "at": 1.401,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "009-email-typing.png",
+   "label": "email-typing",
+   "at": 1.467,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "010-email-typing.png",
+   "label": "email-typing",
+   "at": 1.533,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "011-email-typing.png",
+   "label": "email-typing",
+   "at": 1.6,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "012-email-typing.png",
+   "label": "email-typing",
+   "at": 1.667,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "013-email-typing.png",
+   "label": "email-typing",
+   "at": 1.733,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "014-email-typing.png",
+   "label": "email-typing",
+   "at": 1.8,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "015-email-typing.png",
+   "label": "email-typing",
+   "at": 1.864,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "016-email-typing.png",
+   "label": "email-typing",
+   "at": 1.914,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "017-email-typing.png",
+   "label": "email-typing",
+   "at": 1.964,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "018-email-typing.png",
+   "label": "email-typing",
+   "at": 2.016,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "019-email-typing.png",
+   "label": "email-typing",
+   "at": 2.08,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "020-email-typing.png",
+   "label": "email-typing",
+   "at": 2.132,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "021-email-typing.png",
+   "label": "email-typing",
+   "at": 2.199,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "022-email-typing.png",
+   "label": "email-typing",
+   "at": 2.268,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "023-email-typing.png",
+   "label": "email-typing",
+   "at": 2.334,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "024-email-typing.png",
+   "label": "email-typing",
+   "at": 2.398,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "025-email-submitted.png",
+   "label": "email-submitted",
+   "at": 2.452,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "026-password-empty.png",
+   "label": "password-empty",
+   "at": 2.551,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "027-password-filled.png",
+   "label": "password-filled",
+   "at": 2.62,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "028-signup-pending.png",
+   "label": "signup-pending",
+   "at": 2.684,
+   "url": "http://localhost:3000/register"
+  },
+  {
+   "file": "029-profile.png",
+   "label": "profile",
+   "at": 3.59,
+   "url": "http://localhost:3000/profile"
+  }
+ ]
+}

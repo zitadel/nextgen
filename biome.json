@@ -27,7 +27,8 @@
       "!**/dist",
       "!**/out-tsc",
       "!**/.nuxt-typecheck",
-      "!**/conformance/fixtures"
+      "!**/conformance/fixtures",
+      "!media/login-video/data"
     ]
   },
   "formatter": {

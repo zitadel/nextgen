@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Login in a minute</title>
+<style>
+  @font-face { font-family: "Futural"; src: url("../../apps/website/app/fonts/APK-Futural-Regular.woff2") format("woff2"); }
+  @font-face { font-family: "Arimo"; src: url("../../apps/website/app/fonts/Arimo-latin.woff2") format("woff2"); font-weight: 400 700; }
+  @font-face { font-family: "Azeret Mono"; src: url("../../apps/website/app/fonts/AzeretMono-Medium-latin.woff2") format("woff2"); }
+
+  :root {
+    --bg: #0f0f11; --fg: #f4f4f6; --fg2: #bfbfcf; --muted: #82829c; --accent: #f25543; --accent-soft: #fa9e93; --purple: #6a4cc2; --lilac: #bba5e4;
+    --window: #141417; --bar: #18181c; --edge: rgb(255 255 255 / 0.08);
+    --ok: #5fd99a; --warn: #f2b04b; --bad: #f25543;
+    --sans: "Arimo", Arial, sans-serif; --head: "Futural", Arial, sans-serif; --mono: "Azeret Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+  .abs { position: absolute; }
+  /* The brand's gradient light: orange fading into black (Lightbox guidelines, Gradient Light). */
+  .glow { position: absolute; left: -10%; right: -10%; bottom: -52%; height: 95%; border-radius: 50%;
+    background: radial-gradient(closest-side, rgb(242 85 67 / 0.5), rgb(189 37 20 / 0.22) 50%, transparent 100%);
+    filter: blur(70px); }
+  /* The brand's purple light from above (website accent #6a4cc2, gradient start #401889). */
+  .glow2 { position: absolute; left: -18%; top: -62%; width: 82%; height: 112%; border-radius: 50%;
+    background: radial-gradient(closest-side, rgb(106 76 194 / 0.55), rgb(64 24 137 / 0.26) 55%, transparent 100%);
+    filter: blur(80px); }
+  /* The brand's noise texture, as a soft background layer. */
+  #noise { position: absolute; inset: 0; opacity: 0.09; mix-blend-mode: soft-light; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='256' height='256' filter='url(%23n)'/></svg>"); }
+  /* The cover's fan of gradient blades. */
+  #fan { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  #fan .blade { position: absolute; left: 0; top: 0; width: 980px; height: 250px; margin-top: -125px; border-radius: 26px; transform-origin: 0 50%;
+    background: linear-gradient(to right, rgb(15 15 17 / 0) 0%, rgb(15 15 17 / 0) 22%, rgb(189 37 20 / 0.55) 62%, #f25543 100%); }
+
+  .window { position: absolute; background: var(--window); border: 1px solid var(--edge); border-radius: 14px; overflow: hidden;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 30px 80px -30px rgb(0 0 0 / 0.9); }
+  .bar { height: 44px; background: var(--bar); border-bottom: 1px solid var(--edge); display: flex; align-items: center; padding: 0 16px; gap: 8px; position: relative; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #3a3a40; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .bar .title { position: absolute; left: 0; right: 0; text-align: center; font: 14px var(--mono); color: var(--muted); pointer-events: none; }
+
+  #term { left: 96px; top: 196px; width: calc(104ch + 48px); font: 18px/1.46 var(--mono); }
+  #title { z-index: 20; }
+  #term pre { padding: 18px 24px; height: calc(24 * 1.46em + 36px); white-space: pre; font: inherit; color: #d9d9e3; }
+  #term .prompt { color: var(--accent-soft); } #term .cmd { color: #fff; }
+  #term .g { color: #5fd99a; } #term .c { color: #67d4e8; } #term .gr { color: #7b7b92; } #term .m { color: #d39bf0; }
+  #term .y { color: #f2c94b; } #term .r { color: #ff7a6b; } #term .bl { color: #7aa7ff; } #term .b { font-weight: 700; color: #fff; } #term .d { opacity: 0.6; }
+  #term .cursor { display: inline-block; width: 0.6em; height: 1.1em; vertical-align: -0.2em; background: #e9e9f0; }
+
+  #browser { left: 340px; top: 178px; width: 1240px; height: 780px; }
+  #browser .url { position: absolute; left: 50%; transform: translateX(-50%); width: 46%; height: 28px; border-radius: 8px; background: #0e0e10; border: 1px solid var(--edge);
+    font: 14px/28px var(--mono); color: var(--fg2); text-align: center; }
+  #browser .view { position: absolute; left: 0; right: 0; top: 44px; bottom: 0; overflow: hidden; background: #050505; }
+  #browser .view img { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #browser .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgb(255 255 255 / 0.15); border-top-color: #fff; }
+
+  /* The build clock: a quiet timestamp. It turns orange when the user is signed in. */
+  #clock { right: 72px; top: 54px; text-align: right; }
+  #clock .label { font: 13px var(--mono); letter-spacing: 0.14em; color: var(--muted); }
+  #clock .badge { margin-left: 12px; color: var(--lilac); letter-spacing: 0.06em; }
+  #clock .time { font: 38px/1.15 var(--mono); color: rgb(244 244 246 / 0.78); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  #clock.done .time { color: var(--accent); }
+
+  .caption { position: absolute; left: 0; right: 0; text-align: center; font: 36px/1.3 var(--sans); color: var(--fg); text-shadow: 0 2px 20px rgb(0 0 0 / 0.8); }
+  .caption em { font-style: normal; color: var(--accent); }
+  .big { font-family: var(--head); font-size: 76px; line-height: 1.1; letter-spacing: -0.01em; }
+
+  .callout { position: absolute; left: 1424px; width: 440px; padding: 20px 24px; border-radius: 14px; background: rgb(20 20 23 / 0.8); border: 1px solid var(--edge); }
+  .callout h3 { font: 15px var(--mono); letter-spacing: 0.14em; color: var(--accent); text-transform: uppercase; margin-bottom: 12px; }
+  .callout div { font: 20px/1.6 var(--mono); color: #e8e8f0; white-space: nowrap; }
+  .callout div span { color: var(--muted); }
+
+
+  .chips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .chip { font: 21px var(--mono); padding: 9px 16px; border-radius: 999px; border: 1px solid var(--edge); background: rgb(255 255 255 / 0.04); color: #e8e8f0; white-space: nowrap; }
+
+  #end { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  #end .logo { height: 92px; }
+  #end .line { font: 56px var(--head); margin-top: 34px; }
+  #end .cmdpill { margin-top: 34px; font: 30px var(--mono); padding: 16px 30px; border-radius: 14px; background: #141417; border: 1px solid var(--edge); }
+  #end .cmdpill span { color: var(--muted); }
+  #end .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 1840px; margin-top: 34px; }
+  #end .row .chip { font-size: 19px; padding: 7px 14px; color: var(--fg2); }
+  #end .row.agents .chip { color: #fff; border-color: rgb(242 85 67 / 0.5); }
+  #end .rowlabel { font: 15px var(--mono); letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; margin-top: 30px; }
+
+  #montage img { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+  #k2 { position: absolute; left: 160px; top: 510px; height: 100px; color: var(--fg); display: flex; gap: 0.28em; white-space: nowrap; }
+  #k2a { white-space: nowrap; }
+  #k2w { position: relative; height: 100px; overflow: hidden; }
+  #k2in { display: block; color: var(--accent); white-space: nowrap; }
+  /* The one caption style: a label top left, on the terminal's left edge. */
+  .label { top: 62px; left: 96px; right: auto; text-align: left; font: 50px/1.12 var(--head); padding: 8px 24px 12px; border-radius: 16px;
+    background: rgb(10 10 14 / 0.62); backdrop-filter: blur(6px); white-space: nowrap; text-shadow: none; }
+  /* The website's hero Lottie (zitadel-litebox.vercel.app/cms/homepage-hero-opt.json), played frame by frame. */
+  /* Gradient shapes from the guidelines: a rosette for the turn, a stack of rings for the close. */
+  #rosette { position: absolute; left: 1110px; top: 210px; width: 660px; height: 660px; overflow: visible; }
+  #stack { position: absolute; left: 1520px; top: 380px; width: 340px; height: 430px; overflow: visible; }
+  #bigDial { position: absolute; left: 0; top: 0; width: 470px; height: 470px; overflow: visible; transform-origin: 50% 50%; }
+  #montageCap .step { font: 26px var(--mono); color: var(--lilac); margin-right: 16px; vertical-align: 7px; }
+  #heroArt { position: absolute; left: 0; top: 0; width: 550px; height: 448px; transform-origin: 0 0; mix-blend-mode: lighten;
+    -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%); }
+  .lefty { left: 160px !important; right: auto !important; text-align: left !important; }
+  .endlogo { height: 104px; overflow: visible; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="glow" id="glow"></div>
+  <div class="glow2" id="glow2"></div>
+  <div id="noise"></div>
+  <div id="fan"></div>
+  <svg id="rosette" viewBox="-330 -330 660 660"></svg>
+  <svg id="bigDial" viewBox="-50 -50 100 100"></svg>
+  <img id="heroArt" alt="" />
+
+  <div id="title" class="caption big abs lefty" style="top: 470px">Give us a minute.</div>
+
+  <div id="term" class="window">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title">~/myapp</span></div>
+    <pre id="termText"></pre>
+  </div>
+
+  <div id="calloutPages" class="callout" style="top: 300px"><h3>Your pages</h3>
+    <div>app/login/page.tsx</div><div>app/register/page.tsx</div><div>app/profile/page.tsx</div></div>
+  <div id="calloutConfig" class="callout" style="top: 520px"><h3 style="color: var(--lilac)">Your config</h3>
+    <div>.zitadel/schemas/<span> who users are</span></div><div>.zitadel/flows/<span> how they sign in</span></div><div>.zitadel/policies/<span> the rules</span></div></div>
+
+  <div id="browser" class="window">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="url" id="url">localhost:3000/register</span></div>
+    <div class="view" id="view"><img id="shotA" alt="" /><div class="loading" id="loading"><div class="spinner" id="spin"></div></div></div>
+  </div>
+
+  <div id="montage" class="abs" style="inset:0;overflow:hidden">
+    <img id="mA" alt="" /><img id="mB" alt="" /><div id="flash"></div>
+  </div>
+  <div id="montageCap" class="caption label"></div>
+
+  <div id="kinetic" class="abs" style="inset:0">
+    <div id="k1" class="caption big lefty" style="top: 400px">You own the whole experience.</div>
+    <svg id="stack" viewBox="-170 -350 340 430"></svg>
+    <div id="k2" class="big"><span id="k2a">Zitadel owns the</span><span id="k2w"><span id="k2in"></span></span></div>
+  </div>
+
+  <div id="caption" class="caption label"></div>
+  <div id="midcap" class="caption big lefty" style="top: 452px"></div>
+
+  <div id="black" class="abs" style="inset:0;background:#000;z-index:50"></div>
+  <div id="clock" class="abs"><div class="label"><span id="clockLabel">BUILD TIME</span><span id="clockBadge" class="badge"></span></div><div class="time" id="clockTime">0:00.0</div></div>
+
+  <div id="end" class="abs">
+    <svg class="endlogo" id="endLogo" viewBox="0 0 495 122"></svg>
+    <div class="line">Your login, in under a minute.</div>
+    <div class="cmdpill"><span>$ </span>npx @zitadel/cli@latest start</div>
+    <div class="rowlabel">Your framework</div>
+    <div class="row" id="frameworks"></div>
+    <div class="rowlabel">Your agent</div>
+    <div class="row agents" id="agents"></div>
+  </div>
+</div>
+<script src="data/terminal.js"></script>
+<script src="data/logo.js"></script>
+<script src="timeline.js"></script>
+</body>
+</html>

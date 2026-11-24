@@ -1,0 +1,3 @@
+audio/*
+!audio/track.mp3
+out/
