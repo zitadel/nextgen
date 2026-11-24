@@ -99,6 +99,18 @@ get:
       description: Only events of this HTTP request ID.
       schema:
         type: string
+    - name: release_id
+      in: query
+      description: |
+        Only events of requests served by this release, such as one variant of
+        an A/B test of the sign-in.
+      schema:
+        type: string
+    - name: deployment_id
+      in: query
+      description: Only events of requests served by this deployment.
+      schema:
+        type: string
     - name: fingerprint
       in: query
       description: Only events with this device fingerprint ID.

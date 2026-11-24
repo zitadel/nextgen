@@ -89,7 +89,10 @@ same TX (shared `request_id`).
 ### SIEM join path
 
 Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
-`client_id`, `token_id`, `actor_id`, `entity_id`, `user_id`.
+`client_id`, `token_id`, `actor_id`, `entity_id`, `user_id`. An event emitted
+while a deployment served the request also carries `deployment_id`,
+`release_id` and `target` (the origin that resolved it), so events filter by
+the configuration they ran on.
 
 Path A `request.api` may also carry observed requestor context on metadata
 (`ip`, `user_agent`, `origin` under `client`). Join Path B mutations to that

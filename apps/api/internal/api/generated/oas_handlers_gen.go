@@ -12940,6 +12940,14 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 					In:   "query",
 				}: params.RequestID,
 				{
+					Name: "release_id",
+					In:   "query",
+				}: params.ReleaseID,
+				{
+					Name: "deployment_id",
+					In:   "query",
+				}: params.DeploymentID,
+				{
 					Name: "fingerprint",
 					In:   "query",
 				}: params.Fingerprint,
