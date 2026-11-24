@@ -131,11 +131,9 @@ function row(name: string) {
   return within(screen.getByRole("row", { name: new RegExp(name) }));
 }
 
-/** The heading row's button; an empty table draws a second one under it. */
+/** The tabs' row button, the only one on the page. */
 function inviteButton(): HTMLElement {
-  const [button] = screen.getAllByRole("button", { name: "Invite member" });
-  if (!button) throw new Error("No Invite member button on screen.");
-  return button;
+  return screen.getByRole("button", { name: "Invite member" });
 }
 
 async function openMenu(name: string) {
@@ -283,11 +281,17 @@ describe("project invitations", () => {
     await waitFor(() => expect(reads.length).toBeGreaterThan(before));
   });
 
-  it("offers to invite from the empty state", async () => {
+  it("shows the empty card with no action or guide link of its own", async () => {
     stubPage();
     const section = await openInvitations();
-    expect(section.getByText("No invitations yet")).toBeInTheDocument();
-    await userEvent.click(section.getByRole("button", { name: "Invite member" }));
+    expect(section.getByRole("heading", { name: "No invitations yet" })).toBeInTheDocument();
+    expect(
+      section.getByText("Create a link to invite someone to this project."),
+    ).toBeInTheDocument();
+    expect(section.queryByRole("button")).not.toBeInTheDocument();
+    expect(section.queryByRole("link")).not.toBeInTheDocument();
+    // Inviting stays on the tabs' row.
+    await userEvent.click(inviteButton());
     expect(await screen.findByRole("dialog", { name: "Invite member" })).toBeInTheDocument();
   });
 
