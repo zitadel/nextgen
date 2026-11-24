@@ -248,7 +248,7 @@ func TestSignupProofSpentOnMutationFailure(t *testing.T) {
 		project := ensureProject(t, d.stmts)
 		flow, err := d.stmts.NewManagedID(string(domain.PrefixFlow))
 		require.NoError(t, err)
-		state := &domain.FlowState{ProjectID: project, ID: flow, FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: domain.CollectedAuthMethodData{Password: "a password"}}}}
+		state := &domain.FlowState{ProjectID: project, ID: flow, FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "a password"}}}}
 		protection := signupService(t, d)
 		challenge, err := protection.Challenge(t.Context(), state)
 		require.NoError(t, err)

@@ -129,7 +129,9 @@ describe("COMMANDS", () => {
     it("are in none of the rows the commands command prints", async () => {
       const listed = await runCliForTest(["commands", "--json"]);
 
-      const rows = LISTED_ROWS.parse(parseJson(listed.stdout));
+      const rows = LISTED_ROWS.parse(
+        (parseJson(listed.stdout) as { data: { result: unknown } }).data.result,
+      );
       expect(
         rows.filter((row) => {
           return ANSWERED.has(row.id);

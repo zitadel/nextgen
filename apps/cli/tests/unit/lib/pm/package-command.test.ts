@@ -1,9 +1,11 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PM, type PMName } from "@/lib/pm";
+import { Output } from "@/lib/ui";
+import { test } from "@tests/fixtures";
 import { scratchDir } from "@tests/fixtures/scratch";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -82,5 +84,45 @@ describe("PackageCommand.run with its output captured", () => {
 
     expect(error).toMatchObject({ output: expect.stringContaining("to stdout") });
     expect(error).toMatchObject({ output: expect.stringContaining("to stderr") });
+  });
+});
+
+describe("PackageCommand.run with the output option left out", () => {
+  afterEach(() => {
+    Output.settle({ json: false, color: false });
+  });
+
+  /**
+   * A project whose `talk` script prints a line to stdout.
+   */
+  async function talkingProject(): Promise<string> {
+    const dir = await tempProject();
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "demo", scripts: { talk: `node -e "console.log('to stdout')"` } }),
+    );
+    return dir;
+  }
+
+  test("moves the command's stdout to stderr when the run answers in JSON", async ({
+    terminal,
+  }) => {
+    Output.settle({ json: true, color: false });
+    const dir = await talkingProject();
+
+    await PM.named("npm").script("talk").run({ cwd: dir, env: process.env });
+
+    expect(terminal.errors()).toContain("to stdout");
+  });
+
+  test("leaves the command's stdout alone when the run does not answer in JSON", async ({
+    terminal,
+  }) => {
+    Output.settle({ json: false, color: false });
+    const dir = await talkingProject();
+
+    await PM.named("npm").script("talk").run({ cwd: dir, env: process.env });
+
+    expect(terminal.errors()).not.toContain("to stdout");
   });
 });

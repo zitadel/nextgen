@@ -4,7 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { PREVIEW_PATTERN, PREVIEW_URL } from "@tests/helpers/records";
 import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
+import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/cli/core";
 
 const platform = usePlatformMock();
 
@@ -111,6 +111,22 @@ describe("preview list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "list", "--fields", "origin", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("fails naming the preview credential when it is not set", async () => {
         const app = await anApp();
         await app.bindEnvironment("preview", {
@@ -160,6 +176,7 @@ describe("preview list", () => {
             title: "No previews found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -186,6 +203,7 @@ describe("preview list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -217,6 +235,7 @@ describe("preview list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -243,6 +262,7 @@ describe("preview list", () => {
               },
             ],
             count: 1,
+            truncated: true,
             next_page_token: "1",
             next_commands: [
               expectedPublicCliCommand(

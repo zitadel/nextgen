@@ -45,7 +45,7 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 
 	// 3b. passkey is action-shaped, not field-shaped, so the per-field
 	// enabled-method cross-check above never sees it.
-	if err := validatePasskeyActionsEnabled(newSchemaReader(userSchema), flowDefinition.Steps); err != nil {
+	if err := validatePasskeyActionsEnabled(NewSchemaReader(userSchema), flowDefinition.Steps); err != nil {
 		return nil, err
 	}
 
@@ -109,7 +109,7 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 	// Fail fast on schemas with no `properties` keyword at all. Without
 	// it the resolver would emit one ErrFlowFieldUnknown per user-property
 	// field; the structural defect is clearer surfaced once.
-	sr := newSchemaReader(schema)
+	sr := NewSchemaReader(schema)
 	if sr.Properties() == nil {
 		return nil, ErrFlowDefinitionInvalid("user schema has no properties", nil)
 	}
@@ -157,7 +157,7 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 // flow's verdict cannot change at runtime and the state machine trusts
 // it. Flows applied before this rule surface the violation on their
 // next plan/apply.
-func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) error {
+func validatePasskeyActionsEnabled(sr SchemaReader, steps []FlowDefinitionStep) error {
 	authMethods, err := sr.AuthMethods()
 	if err != nil {
 		return ErrFlowDefinitionInvalid(fmt.Sprintf("user schema: %v", err), nil)
@@ -179,7 +179,7 @@ func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) 
 
 // validateRequiredUserSchemaFields checks that all required fields in the
 // user schema are present in the flow definition.
-func validateRequiredUserSchemaFields(sr schemaReader, steps []FlowDefinitionStep) error {
+func validateRequiredUserSchemaFields(sr SchemaReader, steps []FlowDefinitionStep) error {
 	// Collecting `address.street` covers the leaf and every object above
 	// it, since an object materializes once one of its children is
 	// collected. The same prefixes are what the schema treats as
@@ -259,7 +259,7 @@ func validateSteps(steps []FlowDefinitionStep) error {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action %q has kind=back, which is engine-injected and cannot be declared", step.Name, a.Name), nil)
 			}
-			if a.Name == flowBackActionName {
+			if a.Name == FlowBackActionName {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action name %q is reserved for engine-injected back navigation", step.Name, a.Name), nil)
 			}
@@ -528,10 +528,7 @@ func validateOnSuccessManifests(def FlowDefinition, resolvedByStep map[string]Fl
 
 	for i := range def.Steps {
 		step := &def.Steps[i]
-		if step.OnSuccess == nil {
-			continue
-		}
-		manifest := ManifestForOnSuccess(*step.OnSuccess)
+		manifest := step.OnSuccessSpec().Manifest
 		if manifest == nil {
 			continue
 		}

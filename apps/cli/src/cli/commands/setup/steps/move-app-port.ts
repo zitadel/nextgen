@@ -12,7 +12,7 @@ import { Consent } from "@/lib/consent";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor } from "@/lib/idp";
-import type { CommandResult } from "@/lib/oclif";
+import type { CommandResult } from "@/cli/core";
 import { Orca, createOrca, issuerFromPort } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";

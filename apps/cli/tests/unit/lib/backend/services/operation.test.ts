@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ApiCall } from "@/lib/api";
+import { ApiCall } from "@/cli/core/crud/api-call";
 import { createZitadelClient, Operation, OperationService } from "@/lib/backend";
 import { toZitadelError } from "@/lib/errors";
 import { forcedConsent } from "@tests/helpers/consent";

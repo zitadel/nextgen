@@ -253,7 +253,21 @@ describe("pull of a release pinning two handles that resolve to one file", () =>
 describe("pull's --json envelope", () => {
   it.each([
     [[], ["title", "release_id", "pulled", "skipped", "next_commands"]],
-    [["--dry-run"], ["title", "release_id", "pulled", "skipped", "dry_run", "next_commands"]],
+    [
+      ["--dry-run"],
+      [
+        "dry_run",
+        "title",
+        "verb",
+        "topic",
+        "id",
+        "body",
+        "release_id",
+        "pulled",
+        "skipped",
+        "next_commands",
+      ],
+    ],
   ])("holds exactly the keys of a run with flags %j", async (flags, keys) => {
     const project = await aProjectWithTwoDeploys("zitadel-pull-");
     server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());

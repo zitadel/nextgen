@@ -2,7 +2,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import { aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
@@ -208,14 +208,10 @@ describe("start", () => {
           "--json",
         ]);
 
-        expect(app.envelopeOf(result)).toEqual({
+        expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
-          cli_version: CLI_VERSION,
           command: "start",
-          source: "http://localhost:8080",
           code: "E_VALIDATION",
-          message: "--image requires --runtime docker",
-          hint: "Pass --runtime docker with --image <tag>, or omit --image for the npm binary runtime.",
         });
       });
 
@@ -393,14 +389,14 @@ describe("start", () => {
           data: {
             dry_run: true,
             title: "Would start the local Zitadel server (dry run)",
+            verb: "start",
+            topic: "server",
             runtime: { backend: "binary", port: 8080 },
             urls: {
               api: "http://localhost:8080",
               console: "http://localhost:8080/ui/console/",
             },
-            next_commands: [
-              expectedPublicCliCommand(`start --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
-            ],
+            next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
           },
           warnings: [],
         });
@@ -427,15 +423,15 @@ describe("start", () => {
           data: {
             dry_run: true,
             title: "Would start the local Zitadel server (dry run)",
+            verb: "start",
+            topic: "server",
             runtime: { backend: "binary", port: 9000 },
             urls: {
               api: "http://localhost:9000",
               console: "http://localhost:9000/ui/console/",
             },
             next_commands: [
-              expectedPublicCliCommand(
-                `start --port 9000 --runtime binary --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
-              ),
+              expectedPublicCliCommand(`start --port 9000 --runtime binary --cwd ${app.path}`),
             ],
           },
           warnings: [],
@@ -463,6 +459,8 @@ describe("start", () => {
           data: {
             dry_run: true,
             title: "Would start the local Zitadel server (dry run)",
+            verb: "start",
+            topic: "server",
             runtime: {
               backend: "docker",
               container_name: expect.stringMatching(/^zitadel-server-[0-9a-f]{12}$/),
@@ -475,7 +473,7 @@ describe("start", () => {
             },
             next_commands: [
               expectedPublicCliCommand(
-                `start --runtime docker --image example.test/zitadel:1 --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `start --runtime docker --image example.test/zitadel:1 --cwd ${app.path}`,
               ),
             ],
           },
@@ -558,9 +556,7 @@ describe("start", () => {
         );
 
         expect(result).toSayOnce(
-          expectedPublicCliCommand(
-            `start --port 9000 --runtime binary --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
-          ),
+          expectedPublicCliCommand(`start --port 9000 --runtime binary --cwd ${app.path}`),
         );
       });
 

@@ -9,8 +9,14 @@ and can own projects. A team gets access to a project through a
 
 Create a team, then read, rename and query it. Deactivating a team removes its
 memberships and keeps the team readable with status `deactivated`. A team that
-still owns a project cannot be deactivated yet. See
-[Project, team, and user](/docs/concepts/project-team-user) for how the
-three relate.
+still owns a project cannot be deactivated yet.
+
+Team memberships are created when you create a user with `team_id`, or when the
+platform bootstraps a personal team. Read them with
+`GET /users/{user_id}/teams`, `GET /users/me/teams`, or
+`POST /users/query` filtered by `team_id`. There is no standalone add or remove
+membership endpoint yet, and team-member invitations answer `501`. See
+[Access and memberships](/docs/concepts/access-and-memberships#team-memberships-vs-lifecycle-ownership)
+and [Project, team, and user](/docs/concepts/project-team-user).
 
 <Operations />
