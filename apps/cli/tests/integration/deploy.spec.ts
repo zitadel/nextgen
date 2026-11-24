@@ -1312,12 +1312,6 @@ describe("deploy", () => {
           code: "E_VALIDATION",
           message: "Nonexistent flag: --origin",
           next_commands: [expectedPublicCliCommand("deploy --help")],
-          details: {
-            original: {
-              name: "Error",
-              message: "Nonexistent flag: --origin\nSee more help with --help",
-            },
-          },
         });
       });
 
@@ -2024,7 +2018,7 @@ describe("deploy", () => {
 
         const result = await offTerminal(() => app.deployRendered());
 
-        expect(result).toPrintExactly("resources\n\nRelease ");
+        expect(result).toPrintExactly("or the live release has no commit.\n\nRelease ");
       });
 
       it("suggests listing the deployments once", async () => {

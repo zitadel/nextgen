@@ -90,11 +90,9 @@ export async function readInvitations(
  * accepted or declined. A row without one is `Unnamed invitation`.
  *
  * **Actions follow the status** (`ACTIONS`). A pending link can be replaced or
- * cancelled. An expired one can be replaced; it is to be removable too, as
- * `Remove` since its link is already dead, once `DELETE
- * /invitations/{invitation_id}` deletes an expired row, which today it answers
- * with the opaque `404` and leaves to the cleanup job. A declined one can only
- * be removed: the person said no, so there is no link to make again.
+ * cancelled. An expired one can be replaced or removed, as `Remove` rather
+ * than `Cancel` since its link is already dead. A declined one can only be
+ * removed: the person said no, so there is no link to make again.
  *
  * **Replacing shows a link again.** A replace is a create
  * (`replaces_invitation_id`), so its response is the second and last time a
@@ -354,10 +352,8 @@ interface RowActions {
  * The menu by status. A pending link is cancelled: it stops working. An
  * expired or a declined one already has, so deleting it is `Remove` and only
  * takes the row and the name on it out of the list. An accepted invitation is
- * final and has no menu.
- *
- * Expired has no `removal` yet: `DELETE /invitations/{invitation_id}` deletes
- * pending and declined rows and answers an expired one with the opaque `404`.
+ * final and has no menu: `DELETE /invitations/{invitation_id}` answers it
+ * with the opaque `404`.
  */
 const ACTIONS: Partial<Record<InvitationStatus, RowActions>> = {
   pending: {
@@ -371,7 +367,16 @@ const ACTIONS: Partial<Record<InvitationStatus, RowActions>> = {
       done: "Invitation cancelled",
     },
   },
-  expired: { regenerate: true },
+  expired: {
+    regenerate: true,
+    removal: {
+      action: "Remove invitation",
+      title: "Remove expired invitation?",
+      description: "The link has expired. Removing the invitation takes it off this list.",
+      fallback: "Could not remove the invitation. Try again.",
+      done: "Invitation removed",
+    },
+  },
   rejected: {
     regenerate: false,
     removal: {

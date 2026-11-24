@@ -8,6 +8,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Promptable } from "@/lib/oclif/promptable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -18,8 +19,8 @@ const INVITATION_ID: Refused<string> = {
   schema: invitationIdSchema,
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel invitation list --status pending --status rejected`.",
-    next: [{ id: "invitation:list", flags: { status: ["pending", "rejected"] } }],
+    hint: "Find one with `zitadel invitation list`.",
+    next: [{ id: "invitation:list" }],
     details: {
       argument: "{input}",
     },
@@ -35,32 +36,35 @@ const INVITATION_CANCELLED = "invitation_cancelled";
  */
 const NO_ID_REFUSAL = {
   message: "Name the invitation to cancel",
-  hint: "Pass its id; find one with `zitadel invitation list --status pending --status rejected`.",
-  next: [{ id: "invitation:list", flags: { status: ["pending", "rejected"] } }],
+  hint: "Pass its id; find one with `zitadel invitation list`.",
+  next: [{ id: "invitation:list" }],
 } as const satisfies Refusal;
 
-/** How a cancel of an invitation that has already finished is refused. */
+/** How a cancel of an accepted invitation is refused. */
 const NOT_CANCELLABLE_REFUSAL = {
   message: "{id} is {status}, so there is nothing to cancel",
-  hint: "Only a pending or declined invitation can be cancelled.",
-  next: [{ id: "invitation:list", flags: { status: ["pending", "rejected"] } }],
+  hint: "An accepted invitation can't be cancelled.",
+  next: [{ id: "invitation:list" }],
 } as const satisfies Refusal;
 
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
 const NOTHING_CANCELLABLE_REFUSAL = {
-  message: "The project has no pending or declined invitations",
-  hint: "Only a pending or declined invitation can be cancelled.",
+  message: "The project has no pending, expired or declined invitations",
+  hint: "An accepted invitation can't be cancelled.",
   next: [{ id: "invitation:list" }],
 } as const satisfies Refusal;
 
 /**
  * `zitadel invitation cancel [invitation_id]` — cancel a pending invitation,
- * so its link can no longer be redeemed, or remove a declined one. Without an
- * id it offers the pending and declined invitations to pick from.
+ * so its link can no longer be redeemed, or remove an expired or declined one.
+ * Without an id it offers the pending, expired and declined invitations to
+ * pick from.
  */
-export default class InvitationCancel extends Destructive(ServerCommand(EnvironmentCommand)) {
+export default class InvitationCancel extends Destructive(
+  Promptable(ServerCommand(EnvironmentCommand)),
+) {
   static override description =
-    "Cancel a pending invitation so its link stops working, or remove a declined one.";
+    "Cancel a pending invitation so its link stops working, or remove an expired or declined one.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 8;
   static override examples = [
@@ -70,7 +74,7 @@ export default class InvitationCancel extends Destructive(ServerCommand(Environm
   ];
   static override args = {
     invitation_id: Args.custom<string>({ parse: taken(INVITATION_ID) })({
-      description: "The invitation to cancel. Omit it to pick a pending or declined one.",
+      description: "The invitation to cancel. Omit it to pick a pending, expired or declined one.",
     }),
   };
   static override flags = {
@@ -123,7 +127,8 @@ export default class InvitationCancel extends Destructive(ServerCommand(Environm
         apply: async (consent, { client, projectId, invitation }) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
           await unlocked.cancel(invitation.id);
-          // A declined journey already ended with invitation_rejected.
+          // A declined journey already ended with invitation_rejected, and an
+          // expired one counts as not accepted.
           if (invitation.status === "pending") {
             this.trackEvent(INVITATION_CANCELLED, {
               role: invitationGrant(invitation),
@@ -149,7 +154,7 @@ export default class InvitationCancel extends Destructive(ServerCommand(Environm
   }
 
   /**
-   * The pending or declined invitation a person picks when the command line
+   * The pending, expired or declined invitation a person picks when the command line
    * named none.
    * A script is told to name one instead.
    */
@@ -162,7 +167,7 @@ export default class InvitationCancel extends Destructive(ServerCommand(Environm
     return this.ask.select({
       name: "invitation id",
       message: "Which invitation would you like to cancel?",
-      retry: this.suggest({ id: "invitation:list", flags: { status: ["pending", "rejected"] } }),
+      retry: this.suggest({ id: "invitation:list" }),
       options: cancellable.map((invitation) => {
         return {
           value: invitation,
@@ -183,7 +188,7 @@ export default class InvitationCancel extends Destructive(ServerCommand(Environm
     invitationId: string,
   ): Promise<Invitation> {
     const invitation = await invitationService.get(invitationId);
-    if (invitation.status !== "pending" && invitation.status !== "rejected") {
+    if (invitation.status === "accepted") {
       throw refusalError(NOT_CANCELLABLE_REFUSAL, {
         id: invitation.id,
         status: invitation.status,
@@ -206,9 +211,17 @@ function describe(invitation: Invitation): string {
 function cancellableHint(invitation: Invitation): string {
   const whom = invitation.metadata?.name;
   // The name is whatever an administrator typed; the picker draws hints as given.
-  return escapeControlCharacters(
-    `${whom === undefined ? "" : `${whom}, `}${
-      invitation.status === "pending" ? `expires ${invitation.expires_at}` : "declined"
-    }`,
-  );
+  return escapeControlCharacters(`${whom === undefined ? "" : `${whom}, `}${standing(invitation)}`);
+}
+
+/** Where a cancellable invitation stands: when it expires, expired, or declined. */
+function standing(invitation: Invitation): string {
+  switch (invitation.status) {
+    case "pending":
+      return `expires ${invitation.expires_at}`;
+    case "expired":
+      return `expired ${invitation.expires_at}`;
+    default:
+      return "declined";
+  }
 }

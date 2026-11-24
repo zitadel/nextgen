@@ -1,12 +1,7 @@
-import type { GetMySession200 } from "@zitadel/api/generated/model";
-
 import { getZitadelConfig } from "@zitadel/api/config";
-import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
+import { getSession as readSession } from "@zitadel/sdk-core/session";
 
 import type { ClientAuthResult } from "./types.js";
-
-/** Matches the `configureZitadel()` default so zero-config apps agree with the scaffold. */
-const DEFAULT_PROXY_PATH = "/__nextgen";
 
 /** Options for {@link getSession}. */
 export type GetSessionOptions = {
@@ -121,91 +116,12 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
     );
   }
 
-  // The base the typed API client uses: trailing slashes go, so "/__nextgen/"
-  // doesn't produce a double-slash URL that misses the request-boundary
-  // matcher, and the API prefix follows.
-  const endpoint = `${apiBaseUrl(
-    options.proxyPath ?? getZitadelConfig()?.proxyPath ?? DEFAULT_PROXY_PATH,
-  )}/sessions/me`;
   const projectId = options.projectId || getZitadelConfig()?.projectId || publicProjectId();
   if (!projectId) {
     warnMissingProject();
     return { isAuthenticated: false, session: null };
   }
-
-  const response = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
-    cache: "no-store",
-    credentials: "include",
-    headers: { accept: "application/json" },
-  });
-
-  // Only the backend's canonical error envelope is definitive signed-out.
-  // A framework route, gateway, or WAF can also return 401/404; accepting the
-  // status or content type alone would turn a broken proxy into signed-out.
-  let code: string | undefined;
-  if (response.status === 401 || response.status === 403 || response.status === 404) {
-    const error = await readErrorEnvelope(response);
-    code = error?.code;
-    const isSignedOut =
-      (response.status === 401 && error?.code === "auth.unauthorized") ||
-      (response.status === 403 && error?.code === "sess.project_mismatch") ||
-      (response.status === 404 && error?.code === "sess.not_found");
-    if (isSignedOut) {
-      return { isAuthenticated: false, session: null };
-    }
-  }
-
-  if (!response.ok) {
-    // `req.not_found` is the server knowing no such operation: it is older
-    // than this SDK and does not serve the API under its prefix.
-    const cause =
-      code === "req.not_found"
-        ? ` (req.not_found: a server older than this SDK does not serve the API under ${API_PREFIX})`
-        : "";
-    throw new Error(
-      `[nextgen] Session read failed: HTTP ${response.status} from ${endpoint}${cause}`,
-    );
-  }
-
-  const session = (await response.json()) as GetMySession200;
-
-  // An anonymous session (no verified user factor yet) has no user_id, and a
-  // backend that predates `project_id` answers for any project: for app
-  // chrome, either is "not signed in".
-  if (!session.user_id || session.project_id !== projectId) {
-    return { isAuthenticated: false, session: null };
-  }
-
-  return {
-    isAuthenticated: true,
-    session: {
-      userId: session.user_id,
-      identifier: session.user?.identifier ?? null,
-      identifierProperty: session.user?.identifier_property ?? null,
-      display: session.user?.display ?? null,
-    },
-  };
+  return readSession({ proxyPath: options.proxyPath, projectId });
 }
 
 export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types.js";
-
-type ErrorEnvelope = { code: string; message: string };
-
-async function readErrorEnvelope(response: Response): Promise<ErrorEnvelope | undefined> {
-  try {
-    const body = (await response.json()) as unknown;
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "code" in body &&
-      typeof body.code === "string" &&
-      "message" in body &&
-      typeof body.message === "string"
-    ) {
-      return { code: body.code, message: body.message };
-    }
-  } catch {
-    // The caller reports the HTTP failure below; parsing details are untrusted.
-  }
-  return undefined;
-}

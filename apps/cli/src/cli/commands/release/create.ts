@@ -65,13 +65,16 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
       mode: "deploy",
       dryRun: this.dryRun,
       compare: false,
-      json: this.isJson,
-      color: this.isColored,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
     }
+    // Said now, before the steps that can fail, and kept for a result that a
+    // pipe reads.
     this.narrate(prepared.notices);
+    const diff = prepared.notices.flatMap((notice, at) => {
+      return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
+    });
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the
     // release is posted so nothing is written server-side.
@@ -88,6 +91,7 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
         summary: {
           title,
           sections: [],
+          lines: diff,
         },
         next: {
           commands: [await this.realRun()],
@@ -113,6 +117,7 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
       summary: {
         title,
         sections: [],
+        lines: diff,
       },
       next: {
         commands: [this.suggest({ id: "deployment:create", flags: { release: release.id } })],

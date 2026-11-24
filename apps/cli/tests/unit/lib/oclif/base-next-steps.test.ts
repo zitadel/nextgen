@@ -1,5 +1,5 @@
 import type { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import { asStepsShown } from "@/lib/oclif/next-steps";
@@ -45,6 +45,58 @@ function makeCommand(): NextStepsCommand {
 const DEPLOY: SuggestedCommand = aSuggest({}, "0.0.0-test")({ id: "deploy" });
 /** {@link DEPLOY} as the reader runs it. */
 const PUBLIC_DEPLOY = Spelling.at("0.0.0-test").command("deploy");
+
+/** A footer that carries a colour, which is what the stderr strip acts on. */
+const RED_FOOTER = "\u001b[31mred\u001b[39m";
+
+/**
+ * Runs `run` with stderr reporting `isTTY` as given, and restores it afterwards.
+ *
+ * @param isTTY - Whether stderr is a terminal.
+ * @param run - What to run.
+ * @returns What `run` resolved with.
+ */
+async function withStderrTerminal<T>(isTTY: boolean, run: () => Promise<T>): Promise<T> {
+  const original = process.stderr.isTTY;
+  Object.defineProperty(process.stderr, "isTTY", {
+    value: isTTY,
+    writable: true,
+    configurable: true,
+  });
+  try {
+    return await run();
+  } finally {
+    Object.defineProperty(process.stderr, "isTTY", {
+      value: original,
+      writable: true,
+      configurable: true,
+    });
+  }
+}
+
+/**
+ * What a piped result with a coloured footer writes to stderr.
+ *
+ * @param stderrIsTTY - Whether stderr is a terminal.
+ * @returns The lines written to stderr.
+ */
+async function stderrOfAColouredFooter(stderrIsTTY: boolean): Promise<string[]> {
+  const cmd = makeCommand();
+
+  await withStderrTerminal(stderrIsTTY, () => {
+    return offTerminal(() => {
+      return cmd.finish({
+        summary: { title: "Done", sections: [] },
+        status: "ok",
+        data: {},
+        pretty: rows("row"),
+        footer: RED_FOOTER,
+      });
+    });
+  });
+
+  return cmd.stderr;
+}
 
 describe("BaseCommand next steps", () => {
   describe("in the envelope", () => {
@@ -283,5 +335,35 @@ describe("BaseCommand next steps", () => {
 
       expect(cmd.stdout).toEqual(["Done"]);
     });
+  });
+});
+
+describe("BaseCommand stderr beside piped output", () => {
+  it.each([
+    ["is unset", undefined],
+    ["is 0", "0"],
+    ["is false", "false"],
+  ])("strips colour when FORCE_COLOR %s and stderr is not a terminal", async (_case, value) => {
+    vi.stubEnv("FORCE_COLOR", value);
+
+    const stderr = await stderrOfAColouredFooter(false);
+
+    expect(stderr).toEqual(["\nred"]);
+  });
+
+  it("keeps colour when FORCE_COLOR is 1", async () => {
+    vi.stubEnv("FORCE_COLOR", "1");
+
+    const stderr = await stderrOfAColouredFooter(false);
+
+    expect(stderr).toEqual([`\n${RED_FOOTER}`]);
+  });
+
+  it("keeps colour when stderr is a terminal", async () => {
+    vi.stubEnv("FORCE_COLOR", undefined);
+
+    const stderr = await stderrOfAColouredFooter(true);
+
+    expect(stderr).toEqual([`\n${RED_FOOTER}`]);
   });
 });

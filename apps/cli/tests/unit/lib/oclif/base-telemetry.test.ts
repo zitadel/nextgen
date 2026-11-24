@@ -35,8 +35,10 @@ class TestCommand extends BaseCommand {
   public static override readonly id = "telemetry-test";
   public readonly recorder = new RecordingTelemetry();
   public optOut = false;
+  public consentFlag: boolean | undefined;
 
-  protected override createTelemetry(_deps: TelemetryDeps): Telemetry {
+  protected override createTelemetry(deps: TelemetryDeps): Telemetry {
+    this.consentFlag = deps.flag;
     this.recorder.enabled = !this.optOut;
     return this.recorder as unknown as Telemetry;
   }
@@ -74,6 +76,24 @@ class TestCommand extends BaseCommand {
 function makeCommand(): TestCommand {
   return new TestCommand([], aConfigAt("0.0.0-test"));
 }
+
+describe("BaseCommand telemetry opt-out", () => {
+  it("is read from the words the command was run with when it fails before telemetry opens", async () => {
+    const cmd = new TestCommand(["--no-telemetry"], aConfigAt("0.0.0-test"));
+
+    await cmd.failWith(new Error("refused"));
+
+    expect(cmd.consentFlag).toBe(false);
+  });
+
+  it("leaves the decision to the other signals when the words do not opt out", async () => {
+    const cmd = new TestCommand([], aConfigAt("0.0.0-test"));
+
+    await cmd.failWith(new Error("refused"));
+
+    expect(cmd.consentFlag).toBeUndefined();
+  });
+});
 
 describe("BaseCommand telemetry lifecycle", () => {
   it("fires started on open, then completed on emit, in order", async () => {

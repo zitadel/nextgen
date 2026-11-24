@@ -7,8 +7,11 @@ import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 import { Cmd } from "@/lib/cmd";
 import { byName, type ByName } from "@/lib/names";
 import { nonBlankString } from "./flags";
+import { inputFlag } from "./input";
+import { Documented } from "./documented";
 import { Interruptible } from "./interruptible";
-import { log, style, warnings } from "@/lib/ui";
+import { Loggable } from "./loggable";
+import { Output, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
@@ -37,9 +40,8 @@ import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { Runtime } from "@/lib/runtime";
 import { Skills } from "@/lib/skills";
 import type { Presentation, Summary } from "@/lib/ui";
-import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
+import { NEXT_LABEL } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
-import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import {
   CLI_COMMAND_COMPLETED,
@@ -53,16 +55,13 @@ import {
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
 import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
-import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
-import { painted } from "./rendering";
+import { normalizeCommandResult, Presenter, withWarnings } from "./presenter";
 import type {
   CommandResult,
   ErrorEnvelope,
-  EnvelopeMeta,
   FlagVariable,
   GlobalOptions,
   JsonEnvelope,
-  SkippedEnvelope,
 } from "./types";
 
 /** The variable the server is named by when `--server` is not given. */
@@ -86,7 +85,8 @@ const NO_COLOR: FlagVariable = {
 const FORCE_COLOR: FlagVariable = {
   name: "FORCE_COLOR",
   flag: "color",
-  description: "Turns color on where it would be off, such as in a pipe, as `--color` does.",
+  description:
+    "Turns color on where it would be off, such as in a pipe, as `--color` does; `0` or `false` turns it off.",
   precedence: "`--no-color` and `NO_COLOR` win over it.",
 };
 
@@ -131,7 +131,7 @@ export type Admitted<C extends typeof BaseCommand> = Readonly<{
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Interruptible(Command) {
+export abstract class BaseCommand extends Loggable(Documented(Interruptible(Command))) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -178,6 +178,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
+    input: inputFlag,
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -257,27 +258,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * Whether this run's output is read on a screen rather than by something
-   * else. It asks stdout alone, so it answers what to draw — a table, a line
-   * naming the server — where {@link isTTY} answers whether anyone can be
-   * asked a question.
+   * Runs a read only a person reads the result of: the extra lookup that fills
+   * a human rendering and appears nowhere in `data`. Under `--json` it is not
+   * run, so the envelope never costs a request, or a permission, that nothing
+   * in it uses.
+   *
+   * @param read - The lookup, which a command states without asking where its output goes.
+   * @returns What it read, or `undefined` when nobody reads a rendering.
    */
-  protected get isOnScreen(): boolean {
-    return Boolean(process.stdout.isTTY);
-  }
-
-  /** Whether this run answers in the JSON envelope (`--json`). */
-  protected get isJson(): boolean {
-    return this.meta.json;
-  }
-
-  /**
-   * Whether this run's human output is coloured: the one decision every
-   * command shares, honouring `--color`/`--no-color`, `NO_COLOR`,
-   * `FORCE_COLOR` and a dumb terminal. A JSON run is never coloured.
-   */
-  protected get isColored(): boolean {
-    return this.meta.colored;
+  protected async forHumans<T>(read: () => Promise<T>): Promise<T | undefined> {
+    return Output.json ? undefined : read();
   }
 
   /** The release of the CLI that is running. */
@@ -592,7 +582,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected narrate(notices: readonly string[]): void {
     for (const notice of notices) {
-      log.plain(notice.replace(/\n+$/, ""));
+      this.info(notice.replace(/\n+$/, ""));
     }
   }
 
@@ -656,14 +646,15 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
-    const useColor = flags.color !== false && !process.env[NO_COLOR.name];
+    const useColor =
+      flags.color !== false && !process.env[NO_COLOR.name] && forcedColour(process.env) !== false;
     // Colour is about where the output goes, so it asks stdout alone. `isTTY`
     // is about whether a person can be asked something and needs stdin too: a
     // run with its stdin redirected still writes to a terminal that reads
     // colour.
     const colored =
       useColor &&
-      (Boolean(process.env[FORCE_COLOR.name]) ||
+      (forcedColour(process.env) === true ||
         (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
     this.meta = {
       cwd,
@@ -678,9 +669,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
       debug,
       env: process.env,
       isTTY,
-      colored: !json && colored,
-      json,
     };
+    Output.settle({
+      json,
+      color: !json && colored,
+    });
     this.ui = new Ui(
       {
         interactive: !this.meta.nonInteractive,
@@ -692,7 +685,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       (this.constructor as typeof BaseCommand).heading ??
         `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim(),
     );
-    this.ui.bridgeNarration({
+    this.ui.printLogs({
       debug,
       silent: json,
     });
@@ -857,7 +850,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.nonInteractive || this.jsonEnabled()) {
       return false;
     }
-    const argv = process.argv;
+    const argv = this.argv;
     if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
@@ -866,10 +859,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * Final step of every command: in human mode it prints the rendered result,
-   * then the result's next steps, then its footer (oclif suppresses
-   * {@link Command.log} under `--json`); it returns the envelope so oclif's
-   * `--json` path serialises it.
+   * Final step of every command: records the run's telemetry and hands the
+   * result to a {@link Presenter}, which writes it for the reader the run has
+   * and returns the envelope oclif serialises under `--json`.
+   *
+   * @param result - What the command returned.
+   * @returns The envelope.
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
@@ -888,168 +883,21 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ),
       );
     }
-    const next =
-      normalized.status === "ok" && normalized.nextShown !== undefined
-        ? ""
-        : renderNextSteps(normalized.next ?? {});
-    // Output a script reads keeps stdout to itself, so the next steps go
-    // beside it on stderr rather than into what the script is reading.
-    const beside = normalized.status === "ok" && normalized.pretty?.kind === "piped";
-    // The rendering is the CLI's own, painted by it: what the server wrote was
-    // spelled out as it entered, so escaping the whole of it here would spell
-    // out the colour too.
-    // An empty rendering is written as nothing, not as a blank line: a piped
-    // list of no records must leave stdout empty, so `wc -l` reports 0.
-    const rendered = renderPretty(normalized, beside ? "" : next, !beside);
-    const footer = normalized.status === "ok" ? normalized.footer : undefined;
-    const ending = this.endingOf(normalized, footer);
-    if (beside) {
-      if (rendered !== "") {
-        this.log(stripColumnMarks(rendered));
-      }
-      if (next !== "") {
-        // Set apart from the result only when both share a screen; a piped
-        // result is not on screen to be set apart from.
-        this.logAside(rendered !== "" && this.isOnScreen ? `\n${next}` : next);
-      }
-      // Only the script's own output stays on stdout; what the CLI adds goes beside it.
-      for (const warning of warningsOf(normalized)) {
-        this.logAside(warningLine(warning));
-      }
-      if (footer !== undefined) {
-        this.logAside(`\n${stripColumnMarks(footer)}`);
-      }
-    } else if (this.ui.interactive) {
-      this.ui.finish(ending);
-    } else if (this.rendersForAMachine()) {
-      if (rendered !== "") {
-        this.log(stripColumnMarks(rendered));
-      }
-      if (footer !== undefined) {
-        this.log(`\n${stripColumnMarks(footer)}`);
-      }
-    } else if (!this.isJson) {
-      const text = this.ui.written(ending).replace(/\n+$/, "");
-      if (text !== "") {
+    return new Presenter({
+      meta: this.meta,
+      ui: this.ui,
+      version: this.config.version,
+      wizard: (this.constructor as typeof BaseCommand).wizard === true,
+      skillsOffered: this.skillsOffered,
+      dryRun: this.dryRun,
+      suggest: this.suggest,
+      log: (text) => {
         this.log(text);
-      }
-    }
-    // Reported warnings were printed when they happened, so they join the
-    // envelope only: printing them again here would show them twice.
-    const reported = warnings.take();
-    const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
-    return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
-  }
-
-  /**
-   * How this command ends, as the one {@link Summary} both renderings are
-   * built from: the one the command stated. It is settled here rather than per
-   * rendering, so a run that is drawn and a run that is written cannot end on
-   * different words.
-   *
-   * The next steps are the result's own, stated once; the ending draws the same
-   * ones unless the summary names steps of its own, or the command already
-   * showed them in output of its own.
-   */
-  private endingOf(result: CommandResult, footer: string | undefined): Summary {
-    const own = result.summary;
-    const steps =
-      own.next ??
-      (result.status === "ok" && result.nextShown !== undefined ? [] : stepsOf(result.next));
-    const ran = own.ran ?? this.serverRanOn();
-    const extras = [
-      ...(own.extras ?? []),
-      ...(footer === undefined ? [] : footer.split("\n")),
-      ...(result.status === "ok" && !result.warningsShown
-        ? (result.warnings ?? []).map(warningLine)
-        : []),
-    ];
-    return this.withOverview(
-      {
-        ...own,
-        ...(extras.length === 0 ? {} : { extras }),
-        ...(steps.length === 0 ? {} : { next: steps }),
-        ...(ran === undefined ? {} : { ran }),
       },
-      result.status === "ok",
-    );
-  }
-
-  /**
-   * The server this run spoke to, when it is not the default one, so an ending
-   * that knows no project can still say where it ran.
-   */
-  private serverRanOn(): string | undefined {
-    if (this.dryRun) {
-      return undefined;
-    }
-
-    return ZitadelRuntime.fromUrl(this.meta.source).hostUnlessDefault();
-  }
-
-  /**
-   * Whether what this command rendered is for a machine rather than a person,
-   * in which case it is written as it is and the ending never decorates it.
-   *
-   * Two things make it so. A command that took its own ending away as text
-   * (`setup`, through `Ui.ending`) has already said everything an ending
-   * says. And off a terminal a normal command's answer is the machine form it
-   * chose for itself — `--plain` is implied there, so a list is tab-separated
-   * rows and a record is the record — which `cut`, `awk` and `wc -l` read and
-   * which a count or a footer under it would break. A wizard has no such
-   * form: what it writes is prose for a person however it is read, so it ends
-   * the way it always ends.
-   */
-  private rendersForAMachine(): boolean {
-    return this.ui.reported || (!this.summarises() && !this.isOnScreen);
-  }
-
-  /**
-   * The command overview as the last step of a summary that has steps, so every
-   * box ends the same way and the overview can be found from anywhere without
-   * already knowing it exists. A summary that names it already keeps its own.
-   *
-   * @param summary - The ending as the command stated it.
-   * @param changed - Whether the run did its work. Only one that did spends the
-   * skills offer, which a machine gets once: a skip or a no leaves it for the
-   * next run that changes something.
-   */
-  private withOverview(summary: Summary, changed: boolean): Summary {
-    const steps = summary.next ?? [];
-    if (!this.summarises()) {
-      return {
-        ...summary,
-        boxed: false,
-      };
-    }
-    const overview = steps.some((step) => {
-      return step.text === OVERVIEW;
-    })
-      ? []
-      : [
-          {
-            text: OVERVIEW,
-            command: Spelling.at(this.config.version).command(""),
-          },
-        ];
-    const skills =
-      this.skillsOffered && changed
-        ? [
-            new Skills(process.env, !this.meta.nonInteractive).claim(
-              this.suggest({ id: "skills:add" }),
-            ),
-          ]
-        : [];
-    return {
-      ...summary,
-      next: [
-        ...steps,
-        ...overview,
-        ...skills.filter((step) => {
-          return step !== undefined;
-        }),
-      ],
-    };
+      logAside: (text) => {
+        this.logAside(text);
+      },
+    }).present(normalized);
   }
 
   /** Which of the two shapes this command draws. See {@link BaseCommand.wizard}. */
@@ -1090,7 +938,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   private logAside(text: string): void {
     this.logToStderr(
-      process.stderr.isTTY || process.env[FORCE_COLOR.name] ? text : stripVTControlCharacters(text),
+      process.stderr.isTTY || forcedColour(process.env) === true
+        ? text
+        : stripVTControlCharacters(text),
     );
   }
 
@@ -1191,7 +1041,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       help,
     );
     this.meta = meta;
-    this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
+    this.openTelemetry(this.argv.includes("--no-telemetry") ? false : undefined);
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_FAILED,
@@ -1246,7 +1096,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
-    this.ui.releaseNarration();
+    this.ui.stopPrintingLogs();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
@@ -1272,8 +1122,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
       debug: false,
       env: process.env,
       isTTY: isTerminal(),
-      colored: false,
-      json: false,
     };
   }
 }
@@ -1320,97 +1168,6 @@ function asRaised(error: unknown): unknown {
   });
 }
 
-/** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
-function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
-  const stated =
-    result.pretty === undefined && result.summary !== undefined
-      ? {
-          ...result,
-          pretty: painted(textOf(result.summary)),
-        }
-      : result;
-  if (stated.next?.commands === undefined) {
-    return stated as CommandResult;
-  }
-
-  return {
-    ...stated,
-    next: {
-      ...stated.next,
-      commands: Spelling.at(meta.cliVersion).normalizeCommands(stated.next.commands),
-    },
-  } as CommandResult;
-}
-
-/**
- * The data with the headline the terminal draws as its `title`, so a script
- * reads the very words a person does (see {@link CommandResult.summary}).
- * Data that is not an object, or that already has a `title` of its own, is
- * left as it is.
- */
-function withHeadline(data: unknown, title: string): unknown {
-  // An entity answers the record it stands for through `toJSON`, which spreading it would lose.
-  const record = isObject(data) && typeof data.toJSON === "function" ? data.toJSON() : data;
-
-  return isObject(record) && !("title" in record) && title !== "" ? { title, ...record } : data;
-}
-
-/**
- * The data with its next steps written in. Data that is not an object (a
- * write the server answered without a body) has nowhere to hold them.
- */
-function withNextSteps(data: unknown, next: NextSteps | undefined): unknown {
-  return next === undefined || !isObject(data) ? data : { ...data, ...nextStepsData(next) };
-}
-
-/** Add the warnings reported while the command ran to an ok result. */
-function withReportedWarnings(result: CommandResult, reported: readonly string[]): CommandResult {
-  if (result.status !== "ok" || reported.length === 0) {
-    return result;
-  }
-
-  return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
-}
-
-/**
- * Add reported warnings to a skipped or error envelope. Those envelopes carry
- * `warnings` only when there are some, so their shape is otherwise unchanged.
- */
-function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
-  envelope: T,
-  warnings: readonly string[],
-): T {
-  return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
-}
-
-/** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
-function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
-  const base: EnvelopeMeta = {
-    cli_version: meta.cliVersion,
-    command: meta.command,
-    source: meta.source,
-  };
-  if (result.status === "ok") {
-    return {
-      ...base,
-      status: "ok",
-      data: withNextSteps(
-        result.verbatim === true ? result.data : withHeadline(result.data, result.summary.title),
-        result.next,
-      ),
-      warnings: result.warnings ? [...result.warnings] : [],
-    };
-  }
-
-  return {
-    ...base,
-    status: "skipped",
-    reason: result.reason,
-    data: withHeadline(result.data ?? {}, result.summary.title),
-    next_commands: result.next?.commands ? [...result.next.commands] : undefined,
-  };
-}
-
 /**
  * A failure's follow-ups, each rendered by `renderedFailure` before the failure
  * is reported.
@@ -1441,34 +1198,6 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     next_commands: error.nextCommands === undefined ? undefined : renderedCommands(error),
     details: error.details,
   };
-}
-
-/**
- * Renders a {@link CommandResult} as human-facing text for non-JSON mode: the
- * command's own rendering, or the one its summary gives (`normalizeCommandResult`
- * settles which). `next` is the rendered next-step block, which follows the
- * rendering, and comes before the warnings, which `withWarnings` leaves out for
- * output a script reads.
- */
-function renderPretty(result: CommandResult, next: string, withWarnings: boolean): string {
-  // A command's own rendering arrives spelled out, because the factory that
-  // made it knew which spelling its shape takes, so interpolating what the
-  // server answered is safe wherever a command does it.
-  const own = result.pretty?.text ?? "";
-  return [
-    next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`,
-    next,
-    ...(withWarnings ? warningsOf(result).map(warningLine) : []),
-  ]
-    .filter((line) => {
-      return line !== "";
-    })
-    .join("\n");
-}
-
-/** The warnings a result still has to show: those its own output did not. */
-function warningsOf(result: CommandResult): readonly string[] {
-  return result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
 }
 
 /**
@@ -1507,6 +1236,23 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
 }
 
 /**
+ * What `FORCE_COLOR` says about colour: on for any value but `0` and `false`
+ * (in any case), off for those two, and nothing when it is unset or empty.
+ *
+ * @param env - The environment the run reads.
+ * @returns True when colour is forced on, false when forced off, and
+ * `undefined` when the variable says nothing.
+ */
+function forcedColour(env: NodeJS.ProcessEnv): boolean | undefined {
+  const value = (env[FORCE_COLOR.name] ?? "").toLowerCase();
+  if (value === "") {
+    return undefined;
+  }
+
+  return !["0", "false"].includes(value);
+}
+
+/**
  * A failure as every rendering of it states it. oclif refuses a command line
  * in its own words, so the sentence is its first line and the step is the
  * command's help, in the envelope and on the terminal alike.
@@ -1524,20 +1270,7 @@ function presentedFailure(error: ZitadelError, help: SuggestedCommand): ZitadelE
   return new ZitadelError(error.code, sentence, {
     hint: error.hint,
     nextCommands: error.nextCommands?.length ? error.nextCommands : [help],
-    details: error.details,
   });
 }
 
-/**
- * One warning, as a person reads it: a coloured label and the warning itself.
- *
- * A warning names what the server answered as readily as a rendering does, so
- * it is spelled out here — the one place a warning becomes a line — and only
- * the label is coloured, so there is nothing for the spelling to undo.
- */
-function warningLine(warning: string): string {
-  return `${style.statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
-}
-
 /** The last step of every box: where to find every command. */
-const OVERVIEW = "Explore all commands:";

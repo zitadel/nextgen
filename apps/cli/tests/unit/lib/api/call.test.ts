@@ -41,6 +41,14 @@ describe("ApiCall.pathValues", () => {
     });
   });
 
+  it("sends an id trimmed, as the id arguments of the resource commands do", () => {
+    const target = resolveTarget("getSession");
+
+    expect(ApiCall.to(target).pathValues(["  sess_1\t"], undefined).values).toEqual({
+      session_id: "sess_1",
+    });
+  });
+
   it("names the parameters still missing", () => {
     const target = resolveTarget("completeUserPasskeyRegistration");
 
@@ -71,6 +79,23 @@ describe("ApiCall.pathValues", () => {
   ])("counts the path parameters of %s in the singular or plural", (operation, given, message) => {
     expect(() => ApiCall.to(resolveTarget(operation)).pathValues(given, undefined)).toThrow(
       message,
+    );
+  });
+
+  it.each([
+    ["a dot segment", ".."],
+    ["a single dot", "."],
+    ["an empty value", ""],
+    ["a control character", "a\u0007b"],
+  ])("refuses %s as a path value", (_what, value) => {
+    expect(() => ApiCall.to(resolveTarget("getSession")).pathValues([value], undefined)).toThrow(
+      /Invalid session_id/,
+    );
+  });
+
+  it("refuses a dot segment given in the path", () => {
+    expect(() => ApiCall.to(resolveTarget("/sessions/..")).pathValues([], undefined)).toThrow(
+      /Invalid session_id/,
     );
   });
 
@@ -142,7 +167,7 @@ describe("ApiCall.request", () => {
     ).toEqual({ filter: [{ field: "status", operation: "equals", value: "active" }] });
   });
 
-  it("lays the fields over --input", () => {
+  it("lays the fields over --file", () => {
     expect(
       requestFor("queryUsers", ["limit=5"], { input: { limit: 1, sorting: { field: "id" } } }).body,
     ).toEqual({ limit: 5, sorting: { field: "id" } });
@@ -162,9 +187,9 @@ describe("ApiCall.request", () => {
     expect(requestFor("getLive")).not.toHaveProperty("body");
   });
 
-  it("refuses --input for an operation that takes no body", () => {
+  it("refuses --file for an operation that takes no body", () => {
     expect(() => requestFor("getLive", [], { input: {} })).toThrow(
-      "getLive takes no body, but --input gave one",
+      "getLive takes no body, but --file gave one",
     );
   });
 
@@ -246,7 +271,7 @@ describe("ApiCall.readInput", () => {
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      hint: "Pipe a body in and pass --input -, or pass --input <path>.",
+      hint: "Pipe a body in and pass --file -, or pass --file <path>.",
       nextCommands: [{ id: "setup" }],
     });
   });

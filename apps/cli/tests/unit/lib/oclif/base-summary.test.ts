@@ -43,7 +43,7 @@ class SummarisingCommand extends BaseCommand {
     try {
       return this.emit(result);
     } finally {
-      this.ui.releaseNarration();
+      this.ui.stopPrintingLogs();
     }
   }
 }

@@ -131,6 +131,17 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
   }
 
   /**
+   * What the change did, as the lines of a result.
+   *
+   * @param change - The change.
+   * @param written - The paths it wrote.
+   * @returns The lines.
+   */
+  saying(change: Change, written?: readonly string[]): string[] {
+    return this.said(change, written);
+  }
+
+  /**
    * Makes a change that may leave no way to sign in, without a run.
    *
    * @param target - The schema the change is to.
@@ -596,36 +607,42 @@ describe("AuthMethodCommand.write", () => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const recorded = recordLog();
+    const change = aNewSchema(read);
 
-    await writer.writeChange(read, aNewSchema(read));
+    const written = await writer.writeChange(read, change);
 
-    recorded.stop();
-    expect(recorded.said).toEqual([{ level: "done", text: `Wrote ${NEW_SCHEMA_FILE}` }]);
+    expect(writer.saying(change, written)).toEqual([`Wrote ${NEW_SCHEMA_FILE}`]);
   });
 
   it("says it updated a file the change edits", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const recorded = recordLog();
+    const change = read.config.schemas.enable(read.schema, "password");
 
-    await writer.writeChange(read, read.config.schemas.enable(read.schema, "password"));
+    const written = await writer.writeChange(read, change);
 
-    recorded.stop();
-    expect(recorded.said).toEqual([{ level: "done", text: `Updated ${SCHEMA_FILE}` }]);
+    expect(writer.saying(change, written)).toEqual([`Updated ${SCHEMA_FILE}`]);
   });
 
   it("says it removed a file the change deletes", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const recorded = recordLog();
+    const change = read.config.schemas.remove(SCHEMA_FILE);
 
-    await writer.writeChange(read, read.config.schemas.remove(SCHEMA_FILE));
+    const written = await writer.writeChange(read, change);
 
-    recorded.stop();
-    expect(recorded.said).toEqual([{ level: "done", text: `Removed ${SCHEMA_FILE}` }]);
+    expect(writer.saying(change, written)).toEqual([`Removed ${SCHEMA_FILE}`]);
+  });
+
+  it("says it would remove a file the change deletes, when nothing is written", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
+    const read = await target(cwd);
+    const writer = new ChangeWriter([], CONFIG);
+    const change = read.config.schemas.remove(SCHEMA_FILE);
+
+    expect(writer.saying(change)).toEqual([`Would remove ${SCHEMA_FILE}`]);
   });
 
   it("writes the change to the Project", async ({ dir }) => {
