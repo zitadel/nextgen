@@ -284,7 +284,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 		}
 	}
 
-	if err := s.attachSignupGate(ctx, req.Definition, &result); err != nil {
+	if err := s.attachSignupGate(ctx, s.flowDefinitions(req.Definition.ProjectID, req.Definition), &result); err != nil {
 		return flowengine.StepResult{}, err
 	}
 	return flowengine.StepResult{State: result.State, Step: result.Step}, nil
@@ -298,9 +298,10 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res fl
 	if req.State == nil {
 		return flowengine.StepResult{}, fmt.Errorf("flow service: submit without state")
 	}
+	defs := s.flowDefinitions(req.State.ProjectID)
 	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
-	def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.State.ProjectID, req.State.DefinitionID)
-	if err != nil {
+	// Loaded before the attempt is read; Process reads the loaded one.
+	if _, err := flowengine.ActiveDefinition(ctx, defs, req.State); err != nil {
 		return flowengine.StepResult{}, err
 	}
 	// A dead attempt fails every submission that reaches it, so the flow
@@ -324,11 +325,11 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res fl
 		in.SSOProvider = &flowengine.SSOProviderRef{ID: *req.SSOProviderID}
 	}
 	in.SSOReturn = req.SSOReturn
-	result, err := s.stateMachine.Process(ctx, def, req.State, in)
+	result, err := s.stateMachine.Process(ctx, defs, req.State, in)
 	if err != nil {
 		return flowengine.StepResult{}, err
 	}
-	if err := s.attachSignupGate(ctx, def, &result); err != nil {
+	if err := s.attachSignupGate(ctx, defs, &result); err != nil {
 		return flowengine.StepResult{}, err
 	}
 	return flowengine.StepResult{
@@ -348,15 +349,12 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	if req.State == nil {
 		return flowengine.StepResult{}, fmt.Errorf("flow service: get step without state")
 	}
-	def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.State.ProjectID, req.State.DefinitionID)
+	defs := s.flowDefinitions(req.State.ProjectID)
+	result, err := s.stateMachine.Render(ctx, defs, req.State)
 	if err != nil {
 		return flowengine.StepResult{}, err
 	}
-	result, err := s.stateMachine.Render(ctx, def, req.State)
-	if err != nil {
-		return flowengine.StepResult{}, err
-	}
-	if err := s.attachSignupGate(ctx, def, &result); err != nil {
+	if err := s.attachSignupGate(ctx, defs, &result); err != nil {
 		return flowengine.StepResult{}, err
 	}
 	// A render may resolve parked SSO state. Return its updated cookie before
@@ -379,6 +377,37 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	}, nil
 }
 
+// flowDefinitions loads one request's flow definitions by revision id and
+// keeps each it loaded, so the engine and the sign-up gate share one read.
+// A flow's state names a revision the release it started under pins, and
+// every later request runs under that sealed release.
+type flowDefinitions struct {
+	pool      *DB
+	projectID string
+	loaded    map[string]*domain.FlowDefinition
+}
+
+// flowDefinitions starts the request's definitions with those already loaded.
+func (s *flowService) flowDefinitions(projectID string, loaded ...*domain.FlowDefinition) *flowDefinitions {
+	defs := &flowDefinitions{pool: s.v2Pool, projectID: projectID, loaded: map[string]*domain.FlowDefinition{}}
+	for _, def := range loaded {
+		defs.loaded[def.ID] = def
+	}
+	return defs
+}
+
+func (d *flowDefinitions) Definition(ctx context.Context, id string) (*domain.FlowDefinition, error) {
+	if def, ok := d.loaded[id]; ok {
+		return def, nil
+	}
+	def, err := d.pool.Statements().GetFlowDefinitionByID(ctx, d.projectID, id)
+	if err != nil {
+		return nil, err
+	}
+	d.loaded[id] = def
+	return def, nil
+}
+
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
 	_, ok := def.Purposes[purpose]
 	return ok
@@ -387,12 +416,15 @@ func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinition
 // attachSignupGate announces the sign-up gate on a step whose next submit
 // spends the sign-up proof: one whose on_success declares it, or one carrying a
 // passkey registration that creates its user. Runtime enforcement does not
-// depend on template markup or client-selected purpose.
-// def must be the definition result.State names: Process refuses cross-flow
-// transitions, so it always is today. Pivots must look the step up in theirs.
-func (s *flowService) attachSignupGate(ctx context.Context, def *domain.FlowDefinition, result *flowengine.StepResult) error {
+// depend on template markup or client-selected purpose. The step is looked up
+// in the definition of the flow active in result.State.
+func (s *flowService) attachSignupGate(ctx context.Context, defs flowengine.Definitions, result *flowengine.StepResult) error {
 	if result.Step == nil || result.State == nil {
 		return nil
+	}
+	def, err := flowengine.ActiveDefinition(ctx, defs, result.State)
+	if err != nil {
+		return err
 	}
 	step, ok := def.FindStep(result.Step.Name)
 	if ok && step.OnSuccessSpec().SpendsSignupProof {

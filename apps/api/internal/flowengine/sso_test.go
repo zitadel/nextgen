@@ -67,7 +67,7 @@ func TestFlowStateMachine_Process_SSO_EmitsRedirectStep(t *testing.T) {
 			BindingNonce: "nonce-1",
 		}, nil)
 
-	result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 		Action:      domain.FlowActionSSO,
 		SSOProvider: &flowengine.SSOProviderRef{ID: "google"},
 		SSOReturn:   ssoSubmitReturn,
@@ -125,7 +125,7 @@ func TestFlowStateMachine_Process_SSO_InvalidSubmissions(t *testing.T) {
 			def := ssoStepDefinition()
 			state := startSSOStepFlow(t, w, def)
 
-			_, err := w.sm.Process(t.Context(), def, state, tt.in)
+			_, err := w.sm.Process(t.Context(), served(def), state, tt.in)
 			require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
 		})
 	}
@@ -137,7 +137,7 @@ func TestFlowStateMachine_Process_SSO_ReturnParamsMissing(t *testing.T) {
 	def := ssoStepDefinition()
 	state := startSSOStepFlow(t, w, def)
 
-	_, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+	_, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 		Action:      domain.FlowActionSSO,
 		SSOProvider: &flowengine.SSOProviderRef{ID: "google"},
 	})
@@ -157,7 +157,7 @@ func TestFlowStateMachine_Process_SSO_ProviderUnavailableReRendersStep(t *testin
 		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
 
-	result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 		Action:      domain.FlowActionSSO,
 		SSOProvider: &flowengine.SSOProviderRef{ID: "google"},
 		SSOReturn:   ssoSubmitReturn,
@@ -203,7 +203,7 @@ func TestFlowStateMachine_Process_SSO_IssueErrors(t *testing.T) {
 			state := startSSOStepFlow(t, w, def)
 			w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).Return(flowengine.SSORedirectOutput{}, tt.issue)
 
-			_, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{
+			_, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
 				Action:      domain.FlowActionSSO,
 				SSOProvider: &flowengine.SSOProviderRef{ID: "google"},
 				SSOReturn:   ssoSubmitReturn,
@@ -344,7 +344,7 @@ func TestFlowStateMachine_Process_ReRenderResolvesSSOProvidersAgain(t *testing.T
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -483,7 +483,7 @@ func TestFlowStateMachine_Render_SSOReplayGuardSkipsResolution(t *testing.T) {
 		Return(nil, nil)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
@@ -497,7 +497,7 @@ func TestFlowStateMachine_Render_NoParkedIdentityRendersStep(t *testing.T) {
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(nil, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
@@ -511,7 +511,7 @@ func TestFlowStateMachine_Render_SSORestartRequiredPropagates(t *testing.T) {
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(nil, domain.ErrFlowRestartRequired())
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
@@ -522,7 +522,7 @@ func TestFlowStateMachine_Render_DeadAttemptRestartsStepWithoutSSO(t *testing.T)
 	w, _, state := ssoRenderWorld(t)
 	w.expectParked(nil, domain.ErrFlowRestartRequired())
 
-	_, err := w.sm.Render(t.Context(), signupDefinition(), state)
+	_, err := w.sm.Render(t.Context(), served(signupDefinition()), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
@@ -533,7 +533,7 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
@@ -551,7 +551,7 @@ func TestFlowStateMachine_Render_SSOParkedErrorRendersStepError(t *testing.T) {
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
@@ -621,7 +621,7 @@ func TestFlowStateMachine_Render_SSOCollisionRoutesUserAlreadyExists(t *testing.
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
@@ -638,7 +638,7 @@ func TestFlowStateMachine_Render_SSOCollisionFlipsRegisterToLogin(t *testing.T) 
 	w.expectOwner("email", "alice@example.com", "user-9")
 	w.expectBindCollision("user-9", nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.CurrentPurpose)
 	require.NotNil(t, result.Step.Notice, "the sign-up continues as a sign-in, so the step says why")
@@ -656,7 +656,7 @@ func TestFlowStateMachine_Render_SSOCollisionBindOnDeadAttemptRestarts(t *testin
 	w.expectBindCollision("user-9", domain.ErrFlowRestartRequired())
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID)
 }
@@ -674,7 +674,7 @@ func TestFlowStateMachine_Render_SSOCollisionOwnerOfAnotherSchemaRestarts(t *tes
 	w.ssoIdentities.EXPECT().BindCollision(gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID)
 }
@@ -760,7 +760,7 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 				w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserInvalid())
 			}
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantStep, result.Step.Name)
 			if tc.wantErr == "" {
@@ -798,7 +798,7 @@ func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) 
 		Handoff(gomock.Any(), flowengine.HandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
 		Return(flowengine.HandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "done", result.Step.Name)
 	assert.Equal(t, "handoff-1", result.HandoffToken)
@@ -818,7 +818,7 @@ func TestFlowStateMachine_Render_SSOAutoCreateClearsBackStack(t *testing.T) {
 	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("user-new", nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "enroll", result.Step.Name)
 	assert.Equal(t, "user-new", result.State.CollectedData.UserID)
@@ -842,7 +842,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotCreate(t *testing
 			w.expectOwner("username", "alice", "")
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
@@ -872,7 +872,7 @@ func TestFlowStateMachine_Render_SSOCreateUniqueRaceFallsThroughToCollision(t *t
 		w.expectBindCollision("user-9", nil),
 	)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
@@ -889,7 +889,7 @@ func TestFlowStateMachine_Render_SSOCreateUniqueRaceWithoutOwnerRoutesUserNotFou
 	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(6)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 	assert.Empty(t, result.State.CollectedData.UserID)
@@ -907,7 +907,7 @@ func TestFlowStateMachine_Render_SSOMissingRequiredRoutesUserNotFound(t *testing
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.State.CurrentPurpose)
@@ -934,7 +934,7 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueRoutesUserNotFound(t
 			w.expectOwner("username", "alice", "")
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "sso-register", result.Step.Name)
 		})
@@ -956,7 +956,7 @@ func TestFlowStateMachine_Render_SSOTeamUniqueClaimBindsOwnerWithoutTeam(t *test
 	)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
@@ -970,7 +970,7 @@ func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersStepError(t *testing.T)
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
 	w.expectOwner("email", "alice@example.com", "")
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
@@ -1000,7 +1000,7 @@ func TestFlowStateMachine_Render_SSOCollisionUnroutableDoesNotBind(t *testing.T)
 			w.ssoIdentities.EXPECT().BindCollision(gomock.Any(), gomock.Any()).Times(0)
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
@@ -1024,7 +1024,7 @@ func TestFlowStateMachine_Render_SSOCollisionWithPurposeStartsThatPurposeFresh(t
 	w.expectBindCollision("user-9", nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att-2", nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
@@ -1066,7 +1066,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T
 			w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
@@ -1089,7 +1089,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotRetryHandoff(t *t
 			setSSOAuthenticatedTransition(def, transition)
 			w.expectParked(&flowengine.SSOParkedIdentity{BoundUserID: "user-1"}, nil)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
@@ -1108,7 +1108,7 @@ func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrFlowRestartRequired())
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID, "nothing is recorded for the foreign user")
 	assert.Equal(t, "credentials", state.CurrentStep)
@@ -1121,7 +1121,7 @@ func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *t
 	w.expectParked(&flowengine.SSOParkedIdentity{BoundUserID: "u1"}, nil)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Empty(t, result.HandoffToken)
@@ -1143,7 +1143,7 @@ func TestFlowStateMachine_Render_SSOStaleBindAfterHandoffRestarts(t *testing.T) 
 	w.expectStaleBind(nil, domain.ErrFlowRestartRequired())
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
@@ -1155,7 +1155,7 @@ func TestFlowStateMachine_Render_SSOStaleBindOnReplacedRowRendersStep(t *testing
 	w.expectStaleBind(nil, nil)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
@@ -1184,7 +1184,7 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 			wire(w)
 			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			assert.Nil(t, result.Step.Error)
@@ -1258,7 +1258,7 @@ func TestFlowStateMachine_Render_SSOHandoff(t *testing.T) {
 				Handoff(gomock.Any(), flowengine.HandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
 				Return(flowengine.HandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			require.Equal(t, "done", result.Step.Name)
 			require.NotNil(t, result.Step.Complete)
@@ -1282,7 +1282,7 @@ func TestFlowStateMachine_Render_SSOCollisionStaleRowBindsNothing(t *testing.T) 
 	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
@@ -1305,7 +1305,7 @@ func TestFlowStateMachine_Render_SSOCollisionStaleRowAfterCreationRetriesHandoff
 		Return(flowengine.HandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
 		Times(1)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "done", result.Step.Name)
 	assert.Equal(t, "handoff-1", result.HandoffToken)
@@ -1320,7 +1320,7 @@ func TestFlowStateMachine_Render_SSOUnionTypedClaimDoesNotFailResolution(t *test
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com", "age": 42}, nil), nil)
 	w.expectOwner("email", "alice@example.com", "")
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 }
@@ -1339,7 +1339,7 @@ func TestFlowStateMachine_Render_SSOCollisionProbeMissesRecordNoProof(t *testing
 	w.expectOwner("username", "alice", "")
 	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 }
@@ -1356,7 +1356,7 @@ func TestFlowStateMachine_Render_SSOHandoffLostRace(t *testing.T) {
 			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
 				Return(flowengine.HandoffOutput{}, domain.ErrAuthAttemptAlreadyHandedOff())
 
-			_, err := w.sm.Render(t.Context(), def, state)
+			_, err := w.sm.Render(t.Context(), served(def), state)
 			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 			assert.ErrorIs(t, err, domain.ErrAuthAttemptAlreadyHandedOff())
 		})
@@ -1371,7 +1371,7 @@ func TestFlowStateMachine_Render_TerminalStepSkipsResolution(t *testing.T) {
 	state.CurrentStep = "done"
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "done", result.Step.Name)
 	// Marked complete, so GET /flows/{flow_id} can answer 410 for a finished flow.
@@ -1402,7 +1402,7 @@ func TestFlowStateMachine_Render_SSODottedPropertyFallsBackToCollection(t *testi
 	w.expectOwner("email", "alice@example.com", "")
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 }
@@ -1419,7 +1419,7 @@ func TestFlowStateMachine_Render_SSOCollisionOnAttemptBoundToOtherUserRestarts(t
 	w.ssoIdentities.EXPECT().BindCollision(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Equal(t, "u-a", state.CollectedData.UserID)
 }
@@ -1436,7 +1436,7 @@ func TestFlowStateMachine_Render_SSOCollisionOnAttemptBoundToSameUserBindsWithou
 	w.expectBindCollision("u-b", nil)
 	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
@@ -1453,7 +1453,7 @@ func TestFlowStateMachine_Render_SSOUnlinkedIdentityOnBoundAttemptRestarts(t *te
 	w.expectOwner("email", "alice@example.com", "")
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Equal(t, "u-a", state.CollectedData.UserID)
 }
@@ -1479,7 +1479,7 @@ func TestFlowStateMachine_Render_SSOComposedRequiredSchemaFallsBackToCollection(
 	w.expectOwner("email", "alice@example.com", "")
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 }
@@ -1498,11 +1498,11 @@ func TestFlowStateMachine_Render_SSOCollisionRetryAfterLostCookieRaisesAgain(t *
 	w.expectOwner("email", "alice@example.com", "user-9").Times(2)
 	w.expectBindCollision("user-9", nil).Times(2)
 
-	first, err := w.sm.Render(t.Context(), def, state)
+	first, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "sso-conflict", first.Step.Name)
 
-	retry, err := w.sm.Render(t.Context(), def, &lost)
+	retry, err := w.sm.Render(t.Context(), served(def), &lost)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", retry.Step.Name)
 	assert.Equal(t, "user-9", retry.State.CollectedData.UserID)
@@ -1528,7 +1528,7 @@ func TestFlowStateMachine_Render_SSOUnknownClaimIsNotPersisted(t *testing.T) {
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
 		Return(flowengine.HandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "done", result.Step.Name)
 }
@@ -1603,7 +1603,7 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 			}
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "sso-register", result.Step.Name)
 		})
@@ -1638,7 +1638,7 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueArrayFallsBackToColl
 		Return("", nil)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 }
@@ -1679,7 +1679,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing
 				}).
 				Return(&flowengine.SSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "sso-conflict", result.Step.Name)
 			assert.Equal(t, "u-b", result.State.CollectedData.UserID)
@@ -1709,7 +1709,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileUnroutableRendersError(t *
 			w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).
 				Return(&flowengine.SSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
@@ -1728,7 +1728,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersSte
 	state.CollectedData.UserID = "u-b"
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&flowengine.SSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
@@ -1745,7 +1745,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithUserIdentifiedBeforeSS
 	state.CollectedData.UserID = "u-b"
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&flowengine.SSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
@@ -1760,7 +1760,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithOtherUserRestarts(t *t
 	state.CollectedData.UserID = "u-a"
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&flowengine.SSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
@@ -1777,7 +1777,7 @@ func TestFlowStateMachine_Render_SSOUnlinkedIdentityOnSessionBoundAttemptRestart
 	w.expectOwner("email", "alice@example.com", "")
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID)
 }
@@ -1794,7 +1794,7 @@ func TestFlowStateMachine_Render_SSOCollisionOnSessionBoundAttemptSameOwnerBinds
 	w.expectOwner("email", "alice@example.com", "u-s")
 	w.expectBindCollision("u-s", nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "u-s", result.State.CollectedData.UserID)
@@ -1809,7 +1809,7 @@ func TestFlowStateMachine_Render_SSOCollisionMarkerWithDifferentAttemptUserResta
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).
 		Return(&flowengine.SSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-a", AttemptUserID: "u-b"}, nil)
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID)
 }
@@ -1877,7 +1877,7 @@ func TestFlowStateMachine_Render_SSOUserNotFoundPrefillsCollectionStep(t *testin
 	w.expectOwner("email", "alice@example.com", "")
 	w.expectCollected(parked, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "sso-register", result.Step.Name)
 	assert.Equal(t, map[string]string{"email": "alice@example.com", "given_name": "Alice"}, renderedValues(result.Step.Fields))
@@ -1897,7 +1897,7 @@ func TestFlowStateMachine_Render_SSOUserNotFoundOnSignInCarriesNotice(t *testing
 	w.expectOwner("email", "alice@example.com", "")
 	w.expectCollected(parked, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	require.Equal(t, "sso-register", result.Step.Name)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.Step.Purpose)
@@ -1913,7 +1913,7 @@ func TestFlowStateMachine_Render_SSOCollectionStepPrefillsClaimsBeforeCollected(
 	state.CollectedData.UserData = map[string]any{"email": "typed@example.com", "username": "typed", "given_name": "Typed"}
 	w.expectCollected(unlinkedParked(map[string]any{"email": "alice@example.com", "given_name": 42}, nil), nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
 		"email":      "alice@example.com",
@@ -1930,7 +1930,7 @@ func TestFlowStateMachine_Render_SSOCollectionStepWithoutParkedRowRendersEmpty(t
 	state.CollectedData.UserData = map[string]any{"email": "typed@example.com", "username": "typed"}
 	w.expectCollected(nil, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
+	result, err := w.sm.Render(t.Context(), served(def), state)
 	require.NoError(t, err)
 	assert.Nil(t, result.Step.Error)
 	assert.Empty(t, renderedValues(result.Step.Fields))
@@ -1980,7 +1980,7 @@ func TestFlowStateMachine_Render_SSOCollectionStepReadOnlyFields(t *testing.T) {
 			}
 			w.expectCollected(tc.parked, nil)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			var readOnly []string
 			for _, f := range result.Step.Fields {
@@ -1998,7 +1998,7 @@ func TestFlowStateMachine_Render_SSOCollectionStepLoadErrorPropagates(t *testing
 	w, def, state := collectionStepWorld(t)
 	w.expectCollected(nil, domain.ErrFlowRestartRequired())
 
-	_, err := w.sm.Render(t.Context(), def, state)
+	_, err := w.sm.Render(t.Context(), served(def), state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
@@ -2093,7 +2093,7 @@ func TestFlowStateMachine_Render_SSOCollectionStepRetriesHandoff(t *testing.T) {
 					Return(flowengine.HandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 			}
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			require.Equal(t, tc.wantStep, result.Step.Name)
 			assert.Equal(t, "user-1", result.State.CollectedData.UserID)
@@ -2131,7 +2131,7 @@ func TestFlowStateMachine_Render_SSOCollectionStepUnroutableRetry(t *testing.T) 
 			edit(&def.Steps[len(def.Steps)-1])
 			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-			result, err := w.sm.Render(t.Context(), def, state)
+			result, err := w.sm.Render(t.Context(), served(def), state)
 			require.NoError(t, err)
 			assert.Equal(t, "sso-register", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
@@ -2296,7 +2296,7 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 			}
 			w.expectCreateLinked(tc.wantAttributes, tc.wantPassword, "user-1", nil)
 
-			result, err := w.sm.Process(t.Context(), def, state, in)
+			result, err := w.sm.Process(t.Context(), served(def), state, in)
 			require.NoError(t, err)
 			require.Equal(t, "sso-conflict", result.Step.Name)
 			assert.Equal(t, "user-1", result.State.CollectedData.UserID)
@@ -2369,7 +2369,7 @@ func TestFlowStateMachine_Process_SSOCollectionBindsCollision(t *testing.T) {
 			w.expectCollected(unlinkedParked(tc.claims, nil), nil).Times(2)
 			tc.expect(w)
 
-			result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(tc.edit))
+			result, err := w.sm.Process(t.Context(), served(def), state, collectionSubmit(tc.edit))
 			require.NoError(t, err)
 			require.Equal(t, "sso-conflict", result.Step.Name)
 			assert.Equal(t, "user-9", result.State.CollectedData.UserID)
@@ -2593,7 +2593,7 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 				edit = func(map[string]any) {}
 			}
 
-			result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(edit))
+			result, err := w.sm.Process(t.Context(), served(def), state, collectionSubmit(edit))
 			require.NoError(t, err)
 			assert.Equal(t, "sso-register", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
@@ -2653,7 +2653,7 @@ func TestFlowStateMachine_Process_SSOCollectionStaleRow(t *testing.T) {
 				}).
 				Return(tc.reread, tc.rereadErr)
 
-			result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(map[string]any) {}))
+			result, err := w.sm.Process(t.Context(), served(def), state, collectionSubmit(func(map[string]any) {}))
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				return
@@ -2705,7 +2705,7 @@ func TestFlowStateMachine_Process_SSOCollectionRefusedSubmit(t *testing.T) {
 			// before the prefill, so it reads nothing.
 			w.ssoIdentities.EXPECT().LoadCollected(gomock.Any(), gomock.Any()).Return(nil, nil).Times(tc.wantReads)
 
-			_, err := w.sm.Process(t.Context(), def, state, in)
+			_, err := w.sm.Process(t.Context(), served(def), state, in)
 			require.ErrorIs(t, err, tc.wantErr)
 		})
 	}

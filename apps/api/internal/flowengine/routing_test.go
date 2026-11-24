@@ -41,7 +41,7 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   "alice@example.com",
@@ -74,7 +74,7 @@ func TestFlowStateMachine_FlipTable_LoginUserNotFoundFlipsToRegister(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
 	})
@@ -108,7 +108,7 @@ func TestFlowStateMachine_FlipTable_RecoveryPassthrough(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
 	})
@@ -207,7 +207,7 @@ func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t 
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action:    flowengine.ActionPasskey,
 		Fields:    map[string]any{"email": email},
 		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
@@ -311,7 +311,7 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 			})
 			require.NoError(t, err)
 
-			result, err := w.sm.Process(t.Context(), tt.def, start.State, flowengine.SubmitInput{
+			result, err := w.sm.Process(t.Context(), served(tt.def), start.State, flowengine.SubmitInput{
 				Action: flowengine.ActionSubmit,
 				Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "s3cret-pass"},
 			})
@@ -389,7 +389,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 
 	// Typo: dispatch returns user_not_found, no transition wired,
 	// engine surfaces a step error and the user stays on credentials.
-	typo, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	typo, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email, "x-auth-methods#password": incorrectPassword},
 	})
@@ -401,7 +401,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 
 	// Retry with the correct (known) email: still in login mode, so
 	// identifier resolves, password verifies, and the user signs in.
-	result, err := w.sm.Process(t.Context(), def, typo.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), typo.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email, "x-auth-methods#password": correctPassword},
 	})
@@ -539,7 +539,7 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	afterProfile, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterProfile, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -547,14 +547,14 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 	assert.Equal(t, "set-password", afterProfile.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterProfile.State.CurrentPurpose)
 
-	afterPassword, err := w.sm.Process(t.Context(), def, afterProfile.State, flowengine.SubmitInput{
+	afterPassword, err := w.sm.Process(t.Context(), served(def), afterProfile.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "create", afterPassword.State.CurrentStep)
 
-	done, err := w.sm.Process(t.Context(), def, afterPassword.State, flowengine.SubmitInput{
+	done, err := w.sm.Process(t.Context(), served(def), afterPassword.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 	})
 	require.NoError(t, err)
@@ -589,7 +589,7 @@ func TestFlowDispatch_RegisterEntry_IdentifierAlreadyExists_Flips(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "taken@example.com"},
 	})
@@ -637,7 +637,7 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -651,12 +651,12 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 	assert.Equal(t, flowengine.StepNoticeUserNotFound, *afterIdentify.Step.Notice)
 
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(nil, nil)
-	rendered, err := w.sm.Render(t.Context(), def, afterIdentify.State)
+	rendered, err := w.sm.Render(t.Context(), served(def), afterIdentify.State)
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, rendered.Step.Purpose)
 	assert.Nil(t, rendered.Step.Notice, "the notice belongs to the move, not to the step")
 
-	done, err := w.sm.Process(t.Context(), def, afterIdentify.State, flowengine.SubmitInput{
+	done, err := w.sm.Process(t.Context(), served(def), afterIdentify.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -693,7 +693,7 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "alice@example.com"},
 	})
@@ -706,7 +706,7 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 	require.NotNil(t, afterIdentify.Step.Notice, "the user asked to sign up, so the sign-in says why")
 	assert.Equal(t, flowengine.StepNoticeUserAlreadyExists, *afterIdentify.Step.Notice)
 
-	done, err := w.sm.Process(t.Context(), def, afterIdentify.State, flowengine.SubmitInput{
+	done, err := w.sm.Process(t.Context(), served(def), afterIdentify.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -749,7 +749,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "alice@example.com"},
 	})
@@ -757,7 +757,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 	assert.Equal(t, "new-password", afterIdentify.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRecovery, afterIdentify.State.CurrentPurpose)
 
-	_, err = w.sm.Process(t.Context(), def, afterIdentify.State, flowengine.SubmitInput{
+	_, err = w.sm.Process(t.Context(), served(def), afterIdentify.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "fresh-secret"},
 	})
@@ -815,7 +815,7 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 
 	// Empty fields would fail validation under a submit action; navigate
 	// must skip validation and follow the transition.
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: "cancel",
 		Fields: map[string]any{},
 	})
@@ -851,7 +851,7 @@ func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":    "not-an-email",
@@ -889,7 +889,7 @@ func TestFlowStateMachine_Process_NavigatePurposeSwitch_BothDirections(t *testin
 	require.NoError(t, err)
 	require.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
 
-	toRegister, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	toRegister, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: "register",
 		Fields: map[string]any{},
 	})
@@ -901,7 +901,7 @@ func TestFlowStateMachine_Process_NavigatePurposeSwitch_BothDirections(t *testin
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.Step.Purpose)
 	assert.Nil(t, toRegister.Step.Notice, "the user chose to sign up, so there is nothing to explain")
 
-	toLogin, err := w.sm.Process(t.Context(), def, toRegister.State, flowengine.SubmitInput{
+	toLogin, err := w.sm.Process(t.Context(), served(def), toRegister.State, flowengine.SubmitInput{
 		Action: "sign_in",
 		Fields: map[string]any{},
 	})
@@ -938,7 +938,7 @@ func TestFlowStateMachine_Process_NavigatePurposeSwitchWithoutTarget(t *testing.
 	})
 	require.NoError(t, err)
 
-	toRegister, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	toRegister, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: "register",
 		Fields: map[string]any{},
 	})
@@ -946,7 +946,7 @@ func TestFlowStateMachine_Process_NavigatePurposeSwitchWithoutTarget(t *testing.
 	assert.Equal(t, "register", toRegister.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
 
-	toLogin, err := w.sm.Process(t.Context(), def, toRegister.State, flowengine.SubmitInput{
+	toLogin, err := w.sm.Process(t.Context(), served(def), toRegister.State, flowengine.SubmitInput{
 		Action: "sign_in",
 		Fields: map[string]any{},
 	})
@@ -982,14 +982,14 @@ func TestFlowStateMachine_Process_NavigateClearsPendingChallenge(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action:    flowengine.ActionPasskey,
 		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	navigated, err := w.sm.Process(t.Context(), def, issued.State, flowengine.SubmitInput{
+	navigated, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
 		Action: "register",
 	})
 	require.NoError(t, err)
@@ -1040,13 +1040,13 @@ func TestFlowStateMachine_Process_RegistrationCompletesAfterNavSwitch(t *testing
 	})
 	require.NoError(t, err)
 
-	toRegister, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	toRegister, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: "register",
 	})
 	require.NoError(t, err)
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
 
-	afterEmail, err := w.sm.Process(t.Context(), def, toRegister.State, flowengine.SubmitInput{
+	afterEmail, err := w.sm.Process(t.Context(), served(def), toRegister.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -1054,7 +1054,7 @@ func TestFlowStateMachine_Process_RegistrationCompletesAfterNavSwitch(t *testing
 	assert.Equal(t, "register-password", afterEmail.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterEmail.State.CurrentPurpose)
 
-	done, err := w.sm.Process(t.Context(), def, afterEmail.State, flowengine.SubmitInput{
+	done, err := w.sm.Process(t.Context(), served(def), afterEmail.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -1112,7 +1112,7 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	require.NoError(t, err)
 
 	// Login mode resolves the existing user.
-	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -1120,7 +1120,7 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	require.Equal(t, "password", afterIdentify.State.CurrentStep)
 	require.Equal(t, "user_alice", afterIdentify.State.CollectedData.UserID)
 
-	back, err := w.sm.Process(t.Context(), def, afterIdentify.State, flowengine.SubmitInput{
+	back, err := w.sm.Process(t.Context(), served(def), afterIdentify.State, flowengine.SubmitInput{
 		Action: "back",
 	})
 	require.NoError(t, err)
@@ -1128,7 +1128,7 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 
 	// "Sign up" must start register mode fresh: no resolved user and no
 	// collected credential material.
-	toRegister, err := w.sm.Process(t.Context(), def, back.State, flowengine.SubmitInput{
+	toRegister, err := w.sm.Process(t.Context(), served(def), back.State, flowengine.SubmitInput{
 		Action: "register",
 	})
 	require.NoError(t, err)
@@ -1142,7 +1142,7 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 
 	// Re-identifying the same existing email in register mode routes
 	// through user_already_exists into password verification.
-	guarded, err := w.sm.Process(t.Context(), def, toRegister.State, flowengine.SubmitInput{
+	guarded, err := w.sm.Process(t.Context(), served(def), toRegister.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -1185,7 +1185,7 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 		if state.CurrentStep == "register" {
 			action = "sign_in"
 		}
-		result, err := w.sm.Process(t.Context(), def, state, flowengine.SubmitInput{Action: action})
+		result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{Action: action})
 		require.NoError(t, err)
 		state = result.State
 		require.LessOrEqual(t, len(state.BackStack), 1, "toggle %d must not grow the back stack", i)

@@ -512,18 +512,34 @@ type fakeStateMachine struct {
 func (f *fakeStateMachine) Start(ctx context.Context, in flowengine.StartInput) (flowengine.StepResult, error) {
 	f.gotStartCtx = ctx
 	f.gotStartInput = in
-	return f.startResult, f.startErr
+	return namesDefinition(f.startResult, in.Definition.ID), f.startErr
 }
 
-func (f *fakeStateMachine) Process(_ context.Context, def *domain.FlowDefinition, _ *flowengine.State, in flowengine.SubmitInput) (flowengine.StepResult, error) {
+func (f *fakeStateMachine) Process(ctx context.Context, defs flowengine.Definitions, state *flowengine.State, in flowengine.SubmitInput) (flowengine.StepResult, error) {
+	def, err := flowengine.ActiveDefinition(ctx, defs, state)
+	if err != nil {
+		return flowengine.StepResult{}, err
+	}
 	f.gotProcessDef = def
 	f.gotSubmitInput = in
-	return f.processResult, f.processErr
+	return namesDefinition(f.processResult, state.DefinitionID), f.processErr
 }
 
-func (f *fakeStateMachine) Render(_ context.Context, _ *domain.FlowDefinition, state *flowengine.State) (flowengine.StepResult, error) {
+func (f *fakeStateMachine) Render(ctx context.Context, defs flowengine.Definitions, state *flowengine.State) (flowengine.StepResult, error) {
+	if _, err := flowengine.ActiveDefinition(ctx, defs, state); err != nil {
+		return flowengine.StepResult{}, err
+	}
 	f.gotRenderState = state
-	return f.renderResult, f.renderErr
+	return namesDefinition(f.renderResult, state.DefinitionID), f.renderErr
+}
+
+// namesDefinition has a canned result's state name the definition the flow
+// runs on, as the engine's results do.
+func namesDefinition(result flowengine.StepResult, definitionID string) flowengine.StepResult {
+	if result.State != nil && result.State.DefinitionID == "" {
+		result.State.DefinitionID = definitionID
+	}
+	return result
 }
 
 // stubIDGen returns deterministic prefix_N ids.
@@ -990,6 +1006,33 @@ func TestFlowService_GetStep_GatesAPasskeyRegistrationThatCreatesItsUser(t *test
 			}
 		})
 	}
+}
+
+// The sign-up gate looks the step up in the definition the result's state
+// names, read through the request's definitions, and the definition Process
+// ran on is not read again.
+func TestFlowService_Submit_GateReadsTheActiveDefinition(t *testing.T) {
+	ran := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	ran.Steps = []domain.FlowDefinitionStep{{Name: "start"}}
+	active := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
+	active.Steps = []domain.FlowDefinitionStep{{Name: "start", OnSuccess: new(domain.FlowOnSuccessCreateUser)}}
+	state := &flowengine.State{ID: "flow_1", ProjectID: ran.ProjectID, Progress: flowengine.Progress{DefinitionID: ran.ID}, AuthAttemptID: "att_1"}
+	result := &flowengine.State{ID: "flow_1", ProjectID: ran.ProjectID, Progress: flowengine.Progress{DefinitionID: active.ID}, AuthAttemptID: "att_1"}
+	sm := &fakeStateMachine{processResult: flowengine.StepResult{State: result, Step: &flowengine.Step{Name: "start"}}}
+
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), ran.ProjectID, ran.ID).Return(ran, nil).Times(1)
+	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ran.ProjectID, "att_1").Return(&domain.AuthAttempt{ProjectID: ran.ProjectID, ID: "att_1"}, nil).Times(1)
+	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), active.ProjectID, active.ID).Return(active, nil).Times(1)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+
+	res, err := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{}, nil).
+		Submit(t.Context(), service.SubmitFlowRequest{State: state, Action: "submit"})
+	require.NoError(t, err)
+	assert.Same(t, ran, sm.gotProcessDef)
+	assert.True(t, res.Step.SignupRequired, "the gate read the step of the definition the result names")
 }
 
 func TestFlowService_SignupIssuanceCannotDiscardTransition(t *testing.T) {

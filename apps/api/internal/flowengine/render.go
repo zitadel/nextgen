@@ -11,9 +11,13 @@ import (
 // Render re-emits the current step without advancing. It refreshes IssuedAt
 // only when it resolves a parked SSO identity, the one render the handler
 // re-seals.
-func (r *Runtime) Render(ctx context.Context, def *domain.FlowDefinition, state *State) (StepResult, error) {
-	if def == nil || state == nil {
+func (r *Runtime) Render(ctx context.Context, defs Definitions, state *State) (StepResult, error) {
+	if defs == nil || state == nil {
 		return StepResult{}, fmt.Errorf("%w: render without definition or state", domain.ErrFlowIntegrity())
+	}
+	def, err := ActiveDefinition(ctx, defs, state)
+	if err != nil {
+		return StepResult{}, err
 	}
 	if result, reseal, err := r.resolveSSOIdentity(ctx, def, state); err != nil || result.Step != nil {
 		result.Reseal = reseal

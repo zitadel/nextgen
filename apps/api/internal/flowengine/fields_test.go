@@ -32,7 +32,7 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   "not-an-email",
@@ -71,7 +71,7 @@ func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
 	// The submit action collects the step's fields, so the required email
 	// the client left out entirely must surface as a per-field error rather
 	// than passing through to fail late at create_user.
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"x-auth-methods#password": "correct-horse-battery-staple",
@@ -137,7 +137,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterOmittedRequiredFieldKeepsStep(t
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action:    flowengine.ActionPasskeyRegister,
 		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
@@ -241,7 +241,7 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 	assert.Equal(t, domain.FlowFieldTypeText, streetField.Type)
 	assert.False(t, streetField.Required, "leaf under an optional parent is not required")
 
-	res, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	res, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":          "alice@example.com",
@@ -268,7 +268,7 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 	// A second step writing different leaves of the same object merges into
 	// the map already in state instead of replacing it, and a leaf more than
 	// one level down builds the intermediate objects it descends through.
-	final, err := w.sm.Process(t.Context(), def, res.State, flowengine.SubmitInput{
+	final, err := w.sm.Process(t.Context(), served(def), res.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"address.street":    "Main Street 1",
@@ -310,7 +310,7 @@ func walkToSetPassword(t *testing.T, w *flowTestWorld) (*domain.FlowDefinition, 
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.SubmitInput{
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "newcomer@example.com"},
 	})
@@ -332,7 +332,7 @@ func TestFlowStateMachine_NewPasswordStepCarriesThePolicyBounds(t *testing.T) {
 	assert.Equal(t, &domain.FlowFieldValidation{MinLength: 12, MaxLength: 32}, result.Step.Fields[0].Validation)
 	assert.Equal(t, 1, w.passwords.calls, "rendering the step reads the policy once")
 
-	refused, err := w.sm.Process(t.Context(), def, result.State, flowengine.SubmitInput{
+	refused, err := w.sm.Process(t.Context(), served(def), result.State, flowengine.SubmitInput{
 		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "ninechars"},
 	})
