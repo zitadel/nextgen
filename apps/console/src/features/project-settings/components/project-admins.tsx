@@ -7,6 +7,10 @@ import { type Removable, RemoveAdminDialog } from "./remove-admin-dialog";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
@@ -19,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { joinAnd, titleCase } from "@/lib/text";
 
 import type { api } from "@/api/zitadel";
@@ -87,10 +92,18 @@ export function ProjectAdmins({
   onChanged: () => void;
 }) {
   const rows = toRows(admins, grants, viewerUserId);
+  const scroll = useScrollEdges();
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <section aria-label="Admins" className="flex flex-col gap-4">
-      <div className={RESOURCE_TABLE_WRAP}>
+      {/* The row menu stays at the card's right edge while the rest scrolls
+          under it, so it is reachable on a phone. */}
+      <div
+        ref={scroll.ref}
+        data-scroll-start={scroll.edges.start || undefined}
+        data-scroll-end={scroll.edges.end || undefined}
+        className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_SCROLL}`}
+      >
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
@@ -100,7 +113,7 @@ export function ProjectAdmins({
                 say nothing about any of them. `Access` says what the design's
                 `Level` did and where it comes from. */}
               <ResourceHeadCell>Access</ResourceHeadCell>
-              <ResourceMenuHead className="w-15" />
+              <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -108,7 +121,7 @@ export function ProjectAdmins({
               <ResourceEmptyRow colSpan={3}>No admins to show.</ResourceEmptyRow>
             ) : (
               rows.map((row) => (
-                <ResourceRow key={row.key}>
+                <ResourceRow key={row.key} className="group">
                   <TableCell className={`${RESOURCE_CELL} text-foreground text-sm`}>
                     {/* No person/team glyph: the two look alike at 16px, so a team
                         row carries a label instead. */}
@@ -119,7 +132,9 @@ export function ProjectAdmins({
                     </span>
                   </TableCell>
                   <TableCell className={RESOURCE_CELL_MUTED}>{row.access}</TableCell>
-                  <TableCell className={RESOURCE_CELL}>
+                  <TableCell
+                    className={`${RESOURCE_MENU_CELL_NARROW} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`}
+                  >
                     {row.removable && (
                       <RowActions
                         projectId={projectId}

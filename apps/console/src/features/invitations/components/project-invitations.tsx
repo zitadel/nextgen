@@ -7,6 +7,10 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
@@ -28,7 +32,9 @@ import {
 } from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { formatDate } from "@/lib/date";
+import { cn } from "@/lib/utils";
 
 import { type InvitationsRead, readInvitations } from "../api";
 import {
@@ -43,6 +49,12 @@ import {
 import { ACTIONS, InvitationActions } from "./invitation-actions";
 import { InvitationCreatedDialog } from "./invitation-created";
 import { InviteMemberDialog } from "./invite-member-dialog";
+
+/** The card: the row menu stays at its right edge while the rest scrolls under it. */
+const WRAP = `${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_SCROLL}`;
+
+/** The pinned menu cell of a row. */
+const MENU_CELL = `${RESOURCE_MENU_CELL_NARROW} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`;
 
 /**
  * A project's invitations (root ADR 086 §6, #2855): every link an
@@ -116,6 +128,7 @@ function InvitationsTable({
   // The replacement's link, held here: the row it came from is gone by the
   // time the list reloads.
   const [replaced, setReplaced] = useState<CreatedInvitation | undefined>(undefined);
+  const scroll = useScrollEdges();
 
   if (invitations.length === 0) {
     return (
@@ -146,10 +159,15 @@ function InvitationsTable({
 
   return (
     <>
-      <div className={RESOURCE_TABLE_WRAP}>
-        {/* Wider than the shared minimum: the fixed columns alone are 668px,
+      <div
+        ref={scroll.ref}
+        data-scroll-start={scroll.edges.start || undefined}
+        data-scroll-end={scroll.edges.end || undefined}
+        className={WRAP}
+      >
+        {/* Wider than the shared minimum: the fixed columns alone are 660px,
             so at 36rem the name column had no width left and its text ran
-            under Role. This leaves it 196px before the card scrolls. */}
+            under Role. This leaves it 204px before the card scrolls. */}
         <Table className={`${RESOURCE_TABLE_FIXED} min-w-[54rem]`}>
           <TableHeader>
             <ResourceHeaderRow>
@@ -157,7 +175,7 @@ function InvitationsTable({
               <ResourceHeadCell className="w-32">Role</ResourceHeadCell>
               <ResourceHeadCell className="w-56">Invited by</ResourceHeadCell>
               <ResourceHeadCell className="w-64">Status</ResourceHeadCell>
-              <ResourceMenuHead className="w-15" />
+              <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -231,7 +249,7 @@ function InvitationRow({
         : undefined;
 
   return (
-    <ResourceRow>
+    <ResourceRow className="group">
       <TableCell className={RESOURCE_CELL}>
         <span className="flex min-w-0 items-center gap-2">
           <Avatar size="sm">
@@ -239,7 +257,16 @@ function InvitationRow({
               <User aria-hidden className="size-3" strokeWidth={1.5} />
             </AvatarFallback>
           </Avatar>
-          <span className="text-muted-foreground truncate text-xs leading-4">{name}</span>
+          {/* The row's name at the size and colour the Members tab gives a
+              person; a row nobody was named for says so in the muted tone. */}
+          <span
+            className={cn(
+              "truncate text-sm",
+              invitation.metadata?.name ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {name}
+          </span>
         </span>
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>{roleLabel(invitation)}</TableCell>
@@ -255,7 +282,7 @@ function InvitationRow({
           )}
         </span>
       </TableCell>
-      <TableCell className={RESOURCE_CELL}>
+      <TableCell className={MENU_CELL}>
         {actions && (
           <InvitationActions
             projectId={projectId}
