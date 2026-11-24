@@ -2018,7 +2018,7 @@ describe("deploy", () => {
 
         const result = await offTerminal(() => app.deployRendered());
 
-        expect(result).toPrintExactly("resources\n\nRelease ");
+        expect(result).toPrintExactly("or the live release has no commit.\n\nRelease ");
       });
 
       it("suggests listing the deployments once", async () => {

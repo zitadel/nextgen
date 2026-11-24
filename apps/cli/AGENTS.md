@@ -182,11 +182,13 @@
   utilities `tests/unit/lib/upgrade/layering.test.ts` lists.
 - `src/lib/upgrade` takes each of Zitadel's defaults (`defaults.ts`, `config.ts`) as an option, so a
   test or another product can swap it; the `upgrade` command does the CLI's part, `doctor --fix` too.
-- Say what a command is doing with `log` (`src/lib/ui/log.ts`) from a command or a
-  library alike, never a logger or stream of your own: the running command's
-  sink decides the look, and `--json` installs one that draws nothing; with no
-  sink installed, a line is written plainly. A unit test fails on a
-  `consola` import.
+- Say what a command is doing with `this.info`, `this.warn`, `this.fail` and `this.debug`
+  (`src/lib/oclif/loggable.ts`).
+- Say it from a wizard step or a library with `log` (`src/lib/ui/log.ts`), never a logger or
+  stream of your own. A unit test fails on a `consola` import.
+- A `log` line is for a person at a terminal: a terminal draws it, `--json` and a pipe drop it.
+  `warn` and `fail` stay, and `debug` with `--debug` goes to stderr.
+- Put anything a script reads in the command's result, never a `log` line.
 - Report a warning through `warnings.report` (`src/lib/ui/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.

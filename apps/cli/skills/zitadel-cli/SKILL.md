@@ -300,7 +300,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
 - **Streams.** Capture stdout and stderr separately when scripting, into files
   outside the app directory: `setup` scaffolds a new app only into an empty
   directory. The machine contract is one parseable JSON object on stdout;
-  installer, audit, and package-manager progress belongs on stderr.
+  installer, audit, and package-manager progress belongs on stderr. Without
+  `--json`, stdout that is not a terminal holds the command's result alone: log
+  and progress lines, such as `setup`'s per-file `Wrote …` lines, are written
+  only to a terminal, `--debug` detail goes to stderr, and the result opens with
+  its headline and lists the facts under it.
 
 ## Discovering commands
 

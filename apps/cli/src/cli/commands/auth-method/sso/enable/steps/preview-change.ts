@@ -1,5 +1,6 @@
 import {
-  drawMapping,
+  mappingLines,
+  registrationLines,
   type EnableServices,
   type Fact,
   payload,
@@ -25,12 +26,12 @@ const NOTHING_PUBLISHED: PublishedCredentials = {
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"flags" | "summary" | "preview" | "delivery">;
+type Needs = Fact<"flags" | "summary" | "preview" | "delivery" | "target" | "provider">;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "realRun" | "report">;
+type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "realRun" | "report" | "said">;
 
 /**
  * Ends a dry run with what would be written and stored, before anything is
@@ -82,7 +83,6 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
   async run(needs: Needs): Promise<CommandResult> {
     const real = await this.deps.realRun();
     this.deps.report(needs.preview);
-    drawMapping(needs.preview);
     const toStore = !needs.summary.reused
       ? [needs.delivery.names.clientId, needs.delivery.names.clientSecret].filter((name) => {
           return name !== undefined;
@@ -116,9 +116,14 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
       summary: {
         title,
         sections: [],
-        lines: said.slice(1).map((line) => {
-          return escapeControlCharacters(line);
-        }),
+        lines: [
+          ...registrationLines(needs),
+          ...this.deps.said(needs.preview),
+          ...mappingLines(needs.preview),
+          ...said.slice(1).map((line) => {
+            return escapeControlCharacters(line);
+          }),
+        ],
       },
       next: { commands: [real] },
     };

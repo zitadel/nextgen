@@ -54,7 +54,7 @@ class FailingCommand extends BaseCommand {
     await this.toMeta({ "no-telemetry": true, ...this.flags }, { source: "mock" });
   }
 
-  public async fail(error: Error): Promise<void> {
+  public async failWith(error: Error): Promise<void> {
     await this.open();
     try {
       await this.catch(error);
@@ -90,7 +90,7 @@ describe("BaseCommand errors", () => {
   it("prints the error block for a failure", async () => {
     const cmd = new FailingCommand(false);
 
-    await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port", { hint: "Use 1 to 65535." }));
+    await cmd.failWith(new ZitadelError("E_VALIDATION", "Bad port", { hint: "Use 1 to 65535." }));
 
     expect(cmd.stderr).toEqual(["Error: Bad port (E_VALIDATION)\nUse 1 to 65535."]);
   });
@@ -100,7 +100,7 @@ describe("BaseCommand errors", () => {
   it("keeps a normal command's failure on stderr at a terminal", async () => {
     const cmd = new FailingCommand(false);
 
-    await asTerminal(() => cmd.fail(new ZitadelError("E_VALIDATION", "Bad port")));
+    await asTerminal(() => cmd.failWith(new ZitadelError("E_VALIDATION", "Bad port")));
 
     expect(cmd.stderr.join("\n")).toContain("Bad port");
   });
@@ -108,7 +108,7 @@ describe("BaseCommand errors", () => {
   it("spells out the message and the hint, which name what the server answered", async () => {
     const cmd = new FailingCommand(false);
 
-    await cmd.fail(
+    await cmd.failWith(
       new ZitadelError("E_VALIDATION", "More than one deployment is live.", {
         hint: "Live origins: https://a.example\u001b[2Jwiped.",
       }),
@@ -123,7 +123,7 @@ describe("BaseCommand errors", () => {
   it("keeps the message as it came in the envelope, which a reader parses", async () => {
     const cmd = new FailingCommand(true);
 
-    await cmd.fail(new ZitadelError("E_VALIDATION", "Refused \u001b[2Jwiped"));
+    await cmd.failWith(new ZitadelError("E_VALIDATION", "Refused \u001b[2Jwiped"));
 
     expect(cmd.json).toEqual([expect.objectContaining({ message: "Refused \u001b[2Jwiped" })]);
   });
@@ -134,7 +134,7 @@ describe("BaseCommand errors", () => {
     vi.stubEnv("FORCE_COLOR", "");
     const cmd = new FailingCommand(false);
 
-    await cmd.fail(new ZitadelError("E_VALIDATION", "\u001b[31mBad port\u001b[39m"));
+    await cmd.failWith(new ZitadelError("E_VALIDATION", "\u001b[31mBad port\u001b[39m"));
 
     expect(cmd.stderr.join("\n")).not.toContain("\u001b");
     expect(cmd.stderr.join("\n")).toContain("Bad port");
@@ -144,7 +144,7 @@ describe("BaseCommand errors", () => {
     const cmd = new FailingCommand(false);
     new DrawnSpinner("Fetching users");
 
-    await asTerminal(() => cmd.fail(new ZitadelError("E_VALIDATION", "Bad port")));
+    await asTerminal(() => cmd.failWith(new ZitadelError("E_VALIDATION", "Bad port")));
 
     expect(DrawnSpinner.active.size).toBe(0);
   });
@@ -152,7 +152,7 @@ describe("BaseCommand errors", () => {
   it("prints nothing for Ctrl-C, which the terminal already shows, and still exits 130", async () => {
     const cmd = new FailingCommand(false);
 
-    await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled by user"));
+    await cmd.failWith(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
     expect(cmd.stderr).toEqual([]);
     expect(cmd.exitCode).toBe(130);
@@ -164,7 +164,7 @@ describe("BaseCommand errors", () => {
       new ZitadelError("E_CANCELLED", "Cancelled"),
     );
 
-    await cmd.fail(new Error("socket hang up"));
+    await cmd.failWith(new Error("socket hang up"));
 
     expect(cmd.json).toEqual([expect.objectContaining({ code: "E_CANCELLED" })]);
     expect(cmd.exitCode).toBe(130);
@@ -173,7 +173,7 @@ describe("BaseCommand errors", () => {
   it("still answers --json with the envelope for Ctrl-C", async () => {
     const cmd = new FailingCommand(true);
 
-    await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled by user"));
+    await cmd.failWith(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
     expect(cmd.json).toEqual([expect.objectContaining({ code: "E_CANCELLED" })]);
   });
@@ -188,7 +188,7 @@ describe("the one block every failure is shown as", () => {
   it("says a server's lowercase fragment as it was thrown", async () => {
     const cmd = new FailingCommand(false);
 
-    await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
+    await cmd.failWith(new ZitadelError("E_NOT_FOUND", "variable not found"));
 
     expect(cmd.stderr).toEqual(["Error: variable not found (E_NOT_FOUND)"]);
   });
@@ -196,7 +196,7 @@ describe("the one block every failure is shown as", () => {
   it("leaves the thrown message alone in the envelope", async () => {
     const cmd = new FailingCommand(true);
 
-    await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
+    await cmd.failWith(new ZitadelError("E_NOT_FOUND", "variable not found"));
 
     expect(cmd.json).toEqual([expect.objectContaining({ message: "variable not found" })]);
   });
@@ -204,7 +204,7 @@ describe("the one block every failure is shown as", () => {
   it("says why oclif refused the command line in the CLI's own words", async () => {
     const cmd = new FailingCommand(false);
 
-    await cmd.fail(
+    await cmd.failWith(
       refused(
         "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
       ),
@@ -219,7 +219,7 @@ describe("the one block every failure is shown as", () => {
   it("offers that command's help under Next:, not under oclif's own label", async () => {
     const cmd = new FailingCommand(false);
 
-    await cmd.fail(
+    await cmd.failWith(
       refused(
         "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
       ),
@@ -233,7 +233,7 @@ describe("the one block every failure is shown as", () => {
   it("offers the CLI's own help for a command line that names no command", async () => {
     const cmd = new NamelessCommand(false);
 
-    await cmd.fail(
+    await cmd.failWith(
       refused(
         "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
       ),
@@ -247,7 +247,7 @@ describe("the one block every failure is shown as", () => {
   it("gives the envelope the sentence and help command the terminal shows", async () => {
     const cmd = new FailingCommand(true);
 
-    await cmd.fail(
+    await cmd.failWith(
       refused(
         "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
       ),
@@ -272,7 +272,7 @@ describe("the follow-ups of a failure", () => {
   it("carry the directory the run was given", async () => {
     const cmd = new FailingCommand(true, [], { cwd: "/work/app" });
 
-    await cmd.fail(start);
+    await cmd.failWith(start);
 
     expect(cmd.json).toEqual([
       expect.objectContaining({ next_commands: ["npx @zitadel/cli@test start --cwd /work/app"] }),
@@ -282,7 +282,7 @@ describe("the follow-ups of a failure", () => {
   it("carry nothing when the run was given none", async () => {
     const cmd = new FailingCommand(true);
 
-    await cmd.fail(start);
+    await cmd.failWith(start);
 
     expect(cmd.json).toEqual([
       expect.objectContaining({ next_commands: ["npx @zitadel/cli@test start"] }),
@@ -292,7 +292,7 @@ describe("the follow-ups of a failure", () => {
   it("keep a directory they name themselves", async () => {
     const cmd = new FailingCommand(true, [], { cwd: "/work/app" });
 
-    await cmd.fail(
+    await cmd.failWith(
       new ZitadelError("E_VALIDATION", "Not running", {
         nextCommands: [{ id: "start", flags: { cwd: "/work" } }],
       }),
@@ -348,7 +348,7 @@ describe("a failure whose follow-up cannot be rendered", () => {
   it("is still reported, with its code and message", async () => {
     const cmd = new FailingCommand(true);
 
-    await cmd.fail(broken);
+    await cmd.failWith(broken);
 
     expect(cmd.json).toEqual([
       expect.objectContaining({ status: "error", code: "E_VALIDATION", message: "Not running" }),
@@ -358,7 +358,7 @@ describe("a failure whose follow-up cannot be rendered", () => {
   it("leaves out only the follow-up it cannot render", async () => {
     const cmd = new FailingCommand(true);
 
-    await cmd.fail(broken);
+    await cmd.failWith(broken);
 
     expect(cmd.json).toEqual([
       expect.objectContaining({ next_commands: ["npx @zitadel/cli@test start"] }),
@@ -387,10 +387,10 @@ describe("BaseCommand on an interrupted run", () => {
       asTerminal(async () => {
         await cmd.open();
         cmd.ui.say("something happened");
-        await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
+        await cmd.failWith(new ZitadelError("E_CANCELLED", "Cancelled"));
         // A real run ends by giving consola its reporters back; without it the
         // next command in this process keeps drawing into this chain.
-        cmd.ui.releaseNarration();
+        cmd.ui.stopPrintingLogs();
       }),
     );
 
@@ -404,8 +404,8 @@ describe("BaseCommand on an interrupted run", () => {
     const { stdout } = await printing(() =>
       asTerminal(async () => {
         await cmd.open();
-        await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
-        cmd.ui.releaseNarration();
+        await cmd.failWith(new ZitadelError("E_CANCELLED", "Cancelled"));
+        cmd.ui.stopPrintingLogs();
       }),
     );
 
@@ -421,7 +421,7 @@ describe("BaseCommand on an interrupted run", () => {
       asTerminal(async () => {
         await cmd.open();
         cmd.ui.say("something happened");
-        await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
+        await cmd.failWith(new ZitadelError("E_CANCELLED", "Cancelled"));
       }),
     );
 
@@ -439,8 +439,8 @@ describe("BaseCommand on a wizard that fails", () => {
     await asTerminal(async () => {
       await cmd.open();
       cmd.ui.say("something happened");
-      await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port"));
-      cmd.ui.releaseNarration();
+      await cmd.failWith(new ZitadelError("E_VALIDATION", "Bad port"));
+      cmd.ui.stopPrintingLogs();
     });
 
     expect(cmd.stderr.join("\n")).toContain("Bad port");
@@ -453,8 +453,8 @@ describe("BaseCommand on a wizard that fails", () => {
       asTerminal(async () => {
         await cmd.open();
         cmd.ui.say("something happened");
-        await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port"));
-        cmd.ui.releaseNarration();
+        await cmd.failWith(new ZitadelError("E_VALIDATION", "Bad port"));
+        cmd.ui.stopPrintingLogs();
       }),
     );
 

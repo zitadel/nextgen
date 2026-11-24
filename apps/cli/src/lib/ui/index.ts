@@ -62,6 +62,7 @@ export type { BoxAction } from "./box";
 export type { LogLevel, LogSink } from "./log";
 export { log } from "./log";
 export { Output } from "./output";
+export { announce } from "./plain";
 export type { Presentation } from "./presentation";
 export type { Report, Step } from "./progress";
 export type {

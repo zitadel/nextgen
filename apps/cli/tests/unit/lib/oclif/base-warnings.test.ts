@@ -27,7 +27,7 @@ class WarningCommand extends BaseCommand {
     throw new Error("unused");
   }
 
-  public async fail(error: Error): Promise<void> {
+  public async failWith(error: Error): Promise<void> {
     await this.toMeta({ "no-telemetry": true }, { source: "mock" });
     try {
       await this.catch(error);
@@ -172,7 +172,7 @@ describe("BaseCommand warnings", () => {
     cmd.jsonEnabled = () => true;
     warnings.report("reported early");
 
-    await cmd.fail(new Error("boom"));
+    await cmd.failWith(new Error("boom"));
 
     expect(cmd.json).toEqual([
       expect.objectContaining({ status: "error", warnings: ["reported early"] }),
