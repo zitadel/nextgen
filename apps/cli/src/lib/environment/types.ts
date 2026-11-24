@@ -89,8 +89,8 @@ export type InitialReleaseInput = {
   projectId: string;
   cwd: string;
   env: Record<string, string | undefined>;
-  json: boolean;
-  color: boolean;
+  json?: boolean;
+  color?: boolean;
   message: string;
   narrate: (notices: readonly string[]) => void;
 };

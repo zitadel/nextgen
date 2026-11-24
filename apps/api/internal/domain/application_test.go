@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/secrets"
 )
 
 func webClient(redirectURIs ...string) domain.ApplicationClientDocument {
@@ -18,7 +20,7 @@ func webClient(redirectURIs ...string) domain.ApplicationClientDocument {
 	}
 }
 
-func TestValidateApplicationDocument(t *testing.T) {
+func TestValidateRegisteredApplication(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -110,7 +112,7 @@ func TestValidateApplicationDocument(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := domain.ValidateApplicationDocument(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.clients})
+			err := domain.ValidateRegisteredApplication(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.clients})
 			if tt.wantErr == nil {
 				require.NoError(t, err)
 				return
@@ -126,7 +128,72 @@ func TestValidateApplicationDocument(t *testing.T) {
 	}
 }
 
-func TestApplicationClientsToCreate(t *testing.T) {
+func TestValidateRegisteredApplicationRefusesASecretVariable(t *testing.T) {
+	t.Parallel()
+
+	client := webClient("https://shop.example.com/cb")
+	client.Secret = new("${{ SHOP_WEB_SECRET }}")
+	err := domain.ValidateRegisteredApplication(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: []domain.ApplicationClientDocument{client}})
+	require.ErrorIs(t, err, domain.ErrApplicationInvalid(nil, nil))
+	var de domain.Error
+	require.True(t, errors.As(err, &de))
+	assert.Equal(t, map[string]string{
+		"/clients/0/secret": "only a client declared in a release names its secret; the server generates a registered client's secret",
+	}, de.Details)
+}
+
+func TestValidateDeclaredApplication(t *testing.T) {
+	t.Parallel()
+
+	declared := func(clientID, secret *string) domain.ApplicationClientDocument {
+		client := webClient("https://shop.example.com/cb")
+		client.Type = "confidential"
+		client.ClientID, client.Secret = clientID, secret
+		return client
+	}
+	withoutRedirect := declared(new("shop-web"), new("${{ SHOP_WEB_SECRET }}"))
+	withoutRedirect.RedirectURIs = nil
+	tests := []struct {
+		name   string
+		client domain.ApplicationClientDocument
+		want   map[string]string
+	}{
+		{
+			name:   "a client with its client_id and secret variable passes",
+			client: declared(new("shop-web"), new("${{ SHOP_WEB_SECRET }}")),
+		},
+		{
+			name:   "a client without its client_id or secret variable",
+			client: declared(nil, nil),
+			want: map[string]string{
+				"/clients/0/client_id": "a client declared in a release sets its client_id",
+				"/clients/0/secret":    "a confidential client declared in a release names the variable holding its secret",
+			},
+		},
+		{
+			name:   "the rules both writers share still hold",
+			client: withoutRedirect,
+			want:   map[string]string{"/clients/0/redirect_uris": "authorization_code requires at least one redirect URI"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := domain.ValidateDeclaredApplication(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: []domain.ApplicationClientDocument{tt.client}})
+			if tt.want == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, domain.ErrApplicationInvalid(nil, nil))
+			var de domain.Error
+			require.True(t, errors.As(err, &de))
+			assert.Equal(t, tt.want, de.Details)
+		})
+	}
+}
+
+func TestReviseRegisteredApplication(t *testing.T) {
 	t.Parallel()
 
 	current := domain.ApplicationDocument{Clients: []domain.ApplicationClientDocument{
@@ -142,7 +209,7 @@ func TestApplicationClientsToCreate(t *testing.T) {
 		wantDetails any
 	}{
 		{
-			name:     "on create every client is new",
+			name:     "every client of an application without clients is new",
 			document: []domain.ApplicationClientDocument{{Slug: "web"}, {Slug: "api", ClientID: new("289374592837459283@shop")}},
 			want:     []string{"web", "api"},
 		},
@@ -196,9 +263,16 @@ func TestApplicationClientsToCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := domain.ApplicationClientsToCreate(tt.current, domain.ApplicationDocument{Clients: tt.document})
+			current, err := json.Marshal(tt.current)
+			require.NoError(t, err)
+			old := &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop", Document: current}
+			_, added, _, err := domain.ReviseRegisteredApplication(old, domain.ApplicationDocument{Clients: tt.document}, []byte("{}"), secrets.NewRandomSecretGenerator())
 			if tt.wantErr == nil {
 				require.NoError(t, err)
+				var got []string
+				for _, client := range added {
+					got = append(got, client.Slug)
+				}
 				assert.Equal(t, tt.want, got)
 				return
 			}
@@ -207,6 +281,124 @@ func TestApplicationClientsToCreate(t *testing.T) {
 			ok := errors.As(err, &de)
 			require.True(t, ok)
 			assert.Equal(t, tt.wantDetails, de.Details)
+		})
+	}
+}
+
+// A release checks clients against every client the application ever
+// stored: it may drop one and declare it again, never under another
+// client_id.
+func TestReviseDeclaredApplication(t *testing.T) {
+	t.Parallel()
+
+	declared := &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop", IsDeclared: true}
+	stored := []*domain.ApplicationClient{
+		{Slug: "web", ClientID: "shop-web"},
+		{Slug: "api", ClientID: "shop-api"},
+	}
+
+	tests := []struct {
+		name        string
+		old         *domain.Application
+		document    []domain.ApplicationClientDocument
+		want        []*domain.ApplicationClient
+		wantErr     error
+		wantDetails any
+	}{
+		{
+			name:     "a dropped client is not an error",
+			old:      declared,
+			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+			want:     []*domain.ApplicationClient{},
+		},
+		{
+			name:     "a client declared again under its client_id is not created again",
+			old:      declared,
+			document: []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api")}, {Slug: "cli", ClientID: new("shop-cli")}},
+			want:     []*domain.ApplicationClient{{ProjectID: "prj", Slug: "cli", ClientID: "shop-cli"}},
+		},
+		{
+			name:        "a client declared again under another client_id",
+			old:         declared,
+			document:    []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api-2")}},
+			wantErr:     domain.ErrApplicationFieldImmutable(nil),
+			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
+		},
+		{
+			name:        "the location is the client's index in the new document",
+			old:         declared,
+			document:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}, {Slug: "api", ClientID: new("shop-api-2")}},
+			wantErr:     domain.ErrApplicationFieldImmutable(nil),
+			wantDetails: map[string][]string{"fields": {"/clients/1/client_id"}},
+		},
+		{
+			name:     "a new client with a reserved prefix",
+			old:      declared,
+			document: []domain.ApplicationClientDocument{{Slug: "cli", ClientID: new("client_mine")}},
+			wantErr:  domain.ErrApplicationInvalid(nil, nil),
+			wantDetails: map[string]string{
+				"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_",
+			},
+		},
+		{
+			name:     "a registered application",
+			old:      &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop"},
+			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+			wantErr:  domain.ErrApplicationRegistered(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			revised, got, err := tt.old.ReviseDeclaredApplication(stored, domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.document}, []byte("{}"))
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+				assert.Equal(t, &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop", IsDeclared: true, Document: []byte("{}")}, revised)
+				return
+			}
+			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantDetails == nil {
+				return
+			}
+			var de domain.Error
+			require.True(t, errors.As(err, &de))
+			assert.Equal(t, tt.wantDetails, de.Details)
+		})
+	}
+}
+
+// A client that leaves first_party out takes its writer's default; one that
+// sets it keeps it. Fields the server does not model stay as written.
+func TestFillFirstPartyDefaults(t *testing.T) {
+	t.Parallel()
+	document := []byte(`{"slug":"shop","x-note":12345678901234567890,"clients":[` +
+		`{"slug":"web"},{"slug":"api","first_party":true},{"slug":"cli","first_party":false}]}`)
+	tests := []struct {
+		name     string
+		declared bool
+		want     string
+	}{
+		{
+			name:     "declared",
+			declared: true,
+			want: `{"slug":"shop","x-note":12345678901234567890,"clients":[` +
+				`{"slug":"web","first_party":true},{"slug":"api","first_party":true},{"slug":"cli","first_party":false}]}`,
+		},
+		{
+			name: "registered",
+			want: `{"slug":"shop","x-note":12345678901234567890,"clients":[` +
+				`{"slug":"web","first_party":false},{"slug":"api","first_party":true},{"slug":"cli","first_party":false}]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := domain.FillFirstPartyDefaults(document, tt.declared)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, string(got))
 		})
 	}
 }

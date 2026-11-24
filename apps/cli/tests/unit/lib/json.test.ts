@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { deepMerge, parseJsonObject, setTopLevelJsonKey, stableStringify } from "@/lib/json";
+import {
+  deepMerge,
+  parseJsonObject,
+  setTopLevelJsonKey,
+  stableStringify,
+  wordOf,
+} from "@/lib/json";
 
 describe("setTopLevelJsonKey", () => {
   it("splices one value and leaves every other byte untouched", () => {
@@ -171,5 +177,17 @@ describe("deepMerge", () => {
     deepMerge(target, patch);
 
     expect([target, patch]).toEqual([{ a: { b: 1 } }, { a: { c: 2 } }]);
+  });
+});
+
+describe("wordOf", () => {
+  it("gives a string as it is, and anything else as the JSON it is", () => {
+    expect(wordOf("a b")).toBe("a b");
+    expect([wordOf(3), wordOf(true), wordOf({ a: 1 }), wordOf([1])]).toEqual([
+      "3",
+      "true",
+      '{"a":1}',
+      "[1]",
+    ]);
   });
 });

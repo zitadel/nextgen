@@ -18,7 +18,7 @@ func (h *Handler) PublishApplication(ctx context.Context, req *api.CreateApplica
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to encode application")
 	}
-	result, err := h.applicationService.CreateOrRevise(ctx, string(params.ProjectID), document)
+	result, err := h.applicationService.CreateOrReviseRegistered(ctx, string(params.ProjectID), document)
 	if err != nil {
 		return nil, err
 	}
@@ -30,6 +30,7 @@ func (h *Handler) PublishApplication(ctx context.Context, req *api.CreateApplica
 		ID:         app.ID,
 		RevisionID: app.RevisionID,
 		Slug:       app.Slug,
+		Declared:   app.Declared,
 		CreatedAt:  app.CreatedAt,
 		UpdatedAt:  app.UpdatedAt,
 		Definition: app.Definition,
@@ -59,11 +60,33 @@ func (h *Handler) GetApplication(ctx context.Context, params api.GetApplicationP
 	return &resp, nil
 }
 
+func (h *Handler) GetApplicationRevision(ctx context.Context, params api.GetApplicationRevisionParams) (api.GetApplicationRevisionRes, error) {
+	projectID := string(params.ProjectID)
+	entity, err := h.applicationService.GetRevision(ctx, projectID, string(params.RevisionID))
+	if err != nil {
+		// A miss answers as a revision of an application outside the caller's
+		// scope does, so an unknown id reads like a hidden one (#2112).
+		if accessErr := h.requireTargetAccess(ctx, projectID, string(params.RevisionID), applicationAccess, opRead); accessErr != nil {
+			return nil, accessErr
+		}
+		return nil, err
+	}
+	if _, err := h.requireResourceAccessInProject(ctx, projectID, entity.ID, applicationAccess, opRead); err != nil {
+		return nil, err
+	}
+	resp, err := toAPIApplicationResponse(entity)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 func toAPIApplicationResponse(entity *domain.Application) (api.ApplicationResponse, error) {
 	resp := api.ApplicationResponse{
 		ID:         entity.ID,
 		RevisionID: entity.RevisionID,
 		Slug:       entity.Slug,
+		Declared:   entity.IsDeclared,
 		CreatedAt:  entity.CreatedAt,
 		UpdatedAt:  entity.UpdatedAt,
 	}
@@ -75,13 +98,16 @@ func toAPIApplicationResponse(entity *domain.Application) (api.ApplicationRespon
 
 func applicationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
-	case domain.ErrApplicationNotFound().Code:
+	case domain.ErrApplicationNotFound().Code, domain.ErrApplicationClientNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrApplicationClientSecretInvalid().Code:
+		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
 	case domain.ErrApplicationFieldImmutable(nil).Code, domain.ErrApplicationInvalid(nil, nil).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrApplicationPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrApplicationClientIDTaken().Code, domain.ErrApplicationRevisionConflict().Code:
+	case domain.ErrApplicationClientIDTaken().Code, domain.ErrApplicationRevisionConflict().Code,
+		domain.ErrApplicationDeclared().Code, domain.ErrApplicationRegistered().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)

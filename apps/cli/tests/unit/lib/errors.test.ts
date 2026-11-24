@@ -637,6 +637,13 @@ describe("a failure as a person is shown it", () => {
       expect(failureText(refused).sentence).toBe("Missing required flag kind");
     });
 
+    it("says a flag typed twice was a refused command line too", () => {
+      expect(failureText("Flag --input can only be specified once")).toEqual({
+        sentence: "Flag --input can only be specified once",
+        misuse: true,
+      });
+    });
+
     it("says the command line was refused, so --help can be offered under Next:", () => {
       expect(failureText(refused).misuse).toBe(true);
     });

@@ -1,7 +1,7 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -18,6 +18,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 const FLOWS_URL = "http://localhost/api/v1/flow_definitions";
 const FLOW_URL = "http://localhost/api/v1/flow_definitions/flow_1";
 const SCHEMAS_URL = "http://localhost/api/v1/schemas";
+const BRANDING_URL = "http://localhost/api/v1/branding";
 
 /**
  * A definition serving both purposes out of order, so the row's fixed purpose
@@ -129,7 +130,7 @@ describe("login flows list", () => {
       await renderAt("/flow-definitions");
       expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
       expect(screen.getByText("Error 500")).toBeInTheDocument();
-      expect(screen.getByText("boom")).toBeInTheDocument();
+      expect(screen.getByText("Boom")).toBeInTheDocument();
       // The reference to quote is the request ID from the response; the code
       // would only repeat the sentence.
       expect(screen.getByText("req_01TEST")).toBeInTheDocument();
@@ -169,6 +170,25 @@ describe("login flows list", () => {
 });
 
 describe("login flow detail", () => {
+  // The canvas paints in the project's branding; none published by default.
+  beforeEach(() => {
+    server.use(http.get(BRANDING_URL, () => HttpResponse.json({ branding: [] })));
+  });
+
+  it("draws the canvas when the branding cannot be read", async () => {
+    server.use(
+      http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
+      http.get(SCHEMAS_URL, () => HttpResponse.json(schemasResponse())),
+      http.get(BRANDING_URL, () =>
+        HttpResponse.json({ code: "brand.permission_denied", message: "no" }, { status: 403 }),
+      ),
+    );
+    await renderAt("/flow-definitions/flow_1");
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Canvas" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Step identifier" })).toBeInTheDocument();
+  });
+
   it("renders the steps table, the schema card and the flow id", async () => {
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),

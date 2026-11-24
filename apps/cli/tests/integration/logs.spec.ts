@@ -106,6 +106,19 @@ describe("logs", () => {
         });
       });
 
+      it("refuses to follow when the environment turned JSON mode on", async () => {
+        const app = await aSetUpApp();
+        const started = await app.startLocalServer({ shape: "logging" });
+
+        const result = await app.run(["logs", "--follow"], { ZITADEL_CONTENT_TYPE: "json" });
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          source: `http://localhost:${app.localPortOf(started)}`,
+        });
+      });
+
       it("returns every line the server logged", async () => {
         const app = await aSetUpApp();
         const started = await app.startLocalServer({ shape: "logging" });

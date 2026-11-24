@@ -4,7 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
+import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/cli/core";
 
 const platform = usePlatformMock();
 
@@ -402,8 +402,10 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Validated the preview for 1 URL and deployed nothing (dry run)",
+            title: "Would deploy the preview to 1 URL (dry run)",
             dry_run: true,
+            verb: "deploy",
+            topic: "preview",
             targets: [PREVIEW_URL],
             next_commands: [
               expectedPublicCliCommand(app.againAsRun(`preview --origin ${PREVIEW_URL}`)),
@@ -437,8 +439,10 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Validated the preview for 2 URLs and deployed nothing (dry run)",
+            title: "Would deploy the preview to 2 URLs (dry run)",
             dry_run: true,
+            verb: "deploy",
+            topic: "preview",
             targets: [PREVIEW_URL, OTHER_URL],
             next_commands: [
               expectedPublicCliCommand(
@@ -469,8 +473,10 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Validated the preview for 1 URL and deployed nothing (dry run)",
+            title: "Would deploy the preview to 1 URL (dry run)",
             dry_run: true,
+            verb: "deploy",
+            topic: "preview",
             targets: ["https://w\u001b[2J-acme.vercel.app"],
             next_commands: [
               expectedPublicCliCommand(
@@ -546,7 +552,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
-          data: { title: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build" },
+          data: { title: "Nothing to preview: set ZITADEL_ENV=preview in the pull-request build" },
           warnings: [UNNAMED_CI_WARNING],
         });
       });
@@ -567,7 +573,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
-          data: { title: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build" },
+          data: { title: "Nothing to preview: set ZITADEL_ENV=preview in the pull-request build" },
           warnings: [UNNAMED_CI_WARNING],
         });
       });
@@ -768,7 +774,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
-          data: { title: "nothing to preview — production is deployed after merge" },
+          data: { title: "Nothing to preview: production is deployed after merge" },
         });
       });
 
@@ -790,7 +796,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
-          data: { title: "nothing to preview — production is deployed after merge" },
+          data: { title: "Nothing to preview: production is deployed after merge" },
         });
       });
 
@@ -821,7 +827,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "no-preview-credential",
-          data: { title: "no preview credential (ZITADEL_PROJECT_SECRET) — preview skipped" },
+          data: { title: "Preview skipped: no preview credential (ZITADEL_PROJECT_SECRET)" },
           warnings: [
             `No preview credential (${CREDENTIALS[PREVIEW_CREDENTIAL]}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
           ],
@@ -903,7 +909,7 @@ describe("preview", () => {
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run"]);
 
         const lines = result.stdout.split("\n");
-        expect(lines[0]).toBe("Validated the preview for 1 URL and deployed nothing (dry run)");
+        expect(lines[0]).toBe("Would deploy the preview to 1 URL (dry run)");
         expect(lines[1]).toBe(`  - ${PREVIEW_URL}`);
       });
 
@@ -936,7 +942,7 @@ describe("preview", () => {
 
         const result = await app.run(["preview", "--env", "production", "--origin", PREVIEW_URL]);
 
-        expect(result.stdout).toBe("nothing to preview — production is deployed after merge\n");
+        expect(result.stdout).toBe("Nothing to preview: production is deployed after merge\n");
       });
 
       it("draws the headline of a skipped CI build, and warns once on stderr", async () => {
@@ -945,7 +951,7 @@ describe("preview", () => {
         const result = await app.run(["preview", "--origin", PREVIEW_URL], { CI: "true" });
 
         expect(result.stdout).toBe(
-          "nothing to preview — set ZITADEL_ENV=preview in the pull-request build\n",
+          "Nothing to preview: set ZITADEL_ENV=preview in the pull-request build\n",
         );
         expect(result.stderr.split(UNNAMED_CI_WARNING)).toHaveLength(2);
       });
@@ -956,7 +962,7 @@ describe("preview", () => {
         const result = await app.run(["preview", "--env", "preview", "--origin", PREVIEW_URL]);
 
         expect(result.stdout).toBe(
-          `no preview credential (${CREDENTIALS[PREVIEW_CREDENTIAL]}) — preview skipped\n`,
+          `Preview skipped: no preview credential (${CREDENTIALS[PREVIEW_CREDENTIAL]})\n`,
         );
         expect(result.stderr.split("is set, so the preview is skipped")).toHaveLength(2);
       });

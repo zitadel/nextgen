@@ -55,7 +55,7 @@
         "$TURBO_ROOT$/apps/api/internal/domain/flow_definition.go",
         "$TURBO_ROOT$/apps/api/internal/domain/flow_definition_validator.go",
         "$TURBO_ROOT$/apps/api/internal/domain/flow_on_success.go",
-        "$TURBO_ROOT$/apps/api/internal/domain/flow_state_machine.go"
+        "$TURBO_ROOT$/apps/api/internal/flowengine/routing.go"
       ]
     }
   }

@@ -259,6 +259,7 @@ func TestAuthorizeShowsTheErrorPage(t *testing.T) {
 		{name: "missing_redirect_uri", set: map[string]string{"redirect_uri": ""}, wantStatus: http.StatusBadRequest},
 		{name: "clients_unavailable", clients: failing{domain.ErrUnavailable()}, wantStatus: http.StatusServiceUnavailable},
 		{name: "clients_fail", clients: failing{errors.New("boom")}, wantStatus: http.StatusInternalServerError},
+		{name: "release_revoked", clients: failing{domain.ErrReleaseRevoked()}, wantStatus: http.StatusNotFound},
 		{name: "oauth_off", settings: settings{}, wantStatus: http.StatusNotFound},
 		{name: "settings_without_deployment", settings: settings{settings: Settings{Enabled: true, ReleaseID: "rel_1"}}, wantStatus: http.StatusInternalServerError},
 		{name: "settings_without_release", settings: settings{settings: Settings{Enabled: true, DeploymentID: "dep_1"}}, wantStatus: http.StatusInternalServerError},

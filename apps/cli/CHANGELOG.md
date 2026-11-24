@@ -1,5 +1,79 @@
 # @zitadel/cli
 
+## 0.9.0
+
+### Patch Changes
+
+- [#3252](https://github.com/zitadel/nextgen/pull/3252) [`e15e31c`](https://github.com/zitadel/nextgen/commit/e15e31cb1c830242249d72dbe3671d2877d89a48) - A line the CLI logs for a person, such as the wait for the browser step in `claim`, is no longer written to stdout when it is not a terminal, so a script reading a pipe is given only the command's result. `server console` and `env add` now carry their links and the file they wrote in that result. `--debug` detail goes to stderr when stdout is not a terminal.
+- Updated dependencies [[`a106883`](https://github.com/zitadel/nextgen/commit/a106883f23592c2715d74477bcfa0d9b0d5067db), [`15cfcc3`](https://github.com/zitadel/nextgen/commit/15cfcc3e861a584936aac54dd4735b856bf73027)]:
+  - @zitadel/server@0.9.0
+  - @zitadel/api@0.9.0
+  - @zitadel/config@0.9.0
+
+## 0.8.0
+
+### Minor Changes
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - `zitadel api` reads its JSON body from `--file <path>` (or `--file -` for stdin), matching the body flag on the create and update commands and freeing `--input` for a whole invocation as JSON. The flows README that ships into customer projects names the new flag.
+  
+  **Breaking:** `api --input <path>` is now `api --file <path>`.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - `version`, `commands`, `which`, `help` and `autocomplete` answer `--json` with the same envelope as every other command, and a flag they refuse is the failure envelope with its exit code instead of oclif's whole error object. They still take their own flags (`commands --hidden`, `--tree`, `--columns`, `help --nested-commands`, `autocomplete --refresh-cache`).
+  
+  **Breaking:** `version --json` and `commands --json` print their result as the envelope's `data`, and `commands --json` holds its list under `data.result`.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - A command line the CLI refuses, including a flag typed twice, is one coded failure with the command's help as its next step, like every other failure, and no longer repeats the framework's own error text in the `--json` envelope.
+  
+  **Breaking:** a script that read `details.original` from such a failure no longer finds it.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - Every command that prints a list or a record takes `--fields`, and it cuts the records under `--json` as well as the table: `user list --fields id,email --json` and `variable get NAME --fields value --json` return only those paths, and a field the command does not carry is refused with the ones it does.
+  
+  **Breaking:** `--json` ignored `--fields` before, so a script that passed it and read the whole record must stop passing it.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - Every command now takes its whole invocation as one JSON document with `--input` (inline JSON, `@file.json` or `-` for stdin), also spelled `--flags-file` and `--cli-input-json`: the keys are the command's flag names, `args` holds the positionals, and only the global flags may stand beside it. A document cannot set `server`, `env`, `env-file`, `project` or `cwd`, so one read from elsewhere cannot point the run's credentials at another server or project; a document that is not JSON is refused without quoting its text, and a file that is not a regular file of at most 8 MB is refused.
+
+- [#2929](https://github.com/zitadel/nextgen/pull/2929) [`7f682da`](https://github.com/zitadel/nextgen/commit/7f682da73d3f38f8fd5f9268b7fafe3e6d13abdb) - `zitadel invitation create`, `list`, `get` and `cancel` invite people into a project with a shareable link, under "Users and access" in `zitadel --help`. `create` asks who the invitation is for and which role it grants, then prints the link, which expires in 72 hours; `--replaces` makes a new link for an earlier invitation. `list` leaves accepted invitations out unless `--status` asks for them, and `--status` can be repeated. `cancel` names who the invitation is for and its role before it asks, removes an expired or declined invitation as well as a pending one, refuses an accepted one with `E_VALIDATION`, and without an id offers the pending, expired and declined invitations to pick from. `create` and `cancel` report an anonymous `invitation_created` or `invitation_cancelled` event once the server confirms, carrying the role and a random journey ID, never a name, an invitation ID or the link; cancelling an expired or declined invitation reports none.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - `variable get`, `invitation get`, a resource's `get`, and a created or updated resource print the same plain text off a terminal as on one, and `--json` is the one way to get JSON.
+  
+  **Breaking:** these commands printed JSON when stdout was not a terminal, so a script that parsed it without `--json` must now pass `--json`.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - An update that sets a field to `null` removes it, so it now asks first on a terminal and needs `--force` when nothing can be asked, as a deletion does, and a refused one sends nothing. Every list also reports `truncated` beside `next_page_token`, `true` exactly when more remain.
+  
+  **Breaking:** a script that updated with `:=null` must now pass `--force`.
+
+- [#3264](https://github.com/zitadel/nextgen/pull/3264) [`caf1506`](https://github.com/zitadel/nextgen/commit/caf1506f461ffa52996f3811e4aeb3bf25778afe) - `@zitadel/sdk-react` now tells your own components who is signed in: the `useSession()` hook returns the session's status and the user's identity, shares one server read across the page and offers `refresh()`. Outside components, `sessionStore()` gives route guards and loaders the same read, and `getSession()` makes a single one. `zitadel setup` points React apps' agents at the hook.
+
+### Patch Changes
+
+- [#3206](https://github.com/zitadel/nextgen/pull/3206) [`8adf043`](https://github.com/zitadel/nextgen/commit/8adf04326b745d92f37b8de7c0dd07630525a4d5) - `zitadel api` says which server it called and which secret it sent when the server answers `401`, and its help shows how to update a user (`zitadel api updateUser <user_id> -F attributes.age=1`). A secret belongs to the project on one server, so the hint points at `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, `--env` and `--env-file`.
+
+- [#3203](https://github.com/zitadel/nextgen/pull/3203) [`0d82cf5`](https://github.com/zitadel/nextgen/commit/0d82cf5f8cde4697b8a53e6d456eb34a6533e605) - `deploy` and `deploy --dry-run` now warn when `theme.light.logo_url` or `theme.dark.logo_url` is a public `https` URL that does not serve an image, and name the field. Before, only the top-level `logo_url` and `hero_url` were checked.
+
+- [#3210](https://github.com/zitadel/nextgen/pull/3210) [`8884826`](https://github.com/zitadel/nextgen/commit/888482697cb5539700206d9c037a25d2be7a6a3c) - `zitadel doctor --fix` restores a missing `.zitadel/secret` from the project's credentials in `.env.development.local` and the origins the server reports, so a deleted secret no longer loops between `doctor --fix` and `setup`, which skips an app that is already set up. When `.env.development.local` does not hold the credentials, the repair says what is missing.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - `FORCE_COLOR=0` and `FORCE_COLOR=false` now turn colour off, as the variable's convention says, instead of forcing it on.
+
+- [#3183](https://github.com/zitadel/nextgen/pull/3183) [`ac397d4`](https://github.com/zitadel/nextgen/commit/ac397d4e1c059b0f77bda6b9edc79a73e05cdffc) - The CLI names its hosted server once, `preview.zitadel.com`, and reads it everywhere: the default server, the examples and hints, and the check for the hosted cloud. A host under `zitadel.cloud` is no longer taken for the hosted cloud.
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - An id of `.` or `..`, and a control character in an id or in an `api` path value, is refused as a validation failure before a request is made, and `api` sends a path id without surrounding whitespace.
+
+- [#3033](https://github.com/zitadel/nextgen/pull/3033) [`5901843`](https://github.com/zitadel/nextgen/commit/590184327aaa72270f71d0096b8d525ed6f1b77c) - `zitadel setup` now creates Next.js apps on Next.js 16.4.6 instead of 16.4.2, which lacked the security fixes in 16.4.5, React, Vue, Solid, Svelte and Qwik apps with create-vite 9.3.4, and Qwik Router apps with create-qwik 2.0.0-rc.5.
+
+- [#3205](https://github.com/zitadel/nextgen/pull/3205) [`2cd806d`](https://github.com/zitadel/nextgen/commit/2cd806d52f52252ab9de9b4736a1259eed33fb4a) - `deploy` no longer records a release as built from an uncommitted tree because of a file outside `.zitadel/`. A modified `package.json` or app file leaves the release clean, so the next `deploy --dry-run` still shows a diff.
+
+- [#3181](https://github.com/zitadel/nextgen/pull/3181) [`179776f`](https://github.com/zitadel/nextgen/commit/179776fcc6efff5b5b7d128f726e6a372fd03b26) - A failure of the local server now carries the same hint and next commands from every command, not only the server commands. A malformed runtime record or admin file found in a parent folder points its recovery commands at that folder, a server that no longer answers points `zitadel start` at the folder that recorded it, and the recovery for a malformed admin file removes the file before it resets.
+
+- [#3164](https://github.com/zitadel/nextgen/pull/3164) [`055c0d5`](https://github.com/zitadel/nextgen/commit/055c0d5d1222ab7294dad865d3c5a3e273bc9c74) - A refusal that named a command in its hint, such as a login flow still using a method, the last way to sign in, or `--input -` or `--file -` with nothing piped in, now lists it under `next_commands` too, so it carries the `--cwd`, `--env`, `--env-file` and `--server` the run was given.
+
+- [#3183](https://github.com/zitadel/nextgen/pull/3183) [`ac397d4`](https://github.com/zitadel/nextgen/commit/ac397d4e1c059b0f77bda6b9edc79a73e05cdffc) - `--server` is now declared by the commands that take a server, through one shared definition, rather than by every command. Every command that accepted it still does, with the same help text and the same server resolution, and a failure that comes before the flags are parsed still names the server it was given.
+
+- [#3188](https://github.com/zitadel/nextgen/pull/3188) [`1ed5058`](https://github.com/zitadel/nextgen/commit/1ed50580301384f552a1ffdd7083f422883667c5) - The local server now starts on Windows, which it did not before because its SQLite location was not a valid URI for a drive path. `zitadel setup` scaffolds beside a running local server instead of renaming its `.zitadel` folder, which Windows refuses while the server holds files open, and `zitadel doctor` no longer reports a file mode Windows cannot hold.
+- Updated dependencies [[`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8), [`a242dac`](https://github.com/zitadel/nextgen/commit/a242dacc9badeac3a451b89d2c6ef1e81031ccbf), [`7642a50`](https://github.com/zitadel/nextgen/commit/7642a50a60e397af8a3782366b93eb36a2004b4b), [`106a76d`](https://github.com/zitadel/nextgen/commit/106a76d6f6aa13fe6bd5846b0c80884c151f2dfc), [`891ab88`](https://github.com/zitadel/nextgen/commit/891ab88b99c376f89a260a93b14e04aedac057ba), [`f764fd6`](https://github.com/zitadel/nextgen/commit/f764fd69f3fff15a23d46746fc03c99730207f28), [`f764fd6`](https://github.com/zitadel/nextgen/commit/f764fd69f3fff15a23d46746fc03c99730207f28), [`a72fa58`](https://github.com/zitadel/nextgen/commit/a72fa58b120b3bbc90f786d0bd9955ef5b7293ef), [`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c), [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d), [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1), [`8c8514f`](https://github.com/zitadel/nextgen/commit/8c8514f289a6d8b1aad2089a5e177feb50305b6a), [`1ed5058`](https://github.com/zitadel/nextgen/commit/1ed50580301384f552a1ffdd7083f422883667c5)]:
+  - @zitadel/config@0.8.0
+  - @zitadel/server@0.8.0
+  - @zitadel/api@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

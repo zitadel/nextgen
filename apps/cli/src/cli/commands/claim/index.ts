@@ -7,18 +7,19 @@ import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schem
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
 import { ZitadelError } from "@/lib/errors";
-import { section, log, warnings } from "@/lib/ui";
+import { announce, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import type { Admitted, CommandResult, Connection } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { reads, type Refused, whole } from "@/cli/core/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { ZitadelRuntime } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ChangeCommand } from "@/cli/commands/bases";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -125,7 +126,12 @@ const CHALLENGE_ID: Refused<string> = {
   refusal: {
     message:
       "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_",
-    next: [{ id: "claim", flags: { noWait: true } }],
+    next: [
+      {
+        id: "claim",
+        flags: { noWait: true },
+      },
+    ],
   },
 };
 
@@ -148,18 +154,18 @@ const CHALLENGE_ID: Refused<string> = {
  * `--no-wait` returns the link as the result, and `--challenge-id` resumes
  * waiting on it in a second run.
  */
-export default class Claim extends ServerCommand(EnvironmentCommand) {
+export default class Claim extends ChangeCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 2;
 
   static override examples = [
-    "<%= config.bin %> <%= command.id %>",
-    "<%= config.bin %> <%= command.id %> --no-open",
-    "<%= config.bin %> <%= command.id %> --timeout 120",
-    "<%= config.bin %> <%= command.id %> --no-wait",
-    "<%= config.bin %> <%= command.id %> --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
+    "<%= config.bin %> claim",
+    "<%= config.bin %> claim --no-open",
+    "<%= config.bin %> claim --timeout 120",
+    "<%= config.bin %> claim --no-wait",
+    "<%= config.bin %> claim --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
   ];
   static override flags = relatedFlags(
     {
@@ -186,40 +192,25 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
     { "no-wait": { exclusive: ["challenge-id", "timeout"] } },
   );
 
-  protected async execute({ flags }: Admitted<typeof Claim>): Promise<JsonEnvelope> {
-    // Where a fresh link comes from when this one dies: a run that is part of
-    // the two-step flow suggests the step that hands the link back, so
-    // following the suggestion never blocks with the link out of sight.
-    const startOver =
-      flags.noWait || flags.challengeId !== undefined
-        ? this.suggest({ id: "claim", flags: { noWait: true } })
-        : this.suggest({ id: "claim", flags: { noOpen: flags.noOpen, timeout: flags.timeout } });
+  /**
+   * Says what the command would claim, without claiming it.
+   *
+   * A dry run writes nothing, a prompted answer's file included, so a missing
+   * project id still fails naming the sources it consulted. `--dry-run` promises
+   * to mutate neither files nor the platform, so it stops before the challenge
+   * is minted: minting one is a platform write, and a developer who then
+   * finished the browser step would really claim the project while this run
+   * deliberately skipped recording it, so the local file and the platform would
+   * disagree, which is worse than not previewing at all. There is nothing
+   * further to preview anyway: the outcome of a claim is decided in a browser,
+   * not by anything the CLI could compute.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The result of the dry run.
+   */
+  protected async preview({ flags }: Admitted<typeof Claim>): Promise<CommandResult> {
+    const { startOver, projectId, localRecord } = await this.located(flags, undefined);
 
-    // The project to claim is the one the resolved environment points at — the
-    // same project (and credential) `connect()` authenticates — so a
-    // `--env`/`--env-file` claim targets that environment's project, never the
-    // fallback `.zitadel/secret`.
-    // On a terminal a missing project id is asked for by `connect()`, as every
-    // other project command does. A dry run writes nothing, a prompted answer's
-    // file included, so it still fails naming the sources it consulted.
-    const prompted =
-      this.environment.values.ZITADEL_PROJECT_ID === undefined &&
-      !this.dryRun &&
-      !this.nonInteractive
-        ? await this.connect()
-        : undefined;
-    const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
-    // `.zitadel/secret` is a local cache of the claim, used only when it records
-    // this very project; the durable record is the platform grant (ADR 046).
-    const localSecret = (await Project.at(this.cwd).hasSecret())
-      ? await Project.at(this.cwd).secret()
-      : undefined;
-    const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
-
-    // The local record is authoritative enough to skip the round trip: the
-    // platform enforces first-claim-wins anyway, so re-asking could only ever
-    // return the same answer at the cost of a request. An env project with no
-    // matching local record falls through and lets the platform answer.
     if (localRecord && ClaimWindow.isAttached(localRecord.data)) {
       return this.alreadyClaimed({
         project_id: projectId,
@@ -228,154 +219,244 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
       });
     }
 
-    // `--dry-run` promises to mutate neither files nor the platform, so it has
-    // to stop before `createProjectClaim`: minting a challenge is a platform write, and
-    // a developer who then finished the browser step would really claim the
-    // project while this run deliberately skipped recording it — the local file
-    // and the platform would disagree, which is worse than not previewing at
-    // all. There is nothing further to preview here anyway: the outcome of a
-    // claim is decided in a browser, not by anything the CLI could compute.
-    if (this.dryRun) {
-      const action = flags.noWait
-        ? "Create a link to claim this project"
-        : flags.challengeId === undefined
-          ? "Open a browser to claim this project"
-          : "Wait for the link to be used to claim this project";
-      this.recordTelemetry({ claim_outcome: "dry_run" });
+    const action = flags.noWait
+      ? "Create a link to claim this project"
+      : flags.challengeId === undefined
+        ? "Open a browser to claim this project"
+        : "Wait for the link to be used to claim this project";
+    this.recordTelemetry({ claim_outcome: "dry_run" });
 
-      const would =
-        localRecord && !flags.noWait
-          ? `${action}, then record the owning team in .zitadel/secret.`
-          : `${action}.`;
+    const would =
+      localRecord && !flags.noWait
+        ? `${action}, then record the owning team in .zitadel/secret.`
+        : `${action}.`;
 
-      const title = "Nothing was claimed (dry run)";
+    const result = dryRunResult({
+      verb: "claim",
+      topic: "project",
+      id: projectId,
+      next:
+        flags.challengeId === undefined
+          ? startOver
+          : this.suggest({
+              id: "claim",
+              flags: { challengeId: flags.challengeId },
+            }),
+    });
 
-      return this.emit({
-        status: "ok",
-        data: {
-          dry_run: true,
-          title,
-          project_id: projectId,
-          would,
-        },
-        summary: {
-          title,
-          sections: [],
-          lines: [would],
-        },
-        next: {
-          commands: [
-            flags.challengeId === undefined
-              ? startOver
-              : this.suggest({ id: "claim", flags: { challengeId: flags.challengeId } }),
-          ],
-        },
+    return {
+      ...result,
+      data: {
+        ...(result.data as object),
+        project_id: projectId,
+        would,
+      },
+      summary: {
+        title: result.summary.title,
+        sections: [],
+        lines: [would],
+      },
+    };
+  }
+
+  /**
+   * Claims the project.
+   *
+   * On a terminal a missing project id is asked for by `connect()`, as every
+   * other project command does. A local record is authoritative enough to skip
+   * the round trip: the platform enforces first-claim-wins anyway, so re-asking
+   * could only ever return the same answer at the cost of a request, and an env
+   * project with no matching local record falls through and lets the platform
+   * answer.
+   *
+   * The link is always shown first, before anything is attempted: it is the
+   * whole instruction on its own, so a launch that never happens (headless box,
+   * no `xdg-open`, `--no-open`, an agent) needs no separate path. The URL
+   * prints bare because it must never be split (clickability, the journey e2e
+   * scrape), and what the person must act on while this command waits is written
+   * as the command goes, to a pipe as to a terminal, so a script reading the
+   * pipe can open the link before the claim completes. A server left on the
+   * default public base advertises a claim page on a remote origin, the exact
+   * confusion the warning names; cloud servers legitimately use a console
+   * origin different from the API one, so only a loopback API paired with a
+   * non-loopback claim page warns. Resuming with a challenge id mints nothing:
+   * the link is already with whoever opens it, so that run only waits on it.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The result of the run.
+   */
+  protected async apply({ flags }: Admitted<typeof Claim>): Promise<CommandResult> {
+    const prompted =
+      this.environment.values.ZITADEL_PROJECT_ID === undefined && !this.nonInteractive
+        ? await this.connect()
+        : undefined;
+    const { startOver, projectId, localRecord } = await this.located(flags, prompted);
+
+    if (localRecord && ClaimWindow.isAttached(localRecord.data)) {
+      return this.alreadyClaimed({
+        project_id: projectId,
+        team_id: localRecord.data.team_id,
+        claimed_at: localRecord.data.claimed_at,
       });
     }
 
     const { client } = prompted ?? (await this.connect());
     const claimService = new ClaimService(client, projectId);
 
-    // Set by whichever branch runs: minting a link has early returns and prompts
-    // in the middle, so neither can be one expression.
-    // biome-ignore lint/plugin: set by whichever branch runs, which has early returns and prompts in the middle
-    let waitFor: { challengeId: string; deadline: number };
-    // biome-ignore lint/plugin: set by whichever branch runs, which has early returns and prompts in the middle
-    let opened: boolean | undefined;
-    if (flags.challengeId === undefined) {
-      const started = await claimService.start();
-      switch (started.outcome) {
-        case "already-claimed": {
-          return this.alreadyClaimed({
-            project_id: projectId,
-            team_id: started.teamId,
-            dashboard_url: started.dashboardUrl,
-          });
-        }
-        case "window-expired": {
-          this.recordTelemetry({ claim_outcome: "window_expired" });
-          throw refusalError(WINDOW_CLOSED_REFUSAL, {});
-        }
-        case "started": {
-          break;
-        }
-      }
-      const { challenge } = started;
-
-      // A local server left on the default public base advertises a claim page
-      // on a remote origin — the exact confusion this warning names. Cloud
-      // servers legitimately use a console origin different from the API one,
-      // so only a loopback API paired with a non-loopback claim page warns.
-      if (
-        ZitadelRuntime.fromUrl(this.meta.source).isLoopback() &&
-        !ZitadelRuntime.fromUrl(challenge.claim_url).isLoopback()
-      ) {
-        warnings.report(
-          `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
-            "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
-        );
-      }
-
-      // Always show the link first, before attempting anything: it is the whole
-      // instruction on its own, so a launch that never happens (headless box,
-      // no `xdg-open`, `--no-open`, an agent) needs no separate path.
-      // The URL prints bare: it must never be split (clickability, the journey e2e scrape).
-      this.ui.note("Finish in your browser", [
-        "Create an account or sign in to claim your project, make it permanent and start collaborating.",
-      ]);
-      log.plain(escapeControlCharacters(challenge.claim_url));
-
-      if (flags.noWait) {
-        return this.linkIssued(projectId, challenge);
-      }
-
-      const skipLaunch = flags.noOpen || this.nonInteractive;
-      opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
-      if (!opened) {
-        log.info("Open the link above to continue.");
-      }
-      waitFor = {
-        challengeId: challenge.challenge_id,
-        deadline: claimDeadline({
-          expiresAt: challenge.expires_at,
-          timeoutSeconds: flags.timeout,
-          now: Date.now(),
-        }),
-      };
-    } else {
-      // Resuming mints nothing: the link is already with whoever opens it, so
-      // this run only waits on it.
-      waitFor = {
+    if (flags.challengeId !== undefined) {
+      return this.finished({
+        claimService,
+        projectId,
+        startOver,
+        localRecord,
         challengeId: flags.challengeId,
         deadline: claimDeadline({
           timeoutSeconds: flags.timeout,
           now: Date.now(),
         }),
-      };
+        opened: undefined,
+      });
     }
-    log.start("Waiting for the browser step to finish");
 
-    const completed = await this.poll(
-      claimService,
-      waitFor.challengeId,
-      waitFor.deadline,
-      startOver,
+    const started = await claimService.start();
+    switch (started.outcome) {
+      case "already-claimed": {
+        return this.alreadyClaimed({
+          project_id: projectId,
+          team_id: started.teamId,
+          dashboard_url: started.dashboardUrl,
+        });
+      }
+      case "window-expired": {
+        this.recordTelemetry({ claim_outcome: "window_expired" });
+        throw refusalError(WINDOW_CLOSED_REFUSAL, {});
+      }
+      case "started": {
+        break;
+      }
+    }
+    const { challenge } = started;
+
+    const advertisesRemoteClaimPage =
+      ZitadelRuntime.fromUrl(this.meta.source).isLoopback() &&
+      !ZitadelRuntime.fromUrl(challenge.claim_url).isLoopback();
+    if (advertisesRemoteClaimPage) {
+      warnings.report(
+        `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
+          "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
+      );
+    }
+
+    announce("Finish in your browser");
+    announce(
+      "Create an account or sign in to claim your project, make it permanent and start collaborating.",
     );
+    announce(escapeControlCharacters(challenge.claim_url));
 
-    // Record the completed claim only in a `.zitadel/secret` that is this
-    // project's own record: writing it into a secret that describes a different
-    // project would conflate environments, marking the fallback project claimed
-    // when another was. An env-supplied project keeps no local cache — the
-    // platform grant is the durable record, and a rerun resolves it through the
-    // idempotent already-claimed response rather than a stale local one.
+    if (flags.noWait) {
+      return this.linkIssued(projectId, challenge);
+    }
+
+    const skipLaunch = flags.noOpen || this.nonInteractive;
+    const opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
+    if (!opened) {
+      this.info("Open the link above to continue.");
+    }
+
+    return this.finished({
+      claimService,
+      projectId,
+      startOver,
+      localRecord,
+      challengeId: challenge.challenge_id,
+      deadline: claimDeadline({
+        expiresAt: challenge.expires_at,
+        timeoutSeconds: flags.timeout,
+        now: Date.now(),
+      }),
+      opened,
+    });
+  }
+
+  /**
+   * Resolves what both a dry run and a claim start from: the project to claim,
+   * its local record when the secret describes this very project, and the
+   * command that hands a fresh link back when this one dies.
+   *
+   * The project to claim is the one the resolved environment points at, the same
+   * project (and credential) `connect()` authenticates, so a `--env` or
+   * `--env-file` claim targets that environment's project, never the fallback
+   * `.zitadel/secret`. `.zitadel/secret` is a local cache of the claim, used
+   * only when it records this very project; the durable record is the platform
+   * grant (ADR 046). `startOver` is where a fresh link comes from when this one
+   * dies: a run that is part of the two-step flow suggests the step that hands
+   * the link back, so following the suggestion never blocks with the link out
+   * of sight.
+   *
+   * @param flags - The flags the command accepts.
+   * @param prompted - The connection that asked for a missing project id, if one was opened.
+   * @returns The project id, its local record and the command to start over with.
+   */
+  private async located(flags: Admitted<typeof Claim>["flags"], prompted: Connection | undefined) {
+    const startOver =
+      flags.noWait || flags.challengeId !== undefined
+        ? this.suggest({
+            id: "claim",
+            flags: { noWait: true },
+          })
+        : this.suggest({
+            id: "claim",
+            flags: { noOpen: flags.noOpen, timeout: flags.timeout },
+          });
+    const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
+    const localSecret = (await Project.at(this.cwd).hasSecret())
+      ? await Project.at(this.cwd).secret()
+      : undefined;
+    const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
+
+    return {
+      startOver,
+      projectId,
+      localRecord,
+    };
+  }
+
+  /**
+   * Waits on the link until the browser step lands, records the completed claim
+   * and reports it.
+   *
+   * The completed claim is recorded only in a `.zitadel/secret` that is this
+   * project's own record: writing it into a secret that describes a different
+   * project would conflate environments, marking the fallback project claimed
+   * when another was. An env-supplied project keeps no local cache; the
+   * platform grant is the durable record, and a rerun resolves it through the
+   * idempotent already-claimed response rather than a stale local one. The team
+   * id stays out of the human output by design (it lives in the envelope and
+   * `.zitadel/secret`); the user-facing outcome is permanence.
+   *
+   * @param wait - The link to wait on and where the claim is recorded.
+   * @returns The result of the completed claim.
+   */
+  private async finished(wait: {
+    claimService: ClaimService;
+    projectId: string;
+    startOver: SuggestedCommand;
+    localRecord: Awaited<ReturnType<ReturnType<typeof Project.at>["secret"]>> | undefined;
+    challengeId: string;
+    deadline: number;
+    opened: boolean | undefined;
+  }): Promise<CommandResult> {
+    const { claimService, projectId, startOver, localRecord, challengeId, deadline, opened } = wait;
+    this.info("Waiting for the browser step to finish");
+
+    const completed = await this.poll(claimService, challengeId, deadline, startOver);
+
     if (localRecord) {
       await localRecord
         .with({ claimed_at: completed.claimed_at, team_id: completed.team_id })
         .write();
     }
-    // The team id stays out of the human output by design (it lives in the
-    // envelope and .zitadel/secret); the user-facing outcome is permanence.
-    log.done("Project claimed");
+    this.info("Project claimed");
 
     this.recordTelemetry({
       claim_outcome: "completed",
@@ -384,7 +465,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
 
     const title = "Your project is now permanent";
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -406,7 +487,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
       next: {
         actions: ["Manage your project and collaborate in the Console:", completed.dashboard_url],
       },
-    });
+    };
   }
 
   /**
@@ -415,7 +496,8 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
    * The two failure modes read the same to a user (the link no longer works,
    * start another one), so they share an error shape and differ only in
    * wording — a `410` means the platform expired it, a passed deadline means
-   * we stopped waiting first. `startOver` is how this run gets a new link.
+   * we stopped waiting first. `startOver` is how this run gets a new link. It
+   * never sleeps past the deadline: the last wait ends the retries.
    */
   private async poll(
     claimService: ClaimService,
@@ -476,7 +558,6 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         }
       },
       {
-        // Never sleeps past the deadline: the last wait ends the retries.
         maxRetryTime: Math.max(deadline - Date.now(), 0),
         retries: Number.POSITIVE_INFINITY,
         minTimeout: INITIAL_POLL_MS,
@@ -505,13 +586,16 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
   private linkIssued(
     projectId: string,
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
-  ): JsonEnvelope {
+  ): CommandResult {
     this.recordTelemetry({ claim_outcome: "link_issued" });
-    const wait = this.suggest({ id: "claim", flags: { challengeId: challenge.challenge_id } });
+    const wait = this.suggest({
+      id: "claim",
+      flags: { challengeId: challenge.challenge_id },
+    });
 
     const title = "Open the link in a browser to make your project permanent";
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -534,31 +618,31 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         actions: ["Wait for the browser step to finish with:"],
         commands: [wait],
       },
-    });
+    };
   }
 
   /**
    * The idempotent outcome: the project already belongs to a team, whether we
    * learned that locally or from a `409`. Reported as a skip, not an error, so
-   * re-running the command (or an agent retrying it) is a clean no-op.
+   * re-running the command (or an agent retrying it) is a clean no-op. The
+   * project's link is the platform's own when it gave one, else the server's
+   * console, so a project claimed earlier still says where to manage it.
    */
   private alreadyClaimed(data: {
     project_id: string;
     team_id: string;
     claimed_at?: string;
     dashboard_url?: string;
-  }): JsonEnvelope {
+  }): CommandResult {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
     const title = "This project already belongs to a team";
-    // The platform's own link to the project when it gave one, else the server's
-    // console, so a project claimed earlier still says where to manage it.
     const consoleUrl =
       data.dashboard_url ??
       (URL.canParse(this.meta.source)
         ? ZitadelRuntime.fromUrl(this.meta.source).consoleUrl()
         : undefined);
 
-    return this.emit({
+    return {
       status: "skipped",
       reason: "already-claimed",
       data: {
@@ -578,6 +662,6 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
           ),
         ],
       },
-    });
+    };
   }
 }
