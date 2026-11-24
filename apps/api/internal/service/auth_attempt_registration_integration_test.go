@@ -255,7 +255,7 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 				FlowProgress: domain.FlowProgress{
 					CollectedData: domain.CollectedFlowData{
 						UserData:    map[string]any{"email": "pw-signup@example.com"},
-						AuthMethods: domain.CollectedAuthMethodData{Password: "s3cret"},
+						AuthMethods: map[string]string{domain.AuthMethodPassword: "s3cret"},
 					},
 				},
 			},

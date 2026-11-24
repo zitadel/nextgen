@@ -203,7 +203,7 @@ describe("env add", () => {
       const out = await addRendered(cwd);
 
       expect(out).toContain(
-        "Added the production environment, bound to proj_new .env.production.local holds",
+        "Added the production environment, bound to proj_new Created project proj_new Wrote .env.production.local .env.production.local holds",
       );
       expect(out).not.toContain("Summary");
     });

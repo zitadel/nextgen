@@ -3,6 +3,7 @@
 package stmttest
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -120,7 +121,7 @@ func TestAuthRequestStatements_SetAndRedeemCode(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		request := createAuthRequest(t, d)
 		setCode(&request, "code_1")
-		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &request))
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &request, authRequestNow()))
 
 		got, err := d.stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
 		require.NoError(t, err)
@@ -144,13 +145,13 @@ func TestAuthRequestStatements_SetCodeOnce(t *testing.T) {
 		request := createAuthRequest(t, d)
 		first := request
 		setCode(&first, "code_1")
-		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &first))
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &first, authRequestNow()))
 
 		second := request
 		setCode(&second, "code_2")
 		second.UserID = "user_2"
 		second.SessionID = "sess_2"
-		err := d.stmts.SetAuthRequestCode(t.Context(), &second)
+		err := d.stmts.SetAuthRequestCode(t.Context(), &second, authRequestNow())
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		_, err = d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, second.CodeHash)
@@ -168,14 +169,14 @@ func TestAuthRequestStatements_CodeUnknown(t *testing.T) {
 		unknown := request
 		unknown.ID = "authreq_unknown"
 		setCode(&unknown, "code_1")
-		err := d.stmts.SetAuthRequestCode(t.Context(), &unknown)
+		err := d.stmts.SetAuthRequestCode(t.Context(), &unknown, authRequestNow())
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		_, err = d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, domain.HashSecret("never issued"))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		setCode(&request, "code_1")
-		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &request))
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &request, authRequestNow()))
 		otherProject := ensureProject(t, d.stmts)
 		_, err = d.stmts.RedeemAuthRequestCode(t.Context(), otherProject, request.CodeHash)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -184,6 +185,57 @@ func TestAuthRequestStatements_CodeUnknown(t *testing.T) {
 		redeemed, err := d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, request.CodeHash)
 		require.NoError(t, err)
 		assert.Equal(t, &request, redeemed)
+	})
+}
+
+// An expired request gets no code and its row stays as it was.
+func TestAuthRequestStatements_SetCodeRefusesExpiredRequest(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		request := createAuthRequest(t, d)
+
+		withCode := request
+		setCode(&withCode, "code_1")
+		err := d.stmts.SetAuthRequestCode(t.Context(), &withCode, request.ExpiresAt)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		got, err := d.stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
+		require.NoError(t, err)
+		assert.Equal(t, &request, got)
+	})
+}
+
+// Of several redemptions of one code at once, exactly one gets the request.
+func TestAuthRequestStatements_RedeemCodeConcurrent(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		request := createAuthRequest(t, d)
+		setCode(&request, "code_1")
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &request, authRequestNow()))
+
+		var (
+			wg      sync.WaitGroup
+			results [8]*domain.AuthRequest
+			errs    [8]error
+		)
+		start := make(chan struct{})
+		for i := range results {
+			wg.Go(func() {
+				<-start // release together so the redemptions overlap
+				results[i], errs[i] = d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, request.CodeHash)
+			})
+		}
+		close(start)
+		wg.Wait()
+
+		var won int
+		for i := range results {
+			if errs[i] == nil {
+				won++
+				assert.Equal(t, &request, results[i])
+				continue
+			}
+			assert.ErrorIs(t, errs[i], new(database.NoRowFoundError), "redemption %d", i)
+		}
+		assert.Equal(t, 1, won, "a code redeems exactly once")
 	})
 }
 
@@ -200,9 +252,9 @@ func TestAuthRequestStatements_RequestsWithoutCodeShareAProject(t *testing.T) {
 		}
 
 		setCode(&first, "code_1")
-		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &first))
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &first, authRequestNow()))
 		setCode(&second, "code_2")
-		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &second))
+		require.NoError(t, d.stmts.SetAuthRequestCode(t.Context(), &second, authRequestNow()))
 		for _, request := range []domain.AuthRequest{first, second} {
 			redeemed, err := d.stmts.RedeemAuthRequestCode(t.Context(), request.ProjectID, request.CodeHash)
 			require.NoError(t, err)

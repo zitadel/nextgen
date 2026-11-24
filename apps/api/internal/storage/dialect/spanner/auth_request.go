@@ -3,6 +3,7 @@ package spanner
 import (
 	"context"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -17,7 +18,7 @@ const (
 		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12) THEN RETURN created_at`
 	setAuthRequestCodeStmt = `UPDATE auth_requests SET code_hash = @p3, user_id = @p4, session_id = @p5, code_expires_at = @p6` +
-		` WHERE project_id = @p1 AND id = @p2 AND code_hash IS NULL`
+		` WHERE project_id = @p1 AND id = @p2 AND code_hash IS NULL AND expires_at > @p7`
 )
 
 var authRequestColumns = []string{
@@ -26,7 +27,12 @@ var authRequestColumns = []string{
 	"code_hash", "user_id", "session_id", "code_expires_at",
 }
 
-var redeemAuthRequestCodeStmt = `DELETE FROM auth_requests WHERE project_id = @p1 AND code_hash = @p2 THEN RETURN ` +
+// FORCE_INDEX keeps the delete on the code index, so it does not lock the
+// project's other requests. The index is NULL_FILTERED, hence the IS NOT
+// NULL (see userSearchQuery). The emulator still cannot prove that the index
+// is usable and needs its own hint, which Cloud Spanner ignores.
+var redeemAuthRequestCodeStmt = `DELETE FROM auth_requests@{FORCE_INDEX=uq_auth_requests_code_hash, spanner_emulator.disable_query_null_filtered_index_check=true}` +
+	` WHERE project_id = @p1 AND code_hash = @p2 AND code_hash IS NOT NULL THEN RETURN ` +
 	strings.Join(authRequestColumns, ", ")
 
 type authRequestStatements struct{ statement }
@@ -72,7 +78,7 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 }
 
 // SetAuthRequestCode implements [service.AuthRequestStatements].
-func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest) error {
+func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest, now time.Time) error {
 	n, err := s.db.Update(ctx, buildStatement(setAuthRequestCodeStmt,
 		request.ProjectID,
 		request.ID,
@@ -80,6 +86,7 @@ func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *
 		request.UserID,
 		request.SessionID,
 		request.CodeExpiresAt,
+		now,
 	).statement())
 	if err != nil {
 		return err

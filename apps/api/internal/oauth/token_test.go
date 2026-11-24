@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,24 +27,24 @@ const (
 )
 
 // AuthenticateClient knows one secret for every client of the fake.
-func (c clients) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (domain.ApplicationClientDocument, error) {
+func (c clients) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error) {
 	doc, err := c.Client(ctx, projectID, "", clientID)
 	if err != nil {
-		return doc, err
+		return nil, err
 	}
 	if secret != clientSecret {
-		return domain.ApplicationClientDocument{}, domain.ErrApplicationClientSecretInvalid()
+		return nil, domain.ErrApplicationClientSecretInvalid()
 	}
-	return doc, nil
+	return &service.ServedApplicationClient{Document: doc}, nil
 }
 
-func (f failing) AuthenticateClient(context.Context, string, string, string) (domain.ApplicationClientDocument, error) {
-	return domain.ApplicationClientDocument{}, f.err
+func (f failing) AuthenticateClient(context.Context, string, string, string) (*service.ServedApplicationClient, error) {
+	return nil, f.err
 }
 
 // RedeemCode is never reached in the authorization endpoint's tests.
-func (a *authRequests) RedeemCode(context.Context, service.RedeemCodeInput) (string, error) {
-	return "", errors.New("authRequests redeems no codes")
+func (a *authRequests) RedeemCode(context.Context, service.RedeemCodeInput) (string, time.Duration, error) {
+	return "", 0, errors.New("authRequests redeems no codes")
 }
 
 // recording is a ClientResolver over clients that records the project each
@@ -53,26 +54,27 @@ type recording struct {
 	projectIDs []string
 }
 
-func (r *recording) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (domain.ApplicationClientDocument, error) {
+func (r *recording) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error) {
 	r.projectIDs = append(r.projectIDs, projectID)
 	return r.clients.AuthenticateClient(ctx, projectID, clientID, secret)
 }
 
 // codes is a fake AuthRequestStore that records the redemptions it gets and
-// answers each with token or err.
+// answers each with token, expiresIn or err.
 type codes struct {
-	got   []service.RedeemCodeInput
-	token string
-	err   error
+	got       []service.RedeemCodeInput
+	token     string
+	expiresIn time.Duration
+	err       error
 }
 
 func (c *codes) Create(context.Context, *domain.AuthRequest) (string, error) {
 	return "", errors.New("codes stores no requests")
 }
 
-func (c *codes) RedeemCode(_ context.Context, input service.RedeemCodeInput) (string, error) {
+func (c *codes) RedeemCode(_ context.Context, input service.RedeemCodeInput) (string, time.Duration, error) {
 	c.got = append(c.got, input)
-	return c.token, c.err
+	return c.token, c.expiresIn, c.err
 }
 
 // tokenForm is a valid code exchange, with set applied; an empty value
@@ -144,7 +146,7 @@ func TestTokenExchangesACode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			store := &codes{token: "the-access-token"}
+			store := &codes{token: "the-access-token", expiresIn: domain.AccessTokenTTL}
 			resolver := &recording{clients: shop}
 			mux := newMux(t, Config{PlatformEnabled: tt.platform, Clients: resolver, AuthRequests: store})
 			path := tokenPath

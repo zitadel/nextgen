@@ -2,12 +2,13 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { type Refused, reads } from "@/lib/oclif/flags";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { type Refused, reads } from "@/cli/core/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ChangeCommand } from "@/cli/commands/bases";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -35,7 +36,7 @@ const MESSAGE = {
 /**
  * `zitadel release create` — build a release from .zitadel/ without deploying it.
  */
-export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
+export default class ReleaseCreate extends ChangeCommand {
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.releases;
   static override groupOrder = 4;
@@ -53,45 +54,41 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
     }),
   };
 
-  protected async execute({ flags }: Admitted<typeof ReleaseCreate>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const publisher = new Publisher(client, projectId);
-    // The IdP connections sync before the build, as `deploy` does: a release
-    // names its connections by slug, and the server refuses to build one
-    // that names a slug the project does not hold yet.
-    const prepared = await publisher.prepare({
-      cwd: this.cwd,
-      env: this.env,
-      mode: "deploy",
-      dryRun: this.dryRun,
-      compare: false,
+  /**
+   * Validates the bundle the same way, then stops before the release is posted
+   * so nothing is written server-side.
+   *
+   * @returns The envelope of the dry run.
+   */
+  protected async preview(): Promise<CommandResult> {
+    const { prepared, diff } = await this.prepared(true);
+    const result = dryRunResult({
+      verb: "create",
+      topic: "release",
+      next: await this.realRun(),
     });
-    for (const warning of prepared.warnings) {
-      warnings.report(warning);
-    }
-    this.narrate(prepared.notices);
-    // `release create` carries the same no-mutation promise every command does
-    // under `--dry-run`: validate the bundle the same way, then stop before the
-    // release is posted so nothing is written server-side.
-    if (this.dryRun) {
-      const title = `Validated ${prepared.resourceCount} ${new Intl.PluralRules("en").select(prepared.resourceCount) === "one" ? "resource" : "resources"} and created no release (dry run)`;
 
-      return this.emit({
-        status: "ok",
-        data: {
-          dry_run: true,
-          title,
-          resources: prepared.resourceCount,
-        },
-        summary: {
-          title,
-          sections: [],
-        },
-        next: {
-          commands: [await this.realRun()],
-        },
-      });
-    }
+    return {
+      ...result,
+      data: { ...(result.data as object), resources: prepared.resourceCount },
+      summary: {
+        ...result.summary,
+        lines: [
+          `Validated ${prepared.resourceCount} ${new Intl.PluralRules("en").select(prepared.resourceCount) === "one" ? "resource" : "resources"}`,
+          ...diff,
+        ],
+      },
+    };
+  }
+
+  /**
+   * Builds the release and posts it.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The envelope of the run.
+   */
+  protected async apply({ flags }: Admitted<typeof ReleaseCreate>): Promise<CommandResult> {
+    const { publisher, prepared, diff } = await this.prepared(false);
 
     const release = await publisher.createRelease({
       prepared,
@@ -100,7 +97,7 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
 
     const title = `Created ${escapeControlCharacters(release.id)}`;
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -111,10 +108,50 @@ export default class ReleaseCreate extends ServerCommand(EnvironmentCommand) {
       summary: {
         title,
         sections: [],
+        lines: diff,
       },
       next: {
-        commands: [this.suggest({ id: "deployment:create", flags: { release: release.id } })],
+        commands: [
+          this.suggest({
+            id: "deployment:create",
+            flags: { release: release.id },
+          }),
+        ],
       },
+    };
+  }
+
+  /**
+   * Builds what the release would hold and says so: the IdP connections sync
+   * before the build, as `deploy` does, because a release names its connections
+   * by slug and the server refuses to build one that names a slug the project
+   * does not hold yet. What it found is said now, before the steps that can
+   * fail, and kept for a result that a pipe reads.
+   *
+   * @param dryRun - Whether the release is only validated, so nothing is written server-side.
+   * @returns The publisher, what it prepared, and the diff the result carries.
+   */
+  private async prepared(dryRun: boolean) {
+    const publisher = await this.service(Publisher);
+    const prepared = await publisher.prepare({
+      cwd: this.cwd,
+      env: this.env,
+      mode: "deploy",
+      dryRun,
+      compare: false,
     });
+    for (const warning of prepared.warnings) {
+      warnings.report(warning);
+    }
+    this.narrate(prepared.notices);
+    const diff = prepared.notices.flatMap((notice, at) => {
+      return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
+    });
+
+    return {
+      publisher,
+      prepared,
+      diff,
+    };
   }
 }

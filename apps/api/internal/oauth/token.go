@@ -60,16 +60,17 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 	if !storable(r.Data.ClientID) || len(r.Data.ClientID) > maxClientIDLength {
 		return nil, refused(nil)
 	}
-	doc, err := s.clients.AuthenticateClient(ctx, projectID, r.Data.ClientID, r.Data.ClientSecret)
+	served, err := s.clients.AuthenticateClient(ctx, projectID, r.Data.ClientID, r.Data.ClientSecret)
 	switch {
-	case errors.Is(err, domain.ErrApplicationNotFound()), errors.Is(err, domain.ErrApplicationClientSecretInvalid()):
+	case errors.Is(err, domain.ErrApplicationNotFound()), errors.Is(err, domain.ErrApplicationClientNotFound()),
+		errors.Is(err, domain.ErrApplicationClientSecretInvalid()):
 		return nil, refused(err)
 	case errors.Is(err, domain.ErrUnavailable()):
 		return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
 	case err != nil:
 		return nil, op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
 	}
-	c := newClient(r.Data.ClientID, doc)
+	c := newClient(r.Data.ClientID, served.Document)
 	c.projectID = projectID
 	return c, nil
 }
@@ -79,7 +80,7 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 func (s opServer) CodeExchange(ctx context.Context, r *op.ClientRequest[oidc.AccessTokenRequest]) (_ *op.Response, err error) {
 	defer func() { keepError(ctx, err) }()
 	c := r.Client.(*client)
-	token, err := s.authRequests.RedeemCode(ctx, service.RedeemCodeInput{
+	token, _, err := s.authRequests.RedeemCode(ctx, service.RedeemCodeInput{
 		ProjectID:    c.projectID,
 		ClientID:     c.id,
 		Code:         r.Data.Code,

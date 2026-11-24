@@ -8,6 +8,7 @@ import {
 
 import { fetchSession, signOut } from "@/auth/session";
 import { AppShell } from "@/app-shell/app-shell";
+import { clearInvitationToken } from "@/features/invitations/token";
 import { routerRelativeHref, withoutTrailingSlash } from "@/lib/base-path";
 import { readPlatformAccess } from "@/features/platform/access";
 import {
@@ -119,6 +120,8 @@ function AuthedLayout() {
 
   const handleSignOut = async () => {
     await signOut();
+    // An invitation link opened in this tab was the person's who just left.
+    clearInvitationToken();
     await router.navigate({ to: "/login" });
   };
 

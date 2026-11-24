@@ -186,7 +186,7 @@ tracked below.
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
 | `UpdateTeam` | `team.updated` | `admin` | `team` | delta: `name` |
 | `DeactivateTeam` (when status changed) | `team.deactivated` | `admin` | `team` | _(empty)_ |
-| `CreateToken` / session mint / `GenerateJWE` / authorization code redemption (`RedeemCode`) | `auth.token.issued` | `auth` | `token` | `scopes[]` |
+| `CreateToken` / session mint / `GenerateJWE` / authorization code redemption (`RedeemCode`) | `auth.token.issued` | `auth` | `token` | `scopes[]`, `client_id` (code redemption only) |
 | `DeleteTokenByID` / `RevokeToken` | `auth.token.revoked` | `auth` | `token` | _(empty)_ |
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
 | `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |
@@ -213,8 +213,8 @@ tracked below.
 | ReleaseService revoke | `release.revoked` | `admin` | `release` | `content_hash` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
-| ApplicationService create (new slug) | `application.created` | `admin` | `application` | `slug`, `name`, `client_ids[]`, `revision_id` |
-| ApplicationService revise (existing slug) | `application.updated` | `admin` | `application` | `revision_id`; delta: `name` (when changed), `client_ids[]` (the clients the revision added) |
+| ApplicationService create (new slug; a release build for a declared one) | `application.created` | `admin` | `application` | `slug`, `name`, `client_ids[]`, `revision_id` |
+| ApplicationService revise (existing slug; a release build for a declared one) | `application.updated` | `admin` | `application` | `revision_id`; delta: `name` (when changed), `client_ids[]` (the clients the revision added) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
 | VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |

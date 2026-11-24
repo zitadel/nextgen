@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -17,7 +18,7 @@ const (
 		` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	getAuthRequestStmt     = `SELECT ` + authRequestColumns + ` FROM auth_requests WHERE project_id = ? AND id = ?`
 	setAuthRequestCodeStmt = `UPDATE auth_requests SET code_hash = ?, user_id = ?, session_id = ?, code_expires_at = ?` +
-		` WHERE project_id = ? AND id = ? AND code_hash IS NULL`
+		` WHERE project_id = ? AND id = ? AND code_hash IS NULL AND expires_at > ?`
 	redeemAuthRequestCodeStmt = `DELETE FROM auth_requests WHERE project_id = ? AND code_hash = ? RETURNING ` + authRequestColumns
 )
 
@@ -73,7 +74,7 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 }
 
 // SetAuthRequestCode implements [service.AuthRequestStatements].
-func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest) error {
+func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest, now time.Time) error {
 	n, err := execAffected(ctx, s.client, setAuthRequestCodeStmt,
 		request.CodeHash,
 		request.UserID,
@@ -81,6 +82,7 @@ func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *
 		nullUnixNano(request.CodeExpiresAt),
 		request.ProjectID,
 		request.ID,
+		now.UnixNano(),
 	)
 	if err != nil {
 		return err

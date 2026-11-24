@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // ClientResolver finds a client among the project's registered applications
@@ -18,7 +19,7 @@ type ClientResolver interface {
 	// AuthenticateClient finds the client like Client, when secret is one of
 	// its secrets. A wrong or empty secret is
 	// [domain.ErrApplicationClientSecretInvalid].
-	AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (domain.ApplicationClientDocument, error)
+	AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error)
 }
 
 // client is a client as the library reads it, for one request.

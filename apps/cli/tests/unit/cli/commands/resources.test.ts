@@ -44,7 +44,7 @@ import {
   update,
 } from "@/cli/commands/resources";
 import { COMMANDS, WORKFLOW_COMMANDS } from "@/index";
-import { idArg } from "@/lib/oclif/crud/shared";
+import { idArg } from "@/cli/core/crud/shared";
 import { parseArg } from "@tests/helpers/inputs";
 import { tabulate } from "@tests/helpers/tabulate";
 import {
@@ -54,7 +54,7 @@ import {
   parseFilter,
   parseSort,
   type ResourceDescriptor,
-} from "@/lib/oclif/crud";
+} from "@/cli/core/crud";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://preview.zitadel.com";

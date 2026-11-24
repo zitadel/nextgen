@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/zitadel/oidc/v3/pkg/oidc"
@@ -55,7 +56,7 @@ const (
 // redeems the code the login issued for a request.
 type AuthRequestStore interface {
 	Create(ctx context.Context, request *domain.AuthRequest) (bindingNonce string, err error)
-	RedeemCode(ctx context.Context, input service.RedeemCodeInput) (accessToken string, err error)
+	RedeemCode(ctx context.Context, input service.RedeemCodeInput) (accessToken string, expiresIn time.Duration, err error)
 }
 
 // answeredErrorKey is the context key of the error an opServer method
@@ -110,8 +111,10 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 	}
 	doc, err := s.clients.Client(ctx, issuer.ProjectID, settings.DeploymentID, r.Data.ClientID)
 	switch {
-	case errors.Is(err, domain.ErrApplicationNotFound()):
+	case errors.Is(err, domain.ErrApplicationNotFound()), errors.Is(err, domain.ErrApplicationClientNotFound()):
 		return nil, unknownClient
+	case errors.Is(err, domain.ErrReleaseRevoked()):
+		return nil, noMetadata()
 	case errors.Is(err, domain.ErrUnavailable()):
 		return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
 	case err != nil:

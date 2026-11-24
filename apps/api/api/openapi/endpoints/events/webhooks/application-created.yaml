@@ -3,7 +3,8 @@ post:
   operationId: applicationCreated
   summary: application.created
   description: |
-    A registered application was created.
+    An application was created, through the API or by the release build that
+    first declared it.
 
     The body is the event as `GET /events` returns it.
   tags:

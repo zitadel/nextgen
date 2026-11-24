@@ -20,9 +20,16 @@
     // the deployment's ID as the docs' build is (apps/docs/turbo.json): on
     // Vercel it never hits. The Speed Insights sample rate and the commit the
     // analytics events report are read at build time (next.config.ts,
-    // app/layout.tsx), and strict mode would hide them.
+    // app/layout.tsx), and whether crawlers may index the deployment
+    // (app/robots.txt/route.ts); strict mode would hide them.
     "build": {
-      "env": ["NODE_ENV", "VERCEL_DEPLOYMENT_ID", "VERCEL_GIT_COMMIT_SHA", "WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": [
+        "NODE_ENV",
+        "VERCEL_DEPLOYMENT_ID",
+        "VERCEL_ENV",
+        "VERCEL_GIT_COMMIT_SHA",
+        "WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE"
+      ],
       "dependsOn": ["@zitadel/components#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
