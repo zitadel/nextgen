@@ -7214,7 +7214,7 @@
                         {
                           "client": "jobs",
                           "client_id": "client_01KWHF2XY6RN7F0N9WD3P2E4YQ",
-                          "secret": "sk_csec_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+                          "secret": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
                         }
                       ]
                     }
@@ -7264,7 +7264,7 @@
                         {
                           "client": "web",
                           "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
-                          "secret": "sk_csec_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+                          "secret": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
                         }
                       ]
                     }
@@ -20904,7 +20904,7 @@
           "secret": {
             "type": "string",
             "description": "The secret, shown only in this response. Save it securely: the server cannot return it again.\n",
-            "example": "sk_csec_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+            "example": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
           }
         }
       },

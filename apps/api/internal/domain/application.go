@@ -19,7 +19,8 @@ const (
 	PrefixApplication         ResourcePrefix = "app"
 	PrefixApplicationRevision ResourcePrefix = "apprev"
 	// PrefixApplicationClient prefixes a client row's primary key. The row's
-	// client_id copies it when the document supplied none (ADR 047 §5).
+	// client_id copies it when the document supplied none (ADR 047 §5). A
+	// registered client's generated secret takes it too, as sk_client_….
 	PrefixApplicationClient ResourcePrefix = "client"
 	// PrefixApplicationClientSecret prefixes a client secret row's primary key.
 	PrefixApplicationClientSecret ResourcePrefix = "csec"
@@ -165,7 +166,7 @@ func NewRegisteredApplication(projectID string, doc ApplicationDocument, docbs [
 }
 
 func NewApplicationClient(projectID string, clientID *string, slug string, secretGen secrets.Generator) (client *ApplicationClient, plainSecret string, err error) {
-	secret, err := secretGen.New(string(PrefixApplicationClientSecret))
+	secret, err := secretGen.New(string(PrefixApplicationClient))
 	if err != nil {
 		return nil, "", ErrInternal(err).WithMessage("failed to generate client secret")
 	}

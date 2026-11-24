@@ -52,12 +52,12 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		assert.True(t, got.Created)
 		assert.Equal(t, "app_1", got.Application.ID)
 		assert.Equal(t, []service.ApplicationClientSecret{
-			{Slug: "web", ClientID: "client_1", Secret: "sk_csec_1"},
-			{Slug: "admin", ClientID: "shop-admin", Secret: "sk_csec_2"},
+			{Slug: "web", ClientID: "client_1", Secret: "sk_client_1"},
+			{Slug: "admin", ClientID: "shop-admin", Secret: "sk_client_2"},
 		}, got.Secrets)
 		assert.Equal(t, []*domain.ApplicationClientSecret{
-			{ProjectID: appProjectID, ApplicationClientID: "client_1", SecretHash: domain.HashSecret("sk_csec_1")},
-			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_csec_2")},
+			{ProjectID: appProjectID, ApplicationClientID: "client_1", SecretHash: domain.HashSecret("sk_client_1")},
+			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_client_2")},
 		}, *secrets, "each client stores the hash of the secret it was returned")
 
 		require.Len(t, *f.events, 1)
@@ -91,9 +91,9 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
 		require.NoError(t, err)
 		assert.False(t, got.Created)
-		assert.Equal(t, []service.ApplicationClientSecret{{Slug: "admin", ClientID: "shop-admin", Secret: "sk_csec_1"}}, got.Secrets)
+		assert.Equal(t, []service.ApplicationClientSecret{{Slug: "admin", ClientID: "shop-admin", Secret: "sk_client_1"}}, got.Secrets)
 		assert.Equal(t, []*domain.ApplicationClientSecret{
-			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_csec_1")},
+			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_client_1")},
 		}, *secrets)
 
 		require.Len(t, *f.events, 1)
@@ -355,6 +355,45 @@ func TestApplicationService_ClientUsesDeploymentReleaseForDeclaredApplication(t 
 	got, err := f.svc.Client(t.Context(), appProjectID, "dep_1", "shop-web")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"https://shop.example.com/callback"}, got.RedirectURIs)
+}
+
+// A revoked release serves no declared client, whether the lookup loaded the
+// deployment's release or the request had resolved it already.
+func TestApplicationService_ClientRefusesARevokedRelease(t *testing.T) {
+	t.Parallel()
+	revoked := &domain.Release{ID: "rel_1", RevokedAt: new(time.Now()), Pointers: []domain.ReleasePointer{{
+		Kind: domain.ReleasePointerKindApplication, Handle: "shop", RevisionID: "apprev_1",
+	}}}
+	deployment := &domain.Deployment{ProjectID: appProjectID, ID: "dep_1", ReleaseID: "rel_1"}
+	tests := []struct {
+		name     string
+		resolved bool
+	}{
+		{name: "loaded by the lookup"},
+		{name: "resolved by the request", resolved: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newApplicationFixture(t)
+			f.pool.EXPECT().
+				GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-web").
+				Return(&domain.ApplicationClient{ApplicationID: "app_1", Slug: "web", ClientID: "shop-web"}, nil)
+			f.pool.EXPECT().
+				GetApplication(gomock.Any(), gomock.Any()).
+				Return(&domain.Application{ProjectID: appProjectID, ID: "app_1", Slug: "shop", IsDeclared: true}, nil)
+			ctx := t.Context()
+			if tt.resolved {
+				ctx = service.WithRuntimeResolution(ctx, &service.RuntimeResolution{Deployment: deployment, Release: revoked})
+			} else {
+				f.pool.EXPECT().GetDeploymentByID(gomock.Any(), appProjectID, "dep_1").Return(deployment, nil)
+				f.pool.EXPECT().GetReleaseByID(gomock.Any(), appProjectID, "rel_1").Return(revoked, nil)
+			}
+
+			_, err := f.svc.Client(ctx, appProjectID, "dep_1", "shop-web")
+			assert.ErrorIs(t, err, domain.ErrReleaseRevoked())
+		})
+	}
 }
 
 // applicationFixture splits reads from writes like idpConnectionFixture: the

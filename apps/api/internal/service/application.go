@@ -586,11 +586,13 @@ func (s *applicationService) servedClient(ctx context.Context, projectID, deploy
 				if err != nil {
 					return nil, applicationReadError(err)
 				}
-				if release.Revoked() {
-					return nil, domain.ErrReleaseRevoked()
-				}
 				ctx = WithRuntimeResolution(ctx, &RuntimeResolution{Deployment: deployment, Release: release})
 			}
+		}
+		// Whether the request resolved the release or it was loaded above, a
+		// revoked release serves no client.
+		if served := RuntimeResolutionFromContext(ctx); served != nil && served.Release != nil && served.Release.Revoked() {
+			return nil, domain.ErrReleaseRevoked()
 		}
 		pins, err := runtimePins(ctx, domain.ReleasePointerKindApplication)
 		if err != nil {
