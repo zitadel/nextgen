@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,10 +17,15 @@ import { createAppRouter } from "../../router";
  * checks the session itself, the widget because `/login` mounts it.
  */
 const fetchSession = vi.fn();
+const signOut = vi.fn();
 
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  return { ...actual, fetchSession: (...args: []) => fetchSession(...args) };
+  return {
+    ...actual,
+    fetchSession: (...args: []) => fetchSession(...args),
+    signOut: (...args: []) => signOut(...args),
+  };
 });
 
 vi.mock("@zitadel/sdk-react", () => ({
@@ -109,10 +114,22 @@ async function openLink(token: string | null = TOKEN) {
   return router;
 }
 
+/**
+ * The sign-in widget ends in a full navigation back to the page: a new
+ * document, with the tab's storage as it was left.
+ */
+async function signInAgain() {
+  cleanup();
+  return openLink(null);
+}
+
 beforeEach(() => {
   window.sessionStorage.clear();
   fetchSession.mockReset();
   fetchSession.mockResolvedValue(makeTestSession());
+  signOut.mockReset();
+  // Signing out ends the session the next guard reads.
+  signOut.mockImplementation(async () => fetchSession.mockResolvedValue(null));
   vi.mocked(trackEvent).mockClear();
   _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
 });
@@ -139,6 +156,61 @@ describe("invitation page", () => {
       await screen.findByRole("heading", { name: "You're invited to join acme-app" }),
     ).toBeInTheDocument();
     expect(screen.getByText("You'll join as an editor. Expires in 2 days.")).toBeInTheDocument();
+    expect(tokens).toEqual([TOKEN]);
+  });
+
+  it("names the account that would join", async () => {
+    stubLookup();
+    await openLink();
+    await screen.findByRole("heading", { name: "You're invited to join acme-app" });
+    expect(screen.getByText("test.user@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use another account" })).toBeInTheDocument();
+  });
+
+  it("signs out for another account and keeps the link for them", async () => {
+    const tokens = stubLookup();
+    const router = await openLink();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Use another account" }));
+
+    const widget = await screen.findByTestId("zitadel-login");
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(router.state.resolvedLocation?.search).toEqual({ next: "/invitations/accept" });
+    expect(widget.dataset.postSignInUrl).toBe("/invitations/accept");
+
+    // The other account signs in and comes back to the same invitation.
+    fetchSession.mockResolvedValue(
+      makeTestSession({
+        user_id: "user_other",
+        user: {
+          user_id: "user_other",
+          identifier: "other@example.com",
+          identifier_property: "email",
+        },
+      }),
+    );
+    await signInAgain();
+    expect(
+      await screen.findByRole("heading", { name: "You're invited to join acme-app" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("other@example.com")).toBeInTheDocument();
+    expect(tokens).toEqual([TOKEN, TOKEN]);
+  });
+
+  it("drops the link for someone who signs in after the session it was shown to ended", async () => {
+    const tokens = stubLookup();
+    await openLink();
+    await screen.findByRole("heading", { name: "You're invited to join acme-app" });
+
+    // The session expired; nobody pressed a button. Someone else signs in on
+    // the tab and is sent back to the page the first person left.
+    fetchSession.mockResolvedValue(makeTestSession({ user_id: "user_other" }));
+    await signInAgain();
+
+    expect(
+      await screen.findByRole("heading", { name: "Invitation unavailable" }),
+    ).toBeInTheDocument();
+    expect(readInvitationToken()).toBeUndefined();
     expect(tokens).toEqual([TOKEN]);
   });
 

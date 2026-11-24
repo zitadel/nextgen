@@ -320,6 +320,11 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   capture.
 - `sessionStorage` holds it only while the page needs it. It's cleared on
   accept, decline, an unknown token, and sign-out.
+- A session can end without sign-out (it expires, or is revoked elsewhere), so
+  the token belongs to the first signed-in account the page shows it to: for
+  any other account that signs in on the tab it is dropped unshown. The page
+  names the signed-in account and offers **Use another account**, the one
+  path that hands the token to the next sign-in.
 
 **Authority**
 - Creating, listing, reading and cancelling run the same project `admin` check

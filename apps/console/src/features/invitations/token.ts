@@ -15,8 +15,16 @@
  * full navigation. It is cleared when the invitation is finished (accepted,
  * declined, unknown) and on sign-out; reopening the link stores it again, which
  * is how an interrupted acceptance resumes.
+ *
+ * A session can also end without the sign-out button (it expires, or is
+ * revoked elsewhere), with the token still stored. So the token belongs to the
+ * first signed-in person the page shows it to (`holdInvitationTokenFor`): for
+ * anyone else who signs in on the tab it is dropped instead of shown. Only the
+ * page's own "Use another account" hands it on (`handOverInvitationToken`).
  */
 const STORAGE_KEY = "zitadel.console.invitation_token";
+/** The user the token was first shown to. Not a secret; it names no one else. */
+const HOLDER_KEY = "zitadel.console.invitation_holder";
 
 /** The router-relative path of the invitation page. */
 export const INVITATION_ACCEPT_PATH = "/invitations/accept";
@@ -35,6 +43,8 @@ export function captureInvitationToken(
   if (!token) return false;
   try {
     window.sessionStorage.setItem(STORAGE_KEY, token);
+    // A new link is whoever opens it's, not the last link's holder's.
+    window.sessionStorage.removeItem(HOLDER_KEY);
   } catch {
     // No storage (blocked, or full): the page has no token and says the link
     // is unavailable. The fragment is still dropped.
@@ -52,10 +62,45 @@ export function readInvitationToken(): string | undefined {
   }
 }
 
+/**
+ * The stored token, for the signed-in person about to be shown it. The first
+ * person becomes its holder; for anyone else the token is forgotten and
+ * nothing comes back.
+ */
+export function holdInvitationTokenFor(userId: string): string | undefined {
+  const token = readInvitationToken();
+  if (!token) return undefined;
+  try {
+    const holder = window.sessionStorage.getItem(HOLDER_KEY);
+    if (holder && holder !== userId) {
+      clearInvitationToken();
+      return undefined;
+    }
+    window.sessionStorage.setItem(HOLDER_KEY, userId);
+  } catch {
+    // The token was readable, so storage is there; a failed write only leaves
+    // it without a holder.
+  }
+  return token;
+}
+
+/**
+ * Lets the next person to sign in hold the token: the holder chose to open
+ * the invitation with another account.
+ */
+export function handOverInvitationToken(): void {
+  try {
+    window.sessionStorage.removeItem(HOLDER_KEY);
+  } catch {
+    // Nothing was stored where nothing can be.
+  }
+}
+
 /** Forgets the token: the invitation is finished, or the person signed out. */
 export function clearInvitationToken(): void {
   try {
     window.sessionStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(HOLDER_KEY);
   } catch {
     // Nothing was stored where nothing can be.
   }

@@ -39,33 +39,53 @@ import { clearInvitationToken } from "../token";
  * kind keeps it, so reloading the page or reopening the link picks up where
  * it stopped.
  *
+ * **The account is named.** The page has no app shell, so under every state it
+ * says who is signed in, which is who would join, and offers another account:
+ * a link sent to one address is often opened where another is signed in.
+ *
  * **The inviter is the lookup's.** `inviter` is a user-ref the server resolves,
  * because the invited person cannot read the project's users; the page shows
  * it as it arrives and never looks anyone up by id. An invitation a project
  * secret created has none, and the line is left out.
  */
-export function InvitationPage({ state }: { state: InvitationPageState }) {
+export function InvitationPage({
+  state,
+  account,
+  onSwitchAccount,
+}: {
+  state: InvitationPageState;
+  /** The signed-in account, as the person knows it. */
+  account: string;
+  /** Signs out and comes back to this page through sign-in. */
+  onSwitchAccount: () => Promise<void>;
+}) {
+  return (
+    <StandaloneScreen>
+      <InvitationCard state={state} />
+      <SignedInAs account={account} onSwitchAccount={onSwitchAccount} />
+    </StandaloneScreen>
+  );
+}
+
+/** The card for the state the invitation is in. */
+function InvitationCard({ state }: { state: InvitationPageState }) {
   const [outcome, setOutcome] = useState<"declined" | "gone" | undefined>(undefined);
 
   if (state.kind === "error") {
     return (
-      <InvitationShell>
-        <StatusCard title="Invitation could not be loaded">
-          <FormError message={state.message} />
-        </StatusCard>
-      </InvitationShell>
+      <StatusCard title="Invitation could not be loaded">
+        <FormError message={state.message} />
+      </StatusCard>
     );
   }
 
   if (state.kind === "unavailable" || outcome === "gone") {
     return (
-      <InvitationShell>
-        <StatusCard title="Invitation unavailable">
-          <p className={BODY}>
-            This link is no longer valid. Ask a project admin for a new invitation.
-          </p>
-        </StatusCard>
-      </InvitationShell>
+      <StatusCard title="Invitation unavailable">
+        <p className={BODY}>
+          This link is no longer valid. Ask a project admin for a new invitation.
+        </p>
+      </StatusCard>
     );
   }
 
@@ -73,26 +93,22 @@ export function InvitationPage({ state }: { state: InvitationPageState }) {
 
   if (outcome === "declined") {
     return (
-      <InvitationShell>
-        <StatusCard title="Invitation declined">
-          <p className={BODY}>You haven&apos;t joined {invitation.project_name}.</p>
-          <Button asChild className="w-full px-2.5">
-            <Link to="/projects">Go to projects</Link>
-          </Button>
-        </StatusCard>
-      </InvitationShell>
+      <StatusCard title="Invitation declined">
+        <p className={BODY}>You haven&apos;t joined {invitation.project_name}.</p>
+        <Button asChild className="w-full px-2.5">
+          <Link to="/projects">Go to projects</Link>
+        </Button>
+      </StatusCard>
     );
   }
 
   return (
-    <InvitationShell>
-      <OpenInvitation
-        token={token}
-        invitation={invitation}
-        onDeclined={() => setOutcome("declined")}
-        onGone={() => setOutcome("gone")}
-      />
-    </InvitationShell>
+    <OpenInvitation
+      token={token}
+      invitation={invitation}
+      onDeclined={() => setOutcome("declined")}
+      onGone={() => setOutcome("gone")}
+    />
   );
 }
 
@@ -102,8 +118,31 @@ const BODY = "text-muted-foreground text-sm leading-5";
 const CARD =
   "border-foreground/10 bg-background flex w-full max-w-md flex-col rounded-md border p-6";
 
-function InvitationShell({ children }: { children: ReactNode }) {
-  return <StandaloneScreen>{children}</StandaloneScreen>;
+/** Who is signed in, under the card, and the way to another account. */
+function SignedInAs({
+  account,
+  onSwitchAccount,
+}: {
+  account: string;
+  onSwitchAccount: () => Promise<void>;
+}) {
+  const switching = useSubmit(onSwitchAccount, "Could not sign out. Try again.");
+  return (
+    <div className="flex w-full max-w-md flex-col items-center gap-1 text-center">
+      <p className={`${BODY} wrap-anywhere`}>
+        Signed in as <span className="text-foreground">{account}</span>
+      </p>
+      <Button
+        variant="link"
+        className="text-muted-foreground h-auto px-2.5 py-0"
+        loading={switching.pending}
+        onClick={() => void switching.run()}
+      >
+        Use another account
+      </Button>
+      <FormError message={switching.error} />
+    </div>
+  );
 }
 
 /** A finished state: the title over what it means and, where there is one, the way on. */
