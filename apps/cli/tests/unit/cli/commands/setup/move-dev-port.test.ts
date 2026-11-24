@@ -209,17 +209,19 @@ describe("MoveAppPort", () => {
     it("says so before it asks for consent", async ({ dir, terminal }) => {
       terminal.tty(true);
       await setUpApp(dir);
-      let shownWhenAsked = "";
+      const shownWhenAsked: string[] = [];
 
       await movingTo3101(dir, {
         dryRun: false,
         consent: () => {
-          shownWhenAsked = terminal.shown();
+          shownWhenAsked.push(terminal.shown());
           return Promise.resolve(undefined);
         },
       });
 
-      expect(shownWhenAsked).toContain("Moved from http://localhost:3000 to http://localhost:3101");
+      expect(shownWhenAsked.join("")).toContain(
+        "Moved from http://localhost:3000 to http://localhost:3101",
+      );
     });
   });
 
