@@ -1,20 +1,35 @@
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { quote } from "@/lib/zitadel/rules/sso/shared";
 
+/**
+ * A connection that creates users has verified_claims keys, and none of them is a property of the
+ * flow's schema.
+ *
+ * @remarks
+ * Why it matters: Every property of that user type arrives unverified, so where a required
+ * property is unique the automatic creation can never pass and sign-up stops at the collection
+ * step. It is only a warning because another schema that lists the connection may define the keys.
+ *
+ * Reported once: A key no listing schema defines is the error sso/orphaned-verification-key, so it
+ * is not reported again here. A pinned schema that does not list the provider is refused at the
+ * step by sso/provider-id. A connection that does not create users, or has no verified_claims, is
+ * not judged.
+ *
+ * Fix: Verify a property of the schema in verified_claims, or remove verified_claims.
+ *
+ * Origin: #3287 (Empty verified_claims intersection of #1083);
+ * docs/design/idp/2-auth-method-
+ * selection.md#validation-rules.
+ */
 export const EMPTY_VERIFIED_CLAIMS: Rule = defineRule({
   id: "sso/empty-verified-claims",
   severity: "warning",
-  // A key no listing schema defines is already the error
-  // sso/orphaned-verification-key, so it is not reported again here. Only a
-  // warning: another schema that lists the connection may define the keys.
   each: (config) => {
     return config.flows.pinnedOffers.flatMap((offer) => {
       const connection = offer.connection;
       if (connection === undefined || !connection.createsUsers) {
         return [];
       }
-      // A pinned schema that does not list the provider is already refused at
-      // the step by sso/provider-id.
       if (!offer.schema.providers.includes(offer.slug)) {
         return [];
       }

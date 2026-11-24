@@ -3,6 +3,26 @@ import { propertyName } from "@/lib/zitadel/names";
 import { closest } from "@/lib/zitadel/utils/spelling";
 import { quote, readableProperties, standing, unreadable } from "@/lib/zitadel/rules/sso/shared";
 
+/**
+ * A connection that creates users automatically maps no claim to a property its schema requires of
+ * every user.
+ *
+ * @remarks
+ * Why it matters: Automatic creation can never complete, so every new user is stopped to enter the
+ * missing property by hand. It is only a warning because the sign-up still works through the
+ * collection step.
+ *
+ * Reported once: Only a mapping that fills something the schema defines is judged: a mapping that
+ * fills nothing is reported by sso/empty-claim-mapping, and an unknown target by sso/orphaned-
+ * mapping-target. A required property that an unknown mapping target most likely meant is not
+ * reported, because that typo is already an error.
+ *
+ * Fix: Map the property in the connection file to create users without asking.
+ *
+ * Origin: #3287 (Impossible Auto-Creation (Data) of #1083);
+ * docs/design/idp/1-resource-
+ * model.md#validator-rules.
+ */
 export const IMPOSSIBLE_AUTO_CREATION_DATA: Rule = defineRule({
   id: "sso/impossible-auto-creation-data",
   severity: "warning",
@@ -13,9 +33,6 @@ export const IMPOSSIBLE_AUTO_CREATION_DATA: Rule = defineRule({
       if (connection === undefined || !connection.createsUsers) {
         return [];
       }
-      // A mapping that fills nothing the schema defines is already reported
-      // by sso/empty-claim-mapping, or as an unknown target; this rule only
-      // judges a mapping that fills something.
       const fillsSomething = connection.mappings.some((row) => {
         return offer.schema.has(row.property);
       });
@@ -25,8 +42,6 @@ export const IMPOSSIBLE_AUTO_CREATION_DATA: Rule = defineRule({
       const entry = entries.find((candidate) => {
         return candidate.connection === connection;
       });
-      // A mapping target no listing schema defines that is the nearest name to
-      // a required property is a typo sso/orphaned-mapping-target reports.
       const meant =
         entry === undefined
           ? []

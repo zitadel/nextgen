@@ -2,16 +2,29 @@ import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { didYouMean } from "@/lib/zitadel/utils/spelling";
 import { quote, standing } from "@/lib/zitadel/rules/sso/shared";
 
+/**
+ * A claim_mapping target or verified_claims key of a connection no schema lists is a property no
+ * schema in the project defines, so it looks mistyped.
+ *
+ * @remarks
+ * Why it matters: With no schema listing the connection, the orphaned mapping and verification
+ * errors have nothing to judge it against, so a typo would be read by nothing. It is only a
+ * warning because the schema that lists the connection may not exist yet.
+ *
+ * Reported once: Judged against every schema in the project. A connection a flow offers is not
+ * judged, because sso/provider-id already refuses that step and listing the connection makes the
+ * orphaned errors apply. A project with no schema, or with an external one whose properties are
+ * not known, is not judged, since nothing can then be called unknown. The message names the
+ * property it most likely meant.
+ *
+ * Fix: Fix the name, or remove it.
+ *
+ * Origin: #3287 (Unreferenced Typo Guard of #1083);
+ * docs/design/idp/1-resource-model.md#validator-rules.
+ */
 export const UNREFERENCED_TYPO_GUARD: Rule = defineRule({
   id: "sso/unreferenced-typo-guard",
   severity: "warning",
-  // The orphaned-* errors judge a connection some schema lists. This judges
-  // one none lists against every schema in the project instead. It stays
-  // silent when a flow offers the connection: that is already refused at the
-  // step by sso/provider-id, and listing it makes the orphaned-* errors
-  // apply. It also stays silent when the project has no schema, or an
-  // external one whose properties are not known, since nothing can then be
-  // called unknown.
   each: (config) => {
     const schemas = config.schemas.all;
     if (

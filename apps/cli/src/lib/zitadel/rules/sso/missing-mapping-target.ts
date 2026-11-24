@@ -1,12 +1,25 @@
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { quote, standing } from "@/lib/zitadel/rules/sso/shared";
 
+/**
+ * A claim_mapping target is a property of some schemas that list the connection but not of others.
+ *
+ * @remarks
+ * Why it matters: For a user of a schema without the property the claim is dropped. It is only a
+ * warning because a connection may legitimately map a superset of what each schema defines.
+ *
+ * Reported once: A target no listing schema defines is the error sso/orphaned-mapping-target, so
+ * it is not reported again here.
+ *
+ * Fix: Add the property to the schemas that lack it, or remove the row if only the other schemas
+ * need it.
+ *
+ * Origin: #3287 (Missing Mapping Target of #1083);
+ * docs/design/idp/1-resource-model.md#validator-rules.
+ */
 export const MISSING_MAPPING_TARGET: Rule = defineRule({
   id: "sso/missing-mapping-target",
   severity: "warning",
-  // A target no listing schema defines is the error sso/orphaned-mapping-target,
-  // so it is not reported again here. A connection may map a superset of what
-  // each schema defines, hence a warning and not an error.
   each: (config) => {
     return standing(config).flatMap((entry) => {
       return entry.connection.mappings.flatMap((row) => {

@@ -2,12 +2,30 @@ import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { closest } from "@/lib/zitadel/utils/spelling";
 import { quote, readableProperties, standing, unreadable } from "@/lib/zitadel/rules/sso/shared";
 
+/**
+ * A connection that creates users automatically maps a required unique property but does not
+ * verify it.
+ *
+ * @remarks
+ * Why it matters: A claim with no verified_claims entry always arrives unverified, so the
+ * automatic creation can never pass and every new user is stopped at the collection step. It is
+ * only a warning because the sign-up still works through that step.
+ *
+ * Reported once: A required unique property the connection does not map is named by
+ * sso/impossible-auto-creation-data, or by sso/empty-claim-mapping when the mapping fills nothing,
+ * so only a mapped one is judged here. A property that a mistyped verified_claims key most likely
+ * meant is not reported, because that typo is already an error from sso/orphaned-verification-key.
+ *
+ * Fix: Add the property to verified_claims in the connection file, naming the claim that verifies
+ * it.
+ *
+ * Origin: #3287 (Impossible Auto-Creation (Verification) of #1083);
+ * docs/design/idp/1-resource-
+ * model.md#validator-rules.
+ */
 export const IMPOSSIBLE_AUTO_CREATION_VERIFICATION: Rule = defineRule({
   id: "sso/impossible-auto-creation-verification",
   severity: "warning",
-  // A required unique property the connection does not map is already named
-  // by sso/impossible-auto-creation-data, or by sso/empty-claim-mapping when
-  // the mapping fills nothing; this rule judges only those it maps.
   each: (config) => {
     const entries = standing(config);
     return config.flows.pinnedOffers.flatMap((offer) => {
@@ -18,9 +36,6 @@ export const IMPOSSIBLE_AUTO_CREATION_VERIFICATION: Rule = defineRule({
       const entry = entries.find((candidate) => {
         return candidate.connection === connection;
       });
-      // A verified_claims key no listing schema defines that is the nearest
-      // name to a required property is a typo sso/orphaned-verification-key
-      // reports.
       const meant =
         entry === undefined
           ? []
