@@ -692,7 +692,7 @@ describe("env add", () => {
         );
 
         expect(result).toPrint(
-          "Wrote .env.production.local, which holds ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_PREVIEW_TOKEN, NEXT_PUBLIC_ZITADEL_PROJECT_ID.",
+          ".env.production.local holds ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_PREVIEW_TOKEN, NEXT_PUBLIC_ZITADEL_PROJECT_ID.",
         );
       });
 

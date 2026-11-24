@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from "node:util";
+
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import type { SetupFlags } from "@/cli/commands/setup";
@@ -210,7 +212,21 @@ async function installWith(input: InstallInput) {
 }
 
 /**
- * The steps a run narrated: what it began and how it ended, in order.
+ * The steps a run narrated into its chain: what it began and how it ended, in
+ * order, each with its mark.
+ *
+ * @param terminal - The terminal the run was at.
+ * @returns The lines that open and close a step.
+ */
+function stepsShown(terminal: { shown(): string }): string[] {
+  return stripVTControlCharacters(terminal.shown())
+    .split("\n")
+    .map((line) => line.trimEnd().replace(/^(\S) {2}/, "$1 "))
+    .filter((line) => line !== "");
+}
+
+/**
+ * The lines that open and close a step, from what was said through `log`.
  *
  * @param said - Everything the run said.
  * @returns The lines that open and close a step.
@@ -245,16 +261,15 @@ function textOf(actions: ReadonlyArray<BoxAction>): string {
 
 describe("InstallDependencies", () => {
   describe("when setup added a dependency", () => {
-    it("reports the install as a step of the command's own chain", async ({ dir }) => {
+    it("reports the install as a step of the command's own chain", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await aProject(dir);
-      const log = recordLog();
 
       await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
-      log.stop();
 
-      expect(stepsOf(log.said)).toEqual([
-        "Installing dependencies with npm install",
-        "Installed dependencies",
+      expect(stepsShown(terminal)).toEqual([
+        "◐ Installing dependencies with npm install",
+        "✔ Installed dependencies",
       ]);
     });
 
@@ -581,31 +596,29 @@ describe("InstallDependencies", () => {
       });
     });
 
-    it("reports it as a step of the command's own chain", async ({ dir }) => {
+    it("reports it as a step of the command's own chain", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await aProject(dir);
-      const log = recordLog();
 
       await installWith(aNewAppInput(dir, { run: aRunner() }));
-      log.stop();
 
-      expect(stepsOf(log.said).slice(2)).toEqual([
-        "Running npm run generate-routes",
-        "Ran npm run generate-routes",
+      expect(stepsShown(terminal).slice(2)).toEqual([
+        "◐ Running npm run generate-routes",
+        "✔ Ran npm run generate-routes",
       ]);
     });
 
     // Its output is kept back, so a spinner draws over nothing, unlike the
     // install's, which writes to the terminal itself.
-    it("reports it as a step without --json too", async ({ dir }) => {
+    it("reports it as a step without --json too", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await aProject(dir);
-      const log = recordLog();
 
       await installWith(aNewAppInput(dir, { json: false, run: aRunner() }));
-      log.stop();
 
-      expect(stepsOf(log.said).slice(2)).toEqual([
-        "Running npm run generate-routes",
-        "Ran npm run generate-routes",
+      expect(stepsShown(terminal)).toEqual([
+        "◐ Running npm run generate-routes",
+        "✔ Ran npm run generate-routes",
       ]);
     });
 

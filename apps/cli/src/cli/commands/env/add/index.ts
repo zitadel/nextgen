@@ -484,12 +484,13 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
         sections: [],
         lines: [
           ...(createdProject ? [`Created project ${projectId}`] : []),
+          `Wrote ${environment.file}`,
           ...(deployment === undefined
             ? []
             : [
                 `Deployed ${deployment.contentHash} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
               ]),
-          `Wrote ${environment.file}, which holds ${Object.keys(values).join(", ")}.`,
+          `${environment.file} holds ${Object.keys(values).join(", ")}.`,
           ...guidanceBlock([...originGuidance, ...deployGuidance]),
           "",
           "The deployed app never reads that file. Set these where it is built and run.",
