@@ -95,6 +95,7 @@ Already merged: the front end derives a display name from given/family name if p
 
 ### D55 · User list ships as the raw merged table — 2026-08-12 · [superseded by D23]
 With multiple schemas, the list shows every column of every schema in one table; users without a property get a dash, horizontal scroll takes the width (per D4/D5). Explicitly ship the "mumbo jumbo" and let people react, rather than pre-solving the five possible display fixes now — claiming is close, the dynamic columns are already built (twice), and unreleased work shouldn't grow scope. Column order arrives random from the backend (unordered map); the front end sorts alphabetically as a stopgap, proper (schema-defined) ordering needs its ticket.
+
 ### D54 · Login UI: pure CSS on own tokens, not shadcn/ui — 2026-08-05 · [standing]
 The login app has to run inside many different frameworks and is built as web/lit components, so it can't use the shadcn/ui React library or Tailwind. Rebuild it with pure CSS that maps the design tokens to our own CSS classes (the original "legacy" / `zl-`-prefixed token approach), not shadcn or Tailwind classes. Reuse the same token styles for visual consistency, but add a prominent note in Figma and in code: *"don't use shadcn — the CSS is done manually."* There is no light theme in these variables today. → Design provides light + dark mode values and applies them to the correct color tokens; whether to fully align the login look with the console is a separate open question.
 
