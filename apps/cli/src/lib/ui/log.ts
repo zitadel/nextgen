@@ -19,9 +19,9 @@ export type LogSink = (level: LogLevel, text: string) => void;
  * It names no look: the sink installed by the running command decides whether
  * a line is a chain line with its mark, a plain line, or nothing at all
  * (`--json` installs a sink that draws nothing, and a pipe is given only `warn`
- * and `fail`). Code that logs therefore never
- * needs to know which kind of command it is running under, or be handed the UI
- * to talk to. With no sink installed, a line is written plainly.
+ * and `fail`). Code that logs therefore never needs to know which kind of
+ * command it is running under, or be handed the UI to talk to. With no sink
+ * installed, a line is written plainly.
  *
  * The CLI runs one command per process, so one instance ({@link log}) serves
  * every library that has no `Ui` at hand.

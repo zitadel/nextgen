@@ -106,9 +106,8 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
                 ]
               : []),
             ...mappingLines(needs.change),
-            "",
             ...(unpublished && needs.delivery.areStored(needs.published)
-              ? ["Its credentials are stored in your project."]
+              ? ["", "Its credentials are stored in your project."]
               : []),
           ],
         },

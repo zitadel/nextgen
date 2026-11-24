@@ -3,7 +3,7 @@ import { describe, expect, onTestFinished } from "vitest";
 
 import { it } from "@tests/fixtures";
 import { log } from "@/lib/ui";
-import { GUIDE, MARK } from "@/lib/ui/marks";
+import { MARK } from "@/lib/ui/marks";
 import { LogPrinter } from "@/lib/ui/log-printer";
 
 /** A chain that collects what was narrated into it, as `mark text`. */
@@ -107,17 +107,26 @@ describe("LogPrinter", () => {
     }).not.toThrow();
   });
   describe("off a terminal", () => {
-    it.for<[string, () => void]>([["info", () => log.info("a statement")]])(
-      "leaves a %s line out, so stdout holds only what a script reads",
-      ([, say], { terminal }) => {
-        terminal.tty(false);
-        drawn(new Collected(false));
+    it("leaves an info line out, so stdout holds only what a script reads", ({ terminal }) => {
+      terminal.tty(false);
+      drawn(new Collected(false));
 
-        say();
+      log.info("a statement");
 
-        expect(terminal.plain()).toBe("");
-      },
-    );
+      expect(terminal.plain()).toBe("");
+    });
+
+    it("still writes a failure, and a warning to stderr, which a script is owed", ({
+      terminal,
+    }) => {
+      terminal.tty(false);
+      drawn(new Collected(false));
+
+      log.fail("it failed");
+      log.warn("a warning");
+
+      expect(terminal.errors()).toBe("it failed\nWarning: a warning\n");
+    });
 
     it("leaves a line out of a chain too", ({ terminal }) => {
       terminal.tty(false);
@@ -142,17 +151,6 @@ describe("LogPrinter", () => {
   });
 
   describe("on a terminal", () => {
-    it("draws a block of text in a chain without a mark", ({ terminal }) => {
-      terminal.tty(true);
-      const { chain } = drawn();
-
-      log.info("Using an AI coding agent?\nInstall the skill.");
-
-      expect(chain.lines).toEqual([
-        `${stripAnsi(GUIDE)} Using an AI coding agent?\nInstall the skill.`,
-      ]);
-    });
-
     it("writes a line", ({ terminal }) => {
       terminal.tty(true);
       drawn(new Collected(false));

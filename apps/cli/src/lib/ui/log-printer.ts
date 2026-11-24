@@ -1,5 +1,5 @@
 import { log, type LogLevel } from "./log";
-import { GUIDE, MARK } from "./marks";
+import { MARK } from "./marks";
 import { Output } from "./output";
 import { writePlain } from "./plain";
 import { DrawnSpinner } from "./spinner";
@@ -87,8 +87,7 @@ export class LogPrinter {
       return;
     }
     if (this.chain.chained) {
-      // A paragraph or a diff is a block, not a status, so it has no mark.
-      this.chain.narrate(level === "info" && text.includes("\n") ? GUIDE : MARKS[level], text);
+      this.chain.narrate(MARKS[level], text);
       return;
     }
     // A line written while a spinner draws would be glued to its frame.

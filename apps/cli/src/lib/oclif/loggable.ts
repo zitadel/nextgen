@@ -65,7 +65,8 @@ export function Loggable<TBase extends CommandClass>(Base: TBase) {
     }
 
     /**
-     * Says detail nobody asked for, shown only under `--debug`.
+     * Says detail nobody asked for, shown only under `--debug`. A property, as the
+     * oclif command's own `debug` is.
      *
      * @param args - What to say, formatted the way `console` formats it.
      */
