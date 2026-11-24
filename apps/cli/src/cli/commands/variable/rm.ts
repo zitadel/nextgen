@@ -2,14 +2,12 @@ import { Flags } from "@oclif/core";
 
 import { VariableRemoval, VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { dryRunResult } from "@/lib/oclif/crud/shared";
-import { Destructive } from "@/lib/oclif/destructive";
-import { deletedData } from "@/lib/oclif/envelope";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { deletedData } from "@/cli/core/envelope";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-
+import { RemoveCommand } from "@/cli/commands/bases";
 import { variableNameArg } from "./name";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
@@ -19,7 +17,9 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
  * without it the variable is removed for both kinds.
  */
 export default class VariableRm extends Telemetered(
-  Destructive(ServerCommand(EnvironmentCommand)),
+  RemoveCommand(
+    "Remove the variable without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.projectSettings;
@@ -41,67 +41,76 @@ export default class VariableRm extends Telemetered(
       default: false,
       description: "Remove the preview value alone, leaving the primary one standing.",
     }),
-    force: Flags.boolean({
-      char: "f",
-      description:
-        "Remove the variable without the confirmation prompt. Required when non-interactive.",
-    }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof VariableRm>): Promise<JsonEnvelope> {
-    // The one place this run reads `--preview` as a decision: the removal owns
-    // which kinds it clears from here on.
+  /**
+   * Says what removing the variable would do, without connecting or removing.
+   * This is the one place the run reads `--preview` as a decision: the removal
+   * owns which kinds it clears from here on.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The dry run's envelope.
+   */
+  protected async preview({ args, flags }: Admitted<typeof VariableRm>): Promise<CommandResult> {
+    const removal = VariableRemoval.of({
+      preview: flags.preview,
+    });
+    const result = dryRunResult({
+      verb: "remove",
+      topic: "variable",
+      id: args.name,
+      clause: `from the project${removal.preview ? " (preview)" : ""}`,
+      next: await this.realRun(),
+    });
+
+    return {
+      ...result,
+      data: {
+        ...(result.data as object),
+        kinds: removal.kinds,
+      },
+    };
+  }
+
+  /**
+   * Removes the variable, once the person has agreed or forced it.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The envelope of the removal.
+   */
+  protected async apply({ args, flags }: Admitted<typeof VariableRm>): Promise<CommandResult> {
     const removal = VariableRemoval.of({
       preview: flags.preview,
     });
     const suffix = removal.preview ? " (preview)" : "";
 
-    return this.emit(
-      await this.confirmed({
-        verb: "remove",
-        name: `remove ${removal.preview ? "the preview value of " : ""}${args.name} from the project`,
-        message: async () => {
-          const { projectId, server } = await this.connect();
-          const what = removal.preview ? "the preview value of " : "";
-          return `Remove ${what}${args.name} from project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
-        },
-        preview: async () => {
-          const result = dryRunResult({
-            verb: "remove",
-            topic: "variable",
-            id: args.name,
-            clause: `from the project${suffix}`,
-            next: await this.realRun(),
-          });
-          return {
-            ...result,
-            data: {
-              ...(result.data as object),
-              kinds: removal.kinds,
-            },
-          };
-        },
-        prepare: () => {
-          return this.connect();
-        },
-        apply: async (consent, { client, projectId }) => {
-          const variableService = new VariableService(consent.unlock(client), projectId);
-          await variableService.remove(args.name, removal);
-          return {
-            status: "ok",
-            data: {
-              ...deletedData({
-                name: args.name,
-              }),
-              kinds: removal.kinds,
-            },
-            summary: {
-              title: `Removed ${escapeControlCharacters(args.name)} from the project${suffix}`,
-              sections: [],
-            },
-          };
-        },
-      }),
-    );
+    return await this.confirmed({
+      verb: "remove",
+      name: `remove ${removal.preview ? "the preview value of " : ""}${args.name} from the project`,
+      message: async () => {
+        const what = removal.preview ? "the preview value of " : "";
+        return `Remove ${what}${args.name} from ${await this.projectOnServer()}?`;
+      },
+      apply: async (consent) => {
+        const variableService = await this.service(VariableService, consent);
+        await variableService.remove(args.name, removal);
+        const title = `Removed ${escapeControlCharacters(args.name)} from the project${suffix}`;
+
+        return {
+          status: "ok",
+          data: {
+            ...deletedData({
+              title,
+              name: args.name,
+            }),
+            kinds: removal.kinds,
+          },
+          summary: {
+            title,
+            sections: [],
+          },
+        };
+      },
+    });
   }
 }

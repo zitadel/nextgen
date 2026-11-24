@@ -50,6 +50,18 @@ const config: NextConfig = {
   // Adds each prerendered page's enforced policy, with its inline
   // scripts' hashes, once the build has written the page.
   adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
+  // How to report a vulnerability (RFC 9116): zitadel.com's file, which the
+  // repo-root SECURITY.md names the definitive source, so this host keeps no
+  // copy of its own to fall out of date or past its Expires.
+  async redirects() {
+    return [
+      {
+        source: "/.well-known/security.txt",
+        destination: "https://zitadel.com/.well-known/security.txt",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     // Every response, the pages' and the other routes'. On the cloud's host
     // the website shares an origin with the API and the console, so a script

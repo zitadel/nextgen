@@ -1,8 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups } from "@/cli/commands/groups";
-import { BaseCommand } from "@/lib/oclif";
-import { Wrapped } from "@/lib/oclif/wrapped";
+import { BaseCommand } from "@/cli/core";
+import { Wrapped } from "@/cli/core/wrapped";
 import { TELEMETRY_FLAG } from "@/cli/telemetry/telemetered";
 
 /**

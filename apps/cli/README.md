@@ -233,7 +233,7 @@ Call any operation of the Zitadel API, with this project's server and project se
 ```
 USAGE
   $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-X GET|POST|PUT|PATCH|DELETE] [-F <value>...]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [-X GET|POST|PUT|PATCH|DELETE] [-F <value>...]
     [--file <value>] [--paginate] [-f]
 
 ARGUMENTS
@@ -339,8 +339,8 @@ Disable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey disable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method passkey disable [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -355,6 +355,9 @@ FLAGS
                          positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Disable passkey sign-in for a user schema.
@@ -371,8 +374,8 @@ Enable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey enable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>]
+  $ zitadel auth-method passkey enable [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -386,6 +389,9 @@ FLAGS
                          positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Enable passkey sign-in for a user schema.
@@ -402,8 +408,8 @@ Disable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password disable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method password disable [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -418,6 +424,9 @@ FLAGS
                          positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Disable password sign-in for a user schema.
@@ -434,8 +443,8 @@ Enable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password enable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>]
+  $ zitadel auth-method password enable [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -449,6 +458,9 @@ FLAGS
                          positional arguments go under "args". Only the global flags may stand beside it.
       --schema=<value>   User schema to change, by file name or objectType. Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Enable password sign-in for a user schema.
@@ -465,8 +477,8 @@ Remove an identity provider from a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso disable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>] [--provider <value>] [-f]
+  $ zitadel auth-method sso disable [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [--schema <value>] [--provider <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -484,6 +496,9 @@ FLAGS
                           one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
+GLOBAL FLAGS
+  --json  Format output as json.
+
 DESCRIPTION
   Remove an identity provider from a user schema.
 
@@ -499,9 +514,9 @@ Add an identity provider to a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso enable [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--provider google|custom] [--slug <value>]
-    [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>]
+  $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--schema <value>] [--provider google|custom] [--slug
+    <value>] [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -528,6 +543,9 @@ FLAGS
                               Default: openid profile email.
       --slug=<value>          Name of the custom connection. Schemas and flows refer to it by this.
       --[no-]telemetry        Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Add an identity provider to a user schema.
@@ -609,7 +627,7 @@ Get one branding revision by id.
 ```
 USAGE
   $ zitadel branding get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  branding revision id
@@ -651,7 +669,7 @@ List branding revisions.
 ```
 USAGE
   $ zitadel branding list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--plain]
 
 FLAGS
@@ -695,7 +713,7 @@ Claim this project to make it permanent. Opens a browser to create an account or
 ```
 USAGE
   $ zitadel claim [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--no-open] [--no-wait | --challenge-id <value> |
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--no-open] [--no-wait | --challenge-id <value> |
     --timeout <value>]
 
 FLAGS
@@ -819,7 +837,7 @@ Apply your local configuration to Zitadel.
 ```
 USAGE
   $ zitadel deploy [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f] [-m <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -864,7 +882,7 @@ Deploy an existing release to the project's origins.
 ```
 USAGE
   $ zitadel deployment create --release <value> [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
-    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-m <value>]
+    [-v] [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -901,7 +919,7 @@ Read one deployment by id.
 ```
 USAGE
   $ zitadel deployment get DEPLOYMENT_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   DEPLOYMENT_ID  The deployment to read.
@@ -941,7 +959,7 @@ List the project's deployments, newest first.
 ```
 USAGE
   $ zitadel deployment list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--live] [--limit <value>] [-a |
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--origin <value>] [--live] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
@@ -991,7 +1009,7 @@ Roll back to an earlier deployment.
 ```
 USAGE
   $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
-    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f] [-m <value>]
+    [-v] [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f] [-m <value>]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to roll back to. Omit to undo the last deploy.
@@ -1108,7 +1126,7 @@ Show which server and project resolve, and where each value came from.
 ```
 USAGE
   $ zitadel env [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1188,7 +1206,7 @@ List the environments bound in this directory's .env files.
 ```
 USAGE
   $ zitadel env list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1228,7 +1246,7 @@ Get one event by id.
 ```
 USAGE
   $ zitadel event get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  event id
@@ -1270,7 +1288,7 @@ List events.
 ```
 USAGE
   $ zitadel event list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
@@ -1357,7 +1375,7 @@ Get one flow definition by flow name (newest revision) or revision id.
 ```
 USAGE
   $ zitadel flow-definition get FLOW [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   FLOW  flow name (newest revision) or revision id
@@ -1399,7 +1417,7 @@ List flow definitions.
 ```
 USAGE
   $ zitadel flow-definition list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--plain]
 
 FLAGS
@@ -1447,7 +1465,7 @@ Create a grant.
 ```
 USAGE
   $ zitadel grant create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--relation viewer|editor|admin] [--expires-at <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--relation viewer|editor|admin] [--expires-at <value>]
     [--user-user-id <value>] [--user-identifier <value>] [--team-team-id <value>] [--team-name <value>] [--data <value>
     | --file <value>] [--set <value>...]
 
@@ -1511,7 +1529,7 @@ Delete a grant by id.
 ```
 USAGE
   $ zitadel grant delete ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
   ID  grant id
@@ -1550,7 +1568,7 @@ Get one grant by id.
 ```
 USAGE
   $ zitadel grant get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  grant id
@@ -1592,7 +1610,7 @@ List grants.
 ```
 USAGE
   $ zitadel grant list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
@@ -1709,7 +1727,7 @@ Create an identity provider connection.
 ```
 USAGE
   $ zitadel idp create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--slug <value>] [--protocol oidc] [--template <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--slug <value>] [--protocol oidc] [--template <value>]
     [--display-name <value>] [--subject-claim <value>] [--claim-mapping <value>...] [--verified-claims <value>...]
     [--provisioning-creation disabled|auto] [--oidc-issuer <value>] [--oidc-jwks-uri <value>] [--oidc-id-token-mapping]
     [--oidc-authorization-endpoint <value>] [--oidc-token-endpoint <value>] [--oidc-userinfo-endpoint <value>]
@@ -1802,7 +1820,7 @@ Get one identity provider connection by id.
 ```
 USAGE
   $ zitadel idp get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  identity provider connection id
@@ -1844,7 +1862,7 @@ List identity provider connections.
 ```
 USAGE
   $ zitadel idp list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
@@ -1890,15 +1908,15 @@ EXAMPLES
 
 ## `zitadel invitation cancel [INVITATION_ID]`
 
-Cancel a pending invitation so its link stops working, or remove an expired or declined one.
+Cancel a pending invitation so its link stops working, or remove a declined one.
 
 ```
 USAGE
   $ zitadel invitation cancel [INVITATION_ID] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
-    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [-v] [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
-  [INVITATION_ID]  The invitation to cancel. Omit it to pick a pending, expired or declined one.
+  [INVITATION_ID]  The invitation to cancel. Omit it to pick a pending or declined one.
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1938,7 +1956,7 @@ Invite someone into the project with a link to share.
 ```
 USAGE
   $ zitadel invitation create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--relation viewer|editor|admin]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--name <value>] [--relation viewer|editor|admin]
     [--replaces <value>]
 
 FLAGS
@@ -1982,7 +2000,7 @@ Read one invitation by id.
 ```
 USAGE
   $ zitadel invitation get INVITATION_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   INVITATION_ID  The invitation to read.
@@ -2022,7 +2040,7 @@ List the project's invitations, newest first.
 ```
 USAGE
   $ zitadel invitation list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--status pending|accepted|rejected|expired...] [--type
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--status pending|accepted|rejected|expired...] [--type
     project_member|team_member] [--limit <value>] [-a | --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
@@ -2115,7 +2133,7 @@ Add an origin pattern to the project.
 ```
 USAGE
   $ zitadel origin add PATTERN --kind primary|preview [--json] [-c <value>] [-s <value>] [--input <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--dry-run] [-v] [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry]
 
 ARGUMENTS
   PATTERN  The origin pattern to add.
@@ -2157,7 +2175,7 @@ List the origin patterns on the project.
 ```
 USAGE
   $ zitadel origin list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -2197,7 +2215,7 @@ Remove an origin pattern from the project.
 ```
 USAGE
   $ zitadel origin rm PATTERN [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
   PATTERN  The origin pattern to remove.
@@ -2238,7 +2256,7 @@ Get one policy by policy id or operation.
 ```
 USAGE
   $ zitadel policy get POLICY [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   POLICY  policy id or operation
@@ -2280,7 +2298,7 @@ List policies.
 ```
 USAGE
   $ zitadel policy list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--plain]
 
 FLAGS
@@ -2327,7 +2345,7 @@ Run the test cases in .zitadel/policies/ against the policies.
 ```
 USAGE
   $ zitadel policy test [OPERATION] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--release <value>]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [--release <value>]
 
 ARGUMENTS
   [OPERATION]  Test only this operation's policy, such as auth.factor.password.set.
@@ -2380,7 +2398,7 @@ Deploy a release from .zitadel/ to a pull-request build's preview URLs.
 ```
 USAGE
   $ zitadel preview [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>...] [--ttl <value>] [-m <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--origin <value>...] [--ttl <value>] [-m <value>]
     [--strict]
 
 FLAGS
@@ -2428,7 +2446,7 @@ List the project's live previews, newest first.
 ```
 USAGE
   $ zitadel preview list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--plain]
 
 FLAGS
@@ -2474,7 +2492,7 @@ Remove a live preview from the project.
 ```
 USAGE
   $ zitadel preview rm URL [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
   URL  The preview URL to remove.
@@ -2515,7 +2533,7 @@ Get one project by id.
 ```
 USAGE
   $ zitadel project get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  project id
@@ -2557,7 +2575,7 @@ List projects.
 ```
 USAGE
   $ zitadel project list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
@@ -2607,7 +2625,7 @@ Update a project by id.
 ```
 USAGE
   $ zitadel project update ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--password-hash-algorithm
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--name <value>] [--password-hash-algorithm
     argon2i|argon2id|bcrypt|scrypt|pbkdf2|sha2] [--password-hash-params-time <value>] [--password-hash-params-memory
     <value>] [--password-hash-params-threads <value>] [--password-hash-params-cost <value>]
     [--password-hash-params-rounds <value>] [--password-hash-params-hash sha1|sha224|sha256|sha384|sha512] [--data
@@ -2673,7 +2691,7 @@ Rebuild your .zitadel/ files from a release.
 ```
 USAGE
   $ zitadel pull [TARGET] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry]
 
 ARGUMENTS
   [TARGET]  [default: latest] What to pull: 'latest' (the live release), a release id (rel_…), or a deployment id
@@ -2718,7 +2736,7 @@ Build a release from .zitadel/ without deploying it.
 ```
 USAGE
   $ zitadel release create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-m <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -2756,7 +2774,7 @@ Get one release by id.
 ```
 USAGE
   $ zitadel release get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  release id
@@ -2798,7 +2816,7 @@ List releases.
 ```
 USAGE
   $ zitadel release list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--plain]
 
 FLAGS
@@ -2842,7 +2860,7 @@ Revoke a release so its content is never served again.
 ```
 USAGE
   $ zitadel release revoke RELEASE_ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
   RELEASE_ID  The release to revoke.
@@ -2953,7 +2971,7 @@ Get one schema by object type (current revision) or revision id.
 ```
 USAGE
   $ zitadel schema get SCHEMA [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   SCHEMA  object type (current revision) or revision id
@@ -2995,7 +3013,7 @@ List schemas.
 ```
 USAGE
   $ zitadel schema list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--plain]
 
 FLAGS
@@ -3059,7 +3077,7 @@ Get one session by id.
 ```
 USAGE
   $ zitadel session get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  session id
@@ -3101,7 +3119,7 @@ List sessions.
 ```
 USAGE
   $ zitadel session list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
@@ -3189,7 +3207,7 @@ Revoke a session by id.
 ```
 USAGE
   $ zitadel session revoke ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
   ID  session id
@@ -3372,7 +3390,7 @@ Summarize the local Zitadel server and project state.
 ```
 USAGE
   $ zitadel status [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3433,7 +3451,7 @@ Create a team.
 ```
 USAGE
   $ zitadel team create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--name <value>] [--data <value> | --file <value>] [--set
     <value>...]
 
 FLAGS
@@ -3483,7 +3501,7 @@ Deactivate a team by id.
 ```
 USAGE
   $ zitadel team deactivate ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
   ID  team id
@@ -3522,7 +3540,7 @@ Get one team by id.
 ```
 USAGE
   $ zitadel team get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  team id
@@ -3564,7 +3582,7 @@ List teams.
 ```
 USAGE
   $ zitadel team list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
@@ -3616,7 +3634,7 @@ Update a team by id.
 ```
 USAGE
   $ zitadel team update ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--name <value>] [--data <value> | --file <value>] [--set
     <value>...] [-f]
 
 ARGUMENTS
@@ -3778,7 +3796,7 @@ Create a user.
 ```
 USAGE
   $ zitadel user create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--schema <value>] [--attributes <value>...] [--data
     <value> | --file <value>] [--set <value>...]
 
 FLAGS
@@ -3831,7 +3849,7 @@ Delete a user by id.
 ```
 USAGE
   $ zitadel user delete ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [-f]
 
 ARGUMENTS
   ID  user id
@@ -3870,7 +3888,7 @@ Get one user by id.
 ```
 USAGE
   $ zitadel user get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  user id
@@ -3912,7 +3930,7 @@ List users.
 ```
 USAGE
   $ zitadel user list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields
     <value>] [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
@@ -4004,7 +4022,7 @@ Update a user by id.
 ```
 USAGE
   $ zitadel user update ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--schema <value>] [--attributes <value>...] [--data
     <value> | --file <value>] [--set <value>...] [-f]
 
 ARGUMENTS
@@ -4059,7 +4077,7 @@ Get one variable from the project.
 ```
 USAGE
   $ zitadel variable get NAME [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview] [--fields <value>]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--preview] [--fields <value>]
 
 ARGUMENTS
   NAME  Variable name to read.
@@ -4104,7 +4122,7 @@ List the variables entered on the project.
 ```
 USAGE
   $ zitadel variable list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview] [--fields <value>] [--plain]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--preview] [--fields <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -4147,7 +4165,7 @@ Show the variables a deployment froze, the live one by default.
 ```
 USAGE
   $ zitadel variable resolve [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run]
-    [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>] [--fields <value>]
+    [-v] [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [--origin <value>] [--fields <value>]
     [--plain]
 
 ARGUMENTS
@@ -4196,7 +4214,7 @@ Remove one variable from the project.
 ```
 USAGE
   $ zitadel variable rm NAME [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [--preview] [-f]
+    [--color] [-e <value>] [--env-file <value>] [--telemetry] [--preview] [-f]
 
 ARGUMENTS
   NAME  Variable name to remove.
@@ -4240,7 +4258,7 @@ Set one variable on the project.
 ```
 USAGE
   $ zitadel variable set NAME [VALUE] [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [--secret] [--as string|number|boolean]
+    [--debug] [--color] [-e <value>] [--env-file <value>] [--telemetry] [--secret] [--as string|number|boolean]
     [--preview]
 
 ARGUMENTS

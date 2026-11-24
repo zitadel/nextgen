@@ -3,10 +3,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { Flags } from "@oclif/core";
 
 import { toZitadelError } from "@/lib/errors";
-import type { BaseCommand, Facts, MetaOptions } from "@/lib/oclif/base";
+import type { BaseCommand, Facts, MetaOptions } from "@/cli/core/base";
 import type { CommandClass } from "@/lib/oclif/command-class";
-import type { CommandResult, JsonEnvelope } from "@/lib/oclif";
-import type { GlobalOptions } from "@/lib/oclif/types";
+import type { CommandResult, JsonEnvelope } from "@/cli/core";
+import type { GlobalOptions } from "@/cli/core/types";
 import { Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { markNoticed, profileDue } from "@/lib/telemetry/identity";

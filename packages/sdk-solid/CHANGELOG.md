@@ -1,5 +1,14 @@
 # @zitadel/sdk-solid
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.9.0
+  - @zitadel/components@0.9.0
+  - @zitadel/sdk-core@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

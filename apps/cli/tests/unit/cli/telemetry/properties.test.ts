@@ -8,7 +8,7 @@ import {
   serverKindOf,
   vercelEventKeys,
 } from "@/cli/telemetry/properties";
-import type { GlobalOptions } from "@/lib/oclif/types";
+import type { GlobalOptions } from "@/cli/core/types";
 import { VERCEL_ENDPOINT, vercelEventBody } from "@/lib/telemetry/vercel";
 
 function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {

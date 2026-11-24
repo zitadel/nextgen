@@ -2,7 +2,7 @@ import { describe, expect, vi } from "vitest";
 
 import { type FlowReport, Telemetered } from "@/cli/telemetry/telemetered";
 import { ZitadelError } from "@/lib/errors";
-import { BaseCommand, type Facts } from "@/lib/oclif/base";
+import { BaseCommand, type Facts } from "@/cli/core/base";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { loadOrCreateIdentity, markNoticed, type StoredIdentity } from "@/lib/telemetry/identity";
 import type { RunWatcher } from "@/lib/wizard";

@@ -17,7 +17,7 @@ import { gitConfig } from "./shared.ts";
 // (lib/markdown.ts). A command that calls the API links the operation it
 // calls. The telemetry page beside them is content (content/docs/reference/cli).
 
-/** A flag as apps/cli/src/lib/oclif/reference.ts describes it. */
+/** A flag as apps/cli/src/cli/core/reference.ts describes it. */
 export type CliFlag = {
   name: string;
   char?: string;

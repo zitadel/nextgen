@@ -1,4 +1,3 @@
-import { RealMachine, LocalRuntime } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   BRANDING_DESIGNS,
@@ -31,23 +30,16 @@ import {
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
 import { CommandGroups } from "@/cli/commands/groups";
-import {
-  type Admitted,
-  BaseCommand,
-  type CommandResult,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
-import { Destructive } from "@/lib/oclif/destructive";
-import { projectEnvFile } from "@/lib/oclif/environment-flags";
-import { accepts, parses, reads } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Promptable } from "@/lib/oclif/promptable";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { projectEnvFile } from "@/cli/core/environment-flags";
+import { accepts, parses, reads } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { createOrca } from "@/lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
+import { LocalRuntime, RealMachine } from "@/lib/server";
 import type { Scope } from "@/lib/suggestion";
 import { Output, warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
@@ -83,6 +75,10 @@ import { ShowResult } from "./steps/show-result";
 import { WriteConfiguration } from "./steps/write-configuration";
 import { WriteManifest } from "./steps/write-manifest";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Promptable } from "@/cli/core/promptable";
+import { Previewable } from "@/cli/core/previewable";
+import { Destructive } from "@/cli/core/destructive";
+import { BaseCommand } from "@/cli/core";
 import { projectHash } from "@/lib/telemetry/dimensions/project-hash";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
@@ -178,6 +174,92 @@ const RENDERER_FLAG_DESCRIPTION =
     : `Renderer (default: ${DEFAULT_RENDERER}). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
 
 /**
+ * The flags the command admitted, which every step reads what it needs from.
+ */
+export type SetupFlags = Admitted<typeof Setup>["flags"];
+
+/**
+ * The flags {@link refuseUnusableFlags} reads, as a command reads them.
+ */
+export type SetupFlagsToCheck = Readonly<
+  Partial<
+    Pick<
+      SetupFlags,
+      "design" | "sso" | "ssoSlug" | "ssoDisplayName" | "ssoIssuer" | "ssoScopes"
+    > & {
+      ssoClientId: string;
+    }
+  >
+>;
+
+/**
+ * Refuses a command line setup cannot act on, before anything is detected,
+ * created or written: a removed flag, and a set of `--sso` flags that
+ * contradict each other or leaves out what nobody can be asked for.
+ *
+ * @remarks
+ * `scripted` says nobody can be asked; a person at a terminal is asked for what
+ * is missing instead.
+ *
+ * @param flags - The flags the command was given.
+ * @param scripted - Whether nobody can be asked.
+ * @throws A refusal for the first flag that cannot be acted on.
+ */
+export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean): void {
+  if (flags.design !== undefined) {
+    throw refusalError(DESIGN_REMOVED_REFUSAL, {});
+  }
+  if (flags.ssoClientId !== undefined && flags.sso === undefined) {
+    throw refusalError(CLIENT_ID_NEEDS_SSO_REFUSAL, {});
+  }
+  const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
+  if (flags.sso === undefined) {
+    if (given[0] !== undefined) {
+      throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
+        flag: given[0],
+      });
+    }
+    return;
+  }
+  if (flags.sso !== CUSTOM_PROVIDER && given.length > 0) {
+    throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
+      names: given.join(", "),
+      them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
+      flags: given,
+    });
+  }
+  if (!scripted) {
+    return;
+  }
+  if (flags.sso === CUSTOM_PROVIDER) {
+    const missing = [
+      SETUP_FLAG_NAMES.slug,
+      SETUP_FLAG_NAMES.displayName,
+      SETUP_FLAG_NAMES.issuer,
+    ].filter((name) => {
+      return !given.includes(name);
+    });
+    if (missing.length > 0) {
+      throw refusalError(CUSTOM_CONNECTION_INCOMPLETE_REFUSAL, {
+        list: missing.join(", "),
+        missing,
+      });
+    }
+  }
+  if (flags.ssoClientId === undefined) {
+    const entry = flags.sso === CUSTOM_PROVIDER ? undefined : parseProviderSelection(flags.sso);
+    const catalog = entry === undefined ? undefined : providerOf(entry);
+    throw refusalError(SSO_NEEDS_CLIENT_ID_REFUSAL, {
+      sso: flags.sso,
+      registration:
+        catalog?.consoleUrl === undefined
+          ? `a client at ${catalog?.issuer ?? String(flags.ssoIssuer)}`
+          : `an OAuth application at ${catalog.consoleUrl}`,
+    });
+  }
+}
+
+/**
  * `zitadel setup` — create a Zitadel project and scaffold local auth.
  *
  * @remarks
@@ -191,52 +273,22 @@ const RENDERER_FLAG_DESCRIPTION =
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
 export default class Setup extends Telemetered(
-  Destructive(Promptable(ServerCommand(BaseCommand))),
+  Destructive(
+    Promptable(Previewable(ServerCommand(BaseCommand))),
+    "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
+  ),
 ) {
-  /**
-   * What `--help` says the command does.
-   */
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
-
-  /**
-   * The group the command index lists it under.
-   */
   static override group = CommandGroups.gettingStarted;
   static override readonly headline = "framework";
-
-  /**
-   * Where it sits in its group.
-   */
   static override groupOrder = 1;
 
-  /**
-   * The heading its help carries.
-   */
-  static override heading = "Setting up Zitadel";
-
-  /**
-   * That it draws as a wizard.
-   */
-  static override wizard = true;
-
-  /**
-   * The examples `--help` shows.
-   */
   static override examples = [
     "<%= config.bin %> setup --framework next",
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
-
-  /**
-   * The flags setup takes.
-   */
   static override flags = {
-    force: Flags.boolean({
-      char: "f",
-      description:
-        "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
-    }),
     framework: Flags.string({
       description: "Framework to target.",
       options: FRAMEWORK_OPTIONS,
@@ -333,6 +385,9 @@ export default class Setup extends Telemetered(
     }),
   };
 
+  static override heading = "Setting up Zitadel";
+  static override wizard = true;
+
   /**
    * The server a recovery names instead of the env file, for a project setup
    * moved to another port that has no env file to pin.
@@ -373,6 +428,27 @@ export default class Setup extends Telemetered(
   }
 
   /**
+   * What `setup --dry-run` does: the same steps as a real run, each of which
+   * reads `dryRun` from the services it takes and writes nothing.
+   *
+   * @param admitted - What the command admitted.
+   * @returns The envelope the dry run answers with.
+   */
+  protected async preview(admitted: Admitted<typeof Setup>): Promise<CommandResult> {
+    return this.wizard(admitted);
+  }
+
+  /**
+   * What `setup` does: the steps, in order.
+   *
+   * @param admitted - What the command admitted.
+   * @returns The envelope the run answers with.
+   */
+  protected async apply(admitted: Admitted<typeof Setup>): Promise<CommandResult> {
+    return this.wizard(admitted);
+  }
+
+  /**
    * Refuses a command line setup cannot act on, then runs the steps of `setup`
    * in the order they run: end early for an app that is already set up, work out
    * what the run is about and what to write, create the app and the project,
@@ -391,7 +467,7 @@ export default class Setup extends Telemetered(
    * @param admitted.flags - The flags.
    * @returns The envelope the run answers with.
    */
-  protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
+  private async wizard({ flags }: Admitted<typeof Setup>): Promise<CommandResult> {
     refuseUnusableFlags(flags, this.nonInteractive);
 
     const machine = new RealMachine();
@@ -406,356 +482,268 @@ export default class Setup extends Telemetered(
       ui: this.ui,
     };
 
-    return this.emit(
-      await Wizard.named<Fact<"flags">, CommandResult>("setup")
-        .step(
-          new CheckPreconditions({
-            machine,
-            meta: this.meta,
-            suggest: this.suggest,
-            useServer: (server) => {
-              this.meta = {
-                ...this.meta,
-                source: server,
-              };
-            },
-          }),
-        )
-        .endWhen(
-          new MoveAppPort({
-            cliVersion: this.cliVersion,
-            consent: (gate) => {
-              return this.consent(gate);
-            },
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            realRun: () => {
-              return this.realRun();
-            },
-            recoverAt: (server) => {
-              this.recoveryServer = server;
-            },
-            signal: this.signal,
-            suggest: this.suggest,
-            ui: this.ui,
-          }),
-        )
-        .endWhen(
-          new ReportAlreadySetUp({
-            dryRun: this.dryRun,
-          }),
-        )
-        .step(
-          new ReadSsoFlags({
-            ask: this.ask,
-            dryRun: this.dryRun,
-            nonInteractive: this.nonInteractive,
-            suggest: this.suggest,
-          }),
-        )
-        .step(
-          new DetectFramework({
-            ask: this.ask,
-            cwd: this.cwd,
-            env: this.env,
-            force: this.force,
-            nonInteractive: this.nonInteractive,
-            serverFlag: this.meta.serverFlag,
-            ui: this.ui,
-          }),
-          ({ flags, found, scaffoldedFramework }) => {
+    return await Wizard.named<Fact<"flags">, CommandResult>("setup")
+      .step(
+        new CheckPreconditions({
+          machine,
+          meta: this.meta,
+          suggest: this.suggest,
+          useServer: (server) => {
+            this.meta = {
+              ...this.meta,
+              source: server,
+            };
+          },
+        }),
+      )
+      .endWhen(
+        new MoveAppPort({
+          cliVersion: this.cliVersion,
+          consent: (gate) => {
+            return this.consent(gate);
+          },
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          realRun: () => {
+            return this.realRun();
+          },
+          recoverAt: (server) => {
+            this.recoveryServer = server;
+          },
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .endWhen(
+        new ReportAlreadySetUp({
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(
+        new ReadSsoFlags({
+          ask: this.ask,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          suggest: this.suggest,
+        }),
+      )
+      .step(
+        new DetectFramework({
+          ask: this.ask,
+          cwd: this.cwd,
+          env: this.env,
+          force: this.force,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          ui: this.ui,
+        }),
+        ({ flags, found, scaffoldedFramework }) => {
+          this.annotate({
+            framework: found.app.framework,
+            renderer: flags.renderer ?? DEFAULT_RENDERER,
+            scaffolded_skeleton: scaffoldedFramework,
+            skip_install: Boolean(flags.skipInstall),
+            dev_port_explicit: flags.devPort !== undefined,
+            preset: flags.preset ?? DEFAULT_SETUP_PRESET,
+            use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
+            sso: flags.sso ?? "none",
+            password_policy: flags.passwordMinLength === null ? "empty" : "set",
+            setup_stage: "framework_resolved",
+          });
+        },
+      )
+      .step(new ApplyDefaults())
+      .step(new ConfirmFramework(prompting))
+      .step(new ChooseServer(prompting))
+      .step(new ChooseDevPort(prompting))
+      .step(new ChooseUseCase(prompting))
+      .step(new ChooseSignIn(prompting))
+      .step(new SetPasswordPolicy(prompting))
+      .step(new ChooseSocialSignIn(prompting))
+      .step(
+        new SettleAnswers({
+          dryRun: this.dryRun,
+          machine,
+          nonInteractive: this.nonInteractive,
+          suggest: this.suggest,
+        }),
+        ({ answers }) => {
+          this.annotate({
+            preset: answers.preset,
+            use_case: answers.useCase,
+            sso:
+              answers.sso.length > 1
+                ? "multiple"
+                : (answers.sso.map((draft) => {
+                    return selectionName(draft.selection);
+                  })[0] ?? "none"),
+            password_policy: answers.passwordMinLength === null ? "empty" : "set",
+          });
+        },
+      )
+      .step(
+        new PlanConfiguration({
+          cliVersion: this.cliVersion,
+          cwd: this.cwd,
+          force: this.force,
+        }),
+      )
+      .step(
+        new ScaffoldApp({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          env: this.env,
+          force: this.force,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new CheckPatch({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          force: this.force,
+        }),
+      )
+      .step(
+        new CreateProject({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+        (state) => {
+          this.annotate({
+            setup_stage: "project_created",
+            project_hash: projectHash.value(state.project.id),
+          });
+        },
+      )
+      .step(
+        new PatchApp({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          force: this.force,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new WriteConfiguration({
+          cliVersion: this.cliVersion,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          force: this.force,
+          serverFlag: this.meta.serverFlag,
+          signal: this.signal,
+          suggest: this.suggest,
+        }),
+      )
+      .step(
+        new KeepChanges({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+        }),
+        ({ allFilesWritten, scaffolded }) => {
+          this.annotate({
+            setup_stage: "files_patched",
+            files_written_count: allFilesWritten.length,
+          });
+          if (!this.dryRun) {
             this.annotate({
-              framework: found.app.framework,
-              renderer: flags.renderer ?? DEFAULT_RENDERER,
-              scaffolded_skeleton: scaffoldedFramework,
-              skip_install: Boolean(flags.skipInstall),
-              dev_port_explicit: flags.devPort !== undefined,
-              preset: flags.preset ?? DEFAULT_SETUP_PRESET,
-              use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
-              sso: flags.sso ?? "none",
-              password_policy: flags.passwordMinLength === null ? "empty" : "set",
-              setup_stage: "framework_resolved",
+              password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
             });
+          }
+        },
+      )
+      .commit()
+      .step(
+        new PublishCredentials({
+          dryRun: this.dryRun,
+          signal: this.signal,
+          suggest: this.suggest,
+        }),
+      )
+      .step(
+        new WriteManifest({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(
+        new InstallDependencies({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          env: this.env,
+          isJson: Output.json,
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+        ({ installOutcome }) => {
+          this.annotate({
+            setup_stage: "dependencies_installed",
+            package_manager: installOutcome.install.package_manager,
+          });
+        },
+      )
+      .step(
+        new MakeInitialCommit({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new DoInitialDeploy({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          env: this.env,
+          narrate: (notices) => {
+            this.narrate(notices);
           },
-        )
-        .step(new ApplyDefaults())
-        .step(new ConfirmFramework(prompting))
-        .step(new ChooseServer(prompting))
-        .step(new ChooseDevPort(prompting))
-        .step(new ChooseUseCase(prompting))
-        .step(new ChooseSignIn(prompting))
-        .step(new SetPasswordPolicy(prompting))
-        .step(new ChooseSocialSignIn(prompting))
-        .step(
-          new SettleAnswers({
-            dryRun: this.dryRun,
-            machine,
-            nonInteractive: this.nonInteractive,
-            suggest: this.suggest,
-          }),
-          ({ answers }) => {
-            this.annotate({
-              preset: answers.preset,
-              use_case: answers.useCase,
-              sso:
-                answers.sso.length > 1
-                  ? "multiple"
-                  : (answers.sso.map((draft) => {
-                      return selectionName(draft.selection);
-                    })[0] ?? "none"),
-              password_policy: answers.passwordMinLength === null ? "empty" : "set",
-            });
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ClaimOwnership({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ShowResult({
+          cliVersion: this.cliVersion,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          isJson: Output.json,
+          realRun: () => {
+            return this.realRun();
           },
-        )
-        .step(
-          new PlanConfiguration({
-            cliVersion: this.cliVersion,
-            cwd: this.cwd,
-            force: this.force,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .finish((state) => {
+        return state.answer;
+      })
+      .run(
+        { flags },
+        {
+          watch: this.watchWizard({
+            flow: "onboarding",
+            otherwise: "application_setup",
+            step: onboardingStep,
           }),
-        )
-        .step(
-          new ScaffoldApp({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            env: this.env,
-            force: this.force,
-            ui: this.ui,
-          }),
-        )
-        .step(
-          new CheckPatch({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            force: this.force,
-          }),
-        )
-        .step(
-          new CreateProject({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            signal: this.signal,
-            suggest: this.suggest,
-            ui: this.ui,
-          }),
-          (state) => {
-            this.annotate({
-              setup_stage: "project_created",
-              project_hash: projectHash.value(state.project.id),
-            });
+          onUndoError: (key, error) => {
+            warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
           },
-        )
-        .step(
-          new PatchApp({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            force: this.force,
-            ui: this.ui,
-          }),
-        )
-        .step(
-          new WriteConfiguration({
-            cliVersion: this.cliVersion,
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            force: this.force,
-            serverFlag: this.meta.serverFlag,
-            signal: this.signal,
-            suggest: this.suggest,
-          }),
-        )
-        .step(
-          new KeepChanges({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-          }),
-          ({ allFilesWritten, scaffolded }) => {
-            this.annotate({
-              setup_stage: "files_patched",
-              files_written_count: allFilesWritten.length,
-            });
-            if (!this.dryRun) {
-              this.annotate({
-                password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
-              });
-            }
-          },
-        )
-        .commit()
-        .step(
-          new PublishCredentials({
-            dryRun: this.dryRun,
-            signal: this.signal,
-            suggest: this.suggest,
-          }),
-        )
-        .step(
-          new WriteManifest({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-          }),
-        )
-        .step(
-          new InstallDependencies({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            env: this.env,
-            isJson: Output.json,
-            signal: this.signal,
-            suggest: this.suggest,
-            ui: this.ui,
-          }),
-          ({ installOutcome }) => {
-            this.annotate({
-              setup_stage: "dependencies_installed",
-              package_manager: installOutcome.install.package_manager,
-            });
-          },
-        )
-        .step(
-          new MakeInitialCommit({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            ui: this.ui,
-          }),
-        )
-        .step(
-          new DoInitialDeploy({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            env: this.env,
-            narrate: (notices) => {
-              this.narrate(notices);
-            },
-            signal: this.signal,
-            suggest: this.suggest,
-            ui: this.ui,
-          }),
-        )
-        .step(
-          new ClaimOwnership({
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            signal: this.signal,
-            suggest: this.suggest,
-            ui: this.ui,
-          }),
-        )
-        .step(
-          new ShowResult({
-            cliVersion: this.cliVersion,
-            cwd: this.cwd,
-            dryRun: this.dryRun,
-            isJson: Output.json,
-            realRun: () => {
-              return this.realRun();
-            },
-            suggest: this.suggest,
-            ui: this.ui,
-          }),
-        )
-        .finish((state) => {
-          return state.answer;
-        })
-        .run(
-          { flags },
-          {
-            watch: this.watchWizard({
-              flow: "onboarding",
-              otherwise: "application_setup",
-              step: onboardingStep,
-            }),
-            onUndoError: (key, error) => {
-              warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
-            },
-          },
-        ),
-    );
-  }
-}
-
-/**
- * The flags the command admitted, which every step reads what it needs from.
- */
-export type SetupFlags = Admitted<typeof Setup>["flags"];
-
-/**
- * The flags {@link refuseUnusableFlags} reads, as a command reads them.
- */
-export type SetupFlagsToCheck = Readonly<
-  Partial<
-    Pick<
-      SetupFlags,
-      "design" | "sso" | "ssoSlug" | "ssoDisplayName" | "ssoIssuer" | "ssoScopes"
-    > & {
-      ssoClientId: string;
-    }
-  >
->;
-
-/**
- * Refuses a command line setup cannot act on, before anything is detected,
- * created or written: a removed flag, and a set of `--sso` flags that
- * contradict each other or leaves out what nobody can be asked for.
- *
- * @remarks
- * `scripted` says nobody can be asked; a person at a terminal is asked for what
- * is missing instead.
- *
- * @param flags - The flags the command was given.
- * @param scripted - Whether nobody can be asked.
- * @throws A refusal for the first flag that cannot be acted on.
- */
-export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean): void {
-  if (flags.design !== undefined) {
-    throw refusalError(DESIGN_REMOVED_REFUSAL, {});
-  }
-  if (flags.ssoClientId !== undefined && flags.sso === undefined) {
-    throw refusalError(CLIENT_ID_NEEDS_SSO_REFUSAL, {});
-  }
-  const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
-  if (flags.sso === undefined) {
-    if (given[0] !== undefined) {
-      throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
-        flag: given[0],
-      });
-    }
-    return;
-  }
-  if (flags.sso !== CUSTOM_PROVIDER && given.length > 0) {
-    throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
-      names: given.join(", "),
-      them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
-      flags: given,
-    });
-  }
-  if (!scripted) {
-    return;
-  }
-  if (flags.sso === CUSTOM_PROVIDER) {
-    const missing = [
-      SETUP_FLAG_NAMES.slug,
-      SETUP_FLAG_NAMES.displayName,
-      SETUP_FLAG_NAMES.issuer,
-    ].filter((name) => {
-      return !given.includes(name);
-    });
-    if (missing.length > 0) {
-      throw refusalError(CUSTOM_CONNECTION_INCOMPLETE_REFUSAL, {
-        list: missing.join(", "),
-        missing,
-      });
-    }
-  }
-  if (flags.ssoClientId === undefined) {
-    const entry = flags.sso === CUSTOM_PROVIDER ? undefined : parseProviderSelection(flags.sso);
-    const catalog = entry === undefined ? undefined : providerOf(entry);
-    throw refusalError(SSO_NEEDS_CLIENT_ID_REFUSAL, {
-      sso: flags.sso,
-      registration:
-        catalog?.consoleUrl === undefined
-          ? `a client at ${catalog?.issuer ?? String(flags.ssoIssuer)}`
-          : `an OAuth application at ${catalog.consoleUrl}`,
-    });
+        },
+      );
   }
 }

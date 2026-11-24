@@ -2,11 +2,11 @@ import { Flags } from "@oclif/core";
 
 import { OriginService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "@/lib/oclif";
-import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { type Admitted, type CommandResult, nonBlankArg } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ChangeCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
@@ -23,7 +23,7 @@ const ORIGIN_KINDS = ["primary", "preview"] as const;
  * had, which is why this is a deliberate command and never a side effect of a
  * deploy.
  */
-export default class OriginAdd extends Telemetered(ServerCommand(EnvironmentCommand)) {
+export default class OriginAdd extends Telemetered(ChangeCommand) {
   static override description = "Add an origin pattern to the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 3;
@@ -48,29 +48,38 @@ export default class OriginAdd extends Telemetered(ServerCommand(EnvironmentComm
     { kind: { required: true } },
   );
 
-  protected async execute({ args, flags }: Admitted<typeof OriginAdd>): Promise<JsonEnvelope> {
-    // A dry run makes no request, so it answers before the connection — the
-    // order the resource commands' `create` uses, which keeps
-    // `--dry-run --non-interactive` usable.
-    if (this.dryRun) {
-      return this.emit(
-        dryRunResult({
-          verb: "add",
-          topic: "origin",
-          id: args.pattern,
-          body: { kind: flags.kind },
-          next: await this.realRun(),
-        }),
-      );
-    }
+  /**
+   * Says which origin pattern would be added, without adding it. A dry run
+   * makes no request, so it answers before the connection, the order the
+   * resource commands' `create` uses, which keeps `--dry-run --non-interactive`
+   * usable.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The dry run's envelope.
+   */
+  protected async preview({ args, flags }: Admitted<typeof OriginAdd>): Promise<CommandResult> {
+    return dryRunResult({
+      verb: "add",
+      topic: "origin",
+      id: args.pattern,
+      body: { kind: flags.kind },
+      next: await this.realRun(),
+    });
+  }
 
-    const { client, projectId } = await this.connect();
-    const originService = new OriginService(client, projectId);
+  /**
+   * Adds the origin pattern.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The run's envelope.
+   */
+  protected async apply({ args, flags }: Admitted<typeof OriginAdd>): Promise<CommandResult> {
+    const originService = await this.service(OriginService);
     const added = await originService.add(args.pattern, flags.kind);
 
     const title = `Added ${escapeControlCharacters(added.pattern)} (${escapeControlCharacters(added.kind)})`;
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -82,6 +91,6 @@ export default class OriginAdd extends Telemetered(ServerCommand(EnvironmentComm
         sections: [],
       },
       next: { commands: [this.suggest({ id: "origin:list" })] },
-    });
+    };
   }
 }

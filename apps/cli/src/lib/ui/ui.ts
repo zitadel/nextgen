@@ -26,18 +26,18 @@ import type { Summary } from "./summary";
  *       message: "Would you like to sync the origins?",
  *     });
  *     if (!go) {
- *       return this.emit({
+ *       return {
  *         status: "skipped",
  *         reason: "sync-cancelled",
  *         summary: { title: "Cancelled", sections: [] },
- *       });
+ *       };
  *     }
  *     await this.ui.task("Syncing the origins", () => sync());
- *     return this.emit({
+ *     return {
  *       status: "ok",
  *       data: {},
  *       summary: { title: "Synced the origins", sections: [] },
- *     });
+ *     };
  *   }
  * }
  * ```

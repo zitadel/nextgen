@@ -390,6 +390,10 @@ Each invocation prints one JSON object:
 - On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
   `nothing-to-eject`) and the headline it draws as `data.title`. `skipped` means
   nothing was done because a person declined or there was nothing to do.
+- `--dry-run` is taken only by a command that changes something, and `--force` only by one
+  that asks consent; any other command refuses either as an unknown flag.
+- `--server` is taken only by a command that reads a server: `start`, `stop`, `reset`, `logs`,
+  `tests add`, `skills add`, `upgrade`, `eject` and `branding eject` refuse it as an unknown flag.
 - A dry run (`--dry-run`) answers `ok` with `data.dry_run: true` and a headline
   ending in `(dry run)` as `data.title`, never `skipped`, and `next_commands` holds
   the real command to run.
