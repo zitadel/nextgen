@@ -1,14 +1,13 @@
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 
-import { api } from "@/api/zitadel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { type InvitationsRead, readInvitations } from "@/features/invitations/api";
 import {
-  type InvitationsRead,
   InviteMemberButton,
   ProjectInvitations,
-  readInvitations,
 } from "@/features/invitations/components/project-invitations";
+import { readProjectAccess } from "@/features/project-settings/api";
 import { ProjectAdmins } from "@/features/project-settings/components/project-admins";
 import {
   projectScopeDeps,
@@ -45,20 +44,15 @@ export const Route = createFileRoute("/_authed/project/members")({
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [admins, grants, invitations] = await Promise.all([
-      // One page each: a project's admins are a handful. Add paging with the
-      // first project that needs it. The people and how they hold access come
-      // from the admins list (#1462); the grants add the rows it leaves out.
-      // Their principal refs carry the names, so nothing is expanded.
-      api.listProjectAdmins(projectId, { limit: 100 }),
-      api.queryGrants({ limit: 100 }, { project_id: projectId }),
+    const [access, invitations] = await Promise.all([
+      readProjectAccess(projectId),
       readInvitations(projectId).catch(
         (cause): InvitationsRead => ({
           error: describeError(cause, "The invitations could not be read."),
         }),
       ),
     ]);
-    return { admins: admins.admins, grants: grants.grants, invitations };
+    return { ...access, invitations };
   },
   component: ProjectMembersPage,
 });

@@ -6,13 +6,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 
-import { invitationMessage, type ProjectRelation } from "../model";
-
-/** What a create or a replace returned that the dialog shows: the link, once. */
-export interface CreatedInvitation {
-  relation: ProjectRelation;
-  link: string;
-}
+import { type CreatedInvitation, invitationMessage } from "../model";
 
 export const CREATED_TITLE = "Invitation created";
 export const CREATED_DESCRIPTION = "This link is shown only once. Copy the invitation message now.";

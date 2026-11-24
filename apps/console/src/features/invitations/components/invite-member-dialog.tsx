@@ -1,7 +1,5 @@
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 
-import { trackEvent } from "@/addon/analytics";
-import { api } from "@/api/zitadel";
 import { FormError } from "@/components/form-error";
 import { FORM_DIALOG_BODY, FormDialog, FormDialogFooter } from "@/components/form-dialog";
 import { Button } from "@/components/ui/button";
@@ -17,13 +15,9 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSubmit } from "@/hooks/use-submit";
 
-import { analyticsRole, PROJECT_ROLES, type ProjectRelation } from "../model";
-import {
-  CREATED_DESCRIPTION,
-  CREATED_TITLE,
-  type CreatedInvitation,
-  InvitationCreated,
-} from "./invitation-created";
+import { createProjectInvitation } from "../api";
+import { type CreatedInvitation, PROJECT_ROLES, type ProjectRelation } from "../model";
+import { CREATED_DESCRIPTION, CREATED_TITLE, InvitationCreated } from "./invitation-created";
 
 /** The longest name the API stores (`metadata.name`). */
 const NAME_MAX = 200;
@@ -99,20 +93,7 @@ function InviteForm({
 
   // ADR 030: a refusal's own message is the human-facing string.
   const create = useSubmit(async () => {
-    const trimmed = name.trim();
-    const invitation = await api.createInvitation(
-      {
-        type: "project_member",
-        project_member: { relation },
-        ...(trimmed ? { metadata: { name: trimmed } } : {}),
-      },
-      { project_id: projectId },
-    );
-    trackEvent("invitation_created", {
-      role: analyticsRole(invitation),
-      invitation_journey_id: invitation.journey_id,
-    });
-    onCreated({ relation, link: invitation.link });
+    onCreated(await createProjectInvitation(projectId, { relation, name: name.trim() }));
   }, "The invitation could not be created.");
 
   function submit(event: FormEvent<HTMLFormElement>) {

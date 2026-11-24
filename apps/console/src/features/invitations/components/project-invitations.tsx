@@ -1,29 +1,27 @@
 import { Check, Clock3, Plus, User, UserCog, X } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
-import { trackEvent } from "@/addon/analytics";
-import { api } from "@/api/zitadel";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CARD_ACTION_BUTTON } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
 import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
   ResourceRow,
-  RowMenu,
 } from "@/components/resource-list";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -34,11 +32,13 @@ import {
 } from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { formatDate } from "@/lib/date";
-import { LIST_PAGE_SIZE } from "@/lib/paging";
+import { cn } from "@/lib/utils";
 
+import { type InvitationsRead, readInvitations } from "../api";
 import {
-  analyticsRole,
+  type CreatedInvitation,
   describeExpiry,
   effectiveStatus,
   type Invitation,
@@ -46,38 +46,15 @@ import {
   inviterLabel,
   roleLabel,
 } from "../model";
-import { type CreatedInvitation, InvitationCreatedDialog } from "./invitation-created";
+import { ACTIONS, InvitationActions } from "./invitation-actions";
+import { InvitationCreatedDialog } from "./invitation-created";
 import { InviteMemberDialog } from "./invite-member-dialog";
 
-/** The first page of a project's invitations, or why it could not be read. */
-export type InvitationsRead =
-  | { invitations: Invitation[]; nextPageToken?: string }
-  | { error: string };
+/** The card: the row menu stays at its right edge while the rest scrolls under it. */
+const WRAP = `${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_SCROLL}`;
 
-/**
- * The statuses the tab lists. An accepted invitation is left out: the person
- * it brought in is a row of the Members tab, and the server has erased the
- * name the link carried (root ADR 086, amendment of 2026-11-13).
- */
-const LISTED: Invitation["status"][] = ["pending", "expired", "rejected"];
-
-/**
- * `GET /invitations`: one page, newest first, of the links still worth a row,
- * each with the person who made it.
- */
-export async function readInvitations(
-  projectId: string,
-  pageToken?: string,
-): Promise<{ invitations: Invitation[]; nextPageToken?: string }> {
-  const page = await api.listInvitations({
-    project_id: projectId,
-    limit: LIST_PAGE_SIZE,
-    status: LISTED,
-    expand: ["inviter"],
-    ...(pageToken ? { page_token: pageToken } : {}),
-  });
-  return { invitations: page.invitations, nextPageToken: page.next_page_token ?? undefined };
-}
+/** The pinned menu cell of a row. */
+const MENU_CELL = `${RESOURCE_MENU_CELL_NARROW} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`;
 
 /**
  * A project's invitations (root ADR 086 §6, #2855): every link an
@@ -151,6 +128,7 @@ function InvitationsTable({
   // The replacement's link, held here: the row it came from is gone by the
   // time the list reloads.
   const [replaced, setReplaced] = useState<CreatedInvitation | undefined>(undefined);
+  const scroll = useScrollEdges();
 
   if (invitations.length === 0) {
     return (
@@ -181,10 +159,15 @@ function InvitationsTable({
 
   return (
     <>
-      <div className={RESOURCE_TABLE_WRAP}>
-        {/* Wider than the shared minimum: the fixed columns alone are 668px,
+      <div
+        ref={scroll.ref}
+        data-scroll-start={scroll.edges.start || undefined}
+        data-scroll-end={scroll.edges.end || undefined}
+        className={WRAP}
+      >
+        {/* Wider than the shared minimum: the fixed columns alone are 660px,
             so at 36rem the name column had no width left and its text ran
-            under Role. This leaves it 196px before the card scrolls. */}
+            under Role. This leaves it 204px before the card scrolls. */}
         <Table className={`${RESOURCE_TABLE_FIXED} min-w-[54rem]`}>
           <TableHeader>
             <ResourceHeaderRow>
@@ -192,7 +175,7 @@ function InvitationsTable({
               <ResourceHeadCell className="w-32">Role</ResourceHeadCell>
               <ResourceHeadCell className="w-56">Invited by</ResourceHeadCell>
               <ResourceHeadCell className="w-64">Status</ResourceHeadCell>
-              <ResourceMenuHead className="w-15" />
+              <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -266,7 +249,7 @@ function InvitationRow({
         : undefined;
 
   return (
-    <ResourceRow>
+    <ResourceRow className="group">
       <TableCell className={RESOURCE_CELL}>
         <span className="flex min-w-0 items-center gap-2">
           <Avatar size="sm">
@@ -274,7 +257,16 @@ function InvitationRow({
               <User aria-hidden className="size-3" strokeWidth={1.5} />
             </AvatarFallback>
           </Avatar>
-          <span className="text-muted-foreground truncate text-xs leading-4">{name}</span>
+          {/* The row's name at the size and colour the Members tab gives a
+              person; a row nobody was named for says so in the muted tone. */}
+          <span
+            className={cn(
+              "truncate text-sm",
+              invitation.metadata?.name ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {name}
+          </span>
         </span>
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>{roleLabel(invitation)}</TableCell>
@@ -290,7 +282,7 @@ function InvitationRow({
           )}
         </span>
       </TableCell>
-      <TableCell className={RESOURCE_CELL}>
+      <TableCell className={MENU_CELL}>
         {actions && (
           <InvitationActions
             projectId={projectId}
@@ -326,164 +318,5 @@ function InvitationStatusBadge({ status }: { status: InvitationStatus }) {
       <Icon aria-hidden className={tone} strokeWidth={1.5} />
       {label}
     </Badge>
-  );
-}
-
-/** The words of deleting an invitation, which differ by what is being deleted. */
-interface Removal {
-  action: string;
-  title: string;
-  description: string;
-  fallback: string;
-  done: string;
-}
-
-/** What a row's menu offers. */
-interface RowActions {
-  /** Regenerate link: a new link for the same person and role. */
-  regenerate: boolean;
-  /** How the row is deleted, where the server deletes its status. */
-  removal?: Removal;
-  /** Whether deleting it ends a link that still worked. */
-  cancels?: boolean;
-}
-
-/**
- * The menu by status. A pending link is cancelled: it stops working. An
- * expired or a declined one already has, so deleting it is `Remove` and only
- * takes the row and the name on it out of the list. An accepted invitation is
- * final and has no menu: `DELETE /invitations/{invitation_id}` answers it
- * with the opaque `404`.
- */
-const ACTIONS: Partial<Record<InvitationStatus, RowActions>> = {
-  pending: {
-    regenerate: true,
-    cancels: true,
-    removal: {
-      action: "Cancel invitation",
-      title: "Cancel invitation?",
-      description: "This invitation link will stop working.",
-      fallback: "Could not cancel the invitation. Try again.",
-      done: "Invitation cancelled",
-    },
-  },
-  expired: {
-    regenerate: true,
-    removal: {
-      action: "Remove invitation",
-      title: "Remove expired invitation?",
-      description: "The link has expired. Removing the invitation takes it off this list.",
-      fallback: "Could not remove the invitation. Try again.",
-      done: "Invitation removed",
-    },
-  },
-  rejected: {
-    regenerate: false,
-    removal: {
-      action: "Remove invitation",
-      title: "Remove declined invitation?",
-      description: "The invitation was declined. Removing it takes it off this list.",
-      fallback: "Could not remove the invitation. Try again.",
-      done: "Invitation removed",
-    },
-  },
-};
-
-function InvitationActions({
-  projectId,
-  invitation,
-  name,
-  actions,
-  onCancelled,
-  onReplaced,
-}: {
-  projectId: string;
-  invitation: Invitation;
-  name: string;
-  actions: RowActions;
-  onCancelled: () => void;
-  onReplaced: (created: CreatedInvitation) => void;
-}) {
-  const { regenerate, removal, cancels } = actions;
-  const [dialog, setDialog] = useState<"regenerate" | "cancel" | undefined>(undefined);
-  const close = (open: boolean) => {
-    if (!open) setDialog(undefined);
-  };
-
-  return (
-    <>
-      <RowMenu name={name} contentClassName="w-50">
-        {regenerate && (
-          <DropdownMenuItem onSelect={() => setDialog("regenerate")}>
-            Regenerate link
-          </DropdownMenuItem>
-        )}
-        {regenerate && removal && <DropdownMenuSeparator />}
-        {removal && (
-          <DropdownMenuItem variant="destructive" onSelect={() => setDialog("cancel")}>
-            {removal.action}
-          </DropdownMenuItem>
-        )}
-      </RowMenu>
-
-      <ConfirmDialog
-        open={dialog === "regenerate"}
-        onOpenChange={close}
-        variant="default"
-        title="Regenerate invitation link?"
-        description={
-          cancels
-            ? "The current link will stop working. The new link will be shown only once and expires in 72 hours."
-            : "The new link will be shown only once and expires in 72 hours."
-        }
-        action="Regenerate link"
-        fallback="Could not regenerate the link. Try again."
-        onConfirm={async () => {
-          // Only project invitations can be made here; a team invitation's row
-          // has no menu until its type ships (root ADR 086 §1).
-          if (invitation.type !== "project_member") return;
-          const { relation } = invitation.project_member;
-          const replacement = await api.createInvitation(
-            {
-              type: "project_member",
-              project_member: { relation },
-              ...(invitation.metadata ? { metadata: { name: invitation.metadata.name } } : {}),
-              replaces_invitation_id: invitation.id,
-            },
-            { project_id: projectId },
-          );
-          trackEvent("invitation_created", {
-            role: analyticsRole(replacement),
-            invitation_journey_id: replacement.journey_id,
-          });
-          onReplaced({ relation, link: replacement.link });
-        }}
-      />
-
-      {removal && (
-        <ConfirmDialog
-          open={dialog === "cancel"}
-          onOpenChange={close}
-          title={removal.title}
-          description={removal.description}
-          cancel="Keep invitation"
-          action={removal.action}
-          fallback={removal.fallback}
-          onConfirm={async () => {
-            await api.cancelInvitation(invitation.id, { project_id: projectId });
-            // Only a link that still worked was cancelled; the rest were
-            // already dead and removing them is housekeeping.
-            if (cancels) {
-              trackEvent("invitation_cancelled", {
-                role: analyticsRole(invitation),
-                invitation_journey_id: invitation.journey_id,
-              });
-            }
-            toast.success(removal.done);
-            onCancelled();
-          }}
-        />
-      )}
-    </>
   );
 }

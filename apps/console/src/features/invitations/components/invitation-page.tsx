@@ -9,41 +9,18 @@ import { StandaloneScreen } from "@/components/standalone-screen";
 import { SECTION_HEADING } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { useSubmit } from "@/hooks/use-submit";
-import { errorCode } from "@/lib/api-error";
 import { clearSessionCaches } from "@/lib/session-cache";
 
 import {
   analyticsRole,
   describeExpiry,
-  effectiveStatus,
   type InvitationLookup,
+  type InvitationPageState,
   inviterLabel,
+  isInvitationGone,
   roleInProse,
 } from "../model";
 import { clearInvitationToken } from "../token";
-
-/** What the page found for the link it was opened with. */
-export type InvitationPageState =
-  /** A pending invitation, and the token that spends it. */
-  | { kind: "open"; token: string; invitation: InvitationLookup }
-  /** No token, an unknown one, or an invitation that is finished. */
-  | { kind: "unavailable" }
-  /** The lookup failed for another reason; the token is kept for a retry. */
-  | { kind: "error"; message: string };
-
-/**
- * The answers that mean the link can never be used: the API's one answer for
- * every unknown or finished token (root ADR 086 §10), and the refusal of a
- * link whose creator no longer administers the project, which no retry and no
- * other account changes.
- */
-const DEAD_LINK = new Set(["inv.not_found", "inv.inviter_not_admin"]);
-
-/** Whether a failed call says the link is finished, rather than that the call failed. */
-export function isInvitationGone(cause: unknown): boolean {
-  const code = errorCode(cause);
-  return code !== undefined && DEAD_LINK.has(code);
-}
 
 /**
  * The page an invitation link opens (root ADR 086 §3, #2856), for a signed-in
@@ -230,9 +207,4 @@ function OpenInvitation({
       </div>
     </div>
   );
-}
-
-/** Whether a looked-up invitation can still be acted on. */
-export function isOpen(invitation: InvitationLookup): boolean {
-  return effectiveStatus(invitation) === "pending";
 }

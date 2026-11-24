@@ -1,4 +1,5 @@
 import type { api } from "@/api/zitadel";
+import { errorCode } from "@/lib/api-error";
 
 /** An invitation as the project's list returns it: never its token or link. */
 export type Invitation = Awaited<ReturnType<typeof api.listInvitations>>["invitations"][number];
@@ -38,11 +39,9 @@ export const PROJECT_ROLES: readonly {
   { relation: "viewer", label: "Viewer", description: "View project resources" },
 ];
 
-const ROLE_LABEL: Record<ProjectRelation, string> = {
-  admin: "Admin",
-  editor: "Editor",
-  viewer: "Viewer",
-};
+const ROLE_LABEL = Object.fromEntries(
+  PROJECT_ROLES.map((role) => [role.relation, role.label]),
+) as Record<ProjectRelation, string>;
 
 /** What the type-specific part of an invitation grants, whichever type it is. */
 type Grants =
@@ -121,4 +120,38 @@ export function invitationMessage(projectName: string, invitation: Grants, link:
     "",
     "This link expires in 72 hours.",
   ].join("\n");
+}
+
+/** What a create or a replace returned that the console shows: the link, once. */
+export interface CreatedInvitation {
+  relation: ProjectRelation;
+  link: string;
+}
+
+/** What the invitation page found for the link it was opened with. */
+export type InvitationPageState =
+  /** A pending invitation, and the token that spends it. */
+  | { kind: "open"; token: string; invitation: InvitationLookup }
+  /** No token, an unknown one, or an invitation that is finished. */
+  | { kind: "unavailable" }
+  /** The lookup failed for another reason; the token is kept for a retry. */
+  | { kind: "error"; message: string };
+
+/**
+ * The answers that mean the link can never be used: the API's one answer for
+ * every unknown or finished token (root ADR 086 §10), and the refusal of a
+ * link whose creator no longer administers the project, which no retry and no
+ * other account changes.
+ */
+const DEAD_LINK = new Set(["inv.not_found", "inv.inviter_not_admin"]);
+
+/** Whether a failed call says the link is finished, rather than that the call failed. */
+export function isInvitationGone(cause: unknown): boolean {
+  const code = errorCode(cause);
+  return code !== undefined && DEAD_LINK.has(code);
+}
+
+/** Whether a looked-up invitation can still be acted on. */
+export function isOpen(invitation: InvitationLookup): boolean {
+  return effectiveStatus(invitation) === "pending";
 }
