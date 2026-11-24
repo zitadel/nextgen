@@ -604,7 +604,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain("Wrong email or password.");
+    expect(result).toContain("Wrong password.");
     expect(result).toContain('name="password"');
     expect(result).toContain("invalid");
     expect(result).not.toContain("<zl-alert data-zl-step-error");
@@ -647,7 +647,7 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("Please try again in a few minutes");
     expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="current-password"');
-    expect(result).not.toContain("Wrong email or password.");
+    expect(result).not.toContain("Wrong password.");
   });
 
   it("renders sign-up field annotations: autocomplete, help, inline email error", () => {

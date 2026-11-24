@@ -186,7 +186,7 @@ export const de: Locale = {
   "error.passkey_cancelled": "Die Passkey-Abfrage wurde vorzeitig geschlossen.",
   "error.passkey_timeout": "Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
   "error.passkey_not_registered":
-    "Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.",
+    "Dieser Passkey ist nicht registriert. Bitte melde dich auf andere Weise an.",
   "error.passkey_setup_failed":
     "Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.",
   "error.passkey_unsupported": "Dieses Gerät unterstützt keine Passkeys",
@@ -224,8 +224,10 @@ export const de: Locale = {
   // --- Hinweise: warum der Ablauf von selbst zwischen Anmelden und Registrieren wechselt ---
   "notice.user_not_found":
     "Zu dieser E-Mail-Adresse haben wir kein Konto gefunden. Du kannst jetzt eins erstellen. Vertippt? Korrigiere sie im E-Mail-Feld unten.",
+  "notice.user_not_found.custom_identifier":
+    "Zu diesen Angaben haben wir kein Konto gefunden. Du kannst jetzt eins erstellen. Vertippt? Korrigiere sie unten.",
   "notice.user_already_exists":
-    "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Melde dich an, um fortzufahren.",
+    "Ein Konto mit diesen Angaben existiert bereits. Melde dich an, um fortzufahren.",
   "notice.sso_user_not_found":
     "Für diese Anmeldung gibt es noch kein Konto. Du kannst jetzt eins erstellen.",
 
@@ -233,9 +235,9 @@ export const de: Locale = {
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",
   "error.email_invalid": "Bitte gib eine gültige E-Mail-Adresse ein",
   "error.password_required": "Bitte gib ein Passwort ein",
-  "error.password_incorrect": "Falsche E-Mail oder falsches Passwort.",
+  "error.password_incorrect": "Falsches Passwort.",
   "error.email_exists": "Ein Konto mit dieser E-Mail-Adresse existiert bereits.",
-  "error.invalid_credentials": "Falsche E-Mail oder falsches Passwort.",
+  "error.invalid_credentials": "Falsches Passwort.",
   "error.required": "Dieses Feld ist erforderlich.",
 
   // --- Generische Feldregel-Fallbacks ({0} = Feldbezeichnung) ---

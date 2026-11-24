@@ -184,7 +184,7 @@ export const it: Locale = {
   // --- Errori passkey ---
   "error.passkey_cancelled": "La richiesta della passkey è stata chiusa prima del completamento.",
   "error.passkey_timeout": "La richiesta della passkey è scaduta. Riprova.",
-  "error.passkey_not_registered": "Questa passkey non è registrata. Accedi con e-mail e password.",
+  "error.passkey_not_registered": "Questa passkey non è registrata. Accedi in un altro modo.",
   "error.passkey_setup_failed": "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
@@ -216,8 +216,9 @@ export const it: Locale = {
   // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione ---
   "notice.user_not_found":
     "Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Correggilo nel campo E-mail qui sotto.",
-  "notice.user_already_exists":
-    "Esiste già un account per questo indirizzo e-mail. Accedi per continuare.",
+  "notice.user_not_found.custom_identifier":
+    "Non abbiamo trovato un account con questi dati: puoi crearne uno ora. Hai sbagliato a scriverli? Correggili qui sotto.",
+  "notice.user_already_exists": "Esiste già un account con questi dati. Accedi per continuare.",
   "notice.sso_user_not_found":
     "Non esiste ancora un account per questo accesso: puoi crearne uno ora.",
 
@@ -225,9 +226,9 @@ export const it: Locale = {
   "error.email_required": "Inserisci un indirizzo e-mail",
   "error.email_invalid": "Inserisci un indirizzo e-mail valido",
   "error.password_required": "Inserisci una password",
-  "error.password_incorrect": "E-mail o password errata.",
+  "error.password_incorrect": "Password errata.",
   "error.email_exists": "Esiste già un account con questo indirizzo e-mail.",
-  "error.invalid_credentials": "E-mail o password errata.",
+  "error.invalid_credentials": "Password errata.",
   "error.required": "Questo campo è obbligatorio.",
 
   // --- Fallback generici per regole di campo ({0} = etichetta del campo) ---
