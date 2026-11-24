@@ -1,5 +1,8 @@
 # Design Decisions
 
+> [!NOTE]
+> The [Console UI pattern guides](console/ui-patterns/README.md) expand the reusable design targets recorded in D47 and D48 below. The guides are design specifications, not evidence of implementation; [Console styling](../../apps/console/docs/styling.md) remains the technical baseline until the implementation and documentation are reconciled. This decisions log remains active.
+
 ---
 
 ## Open questions
@@ -15,6 +18,16 @@
 ---
 
 ## Decisions
+
+### D47 · Reusable Console UI polishing patterns — 2026-11-23 · [standing]
+The seven [UI-01–UI-07 guides](console/ui-patterns/README.md) are the approved reusable design targets and verification criteria for Console polishing. They do not change code or supersede valid product, routing, accessibility or backend contracts. `apps/console/docs/styling.md` remains the description of current technical implementation; an implementation PR must reconcile changed components and that baseline together.
+
+The approved differences from the current technical baseline are: **44px** resource-list headers with `muted-foreground` labels for comfortable density (preserving **56px** body rows and existing **40px** compact lists); resource-name and secondary-reference links without hover underline (secondary references change from muted to foreground on hover); **vertical** row-menu ellipsis; and **12px monospace** resource identifiers where applicable, retaining the existing layout-aware middle truncation and full-value Copy. Preserve table widths, pinned columns, native link behavior and focus affordances. Do not apply resource-list header changes to panel-table heads or compact Events.
+
+The guides also record shared targets for real-route row navigation; actionable `+N` overflow; externally directed link indications; consistent page title → optional truthful metadata → content; field-semantic date/time formatting and the existing 24-hour relative rule; existing Card/Badge semantics; first-use versus filtered-empty feedback; contextual success/error/loading behavior; optional-field markers, blur/submit validation and useful helper placement; **FormSheet for Create**, while existing detail-page edits remain inline unless separately decided; and explicit destructive confirmations. These are reusable patterns, not authorization to redesign screen-specific columns, navigation, permissions, API states or page widths. Existing relevant D-decisions (including D5, D13, D15, D19, D27, D35, D40 and D41) still apply. Users-specific changes are D48.
+
+### D48 · Users table exposes Columns and uses schema-resolved identity — 2026-11-23 · [standing]
+Amends **only** D23's right-click-only Columns affordance and its mandatory identifier-property chip. The Users table exposes a visible text-labelled **Columns** control at the right of its table toolbar, while existing optional-property pinning remains available; the reviewed primary identity is the server-resolved `x-display` name with the designated `x-identifier` beneath (ID as fallback; ADR 058 §3a), without redundant property-type chips. The existing **ID column** remains independent of the user's identifier property. Preserve D23's column-width and horizontal-scroll rules, pinned properties, Attributes popover, sticky row action and the relevant identity card. This is a design target; implementation PRs, including any already open Users-table work, must align with it separately.
 
 ### D46 · Events' rows lead with the time, and an open event stands beside the list — 2026-11-13
 Amends D30 and D45. A pass on the team's comments, measured against Vercel's Logs, which Events follows (D30). Supabase's log explorer was the other reference raised; its filters stand in a second column beside the navigation, and Events keeps its one sidebar that swaps to its own list, as Vercel's does.
@@ -150,6 +163,8 @@ Every console surface (cards, tables, panels, dialogs, drawers, alerts, tab stri
 
 ### D17 · Every directory is a resource table — 2026-10-07 · [standing]
 User schemas and Login flows draw the same data table as Users, Teams and Projects: a name column with the resource icon, the resource's own columns, a date, and the row menu. The stacked card rows broke on narrow widths. Supersedes D7 and the schema half of D0a. The schema id leaves the list row for the detail header card, which matches Login flows (refines D10).
+
+Amended (#2733): the User schemas name column shows the name as text, without the resource icon.
 
 ### D16 · Profile is generated from the person's own schema; the identifier is read-only — 2026-09-30, amended 2026-10-16 · [standing]
 Claiming asks for nothing but an email address, and the identifier cannot be changed, so the schema's `x-identifier` (the email by default) is a disabled field. Amended: Profile is generated from the person's own user schema as Add user is — every property is a row; strings and numbers are editable and saved through `PATCH /users/me`, anything a text input cannot round-trip (a boolean) is read-only. The platform project's schema adds an optional `name` designated as `x-display`, so the people operating Zitadel can name themselves; the account menu offers it while none is set.

@@ -1120,6 +1120,14 @@ export function rejectInvitation(invitationId: string): void {
   }
 }
 
+/** Backdates an invitation past its expiry, as 72 hours passing would. */
+export function expireInvitation(invitationId: string): void {
+  const invitation = store.invitations.get(invitationId);
+  if (invitation) {
+    invitation.expiresAt = new Date(Date.now() - 1000).toISOString();
+  }
+}
+
 /** Backdates the project past the claim window, for window-expiry tests. */
 export function expireClaimWindow(projectId: string): void {
   const project = store.projects.get(projectId);
@@ -3883,10 +3891,8 @@ export function setupPlatformHandlers() {
         return query.response;
       }
       const invitation = projectInvitation(query.data.project_id, path.data.invitation_id);
-      // Only a pending or declined invitation can be cancelled; the server answers
-      // any other as not found.
-      const status = invitation === undefined ? undefined : invitationStatus(invitation);
-      if (invitation === undefined || (status !== "pending" && status !== "rejected")) {
+      // An accepted invitation can't be cancelled; the server answers it as not found.
+      if (invitation === undefined || invitationStatus(invitation) === "accepted") {
         return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
       }
       store.invitations.delete(invitation.id);

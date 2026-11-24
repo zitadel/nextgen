@@ -29,6 +29,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { BrandingRevision } from "@/features/branding/branding-palette";
+import { fetchLatestBranding } from "@/features/branding/api";
 import { flowDisplayName } from "@/features/flow-definitions/model";
 import { api } from "@/api/zitadel";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
@@ -53,14 +54,11 @@ export const Route = createFileRoute("/_authed/branding/")({
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
-    // Newest first, so the head of the list is what visitors see today, and
-    // one row is all the screen reads. The list carries ids only, so the
-    // configuration itself is a second call. A project that has never
-    // published branding has no revision, and the panel then shows the
-    // maintained defaults.
+    // A project that has never published branding has no revision, and the
+    // panel then shows the maintained defaults.
     const projectId = requireProjectScope(deps.project);
-    const [revisions, flows] = await Promise.all([
-      api.listBranding({ project_id: projectId, limit: 1 }),
+    const [revision, flows] = await Promise.all([
+      fetchLatestBranding(projectId),
       // One row per flow rather than per revision (#1246), as the Login
       // flows directory asks for it. The preview starts a flow by name, so a
       // second revision of one is an ambiguous row rather than another choice.
@@ -78,10 +76,7 @@ export const Route = createFileRoute("/_authed/branding/")({
       purposes: Object.keys(entry.flow_definition.purposes ?? {}),
       successStep: successStepName(entry.flow_definition.steps),
     }));
-    const latest = revisions.branding[0];
-    if (!latest) return { revision: {} as BrandingRevision, flows: previewFlows };
-    const found = await api.getBranding(latest.id);
-    return { revision: found.branding as BrandingRevision, flows: previewFlows };
+    return { revision: revision ?? ({} as BrandingRevision), flows: previewFlows };
   },
   component: BrandingScreen,
 });

@@ -159,7 +159,7 @@ func isObjectShaped(prop map[string]any) bool {
 // values are non-null scalars via the `type` keyword: one scalar type name,
 // optionally in a union with "null" (the nullable idiom). Exactly one
 // non-null type is required, matching the flow resolver's reduction —
-// schemaReader.JSONType rejects multi-type unions, so accepting one here
+// SchemaReader.JSONType rejects multi-type unions, so accepting one here
 // would designate an identifier no flow could ever render as a field. JSON
 // Schema keywords are conjunctive, so a local scalar type cannot be widened
 // by `$ref`, `allOf`, or any other keyword the property carries; without

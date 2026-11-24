@@ -28,8 +28,6 @@ const (
 		` RETURNING ` + invitationColumns
 	deleteUnacceptedInvitationStmt = `DELETE FROM zitadel_nextgen.invitations` +
 		` WHERE project_id = $1 AND id = $2 AND status <> 'accepted'`
-	deleteCancellableInvitationStmt = `DELETE FROM zitadel_nextgen.invitations` +
-		` WHERE project_id = $1 AND id = $2 AND (status = 'rejected' OR (status = 'pending' AND expires_at > $3))`
 	countPendingInvitationsStmt = `SELECT count(*) FROM zitadel_nextgen.invitations` +
 		` WHERE project_id = $1 AND status = 'pending' AND expires_at > $2`
 )
@@ -121,11 +119,6 @@ func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projec
 // DeleteUnacceptedInvitation implements [service.InvitationStatements].
 func (s invitationStatements) DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error {
 	return s.execOne(ctx, deleteUnacceptedInvitationStmt, projectID, id)
-}
-
-// DeleteCancellableInvitation implements [service.InvitationStatements].
-func (s invitationStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	return s.execOne(ctx, deleteCancellableInvitationStmt, projectID, id, now)
 }
 
 // CountPendingInvitations implements [service.InvitationStatements].

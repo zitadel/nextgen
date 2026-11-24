@@ -179,7 +179,11 @@ describe("claim", () => {
     expect(secret.preview_secret).toBe("sk_preview_test");
   });
 
-  it("prints the link and the permanence outcome, without team wording", async ({ dir: cwd }) => {
+  it("prints the link and the permanence outcome, without team wording", async ({
+    dir: cwd,
+    terminal,
+  }) => {
+    terminal.tty(true);
     const project = await makeProject(cwd);
 
     // No `--json`: the envelope silences the narration, and the point here is the

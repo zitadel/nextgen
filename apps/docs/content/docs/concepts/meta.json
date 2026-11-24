@@ -2,6 +2,7 @@
   "title": "Concepts",
   "pages": [
     "project-team-user",
+    "access-and-memberships",
     "repo-config",
     "releases-and-deployments",
     "origins-and-previews",

@@ -237,6 +237,8 @@ describe("reset", () => {
           source: "http://localhost:8080",
           data: {
             dry_run: true,
+            verb: "reset",
+            topic: "server",
             title: "Would reset the local Zitadel server runtime (dry run)",
             runtime: {
               backend: "missing",
@@ -262,6 +264,8 @@ describe("reset", () => {
           source: `http://localhost:${app.localPortOf(started)}`,
           data: {
             dry_run: true,
+            verb: "reset",
+            topic: "server",
             title: "Would reset the local Zitadel server runtime (dry run)",
             runtime: {
               backend: "binary",

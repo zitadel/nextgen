@@ -36,6 +36,7 @@ import { PASSWORD_FIELD } from "./fixtures/login.js";
 import { setupMockHandlers } from "./handlers.js";
 import {
   acceptInvitation,
+  expireInvitation,
   expireClaimChallenge,
   expireClaimWindow,
   snapshotPlatformStore,
@@ -4007,6 +4008,18 @@ describe("api-mock invitations", () => {
   test("cancels a pending invitation", async () => {
     const projectId = await newProject("invitations-cancel");
     const created = await invited(projectId);
+
+    const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(204);
+  });
+
+  test("cancels an expired invitation", async () => {
+    const projectId = await newProject("invitations-cancel-expired");
+    const created = await invited(projectId);
+    expireInvitation(created.id);
 
     const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
       method: "DELETE",

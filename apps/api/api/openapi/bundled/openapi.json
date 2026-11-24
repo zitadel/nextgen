@@ -8972,7 +8972,7 @@
         "operationId": "queryGrants",
         "x-zitadel-cli": "grant list",
         "summary": "Query grants",
-        "description": "Returns a page of a project's grants.\n\nOnly unrevoked grants this API manages are listed, which bind a user or team\nto the viewer, editor or admin role. Expired grants are included, so a client\ncan revoke them with `deleteGrant` (`DELETE /grants/{grant_id}`) before it grants the same binding again.\nProject-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are\nnot returned. Requires `project.read`.\n\n`expand: [\"principal\"]` adds envelope fields on `user` and `team`. For project\nsecrets it additionally requires `user.read` and `team.read`. A user-bound\nconsole session that already passed the project check may expand without those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
+        "description": "Returns a page of a project's grants.\n\nOnly unrevoked grants this API manages are listed, which bind a user or team\nto the viewer, editor or admin role. Expired grants are included, so a client\ncan revoke them with `deleteGrant` (`DELETE /grants/{grant_id}`) before it grants the same binding again.\nProject-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are\nnot returned. Requires `project.read`.\n\n`expand: [\"principal\"]` adds envelope fields on `user` and `team`. Expanding\nrequires read access to the principal's home project (the platform project\nwhen the server has one), for project secrets and for console sessions alike.\nA caller without it gets `403` `user.permission_denied`.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Grants"
         ],
@@ -9054,7 +9054,7 @@
         "operationId": "getGrant",
         "x-zitadel-cli": "grant get",
         "summary": "Get a grant by ID",
-        "description": "Returns a grant by ID, when this API manages it and it has not been revoked.\n\nThis API manages grants that bind a user or team to the viewer, editor or\nadmin role. An expired grant is still returned, so you can revoke it with\n`deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization still\nignores expired grants. Send `project_id` as well as the grant ID.\nMisses, revoked grants, project-secret setup rows (`sk_proj`), owning-team\n(`relation=team`) rows and grants of another project all return `404`.\n\n`expand=principal` adds envelope fields on `user` or `team`. For project\nsecrets it requires `user.read` and `team.read` in addition to `project.read`.\nA user-bound console session that already passed the project check may expand\nwithout those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
+        "description": "Returns a grant by ID, when this API manages it and it has not been revoked.\n\nThis API manages grants that bind a user or team to the viewer, editor or\nadmin role. An expired grant is still returned, so you can revoke it with\n`deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization still\nignores expired grants. Send `project_id` as well as the grant ID.\nMisses, revoked grants, project-secret setup rows (`sk_proj`), owning-team\n(`relation=team`) rows and grants of another project all return `404`.\n\n`expand=principal` adds envelope fields on `user` or `team`. Expanding\nrequires read access to the principal's home project (the platform project\nwhen the server has one), for project secrets and for console sessions alike.\nA caller without it gets `403` `user.permission_denied`.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Grants"
         ],
@@ -9206,7 +9206,7 @@
         "operationId": "createInvitation",
         "x-zitadel-cli": "invitation create",
         "summary": "Create an invitation",
-        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and the original is deleted in the same\ntransaction unless it was accepted.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` (1–200 characters) labels who the link is\nfor. Optional `replaces_invitation_id` replaces that invitation: the new\nrow keeps the original's `journey_id`, and the original is deleted in the\nsame transaction unless it was accepted.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project already has 100 pending unexpired invitations.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9794,7 +9794,7 @@
         "operationId": "cancelInvitation",
         "x-zitadel-cli": "invitation cancel",
         "summary": "Cancel an invitation",
-        "description": "Deletes a pending or rejected invitation. A pending invitation's link can\nno longer be redeemed; a rejected one's row and metadata are removed. An\naccepted or expired invitation answers the same opaque `404` as a miss.\nExpired invitations keep their row until a later cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Deletes a pending, expired or rejected invitation, with its metadata. A\npending invitation's link can no longer be redeemed. An accepted\ninvitation answers the same opaque `404` as a miss.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9841,7 +9841,7 @@
             }
           },
           "404": {
-            "description": "Invitation or project not found, or the invitation is no longer\npending.\n",
+            "description": "Invitation or project not found, or the invitation was accepted.\n",
             "content": {
               "application/json": {
                 "schema": {

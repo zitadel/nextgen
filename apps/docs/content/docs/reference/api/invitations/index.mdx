@@ -11,9 +11,17 @@ The redeem path looks up, accepts or declines an invitation by its token
 without the project ID in the URL.
 
 Creating a project-member invitation needs the same project `admin` check as
-creating a grant. Team-member invitations are declared in the contract and
-answer `501` until they ship. Refused for an unclaimed project, on a server
-without a platform project, and when the project's pending-invitation cap is
-reached.
+creating a grant. Optional `metadata.name` is 1–200 characters and only labels
+who the link is for. `replaces_invitation_id` keeps `journey_id` and deletes any
+unaccepted original. A project may hold at most 100 pending unexpired
+invitations. The creator cannot accept or decline their own link; accept
+re-checks that the creator still has `admin` unless the invitation was created
+with a project secret. Team-member invitations are declared in the contract and
+answer `501` until they ship. Refused for an unclaimed project and on a server
+without a platform project.
+
+How invitations fit with grants and owning teams:
+[Access and memberships](/docs/concepts/access-and-memberships).
+CLI and recovery steps: [Manage project access](/docs/guides/manage-project-access).
 
 <Operations />
