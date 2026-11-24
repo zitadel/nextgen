@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { de } from "./de.js";
 import { en } from "./en.js";
 import { it as italian } from "./it.js";
-import { isHidden, localeFor, mergeLocale } from "./index.js";
+import { builtinLocales, isHidden, localeFor, mergeLocale } from "./index.js";
 
 describe("built-in locale dictionaries", () => {
   it("keeps translated locale keys aligned with English", () => {
@@ -12,6 +12,15 @@ describe("built-in locale dictionaries", () => {
     expect(Object.keys(de).sort()).toEqual(englishKeys);
     expect(Object.keys(italian).sort()).toEqual(englishKeys);
   });
+
+  // The schema's identifier may be an employee number rather than an email.
+  it.each(Object.entries(builtinLocales))(
+    "names no email where the identifier may be another field (%s)",
+    (_, locale) => {
+      expect(locale["identifier.description.custom_identifier"]).not.toMatch(/mail/i);
+      expect(locale["passkey-first.action.email_fallback"]).not.toMatch(/mail/i);
+    },
+  );
 });
 
 describe("mergeLocale", () => {
@@ -67,6 +76,30 @@ describe("mergeLocale", () => {
     const merged = mergeLocale(builtin, { "identifier.title": "Welcome" });
 
     expect(merged["password.description.sso"]).toBe(builtin["password.description.sso"]);
+  });
+
+  describe("the wording for an identifier that is not an email", () => {
+    const withVariant = {
+      "identifier.description": "Enter your email to continue",
+      "identifier.description.custom_identifier": "Enter your details to continue",
+    };
+
+    it("is dropped from a description the integrator rewrote", () => {
+      const merged = mergeLocale(withVariant, {
+        "identifier.description": "Enter your employee number",
+      });
+
+      expect(merged).not.toHaveProperty("identifier.description.custom_identifier");
+    });
+
+    it("is kept when the integrator wrote it too", () => {
+      const merged = mergeLocale(withVariant, {
+        "identifier.description": "Enter your employee number",
+        "identifier.description.custom_identifier": "Enter your employee number",
+      });
+
+      expect(merged["identifier.description.custom_identifier"]).toBe("Enter your employee number");
+    });
   });
 });
 

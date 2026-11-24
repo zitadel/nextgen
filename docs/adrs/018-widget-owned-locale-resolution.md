@@ -47,8 +47,9 @@ The private `resolveLocale()` method determines the effective dictionary:
    built-in dictionary (`mergeLocale` in `locales/index.ts`), skipping
    explicit `undefined`. This allows partial overrides without importing the
    full base dictionary. When the custom dictionary rewrites a step's
-   `<step>.description` but has no `<step>.description.sso` of its own, the
-   built-in `.sso` entry is dropped so the step falls back to the custom text.
+   `<step>.description` but has no variant of it of its own (`.sso`, or
+   `.custom_identifier` for an identifier that is not an email), the built-in
+   variant is dropped so the step falls back to the custom text.
 4. If no custom override exists, use the built-in dictionary directly.
 5. Fall back to `en` if no built-in matches.
 

@@ -33,7 +33,7 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys, stepTexts } from "./liquid.js";
 import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
@@ -1241,7 +1241,7 @@ export class ZitadelLogin extends ZitadelSurface {
       step: {
         name: step.name,
         complete: step.complete,
-        texts: step.texts ?? {},
+        texts: stepTexts(step.texts ?? {}, fields, this.resolveLocale()),
       },
       fields,
       actions,

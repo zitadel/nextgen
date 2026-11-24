@@ -17,17 +17,31 @@ import { it } from "./it.js";
 export const builtinLocales: Readonly<Record<string, Locale>> = { en, de, it };
 
 /**
+ * The variant of `<step>.description` a step asks for when the identifier it
+ * collects is not an email address, such as a schema whose `x-identifier` is
+ * `employee_number`: the plain sentence may name the email.
+ */
+export const CUSTOM_IDENTIFIER_SUFFIX = ".custom_identifier";
+
+/**
+ * The variants of a `<step>.description`: `.sso` when the step offers sign-in
+ * providers, which the server asks for, and {@link CUSTOM_IDENTIFIER_SUFFIX}.
+ */
+const DESCRIPTION_VARIANT_SUFFIXES = [".sso", CUSTOM_IDENTIFIER_SUFFIX];
+
+/**
  * A built-in dictionary with an integrator's `locales` entries on top.
  *
  * Entries are partial: they merge key by key, and an explicit `undefined` is
  * skipped rather than shadowing the built-in copy.
  *
- * A step that offers sign-in providers asks for `<step>.description.sso`, and
- * the `t` filter falls back to `<step>.description` only when the first is
- * missing. So when the integrator wrote their own `<step>.description` but no
- * `.sso` variant of their own (absent, or the built-in one copied in by spreading
- * a built-in dictionary), the built-in `.sso` sentence is dropped: theirs is what shows,
- * rather than built-in copy, possibly in another language, that they never saw.
+ * A step can ask for a variant of its description (a step that offers sign-in
+ * providers asks for `<step>.description.sso`), and falls back to
+ * `<step>.description` only when the variant is missing. So when the
+ * integrator wrote their own `<step>.description` but not a variant of their
+ * own (absent, or the built-in one copied in by spreading a built-in
+ * dictionary), the built-in variant is dropped: theirs is what shows, rather
+ * than built-in copy, possibly in another language, that they never saw.
  */
 export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
   const merged: Locale = { ...builtin };
@@ -36,11 +50,13 @@ export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
   }
   for (const [key, value] of Object.entries(custom)) {
     if (value === undefined || !key.endsWith(".description") || value === builtin[key]) continue;
-    // A dictionary built by spreading a built-in one carries the built-in
-    // provider sentence too, so a copied value counts as not written.
-    const sso = custom[`${key}.sso`];
-    if (sso === undefined || sso === builtin[`${key}.sso`]) {
-      delete merged[`${key}.sso`];
+    for (const suffix of DESCRIPTION_VARIANT_SUFFIXES) {
+      // A dictionary built by spreading a built-in one carries the built-in
+      // variants too, so a copied value counts as not written.
+      const variant = custom[`${key}${suffix}`];
+      if (variant === undefined || variant === builtin[`${key}${suffix}`]) {
+        delete merged[`${key}${suffix}`];
+      }
     }
   }
   return merged;
