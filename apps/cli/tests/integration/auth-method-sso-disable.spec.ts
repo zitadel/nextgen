@@ -626,6 +626,8 @@ describe("auth-method sso disable", () => {
               notices: [GOOGLE_STAYS_NOTICE, STEPS_STAY_NOTICE],
               title: "Would remove google from default-human-user (dry run)",
               dry_run: true,
+              verb: "remove",
+              topic: "provider",
               next_args: [
                 [
                   "auth-method",
@@ -673,6 +675,8 @@ describe("auth-method sso disable", () => {
               ],
               title: "Would remove google from default-human-user (dry run)",
               dry_run: true,
+              verb: "remove",
+              topic: "provider",
               next_args: [
                 [
                   "auth-method",
@@ -734,6 +738,8 @@ describe("auth-method sso disable", () => {
               notices: [],
               title: "default-human-user does not offer google, so nothing would change (dry run)",
               dry_run: true,
+              verb: "remove",
+              topic: "provider",
               next_args: [
                 [
                   "auth-method",

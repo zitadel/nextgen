@@ -2,13 +2,15 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { type Deployment, DeploymentService } from "@/lib/backend";
+import { ListDeploymentsResponse } from "@/lib/backend/schemas";
+import { fieldPaths } from "@/cli/core/crud";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { reads, type Refused, whole } from "@/cli/core/flags";
 import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
+import { ReadCommand } from "@/cli/commands/bases";
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;
@@ -52,7 +54,7 @@ const COLUMNS = [
  * empty for any other deployment. It is also empty, with a warning, when the
  * live view or the previews cannot be read.
  */
-export default class DeploymentList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class DeploymentList extends ReadCommand {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;
@@ -81,12 +83,21 @@ export default class DeploymentList extends Tabulatable(ServerCommand(Environmen
         char: "a",
         description: "Fetch every page instead of one.",
       }),
+      fields: fieldsFlag({
+        shape: fieldPaths(ListDeploymentsResponse.shape.deployments.element),
+      }),
       plain: plainFlag,
     },
     { all: { exclusive: ["page-token"] } },
   );
 
-  protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
+  /**
+   * Lists the project's deployments, newest first.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The deployments as a list.
+   */
+  protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<CommandResult> {
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
     const listed = await deploymentService.page(
@@ -101,11 +112,12 @@ export default class DeploymentList extends Tabulatable(ServerCommand(Environmen
       },
     );
 
-    const serving = this.isJson
-      ? new Map<string, Deployment>()
-      : await PreviewExpiries.reading(() => {
+    const serving =
+      (await this.forHumans(() => {
+        return PreviewExpiries.reading(() => {
           return deploymentService.servingLivePreviews(listed.items, flags.live === true);
         }, new Map<string, Deployment>());
+      })) ?? new Map<string, Deployment>();
     const expiries = await PreviewExpiries.of(client, projectId).live(
       [...serving.values()].flatMap((deployment) => {
         return deployment.origins;
@@ -132,7 +144,7 @@ export default class DeploymentList extends Tabulatable(ServerCommand(Environmen
     };
     const extra = {};
 
-    return this.emitList(flags, {
+    return this.listed(flags, {
       columns,
       rows,
       items,

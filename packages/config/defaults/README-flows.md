@@ -136,7 +136,7 @@ your shell history:
 ```
 
 ```sh
-zitadel api setUserPassword <user-id> --input password.json
+zitadel api setUserPassword <user-id> --file password.json
 rm password.json
 ```
 

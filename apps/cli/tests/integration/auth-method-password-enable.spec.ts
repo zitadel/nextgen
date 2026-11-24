@@ -177,6 +177,8 @@ describe("auth-method password enable", () => {
               notices: [],
               title: "Would enable password for default-human-user (dry run)",
               dry_run: true,
+              verb: "enable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",
@@ -229,6 +231,8 @@ describe("auth-method password enable", () => {
               notices: [],
               title: "Would enable password for default-human-user (dry run)",
               dry_run: true,
+              verb: "enable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",
@@ -272,6 +276,8 @@ describe("auth-method password enable", () => {
               notices: [],
               title: "Nothing to enable for default-human-user (dry run)",
               dry_run: true,
+              verb: "enable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",

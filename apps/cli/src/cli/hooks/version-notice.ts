@@ -2,7 +2,7 @@ import type { Hook } from "@oclif/core";
 
 /** Whether these arguments print the version: oclif's `--version`, or `version` for a person. */
 export function isVersionRun(argv: readonly string[]): boolean {
-  return argv[0] === "--version" || (argv[0] === "version" && !argv.includes("--json"));
+  return (argv[0] === "--version" || argv[0] === "version") && !argv.includes("--json");
 }
 
 /**
@@ -12,7 +12,8 @@ export function isVersionRun(argv: readonly string[]): boolean {
  * The box goes to stderr, and only with a terminal on both streams: stdout stays
  * the one line `$(zitadel --version)` reads, and such a run never asks the
  * registry. It runs after every command, so everything else is loaded only once
- * this is a version run for a person.
+ * this is a version run for a person. Advice about the version must never
+ * break printing the version, so a failure to fetch it is swallowed.
  */
 const hook: Hook<"finally"> = async ({ config }) => {
   if (!isVersionRun(process.argv.slice(2)) || !process.stdout.isTTY || !process.stderr.isTTY) {
@@ -32,7 +33,7 @@ const hook: Hook<"finally"> = async ({ config }) => {
       process.stderr.write(`${notice}\n`);
     }
   } catch {
-    // Advice about the version must never break printing the version.
+    return;
   }
 };
 

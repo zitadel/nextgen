@@ -195,6 +195,9 @@ function configErrorCode(error: ConfigError): ZitadelErrorCode {
  */
 const OCLIF_HELP = /\n *See more help with --help\s*$/;
 
+/** What oclif says of a flag typed twice, which carries no help footer of its own. */
+const OCLIF_REPEATED = /^Flag --[\w-]+ can only be specified once$/u;
+
 /** The heading oclif puts over the flags it rejected, which nothing else writes. */
 const OCLIF_PREAMBLE = /^The following errors? occurred:\n/;
 
@@ -221,6 +224,12 @@ export type FailureText = {
  * like any other command the CLI suggests.
  */
 export function failureText(message: string): FailureText {
+  if (OCLIF_REPEATED.test(message)) {
+    return {
+      sentence: message,
+      misuse: true,
+    };
+  }
   if (!OCLIF_HELP.test(message)) {
     return {
       sentence: message,

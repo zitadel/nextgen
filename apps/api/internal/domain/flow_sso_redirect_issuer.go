@@ -16,6 +16,15 @@ type FlowSSORedirectIssuer interface {
 	Issue(ctx context.Context, in FlowIssueSSORedirectInput) (FlowSSORedirectOutput, error)
 }
 
+// FlowSSOReturn is the browser-side context of an external sign-in,
+// derived from the HTTP request at the API edge: RedirectURI is the
+// callback route the provider sends the browser to, ReturnTarget the page
+// the callback hands the browser back to.
+type FlowSSOReturn struct {
+	RedirectURI  string
+	ReturnTarget string
+}
+
 // FlowIssueSSORedirectInput names the provider the user picked and what the
 // API derived from the request, the callback route and the return page.
 type FlowIssueSSORedirectInput struct {
