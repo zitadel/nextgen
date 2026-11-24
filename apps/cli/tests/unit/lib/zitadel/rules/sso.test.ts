@@ -258,7 +258,10 @@ describe("SSO_RULES", () => {
   });
 
   it("refuse a second connection file that claims a slug, naming the first", () => {
-    const config = aConfig({ connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY } });
+    const config = aConfig({
+      connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY },
+      schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) },
+    });
 
     const issues = SSO_RULES.flatMap((rule) => {
       return rule.check(config, {});
