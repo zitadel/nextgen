@@ -46,6 +46,8 @@ export function useDragToPan(ref: RefObject<HTMLElement | null>): boolean {
       if (!start.moved) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         start.moved = true;
+        // The press may have begun selecting the text under it.
+        window.getSelection()?.removeAllRanges();
         setDragging(true);
       }
       element.scrollLeft = start.left - dx;

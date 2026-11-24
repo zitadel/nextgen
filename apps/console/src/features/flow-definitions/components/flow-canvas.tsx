@@ -1,13 +1,5 @@
 import { Maximize2, Minimize2, Minus, Plus } from "lucide-react";
-import {
-  type KeyboardEvent,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type KeyboardEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { brandingDeclarations, resolveLogoUrl } from "@zitadel/components";
 
@@ -184,7 +176,7 @@ export function FlowCanvas({
         >
           <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
             <DialogTitle className={cn(SECTION_HEADING, "mr-auto")}>{name}</DialogTitle>
-            <Legend />
+            <Legend hints={false} />
             {zoomControls}
             <DialogClose asChild>
               <Button ref={exit} variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
@@ -267,19 +259,25 @@ function Viewport({
   const side = useDocumentTheme();
   const variables = useMemo(() => brandingDeclarations(branding, side), [branding, side]);
   const logo = resolveLogoUrl(branding, side);
-  const [highlighted, setHighlighted] = useState<string | null>(null);
+  // Hover wins while it lasts; leaving a card falls back to the focused step.
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [focused, setFocused] = useState<string | null>(null);
+  const highlighted = hovered ?? focused;
   const highlight = useMemo(
     () => (highlighted ? highlightStep(canvas, highlighted) : null),
     [canvas, highlighted],
   );
   const cards = useRef(new Map<string, HTMLElement>());
 
-  useEffect(() => {
+  // Reported before the first paint, so the canvas is never drawn at a zoom
+  // fitted to no viewport or to the one it just left.
+  useLayoutEffect(() => {
     const element = viewport.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      onResize({ width: element.clientWidth, height: element.clientHeight });
-    });
+    if (!element) return;
+    const report = () => onResize({ width: element.clientWidth, height: element.clientHeight });
+    report();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(report);
     observer.observe(element);
     return () => observer.disconnect();
   }, [onResize]);
@@ -291,6 +289,8 @@ function Viewport({
     const observer = new ResizeObserver(() => {
       const next: Record<string, CardSize> = {};
       for (const [name, element] of cards.current) {
+        // Not laid out (a hidden ancestor) reads zero: keep the estimate.
+        if (element.offsetHeight === 0) continue;
         const ports: Record<string, number> = {};
         for (const control of element.querySelectorAll<HTMLElement>("[data-port]")) {
           const port = control.dataset.port;
@@ -298,7 +298,7 @@ function Viewport({
         }
         next[name] = { height: element.offsetHeight, ports };
       }
-      onMeasure(next);
+      if (Object.keys(next).length > 0) onMeasure(next);
     });
     for (const element of cards.current.values()) observer.observe(element);
     return () => observer.disconnect();
@@ -347,7 +347,8 @@ function Viewport({
               logo={logo}
               style={variables}
               dimmed={highlight !== null && !highlight.nodes.has(card.name)}
-              onHighlight={setHighlighted}
+              onHover={setHovered}
+              onFocusChange={setFocused}
               ref={(element) => {
                 if (element) cards.current.set(card.name, element);
                 else cards.current.delete(card.name);
@@ -426,7 +427,8 @@ function Edges({
   );
 }
 
-function Legend() {
+/** The arrow key, and in the card the hints for what the canvas responds to. */
+function Legend({ hints = true }: { hints?: boolean }) {
   return (
     <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
       {LEGEND.map(({ kind, text }) => (
@@ -445,8 +447,12 @@ function Legend() {
           {text}
         </span>
       ))}
-      <span>Hover or focus a step to isolate its transitions</span>
-      <span>Ctrl or ⌘ and scroll to zoom; with the canvas focused, + − and 0</span>
+      {hints && (
+        <>
+          <span>Hover or focus a step to isolate its transitions</span>
+          <span>Ctrl or ⌘ and scroll to zoom; with the canvas focused, + − and 0</span>
+        </>
+      )}
     </div>
   );
 }
