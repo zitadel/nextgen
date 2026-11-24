@@ -556,6 +556,13 @@ describe("SSO_RULES", () => {
         message: 'reads "email", a string claim, into "email", which the schema types as integer',
       },
       {
+        rule: "sso/inert-connection",
+        severity: "warning",
+        documents: { connections: { [CONNECTION_FILE]: ACME } },
+        file: CONNECTION_PATH,
+        message: 'connection "acme" is listed in sso.providers by no schema',
+      },
+      {
         rule: "sso/orphaned-mapping-target",
         severity: "error",
         documents: agreeing(
@@ -668,6 +675,15 @@ describe("SSO_RULES", () => {
         documents: agreeing(anOidcConnection({ subject_claim: "oid" })),
       },
       { rule: "sso/claim-type-mismatch", documents: agreeing(ACME) },
+      { rule: "sso/inert-connection", documents: agreeing(ACME) },
+      {
+        rule: "sso/inert-connection",
+        documents: {
+          schemas: { [SCHEMA_FILE]: aSchemaListing(["other"]) },
+          connections: { [CONNECTION_FILE]: ACME },
+          flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
+        },
+      },
       {
         rule: "sso/claim-type-mismatch",
         documents: agreeing(ACME, {

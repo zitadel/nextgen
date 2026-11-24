@@ -71,6 +71,7 @@ export const RULE_IDS = [
   "sso/claim-type-mismatch",
   "sso/orphaned-mapping-target",
   "sso/orphaned-verification-key",
+  "sso/inert-connection",
 ] as const;
 
 /**

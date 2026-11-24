@@ -890,4 +890,25 @@ export const SSO_RULES: readonly Rule[] = [
       return `verified_claims key ${quote(fact.property)} is not a property of any schema that lists ${quote(fact.entry.slug)} in sso.providers, so it can never verify.${didYouMean(fact.property, readableProperties(fact.entry))} Fix the name, or remove it.`;
     },
   }),
+
+  defineRule({
+    id: "sso/inert-connection",
+    severity: "warning",
+    // A connection a flow offers but no schema lists is already refused by
+    // sso/provider-id at the step, so it is not reported again here.
+    each: (config) => {
+      return standing(config).filter((entry) => {
+        const offered = config.flows.offers.some((offer) => {
+          return offer.slug === entry.slug;
+        });
+        return entry.listing.length === 0 && !offered;
+      });
+    },
+    file: (fact) => {
+      return fact.connection.path;
+    },
+    says: (fact) => {
+      return `connection ${quote(fact.slug)} is listed in sso.providers by no schema, so no user type can use it. List ${quote(fact.slug)} in sso.providers of a schema, or delete this file.`;
+    },
+  }),
 ];
