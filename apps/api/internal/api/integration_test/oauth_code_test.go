@@ -92,8 +92,9 @@ func TestOAuthCodeRedemption(t *testing.T) {
 		userID := harness.CreateUserWithTeam(t, project.ID)
 		code, request, _ := issue(t, userID)
 
-		token, err := requests.RedeemCode(t.Context(), input(code))
+		token, expiresIn, err := requests.RedeemCode(t.Context(), input(code))
 		require.NoError(t, err)
+		assert.Equal(t, domain.AccessTokenTTL, expiresIn, "the session outlives the token")
 
 		key, err := harness.EnsureKeyService(t).GetProjectSigningKey(t.Context(), project.ID, domain.SigningKeyPurposeToken)
 		require.NoError(t, err)
@@ -122,7 +123,7 @@ func TestOAuthCodeRedemption(t *testing.T) {
 			"client_id": "web",
 		}, claims, "no scope, nbf or sid")
 
-		_, err = requests.RedeemCode(t.Context(), input(code))
+		_, _, err = requests.RedeemCode(t.Context(), input(code))
 		assert.ErrorIs(t, err, domain.ErrAuthCodeInvalid(), "a replayed code is refused")
 		assert.Empty(t, exchangeFailures(t, request.ID), "a replayed code consumes nothing")
 	})
@@ -133,10 +134,10 @@ func TestOAuthCodeRedemption(t *testing.T) {
 
 		wrong := input(code)
 		wrong.RedirectURI += "/other"
-		_, err := requests.RedeemCode(t.Context(), wrong)
+		_, _, err := requests.RedeemCode(t.Context(), wrong)
 		require.ErrorIs(t, err, domain.ErrAuthCodeRedirectURIMismatch())
 
-		_, err = requests.RedeemCode(t.Context(), input(code))
+		_, _, err = requests.RedeemCode(t.Context(), input(code))
 		assert.ErrorIs(t, err, domain.ErrAuthCodeInvalid())
 
 		failures := exchangeFailures(t, request.ID)
@@ -150,7 +151,7 @@ func TestOAuthCodeRedemption(t *testing.T) {
 		code, request, session := issue(t, harness.CreateUserWithTeam(t, project.ID))
 		require.NoError(t, stmts.DeleteSessionByID(t.Context(), project.ID, session.ID))
 
-		_, err := requests.RedeemCode(t.Context(), input(code))
+		_, _, err := requests.RedeemCode(t.Context(), input(code))
 		assert.ErrorIs(t, err, domain.ErrAuthCodeInvalid())
 		failures := exchangeFailures(t, request.ID)
 		require.Len(t, failures, 1)
@@ -162,7 +163,7 @@ func TestOAuthCodeRedemption(t *testing.T) {
 		code, request, _ := issue(t, userID)
 		require.NoError(t, stmts.DeactivateUser(t.Context(), project.ID, userID))
 
-		_, err := requests.RedeemCode(t.Context(), input(code))
+		_, _, err := requests.RedeemCode(t.Context(), input(code))
 		assert.ErrorIs(t, err, domain.ErrAuthCodeInvalid())
 		failures := exchangeFailures(t, request.ID)
 		require.Len(t, failures, 1)

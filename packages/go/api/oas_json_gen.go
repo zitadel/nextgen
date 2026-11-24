@@ -15109,10 +15109,17 @@ func (s *AuthTokenIssuedPayload) encodeFields(e *jx.Encoder) {
 			e.ArrEnd()
 		}
 	}
+	{
+		if s.ClientID.Set {
+			e.FieldStart("client_id")
+			s.ClientID.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfAuthTokenIssuedPayload = [1]string{
+var jsonFieldsNameOfAuthTokenIssuedPayload = [2]string{
 	0: "scopes",
+	1: "client_id",
 }
 
 // Decode decodes AuthTokenIssuedPayload from json.
@@ -15141,6 +15148,16 @@ func (s *AuthTokenIssuedPayload) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"scopes\"")
+			}
+		case "client_id":
+			if err := func() error {
+				s.ClientID.Reset()
+				if err := s.ClientID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
 			}
 		default:
 			return d.Skip()

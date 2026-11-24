@@ -106,6 +106,9 @@ type TeamMembershipUpdatedPayload struct {
 
 type AuthTokenIssuedPayload struct {
 	Scopes []string `json:"scopes,omitempty"`
+	// ClientID is the client that redeemed an authorization code; empty for
+	// every other token.
+	ClientID string `json:"client_id,omitempty"`
 }
 
 type AuthTokenRevokedPayload struct{}

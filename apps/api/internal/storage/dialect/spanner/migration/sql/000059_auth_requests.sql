@@ -16,10 +16,6 @@ CREATE TABLE auth_requests (
     binding_hash    STRING(MAX)        NOT NULL,
     created_at      TIMESTAMP          NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     expires_at      TIMESTAMP          NOT NULL,
-    code_hash       STRING(MAX),
-    user_id         STRING(MAX),
-    session_id      STRING(MAX),
-    code_expires_at TIMESTAMP,
     CONSTRAINT chk_auth_requests_id CHECK (id <> ''),
     CONSTRAINT fk_auth_requests_project
         FOREIGN KEY (project_id)
@@ -28,19 +24,8 @@ CREATE TABLE auth_requests (
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 
--- NULL_FILTERED: Spanner indexes NULL as a value, so every request without a
--- code would collide on (project_id, NULL).
--- +goose StatementBegin
-CREATE UNIQUE NULL_FILTERED INDEX uq_auth_requests_code_hash
-    ON auth_requests (project_id, code_hash)
--- +goose StatementEnd
-
 -- +goose Down
 -- +goose NO TRANSACTION
--- +goose StatementBegin
-DROP INDEX IF EXISTS uq_auth_requests_code_hash
--- +goose StatementEnd
-
 -- +goose StatementBegin
 DROP TABLE IF EXISTS auth_requests
 -- +goose StatementEnd

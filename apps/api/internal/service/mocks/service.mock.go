@@ -8024,17 +8024,17 @@ func (c *MockAllStatementsSetAuthAttemptFactorCall) DoAndReturn(f func(context.C
 }
 
 // SetAuthRequestCode mocks base method.
-func (m *MockAllStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest) error {
+func (m *MockAllStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest, now time.Time) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetAuthRequestCode", ctx, request)
+	ret := m.ctrl.Call(m, "SetAuthRequestCode", ctx, request, now)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetAuthRequestCode indicates an expected call of SetAuthRequestCode.
-func (mr *MockAllStatementsMockRecorder) SetAuthRequestCode(ctx, request any) *MockAllStatementsSetAuthRequestCodeCall {
+func (mr *MockAllStatementsMockRecorder) SetAuthRequestCode(ctx, request, now any) *MockAllStatementsSetAuthRequestCodeCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAuthRequestCode", reflect.TypeOf((*MockAllStatements)(nil).SetAuthRequestCode), ctx, request)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAuthRequestCode", reflect.TypeOf((*MockAllStatements)(nil).SetAuthRequestCode), ctx, request, now)
 	return &MockAllStatementsSetAuthRequestCodeCall{Call: call}
 }
 
@@ -8050,13 +8050,13 @@ func (c *MockAllStatementsSetAuthRequestCodeCall) Return(arg0 error) *MockAllSta
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsSetAuthRequestCodeCall) Do(f func(context.Context, *domain.AuthRequest) error) *MockAllStatementsSetAuthRequestCodeCall {
+func (c *MockAllStatementsSetAuthRequestCodeCall) Do(f func(context.Context, *domain.AuthRequest, time.Time) error) *MockAllStatementsSetAuthRequestCodeCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsSetAuthRequestCodeCall) DoAndReturn(f func(context.Context, *domain.AuthRequest) error) *MockAllStatementsSetAuthRequestCodeCall {
+func (c *MockAllStatementsSetAuthRequestCodeCall) DoAndReturn(f func(context.Context, *domain.AuthRequest, time.Time) error) *MockAllStatementsSetAuthRequestCodeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

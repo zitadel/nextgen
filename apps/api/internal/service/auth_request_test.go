@@ -91,6 +91,7 @@ func TestAuthRequestService_IssueCode(t *testing.T) {
 		{name: "issued", userID: "user_1", sessionID: "sess_1"},
 		{name: "no_user", sessionID: "sess_1", wantErr: domain.ErrInternal(nil)},
 		{name: "no_session", userID: "user_1", wantErr: domain.ErrInternal(nil)},
+		// The request is unknown, expired, or already has a code.
 		{name: "no_row_changed", userID: "user_1", sessionID: "sess_1", setErr: database.NewNoRowFoundError(nil), wantErr: domain.ErrAuthCodeNotIssued()},
 		{name: "storage_unavailable", userID: "user_1", sessionID: "sess_1", setErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
 		{name: "storage_fails", userID: "user_1", sessionID: "sess_1", setErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
@@ -101,11 +102,14 @@ func TestAuthRequestService_IssueCode(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			pool := servicemocks.NewMockPool(ctrl)
 			stmts := servicemocks.NewMockAllStatements(ctrl)
-			var stored *domain.AuthRequest
+			var (
+				stored    *domain.AuthRequest
+				storedNow time.Time
+			)
 			if tt.userID != "" && tt.sessionID != "" {
 				pool.EXPECT().Statements().Return(stmts)
-				stmts.EXPECT().SetAuthRequestCode(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, r *domain.AuthRequest) error {
-					stored = r
+				stmts.EXPECT().SetAuthRequestCode(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, r *domain.AuthRequest, now time.Time) error {
+					stored, storedNow = r, now
 					return tt.setErr
 				})
 			}
@@ -125,7 +129,9 @@ func TestAuthRequestService_IssueCode(t *testing.T) {
 			assert.Equal(t, "user_1", stored.UserID)
 			assert.Equal(t, "sess_1", stored.SessionID)
 			require.NotNil(t, stored.CodeExpiresAt)
-			assert.WithinDuration(t, time.Now().Add(domain.AuthCodeTTL), *stored.CodeExpiresAt, 5*time.Second)
+			// The statement refuses a request expired at storedNow.
+			assert.WithinDuration(t, time.Now(), storedNow, 5*time.Second)
+			assert.True(t, storedNow.Add(domain.AuthCodeTTL).Equal(*stored.CodeExpiresAt), "the code expires a TTL after now")
 			assert.Equal(t, time.UTC, stored.CodeExpiresAt.Location())
 		})
 	}
@@ -161,6 +167,8 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 		signer                                                     jose.Signer
 		reach                                                      redeemReach
 		wantErr                                                    error
+		// wantMessage is the message of the outermost domain error, when set.
+		wantMessage string
 		// wantRollback is a fault: the callback returns it, so the code stays.
 		wantRollback bool
 		// retried runs the callback twice, as Spanner does after an abort: the
@@ -170,7 +178,27 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 		// refusal of a consumed code writes.
 		wantReason string
 	}{
+		// activeSession expires in an hour, after the token.
 		{name: "issued", reach: reachIssue},
+		{
+			// The token never outlives its session.
+			name: "issued_until_the_session_expires",
+			session: func() *domain.Session {
+				s := activeSession(new("user_1"))
+				s.ExpiresAt = time.Now().Add(2 * time.Minute)
+				return s
+			}(),
+			reach: reachIssue,
+		},
+		{
+			name: "issued_for_a_session_without_expiry",
+			session: func() *domain.Session {
+				s := activeSession(new("user_1"))
+				s.ExpiresAt = time.Time{}
+				return s
+			}(),
+			reach: reachIssue,
+		},
 		{name: "issued_on_retry", retried: true, reach: reachIssue},
 		{
 			name:   "issued_with_scopes",
@@ -304,13 +332,23 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 			wantRollback: true,
 			wantReason:   domain.AuthRequestExchangeReasonClientMismatch,
 		},
-		{name: "redeem_fails", redeemErr: boom, wantErr: domain.ErrInternal(nil), wantRollback: true},
+		{name: "redeem_fails", redeemErr: boom, wantErr: domain.ErrInternal(nil), wantMessage: "failed to redeem the authorization code", wantRollback: true},
 		{name: "redeem_unavailable", redeemErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable(), wantRollback: true},
 		{name: "release_read_fails", releaseErr: boom, reach: reachRelease, wantErr: domain.ErrInternal(nil), wantRollback: true},
+		{
+			// A domain error that is not a server fault must not leave as a
+			// refusal: it is a fault of the redemption.
+			name:         "release_read_refused",
+			releaseErr:   domain.ErrReleaseNotFound(),
+			reach:        reachRelease,
+			wantErr:      domain.ErrInternal(nil),
+			wantMessage:  "failed to redeem the authorization code",
+			wantRollback: true,
+		},
 		{name: "session_read_fails", sessionErr: boom, reach: reachSession, wantErr: domain.ErrInternal(nil), wantRollback: true},
 		{name: "user_read_fails", userErr: boom, reach: reachUser, wantErr: domain.ErrInternal(nil), wantRollback: true},
 		{name: "token_id_fails", idErr: boom, reach: reachIssue, wantErr: domain.ErrInternal(nil), wantRollback: true},
-		{name: "signing_fails", signer: failingSigner{}, reach: reachIssue, wantErr: domain.ErrInternal(nil), wantRollback: true},
+		{name: "signing_fails", signer: failingSigner{}, reach: reachIssue, wantErr: domain.ErrInternal(nil), wantMessage: "failed to sign the access token", wantRollback: true},
 		{name: "event_fails", emitErr: boom, reach: reachIssue, wantErr: domain.ErrInternal(nil), wantRollback: true},
 	}
 	for _, tt := range tests {
@@ -410,10 +448,17 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 				}
 			}
 
-			token, err := service.NewAuthRequestService(service.NewPool(pool), keys).RedeemCode(t.Context(), input)
+			before := time.Now()
+			token, expiresIn, err := service.NewAuthRequestService(service.NewPool(pool), keys).RedeemCode(t.Context(), input)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Empty(t, token)
+				assert.Zero(t, expiresIn)
+				if tt.wantMessage != "" {
+					outer, ok := errors.AsType[domain.Error](err)
+					require.True(t, ok)
+					assert.Equal(t, tt.wantMessage, outer.Message)
+				}
 				if tt.wantRollback {
 					assert.Error(t, callbackErr, "a fault must roll the redemption back")
 				} else {
@@ -454,7 +499,14 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 			require.NoError(t, json.Unmarshal(payload, &claims))
 			now := float64(time.Now().Unix())
 			assert.InDelta(t, now, claims["iat"], 5)
-			assert.InDelta(t, now+domain.AccessTokenTTL.Seconds(), claims["exp"], 5)
+			if !session.ExpiresAt.IsZero() && session.ExpiresAt.Before(before.Add(domain.AccessTokenTTL)) {
+				assert.Equal(t, float64(session.ExpiresAt.Unix()), claims["exp"], "the token expires with its session")
+				assert.InDelta(t, 2*time.Minute, expiresIn, float64(5*time.Second))
+				assert.LessOrEqual(t, expiresIn, session.ExpiresAt.Sub(before))
+			} else {
+				assert.Equal(t, claims["iat"].(float64)+domain.AccessTokenTTL.Seconds(), claims["exp"])
+				assert.Equal(t, domain.AccessTokenTTL, expiresIn)
+			}
 			delete(claims, "iat")
 			delete(claims, "exp")
 			want := map[string]any{
@@ -464,10 +516,10 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 				"client_id": "shop",
 				"jti":       "tkn_1",
 			}
-			wantPayload := `{}`
+			wantPayload := `{"client_id":"shop"}`
 			if len(request.Scopes) > 0 {
 				want["scope"] = "read write"
-				wantPayload = `{"scopes":["read","write"]}`
+				wantPayload = `{"client_id":"shop","scopes":["read","write"]}`
 			}
 			assert.Equal(t, want, claims, "no nbf or sid, and scope only with stored scopes")
 
@@ -481,6 +533,26 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 			assert.JSONEq(t, wantPayload, string(event.Payload))
 		})
 	}
+}
+
+// Without a signer the redemption stops before its transaction, so the code
+// is not consumed.
+func TestAuthRequestService_RedeemCodeWithoutSigner(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl) // no Transaction expected
+	keys := servicemocks.NewMockKeyService(ctrl)
+	signerErr := domain.ErrInternal(errors.New("boom")).WithMessage("failed to load the signing key")
+	keys.EXPECT().GetProjectSigner(gomock.Any(), "proj_1", domain.SigningKeyPurposeToken, gomock.Any()).Return(nil, signerErr)
+
+	token, expiresIn, err := service.NewAuthRequestService(service.NewPool(pool), keys).RedeemCode(t.Context(), service.RedeemCodeInput{
+		ProjectID: "proj_1",
+		ClientID:  "shop",
+		Code:      redeemCode,
+	})
+	assert.Equal(t, signerErr, err)
+	assert.Empty(t, token)
+	assert.Zero(t, expiresIn)
 }
 
 func activeSession(userID *string) *domain.Session {

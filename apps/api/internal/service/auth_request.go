@@ -22,14 +22,17 @@ type AuthRequestService interface {
 	// nonce the browser's binding cookie holds.
 	Create(ctx context.Context, request *domain.AuthRequest) (bindingNonce string, err error)
 	// IssueCode gives the request its authorization code, for the user and
-	// session the login signed in. A request gets one code; an unknown request
-	// or one that already has a code returns [domain.ErrAuthCodeNotIssued].
+	// session the login signed in. A request gets one code; an unknown
+	// request, an expired one, or one that already has a code returns
+	// [domain.ErrAuthCodeNotIssued].
 	IssueCode(ctx context.Context, projectID, authRequestID, userID, sessionID string) (code string, err error)
 	// RedeemCode consumes a code and returns the access token it is
-	// exchanged for, writing auth.token.issued. A refused code is consumed
+	// exchanged for and the token's lifetime, writing auth.token.issued. The
+	// token never outlives the session's ExpiresAt. A refused code is consumed
 	// too and writes auth.request.exchange.failed with the reason; an unknown
-	// code writes nothing. A server fault leaves the code redeemable.
-	RedeemCode(ctx context.Context, input RedeemCodeInput) (accessToken string, err error)
+	// code writes nothing. A server fault leaves the code redeemable. On every
+	// error expiresIn is 0.
+	RedeemCode(ctx context.Context, input RedeemCodeInput) (accessToken string, expiresIn time.Duration, err error)
 }
 
 // RedeemCodeInput is what a client presents to redeem a code.
@@ -96,14 +99,15 @@ func (s *authRequestService) IssueCode(ctx context.Context, projectID, authReque
 	if err != nil {
 		return "", err
 	}
+	now := time.Now().UTC()
 	if err := s.db.Statements().SetAuthRequestCode(ctx, &domain.AuthRequest{
 		ProjectID:     projectID,
 		ID:            authRequestID,
 		CodeHash:      hash,
 		UserID:        userID,
 		SessionID:     sessionID,
-		CodeExpiresAt: new(time.Now().UTC().Add(domain.AuthCodeTTL)),
-	}); err != nil {
+		CodeExpiresAt: new(now.Add(domain.AuthCodeTTL)),
+	}, now); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return "", domain.ErrAuthCodeNotIssued()
 		}
@@ -116,19 +120,20 @@ func (s *authRequestService) IssueCode(ctx context.Context, projectID, authReque
 }
 
 // RedeemCode implements [AuthRequestService].
-func (s *authRequestService) RedeemCode(ctx context.Context, input RedeemCodeInput) (_ string, err error) {
+func (s *authRequestService) RedeemCode(ctx context.Context, input RedeemCodeInput) (_ string, _ time.Duration, err error) {
 	ctx, end := startSpan(ctx, "AuthRequestService.RedeemCode")
 	defer end(&err)
 
 	signer, err := s.keys.GetProjectSigner(ctx, input.ProjectID, domain.SigningKeyPurposeToken, (&jose.SignerOptions{}).WithType("at+jwt"))
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	codeHash := domain.HashSecret(input.Code)
 	var token string
+	var expiresIn time.Duration
 	var refusal error
 	if err := s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		token, refusal = "", nil
+		token, expiresIn, refusal = "", 0, nil
 		now := time.Now()
 		stmts := tx.Statements()
 		request, err := stmts.RedeemAuthRequestCode(ctx, input.ProjectID, codeHash)
@@ -139,7 +144,7 @@ func (s *authRequestService) RedeemCode(ctx context.Context, input RedeemCodeInp
 			}
 			return err
 		}
-		reason, err := redemptionRefusal(ctx, stmts, request, input, now)
+		reason, session, err := redemptionRefusal(ctx, stmts, request, input, now)
 		if err != nil {
 			return err
 		}
@@ -162,6 +167,11 @@ func (s *authRequestService) RedeemCode(ctx context.Context, input RedeemCodeInp
 		if err != nil {
 			return err
 		}
+		// The token never outlives its session; a zero ExpiresAt never expires.
+		expiresAt := now.Add(domain.AccessTokenTTL)
+		if !session.ExpiresAt.IsZero() && session.ExpiresAt.Before(expiresAt) {
+			expiresAt = session.ExpiresAt
+		}
 		// Set field by field: oidc.NewAccessTokenClaims would add nbf.
 		token, err = crypto.Sign(&oidc.AccessTokenClaims{TokenClaims: oidc.TokenClaims{
 			Issuer:     request.Issuer,
@@ -169,65 +179,71 @@ func (s *authRequestService) RedeemCode(ctx context.Context, input RedeemCodeInp
 			Audience:   []string{request.ClientID},
 			ClientID:   request.ClientID,
 			IssuedAt:   oidc.FromTime(now),
-			Expiration: oidc.FromTime(now.Add(domain.AccessTokenTTL)),
+			Expiration: oidc.FromTime(expiresAt),
 			JWTID:      tokenID,
 		}, Scopes: request.Scopes}, signer)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to sign the access token")
 		}
-		return emitAuthTokenIssued(ctx, stmts, request.ProjectID, tokenID, &request.SessionID, nil, &request.UserID, request.Scopes)
+		expiresIn = expiresAt.Sub(now)
+		return emitAuthTokenIssued(ctx, stmts, request.ProjectID, tokenID, &request.SessionID, nil, &request.UserID, request.Scopes, request.ClientID)
 	}); err != nil {
 		if _, ok := errors.AsType[*database.UnavailableError](err); ok {
-			return "", domain.ErrUnavailable().WithParent(err)
+			return "", 0, domain.ErrUnavailable().WithParent(err)
 		}
-		return "", domain.ErrInternal(err).WithMessage("failed to redeem the authorization code")
+		// A server fault the callback named already says what failed. Any
+		// other domain error must not leave as a refusal, so it is wrapped.
+		if _, ok := errors.AsType[domain.Error](err); ok && domain.IsServerFault(err) {
+			return "", 0, err
+		}
+		return "", 0, domain.ErrInternal(err).WithMessage("failed to redeem the authorization code")
 	}
 	if refusal != nil {
-		return "", refusal
+		return "", 0, refusal
 	}
-	return token, nil
+	return token, expiresIn, nil
 }
 
 // redemptionRefusal checks, in order, whether input may redeem the request
-// its code consumed. It returns the reason of the refusal (empty when the
-// request passes), or an error for a server fault.
-func redemptionRefusal(ctx context.Context, stmts AllStatements, request *domain.AuthRequest, input RedeemCodeInput, now time.Time) (reason string, err error) {
+// its code consumed. It returns the reason of the refusal, or the request's
+// active session when the request passes, or an error for a server fault.
+func redemptionRefusal(ctx context.Context, stmts AllStatements, request *domain.AuthRequest, input RedeemCodeInput, now time.Time) (reason string, session *domain.Session, err error) {
 	if input.ClientID != request.ClientID {
-		return domain.AuthRequestExchangeReasonClientMismatch, nil
+		return domain.AuthRequestExchangeReasonClientMismatch, nil, nil
 	}
 	if request.CodeExpiresAt == nil || now.After(*request.CodeExpiresAt) {
-		return domain.AuthRequestExchangeReasonCodeExpired, nil
+		return domain.AuthRequestExchangeReasonCodeExpired, nil, nil
 	}
 	if input.RedirectURI != request.RedirectURI {
-		return domain.AuthRequestExchangeReasonRedirectURIMismatch, nil
+		return domain.AuthRequestExchangeReasonRedirectURIMismatch, nil, nil
 	}
 	switch {
 	case request.CodeChallenge == "" && input.CodeVerifier != "":
-		return domain.AuthRequestExchangeReasonCodeVerifierUnexpected, nil
+		return domain.AuthRequestExchangeReasonCodeVerifierUnexpected, nil, nil
 	case request.CodeChallenge == "":
 	case input.CodeVerifier == "":
-		return domain.AuthRequestExchangeReasonCodeVerifierMissing, nil
+		return domain.AuthRequestExchangeReasonCodeVerifierMissing, nil, nil
 	case subtle.ConstantTimeCompare([]byte(oidc.NewSHACodeChallenge(input.CodeVerifier)), []byte(request.CodeChallenge)) != 1:
-		return domain.AuthRequestExchangeReasonCodeVerifierInvalid, nil
+		return domain.AuthRequestExchangeReasonCodeVerifierInvalid, nil, nil
 	}
 	if request.ReleaseID != "" {
 		release, err := stmts.GetReleaseByID(ctx, request.ProjectID, request.ReleaseID)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		if release.Revoked() {
-			return domain.AuthRequestExchangeReasonReleaseRevoked, nil
+			return domain.AuthRequestExchangeReasonReleaseRevoked, nil, nil
 		}
 	}
-	session, err := stmts.GetSessionByID(ctx, request.ProjectID, request.SessionID)
+	session, err = stmts.GetSessionByID(ctx, request.ProjectID, request.SessionID)
 	if errors.Is(err, domain.ErrSessionNotFound()) {
-		return domain.AuthRequestExchangeReasonSessionNotActive, nil
+		return domain.AuthRequestExchangeReasonSessionNotActive, nil, nil
 	}
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if session.State() != domain.SessionStateActive || session.UserID == nil || *session.UserID != request.UserID {
-		return domain.AuthRequestExchangeReasonSessionNotActive, nil
+		return domain.AuthRequestExchangeReasonSessionNotActive, nil, nil
 	}
 	_, err = stmts.GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), request.ProjectID),
@@ -235,9 +251,12 @@ func redemptionRefusal(ctx context.Context, stmts AllStatements, request *domain
 		database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
 	), UserQueryOptions{})
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-		return domain.AuthRequestExchangeReasonUserNotActive, nil
+		return domain.AuthRequestExchangeReasonUserNotActive, nil, nil
 	}
-	return "", err
+	if err != nil {
+		return "", nil, err
+	}
+	return "", session, nil
 }
 
 // refusalError is the error a redemption refused for reason answers with.

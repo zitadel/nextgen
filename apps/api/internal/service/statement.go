@@ -839,10 +839,10 @@ type AuthRequestStatements interface {
 	// [database.NoRowFoundError].
 	GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error)
 	// SetAuthRequestCode stores request's CodeHash, UserID, SessionID and
-	// CodeExpiresAt on the row of its ProjectID and ID. A row that is unknown
-	// or already has a code is left as it is, and returns a
+	// CodeExpiresAt on the row of its ProjectID and ID. A row that is unknown,
+	// expired at now, or already has a code is left as it is, and returns a
 	// [database.NoRowFoundError].
-	SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest) error
+	SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest, now time.Time) error
 	// RedeemAuthRequestCode deletes the request whose code has codeHash and
 	// returns it, expired or not, or a [database.NoRowFoundError].
 	RedeemAuthRequestCode(ctx context.Context, projectID, codeHash string) (*domain.AuthRequest, error)

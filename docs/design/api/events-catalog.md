@@ -186,7 +186,7 @@ tracked below.
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
 | `UpdateTeam` | `team.updated` | `admin` | `team` | delta: `name` |
 | `DeactivateTeam` (when status changed) | `team.deactivated` | `admin` | `team` | _(empty)_ |
-| `CreateToken` / session mint / `GenerateJWE` / authorization code redemption (`RedeemCode`) | `auth.token.issued` | `auth` | `token` | `scopes[]` |
+| `CreateToken` / session mint / `GenerateJWE` / authorization code redemption (`RedeemCode`) | `auth.token.issued` | `auth` | `token` | `scopes[]`, `client_id` (code redemption only) |
 | `DeleteTokenByID` / `RevokeToken` | `auth.token.revoked` | `auth` | `token` | _(empty)_ |
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
 | `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |

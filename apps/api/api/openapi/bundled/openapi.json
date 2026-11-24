@@ -24133,6 +24133,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client that redeemed the authorization code. Only a token issued for a code has it."
           }
         }
       },

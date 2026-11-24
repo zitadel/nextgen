@@ -16,19 +16,11 @@ CREATE TABLE auth_requests (
     binding_hash    TEXT    NOT NULL,
     created_at      INTEGER NOT NULL,
     expires_at      INTEGER NOT NULL,
-    code_hash       TEXT,
-    user_id         TEXT,
-    session_id      TEXT,
-    code_expires_at INTEGER,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_auth_requests_id CHECK (id <> ''),
     CONSTRAINT fk_auth_requests_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
--- +goose StatementEnd
-
--- +goose StatementBegin
-CREATE UNIQUE INDEX uq_auth_requests_code_hash ON auth_requests (project_id, code_hash);
 -- +goose StatementEnd
 
 -- +goose Down

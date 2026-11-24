@@ -1,12 +1,10 @@
 -- +goose Up
 -- An authorization request the endpoint validated, waiting for the login to
--- complete it (ADR 081 §8). code_challenge is empty when the client sent
--- none. client_id has no FK: a declared client (#2790) lives in a release
--- and has no row in application_clients.
+-- complete it (ADR 081 §8). Rows are never updated. code_challenge is empty
+-- when the client sent none. client_id has no FK: a declared client
+-- (#2790) lives in a release and has no row in application_clients.
 -- deployment_id and release_id have no FK: they record what the request
--- resolved, and a revoked release is read, not cascaded. The login sets
--- code_hash, user_id, session_id and code_expires_at once, when it issues the
--- code; they are NULL until then. Redeeming the code deletes the row.
+-- resolved, and a revoked release is read, not cascaded.
 CREATE TABLE zitadel_nextgen.auth_requests (
     project_id TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
@@ -22,17 +20,9 @@ CREATE TABLE zitadel_nextgen.auth_requests (
     , binding_hash TEXT COLLATE "C" NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     , expires_at TIMESTAMPTZ NOT NULL
-    , code_hash TEXT COLLATE "C"
-    , user_id TEXT COLLATE "C"
-    , session_id TEXT COLLATE "C"
-    , code_expires_at TIMESTAMPTZ
 
     , PRIMARY KEY (project_id, id)
 );
-
--- The redemption looks a code up by its hash.
-CREATE UNIQUE INDEX uq_auth_requests_code_hash
-    ON zitadel_nextgen.auth_requests (project_id, code_hash);
 
 -- +goose Down
 DROP TABLE IF EXISTS zitadel_nextgen.auth_requests;

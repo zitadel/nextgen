@@ -9311,6 +9311,8 @@ func (s *AuthTokenIssuedEventDelegationType) UnmarshalText(data []byte) error {
 // Ref: #
 type AuthTokenIssuedPayload struct {
 	Scopes []string `json:"scopes"`
+	// The client that redeemed the authorization code. Only a token issued for a code has it.
+	ClientID OptString `json:"client_id"`
 }
 
 // GetScopes returns the value of Scopes.
@@ -9318,9 +9320,19 @@ func (s *AuthTokenIssuedPayload) GetScopes() []string {
 	return s.Scopes
 }
 
+// GetClientID returns the value of ClientID.
+func (s *AuthTokenIssuedPayload) GetClientID() OptString {
+	return s.ClientID
+}
+
 // SetScopes sets the value of Scopes.
 func (s *AuthTokenIssuedPayload) SetScopes(val []string) {
 	s.Scopes = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthTokenIssuedPayload) SetClientID(val OptString) {
+	s.ClientID = val
 }
 
 // Merged schema.

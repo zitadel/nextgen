@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/muhlemmer/gu"
@@ -18,7 +19,7 @@ const (
 		` VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING created_at`
 	getAuthRequestStmt     = `SELECT ` + authRequestColumns + ` FROM zitadel_nextgen.auth_requests WHERE project_id = $1 AND id = $2`
 	setAuthRequestCodeStmt = `UPDATE zitadel_nextgen.auth_requests SET code_hash = $3, user_id = $4, session_id = $5, code_expires_at = $6` +
-		` WHERE project_id = $1 AND id = $2 AND code_hash IS NULL`
+		` WHERE project_id = $1 AND id = $2 AND code_hash IS NULL AND expires_at > $7`
 	redeemAuthRequestCodeStmt = `DELETE FROM zitadel_nextgen.auth_requests WHERE project_id = $1 AND code_hash = $2 RETURNING ` + authRequestColumns
 )
 
@@ -54,7 +55,6 @@ func (s authRequestStatements) CreateAuthRequest(ctx context.Context, request *d
 	).Scan(&request.CreatedAt); err != nil {
 		return wrapError(err)
 	}
-	request.CreatedAt = request.CreatedAt.UTC()
 	return nil
 }
 
@@ -72,7 +72,7 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 }
 
 // SetAuthRequestCode implements [service.AuthRequestStatements].
-func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest) error {
+func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest, now time.Time) error {
 	tag, err := s.client.Exec(ctx, setAuthRequestCodeStmt,
 		request.ProjectID,
 		request.ID,
@@ -80,6 +80,7 @@ func (s authRequestStatements) SetAuthRequestCode(ctx context.Context, request *
 		request.UserID,
 		request.SessionID,
 		request.CodeExpiresAt,
+		now,
 	)
 	if err != nil {
 		return wrapError(err)
@@ -132,8 +133,6 @@ func scanAuthRequest(row pgx.CollectableRow) (*domain.AuthRequest, error) {
 	request.CodeHash = gu.Value(codeHash)
 	request.UserID = gu.Value(userID)
 	request.SessionID = gu.Value(sessionID)
-	request.CreatedAt = request.CreatedAt.UTC()
-	request.ExpiresAt = request.ExpiresAt.UTC()
 	return &request, nil
 }
 
