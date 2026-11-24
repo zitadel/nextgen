@@ -901,7 +901,9 @@ export const SSO_RULES: readonly Rule[] = [
         const offered = config.flows.offers.some((offer) => {
           return offer.slug === entry.slug;
         });
-        return entry.listing.length === 0 && !offered;
+        // A connection the server already has is one `auth-method sso disable`
+        // left behind on purpose, so it is not nagged about.
+        return entry.listing.length === 0 && !offered && !config.connections.isDeployed(entry.slug);
       });
     },
     file: (fact) => {
@@ -1046,6 +1048,11 @@ export const SSO_RULES: readonly Rule[] = [
         if (connection === undefined || !connection.createsUsers) {
           return [];
         }
+        // A pinned schema that does not list the provider is already refused at
+        // the step by sso/provider-id.
+        if (!offer.schema.providers.includes(offer.slug)) {
+          return [];
+        }
         const keys = connection.verifications.map((row) => {
           return row.property;
         });
@@ -1169,7 +1176,7 @@ export const SSO_RULES: readonly Rule[] = [
     },
     says: (fact, where) => {
       const names = fact.missing.map(quote).join(", ");
-      return `${where}: ${quote(fact.slug)} creates users automatically, but ${fact.schema.path} requires ${names} and claim_mapping of ${fact.connection.path} maps no claim to it, so automatic creation can never complete and every new user is asked for it instead. Map ${names} in ${fact.connection.path} to create users without asking.`;
+      return `${where}: ${quote(fact.slug)} creates users automatically, but a user of ${fact.schema.path} must end up with ${names} and claim_mapping of ${fact.connection.path} maps no claim to it, so automatic creation can never complete and every new user is asked for it instead. Map ${names} in ${fact.connection.path} to create users without asking.`;
     },
   }),
 

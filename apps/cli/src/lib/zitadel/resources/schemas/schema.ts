@@ -368,7 +368,9 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * A required path counts when the property at it carries a non-empty
    * `x-unique` scope. The contract keeps no `x-unique` for a nested property,
    * so it is read from the body as written. A nested path is named by the
-   * top-level property that holds it.
+   * top-level property that holds it. A property required only through
+   * `allOf` or `if/then` has no definition under `properties`, so it is not
+   * counted.
    *
    * @returns The top-level property names, each once, in the order required.
    */

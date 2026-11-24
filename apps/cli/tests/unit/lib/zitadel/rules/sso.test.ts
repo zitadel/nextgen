@@ -666,7 +666,7 @@ describe("SSO_RULES", () => {
         severity: "warning",
         documents: agreeing(ACME, { schemas: { [SCHEMA_FILE]: aRequiringSchema() } }),
         file: FLOW_PATH,
-        message: `step "identifier": "acme" creates users automatically, but ${SCHEMA_PATH} requires "phone" and claim_mapping of ${CONNECTION_PATH} maps no claim to it`,
+        message: `step "identifier": "acme" creates users automatically, but a user of ${SCHEMA_PATH} must end up with "phone" and claim_mapping of ${CONNECTION_PATH} maps no claim to it`,
       },
       {
         rule: "sso/impossible-auto-creation-verification",
@@ -817,6 +817,19 @@ describe("SSO_RULES", () => {
         }),
       },
       { rule: "sso/empty-verified-claims", documents: agreeing(ACME) },
+      {
+        rule: "sso/empty-verified-claims",
+        documents: {
+          schemas: { [SCHEMA_FILE]: aSchemaListing(["other"]) },
+          connections: {
+            [CONNECTION_FILE]: anOidcConnection({
+              claim_mapping: { email: "email", phone: "phone" },
+              verified_claims: { phone: true },
+            }),
+          },
+          flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
+        },
+      },
       {
         rule: "sso/empty-verified-claims",
         documents: agreeing(
@@ -1114,6 +1127,16 @@ describe("SSO_RULES", () => {
           ),
         },
       ]);
+    });
+
+    it("does not call a deployed connection inert when no schema lists it", () => {
+      const issues = issuesOf(
+        "sso/inert-connection",
+        { connections: { [CONNECTION_FILE]: ACME } },
+        { deployed: new Set(["acme"]) },
+      );
+
+      expect(issues).toEqual([]);
     });
 
     it("does not warn about an unstable subject once the connection is deployed", () => {
