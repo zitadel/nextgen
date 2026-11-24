@@ -39,7 +39,7 @@ type StartFlowRequest struct {
 }
 
 type SubmitFlowRequest struct {
-	State         *domain.FlowState
+	State         *flowengine.FlowState
 	Action        string
 	Fields        map[string]any
 	GateProofs    map[string]string
@@ -56,7 +56,7 @@ type SubmitFlowRequest struct {
 }
 
 type GetFlowStepRequest struct {
-	State *domain.FlowState
+	State *flowengine.FlowState
 }
 
 type ResolveFlowRequest struct {

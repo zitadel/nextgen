@@ -28,7 +28,7 @@ func (createUserHandler) run(r *FlowStateMachineRuntime, pc *processCtx, resolve
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	result, err := r.userCreater.Handle(pc.ctx, domain.FlowOnSuccessInput{
+	result, err := r.userCreater.Handle(pc.ctx, FlowOnSuccessInput{
 		GateProofs:    pc.in.GateProofs,
 		ProjectID:     pc.state.ProjectID,
 		UserSchemaURL: pc.state.UserSchemaURL,

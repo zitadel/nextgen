@@ -11,7 +11,7 @@ import (
 // Render re-emits the current step without advancing. It refreshes IssuedAt
 // only when it resolves a parked SSO identity, the one render the handler
 // re-seals.
-func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *domain.FlowDefinition, state *FlowState) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", domain.ErrFlowIntegrity())
 	}
@@ -43,7 +43,7 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved domai
 // Callers advance state before invoking so state.CurrentStep already points
 // at the step they want rendered. Back does not come through here: it
 // resolves its target once and builds from that set.
-func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState) (*FlowStep, error) {
+func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *domain.FlowDefinition, state *FlowState) (*FlowStep, error) {
 	step, ok := def.FindStep(state.CurrentStep)
 	if !ok {
 		return nil, fmt.Errorf("%w: render unknown step %q", domain.ErrFlowIntegrity(), state.CurrentStep)
@@ -64,7 +64,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *domain.Fl
 // always the caller's to name: Start and renderStep supply state + step
 // directly, mid-pipeline callers pass pc.state + pc.currentStep, and
 // the back handler passes pc.state with the back-stack step it just popped to.
-func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, resolved domain.FlowResolvedFields, failure *domain.FlowStepFailure, complete *domain.FlowStepComplete, redirectURL *string) (*FlowStep, error) {
+func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep, resolved domain.FlowResolvedFields, failure *domain.FlowStepFailure, complete *domain.FlowStepComplete, redirectURL *string) (*FlowStep, error) {
 	providers, err := r.resolveSSOProviders(ctx, state, step)
 	if err != nil {
 		return nil, err

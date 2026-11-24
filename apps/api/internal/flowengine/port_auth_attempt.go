@@ -1,15 +1,17 @@
-package domain
+package flowengine
 
 import (
 	"context"
 	"time"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // FlowAuthAttemptService is the [FlowStateMachine]'s narrow view of the
 // auth-attempt domain. Submit* calls collapse the underlying
 // issue-then-verify cycle so the state machine never sees challenge
 // IDs. Identifier no-match and password failure surface as
-// [ErrAuthAttemptProofRejected] (use [errors.Is]).
+// [domain.ErrAuthAttemptProofRejected] (use [errors.Is]).
 //
 // A two-phase ceremony (a passkey sign-in or registration) cannot collapse
 // issue and verify into one call: [IssueChallenge] mints what the client
@@ -28,9 +30,9 @@ type FlowAuthAttemptService interface {
 	// VerifyChallenge verifies the proof against the issued challenge and
 	// returns the user it authenticated; a check whose user is bound at
 	// issue returns none. Rejection surfaces as
-	// [ErrAuthAttemptProofRejected], an expired challenge as
-	// [ErrAuthAttemptStaleChallenge], and a ceremony whose new user
-	// conflicts with an existing one as [ErrUserAlreadyExists].
+	// [domain.ErrAuthAttemptProofRejected], an expired challenge as
+	// [domain.ErrAuthAttemptStaleChallenge], and a ceremony whose new user
+	// conflicts with an existing one as [domain.ErrUserAlreadyExists].
 	VerifyChallenge(ctx context.Context, in FlowVerifyChallengeInput) (userID string, err error)
 	// Handoff mints the single-use token the client exchanges for a
 	// session. Called by the state machine on the terminal step.
@@ -46,7 +48,7 @@ type FlowCreateAttemptInput struct {
 	ProjectID      string
 	FlowID         string
 	SessionID      *string
-	RequiredChecks []AuthCheckType
+	RequiredChecks []domain.AuthCheckType
 }
 
 // FlowSubmitIdentifierInput names the submitted identifier field
@@ -80,7 +82,7 @@ type FlowIssueChallengeInput struct {
 
 // FlowChallengeParams is what one check type's ceremony is issued with.
 type FlowChallengeParams interface {
-	CheckType() AuthCheckType
+	CheckType() domain.AuthCheckType
 }
 
 // FlowPasskeyChallengeParams carries the WebAuthn relying-party parameters
@@ -94,7 +96,9 @@ type FlowPasskeyChallengeParams struct {
 	UserVerification string
 }
 
-func (FlowPasskeyChallengeParams) CheckType() AuthCheckType { return AuthCheckTypePasskey }
+func (FlowPasskeyChallengeParams) CheckType() domain.AuthCheckType {
+	return domain.AuthCheckTypePasskey
+}
 
 // FlowPasskeyRegistrationChallengeParams carries the relying-party
 // parameters and the user context needed to begin a registration ceremony.
@@ -109,8 +113,8 @@ type FlowPasskeyRegistrationChallengeParams struct {
 	RPOrigins   []string
 }
 
-func (FlowPasskeyRegistrationChallengeParams) CheckType() AuthCheckType {
-	return AuthCheckTypePasskeyRegistration
+func (FlowPasskeyRegistrationChallengeParams) CheckType() domain.AuthCheckType {
+	return domain.AuthCheckTypePasskeyRegistration
 }
 
 // FlowIssuedChallenge is the issued challenge. Options is the JSON the client
@@ -132,7 +136,7 @@ type FlowIssuedChallenge struct {
 type FlowVerifyChallengeInput struct {
 	ProjectID   string
 	AttemptID   string
-	Check       AuthCheckType
+	Check       domain.AuthCheckType
 	ChallengeID string
 	Proof       []byte
 	SignUp      *FlowChallengeSignUp
@@ -140,7 +144,7 @@ type FlowVerifyChallengeInput struct {
 
 // FlowChallengeSignUp feeds the user creation that runs inside the verify
 // transaction when the ceremony is provisional. That creation is a sign-up:
-// it first spends the proof submitted under [SignupGate] in GateProofs, bound
+// it first spends the proof submitted under [domain.SignupGate] in GateProofs, bound
 // to the flow in State.
 type FlowChallengeSignUp struct {
 	UserSchemaURL  string

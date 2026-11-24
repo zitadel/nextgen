@@ -1,20 +1,10 @@
-package domain
+package flowengine
 
 import (
 	"context"
-	"errors"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
-
-// ErrSSOOwnerOtherSchema reports a unique value held by a user of another
-// schema than the flow's. A provider's claim cannot be changed, so the
-// callback restarts the flow; a typed value can, so the step shows it taken.
-var ErrSSOOwnerOtherSchema = errors.New("sso: unique value is owned by a user of another schema")
-
-// ErrSSOParkedIdentityUnusable reports a parked identity the flow cannot go
-// on with: its connection revision is gone, or its user is of another
-// schema. The flow restarts, and the cause names why, for the operator's
-// line. Log-only: it never reaches a client.
-var ErrSSOParkedIdentityUnusable = errors.New("sso: the parked identity cannot be used")
 
 // FlowSSOIdentityService reads and settles the external identity an SSO
 // callback parked on the flow's auth attempt. The domain cannot parse a
@@ -77,7 +67,7 @@ type FlowSSOParkedIdentity struct {
 	// CheckID is the parked row's id, the replay key for
 	// [FlowState.SSOResolvedCheckID].
 	CheckID string
-	// ErrorKey is set when the ceremony failed ([SSOCallbackResult.ErrorKey]):
+	// ErrorKey is set when the ceremony failed ([domain.SSOCallbackResult.ErrorKey]):
 	// the step renders it as its error. Only CheckID and AttemptUserID are set
 	// besides it; the row carries no identity to resolve.
 	ErrorKey string
@@ -96,7 +86,7 @@ type FlowSSOParkedIdentity struct {
 	// can be retried. Every other field is then empty.
 	BoundUserID string
 	// CollisionUserID is set when the parked row holds the collision marker
-	// ([SSOCallbackResult.CollisionUserID]) a collision bind wrote with the user
+	// ([domain.SSOCallbackResult.CollisionUserID]) a collision bind wrote with the user
 	// factor, whatever the cookie recorded. The cookie that recorded the bind
 	// may have been lost, so the engine catches the state up. Only CheckID
 	// and AttemptUserID are set besides it.
@@ -120,4 +110,40 @@ type FlowSSOCreateInput struct {
 	Attributes                                                          map[string]any
 	// Password is empty unless the definition collects one on the way.
 	Password string
+}
+
+// FlowSSOProviderResolver turns the connection slugs a step offers into the
+// providers rendered to the client, in the step's order.
+type FlowSSOProviderResolver interface {
+	Resolve(ctx context.Context, projectID string, slugs []string) ([]domain.FlowSSOProvider, error)
+}
+
+// FlowSSORedirectIssuer issues the redirect that begins an external sign-in
+// on an auth attempt: it pins the connection the slug names (the release's
+// revision when the request's release pins a flow, otherwise the newest),
+// issues the single-use state record and builds the authorize URL the
+// browser is sent to.
+//
+// errors: [domain.ErrIDPConnectionNotFound] when no connection in the project has
+// the slug; [domain.ErrFlowSSOUnavailable] when the connection cannot be served,
+// with the engine's error as the log-only cause; the attempt errors of
+// [FlowAuthAttemptService] and [domain.ErrInternal] pass through.
+type FlowSSORedirectIssuer interface {
+	Issue(ctx context.Context, in FlowIssueSSORedirectInput) (FlowSSORedirectOutput, error)
+}
+
+// FlowIssueSSORedirectInput names the provider the user picked and what the
+// API derived from the request, the callback route and the return page.
+type FlowIssueSSORedirectInput struct {
+	ProjectID    string
+	AttemptID    string
+	ProviderSlug string
+	domain.FlowSSOReturn
+}
+
+// FlowSSORedirectOutput is the authorize URL and the nonce the handler sets
+// as the browser-binding cookie; the state record keeps the nonce's hash.
+type FlowSSORedirectOutput struct {
+	RedirectURL  string
+	BindingNonce string
 }

@@ -1,6 +1,10 @@
-package domain
+package flowengine
 
-import "time"
+import (
+	"time"
+
+	"github.com/zitadel/nextgen/internal/domain"
+)
 
 // FlowState is the runtime state of a single in-flight flow. The handler
 // JSON-encodes it as the payload of the sealed `_zflow` cookie on every
@@ -141,11 +145,11 @@ type FlowProgress struct {
 	// Purpose is the kind of flow (login, signup, recovery, …). The
 	// handler uses it to surface a coarse classification without parsing
 	// the definition.
-	Purpose FlowDefinitionPurpose
+	Purpose domain.FlowDefinitionPurpose
 
 	// CurrentPurpose is the dynamic dispatch mode. Flips on identifier
 	// outcomes; Purpose stays pinned for telemetry / ACR.
-	CurrentPurpose FlowDefinitionPurpose
+	CurrentPurpose domain.FlowDefinitionPurpose
 
 	// CurrentStep is the name of the step the user is currently on
 	// within DefinitionID. The next submit is interpreted against this
@@ -171,7 +175,7 @@ type FlowProgress struct {
 type FlowBackEntry struct {
 	StepName string
 	// Purpose is kept in the history so the flow returns with the current purpose.
-	Purpose FlowDefinitionPurpose
+	Purpose domain.FlowDefinitionPurpose
 }
 
 // ClearBackStack drops any accumulated back-navigation entries. Called
@@ -212,7 +216,7 @@ type CollectedFlowData struct {
 	UserData map[string]any
 	UserID   string
 	// AuthMethods holds the credentials submitted for `x-auth-methods`
-	// fields, keyed by method name (e.g. [AuthMethodPassword]).
+	// fields, keyed by method name (e.g. [domain.AuthMethodPassword]).
 	AuthMethods map[string]string `json:",omitempty"`
 	// SSOConflictConnectionID is the connection whose sign-in collided with
 	// the bound user (user_already_exists from an external identity). The

@@ -28,10 +28,10 @@ type challengeMethod struct {
 	irreversible bool
 	// params builds what the challenge is issued with from the fields the
 	// ceremony reads.
-	params func(pc *processCtx, fields domain.FlowResolvedFields) (domain.FlowChallengeParams, error)
+	params func(pc *processCtx, fields domain.FlowResolvedFields) (FlowChallengeParams, error)
 }
 
-// challengeMethods holds one declaration per [domain.FlowPendingChallenge]
+// challengeMethods holds one declaration per [FlowPendingChallenge]
 // method.
 var challengeMethods = map[string]challengeMethod{
 	FlowChallengeMethodPasskey: {
@@ -69,7 +69,7 @@ func (r *FlowStateMachineRuntime) issueChallenge(pc *processCtx, method string, 
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	out, err := r.authAttempts.IssueChallenge(pc.ctx, domain.FlowIssueChallengeInput{
+	out, err := r.authAttempts.IssueChallenge(pc.ctx, FlowIssueChallengeInput{
 		ProjectID: state.ProjectID,
 		AttemptID: state.AuthAttemptID,
 		Params:    params,
@@ -95,7 +95,7 @@ func (r *FlowStateMachineRuntime) issueChallenge(pc *processCtx, method string, 
 		// stays stable and the verify leg knows which user it targets.
 		state.CollectedData.UserID = out.UserID
 	}
-	state.PendingChallenge = &domain.FlowPendingChallenge{
+	state.PendingChallenge = &FlowPendingChallenge{
 		ID:       out.ChallengeID,
 		Method:   method,
 		Options:  out.Options,
@@ -120,7 +120,7 @@ func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fiel
 	}
 	declared := challengeMethodFor(method)
 
-	verifyInput := domain.FlowVerifyChallengeInput{
+	verifyInput := FlowVerifyChallengeInput{
 		ProjectID:   state.ProjectID,
 		AttemptID:   state.AuthAttemptID,
 		Check:       declared.check,
@@ -131,7 +131,7 @@ func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fiel
 		// The attempt service decides from the stored challenge whether the
 		// ceremony is provisional; a provisional one spends the sign-up
 		// proof and creates the user in the verify transaction.
-		verifyInput.SignUp = &domain.FlowChallengeSignUp{
+		verifyInput.SignUp = &FlowChallengeSignUp{
 			UserSchemaURL:  state.UserSchemaURL,
 			UserAttributes: state.CollectedData.UserData,
 			State:          state,
@@ -206,7 +206,7 @@ func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, fields
 		}
 		// Only a sign-up looks here, so a miss is not a failed sign-in:
 		// Register keeps it from writing one.
-		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, domain.FlowSubmitIdentifierInput{
+		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
 			ProjectID:     state.ProjectID,
 			AttemptID:     state.AuthAttemptID,
 			AttributeName: candidate[0],
@@ -242,7 +242,7 @@ func (r *FlowStateMachineRuntime) renderPendingChallenge(pc *processCtx, resolve
 
 // attachPendingChallenge surfaces a pending ceremony on a rendered step so the
 // client can run it (and re-run it on a plain GET re-render).
-func attachPendingChallenge(step *FlowStep, pc *domain.FlowPendingChallenge) {
+func attachPendingChallenge(step *FlowStep, pc *FlowPendingChallenge) {
 	if step == nil || pc == nil {
 		return
 	}

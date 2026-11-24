@@ -128,9 +128,9 @@ var purposeChangeNotices = map[string]string{
 // the deferred pivot work.
 type FlowStateMachine interface {
 	Start(ctx context.Context, in FlowStartInput) (FlowStepResult, error)
-	Process(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState, in FlowSubmitInput) (FlowStepResult, error)
+	Process(ctx context.Context, def *domain.FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
 	// Render re-emits the current step without advancing. Backs GET /flows/{flow_id}.
-	Render(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState) (FlowStepResult, error)
+	Render(ctx context.Context, def *domain.FlowDefinition, state *FlowState) (FlowStepResult, error)
 }
 
 // FlowStartInput carries everything the state machine needs to
@@ -173,7 +173,7 @@ type FlowSubmitInput struct {
 	PasskeyRP *FlowPasskeyRP
 }
 
-// FlowChallengeResponse is the client's answer to a [domain.FlowPendingChallenge].
+// FlowChallengeResponse is the client's answer to a [FlowPendingChallenge].
 type FlowChallengeResponse struct {
 	ChallengeID string
 	Method      string
@@ -201,7 +201,7 @@ type FlowSSOProviderRef struct {
 // [Render], when resolving a parked SSO identity changed the state: the
 // handler re-seals only such a render.
 type FlowStepResult struct {
-	State                 *domain.FlowState
+	State                 *FlowState
 	Step                  *FlowStep
 	Pop                   bool
 	HandoffToken          string
@@ -300,11 +300,11 @@ const FlowStepNameSSORedirect = "sso-redirect"
 const flowSSORedirectTitleKey = "sso.redirect.title"
 
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
-// [domain.FlowPendingChallenge.Method] value for the WebAuthn passkey ceremony.
+// [FlowPendingChallenge.Method] value for the WebAuthn passkey ceremony.
 const FlowChallengeMethodPasskey = "passkey"
 
 // FlowChallengeMethodPasskeyRegister is the [FlowStepChallenge.Method] /
-// [domain.FlowPendingChallenge.Method] value for the WebAuthn registration ceremony.
+// [FlowPendingChallenge.Method] value for the WebAuthn registration ceremony.
 const FlowChallengeMethodPasskeyRegister = "passkey_register"
 
 // flowPasskeyDefaultUserVerification is the WebAuthn user-verification
@@ -331,28 +331,28 @@ type FlowStateMachineRuntime struct {
 	schemas       domain.SchemaResolver
 	schemaStore   domain.JSONSchemaStore
 	fields        domain.FlowFieldResolver
-	userCreater   domain.FlowOnSuccessHandler
-	authAttempts  domain.FlowAuthAttemptService
-	ssoProviders  domain.FlowSSOProviderResolver
-	ssoIdentities domain.FlowSSOIdentityService
-	ssoRedirects  domain.FlowSSORedirectIssuer
-	passwords     domain.FlowPasswordPolicy
+	userCreater   FlowOnSuccessHandler
+	authAttempts  FlowAuthAttemptService
+	ssoProviders  FlowSSOProviderResolver
+	ssoIdentities FlowSSOIdentityService
+	ssoRedirects  FlowSSORedirectIssuer
+	passwords     FlowPasswordPolicy
 	now           func() time.Time
 }
 
 // FlowStateMachineDeps are the services the runtime calls. Now is injectable
-// so tests can produce deterministic [domain.FlowState.IssuedAt] values; nil
+// so tests can produce deterministic [FlowState.IssuedAt] values; nil
 // means [time.Now].
 type FlowStateMachineDeps struct {
 	Schemas       domain.SchemaResolver
 	SchemaStore   domain.JSONSchemaStore
 	Fields        domain.FlowFieldResolver
-	CreateUser    domain.FlowOnSuccessHandler
-	AuthAttempts  domain.FlowAuthAttemptService
-	SSOProviders  domain.FlowSSOProviderResolver
-	SSOIdentities domain.FlowSSOIdentityService
-	SSORedirects  domain.FlowSSORedirectIssuer
-	Passwords     domain.FlowPasswordPolicy
+	CreateUser    FlowOnSuccessHandler
+	AuthAttempts  FlowAuthAttemptService
+	SSOProviders  FlowSSOProviderResolver
+	SSOIdentities FlowSSOIdentityService
+	SSORedirects  FlowSSORedirectIssuer
+	Passwords     FlowPasswordPolicy
 	Now           func() time.Time
 }
 
@@ -387,11 +387,11 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 		return FlowStepResult{}, fmt.Errorf("%w: definition %q does not serve purpose %s", domain.ErrFlowIntegrity(), in.Definition.ID, in.Purpose)
 	}
 
-	state := &domain.FlowState{
+	state := &FlowState{
 		ID:            in.ID,
 		ProjectID:     in.Definition.ProjectID,
 		UserSchemaURL: in.UserSchemaURL,
-		FlowProgress: domain.FlowProgress{
+		FlowProgress: FlowProgress{
 			DefinitionID:   in.Definition.ID,
 			Purpose:        in.Purpose,
 			CurrentPurpose: in.Purpose,
@@ -414,7 +414,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	if r.authAttempts == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", domain.ErrFlowIntegrity())
 	}
-	attemptInput := domain.FlowCreateAttemptInput{ProjectID: state.ProjectID, FlowID: state.ID}
+	attemptInput := FlowCreateAttemptInput{ProjectID: state.ProjectID, FlowID: state.ID}
 	if state.SessionID != "" {
 		sid := state.SessionID
 		attemptInput.SessionID = &sid
@@ -437,14 +437,14 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 type processCtx struct {
 	ctx         context.Context
 	def         *domain.FlowDefinition
-	state       *domain.FlowState
+	state       *FlowState
 	currentStep *domain.FlowDefinitionStep
 	in          FlowSubmitInput
 }
 
 // Process advances the flow one step by dispatching the submission to
 // the handler for its action kind (see [actionKindHandlers]).
-func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState, in FlowSubmitInput) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *domain.FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", domain.ErrFlowIntegrity())
 	}
@@ -477,7 +477,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *domain.FlowD
 
 // recordResolvedUser stores the resolved user id; if it changed, any
 // state bound to the previous user is cleared.
-func recordResolvedUser(state *domain.FlowState, userID string) {
+func recordResolvedUser(state *FlowState, userID string) {
 	if state.CollectedData.UserData == nil {
 		state.CollectedData.UserData = map[string]any{}
 	}
@@ -489,7 +489,7 @@ func recordResolvedUser(state *domain.FlowState, userID string) {
 
 // clearUserBoundState drops the resolved user id and any in-flight
 // ceremony.
-func clearUserBoundState(state *domain.FlowState) {
+func clearUserBoundState(state *FlowState) {
 	state.ClearPendingChallenge()
 	state.CollectedData.UserID = ""
 	state.CollectedData.SSOConflictConnectionID = ""

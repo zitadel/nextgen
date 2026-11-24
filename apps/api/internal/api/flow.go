@@ -335,7 +335,7 @@ func (h *Handler) admitOrigin(ctx context.Context, projectID, origin string) err
 	return err
 }
 
-func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
+func (h *Handler) openState(ctx context.Context, raw string) (*flowengine.FlowState, error) {
 	if raw == "" {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
@@ -358,7 +358,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 	if err != nil {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
-	var state domain.FlowState
+	var state flowengine.FlowState
 	if err := json.Unmarshal([]byte(payload), &state); err != nil {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
@@ -368,7 +368,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 	return &state, nil
 }
 
-func (h *Handler) sealState(ctx context.Context, state *domain.FlowState) (string, error) {
+func (h *Handler) sealState(ctx context.Context, state *flowengine.FlowState) (string, error) {
 	payload, err := json.Marshal(state)
 	if err != nil {
 		return "", fmt.Errorf("marshal flow state: %w", err)

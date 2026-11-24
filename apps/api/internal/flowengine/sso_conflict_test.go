@@ -49,7 +49,7 @@ func conflictDefinition() *domain.FlowDefinition {
 
 // conflictWorld starts a login flow, switches to sign-up and types an email
 // alice already owns, which lands on the conflict step bound to her.
-func conflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+func conflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *flowengine.FlowState) {
 	t.Helper()
 	w := newFlowTestWorld(t)
 	def := conflictDefinition()
@@ -122,7 +122,7 @@ func TestFlowStateMachine_Process_ConflictBackAfterSignInAsksToSignIn(t *testing
 // bankedRegisterPassword starts a register flow whose register step collects
 // the password with the email, so the password is banked unchecked when the
 // flow moves on to register-password.
-func bankedRegisterPassword(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+func bankedRegisterPassword(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *flowengine.FlowState) {
 	t.Helper()
 	w := newFlowTestWorld(t)
 	def := purposeNavDefinition()
@@ -192,11 +192,11 @@ func TestFlowStateMachine_Process_ConflictPasswordSignsInAndDropsPassword(t *tes
 	t.Parallel()
 	w, def, state := conflictWorld(t)
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitPasswordInput) bool {
 			return in.AttemptID == "attempt-1" && in.Plain == "correct-horse-battery-staple"
 		})).
 		Return(nil)
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(domain.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
 
 	result, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
 		Action: flowengine.FlowActionSubmit,
@@ -218,17 +218,17 @@ func TestFlowStateMachine_Process_ConflictPasskeySignsInBoundUser(t *testing.T) 
 	const proof = `{"id":"x"}`
 	w, def, state := conflictWorld(t)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyChallengeParams) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.FlowIssueChallengeInput, params flowengine.FlowPasskeyChallengeParams) bool {
 			return in.AttemptID == "attempt-1"
 		})).
-		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil)
+		Return(flowengine.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil)
 	w.authAttemptService.EXPECT().
-		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, func(in domain.FlowVerifyChallengeInput) bool {
+		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, func(in flowengine.FlowVerifyChallengeInput) bool {
 			return in.ChallengeID == challengeID && string(in.Proof) == proof
 		})).
 		Return("user_alice", nil)
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(domain.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
 
 	issued, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
 		Action:    flowengine.FlowActionPasskey,
@@ -251,7 +251,7 @@ func TestFlowStateMachine_Process_ConflictPasskeySignsInBoundUser(t *testing.T) 
 // ssoConflictWorld is ssoRenderWorld whose sign-in step routes a collision to
 // a conflict step shaped like the one `zitadel auth-method sso enable` writes:
 // a password, a passkey, and both providers.
-func ssoConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+func ssoConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *flowengine.FlowState) {
 	t.Helper()
 	w, def, state := ssoRenderWorld(t)
 	def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "sso-conflict"}
@@ -271,8 +271,8 @@ func ssoConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *do
 	return w, def, state
 }
 
-func conflictParked(verified bool) *domain.FlowSSOParkedIdentity {
-	return &domain.FlowSSOParkedIdentity{
+func conflictParked(verified bool) *flowengine.FlowSSOParkedIdentity {
+	return &flowengine.FlowSSOParkedIdentity{
 		CheckID:      "ch-1",
 		ConnectionID: "idp-1",
 		Subject:      "sub-1",

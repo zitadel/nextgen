@@ -6,9 +6,11 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
+
+	"github.com/zitadel/nextgen/internal/flowengine"
 )
 
-// FlowSSOProviderResolver implements [domain.FlowSSOProviderResolver] over
+// FlowSSOProviderResolver implements [flowengine.FlowSSOProviderResolver] over
 // the connection service, at the revisions the request's release pins.
 type FlowSSOProviderResolver struct {
 	connections IDPConnectionService
@@ -18,7 +20,7 @@ func NewFlowSSOProviderResolver(connections IDPConnectionService) *FlowSSOProvid
 	return &FlowSSOProviderResolver{connections: connections}
 }
 
-var _ domain.FlowSSOProviderResolver = (*FlowSSOProviderResolver)(nil)
+var _ flowengine.FlowSSOProviderResolver = (*FlowSSOProviderResolver)(nil)
 
 func (r *FlowSSOProviderResolver) Resolve(ctx context.Context, projectID string, slugs []string) ([]domain.FlowSSOProvider, error) {
 	providers := make([]domain.FlowSSOProvider, 0, len(slugs))

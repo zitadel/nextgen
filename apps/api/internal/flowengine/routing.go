@@ -124,7 +124,7 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 	if !hadResolvedUser {
 		return nil
 	}
-	attemptInput := domain.FlowCreateAttemptInput{ProjectID: pc.state.ProjectID, FlowID: pc.state.ID}
+	attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID, FlowID: pc.state.ID}
 	if pc.state.SessionID != "" {
 		sid := pc.state.SessionID
 		attemptInput.SessionID = &sid
@@ -185,7 +185,7 @@ func identifierFieldsOnly(resolved domain.FlowResolvedFields, values map[string]
 // applyOutcomeFlip flips CurrentPurpose on resolution outcomes:
 // login + user_not_found → register; login + sso_user_not_found → register;
 // register + user_already_exists → login, typed or SSO. Recovery never flips.
-func applyOutcomeFlip(state *domain.FlowState, outcome string) {
+func applyOutcomeFlip(state *FlowState, outcome string) {
 	switch {
 	case state.CurrentPurpose == domain.FlowDefinitionPurposeLogin &&
 		(outcome == domain.FlowImplicitOutcomeUserNotFound || outcome == domain.FlowImplicitOutcomeSSOUserNotFound):
@@ -208,7 +208,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved do
 		}
 		switch challenge {
 		case domain.FlowFieldChallengeIdentifier:
-			userID, err := r.authAttempts.SubmitIdentifier(ctx, domain.FlowSubmitIdentifierInput{
+			userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 				ProjectID:     state.ProjectID,
 				AttemptID:     state.AuthAttemptID,
 				AttributeName: name,
@@ -250,7 +250,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved do
 			if state.CollectedData.UserID == "" {
 				return flowDispatchResult{StepError: domain.FlowStepFailed(FlowStepErrorSignInFirst, nil)}, nil
 			}
-			err := r.authAttempts.SubmitPassword(ctx, domain.FlowSubmitPasswordInput{
+			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
 				ProjectID: state.ProjectID,
 				AttemptID: state.AuthAttemptID,
 				Plain:     value,
@@ -338,7 +338,7 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *domain.FlowDef
 	if pc.state.AuthAttemptID == "" {
 		return FlowStepResult{}, fmt.Errorf("%w: terminate without auth attempt id", domain.ErrFlowIntegrity())
 	}
-	handoff, err := r.authAttempts.Handoff(pc.ctx, domain.FlowHandoffInput{
+	handoff, err := r.authAttempts.Handoff(pc.ctx, FlowHandoffInput{
 		ProjectID: pc.state.ProjectID,
 		AttemptID: pc.state.AuthAttemptID,
 	})

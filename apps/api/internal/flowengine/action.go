@@ -13,7 +13,7 @@ type actionKindHandler interface {
 // signupProofAcceptor is an [actionKindHandler] whose kind can create a user:
 // a step declaring it may let the submission carry the sign-up proof.
 type signupProofAcceptor interface {
-	acceptsSignupProof(state *domain.FlowState, in FlowSubmitInput) bool
+	acceptsSignupProof(state *FlowState, in FlowSubmitInput) bool
 }
 
 // actionKindHandlers holds one handler per kind a step can declare or the
@@ -66,7 +66,7 @@ func (r *FlowStateMachineRuntime) takeInputs(pc *processCtx, inputs stepInputs) 
 // acceptsSignupProof reports whether a submission to step may carry the
 // sign-up proof: one to a step whose on_success spends it, or one a kind the
 // step declares accepts it with.
-func acceptsSignupProof(step *domain.FlowDefinitionStep, state *domain.FlowState, in FlowSubmitInput) bool {
+func acceptsSignupProof(step *domain.FlowDefinitionStep, state *FlowState, in FlowSubmitInput) bool {
 	if step.OnSuccessSpec().SpendsSignupProof {
 		return true
 	}

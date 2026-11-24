@@ -19,6 +19,7 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -57,7 +58,7 @@ const ssoDiscoveryDocument = `{
 	"oidc": {"issuer": "https://accounts.example.test", "client_id": "client-1", "client_secret": "s", "scopes": ["openid"]}
 }`
 
-var ssoIssueInput = domain.FlowIssueSSORedirectInput{
+var ssoIssueInput = flowengine.FlowIssueSSORedirectInput{
 	ProjectID:    "proj-1",
 	AttemptID:    "attempt-1",
 	ProviderSlug: "google",

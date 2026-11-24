@@ -203,19 +203,19 @@ func parkSSOResult(t *testing.T, projectID, attemptID, revisionID, subject strin
 }
 
 // openFlowState decrypts a _zflow cookie the way the handler does.
-func openFlowState(t *testing.T, projectID, zflow string) domain.FlowState {
+func openFlowState(t *testing.T, projectID, zflow string) flowengine.FlowState {
 	t.Helper()
 	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), projectID, domain.EncryptionKeyPurposeCookie)
 	require.NoError(t, err)
 	payload, err := crypter.Decrypt(zflow)
 	require.NoError(t, err)
-	var state domain.FlowState
+	var state flowengine.FlowState
 	require.NoError(t, json.Unmarshal([]byte(payload), &state))
 	return state
 }
 
 // sealFlowState encrypts state into a _zflow cookie the way the handler does.
-func sealFlowState(t *testing.T, state domain.FlowState) string {
+func sealFlowState(t *testing.T, state flowengine.FlowState) string {
 	t.Helper()
 	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), state.ProjectID, domain.EncryptionKeyPurposeCookie)
 	require.NoError(t, err)
@@ -625,7 +625,7 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 	parked, ok := f.attempt(t, flow).SSOCallback()
 	require.True(t, ok)
 
-	_, err := resolver.CreateLinked(t.Context(), domain.FlowSSOCreateInput{
+	_, err := resolver.CreateLinked(t.Context(), flowengine.FlowSSOCreateInput{
 		ProjectID:     f.project.ID,
 		AttemptID:     flow.attemptID,
 		CheckID:       parked.ID,

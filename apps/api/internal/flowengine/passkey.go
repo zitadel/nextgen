@@ -9,12 +9,12 @@ import (
 )
 
 // passkeyChallengeParams issues an assertion with the request's relying party.
-func passkeyChallengeParams(pc *processCtx, _ domain.FlowResolvedFields) (domain.FlowChallengeParams, error) {
+func passkeyChallengeParams(pc *processCtx, _ domain.FlowResolvedFields) (FlowChallengeParams, error) {
 	rp := pc.in.PasskeyRP
 	if rp == nil {
 		return nil, fmt.Errorf("%w: passkey relying-party params missing", domain.ErrFlowIntegrity())
 	}
-	return domain.FlowPasskeyChallengeParams{
+	return FlowPasskeyChallengeParams{
 		RPID:             rp.RPID,
 		RPOrigins:        rp.Origins,
 		UserVerification: flowPasskeyDefaultUserVerification,
@@ -23,13 +23,13 @@ func passkeyChallengeParams(pc *processCtx, _ domain.FlowResolvedFields) (domain
 
 // passkeyRegistrationChallengeParams issues a creation challenge for the
 // flow's user, labelled with the collected identifier.
-func passkeyRegistrationChallengeParams(pc *processCtx, fields domain.FlowResolvedFields) (domain.FlowChallengeParams, error) {
+func passkeyRegistrationChallengeParams(pc *processCtx, fields domain.FlowResolvedFields) (FlowChallengeParams, error) {
 	rp := pc.in.PasskeyRP
 	if rp == nil {
 		return nil, fmt.Errorf("%w: passkey relying-party params missing", domain.ErrFlowIntegrity())
 	}
 	username, displayName := passkeyRegistrationDisplay(fields, pc.state.CollectedData.UserData)
-	return domain.FlowPasskeyRegistrationChallengeParams{
+	return FlowPasskeyRegistrationChallengeParams{
 		UserID:      pc.state.CollectedData.UserID,
 		Username:    username,
 		DisplayName: displayName,
@@ -57,7 +57,7 @@ func passkeyRegistrationDisplay(resolved domain.FlowResolvedFields, collected ma
 // action would not, since a ceremony for a bound user lists that user's
 // passkeys as allowCredentials. Anyone else is never asked, so the step does
 // not depend on an account the visitor has not reached.
-func (r *FlowStateMachineRuntime) offersPasskey(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep) (bool, error) {
+func (r *FlowStateMachineRuntime) offersPasskey(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep) (bool, error) {
 	if state.CollectedData.SSOConflictConnectionID == "" || state.CollectedData.UserID == "" {
 		return true, nil
 	}

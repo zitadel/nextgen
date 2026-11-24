@@ -27,7 +27,7 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Any()).
-		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
+		Return(flowengine.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 
 	def := signupDefinition()
 	// Mutate the submit transition to point at a non-existent step.
@@ -195,7 +195,7 @@ func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t 
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.FlowPasskeyChallengeParams](nil)).
 		Times(0)
 
 	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
@@ -357,24 +357,24 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitIdentifierInput) bool {
 			return attemptID == in.AttemptID && in.AttributeName == "email" && email == in.Value
 		})).
 		Return(userID, nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitPasswordInput) bool {
 			return attemptID == in.AttemptID && in.Plain == incorrectPassword
 		})).
 		Return(domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitPasswordInput) bool {
 			return attemptID == in.AttemptID && in.Plain == correctPassword
 		})).
 		Return(nil).
 		Times(1)
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(domain.FlowHandoffOutput{
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.FlowHandoffOutput{
 		Token:     handoffToken,
 		ExpiresAt: time.Unix(1700000060, 0).UTC(),
 	}, nil)
@@ -518,13 +518,13 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
 	w.createUser.EXPECT().
-		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+		Handle(gomock.Any(), gomock.Cond(func(in flowengine.FlowOnSuccessInput) bool {
 			return in.State.CollectedData.UserData["email"] == email
 		})).
-		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
+		Return(flowengine.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.FlowHandoffOutput{
 			Token:     "handoff_01TEST",
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil)
@@ -577,7 +577,7 @@ func TestFlowDispatch_RegisterEntry_IdentifierAlreadyExists_Flips(t *testing.T) 
 		Return("user_existing", nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
+		Return(flowengine.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
 
 	def := multiStepSignupDefinition()
 
@@ -618,13 +618,13 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.createUser.EXPECT().
-		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+		Handle(gomock.Any(), gomock.Cond(func(in flowengine.FlowOnSuccessInput) bool {
 			return in.State.CollectedData.UserData["email"] == email
 		})).
-		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
+		Return(flowengine.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.FlowHandoffOutput{
 			Token:     "handoff_01TEST",
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil)
@@ -681,7 +681,7 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
+		Return(flowengine.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
 
 	def := combinedSigninSignupDefinition()
 
@@ -734,7 +734,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.FlowHandoffOutput{
 			Token:     "handoff_01TEST",
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil)
@@ -969,8 +969,8 @@ func TestFlowStateMachine_Process_NavigateClearsPendingChallenge(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}, nil)
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.FlowPasskeyChallengeParams](nil)).
+		Return(flowengine.FlowIssuedChallenge{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}, nil)
 	// navigation abandons the ceremony; no verification may run
 	w.authAttemptService.EXPECT().VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, nil)).Times(0)
 
@@ -1019,13 +1019,13 @@ func TestFlowStateMachine_Process_RegistrationCompletesAfterNavSwitch(t *testing
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
 	w.createUser.EXPECT().
-		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+		Handle(gomock.Any(), gomock.Cond(func(in flowengine.FlowOnSuccessInput) bool {
 			return in.State.CollectedData.UserData["email"] == email
 		})).
-		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
+		Return(flowengine.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.FlowHandoffOutput{
 			Token:     "handoff_01TEST",
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil)
@@ -1087,20 +1087,20 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	gomock.InOrder(
 		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil),
 		w.authAttemptService.EXPECT().
-			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitIdentifierInput) bool {
 				return in.AttemptID == "attempt-1"
 			})).
 			Return("user_alice", nil),
 		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-2", nil),
 		w.authAttemptService.EXPECT().
-			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitIdentifierInput) bool {
 				return in.AttemptID == "attempt-2"
 			})).
 			Return("user_alice", nil),
 	)
 	// The register leg must never issue a passkey registration or create a
 	// user for the login-resolved account.
-	w.authAttemptService.EXPECT().IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).Times(0)
+	w.authAttemptService.EXPECT().IssueChallenge(gomock.Any(), issuesChallenge[flowengine.FlowPasskeyChallengeParams](nil)).Times(0)
 	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
 
 	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{

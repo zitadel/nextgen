@@ -59,7 +59,7 @@ func flowFormatDefinition(purpose domain.FlowDefinitionPurpose) *domain.FlowDefi
 	}
 }
 
-func startFormatFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) *domain.FlowState {
+func startFormatFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) *flowengine.FlowState {
 	t.Helper()
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
@@ -131,7 +131,7 @@ func TestFlowStateMachine_Process_SSOCollectionHoldsIdentifierToItsFormat(t *tes
 func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 	t.Parallel()
 	const purpose = domain.FlowDefinitionPurposeRegister
-	build := func(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	build := func(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *flowengine.FlowState) {
 		t.Helper()
 		w := newFlowTestWorld(t)
 		def := flowFormatDefinition(purpose)
@@ -141,7 +141,7 @@ func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 			SubmitIdentifier(gomock.Any(), identifiedBy("attempt-1", "employee", uuidIdentifier)).
 			Return("", domain.ErrAuthAttemptProofRejected(nil)).
 			AnyTimes()
-		w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(domain.FlowHandoffOutput{}, nil).AnyTimes()
+		w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.FlowHandoffOutput{}, nil).AnyTimes()
 		return w, def, state
 	}
 

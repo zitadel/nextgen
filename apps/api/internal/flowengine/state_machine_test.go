@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/flowengine"
+	flowenginemock "github.com/zitadel/nextgen/internal/flowengine/mock"
 )
 
 const testProjectID = "proj-1"
@@ -59,7 +60,7 @@ func containsFieldName(fields []domain.FlowField, name string) bool {
 // session id is the load-bearing part: exchange upgrades that session in
 // place, so an attempt started without it would strand the sign-in.
 func attemptFor(projectID, sessionID string) gomock.Matcher {
-	return gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
+	return gomock.Cond(func(in flowengine.FlowCreateAttemptInput) bool {
 		if in.ProjectID != projectID {
 			return false
 		}
@@ -72,7 +73,7 @@ func attemptFor(projectID, sessionID string) gomock.Matcher {
 // the flow on defaultSchemaURL), so a test pinning rotation cannot pass on a
 // call that went to the wrong attempt.
 func identifiedBy(attemptID, attribute, value string) gomock.Matcher {
-	return gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+	return gomock.Cond(func(in flowengine.FlowSubmitIdentifierInput) bool {
 		return in.AttemptID == attemptID && in.AttributeName == attribute && in.Value == value &&
 			in.UserSchemaURL == defaultSchemaURL
 	})
@@ -93,12 +94,12 @@ func findAction(actions []flowengine.FlowAction, name string) (flowengine.FlowAc
 type flowTestWorld struct {
 	mock               *gomock.Controller
 	hasher             *cryptomock.MockHasher
-	authAttemptService *domainmock.MockFlowAuthAttemptService
+	authAttemptService *flowenginemock.MockFlowAuthAttemptService
 	schemaResolver     *domainmock.MockSchemaResolver
-	createUser         *domainmock.MockFlowOnSuccessHandler
-	ssoProviders       *domainmock.MockFlowSSOProviderResolver
-	ssoIdentities      *domainmock.MockFlowSSOIdentityService
-	ssoRedirects       *domainmock.MockFlowSSORedirectIssuer
+	createUser         *flowenginemock.MockFlowOnSuccessHandler
+	ssoProviders       *flowenginemock.MockFlowSSOProviderResolver
+	ssoIdentities      *flowenginemock.MockFlowSSOIdentityService
+	ssoRedirects       *flowenginemock.MockFlowSSORedirectIssuer
 	passwords          *fakePasswordPolicy
 	sm                 *flowengine.FlowStateMachineRuntime
 }
@@ -134,11 +135,11 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
 	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
-	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
-	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
-	ssoProviders := domainmock.NewMockFlowSSOProviderResolver(mock)
-	ssoIdentities := domainmock.NewMockFlowSSOIdentityService(mock)
-	ssoRedirects := domainmock.NewMockFlowSSORedirectIssuer(mock)
+	authAttemptService := flowenginemock.NewMockFlowAuthAttemptService(mock)
+	createUser := flowenginemock.NewMockFlowOnSuccessHandler(mock)
+	ssoProviders := flowenginemock.NewMockFlowSSOProviderResolver(mock)
+	ssoIdentities := flowenginemock.NewMockFlowSSOIdentityService(mock)
+	ssoRedirects := flowenginemock.NewMockFlowSSORedirectIssuer(mock)
 	passwords := &fakePasswordPolicy{}
 
 	resolver := domain.NewSchemaFieldResolver()
@@ -252,7 +253,7 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 
 	w.authAttemptService.EXPECT().
-		Start(gomock.Any(), gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
+		Start(gomock.Any(), gomock.Cond(func(in flowengine.FlowCreateAttemptInput) bool {
 			// The attempt records the flow, or the exchange's events lose it.
 			return in.ProjectID == testProjectID && in.FlowID == "flow_01TEST" && in.SessionID != nil && *in.SessionID == "sess-1"
 		})).
@@ -296,20 +297,20 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
 	w.createUser.EXPECT().
-		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+		Handle(gomock.Any(), gomock.Cond(func(in flowengine.FlowOnSuccessInput) bool {
 			return in.State.CollectedData.UserData["email"] == email &&
 				in.State.CollectedData.AuthMethods[domain.AuthMethodPassword] == password
 		})).
-		Return(domain.FlowOnSuccessResult{UserID: userID}, nil)
+		Return(flowengine.FlowOnSuccessResult{UserID: userID}, nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.FlowHandoffOutput{
 			Token:     handoffToken,
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitIdentifierInput) bool {
 			// Register marks the lookup as a sign-up's, which records no
 			// failed check when the email is free.
 			return in.Value == email && in.Register
@@ -365,7 +366,7 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return(attemptID, nil)
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitIdentifierInput) bool {
 			return assert.Equal(t, attemptID, in.AttemptID) &&
 				assert.Equal(t, "email", in.AttributeName) &&
 				assert.Equal(t, email, in.Value) &&
@@ -374,15 +375,15 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 		Return(userID, nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitPasswordInput) bool {
 			return in.AttemptID == attemptID
 		})).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		Handoff(gomock.Any(), gomock.Cond(func(in domain.FlowHandoffInput) bool {
+		Handoff(gomock.Any(), gomock.Cond(func(in flowengine.FlowHandoffInput) bool {
 			return in.AttemptID == attemptID
 		})).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.FlowHandoffOutput{
 			Token:     handoffToken,
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil).
@@ -530,7 +531,7 @@ func TestFlowStateMachine_Process_RegisterCollisionVerifiesPassword(t *testing.T
 		SubmitIdentifier(gomock.Any(), identifiedBy("attempt-1", "email", "alice@example.com")).
 		Return("user_alice", nil)
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitPasswordInput) bool {
 			return in.AttemptID == "attempt-1" && in.Plain == "wrong-password"
 		})).
 		Return(domain.ErrAuthAttemptProofRejected(nil))
@@ -699,10 +700,10 @@ func TestFlowStateMachine_Start_InitializesCurrentPurpose(t *testing.T) {
 
 func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 	t.Parallel()
-	state := domain.FlowState{
+	state := flowengine.FlowState{
 		ID:        "flow-1",
 		ProjectID: "proj-1",
-		FlowProgress: domain.FlowProgress{
+		FlowProgress: flowengine.FlowProgress{
 			DefinitionID:   "def-1",
 			Purpose:        domain.FlowDefinitionPurposeLogin,
 			CurrentPurpose: domain.FlowDefinitionPurposeRegister,
@@ -712,7 +713,7 @@ func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 	payload, err := json.Marshal(state)
 	require.NoError(t, err)
 
-	var decoded domain.FlowState
+	var decoded flowengine.FlowState
 	require.NoError(t, json.Unmarshal(payload, &decoded))
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, decoded.Purpose)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, decoded.CurrentPurpose)
@@ -720,27 +721,27 @@ func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 
 func TestFlowState_JSONRoundTrip_PivotPushPopPreservesCurrentPurpose(t *testing.T) {
 	t.Parallel()
-	parent := domain.FlowProgress{
+	parent := flowengine.FlowProgress{
 		DefinitionID:   "def-parent",
 		Purpose:        domain.FlowDefinitionPurposeLogin,
 		CurrentPurpose: domain.FlowDefinitionPurposeRegister,
 		CurrentStep:    "parent-step",
 	}
-	state := domain.FlowState{
+	state := flowengine.FlowState{
 		ID:        "flow-1",
 		ProjectID: "proj-1",
-		FlowProgress: domain.FlowProgress{
+		FlowProgress: flowengine.FlowProgress{
 			DefinitionID:   "def-child",
 			Purpose:        domain.FlowDefinitionPurposeLogin,
 			CurrentPurpose: domain.FlowDefinitionPurposeLogin,
 			CurrentStep:    "child-step",
 		},
-		PivotStack: []domain.FlowProgress{parent},
+		PivotStack: []flowengine.FlowProgress{parent},
 	}
 
 	payload, err := json.Marshal(state)
 	require.NoError(t, err)
-	var decoded domain.FlowState
+	var decoded flowengine.FlowState
 	require.NoError(t, json.Unmarshal(payload, &decoded))
 
 	require.Len(t, decoded.PivotStack, 1)

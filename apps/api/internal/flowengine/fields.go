@@ -30,9 +30,9 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (domain.FlowReso
 // left out. Without a parked identity that step renders empty: its submit
 // cannot succeed. A field showing a verified unique claim is read-only, since
 // the submit refuses a changed value.
-func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, resolved *domain.FlowResolvedFields) error {
+func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep, resolved *domain.FlowResolvedFields) error {
 	if step.OnSuccessSpec().ProviderIdentity {
-		collected, err := r.ssoIdentities.LoadCollected(ctx, domain.FlowSSOLoadInput{
+		collected, err := r.ssoIdentities.LoadCollected(ctx, FlowSSOLoadInput{
 			ProjectID:       state.ProjectID,
 			AttemptID:       state.AuthAttemptID,
 			UserSchemaURL:   state.UserSchemaURL,
@@ -102,7 +102,7 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved doma
 // optional field with a format is an unset attribute, not a value: a user write
 // refuses "" for it, possibly on a later step with no such field to correct. It
 // also clears what an earlier visit to the step collected for that field.
-func collectStepFields(state *domain.FlowState, resolved domain.FlowResolvedFields, values map[string]any) error {
+func collectStepFields(state *FlowState, resolved domain.FlowResolvedFields, values map[string]any) error {
 	kept := maps.Clone(values)
 	for _, field := range resolved.Fields {
 		if field.Required || field.Validation == nil || field.Validation.Format == "" || values[field.Name] != "" {
@@ -117,7 +117,7 @@ func collectStepFields(state *domain.FlowState, resolved domain.FlowResolvedFiel
 	return nil
 }
 
-func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep) (domain.FlowResolvedFields, error) {
+func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep) (domain.FlowResolvedFields, error) {
 	if len(step.Fields) == 0 {
 		return domain.FlowResolvedFields{}, nil
 	}
@@ -144,7 +144,7 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 // may predate a stricter policy, and verifying it is the only check. The
 // bounds are public on purpose: a user cannot choose a valid password without
 // them (ADR 066, What a step discloses).
-func (r *FlowStateMachineRuntime) applyPasswordPolicy(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, fields []domain.FlowField) error {
+func (r *FlowStateMachineRuntime) applyPasswordPolicy(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep, fields []domain.FlowField) error {
 	if !domain.ChoosesPassword(state.CurrentPurpose) {
 		return nil
 	}
@@ -257,7 +257,7 @@ func collectedString(collected map[string]any, name string) (string, bool) {
 	return v, true
 }
 
-func mergeCollected(state *domain.FlowState, fields map[string]any) error {
+func mergeCollected(state *FlowState, fields map[string]any) error {
 	if state.CollectedData.UserData == nil {
 		state.CollectedData.UserData = map[string]any{}
 	}

@@ -13,6 +13,7 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -246,14 +247,14 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 		attempt, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{ProjectID: projectID})
 		require.NoError(t, err)
 
-		out, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+		out, err := handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{
 			ProjectID:     projectID,
 			UserSchemaURL: registrationTestSchemaURL,
-			State: &domain.FlowState{
+			State: &flowengine.FlowState{
 				ProjectID:     projectID,
 				AuthAttemptID: attempt.ID,
-				FlowProgress: domain.FlowProgress{
-					CollectedData: domain.CollectedFlowData{
+				FlowProgress: flowengine.FlowProgress{
+					CollectedData: flowengine.CollectedFlowData{
 						UserData:    map[string]any{"email": "pw-signup@example.com"},
 						AuthMethods: map[string]string{domain.AuthMethodPassword: "s3cret"},
 					},
