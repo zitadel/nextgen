@@ -50,6 +50,8 @@ interface TeamRow {
   expiry: Expiry;
   /** The people listed through the team. */
   members: Person[];
+  /** The team that owns the project, which holds it until it leaves. */
+  owning: boolean;
   action?: RowAction;
 }
 
@@ -147,6 +149,7 @@ export function toMemberRows(
       // Owning the project ends only when the team leaves it, never by date.
       expiry: team.owning ? { kind: "never" } : expiryOf(team.grants, now),
       members: [...team.members].sort((a, b) => byName(a.name, b.name)),
+      owning: team.owning,
       action,
     };
   });

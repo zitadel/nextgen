@@ -207,7 +207,7 @@ test("lists a colleague's admin grant, lets them in, and takes it away", async (
     // The operator's own grant (the one `signIn` wrote) comes back as their
     // row, marked as theirs.
     const own = page.getByRole("row").filter({ hasText: operator.email });
-    await expect(own.getByText(/\(you\)$/)).toBeVisible();
+    await expect(own.getByText("You", { exact: true })).toBeVisible();
     await expect(own.getByText("Admin", { exact: true })).toBeVisible();
 
     await grantProjectAdmin(zitadel, colleague.id);
@@ -296,7 +296,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
       page
         .getByRole("row")
         .filter({ hasText: operator.email })
-        .getByText(/\(you\)$/),
+        .getByText("You", { exact: true }),
     ).toBeVisible();
     await expectNoErrorBoundary(page);
   } finally {

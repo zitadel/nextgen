@@ -1,6 +1,6 @@
 import { api } from "@/api/zitadel";
 import { livePrimaryReleaseId } from "@/features/deployments/deployment";
-import { LIST_PAGE_SIZE, readAllPages } from "@/lib/paging";
+import { MAX_PAGE_SIZE, readAllPages } from "@/lib/paging";
 
 import type { Grant, Member } from "./members";
 import type { PasswordPolicyConfig } from "./password-policy";
@@ -52,14 +52,14 @@ export async function readProjectMembers(
   const [members, grants] = await Promise.all([
     readAllPages(async (pageToken) => {
       const page = await api.listProjectMembers(projectId, {
-        limit: LIST_PAGE_SIZE,
+        limit: MAX_PAGE_SIZE,
         page_token: pageToken,
       });
       return { items: page.members, next: page.next_page_token };
     }),
     readAllPages(async (pageToken) => {
       const page = await api.queryGrants(
-        { limit: LIST_PAGE_SIZE, page_token: pageToken },
+        { limit: MAX_PAGE_SIZE, page_token: pageToken },
         { project_id: projectId },
       );
       return { items: page.grants, next: page.next_page_token };

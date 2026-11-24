@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { api } from "@/api/zitadel";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { MemberRow, RowAction } from "@/features/project-settings/members";
+import { errorCode } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
 import { joinAnd } from "@/lib/text";
 
@@ -47,14 +48,22 @@ export function RemoveMemberDialog({
         const results = await Promise.allSettled(
           action.grantIds.map((grantId) => api.deleteGrant(grantId, { project_id: projectId })),
         );
-        const failed = results.find((result) => result.status === "rejected");
-        if (failed) {
+        // A grant someone else revoked first is gone either way. The server
+        // also answers `not_found` to a viewer who lost access to the project,
+        // so only a delete that went through claims success; the reload shows
+        // the rest.
+        const gone = (result: PromiseSettledResult<unknown>) =>
+          result.status === "fulfilled" || errorCode(result.reason) === "grant.not_found";
+        const failed = results.find((result) => !gone(result));
+        if (failed?.status === "rejected") {
           // A grant that went is gone whatever happened to the others, so the
           // table reloads to show what is left, and the dialog shows the error.
-          if (results.some((result) => result.status === "fulfilled")) onRemoved();
+          if (results.some(gone)) onRemoved();
           throw failed.reason;
         }
-        toast.success(role ? "Role removed" : "Access removed");
+        if (results.some((result) => result.status === "fulfilled")) {
+          toast.success(role ? "Role removed" : "Access removed");
+        }
         onRemoved();
       }}
     />

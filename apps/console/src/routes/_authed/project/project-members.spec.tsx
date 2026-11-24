@@ -87,18 +87,22 @@ function stubProject(
 ) {
   const memberReads: string[] = [];
   const grantReads: (string | null)[] = [];
+  const limits: (string | null)[] = [];
   server.use(
     http.get(`${PROJECTS_URL}/:id`, () => HttpResponse.json(record)),
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
     http.get("http://localhost/api/v1/deployments", () =>
       HttpResponse.json({ deployments: [], next_page_token: null }),
     ),
-    http.get(`${PROJECTS_URL}/:id/members`, ({ params }) => {
+    http.get(`${PROJECTS_URL}/:id/members`, ({ params, request }) => {
       memberReads.push(params.id as string);
+      limits.push(new URL(request.url).searchParams.get("limit"));
       return HttpResponse.json({ members });
     }),
-    http.post(GRANTS_QUERY_URL, ({ request }) => {
+    http.post(GRANTS_QUERY_URL, async ({ request }) => {
       grantReads.push(new URL(request.url).searchParams.get("project_id"));
+      const body = (await request.json()) as { limit?: number };
+      limits.push(String(body.limit));
       return HttpResponse.json({ grants });
     }),
     // The Invitations tab is read with the page; its own spec covers it.
@@ -106,7 +110,7 @@ function stubProject(
       HttpResponse.json({ invitations: [], next_page_token: null }),
     ),
   );
-  return { memberReads, grantReads };
+  return { memberReads, grantReads, limits };
 }
 
 /** Every `DELETE /grants/{grant_id}` the console sends, with the project it named. */
@@ -150,7 +154,7 @@ async function openRemove(name: string, item = "Remove access") {
 
 describe("project members", () => {
   it("reads the members and the grants of the route's project", async () => {
-    const { memberReads, grantReads } = stubProject({
+    const { memberReads, grantReads, limits } = stubProject({
       members: [member(MAYA, "admin", [{ type: "grant", grant_id: "asgn_1" }])],
       grants: [grant()],
     });
@@ -159,6 +163,8 @@ describe("project members", () => {
     const section = await openMembers();
     expect(memberReads).toEqual([PROJECT_ID]);
     expect(grantReads).toEqual([PROJECT_ID]);
+    // Both are read to the end, so at the server's largest page.
+    expect(limits).toEqual(["100", "100"]);
     const maya = row("Maya Patel");
     // The identifier under the display name, the role, and no end date.
     expect(maya.getByText("maya@acme.com")).toBeInTheDocument();
@@ -172,15 +178,26 @@ describe("project members", () => {
     ]);
   });
 
-  it("marks the viewer's own row, and offers no action on it", async () => {
+  it("marks the viewer's own row, and says why it has no action", async () => {
     // Leaving a project has no endpoint yet (#2863).
     stubProject({ grants: [grant({ user: { user_id: "user_test", identifier: SELF } })] });
     await renderProject();
 
     await openMembers();
     const self = row(SELF);
-    expect(self.getByText(`${SELF} (you)`)).toBeInTheDocument();
+    expect(self.getByText("You")).toBeInTheDocument();
     expect(self.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
+  });
+
+  it("says why the owning team has no action", async () => {
+    const owners = { team_id: "team_owners", name: "Owners" };
+    stubProject({ members: [member(ADA, "admin", [{ type: "owning_team", team: owners }])] });
+    await renderProject();
+
+    await openMembers();
+    const team = row("Owners");
+    expect(team.getByText("Owner")).toBeInTheDocument();
+    expect(team.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
   });
 
   it("shows when a grant ends, and when it has", async () => {
@@ -216,6 +233,57 @@ describe("project members", () => {
       "aria-expanded",
       "true",
     );
+  });
+
+  it("marks the viewer among a team's people", async () => {
+    const self = { user_id: "user_test", identifier: SELF };
+    stubProject({
+      members: [member(self, "editor", [{ type: "grant", grant_id: "asgn_ops", team: OPS }])],
+      grants: [grant({ id: "asgn_ops", relation: "editor", user: undefined, team: OPS })],
+    });
+    await renderProject();
+
+    await openMembers();
+    await userEvent.click(row("Ops").getByRole("button", { name: "Show the members of Ops" }));
+    expect(membersTable().getByText(`${SELF} (you)`)).toBeInTheDocument();
+  });
+
+  it("leaves a team nobody is listed in closed, with nothing to toggle", async () => {
+    stubProject({
+      grants: [grant({ id: "asgn_ops", relation: "editor", user: undefined, team: OPS })],
+    });
+    await renderProject();
+
+    await openMembers();
+    const ops = row("Ops");
+    expect(ops.getByText("No members")).toBeInTheDocument();
+    expect(ops.queryByRole("button", { name: /members of Ops/ })).not.toBeInTheDocument();
+    const rows = membersTable().getAllByRole("row").length;
+    await userEvent.click(ops.getByText("Editor"));
+    expect(membersTable().getAllByRole("row")).toHaveLength(rows);
+  });
+
+  it("opens and closes a team on a click anywhere in its row, but not from its menu", async () => {
+    stubProject({
+      members: [member(ADA, "editor", [{ type: "grant", grant_id: "asgn_ops", team: OPS }])],
+      grants: [grant({ id: "asgn_ops", relation: "editor", user: undefined, team: OPS })],
+    });
+    await renderProject();
+
+    await openMembers();
+    await userEvent.click(row("Ops").getByText("Editor"));
+    expect(row("Ada Lovelace").getByText("Via team")).toBeInTheDocument();
+
+    // The menu and its confirmation, portalled out of the row, leave it as it is.
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Ops" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove access" }));
+    const dialog = within(await screen.findByRole("alertdialog"));
+    await userEvent.click(dialog.getByText("Remove access?"));
+    await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    expect(row("Ada Lovelace").getByText("Via team")).toBeInTheDocument();
+
+    await userEvent.click(row("Ops").getByText("Editor"));
+    expect(membersTable().queryByText("Ada Lovelace")).not.toBeInTheDocument();
   });
 
   it("removes a person's access from the route's project after confirming", async () => {
@@ -323,23 +391,55 @@ describe("project members", () => {
     stubProject({ grants: [grant()] });
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () =>
-        HttpResponse.json({ code: "grant.not_found", message: "no such grant" }, { status: 404 }),
+        HttpResponse.json(
+          { code: "grant.permission_denied", message: "not allowed" },
+          { status: 403 },
+        ),
       ),
     );
     await renderProject();
 
     const dialog = await openRemove("Maya Patel");
     await userEvent.click(dialog.getByRole("button", { name: "Remove access" }));
-    expect(await screen.findByText("No such grant")).toBeInTheDocument();
+    expect(await screen.findByText("Not allowed")).toBeInTheDocument();
 
     await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
     await openRemove("Maya Patel");
-    expect(screen.queryByText("No such grant")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not allowed")).not.toBeInTheDocument();
   });
 
   it("reloads what is left when one of a row's grants fails to go", async () => {
     const { memberReads } = stubProject({
       // A live role and one that expired: removing access clears both grants.
+      grants: [
+        grant(),
+        grant({ id: "asgn_2", relation: "editor", expires_at: "2026-01-01T00:00:00Z" }),
+      ],
+    });
+    server.use(
+      http.delete(`${GRANTS_URL}/:id`, ({ params }) =>
+        params.id === "asgn_2"
+          ? HttpResponse.json(
+              { code: "grant.permission_denied", message: "not allowed" },
+              { status: 403 },
+            )
+          : new HttpResponse(null, { status: 204 }),
+      ),
+    );
+    await renderProject();
+
+    const dialog = await openRemove("Maya Patel");
+    const reads = memberReads.length;
+    await userEvent.click(dialog.getByRole("button", { name: "Remove access" }));
+    expect(await screen.findByText("Not allowed")).toBeInTheDocument();
+    await waitFor(() => expect(memberReads.length).toBeGreaterThan(reads));
+    expect(screen.queryByText("Access removed")).not.toBeInTheDocument();
+    // The reload leaves the dialog and its error in place.
+    expect(screen.getByText("Not allowed")).toBeInTheDocument();
+  });
+
+  it("takes a grant someone else revoked first as removed", async () => {
+    stubProject({
       grants: [
         grant(),
         grant({ id: "asgn_2", relation: "editor", expires_at: "2026-01-01T00:00:00Z" }),
@@ -358,13 +458,29 @@ describe("project members", () => {
     await renderProject();
 
     const dialog = await openRemove("Maya Patel");
+    await userEvent.click(dialog.getByRole("button", { name: "Remove access" }));
+    expect(await screen.findByText("Access removed")).toBeInTheDocument();
+    expect(screen.queryByText("No such grant")).not.toBeInTheDocument();
+  });
+
+  it("claims nothing when no delete went through, and reloads", async () => {
+    // The server answers `grant.not_found` to a viewer who lost the project
+    // too, so the reload, not a toast, says what happened.
+    const { memberReads } = stubProject({ grants: [grant()] });
+    server.use(
+      http.delete(`${GRANTS_URL}/:id`, () =>
+        HttpResponse.json({ code: "grant.not_found", message: "no such grant" }, { status: 404 }),
+      ),
+    );
+    await renderProject();
+
+    const dialog = await openRemove("Maya Patel");
     const reads = memberReads.length;
     await userEvent.click(dialog.getByRole("button", { name: "Remove access" }));
-    expect(await screen.findByText("No such grant")).toBeInTheDocument();
     await waitFor(() => expect(memberReads.length).toBeGreaterThan(reads));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(screen.queryByText("Access removed")).not.toBeInTheDocument();
-    // The reload leaves the dialog and its error in place.
-    expect(screen.getByText("No such grant")).toBeInTheDocument();
+    expect(screen.queryByText("No such grant")).not.toBeInTheDocument();
   });
 
   it("keeps the row when the removal is cancelled", async () => {

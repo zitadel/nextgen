@@ -47,6 +47,12 @@ import { titleCase } from "@/lib/text";
 const MEMBER_CELL = `${RESOURCE_CELL} text-sm`;
 /** The row menu's cell, pinned to the card's right edge. */
 const MENU_CELL = `${RESOURCE_MENU_CELL_NARROW} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`;
+/**
+ * A row with nothing to open takes no hover fill, so it does not read as
+ * clickable; its pinned menu cell drops the fill with it.
+ */
+const STATIC_ROW = "hover:bg-transparent";
+const STATIC_MENU_CELL = `${MENU_CELL} group-hover:bg-card`;
 /** The member cell's avatar and name block, 8px apart. */
 const MEMBER_BLOCK = "flex min-w-0 items-center gap-2";
 const NAME = "text-foreground truncate text-sm font-medium";
@@ -111,7 +117,7 @@ export function ProjectMembers({
             </EmptyMedia>
             <EmptyTitle className="text-base leading-5">No members yet</EmptyTitle>
             <EmptyDescription className="leading-5">
-              Invite people or add a team to give them access to this project.
+              Invite a member to give them access to this project.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -128,13 +134,17 @@ export function ProjectMembers({
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const expanded = row.kind === "team" && open.has(row.key);
+              const expandable = row.kind === "team" && row.members.length > 0;
+              const expanded = expandable && open.has(row.key);
               return (
                 <Fragment key={row.key}>
-                  <ResourceRow className="group">
+                  <ResourceRow
+                    className={expandable ? "group" : `group ${STATIC_ROW}`}
+                    onOpen={expandable ? () => toggle(row.key) : undefined}
+                  >
                     <TableCell className={MEMBER_CELL}>
                       {row.kind === "user" ? (
-                        <PersonBlock person={row} self={row.self} />
+                        <PersonBlock person={row} />
                       ) : (
                         <TeamBlock
                           name={row.name}
@@ -150,23 +160,28 @@ export function ProjectMembers({
                     <TableCell className={`${RESOURCE_CELL} text-foreground text-sm`}>
                       <ExpiryCell expiry={row.expiry} />
                     </TableCell>
-                    <TableCell className={MENU_CELL}>
-                      {row.action && (
+                    <TableCell className={expandable ? MENU_CELL : STATIC_MENU_CELL}>
+                      {row.action ? (
                         <RowActions
                           projectId={projectId}
                           row={row}
                           action={row.action}
                           onRemoved={onChanged}
                         />
+                      ) : (
+                        <NoActionNote row={row} />
                       )}
                     </TableCell>
                   </ResourceRow>
                   {expanded &&
                     row.members.map((person) => (
-                      <ResourceRow key={`${row.key}:${person.userId}`} className="group">
+                      <ResourceRow
+                        key={`${row.key}:${person.userId}`}
+                        className={`group ${STATIC_ROW}`}
+                      >
                         <TableCell className={MEMBER_CELL}>
-                          {/* Under its team: the avatar starts 24px in. */}
-                          <span className="flex min-w-0 items-center pl-6">
+                          {/* Under its team: the avatar starts 24px past the team's. */}
+                          <span className="flex min-w-0 items-center pl-14">
                             <PersonBlock person={person} self={person.userId === viewerUserId} />
                           </span>
                         </TableCell>
@@ -174,7 +189,7 @@ export function ProjectMembers({
                           Via team
                         </TableCell>
                         <TableCell className={RESOURCE_CELL} />
-                        <TableCell className={MENU_CELL} />
+                        <TableCell className={STATIC_MENU_CELL} />
                       </ResourceRow>
                     ))}
                 </Fragment>
@@ -187,15 +202,21 @@ export function ProjectMembers({
   );
 }
 
-function PersonBlock({ person, self }: { person: Person; self: boolean }) {
+/** Why a row has no menu, where the viewer could otherwise expect one. */
+function NoActionNote({ row }: { row: MemberRow }) {
+  const note = row.kind === "user" ? row.self && "You" : row.owning && "Owner";
+  if (!note) return null;
+  return <span className="text-muted-foreground block text-center text-xs">{note}</span>;
+}
+
+/** `self` marks the viewer under a team, where no note says so. */
+function PersonBlock({ person, self = false }: { person: Person; self?: boolean }) {
   return (
     <span className={MEMBER_BLOCK}>
       <Avatar size="sm" aria-hidden>
         {/* The design's muted initials on the muted disc are 4.34:1 in light, under
             AA for 10px text, so they take the foreground. */}
-        <AvatarFallback className="text-foreground text-[10px]!">
-          {initials(person.name)}
-        </AvatarFallback>
+        <AvatarFallback className="text-foreground">{initials(person.name)}</AvatarFallback>
       </Avatar>
       <span className="min-w-0">
         <span className={`${NAME} block`}>
@@ -208,7 +229,10 @@ function PersonBlock({ person, self }: { person: Person; self: boolean }) {
   );
 }
 
-/** A team's name, its badge and the disclosure that lists its people. */
+/**
+ * A team's disclosure, avatar, name and badge. The whole row toggles it too;
+ * the chevron is the control a keyboard or screen reader reaches.
+ */
 function TeamBlock({
   name,
   count,
@@ -223,6 +247,20 @@ function TeamBlock({
   const Chevron = expanded ? ChevronDown : ChevronRight;
   return (
     <span className={MEMBER_BLOCK}>
+      {count > 0 ? (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Hide" : "Show"} the members of ${name}`}
+          onClick={onToggle}
+        >
+          <Chevron aria-hidden className="stroke-[1.5]" />
+        </Button>
+      ) : (
+        // Keeps the team's avatar in line with the others.
+        <span aria-hidden className="size-6 shrink-0" />
+      )}
       <Avatar size="sm" aria-hidden>
         <AvatarFallback>
           <Users className="size-3 stroke-[1.5]" />
@@ -232,18 +270,6 @@ function TeamBlock({
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={NAME}>{name}</span>
           <Badge variant="secondary">Team</Badge>
-          {count > 0 && (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="size-4 rounded-sm"
-              aria-expanded={expanded}
-              aria-label={`${expanded ? "Hide" : "Show"} the members of ${name}`}
-              onClick={onToggle}
-            >
-              <Chevron aria-hidden className="stroke-[1.5]" />
-            </Button>
-          )}
         </span>
         <span className={SECONDARY}>
           {count === 0 ? "No members" : `${count} ${count === 1 ? "member" : "members"}`}
