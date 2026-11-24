@@ -13,6 +13,11 @@
 - [x] **Projects in navigation** — main nav (key-resource consistency) vs. top context dropdown only. Depends on whether the API can list multiple projects (no API design yet); may be skipped for MVP since there's only one project. *(owner: Julia / eng)* → Resolved by D27: the account sidebar, with the top context dropdown and the logo.
 - [ ] **"Team" naming** — overloaded (customer-portal team vs. organization/tenant); consider "organization" or "tenant" instead. Note: a Teams API is already built. *(owner: team)*
 - [ ] **Project name scheme** — nature words (e.g. "River") vs. random words for generated project names. *(owner: Julia)*
+- [ ] **Environment lifecycle & default set** — `dev`, `staging`, and `prod` are currently seeded as a temporary implementation detail, not a required deployment pipeline. Define whether projects can start with one or multiple environments, custom names, and how create / rename / retire works. See #528 / #965. *(owner: product / eng)*
+- [ ] **When are environment-specific IDP credentials captured?** — the connection is environment-independent and credential values belong to the target environment, but it is still open whether the CLI asks for them during provider setup, after selecting an environment, or only when a deploy finds required values missing. This must also work when production credentials do not exist yet during initial setup. *(owner: CLI / eng / design)*
+- [ ] **Variables/secrets across deployments and rollback** — clarify whether environment values are snapshotted per deployment, what happens when a secret is rotated, and which values a rollback resolves. Also clarify whether snapshotting is purely backend behavior or affects the CLI model. *(owner: eng)*
+- [ ] **IDP delete semantics** — define what deleting an IDP connection means when it may be referenced by one or more user schemas / flows. Delete may be deferred from the first iteration until those semantics are defined. *(owner: product / eng)*
+- [ ] **Enterprise SSO naming & downstream configuration surface** — settle the product terminology (e.g. "Enterprise SSO" vs. another term) and the concrete downstream-admin surface: embeddable component/module, API, or both. Do not assume the ZITADEL Console is the required surface. *(owner: team)*
 - [ ] **Font loading for Zitadel-served login** — `font_url` property vs. a hosted font picker vs. custom CSS overrides; needs a CSP answer before it can be designed. *(owner: Max)*
 - [ ] **Relative vs. absolute asset paths** — a relative logo path typed into the console resolves against the customer's app, not the console; decide what we validate and how the field explains it. *(owner: Max)*
 - [ ] **Code ↔ console sync** — the CLI can publish but has no `fetch`/`pull`, so a console edit and a local `branding.json` can silently diverge. Blocks making branding editable (D75). *(owner: eng)*
@@ -37,6 +42,59 @@
 ---
 
 ## Decisions
+
+### D92 · Enterprise SSO configuration must reach the customer's customer — 2026-09-09
+B2B / Enterprise SSO has a different configuration boundary from social login. The ZITADEL operator can configure or enable the capability, but a downstream customer's admin must be able to configure their own SAML/OIDC connection without using the ZITADEL CLI.
+
+That configuration surface belongs in the ZITADEL customer's product and may be provided through an embeddable component/module or API; it is not assumed to be the ZITADEL Console.
+
+→ Keep exact naming and delivery mechanism open.
+
+### D91 · CLI is command-driven, not workflow-driven — 2026-09-09 · [standing]
+The post-claim CLI should optimize for direct commands, good defaults, validation, developers, automation, and agents — not a state-machine / terminal UI that walks users through long end-to-end wizards.
+
+Users should be able to enter at the command relevant to their task. Interactive prompts can support individual commands but are not the primary architecture.
+
+→ Rework guided CLI journeys accordingly, including the current IDP setup concept.
+
+### D90 · Deployment review belongs inside deploy — 2026-09-09
+Do not expose "Review deployment" as a separate action.
+
+The user chooses Deploy; the relevant changes / diff are shown as part of that operation before confirmation.
+
+This keeps reviewing attached to the action that will actually make the configuration live and aligns with the removal of a separate `plan` step.
+
+### D89 · One deployment workflow; no separate promotion flow for MVP — 2026-09-09
+Deploying an existing release onto another environment is the same underlying deployment operation as deploying it anywhere else.
+
+For MVP, do not introduce a separate user-facing promotion workflow. The user selects the release, selects the target environment, reviews the change, and deploys it.
+
+A dedicated `promote` helper may be reconsidered later if actual usage shows that it adds value.
+
+→ Align the CLI direction in ADR 035 and #539 with this decision. The underlying release / environment / deployment architecture remains unchanged.
+
+### D88 · Environment order is not enforced — 2026-09-09 · [standing]
+Do not require a fixed `dev → staging → prod` progression.
+
+A deployment explicitly targets an environment; users may deploy directly to whichever environment they need.
+
+The currently seeded `dev`, `staging`, and `prod` environments are temporary implementation scaffolding, not a mandatory product workflow.
+
+### D87 · IDP configuration is environment-independent; credential values are not — 2026-09-09 · [standing]
+An IDP connection is configuration that can travel unchanged with a release.
+
+Credential values required by that connection are resolved for the target environment rather than baked into the connection or release. Secret values are not stored in the connection configuration.
+
+For MVP, values do not need to be automatically copied between environments; requiring missing target-environment values again is acceptable.
+
+→ Exact credential-capture timing remains open.
+
+### D86 · IDP connections are reusable across user schemas — 2026-09-09
+An identity-provider connection is a centrally managed configuration object, not configuration nested under one user schema.
+
+The same connection can be enabled for multiple user schemas / authentication flows and should be reused rather than duplicated per schema.
+
+Users may conceptually approach configuration from either the user-schema side or the provider side; both operate on the same underlying connection.
 
 ### D85 · Branding customization targets the login widget, not the page — 2026-09-02 · [standing]
 Everything in the branding scope applies to `<zitadel-login>` — the card, its fields, buttons and type. The page around it (split screen, hero, marketing copy) belongs to the customer in the embedded model and to page templates/chrome in the Zitadel-served model. Two different products; don't mix their knobs into one settings screen.
