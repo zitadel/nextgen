@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -109,6 +110,32 @@ func ErrReleaseRevoked() Error {
 // WithMessage so the login surface can show it.
 func ErrReleaseNotDeployed(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "nothing is deployed to this origin", details, nil)
+}
+
+// ErrReleaseReferenceInvalid reports an X-Zitadel-Release value that names
+// no release in a form the server accepts. It is told apart from
+// ErrReleaseNotFound, a well-formed reference to a release that does not exist.
+func ErrReleaseReferenceInvalid(details any) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("reference_invalid"), "release: the pinned release is not a release id", details, nil)
+}
+
+// ReleaseReferenceDetails names the pin a release error is about, as the
+// request sent it.
+type ReleaseReferenceDetails struct {
+	Origin  string `json:"origin,omitempty"`
+	Release string `json:"release"`
+}
+
+var releaseIDPattern = regexp.MustCompile(`^rel_[a-zA-Z0-9_-]+$`)
+
+// ParseReleaseReference reads the release a request pins. The release id is
+// the one form accepted; a later form is added here and nowhere else.
+func ParseReleaseReference(reference string) (string, error) {
+	reference = strings.TrimSpace(reference)
+	if !releaseIDPattern.MatchString(reference) {
+		return "", ErrReleaseReferenceInvalid(ReleaseReferenceDetails{Release: reference})
+	}
+	return reference, nil
 }
 
 // ErrReleaseNoDefault reports that a request with no origin, or from a console

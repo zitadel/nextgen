@@ -834,6 +834,24 @@ type CreateFlowParams struct {
 	// Browsers send it automatically; no client action is required. Absent when the caller is not a
 	// browser.
 	Origin OptURI `json:",omitempty,omitzero"`
+	// Pins the request to a release: the app sends the release id that `zitadel deploy` or
+	// `zitadel preview` printed when it was built, and is served that release's configuration instead of
+	// the newest one deployed to its origin.
+	//
+	// The `Origin` header picks the target first, as it does without a pin. The pin then selects among the
+	// releases deployed to that target, and the request runs on the newest deployment of the pinned
+	// release there. A pin never deploys a release and never admits an origin, and it needs no credential
+	// of its own: a release stays pinnable until it is revoked.
+	//
+	// The release id, `rel_` followed by letters, digits, `_` or `-`, is the one form accepted. Send the
+	// value as it was printed, without reading it.
+	//
+	//  - `400 rel.reference_invalid`: the value is not a release id.
+	//  - `404 rel.not_found`: the project has no release with that id.
+	//  - `409 rel.not_deployed`: the release was never deployed to the target, or the request has no
+	//    `Origin` to pick one.
+	//  - `409 rel.revoked`: the release is revoked.
+	XZitadelRelease OptString `json:",omitempty,omitzero"`
 }
 
 func unpackCreateFlowParams(packed middleware.Parameters) (params CreateFlowParams) {
@@ -844,6 +862,15 @@ func unpackCreateFlowParams(packed middleware.Parameters) (params CreateFlowPara
 		}
 		if v, ok := packed[key]; ok {
 			params.Origin = v.(OptURI)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Zitadel-Release",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.XZitadelRelease = v.(OptString)
 		}
 	}
 	return params
@@ -886,6 +913,45 @@ func decodeCreateFlowParams(args [0]string, argsEscaped bool, r *http.Request) (
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "Origin",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Zitadel-Release.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Zitadel-Release",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotXZitadelReleaseVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotXZitadelReleaseVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.XZitadelRelease.SetTo(paramsDotXZitadelReleaseVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Zitadel-Release",
 			In:   "header",
 			Err:  err,
 		}
@@ -14942,6 +15008,24 @@ type SetUserPasswordParams struct {
 	// Standard browser `Origin` header. Selects the deployment whose password policy applies. Browsers
 	// send it automatically; no client action is required. Absent when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
+	// Pins the request to a release: the app sends the release id that `zitadel deploy` or
+	// `zitadel preview` printed when it was built, and is served that release's configuration instead of
+	// the newest one deployed to its origin.
+	//
+	// The `Origin` header picks the target first, as it does without a pin. The pin then selects among the
+	// releases deployed to that target, and the request runs on the newest deployment of the pinned
+	// release there. A pin never deploys a release and never admits an origin, and it needs no credential
+	// of its own: a release stays pinnable until it is revoked.
+	//
+	// The release id, `rel_` followed by letters, digits, `_` or `-`, is the one form accepted. Send the
+	// value as it was printed, without reading it.
+	//
+	//  - `400 rel.reference_invalid`: the value is not a release id.
+	//  - `404 rel.not_found`: the project has no release with that id.
+	//  - `409 rel.not_deployed`: the release was never deployed to the target, or the request has no
+	//    `Origin` to pick one.
+	//  - `409 rel.revoked`: the release is revoked.
+	XZitadelRelease OptString `json:",omitempty,omitzero"`
 }
 
 func unpackSetUserPasswordParams(packed middleware.Parameters) (params SetUserPasswordParams) {
@@ -14959,6 +15043,15 @@ func unpackSetUserPasswordParams(packed middleware.Parameters) (params SetUserPa
 		}
 		if v, ok := packed[key]; ok {
 			params.Origin = v.(OptURI)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Zitadel-Release",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.XZitadelRelease = v.(OptString)
 		}
 	}
 	return params
@@ -15061,6 +15154,45 @@ func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Reque
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "Origin",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Zitadel-Release.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Zitadel-Release",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotXZitadelReleaseVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotXZitadelReleaseVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.XZitadelRelease.SetTo(paramsDotXZitadelReleaseVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Zitadel-Release",
 			In:   "header",
 			Err:  err,
 		}

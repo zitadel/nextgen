@@ -17924,6 +17924,7 @@ type CreateFlowErrorResponse struct {
 	RelNoDefault           RelNoDefault
 	RelNotDeployed         RelNotDeployed
 	RelNotFound            RelNotFound
+	RelReferenceInvalid    RelReferenceInvalid
 	RelRevoked             RelRevoked
 	ReqInvalid             ReqInvalid
 	EncKeyUnknownAlg       EncKeyUnknownAlg
@@ -17954,6 +17955,7 @@ const (
 	RelNoDefaultCreateFlowErrorResponse           CreateFlowErrorResponseType = "rel.no_default"
 	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
 	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
+	RelReferenceInvalidCreateFlowErrorResponse    CreateFlowErrorResponseType = "rel.reference_invalid"
 	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
@@ -18051,6 +18053,11 @@ func (s CreateFlowErrorResponse) IsRelNotDeployed() bool {
 // IsRelNotFound reports whether CreateFlowErrorResponse is RelNotFound.
 func (s CreateFlowErrorResponse) IsRelNotFound() bool {
 	return s.Type == RelNotFoundCreateFlowErrorResponse
+}
+
+// IsRelReferenceInvalid reports whether CreateFlowErrorResponse is RelReferenceInvalid.
+func (s CreateFlowErrorResponse) IsRelReferenceInvalid() bool {
+	return s.Type == RelReferenceInvalidCreateFlowErrorResponse
 }
 
 // IsRelRevoked reports whether CreateFlowErrorResponse is RelRevoked.
@@ -18469,6 +18476,27 @@ func (s CreateFlowErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
 func NewRelNotFoundCreateFlowErrorResponse(v RelNotFound) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelReferenceInvalid sets CreateFlowErrorResponse to RelReferenceInvalid.
+func (s *CreateFlowErrorResponse) SetRelReferenceInvalid(v RelReferenceInvalid) {
+	s.Type = RelReferenceInvalidCreateFlowErrorResponse
+	s.RelReferenceInvalid = v
+}
+
+// GetRelReferenceInvalid returns RelReferenceInvalid and true boolean if CreateFlowErrorResponse is RelReferenceInvalid.
+func (s CreateFlowErrorResponse) GetRelReferenceInvalid() (v RelReferenceInvalid, ok bool) {
+	if !s.IsRelReferenceInvalid() {
+		return v, false
+	}
+	return s.RelReferenceInvalid, true
+}
+
+// NewRelReferenceInvalidCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelReferenceInvalid.
+func NewRelReferenceInvalidCreateFlowErrorResponse(v RelReferenceInvalid) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelReferenceInvalid(v)
 	return s
 }
 
@@ -77312,6 +77340,52 @@ func (o OptRelProjectNotFoundDetails) Or(d RelProjectNotFoundDetails) RelProject
 	return d
 }
 
+// NewOptRelReferenceInvalidDetails returns new OptRelReferenceInvalidDetails with value set to v.
+func NewOptRelReferenceInvalidDetails(v RelReferenceInvalidDetails) OptRelReferenceInvalidDetails {
+	return OptRelReferenceInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelReferenceInvalidDetails is optional RelReferenceInvalidDetails.
+type OptRelReferenceInvalidDetails struct {
+	Value RelReferenceInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelReferenceInvalidDetails was set.
+func (o OptRelReferenceInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelReferenceInvalidDetails) Reset() {
+	var v RelReferenceInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelReferenceInvalidDetails) SetTo(v RelReferenceInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelReferenceInvalidDetails) Get() (v RelReferenceInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelReferenceInvalidDetails) Or(d RelReferenceInvalidDetails) RelReferenceInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelRevisionNotFoundDetails returns new OptRelRevisionNotFoundDetails with value set to v.
 func NewOptRelRevisionNotFoundDetails(v RelRevisionNotFoundDetails) OptRelRevisionNotFoundDetails {
 	return OptRelRevisionNotFoundDetails{
@@ -94696,6 +94770,59 @@ func (s *RelProjectNotFoundDetails) init() RelProjectNotFoundDetails {
 
 // Merged schema.
 // Ref: #
+type RelReferenceInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelReferenceInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelReferenceInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelReferenceInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelReferenceInvalid) GetDetails() OptRelReferenceInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelReferenceInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelReferenceInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelReferenceInvalid) SetDetails(val OptRelReferenceInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelReferenceInvalidDetails map[string]jx.Raw
+
+func (s *RelReferenceInvalidDetails) init() RelReferenceInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type RelRevisionNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -103491,6 +103618,7 @@ type SetUserPasswordErrorResponse struct {
 	RelNoDefault                RelNoDefault
 	RelNotDeployed              RelNotDeployed
 	RelNotFound                 RelNotFound
+	RelReferenceInvalid         RelReferenceInvalid
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	Unavailable                 Unavailable
@@ -103519,6 +103647,7 @@ const (
 	RelNoDefaultSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "rel.no_default"
 	RelNotDeployedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "rel.not_deployed"
 	RelNotFoundSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "rel.not_found"
+	RelReferenceInvalidSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "rel.reference_invalid"
 	RelRevokedSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "rel.revoked"
 	ReqInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "req.invalid"
 	UnavailableSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "unavailable"
@@ -103580,6 +103709,11 @@ func (s SetUserPasswordErrorResponse) IsRelNotDeployed() bool {
 // IsRelNotFound reports whether SetUserPasswordErrorResponse is RelNotFound.
 func (s SetUserPasswordErrorResponse) IsRelNotFound() bool {
 	return s.Type == RelNotFoundSetUserPasswordErrorResponse
+}
+
+// IsRelReferenceInvalid reports whether SetUserPasswordErrorResponse is RelReferenceInvalid.
+func (s SetUserPasswordErrorResponse) IsRelReferenceInvalid() bool {
+	return s.Type == RelReferenceInvalidSetUserPasswordErrorResponse
 }
 
 // IsRelRevoked reports whether SetUserPasswordErrorResponse is RelRevoked.
@@ -103844,6 +103978,27 @@ func (s SetUserPasswordErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) 
 func NewRelNotFoundSetUserPasswordErrorResponse(v RelNotFound) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelReferenceInvalid sets SetUserPasswordErrorResponse to RelReferenceInvalid.
+func (s *SetUserPasswordErrorResponse) SetRelReferenceInvalid(v RelReferenceInvalid) {
+	s.Type = RelReferenceInvalidSetUserPasswordErrorResponse
+	s.RelReferenceInvalid = v
+}
+
+// GetRelReferenceInvalid returns RelReferenceInvalid and true boolean if SetUserPasswordErrorResponse is RelReferenceInvalid.
+func (s SetUserPasswordErrorResponse) GetRelReferenceInvalid() (v RelReferenceInvalid, ok bool) {
+	if !s.IsRelReferenceInvalid() {
+		return v, false
+	}
+	return s.RelReferenceInvalid, true
+}
+
+// NewRelReferenceInvalidSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelReferenceInvalid.
+func NewRelReferenceInvalidSetUserPasswordErrorResponse(v RelReferenceInvalid) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelReferenceInvalid(v)
 	return s
 }
 

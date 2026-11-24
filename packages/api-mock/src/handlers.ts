@@ -16,10 +16,7 @@ import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
  * `reset` and `getCaptured` references, so parallel test suites never share
  * state even when running in the same worker.
  */
-import {
-  getCreateFlowMockHandler,
-  getGetFlowStepMockHandler,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
+import { getGetFlowStepMockHandler } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
   CreateFlow201StepPurpose,
@@ -64,7 +61,7 @@ import { SsoIdentityStore } from "./lib/sso-identities.js";
 import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
 
 export type CapturedRequest =
-  | { kind: "createFlow"; body: CreateFlowBody }
+  | { kind: "createFlow"; body: CreateFlowBody; release?: string }
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
   | { kind: "getFlowStep"; flowId: string }
   | { kind: "exchangeHandoff"; body: ExchangeHandoffBody; projectId?: string };
@@ -81,6 +78,12 @@ export type MockHandle = {
   delayNextSubmitUntil: (released: Promise<void>) => void;
   /** Fail one exchange with a 503 error envelope. */
   failNextExchange: () => void;
+  /**
+   * Refuse the next pinned flow start as the server refuses a pin it will not
+   * serve: a release never deployed to the origin, a revoked one, or an id the
+   * project does not hold. A start without `X-Zitadel-Release` is not refused.
+   */
+  refuseNextPin: (code: PinRefusal) => void;
   /**
    * Pre-register a WebAuthn credential so that a subsequent passkey-login
    * submission succeeds without going through the full register flow.
@@ -116,6 +119,48 @@ export type MockHandle = {
 };
 
 const FLOW_ID = "flow_mock";
+
+/** The codes a pinned flow start is refused with, beside a malformed pin. */
+export type PinRefusal = "rel.not_deployed" | "rel.revoked" | "rel.not_found";
+
+const PIN_REFUSAL_STATUS: Record<PinRefusal, number> = {
+  "rel.not_deployed": 409,
+  "rel.revoked": 409,
+  "rel.not_found": 404,
+};
+
+/** The release id the server accepts in `X-Zitadel-Release`, written out as PROJECT_ID is. */
+const RELEASE_ID = /^rel_[a-zA-Z0-9_-]+$/;
+
+/** The server's refusal of a pin, or nothing when the start may go on. */
+function pinRefusal(request: Request, refusal: PinRefusal | undefined): Response | undefined {
+  const release = request.headers.get("x-zitadel-release");
+  if (release === null) {
+    return undefined;
+  }
+  if (!RELEASE_ID.test(release.trim())) {
+    return HttpResponse.json(
+      {
+        code: "rel.reference_invalid",
+        message: "release: the pinned release is not a release id",
+        details: { release },
+      },
+      { status: 400 },
+    );
+  }
+  if (refusal === undefined) {
+    return undefined;
+  }
+  const origin = request.headers.get("origin") ?? undefined;
+  return HttpResponse.json(
+    {
+      code: refusal,
+      message: `release ${release} is not served here`,
+      details: { origin, release },
+    },
+    { status: PIN_REFUSAL_STATUS[refusal] },
+  );
+}
 
 /** The purpose a step of the default flow serves, where the step decides it. */
 const STEP_PURPOSES: Partial<Record<FlowStepName, CreateFlow201StepPurpose>> = {
@@ -235,6 +280,7 @@ export function setupMockHandlers(
   let submitError: string | undefined;
   let submitDelay: Promise<void> | undefined;
   let exchangeFails = false;
+  let pinRefused: PinRefusal | undefined;
   // Typed emails and the provider's return ask the same store, so an account
   // is one whichever way the visitor arrives.
   const authn = new AuthnStore(options.accounts);
@@ -294,6 +340,7 @@ export function setupMockHandlers(
     submitError = undefined;
     submitDelay = undefined;
     exchangeFails = false;
+    pinRefused = undefined;
     authn.clear();
     // Links too: a caller asking for a clean mock must not inherit an email
     // that a previous test signed up through a provider, which would turn the
@@ -483,11 +530,21 @@ export function setupMockHandlers(
   }
 
   const handlers: RequestHandler[] = [
-    getCreateFlowMockHandler(async ({ request }) => {
+    // Hand-written rather than the generated wrapper: that one answers 201
+    // with whatever it is given, and a refused pin is a 400, 404 or 409.
+    http.post("*/flows", async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
-      captured.push({ kind: "createFlow", body });
+      const release = request.headers.get("x-zitadel-release") ?? undefined;
+      captured.push({ kind: "createFlow", body, ...(release === undefined ? {} : { release }) });
+      const refused = pinRefusal(request, pinRefused);
+      if (release !== undefined) {
+        pinRefused = undefined;
+      }
+      if (refused) {
+        return refused;
+      }
       startFlow(body.purpose);
-      return currentResponse();
+      return HttpResponse.json(await currentResponse(), { status: 201 });
     }),
     // Hand-written rather than the generated wrapper: that one answers 200
     // with whatever it is given, and the refusal below is a 400.
@@ -742,6 +799,9 @@ export function setupMockHandlers(
     },
     failNextExchange: () => {
       exchangeFails = true;
+    },
+    refuseNextPin: (code) => {
+      pinRefused = code;
     },
   };
 }

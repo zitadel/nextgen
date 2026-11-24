@@ -69,7 +69,7 @@ var (
 		"GET": "Authorization",
 	}
 	rn22AllowedHeaders = map[string]string{
-		"POST": "Content-Type,Origin",
+		"POST": "Content-Type,Origin,X-Zitadel-Release",
 	}
 	rn128AllowedHeaders = map[string]string{
 		"POST": "Content-Type,Origin",
@@ -247,7 +247,7 @@ var (
 	}
 	rn88AllowedHeaders = map[string]string{
 		"GET": "Authorization",
-		"PUT": "Authorization,Content-Type,Origin",
+		"PUT": "Authorization,Content-Type,Origin,X-Zitadel-Release",
 	}
 	rn109AllowedHeaders = map[string]string{
 		"GET": "Authorization",
