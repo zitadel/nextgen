@@ -44,7 +44,7 @@ export function article(word: string): string {
 /**
  * A connection that stands for its slug, with what the rules ask about it.
  */
-export type Standing = {
+type Standing = {
   /**
    * The connection, the first file in path order with its slug.
    */

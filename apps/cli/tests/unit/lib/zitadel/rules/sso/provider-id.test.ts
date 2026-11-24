@@ -8,9 +8,13 @@ import {
   FLOW_FILE,
   FLOW_PATH,
   CONNECTION_FILE,
-  SCHEMA_ID,
   ACME,
 } from "@tests/helpers/sso-rules";
+
+/**
+ * The `$id` a schema and the flow pinning it may both name.
+ */
+const SCHEMA_ID = "https://schemas.example.test/staff.json";
 
 describe("sso/provider-id", () => {
   it("refuse a provider the pinned schema does not list, naming the flow file and its step", () => {
