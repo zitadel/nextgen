@@ -39,10 +39,11 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 	if o, ok := params.Origin.Get(); ok {
 		origin = o.String()
 	}
-	if _, err := releasePin(params.XZitadelRelease); err != nil {
+	pin, err := releasePin(params.XZitadelRelease)
+	if err != nil {
 		return nil, err
 	}
-	ctx, err = h.resolveRuntime(ctx, string(req.ProjectID), origin)
+	ctx, err = h.resolveRuntime(ctx, string(req.ProjectID), origin, pin)
 	if err != nil {
 		return nil, err
 	}

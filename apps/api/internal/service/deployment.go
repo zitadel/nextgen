@@ -508,6 +508,17 @@ func (s *DeploymentService) liveIDs(ctx context.Context, projectID string, items
 
 // newestPrimary is the project's newest primary deployment, nil when none.
 // It is a lookup, not the caller's list, so it reads unfiltered.
+// newestDeploymentOfRelease is the newest deployment of releaseID that named
+// origin, nil for none. It reads the history, not the live view: a pinned
+// request may run on a deployment the origin no longer serves.
+func newestDeploymentOfRelease(ctx context.Context, stmts DeploymentStatements, projectID, origin, releaseID string) (*domain.Deployment, error) {
+	result, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.ListOptions(projectID, &origin, &releaseID, 1))
+	if err != nil || len(result.Items) == 0 {
+		return nil, err
+	}
+	return result.Items[0], nil
+}
+
 func newestPrimary(ctx context.Context, stmts DeploymentStatements, projectID string) (*domain.Deployment, error) {
 	result, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(projectID, domain.DeploymentOriginKindPrimary))
 	if err != nil || len(result.Items) == 0 {
