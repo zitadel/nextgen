@@ -527,8 +527,9 @@ func WebhookPayloadDelta(update WebhookUpdate, stored *Webhook) WebhookPayload {
 }
 
 // ApplicationPayload is shared by application.created (snapshot) and
-// application.updated (delta). ClientIDs are the clients the write created,
-// each of which got a secret. The document body and the secrets stay out.
+// application.updated (delta). ClientIDs are the clients the write created:
+// a registered application's each got a secret, a declared one's name a
+// variable. The document body and the secrets stay out.
 type ApplicationPayload struct {
 	Slug       string   `json:"slug,omitempty"`
 	Name       string   `json:"name,omitempty"`

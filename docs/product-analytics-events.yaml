@@ -632,28 +632,39 @@ components:
         destinations: [vercel]
         properties: [page, utm_source, utm_medium, utm_campaign, referrer_host]
       invitation_created:
-        status: planned
+        status: emitted
         plan: "#2859"
-        trigger: The invite dialog's create or replace, after the API confirms it.
-        destinations: [mixpanel]
+        trigger: >-
+          The API confirmed an invitation made from the project's Invitations
+          settings, a replacement (`Regenerate link`) included. Only the cloud build
+          sends it, to Vercel like `copied_command`; Mixpanel follows once the
+          Console has a sink for it.
+        destinations: [vercel, mixpanel]
         properties: [role, invitation_journey_id]
       invitation_accepted:
-        status: planned
+        status: emitted
         plan: "#2859"
-        trigger: The invitation page's accept, after the API confirms it.
-        destinations: [mixpanel]
+        trigger: >-
+          The API confirmed the accept on the invitation page. Sent like
+          `invitation_created`.
+        destinations: [vercel, mixpanel]
         properties: [role, invitation_journey_id]
       invitation_rejected:
-        status: planned
+        status: emitted
         plan: "#2859"
-        trigger: The invitation page's decline, after the API confirms it.
-        destinations: [mixpanel]
+        trigger: >-
+          The API confirmed the decline on the invitation page. Sent like
+          `invitation_created`.
+        destinations: [vercel, mixpanel]
         properties: [role, invitation_journey_id]
       invitation_cancelled:
-        status: planned
+        status: emitted
         plan: "#2859"
-        trigger: The invitations list's cancel, after the API confirms it.
-        destinations: [mixpanel]
+        trigger: >-
+          The API confirmed the cancel of a pending invitation in the project's
+          Invitations list. Removing an expired or a declined one sends nothing:
+          that link was already dead. Sent like `invitation_created`.
+        destinations: [vercel, mixpanel]
         properties: [role, invitation_journey_id]
       viewed_page:
         status: planned

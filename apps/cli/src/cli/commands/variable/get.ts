@@ -2,14 +2,12 @@ import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { json } from "@/lib/oclif/rendering";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { fieldsFlag } from "@/cli/core/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
-
+import { ReadCommand } from "@/cli/commands/bases";
 import { variableNameArg } from "./name";
-import { ServerCommand } from "@/cli/commands/server-command";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -17,9 +15,10 @@ import { ServerCommand } from "@/cli/commands/server-command";
  * A name the project has not entered answers `var.not_found`. A secret is found
  * but not disclosed, so the answer says it is held and nothing more. Without
  * `--preview` it reads the primary value; with it, the preview value. A name with
- * no value of the kind asked for is a miss.
+ * no value of the kind asked for is a miss. `--fields` cuts the data and the
+ * rows to the dot-paths it names, judged by the record's shape.
  */
-export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class VariableGet extends ReadCommand {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;
@@ -40,41 +39,47 @@ export default class VariableGet extends Tabulatable(ServerCommand(EnvironmentCo
       default: false,
       description: "Read the preview value instead of the primary one.",
     }),
+    fields: fieldsFlag({
+      fallback: ["name"],
+      shape: {
+        /**
+         * The keys of {@link Variable}'s JSON that a single read carries; `variable list` adds the preview.
+         */
+        known: new Set(["name", "secret", "value"]),
+        open: [],
+      },
+    }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const variableService = new VariableService(client, projectId);
+  /**
+   * Reads one variable and shows it.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The variable, as a record.
+   */
+  protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<CommandResult> {
+    const variableService = await this.service(VariableService);
     const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
     this.recordTelemetry({
       is_secret: variable.secret,
     });
 
     const title = `Read ${escapeControlCharacters(args.name)}`;
-    if (!this.isOnScreen) {
-      return this.emit({
-        status: "ok",
-        data: variable,
-        pretty: json(variable),
-        summary: {
-          title,
-          sections: [],
-        },
-      });
-    }
-
     const cell = VariableView.of(variable).cell();
+    const view = this.viewRecord(variable, flags.fields, ["value"]);
 
-    return this.emit({
+    return {
       status: "ok",
-      data: variable,
+      data: view.data,
       summary: {
         title,
         sections: [],
-        lines: this.tabulateDetail(undefined, ["value"], {
+        lines: this.tabulateDetail(undefined, view.columns, {
+          name: variable.name,
+          secret: variable.secret,
           value: cell.value === "" ? '""' : cell.value,
         }).split("\n"),
       },
-    });
+    };
   }
 }

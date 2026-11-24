@@ -28,7 +28,7 @@ zitadel <resource> delete  <id> [--force]
 The verbs are generated from one registry
 (`apps/cli/src/cli/commands/resources.ts`)
 by a platform-agnostic factory
-(`apps/cli/src/lib/oclif/crud/`).
+(`apps/cli/src/cli/core/crud/`).
 The registry names the client call per verb, the id field, the table columns,
 and the filterable and sortable fields. The factory owns everything below.
 Adding a backend resource is adding a registry entry.

@@ -384,7 +384,7 @@ describe("add user sheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("a user already exists with the given unique attributes");
+    expect(alert).toHaveTextContent("A user already exists with the given unique attributes");
     expect(alert).not.toHaveTextContent(/returned 409/);
   });
 
@@ -613,7 +613,7 @@ describe("add user sheet", () => {
 
     await userEvent.type(await screen.findByLabelText("Email"), "a@b");
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("taken");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Taken");
 
     // Valid when submitted, so the first keystroke is not yet a mistake.
     const nick = screen.getByLabelText("Nick");

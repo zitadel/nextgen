@@ -196,7 +196,10 @@ describe("claim", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Nothing was claimed (dry run)",
+            title: "Would claim project proj_prod (dry run)",
+            verb: "claim",
+            topic: "project",
+            id: "proj_prod",
             project_id: "proj_prod",
             would: "Open a browser to claim this project.",
             next_commands: [
@@ -343,7 +346,10 @@ describe("claim", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Nothing was claimed (dry run)",
+            title: expect.stringMatching(/^Would claim project proj-[0-9a-f]{12} \(dry run\)$/),
+            verb: "claim",
+            topic: "project",
+            id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             project_id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             would:
               "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
@@ -369,7 +375,10 @@ describe("claim", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Nothing was claimed (dry run)",
+            title: expect.stringMatching(/^Would claim project proj-[0-9a-f]{12} \(dry run\)$/),
+            verb: "claim",
+            topic: "project",
+            id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             project_id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             would: "Create a link to claim this project.",
             next_commands: [
@@ -482,7 +491,20 @@ describe("claim", () => {
           app.run(["claim", "--no-open", "--timeout", "5", "--dry-run"]),
         );
 
-        expect(result).toSayOnce("Nothing was claimed (dry run)");
+        const [, id] = /Would claim project (\S+) \(dry run\)/.exec(result.stdout) ?? [];
+
+        expect(id).toMatch(/^proj-[0-9a-f]{12}$/);
+        expect(result).toSayOnce(`Would claim project ${id} (dry run)`);
+      });
+
+      it("says what the real claim would do", async () => {
+        const app = await aSetUpApp();
+
+        const result = await shown(() =>
+          app.run(["claim", "--no-open", "--timeout", "5", "--dry-run"]),
+        );
+
+        expect(result).toSayOnce("Open a browser to claim this project");
       });
 
       it("prints the claim it planned, once", async () => {

@@ -3,10 +3,12 @@ import { format } from "node:util";
 import { writePlain } from "./plain";
 
 /**
- * What a line of narration is. The level decides the mark it carries in a
- * wizard's chain; a normal command draws every level as a plain line.
+ * What a line of narration is. Only `warn` and `fail` are written when stdout is
+ * not a terminal; `debug` is shown under `--debug`, on stderr off a terminal. A
+ * wizard's chain marks an `info` line as a status, and a block of text without
+ * a mark; a normal command draws every level as a plain line.
  */
-export type LogLevel = "info" | "done" | "start" | "warn" | "fail" | "plain" | "debug";
+export type LogLevel = "info" | "warn" | "fail" | "debug";
 
 /** Whatever draws a command's narration: the UI the base command hands it to. */
 export type LogSink = (level: LogLevel, text: string) => void;
@@ -16,9 +18,10 @@ export type LogSink = (level: LogLevel, text: string) => void;
  *
  * It names no look: the sink installed by the running command decides whether
  * a line is a chain line with its mark, a plain line, or nothing at all
- * (`--json` installs a sink that draws nothing). Code that logs therefore never
- * needs to know which kind of command it is running under, or be handed the UI
- * to talk to. With no sink installed, a line is written plainly.
+ * (`--json` installs a sink that draws nothing, and a pipe is given only `warn`
+ * and `fail`). Code that logs therefore never needs to know which kind of
+ * command it is running under, or be handed the UI to talk to. With no sink
+ * installed, a line is written plainly.
  *
  * The CLI runs one command per process, so one instance ({@link log}) serves
  * every library that has no `Ui` at hand.
@@ -37,24 +40,6 @@ export class Log {
   }
 
   /**
-   * Something finished.
-   *
-   * @param args - What to say, formatted the way `console` formats it.
-   */
-  done(...args: unknown[]): void {
-    this.emit("done", args);
-  }
-
-  /**
-   * Work that has begun, and will report how it ended.
-   *
-   * @param args - What to say, formatted the way `console` formats it.
-   */
-  start(...args: unknown[]): void {
-    this.emit("start", args);
-  }
-
-  /**
    * Something that worked but wants a look. Use `warnings.report` to warn.
    *
    * @param args - What to say, formatted the way `console` formats it.
@@ -70,15 +55,6 @@ export class Log {
    */
   fail(...args: unknown[]): void {
     this.emit("fail", args);
-  }
-
-  /**
-   * A line with no mark of its own, such as a link or a pasted diff.
-   *
-   * @param args - What to say, formatted the way `console` formats it.
-   */
-  plain(...args: unknown[]): void {
-    this.emit("plain", args);
   }
 
   /**

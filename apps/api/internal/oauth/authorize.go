@@ -106,8 +106,10 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 	}
 	doc, err := s.clients.Client(ctx, issuer.ProjectID, settings.DeploymentID, r.Data.ClientID)
 	switch {
-	case errors.Is(err, domain.ErrApplicationNotFound()):
+	case errors.Is(err, domain.ErrApplicationNotFound()), errors.Is(err, domain.ErrApplicationClientNotFound()):
 		return nil, unknownClient
+	case errors.Is(err, domain.ErrReleaseRevoked()):
+		return nil, noMetadata()
 	case errors.Is(err, domain.ErrUnavailable()):
 		return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
 	case err != nil:

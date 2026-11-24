@@ -6,7 +6,8 @@ description: |
 oneOf:
   - title: application.created
     description: |
-      A registered application was created.
+      An application was created, through the API or by the release build
+      that first declared it.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object
@@ -21,9 +22,9 @@ oneOf:
             $ref: payloads/application-payload.yaml
   - title: application.updated
     description: |
-      A registered application was revised. The payload holds the new
-      revision, the name when it changed, and the clients the revision
-      added.
+      An application was revised, through the API or by a release build. The
+      payload holds the new revision, the name when it changed, and the
+      clients the revision added.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object

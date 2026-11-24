@@ -382,7 +382,7 @@ async function replaceOrigin(
     } catch (cause) {
       onChanged();
       throw new Error(
-        `${current.pattern} was removed, but could not be put back: ${describeError(cause, "the request failed")}`,
+        `${current.pattern} was removed, but could not be put back. ${describeError(cause, "The request failed.")}`,
       );
     }
     throw refusal;

@@ -44,6 +44,11 @@ type VariableService interface {
 	// clear. It exists for server-side consumers that use the value itself,
 	// such as the SSO flow presenting a client secret to a provider.
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
+	// DecryptVariableSetSecrets returns the decrypted value of each secret of
+	// set named in names. A name set holds as a plain value, or not at all,
+	// has no entry. Like GetDecryptedVariables, it must never back an API
+	// response.
+	DecryptVariableSetSecrets(ctx context.Context, set *domain.VariableSet, names ...string) (map[string]any, error)
 	// GetDeploymentVariables returns the set deploymentID was frozen with.
 	// A deployment that was never frozen returns an error that is not internal.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
@@ -168,6 +173,32 @@ func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domai
 		})
 	}
 	return decrypted, nil
+}
+
+func (s *variableService) DecryptVariableSetSecrets(ctx context.Context, set *domain.VariableSet, names ...string) (_ map[string]any, err error) {
+	ctx, end := startSpan(ctx, "VariableService.DecryptVariableSetSecrets")
+	defer end(&err)
+
+	variables := set.Variables()
+	// Built lazily, so a set holding none of the names never reaches the key
+	// service.
+	var decrypter crypto.Decrypter
+	values := make(map[string]any, len(names))
+	for _, name := range names {
+		variable, ok := variables[name]
+		if !ok || !variable.IsSecret {
+			continue
+		}
+		if decrypter == nil {
+			decrypter = decrypterOfWritingKey(ctx, s.keys)
+		}
+		value, err := variable.GetDecryptedValue(decrypter)
+		if err != nil {
+			return nil, domain.ErrFailedToDecryptVariable(err).WithDetails(map[string]any{"name": name})
+		}
+		values[name] = value
+	}
+	return values, nil
 }
 
 // errNoFrozenVariables is a sealed deployment whose create did not freeze a

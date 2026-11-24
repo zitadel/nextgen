@@ -409,6 +409,8 @@ describe("pull", () => {
               pulled: PINNED,
               skipped: SKIPPED,
               dry_run: true,
+              verb: "write",
+              topic: "pull",
               next_commands: [expectedPublicCliCommand(checkout.againAsRun("pull"))],
             },
             warnings: SKIPPED_WARNINGS,
@@ -438,6 +440,8 @@ describe("pull", () => {
               pulled: PINNED,
               skipped: SKIPPED,
               dry_run: true,
+              verb: "write",
+              topic: "pull",
               next_commands: [
                 expectedPublicCliCommand(checkout.againAsRun(`pull ${deployed.release_id}`)),
               ],

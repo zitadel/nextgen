@@ -1,0 +1,493 @@
+import { Flags, type Interfaces } from "@oclif/core";
+import { getProperty, hasProperty, setProperty } from "dot-prop";
+
+import { Cmd } from "@/lib/cmd";
+import { isObject } from "@/lib/json";
+import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
+import type { Summary } from "@/lib/ui";
+
+import type { BaseCommand } from "./base";
+import { chosenColumns, type FieldPaths, readColumns } from "@/cli/core/columns";
+import { listData } from "./envelope";
+import { painted, rows } from "@/lib/oclif/rendering";
+import { type Refusal, refusalError } from "./refusal";
+import type { CommandResult } from "./types";
+import type { CommandClass } from "@/lib/oclif/command-class";
+import { Output } from "@/lib/ui";
+
+/** What a command draws a table with: its own `tabulate`, for code that formats around the table. */
+export type Tabulate = (columns: readonly string[], items: readonly unknown[]) => Promise<string>;
+
+/**
+ * `--fields` given to a list that carries no records to choose fields from.
+ */
+const NO_FIELDS_REFUSAL = {
+  message: "This list has no fields to choose from",
+} as const satisfies Refusal;
+
+/**
+ * The `--plain` flag every list command declares, as the last entry of its
+ * `flags`. One definition, so the help reads the same on all of them.
+ */
+export const plainFlag = Flags.boolean({
+  description:
+    "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+});
+
+/**
+ * The `--fields` flag of a list: comma-separated dot-paths of a record to show
+ * in the table and to return under `--json`. One definition, so every list
+ * takes and words it the same way; the paths are judged against the records
+ * when the list is emitted.
+ *
+ * @param options - What the list knows of its records: the `fallback` columns
+ *   the refusal's example shows, and the `shape` of a record when a schema
+ *   knows it, so a field is judged before any request is made.
+ * @returns The flag.
+ */
+export const fieldsFlag = (options: { fallback?: readonly string[]; shape?: FieldPaths } = {}) => {
+  return Flags.custom<
+    readonly string[],
+    Readonly<{ fallback?: readonly string[]; shape?: FieldPaths }>
+  >({
+    delimiter: ",",
+    parse: async (input, _command, flag) => {
+      return readColumns(input, flag.fallback ?? ["id"], flag.shape);
+    },
+  })({
+    description:
+      "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+    ...options,
+  });
+};
+
+/**
+ * What a list command hands {@link Tabulatable}'s `listed`: its parsed flags,
+ * which must carry `plain` and `fields`, so a list that forgot to declare
+ * either does not compile.
+ */
+export type ListFlags = {
+  readonly plain: boolean | undefined;
+  readonly fields: readonly string[] | undefined;
+};
+
+/**
+ * The next page of a paged list. A page token only works with the flags that
+ * issued it, so `listed` suggests the run again as typed with the token in
+ * place of any it was given, and `--json` when the run was JSON.
+ */
+export type ListPage = {
+  token: string | null;
+  /** The envelope property the cursor is reported under, when the platform spells it differently. */
+  cursorKey?: string;
+};
+
+/** Fields `--json` carries beside the canonical ones, which they may not replace. */
+export type ListExtra = Record<string, unknown> & {
+  items?: never;
+  count?: never;
+  next_page_token?: never;
+};
+
+/**
+ * Everything one list command says about its list; `listed` does the rest.
+ * Every list passes every field, with the empty value when it has nothing to
+ * say (`footer: []`, `page: null`, `extra: {}`), so the end of every list
+ * command reads the same.
+ *
+ * A list either has the canonical `--json` shape, which `listed` builds from
+ * its items, page and extra fields, or fixes the whole `data` itself and has
+ * no page; it cannot do both, so the cursor in the data and the cursor in the
+ * footer cannot differ.
+ */
+export type ListView = {
+  /** The dot-paths drawn as columns, in order. */
+  columns: readonly string[];
+  /** What is drawn: one record per row. */
+  rows: readonly unknown[];
+  /**
+   * The paths a record of this list can carry, when its schema knows them, so
+   * `--fields` is judged by the shape and not by how many records a page held.
+   * Without it the records in hand judge.
+   */
+  shape?: FieldPaths;
+  singular: string;
+  plural?: string;
+  /** Said to a person when there is nothing to list; a pipe gets nothing. */
+  empty: string;
+  /** Lines under the count, for a person. */
+  footer: readonly string[];
+} & (
+  | {
+      /** What `--json` carries: the records the rows were made from. */
+      items: readonly unknown[];
+      page: ListPage | null;
+      extra: ListExtra;
+      data?: never;
+    }
+  | {
+      /** The whole `--json` data, for a shape fixed before the canonical one. */
+      data: unknown;
+      items?: never;
+      page: null;
+      extra: Record<string, never>;
+    }
+);
+
+/** Keeps a cell on one line: a line break or tab in it is escaped as well. */
+const ONE_LINE: EscapeOptions = { keepLayout: false };
+
+/**
+ * One cell: a dot-path resolved through objects, rendered as text. Every view
+ * reads its values here, so control characters in a value from a server are
+ * escaped for all of them and none can drive the terminal.
+ */
+const readCell = (column: string, item: unknown, options?: EscapeOptions): string => {
+  const value = column.split(".").reduce<unknown>((current, key) => {
+    return isObject(current) ? current[key] : undefined;
+  }, item);
+  const text = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+
+  return escapeControlCharacters(text, options);
+};
+
+/**
+ * The machine form of a list: one record per line, fields separated by tabs,
+ * no header and no padding, so `cut -f2` and `awk -F'\t'` work. This is what a
+ * piped run emits — the aligned table is for a terminal, where nothing is
+ * parsing it. Tabs and newlines inside a value would break the record, so they
+ * are escaped rather than passed through.
+ */
+const tabulateRows = (columns: readonly string[], items: readonly unknown[]): string => {
+  return items
+    .map((item) => {
+      return columns
+        .map((column) => {
+          return readCell(column, item).replaceAll("\t", "\\t").replaceAll("\n", "\\n");
+        })
+        .join("\t");
+    })
+    .join("\n");
+};
+
+/**
+ * Marks a command that prints a table, a list or a record, and gives it the one
+ * way to do it. Only a command built on this has `this.tabulate`,
+ * `this.tabulateDetail` and `this.listed`, so what prints one is visible in
+ * the class it extends, and `@oclif/table` is imported nowhere else. A list
+ * draws itself through `listed` alone: how it is rendered, and whether it is
+ * plain, is not a command's to decide.
+ *
+ * ```ts
+ * export default class OriginList extends Tabulatable(EnvironmentCommand) {}
+ * ```
+ *
+ * A table is for a person at a terminal, so under `--json` the two that draw
+ * one return an empty string without loading anything: the table library draws
+ * with `ink` and `react`, which take a few hundred milliseconds to load, and a
+ * machine reading the envelope would pay for a rendering it throws away.
+ */
+export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
+  abstract class TabulatableCommand extends Base {
+    /**
+     * `items` as an aligned text table, one column per dot-path in `columns`,
+     * headed by each path's last segment. Nested paths resolve through objects;
+     * missing values render empty; non-strings render as JSON. Nothing under
+     * `--json`.
+     *
+     * `@oclif/table` lays it out, so wide characters are measured by how they
+     * are drawn and the columns after them stay aligned. The table keeps its
+     * natural width at any terminal size: the library's way of fitting one
+     * shares the width between columns in proportion and breaks inside a word,
+     * which leaves an id or a path in pieces that cannot be read or copied, so
+     * a row wider than the terminal is left to the terminal to wrap. The
+     * library is imported here, when a table is drawn, and not at the top.
+     *
+     * The library styles a header bold blue from its own reading of the
+     * environment, and spreads what it is given over that, so turning the
+     * style off means naming both. The run has already settled the question,
+     * and a `--no-color` run whose table arrived coloured anyway would be the
+     * answer going unheard.
+     */
+    protected async tabulate(
+      columns: readonly string[],
+      items: readonly unknown[],
+    ): Promise<string> {
+      if (this.jsonEnabled()) {
+        return "";
+      }
+      const { makeTable } = await import("@oclif/table");
+      const table = makeTable({
+        data: items.map((item) => {
+          return Object.fromEntries(
+            columns.map((column) => {
+              return [column, readCell(column, item, ONE_LINE)];
+            }),
+          );
+        }),
+        columns: columns.map((key) => {
+          return {
+            key,
+            name: key.split(".").at(-1) ?? key,
+          };
+        }),
+        borderStyle: "headers-only-with-underline",
+        maxWidth: "none",
+        headerOptions: Output.color
+          ? { bold: true, color: "blue" }
+          : { bold: false, color: undefined },
+      });
+
+      return table.replace(/\n+$/, "");
+    }
+
+    /**
+     * The record reduced to the dot-paths named, nested as they were: `id` and
+     * `attributes.email` give `{ id, attributes: { email } }`. The record is
+     * read as `--json` prints it, through its `toJSON` when it has one, and
+     * only by the keys it holds itself. A path the record does not carry, or
+     * that names a prototype, is left out.
+     *
+     * @param item - A record.
+     * @param paths - The dot-paths to keep.
+     * @returns A new record holding only those paths.
+     */
+    protected pickFields(item: unknown, paths: readonly string[]): Record<string, unknown> {
+      const record: Record<string, unknown> = JSON.parse(JSON.stringify(item ?? {}));
+      const picked: Record<string, unknown> = {};
+      for (const path of paths) {
+        if (hasProperty(record, path)) {
+          setProperty(picked, path, getProperty(record, path));
+        }
+      }
+
+      return picked;
+    }
+
+    /**
+     * What a command that reads one record carries and shows under `--fields`:
+     * the record `--json` prints, cut to the paths chosen, and the columns the
+     * human rows draw. The paths were judged against the record's shape when the
+     * flag was parsed, so a path the record does not carry is simply left out
+     * of the data, and the columns are the ones chosen, never re-judged here.
+     *
+     * @param record - The record the command read.
+     * @param fields - The parsed `--fields`, or `undefined` when none was given.
+     * @param fallback - The columns shown when no field was chosen.
+     * @returns The `data` for the envelope, whole when no field was chosen, and the `columns` for the rows.
+     */
+    protected viewRecord<Record_>(
+      record: Record_,
+      fields: readonly string[] | undefined,
+      fallback: readonly string[],
+    ): {
+      readonly data: Record_ | Record<string, unknown>;
+      readonly columns: readonly string[];
+    } {
+      if (fields === undefined) {
+        return {
+          data: record,
+          columns: fallback,
+        };
+      }
+
+      return {
+        data: this.pickFields(record, fields),
+        columns: fields,
+      };
+    }
+
+    /**
+     * The one way a list command ends: `return this.listed(flags, {...})`.
+     * It decides plain from the flags, builds the `--json` data, the table or
+     * rows, the page footer and the next-page suggestion, and sends the next
+     * steps to stderr for a pipe, so a list cannot forget any of them.
+     *
+     * {@link listed}, for a caller that returns the result instead of
+     * emitting it.
+     *
+     * `--fields` names paths of the records `--json` carries, so a table of
+     * them is read from those records, and the records are cut to the paths.
+     * The paths are judged by the shape the `fields` flag was declared with.
+     *
+     * A list is for a script when `--plain` asks, or when nothing is on screen
+     * to draw a table on. The cursor is opaque text from the server:
+     * `Cmd.option` quotes it so whitespace, shell metacharacters and control
+     * characters cannot run from a copied command, and spelling it out first
+     * would change what it reads back as. The data keeps the cursor as it came,
+     * so paging with it works. The envelope carries the raw cursor, where a
+     * script reads it to page, and `renderNextSteps` spells it out for the copy
+     * a person sees; the rest is the run again as typed, so the token goes with
+     * the flags that issued it. What a script's rows leave out is said beside
+     * them on stderr: the empty line and the footer would break `cut`, `awk`
+     * and `wc -l` on stdout, but a deployment id or an origin list is not the
+     * script's to lose.
+     *
+     * @param flags - The list command's flags.
+     * @param given - What the command lists.
+     * @returns The result to emit.
+     * @throws {ZitadelError} When `--fields` is given for a list that carries no records.
+     */
+    protected async listed(flags: ListFlags, given: ListView): Promise<CommandResult> {
+      if (flags.fields !== undefined && given.items === undefined) {
+        throw refusalError(NO_FIELDS_REFUSAL, {});
+      }
+      const view: ListView =
+        flags.fields === undefined || given.items === undefined
+          ? given
+          : {
+              ...given,
+              columns: chosenColumns(
+                flags.fields,
+                given.columns,
+                given.items,
+                given.shape ??
+                  (this.ctor.flags?.fields as { shape?: FieldPaths } | undefined)?.shape,
+              ),
+              rows: given.items,
+              items: given.items.map((item) => {
+                return this.pickFields(item, flags.fields ?? []);
+              }),
+            };
+      const plain = flags.plain === true || !Output.screen;
+      const token = view.page?.token || null;
+      const more =
+        token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
+      const nextCommand =
+        token === null
+          ? undefined
+          : await this.rerun<{
+              "page-token": Interfaces.OptionFlag<string | undefined>;
+              all: Interfaces.BooleanFlag<boolean>;
+            }>({
+              without: ["pageToken", "all"],
+              after: { pageToken: token, ...(this.jsonEnabled() ? { json: true } : {}) },
+            });
+      const aside = [
+        ...(view.rows.length === 0
+          ? [escapeControlCharacters(view.empty)]
+          : view.footer.map((line) => {
+              return escapeControlCharacters(line);
+            })),
+        ...more,
+      ];
+      const pretty = plain
+        ? rows(await this.renderList(plain, view))
+        : this.jsonEnabled()
+          ? painted(await this.renderList(plain, view))
+          : undefined;
+      return {
+        status: "ok",
+        data: view.items === undefined ? view.data : this.canonicalData(view, token),
+        ...(pretty === undefined ? {} : { pretty }),
+        ...(plain && !this.jsonEnabled() && aside.length > 0 ? { footer: aside.join("\n") } : {}),
+        summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
+        ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
+      };
+    }
+
+    /**
+     * How a person at a terminal sees the end of a list: the count is the
+     * headline, the table is what it produced, and the footer lines sit beside
+     * it. A list that found nothing says so, in the one sentence every list uses.
+     */
+    private async listSummary(
+      view: ListView,
+      more: readonly string[],
+      drawn: boolean,
+    ): Promise<Summary> {
+      if (view.rows.length === 0) {
+        return {
+          title: escapeControlCharacters(view.empty),
+          sections: [],
+          ...(more.length === 0 ? {} : { extras: [...more] }),
+        };
+      }
+      return {
+        title: `Found ${view.rows.length} ${new Intl.PluralRules("en").select(view.rows.length) === "one" ? view.singular : (view.plural ?? `${view.singular}s`)}`,
+        sections: [],
+        ...(drawn ? { lines: (await this.tabulate(view.columns, view.rows)).split("\n") } : {}),
+        extras: [
+          ...view.footer.map((line) => {
+            return escapeControlCharacters(line);
+          }),
+          ...more,
+        ],
+      };
+    }
+
+    /** The canonical `--json` data of a list: `items`, `count`, its cursor and its extra fields. */
+    private canonicalData(
+      view: ListView & { items: readonly unknown[] },
+      token: string | null,
+    ): Record<string, unknown> {
+      const canonical = listData(view.items, {
+        nextPageToken: token,
+        cursorKey: view.page?.cursorKey,
+      });
+      const replaced = Object.keys(view.extra).filter((key) => {
+        return key in canonical;
+      });
+      if (replaced.length > 0) {
+        throw new Error(`a list's extra fields may not replace ${replaced.join(", ")}`);
+      }
+      return {
+        ...canonical,
+        ...view.extra,
+      };
+    }
+
+    /**
+     * What a script reads of a list: tab-separated rows with no header and
+     * nothing when empty, so `cut`, `awk` and `wc -l` work. Nothing under
+     * `--json`. A terminal is not drawn from this but from the summary.
+     */
+    private async renderList(plain: boolean, view: ListView): Promise<string> {
+      if (this.jsonEnabled() || !plain) {
+        return "";
+      }
+
+      return tabulateRows(view.columns, view.rows);
+    }
+
+    /**
+     * One record for a person: the heading first, then a labelled field per
+     * line. Nested paths are labelled by their last segment, so
+     * `metadata.status` reads as `status`. It is the terminal rendering of
+     * `get`; a pipe (and `--json`) still receives the whole object, since a
+     * script wants the record, not a view of it.
+     *
+     * Width is measured over the fields that survive, so an omitted one cannot
+     * pad every other label out of alignment. The heading is a field of the
+     * record, so it is the server's text as much as any cell is, and `readCell`
+     * spells out only the cells.
+     */
+    protected tabulateDetail(
+      heading: string | undefined,
+      fields: readonly string[],
+      item: unknown,
+    ): string {
+      const rows = fields
+        .map((field) => {
+          return [field.split(".").at(-1) ?? field, readCell(field, item)] as const;
+        })
+        .filter(([, value]) => {
+          return value !== "";
+        });
+      const width = Math.max(
+        0,
+        ...rows.map(([label]) => {
+          return label.length;
+        }),
+      );
+      const body = rows.map(([label, value]) => {
+        return `${label.padEnd(width)}  ${value}`;
+      });
+      const headed = heading === undefined ? [] : [escapeControlCharacters(heading), ""];
+
+      return [...headed, ...body].join("\n");
+    }
+  }
+
+  return TabulatableCommand;
+}

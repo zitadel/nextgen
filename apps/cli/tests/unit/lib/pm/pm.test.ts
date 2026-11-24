@@ -1,9 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
-import { PM, type PMName } from "@/lib/pm";
+import { PM, type PMName, type Runner } from "@/lib/pm";
+import { log, Output } from "@/lib/ui";
 import { it } from "@tests/fixtures";
 
 /**
@@ -164,4 +165,65 @@ describe("package manager commands", () => {
       expect(PM.named(packageManager).script("test:e2e").display).toBe(display);
     },
   );
+});
+
+/**
+ * What a package manager is run with.
+ */
+type RunOptions = Parameters<Runner>[1];
+
+describe("PM.installDependencies with the json option left out", () => {
+  afterEach(() => {
+    Output.settle({ json: false, color: false });
+  });
+
+  /**
+   * Installs what a command added, with the run of the package manager recorded in place of run.
+   *
+   * @param dir - The project directory.
+   * @returns The options the package manager was run with.
+   */
+  async function installed(dir: string): Promise<RunOptions[]> {
+    const received: RunOptions[] = [];
+
+    await PM.named("npm").installDependencies(
+      { needed: true, dryRun: false, skipInstall: false },
+      {
+        cwd: dir,
+        env: {},
+        task: async (_label, work) => {
+          return work();
+        },
+        log,
+        failed: (error) => {
+          return error instanceof Error ? error : new Error(String(error));
+        },
+        run: async (_command, options) => {
+          received.push(options);
+        },
+      },
+    );
+
+    return received;
+  }
+
+  it("keeps the package manager's output off stdout when the run answers in JSON", async ({
+    dir,
+  }) => {
+    Output.settle({ json: true, color: false });
+
+    const received = await installed(dir);
+
+    expect(received[0]?.redirectStdoutToStderr).toBe(true);
+  });
+
+  it("leaves the package manager's output alone when the run does not answer in JSON", async ({
+    dir,
+  }) => {
+    Output.settle({ json: false, color: false });
+
+    const received = await installed(dir);
+
+    expect(received[0]?.redirectStdoutToStderr).toBe(false);
+  });
 });

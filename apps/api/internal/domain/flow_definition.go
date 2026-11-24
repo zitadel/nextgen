@@ -35,7 +35,7 @@ const (
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
 	// FlowOnSuccessCreateUserWithSso creates the user from the identity an
 	// external provider returned, with the values the step collected, and
-	// links the identity to it (see processSSOCollection).
+	// links the identity to it.
 	FlowOnSuccessCreateUserWithSso
 )
 
@@ -106,6 +106,14 @@ const (
 	// the validator on inbound flow definitions — flow authors never declare it.
 	FlowActionKindBack
 )
+
+// FlowActionSSO is the action the client submits with
+// [FlowSubmitInput.SSOProvider] to start an external sign-in. It is not
+// declared on the step: offering sso_providers is what enables it.
+const FlowActionSSO = "sso"
+
+// FlowBackActionName is the name attached to the injected back action.
+const FlowBackActionName = "back"
 
 // FlowDefinition is a customer-configured directed graph of authentication steps.
 // It is immutable: modifications produce a new revision with a new SchemaVersion.
@@ -232,10 +240,13 @@ type FlowDefinitionAudience struct {
 	TeamIDs []string
 }
 
-// authMethodPrefix marks a step.fields entry as referring to an entry
+// AuthMethodPrefix marks a step.fields entry as referring to an entry
 // under the user schema's `x-auth-methods` keyword (e.g.
 // "x-auth-methods#password") rather than to a user property.
-const authMethodPrefix = SchemaAnnotationAuthMethods + "#"
+const AuthMethodPrefix = SchemaAnnotationAuthMethods + "#"
+
+// AuthMethodPassword is the `x-auth-methods` entry of the password.
+const AuthMethodPassword = "password"
 
 // Field carries the raw field name from a flow-definition step.
 type Field string
@@ -252,12 +263,12 @@ func (f Field) IsUserProperty() bool {
 
 // IsAuthMethod reports whether the field references an `x-auth-methods` entry.
 func (f Field) IsAuthMethod() bool {
-	return strings.HasPrefix(f.String(), authMethodPrefix)
+	return strings.HasPrefix(f.String(), AuthMethodPrefix)
 }
 
 // AuthMethod returns the method name after the `x-auth-methods#` prefix (e.g. "password").
 func (f Field) AuthMethod() string {
-	return strings.TrimPrefix(f.String(), authMethodPrefix)
+	return strings.TrimPrefix(f.String(), AuthMethodPrefix)
 }
 
 // FieldsFromStrings lifts wire-format string field names into typed

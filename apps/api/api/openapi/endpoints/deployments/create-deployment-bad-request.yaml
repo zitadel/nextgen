@@ -5,10 +5,12 @@ description: |
 oneOf:
   - $ref: ../../components/schemas/errors/dep-invalid.yaml
   - $ref: deployment-variables-missing.yaml
+  - $ref: deployment-variables-not-secret.yaml
   - $ref: ../../components/schemas/errors/req-invalid.yaml
 discriminator:
   propertyName: code
   mapping:
     dep.invalid: ../../components/schemas/errors/dep-invalid.yaml
     dep.variables_missing: deployment-variables-missing.yaml
+    dep.variables_not_secret: deployment-variables-not-secret.yaml
     req.invalid: ../../components/schemas/errors/req-invalid.yaml

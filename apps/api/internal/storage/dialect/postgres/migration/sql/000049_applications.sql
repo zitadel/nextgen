@@ -37,8 +37,9 @@ CREATE TABLE zitadel_nextgen.application_revisions (
 CREATE UNIQUE INDEX uq_application_revisions_application_created_at
     ON zitadel_nextgen.application_revisions (project_id, application_id, created_at);
 
--- One client of an application. A revision cannot remove a client, so no row
--- is deleted, and a client_id stays taken once held (ADR 047 section 5). The
+-- One client of an application. No row is deleted: a registered revision
+-- cannot remove a client, and a release that drops one only stops serving it,
+-- so a client_id stays taken once held (ADR 047 section 5). The
 -- cascade frees a client_id when its application is deleted; the PR that adds
 -- deletion owns the contract's promise that an id once held is never reused.
 CREATE TABLE zitadel_nextgen.application_clients (

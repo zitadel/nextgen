@@ -203,6 +203,37 @@ describe("release detail", () => {
     expect(within(region).getByText(/Edit the policy locally/)).toBeInTheDocument();
   });
 
+  it("lists a pinned application under its name", async () => {
+    serveDeployments();
+    let requestedProject: string | null = null;
+    server.use(
+      http.get(`${RELEASES_URL}/rel_1`, () =>
+        HttpResponse.json(
+          release({
+            pointers: [{ kind: "application", handle: "shop", revision_id: "apprev_1" }],
+          }),
+        ),
+      ),
+      http.get(`${API}/applications/revisions/apprev_1`, ({ request }) => {
+        requestedProject = new URL(request.url).searchParams.get("project_id");
+        return HttpResponse.json({
+          id: "app_1",
+          revision_id: "apprev_1",
+          slug: "shop",
+          declared: true,
+          created_at: CREATED_AT,
+          updated_at: CREATED_AT,
+          definition: { slug: "shop", name: "Shop", clients: [] },
+        });
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(await screen.findByRole("heading", { name: "Applications" })).toBeInTheDocument();
+    expect(requestedProject).toBe("proj_test");
+    expect(screen.getByRole("button", { name: /^Shop apprev_1$/ })).toBeInTheDocument();
+  });
+
   it("names a policy from its handle when its revision cannot be read", async () => {
     serveDeployments();
     server.use(
