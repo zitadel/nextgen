@@ -35,16 +35,6 @@ export const CONNECTION_FILE = "acme.json";
 export const CONNECTION_PATH = `.zitadel/idps/${CONNECTION_FILE}`;
 
 /**
- * The file name of a second connection claiming the same slug.
- */
-export const COPY_FILE = "copy.json";
-
-/**
- * The `$id` a schema and the flow pinning it may both name.
- */
-export const SCHEMA_ID = "https://schemas.example.test/staff.json";
-
-/**
  * The connection the schema and flow name, mapping the email claim it asks
  * for.
  */
@@ -54,37 +44,12 @@ export const ACME = anOidcConnection({
 });
 
 /**
- * A second connection claiming {@link ACME}'s slug, with a secret of its own.
- */
-export const ACME_COPY = anOidcConnection({
-  claim_mapping: { email: "email" },
-  oidc: { scopes: ["openid", "email"], client_secret: "${{ COPY_CLIENT_SECRET }}" },
-});
-
-/**
  * A second schema that lists `acme` but defines no `email`, as one of two
  * schemas the connection `acme.json` maps into.
  */
 export const NO_EMAIL_SCHEMA = aSchemaListing(["acme"], {
   objectType: "contractor",
   properties: { phone: { "x-unique": "project" } },
-});
-
-/**
- * Where {@link NO_EMAIL_SCHEMA} sits when it is the file `field.json`.
- */
-export const NO_EMAIL_PATH = ".zitadel/schemas/field.json";
-
-/**
- * A second connection, `other`, that nobody lists or offers.
- */
-export const OTHER_PATH = ".zitadel/idps/other.json";
-
-/**
- * The schema listing `acme`, with a property whose type is a number.
- */
-export const NUMERIC_EMAIL_SCHEMA = aSchemaListing(["acme"], {
-  properties: { email: { "x-unique": "project", type: "integer" } },
 });
 
 /**

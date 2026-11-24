@@ -1,3 +1,15 @@
+/**
+ * What two or more SSO rules use: the connections that stand for their slug,
+ * the claims a connection reads, which properties a schema can read, and the
+ * way every message quotes a name.
+ *
+ * @remarks
+ * A helper that one rule alone uses stays in that rule's file. Rules are
+ * documented in the form set out in `index.ts`; a helper here that decides
+ * when a rule stays silent, such as {@link heldByBrokenConnection}, says so in
+ * its own remarks so the rules' `Reported once:` paragraphs can point at it.
+ */
+
 import { basename } from "node:path";
 
 import type { ZitadelConfig } from "@/lib/zitadel/config";
@@ -32,7 +44,7 @@ export function article(word: string): string {
 /**
  * A connection that stands for its slug, with what the rules ask about it.
  */
-export type Standing = {
+type Standing = {
   /**
    * The connection, the first file in path order with its slug.
    */

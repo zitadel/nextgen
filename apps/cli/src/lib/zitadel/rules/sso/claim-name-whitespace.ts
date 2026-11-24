@@ -10,11 +10,21 @@ import { claimReads, quote, standing } from "@/lib/zitadel/rules/sso/shared";
  */
 const EDGE_SPACE = /^\p{White_Space}|\p{White_Space}$/u;
 
+/**
+ * A claim name in claim_mapping, verified_claims or subject_claim has a space at its start or end.
+ *
+ * @remarks
+ * Why it matters: A claim name is matched exactly, so the space names a claim no provider sends and
+ * the property is never filled.
+ *
+ * Fix: Remove the space.
+ *
+ * Origin: #2889; docs/design/idp/2-auth-method-selection.md#validation-rules as Claim Name
+ * Whitespace.
+ */
 export const CLAIM_NAME_WHITESPACE: Rule = defineRule({
   id: "sso/claim-name-whitespace",
   severity: "error",
-  // A claim name is matched exactly, so a space around it names a claim no
-  // provider sends.
   each: (config) => {
     return standing(config).flatMap((entry) => {
       const subject = entry.connection.subjectClaim;

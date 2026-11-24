@@ -53,7 +53,11 @@ describe("sso/connection-resolves", () => {
         return rule.check(config, {});
       });
 
-      expect(config.broken.map((file) => file.path)).toEqual([CONNECTION_PATH]);
+      expect(
+        config.broken.map((file) => {
+          return file.path;
+        }),
+      ).toEqual([CONNECTION_PATH]);
       expect(
         issues.filter((issue) => {
           return issue.rule === "sso/connection-resolves";
@@ -83,7 +87,11 @@ describe("sso/connection-resolves", () => {
         return rule.check(config, {});
       });
 
-      expect(config.broken.map((file) => file.path)).toEqual([CONNECTION_PATH]);
+      expect(
+        config.broken.map((file) => {
+          return file.path;
+        }),
+      ).toEqual([CONNECTION_PATH]);
       expect(
         issues.filter((issue) => {
           return issue.rule === "sso/connection-resolves";
@@ -102,7 +110,11 @@ describe("sso/connection-resolves", () => {
       return rule.check(config, {});
     });
 
-    expect(config.broken.map((file) => file.path)).toEqual([CONNECTION_PATH]);
+    expect(
+      config.broken.map((file) => {
+        return file.path;
+      }),
+    ).toEqual([CONNECTION_PATH]);
     expect(
       issues.filter((issue) => {
         return issue.rule === "sso/connection-resolves";

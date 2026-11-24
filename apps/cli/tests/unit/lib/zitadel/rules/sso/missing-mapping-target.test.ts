@@ -4,12 +4,17 @@ import { aSchemaListing } from "@tests/helpers/schemas";
 import {
   ACME,
   CONNECTION_PATH,
-  NO_EMAIL_PATH,
   SCHEMA_FILE,
   agreeing,
   issuesOf,
   twoSchemas,
 } from "@tests/helpers/sso-rules";
+
+/**
+ * Where the schema that defines no `email` sits, as one of the two
+ * {@link twoSchemas}.
+ */
+const NO_EMAIL_PATH = ".zitadel/schemas/field.json";
 
 describe("sso/missing-mapping-target", () => {
   it.each([

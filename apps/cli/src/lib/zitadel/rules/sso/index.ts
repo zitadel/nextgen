@@ -10,8 +10,37 @@
  *
  * Each mistake is reported once, at its cause: a typo is named with what it
  * most likely meant, and what follows from it is not reported again.
+ *
+ * @remarks
+ * Layout: one file per rule, named for the rule's id without the `sso/`
+ * prefix (`sso/claim-needs-scope` is `claim-needs-scope.ts`), exporting one
+ * constant named for the id in upper snake case (`CLAIM_NEEDS_SCOPE`). A file
+ * whose rule reads two kinds of file exports an array with one `defineRule`
+ * per kind, and spreads into {@link SSO_RULES}. What two or more rules use
+ * lives in `shared.ts`; whatever one rule uses lives in its own file. Each
+ * rule's tests mirror it under `tests/unit/lib/zitadel/rules/sso/`.
+ *
+ * Report order: {@link SSO_RULES} is the order the findings are reported in,
+ * after the contract, flow and environment rules. It runs from the checks on
+ * the connection files themselves (duplicate slugs, shared variables), through
+ * provider names and routing in the flows, to the claim mappings and the
+ * properties they name, with errors and warnings interleaved by subject. The
+ * order is part of what a developer sees, so a new rule goes where its subject
+ * reads naturally and an existing rule is never moved without its tests.
+ *
+ * Documentation standard: every exported rule constant, and every
+ * `defineRule` inside an array, carries one TSDoc block of this shape, in
+ * plain prose, with a heading omitted when it has nothing to say. The first
+ * sentence says what mistake the rule finds, as the developer would put it.
+ * Then `@remarks` holds separate paragraphs that start with these labels, in
+ * this order: `Why it matters:` (the consequence at sign-in or deploy, and
+ * why the rule is only a warning or an error), `Reported once:` (which rule
+ * or contract reports it instead, or when the rule stays silent, and why),
+ * `Fix:` (what the message tells the developer to change) and `Origin:` (the
+ * pull requests and issues and the design-doc section it came from). Keep
+ * inline comments inside a rule for a line of code that is not obvious, never
+ * for what the rule is for.
  */
-
 import type { Rule } from "@/lib/zitadel/rules/rule";
 import { DUPLICATE_SLUG } from "@/lib/zitadel/rules/sso/duplicate-slug";
 import { SHARED_VARIABLE } from "@/lib/zitadel/rules/sso/shared-variable";

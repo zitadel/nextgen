@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
-import { aConfig } from "@tests/helpers/config";
+import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import { aSchemaListing } from "@tests/helpers/schemas";
-import {
-  CONNECTION_FILE,
-  CONNECTION_PATH,
-  COPY_FILE,
-  SCHEMA_FILE,
-  ACME,
-  ACME_COPY,
-} from "@tests/helpers/sso-rules";
+import { CONNECTION_FILE, CONNECTION_PATH, SCHEMA_FILE, ACME } from "@tests/helpers/sso-rules";
+
+/**
+ * The file name of a second connection claiming the same slug.
+ */
+const COPY_FILE = "copy.json";
+
+/**
+ * A second connection claiming {@link ACME}'s slug, with a secret of its own.
+ */
+const ACME_COPY = anOidcConnection({
+  claim_mapping: { email: "email" },
+  oidc: { scopes: ["openid", "email"], client_secret: "${{ COPY_CLIENT_SECRET }}" },
+});
 
 describe("sso/duplicate-slug", () => {
   it("refuse a second connection file that claims a slug, naming the first", () => {

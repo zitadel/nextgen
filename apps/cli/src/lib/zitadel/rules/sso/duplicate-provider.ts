@@ -17,7 +17,25 @@ function repeatedProviders(providers: readonly string[]): readonly string[] {
   ];
 }
 
+/**
+ * The rules that find a provider listed twice, one for a schema's sso.providers and one for a flow
+ * step's sso_providers.
+ */
 export const DUPLICATE_PROVIDER: readonly Rule[] = [
+  /**
+   * A schema's sso.providers lists the same provider twice.
+   *
+   * @remarks
+   * Why it matters: A duplicate entry is a mistake in the list the schema's sign-in methods are
+   * built from.
+   *
+   * Reported once: Each repeated provider is reported once, however many times it repeats.
+   *
+   * Fix: List each provider once.
+   *
+   * Origin: #2889; docs/design/idp/2-auth-method-selection.md#validation-rules as Duplicate
+   * Provider.
+   */
   defineRule({
     id: "sso/duplicate-provider",
     severity: "error",
@@ -39,6 +57,20 @@ export const DUPLICATE_PROVIDER: readonly Rule[] = [
     },
   }),
 
+  /**
+   * A flow step's sso_providers lists the same provider twice.
+   *
+   * @remarks
+   * Why it matters: The step offers that provider's button twice.
+   *
+   * Reported once: Steps with the same repeated provider are one mistake, reported together as one
+   * finding naming every step.
+   *
+   * Fix: List each provider once.
+   *
+   * Origin: #2889; docs/design/idp/2-auth-method-selection.md#validation-rules as Duplicate
+   * Provider.
+   */
   defineRule({
     id: "sso/duplicate-provider",
     severity: "error",

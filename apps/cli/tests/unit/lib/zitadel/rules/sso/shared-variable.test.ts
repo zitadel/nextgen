@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { anOidcConnection, type ConfigDocuments } from "@tests/helpers/config";
-import { CONNECTION_FILE, ACME, OTHER_PATH, issuesOf } from "@tests/helpers/sso-rules";
+import { CONNECTION_FILE, ACME, issuesOf } from "@tests/helpers/sso-rules";
+
+/**
+ * A second connection, `other`, that nobody lists or offers.
+ */
+const OTHER_PATH = ".zitadel/idps/other.json";
 
 describe("sso/shared-variable", () => {
   it.each([

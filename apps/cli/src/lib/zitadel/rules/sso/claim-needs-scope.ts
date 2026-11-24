@@ -2,12 +2,26 @@ import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { isStandardScope, standardClaim } from "@/lib/zitadel/rules/claims";
 import { claimReads, quote, standing } from "@/lib/zitadel/rules/sso/shared";
 
+/**
+ * A claim_mapping or verified_claims row reads a standard claim without the scope that makes a
+ * provider return it.
+ *
+ * @remarks
+ * Why it matters: The provider does not send the claim, so the property is never filled or
+ * verified. It is only a warning because a provider may return the claim another way, such as the
+ * claims request parameter or its own behaviour, for a catalog connection as for a custom one.
+ *
+ * Reported once: Judged only when oidc.scopes holds standard scopes alone, because a scope the
+ * standard does not define may bundle claims. One finding for each field and each missing scope.
+ *
+ * Fix: Add the scope to oidc.scopes, or read another claim.
+ *
+ * Origin: #2889; the warning-grade rules of #1083;
+ * docs/design/idp/2-auth-method-selection.md#validation-rules as Claim Needs Scope.
+ */
 export const CLAIM_NEEDS_SCOPE: Rule = defineRule({
   id: "sso/claim-needs-scope",
   severity: "warning",
-  // A scope the standard does not define may bundle claims, so only a list
-  // of standard scopes alone can be said to leave a claim out. Only a
-  // warning: a provider may return the claim another way.
   each: (config) => {
     return standing(config).flatMap((entry) => {
       const scopes = entry.connection.scopes;
