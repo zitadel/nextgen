@@ -101,6 +101,7 @@ type flowTestWorld struct {
 	ssoIdentities      *flowenginemock.MockSSOIdentityService
 	ssoRedirects       *flowenginemock.MockSSORedirectIssuer
 	passwords          *fakePasswordPolicy
+	deps               flowengine.Deps
 	sm                 *flowengine.Runtime
 }
 
@@ -146,7 +147,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
 
-	sm := flowengine.New(flowengine.Deps{
+	deps := flowengine.Deps{
 		Schemas:       schemaResolver,
 		SchemaStore:   schemaStore,
 		Fields:        resolver,
@@ -157,7 +158,8 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		SSORedirects:  ssoRedirects,
 		Passwords:     passwords,
 		Now:           now,
-	})
+	}
+	sm := flowengine.New(deps)
 
 	return &flowTestWorld{
 		mock:               mock,
@@ -169,6 +171,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		ssoIdentities:      ssoIdentities,
 		ssoRedirects:       ssoRedirects,
 		passwords:          passwords,
+		deps:               deps,
 		sm:                 sm,
 	}
 }
