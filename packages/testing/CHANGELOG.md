@@ -1,5 +1,14 @@
 # @zitadel/testing
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [[`e15e31c`](https://github.com/zitadel/nextgen/commit/e15e31cb1c830242249d72dbe3671d2877d89a48)]:
+  - @zitadel/cli@0.9.0
+  - @zitadel/api@0.9.0
+  - @zitadel/config@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

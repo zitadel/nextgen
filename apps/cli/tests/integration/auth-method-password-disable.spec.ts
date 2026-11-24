@@ -407,6 +407,8 @@ describe("auth-method password disable", () => {
               notices: [{ severity: "warning", message: WOULD_LEAVE_NONE_WARNING }],
               title: "Would disable password for default-human-user (dry run)",
               dry_run: true,
+              verb: "disable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",
@@ -460,6 +462,8 @@ describe("auth-method password disable", () => {
               notices: [{ severity: "warning", message: NO_ACTIVE_FLOW_WARNING }],
               title: "Nothing to disable for default-human-user (dry run)",
               dry_run: true,
+              verb: "disable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",

@@ -4,16 +4,9 @@ import { z } from "zod";
 import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
-import {
-  type Admitted,
-  type CommandResult,
-  CREDENTIALS,
-  type JsonEnvelope,
-  PREVIEW_CREDENTIAL,
-  PreviewCommand,
-} from "@/lib/oclif";
-import { filled, reads, type Refused } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Admitted, type CommandResult, CREDENTIALS, PREVIEW_CREDENTIAL } from "@/cli/core";
+import { filled, reads, type Refused } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { PreviewExpiries, PreviewUrls } from "@/lib/preview";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
@@ -22,6 +15,9 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Ttl, TtlError } from "@/lib/ttl";
 import { warnings } from "@/lib/ui";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Previewable } from "@/cli/core/previewable";
+import { PreviewCommand } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
 
 const CREDENTIAL_REQUIRED_REFUSAL = {
   message: "{credential} is not set",
@@ -63,32 +59,24 @@ const ORIGIN = {
 } as const satisfies Refused<string>;
 
 /**
- * Reads a `--ttl` value, turning what `Ttl` refuses into the CLI's own validation error.
- *
- * @param input - The value as it was typed.
- * @returns The parsed TTL.
- * @throws {ZitadelError} `E_VALIDATION`, with `Ttl`'s message and hint, when it is not a TTL.
- */
-function readTtl(input: string): Ttl {
-  try {
-    return Ttl.parse(input);
-  } catch (error) {
-    if (error instanceof TtlError) {
-      throw new ZitadelError("E_VALIDATION", error.message, { hint: error.hint });
-    }
-    throw error;
-  }
-}
-
-/**
- * How long a preview stays live, as `7d`, `12h` or `90m`. `readTtl` refuses a
- * value that is not a duration, in its own words; the schema refuses one
- * outside the server's fixed limits of a minute and 365 days.
+ * How long a preview stays live, as `7d`, `12h` or `90m`. A value that is not
+ * a duration is refused as `E_VALIDATION` with `Ttl`'s own message and hint;
+ * the schema refuses one outside the server's fixed limits of a minute and
+ * 365 days.
  */
 const TTL = {
   schema: z
     .string()
-    .transform(readTtl)
+    .transform((input) => {
+      try {
+        return Ttl.parse(input);
+      } catch (error) {
+        if (error instanceof TtlError) {
+          throw new ZitadelError("E_VALIDATION", error.message, { hint: error.hint });
+        }
+        throw error;
+      }
+    })
     .refine((ttl) => {
       return ttl.ms >= TTL_MINIMUM_MS && ttl.ms <= TTL_MAXIMUM_MS;
     }),
@@ -186,7 +174,10 @@ export function readPreviewUrls(
  * Refuses a preview URL that is a primary origin: an exact primary origin is
  * production as surely as the `primary` keyword is. The server is the authority
  * on what the preview token may reach; this catches the mistake before anything
- * is built, whenever the token can read the project's origins.
+ * is built, whenever the token can read the project's origins. A token that
+ * may not read the project (403) leaves the server to decide what it can
+ * deploy to. A 401 is a token the server does not accept at all, which fails
+ * here rather than after the whole bundle is built.
  */
 export async function refusePrimaryOrigins(
   urls: readonly string[],
@@ -194,9 +185,6 @@ export async function refusePrimaryOrigins(
   projectId: string,
 ): Promise<void> {
   const originService = new OriginService(client, projectId);
-  // A token that may not read the project (403) leaves the server to decide
-  // what it can deploy to. A 401 is a token the server does not accept at all,
-  // which fails here rather than after the whole bundle is built.
   const production = await originService
     .primaryAmong(urls)
     .catch((error: unknown): readonly string[] => {
@@ -232,7 +220,7 @@ export async function refusePrimaryOrigins(
  * prints is the release digest as `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build
  * to pin.
  */
-export default class Preview extends ServerCommand(PreviewCommand) {
+export default class Preview extends Previewable(ServerCommand(PreviewCommand)) {
   static override description =
     "Deploy a release from .zitadel/ to a pull-request build's preview URLs.";
   static override group = CommandGroups.releases;
@@ -270,24 +258,27 @@ export default class Preview extends ServerCommand(PreviewCommand) {
     }),
   };
 
-  protected async execute({ flags }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
+  /**
+   * Says what the command would publish, without publishing it.
+   *
+   * A dry run validates and resolves the targets but writes nothing (no
+   * release, no deployment, no preview registration), so a pull-request build
+   * can check its `.zitadel/` without publishing, as `deploy --dry-run` does.
+   *
+   * @param input.flags - The flags the command accepts.
+   * @returns The result of the dry run.
+   */
+  protected async preview({ flags }: Admitted<typeof Preview>): Promise<CommandResult> {
     const skipped = this.skippedUnlessPreviewable(flags.strict);
     if (skipped !== undefined) {
-      return this.emit(skipped);
+      return skipped;
     }
-    const urls = readPreviewUrls(flags.origin ?? [], this.env);
-    const { client, projectId } = await this.connect();
-    await refusePrimaryOrigins(urls, client, projectId);
-
-    const publisher = new Publisher(client, projectId);
-    // The IdP step validates the connection files and stops short of syncing
-    // them in a preview, so a pull-request build never reconfigures the
-    // connections a merged deploy owns.
+    const { urls, publisher } = await this.connected(flags);
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
       mode: "preview",
-      dryRun: this.dryRun,
+      dryRun: true,
       compare: false,
     });
     for (const warning of prepared.warnings) {
@@ -295,59 +286,77 @@ export default class Preview extends ServerCommand(PreviewCommand) {
     }
     this.narrate(prepared.notices);
 
-    // A dry run validates and resolves the targets but writes nothing — no
-    // release, no deployment, no preview registration — so a pull-request build
-    // can check its `.zitadel/` without publishing, as `deploy --dry-run` does.
-    if (this.dryRun) {
-      const title = `Validated the preview for ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"} and deployed nothing (dry run)`;
-
-      return this.emit({
-        status: "ok",
-        data: {
-          title,
-          dry_run: true,
-          targets: urls,
+    const dryRun = dryRunResult({
+      verb: "deploy",
+      topic: "preview",
+      noun: `the preview to ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"}`,
+      next: this.suggest({
+        id: "preview",
+        flags: {
+          origin: [...urls],
+          ttl: flags.ttl?.canonical,
+          message: flags.message,
+          strict: flags.strict,
         },
-        pretty: prose(
-          [
-            title,
-            ...urls.map((url) => {
-              return `  • ${url}`;
-            }),
-          ].join("\n"),
-        ),
-        summary: {
-          title,
-          sections: [],
-          lines: urls.map((url) => {
-            return `  • ${escapeControlCharacters(url)}`;
+      }),
+    });
+
+    return {
+      ...dryRun,
+      pretty: prose(
+        [
+          dryRun.summary.title,
+          ...urls.map((url) => {
+            return `  • ${url}`;
           }),
-        },
-        next: {
-          commands: [
-            this.suggest({
-              id: "preview",
-              flags: {
-                origin: [...urls],
-                ttl: flags.ttl?.canonical,
-                message: flags.message,
-                strict: flags.strict,
-              },
-            }),
-          ],
-        },
-      });
-    }
+        ].join("\n"),
+      ),
+      data: { ...(dryRun.data as object), targets: urls },
+      summary: {
+        ...dryRun.summary,
+        lines: urls.map((url) => {
+          return `  • ${escapeControlCharacters(url)}`;
+        }),
+      },
+    };
+  }
 
-    // The release keeps the message of whichever run built it first, usually
-    // this one, so the deploy after merge reuses it rather than adding its own.
+  /**
+   * Publishes the preview.
+   *
+   * The IdP step validates the connection files and stops short of syncing them
+   * in a preview, so a pull-request build never reconfigures the connections a
+   * merged deploy owns. The release keeps the message of whichever run built
+   * it first, usually this one, so the deploy after merge reuses it rather than
+   * adding its own. The wire takes an ISO-8601 duration, while `--ttl` keeps
+   * the `7d`/`12h` spelling a person writes (create-deployment-request.yaml).
+   *
+   * @param input.flags - The flags the command accepts.
+   * @returns The result of the run.
+   */
+  protected async apply({ flags }: Admitted<typeof Preview>): Promise<CommandResult> {
+    const skipped = this.skippedUnlessPreviewable(flags.strict);
+    if (skipped !== undefined) {
+      return skipped;
+    }
+    const { urls, client, projectId, publisher } = await this.connected(flags);
+    const prepared = await publisher.prepare({
+      cwd: this.cwd,
+      env: this.env,
+      mode: "preview",
+      dryRun: false,
+      compare: false,
+    });
+    for (const warning of prepared.warnings) {
+      warnings.report(warning);
+    }
+    this.narrate(prepared.notices);
+
     const message = await deployMessage(flags.message, this.cwd, this.env);
     const { release, deployment } = await publisher.preview({
       prepared,
       message,
       urls,
-      // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`
-      // spelling a person writes (create-deployment-request.yaml).
       ...(flags.ttl === undefined
         ? {}
         : {
@@ -371,7 +380,7 @@ export default class Preview extends ServerCommand(PreviewCommand) {
 
     const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -404,7 +413,7 @@ export default class Preview extends ServerCommand(PreviewCommand) {
           `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
         ],
       },
-    });
+    };
   }
 
   /**
@@ -436,7 +445,7 @@ export default class Preview extends ServerCommand(PreviewCommand) {
           status: "skipped",
           reason: "nothing-to-preview",
           summary: {
-            title: "nothing to preview — production is deployed after merge",
+            title: "Nothing to preview: production is deployed after merge",
             sections: [],
           },
         };
@@ -449,7 +458,7 @@ export default class Preview extends ServerCommand(PreviewCommand) {
           status: "skipped",
           reason: "nothing-to-preview",
           summary: {
-            title: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+            title: "Nothing to preview: set ZITADEL_ENV=preview in the pull-request build",
             sections: [],
           },
         };
@@ -462,11 +471,31 @@ export default class Preview extends ServerCommand(PreviewCommand) {
           status: "skipped",
           reason: "no-preview-credential",
           summary: {
-            title: `no preview credential (${escapeControlCharacters(credential)}) — preview skipped`,
+            title: `Preview skipped: no preview credential (${escapeControlCharacters(credential)})`,
             sections: [],
           },
         };
       }
     }
+  }
+
+  /**
+   * Reads and checks what both a dry run and a publish start from: the URLs
+   * to preview, the connection, and a refusal of the primary origins.
+   *
+   * @param flags - The flags the command accepts.
+   * @returns The URLs, the connection and a publisher on it.
+   */
+  private async connected(flags: Admitted<typeof Preview>["flags"]) {
+    const urls = readPreviewUrls(flags.origin ?? [], this.env);
+    const { client, projectId } = await this.connect();
+    await refusePrimaryOrigins(urls, client, projectId);
+
+    return {
+      urls,
+      client,
+      projectId,
+      publisher: new Publisher(client, projectId),
+    };
   }
 }

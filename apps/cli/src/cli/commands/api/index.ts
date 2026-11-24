@@ -1,10 +1,9 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { ApiCall, type PathValues } from "@/lib/api";
+import { ApiCall, type PathValues } from "@/cli/core/crud/api-call";
 import {
   type ApiRequest,
-  type ApiResponse,
   createZitadelClient,
   InvalidError,
   Operation,
@@ -13,27 +12,20 @@ import {
   UnauthorizedError,
   type ZitadelClient,
 } from "@/lib/backend";
-import { CANCELLED, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import { Output } from "@/lib/ui";
 import { ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
-import {
-  type Admitted,
-  CREDENTIALS,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
-import { Destructive } from "@/lib/oclif/destructive";
-import { reads, type Refused } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Admitted, CREDENTIALS, type CommandResult, nonBlankString } from "@/cli/core";
+import { reads, type Refused } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { Suggested } from "@/lib/suggestion";
-import { json, prose, type Rendering } from "@/lib/oclif/rendering";
-import { Promptable } from "@/lib/oclif/promptable";
+import { json, prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { Summary } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { Promptable } from "@/cli/core/promptable";
+import { Destructive } from "@/cli/core/destructive";
+import { ChangeCommand } from "@/cli/commands/bases";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -84,7 +76,12 @@ function resolveTarget(ref: string, method?: string): Target {
     if (error instanceof InvalidError) {
       throw new ZitadelError("E_VALIDATION", error.message, {
         hint: error.hint,
-        nextCommands: [{ id: "api:ls", flags: { json: true } }],
+        nextCommands: [
+          {
+            id: "api:ls",
+            flags: { json: true },
+          },
+        ],
       });
     }
     throw error;
@@ -125,16 +122,6 @@ export function refuseUnpaged(target: Target | undefined, paginate: boolean): vo
     });
   }
 }
-
-/**
- * Where a call goes, the project a `project_id` left out is filled from, and
- * the client that sends it.
- */
-type Reach = Readonly<{
-  server: string;
-  projectId: string | undefined;
-  client: ZitadelClient;
-}>;
 
 /**
  * Every path parameter's value the command line gives: from the path itself
@@ -223,7 +210,10 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Destructive(Promptable(ServerCommand(EnvironmentCommand))) {
+export default class Api extends Destructive(
+  Promptable(ChangeCommand),
+  "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
+) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override group = CommandGroups.apiAndEvents;
@@ -238,7 +228,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
     "<%= config.bin %> api createTeam -F name=Support --dry-run",
     "<%= config.bin %> api createTeam --file - < team.json",
   ];
-  // The path parameters follow the operation as further arguments.
+  /** The path parameters follow the operation as further arguments. */
   static override strict = false;
   static override args = {
     operation: Args.string({
@@ -268,26 +258,22 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
       description:
         "Follow next_page_token to the last page, and answer with every page's items in one list.",
     }),
-    force: Flags.boolean({
-      char: "f",
-      description:
-        "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
-    }),
   };
 
   /**
    * No operation is called help, so the word asks for this command's help as
    * `--help` does. It answers before the run is admitted, because help needs
    * neither a resolved server nor an operation, and the operation this command
-   * requires would refuse `help` as a name it does not know.
+   * requires would refuse `help` as a name it does not know. Only the command's
+   * name is needed for the envelope: `toMeta` would also open telemetry and the
+   * first-run notice, which `--help` does not. The result is built here, as the
+   * run was not admitted, so it has no directory of its own to put back.
    */
-  override async run(): Promise<JsonEnvelope> {
+  protected override async answeredEarly(): Promise<CommandResult | undefined> {
     const { args, flags } = await this.parseOnce();
     if (args.operation?.toLowerCase() !== "help") {
-      return super.run();
+      return undefined;
     }
-    // Only the command's name is needed for the envelope: `toMeta` would also
-    // open telemetry and the first-run notice, which `--help` does not.
     this.meta = {
       ...this.meta,
       command: this.id ?? this.meta.command,
@@ -296,7 +282,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
       await this.config.runCommand("help", [Api.id]);
     }
 
-    return this.emit({
+    return {
       status: "ok",
       data: {},
       pretty: prose(""),
@@ -304,7 +290,6 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
         title: "Done",
         sections: [],
       },
-      // Built here, as the run was not admitted: it has no directory of its own to put back.
       next: this.jsonEnabled()
         ? {
             commands: [
@@ -314,10 +299,167 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
             ],
           }
         : undefined,
-    });
+    };
   }
 
-  protected async execute({ argv, args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
+  /**
+   * Says what the command would call, without calling it. Prints the cURL
+   * command that sends the request. The project secret is never written out: an
+   * operation that needs it reads it from `$ZITADEL_PROJECT_SECRET`, as the API
+   * reference's cURL samples do, in double quotes so the shell expands it.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The result of the dry run.
+   */
+  protected async preview({ args, argv, flags }: Admitted<typeof Api>): Promise<CommandResult> {
+    const { server, projectId, target, built } = await this.prepared({ args, flags });
+    const request = ApiCall.to(target).fill(
+      built,
+      await this.pathValues(
+        target,
+        pathValuesFromWords(target, argv, args.operation !== undefined, projectId),
+      ),
+    );
+    const curl = prose(
+      [
+        `curl -X ${request.operation.method} ${quote(request.operation.urlOn(server, request))}`,
+        ...(request.operation.auth === "secret"
+          ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
+          : []),
+        ...(request.body === undefined
+          ? []
+          : ["-H 'Content-Type: application/json'", `-d ${quote(JSON.stringify(request.body))}`]),
+      ].join(" \\\n  "),
+    );
+    const title = `Would call ${request.operation.id} (dry run)`;
+
+    return {
+      status: "ok",
+      data: {
+        title,
+        dry_run: true,
+        operation: request.operation.id,
+        method: request.operation.method,
+        url: request.operation.urlOn(server, request),
+        ...(request.body === undefined
+          ? {}
+          : {
+              body: request.body,
+            }),
+      },
+      pretty: curl,
+      summary: {
+        title,
+        sections: [],
+        lines: curl.text.split("\n"),
+      },
+    };
+  }
+
+  /**
+   * Calls the operation. The question a person is asked is the one a refusal
+   * hands to whoever must ask them.
+   *
+   * A JSON body is spelled the way JSON spells a control character, because
+   * this is the command a script pipes into `jq`: the terminal spelling would
+   * write `\x9b` for a C1 character, which is not an escape JSON has, and the
+   * body would not parse. A text body and the note about an empty one are a
+   * person's to read, so they take the spelling a person reads. The body is
+   * the server's, not the CLI's, so the ending writes it as it came instead of
+   * folding it to the width of the terminal.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The result of the call.
+   */
+  protected async apply({ args, argv, flags }: Admitted<typeof Api>): Promise<CommandResult> {
+    const { server, projectId, client, target, built, question } = await this.prepared({
+      args,
+      flags,
+    });
+    const { operation } = target;
+    refuseUnforced(built, this.meta, question);
+    const request = ApiCall.to(target).fill(
+      built,
+      await this.pathValues(
+        target,
+        pathValuesFromWords(target, argv, args.operation !== undefined, projectId),
+      ),
+    );
+    const url = operation.urlOn(server, request);
+
+    this.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
+    const destructive = operation.destructive;
+    const consent = destructive
+      ? await this.consent({
+          verb: "call",
+          name: `call ${operation.id}`,
+          message: question,
+          ...(request.body === undefined
+            ? {}
+            : {
+                retry: undefined,
+              }),
+        })
+      : undefined;
+    if (destructive && consent === undefined) {
+      return this.cancelled("call", [`${operation.id} was not called.`]);
+    }
+    const operationService = new OperationService(
+      consent === undefined ? client : consent.unlock(client),
+    );
+    const response = await (flags.paginate
+      ? operationService.callAll(request)
+      : operationService.call(request)
+    ).catch((error: unknown) => {
+      if (error instanceof UnauthorizedError && operation.auth === "secret") {
+        throw new ZitadelError("E_AUTH", error.message, {
+          hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
+          details: {
+            server,
+          },
+        });
+      }
+      throw error;
+    });
+
+    if (response.body === undefined) {
+      return {
+        status: "ok",
+        data: null,
+        verbatim: true,
+        ...(Output.screen ? {} : { pretty: prose("") }),
+        summary: {
+          title: `No content (${response.status})`,
+          sections: [],
+        },
+      };
+    }
+    const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
+
+    return {
+      status: "ok",
+      data: response.body,
+      verbatim: true,
+      ...(Output.screen ? {} : { pretty }),
+      summary: {
+        title: `Called ${operation.id}`,
+        sections: [],
+        lines: pretty.text.split("\n"),
+      },
+    };
+  }
+
+  /**
+   * Everything a call needs before it is made or only described: the operation
+   * chosen, the server and project it is about, the request as asked for, and the
+   * question a person would be asked. A body is not repeated in a suggestion,
+   * since it can hold a secret, or have come from a pipe a rerun of the
+   * command alone would not have.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The operation, where it goes, the request as asked for, and what a person would be asked.
+   */
+  private async prepared({ args, flags }: Pick<Admitted<typeof Api>, "args" | "flags">) {
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
 
@@ -338,143 +480,20 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
         without: ["field"],
       }),
     );
-    // The question a person is asked, and the one a refusal hands to whoever must ask them.
     const question = [
       `Call ${operation.id}${
         projectId === undefined ? "" : ` in project ${projectId}`
       } on ${server.replace(/^https?:\/\//, "")}?`,
       ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
     ].join(" ");
-    refuseUnforced(built, this.meta, question);
-    const request = ApiCall.to(target).fill(
-      built,
-      await this.pathValues(
-        target,
-        pathValuesFromWords(target, argv, args.operation !== undefined, projectId),
-      ),
-    );
 
-    const url = operation.urlOn(server, request);
-    if (this.dryRun) {
-      const curl = prose(this.curlFor(request, server));
-      const title = `Would call ${operation.id} (dry run)`;
-
-      return this.emit({
-        status: "ok",
-        data: {
-          title,
-          dry_run: true,
-          operation: operation.id,
-          method: operation.method,
-          url,
-          ...(request.body === undefined
-            ? {}
-            : {
-                body: request.body,
-              }),
-        },
-        pretty: curl,
-        summary: {
-          title,
-          sections: [],
-          lines: curl.text.split("\n"),
-        },
-      });
-    }
-
-    this.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
-    const destructive = request.operation.destructive;
-    const consent = destructive
-      ? await this.consent({
-          verb: "call",
-          name: `call ${operation.id}`,
-          message: question,
-          // A body is not repeated in a suggestion: it can hold a secret, or
-          // have come from a pipe a rerun of the command alone would not have.
-          ...(request.body === undefined
-            ? {}
-            : {
-                retry: undefined,
-              }),
-        })
-      : undefined;
-    if (destructive && consent === undefined) {
-      return this.emit({
-        status: "skipped",
-        reason: "call-cancelled",
-        summary: {
-          title: CANCELLED,
-          sections: [],
-          lines: [`${operation.id} was not called.`],
-        },
-      });
-    }
-    const operationService = new OperationService(
-      consent === undefined ? client : consent.unlock(client),
-    );
-    const response = await (flags.paginate
-      ? operationService.callAll(request)
-      : operationService.call(request)
-    ).catch((error: unknown) => {
-      if (error instanceof UnauthorizedError && operation.auth === "secret") {
-        throw new ZitadelError("E_AUTH", error.message, {
-          hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
-          details: {
-            server,
-          },
-        });
-      }
-      throw error;
-    });
-
-    const answer = this.answered(operation.id, response);
-
-    return this.emit({
-      status: "ok",
-      data: response.body ?? null,
-      verbatim: true,
-      ...(answer.pretty === undefined ? {} : { pretty: answer.pretty }),
-      summary: answer.summary,
-    });
-  }
-
-  /**
-   * What the call answered: the ending a person at a terminal sees, and the
-   * rendering a pipe is given when that differs from it.
-   *
-   * A JSON body is spelled the way JSON spells a control character, because
-   * this is the command a script pipes into `jq`: the terminal spelling would
-   * write `\x9b` for a C1 character, which is not an escape JSON has, and the
-   * body would not parse. A text body and the note about an empty one are a
-   * person's to read, so they take the spelling a person reads. The body is
-   * the server's, not the CLI's, so the ending writes it as it came instead of
-   * folding it to the width of the terminal.
-   *
-   * @param operationId - The operation that was called.
-   * @param response - The answer the call got.
-   * @returns The ending, and the rendering when a script is given something else.
-   */
-  private answered(
-    operationId: string,
-    response: ApiResponse,
-  ): { summary: Summary; pretty?: Rendering } {
-    if (response.body === undefined) {
-      return {
-        summary: {
-          title: `No content (${response.status})`,
-          sections: [],
-        },
-        ...(Output.screen ? {} : { pretty: prose("") }),
-      };
-    }
-    const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
     return {
-      summary: {
-        title: `Called ${operationId}`,
-        sections: [],
-        lines: pretty.text.split("\n"),
-      },
-      ...(Output.screen ? {} : { pretty }),
+      server,
+      projectId,
+      client,
+      target,
+      built,
+      question,
     };
   }
 
@@ -486,7 +505,13 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
    * needs no credential runs anywhere: against the project's server when the
    * environment names one, else against the cloud, with no project to fill in.
    */
-  private async reach(operation: Operation): Promise<Reach> {
+  private async reach(operation: Operation): Promise<
+    Readonly<{
+      server: string;
+      projectId: string | undefined;
+      client: ZitadelClient;
+    }>
+  > {
     if (operation.auth === "secret") {
       return this.connect();
     }
@@ -521,7 +546,10 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
         (operation.auth !== "secret" || hasSecret)
       );
     });
-    const retry = this.suggest({ id: "api:ls", flags: { json: true } });
+    const retry = this.suggest({
+      id: "api:ls",
+      flags: { json: true },
+    });
     const tags = [
       ...new Set(
         callable.map((operation) => {
@@ -558,7 +586,15 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
     });
   }
 
-  /** Every path parameter's value, asking for the ones the command line left out. */
+  /**
+   * Every path parameter's value, asking for the ones the command line left
+   * out. The path parameters follow the operation as arguments the command does
+   * not declare one by one, so the run is repeated as typed with them added.
+   *
+   * @param target - The operation being called.
+   * @param pathValues - The values the command line gave, and the names it left out.
+   * @returns Each parameter's value by name.
+   */
   private async pathValues(
     target: Target,
     { values, missing }: PathValues,
@@ -571,8 +607,6 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
       filled[name] = await this.ask.text({
         name,
         message: `What is the value of ${name}?`,
-        // The path parameters follow the operation as arguments the command
-        // does not declare one by one, so the run is repeated as typed with them added.
         retry: await this.rerun({ arguments: [target.operation.id, ...placeholders] }),
         parse: (value: string) => {
           const typed = value.trim();
@@ -590,27 +624,5 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
       });
     }
     return filled;
-  }
-
-  /**
-   * The cURL command that sends a request, which a dry run prints. The project
-   * secret is never written out: an operation that needs it reads it from
-   * `$ZITADEL_PROJECT_SECRET`, as the API reference's cURL samples do, in
-   * double quotes so the shell expands it.
-   *
-   * @param request - The request.
-   * @param server - The server it is sent to.
-   * @returns The command.
-   */
-  private curlFor(request: ApiRequest, server: string): string {
-    return [
-      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(server, request))}`,
-      ...(request.operation.auth === "secret"
-        ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
-        : []),
-      ...(request.body === undefined
-        ? []
-        : ["-H 'Content-Type: application/json'", `-d ${quote(JSON.stringify(request.body))}`]),
-    ].join(" \\\n  ");
   }
 }

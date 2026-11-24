@@ -23,7 +23,7 @@ function flagsMapping(claim: string): { flags: SetupFlags } {
       sso: "google",
       ssoClientId: "an-id",
       ssoClaim: [claim],
-    } as SetupFlags,
+    } as unknown as SetupFlags,
   };
 }
 

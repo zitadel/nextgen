@@ -1,4 +1,3 @@
-import { RealMachine } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   type ClientId,
@@ -24,10 +23,11 @@ import {
   parseVerifiedEntry,
 } from "@/lib/idp";
 import { CommandGroups } from "@/cli/commands/groups";
-import type { Admitted, CommandResult, JsonEnvelope } from "@/lib/oclif";
-import { environmentFlags } from "@/lib/oclif/environment-flags";
-import { accepts, parses } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { environmentFlags } from "@/cli/core/environment-flags";
+import { accepts, parses } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { RealMachine } from "@/lib/server";
 import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 
@@ -71,24 +71,10 @@ const PROVIDER_IS_NAMED_REFUSAL = {
  * history, a process listing, or CI logs.
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
-  /**
-   * What `--help` says the command does.
-   */
   static override description = "Add an identity provider to a user schema.";
-
-  /**
-   * The group the command index lists it under.
-   */
   static override group = CommandGroups.signIn;
-
-  /**
-   * Where the command sits in its group.
-   */
   static override groupOrder = 1;
 
-  /**
-   * The examples `--help` shows.
-   */
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -96,16 +82,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES)}`,
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES, true)} --client-id abc123 --non-interactive < secret.txt`,
   ];
-  /**
-   * The flags every `auth-method` command takes, and the environment's.
-   */
   static override baseFlags = {
     ...AuthMethodCommand.baseFlags,
     ...environmentFlags,
   };
-  /**
-   * The flags the command takes.
-   */
   static override flags = {
     provider: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
@@ -170,12 +150,30 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }),
   };
 
-  /**
-   * That the command resolves the server and the environment before it runs.
-   */
   static override meta = {
     environment: true,
   };
+
+  /**
+   * What `--dry-run` does: the same steps as a real run, which show the change
+   * and write nothing.
+   *
+   * @param admitted - What the command admitted.
+   * @returns The result.
+   */
+  protected async preview(admitted: Admitted<typeof AuthMethodSsoEnable>): Promise<CommandResult> {
+    return this.wizard(admitted);
+  }
+
+  /**
+   * What the command does: the steps, in order.
+   *
+   * @param admitted - What the command admitted.
+   * @returns The result.
+   */
+  protected async apply(admitted: Admitted<typeof AuthMethodSsoEnable>): Promise<CommandResult> {
+    return this.wizard(admitted);
+  }
 
   /**
    * Add the provider to the schema and its login flows, and publish its
@@ -186,128 +184,125 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * work out the whole change and refuse what cannot be done, preview it or ask
    * for the credentials, then store them and write the files.
    *
-   * @param admitted - What the command admitted.
-   * @param admitted.flags - The provider, its settings, the schema and the environment flags.
-   * @returns The envelope the run answers with.
+   * @param input.flags - The provider, its settings, the schema and the environment flags.
+   * @returns The result.
    * @throws {@link ZitadelError} When no provider is named, a setting is
    *   refused, the schema cannot be chosen, or no flow can offer the provider.
    */
-  protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+  private async wizard({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<CommandResult> {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
 
-    return this.emit(
-      await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
-        .step(
-          new ChooseProvider({
-            dryRun: this.dryRun,
-            nonInteractive: this.nonInteractive,
-          }),
-        )
-        .step(
-          new ReadIssuer({
-            cwd: this.cwd,
-            env: this.env,
-          }),
-        )
-        .step(
-          new LoadSchema({
-            loadSchemaTarget: (input) => {
-              return this.loadSchemaTarget(input);
-            },
-          }),
-        )
-        .step(
-          new ReadOrigins({
-            connect: () => {
-              return this.connect();
-            },
-          }),
-        )
-        .step(
-          new SelectConnection({
-            ask: this.ask,
-            dryRun: this.dryRun,
-          }),
-        )
-        .step(new ReadClaims())
-        .step(
-          new PlanChange({
-            machine: new RealMachine(),
-          }),
-        )
-        .step(new IntroduceProvider())
-        .endWhen(
-          new PreviewChange({
-            argsOf: (command) => {
-              return this.argsOf(command);
-            },
-            dryRun: this.dryRun,
-            realRun: () => {
-              return this.realRun();
-            },
-            report: (change) => {
-              this.report(change);
-            },
-            said: (change) => {
-              return this.said(change);
-            },
-          }),
-        )
-        .step(
-          new CollectCredentials({
-            ask: this.ask,
-            developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
-            again: this.again,
-          }),
-        )
-        .step(
-          new AskClaims({
-            ask: this.ask,
-            nonInteractive: this.nonInteractive,
-          }),
-        )
-        .step(new BuildChange())
-        .step(
-          new PublishCredentials({
-            signal: this.signal,
-            source: this.meta.source,
-            suggest: this.suggest,
-          }),
-        )
-        .step(
-          new WriteFiles({
-            report: (change) => {
-              this.report(change);
-            },
-            write: (target, change) => {
-              return this.write(target, change, undefined);
-            },
-          }),
-        )
-        .step(
-          new ShowResult({
-            said: (change, written) => {
-              return this.said(change, written);
-            },
-            followUps: (changed, leading) => {
-              return this.followUps(changed, leading);
-            },
-            suggest: this.suggest,
-          }),
-        )
-        .finish((state) => {
-          return state.answer;
-        })
-        .run(
-          { flags },
-          {
-            onUndoError: (key, error) => {
-              warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
-            },
+    return await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
+      .step(
+        new ChooseProvider({
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+        }),
+      )
+      .step(
+        new ReadIssuer({
+          cwd: this.cwd,
+          env: this.env,
+        }),
+      )
+      .step(
+        new LoadSchema({
+          loadSchemaTarget: (input) => {
+            return this.loadSchemaTarget(input);
           },
-        ),
-    );
+        }),
+      )
+      .step(
+        new ReadOrigins({
+          connect: () => {
+            return this.connect();
+          },
+        }),
+      )
+      .step(
+        new SelectConnection({
+          ask: this.ask,
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(new ReadClaims())
+      .step(
+        new PlanChange({
+          machine: new RealMachine(),
+        }),
+      )
+      .step(new IntroduceProvider())
+      .endWhen(
+        new PreviewChange({
+          argsOf: (command) => {
+            return this.argsOf(command);
+          },
+          dryRun: this.dryRun,
+          realRun: () => {
+            return this.realRun();
+          },
+          report: (change) => {
+            this.report(change);
+          },
+          said: (change) => {
+            return this.said(change);
+          },
+        }),
+      )
+      .step(
+        new CollectCredentials({
+          ask: this.ask,
+          developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
+          again: this.again,
+        }),
+      )
+      .step(
+        new AskClaims({
+          ask: this.ask,
+          nonInteractive: this.nonInteractive,
+        }),
+      )
+      .step(new BuildChange())
+      .step(
+        new PublishCredentials({
+          signal: this.signal,
+          source: this.meta.source,
+          suggest: this.suggest,
+        }),
+      )
+      .step(
+        new WriteFiles({
+          report: (change) => {
+            this.report(change);
+          },
+          write: (target, change) => {
+            return this.write(target, change, undefined);
+          },
+        }),
+      )
+      .step(
+        new ShowResult({
+          said: (change, written) => {
+            return this.said(change, written);
+          },
+          followUps: (changed, leading) => {
+            return this.followUps(changed, leading);
+          },
+          suggest: this.suggest,
+        }),
+      )
+      .finish((state) => {
+        return state.answer;
+      })
+      .run(
+        { flags },
+        {
+          onUndoError: (key, error) => {
+            warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
+          },
+        },
+      );
   }
 }

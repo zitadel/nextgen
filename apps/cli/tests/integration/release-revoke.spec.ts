@@ -391,7 +391,10 @@ describe("release revoke", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: `Would revoke ${releaseId} (dry run)`,
+              title: `Would revoke release ${releaseId} (dry run)`,
+              verb: "revoke",
+              topic: "release",
+              id: releaseId,
               release_id: releaseId,
               next_commands: [
                 expectedPublicCliCommand(app.againAsRun(`release revoke ${releaseId} --force`)),
@@ -561,7 +564,7 @@ describe("release revoke", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toPrint(`Would revoke ${releaseId} (dry run)`);
+        expect(result).toPrint(`Would revoke release ${releaseId} (dry run)`);
       });
 
       it("suggests revoking for real after a dry run once", async () => {

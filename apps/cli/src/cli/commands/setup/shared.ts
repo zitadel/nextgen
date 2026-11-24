@@ -50,11 +50,11 @@ import {
   seedMapping,
   selectionFromFlags,
 } from "@/lib/idp";
-import type { GlobalOptions } from "@/lib/oclif/types";
+import type { GlobalOptions } from "@/cli/core/types";
 import type { FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { LocalRuntime, type LocalMachine, type ResolvedServer } from "@/lib/server";
 
 import { style } from "@/lib/ui";
@@ -83,8 +83,8 @@ import type { SetupFlags } from "./index";
 import type { InitialCommitOutcome } from "./steps/make-initial-commit";
 import type { SetupInstallOutcome } from "./steps/install-dependencies";
 import { z } from "zod";
+import { type Refused, whole } from "@/cli/core/flags";
 import { Project } from "@/lib/project";
-import { type Refused, whole } from "@/lib/oclif/flags";
 
 /**
  * The name of the README setup writes into each configuration directory.

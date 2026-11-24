@@ -317,6 +317,8 @@ describe("eject", () => {
           status: "ok",
           data: {
             dry_run: true,
+            verb: "remove",
+            topic: "zitadel",
             title: WOULD_REMOVE_TITLE,
             files_removed: REMOVED,
             files_preserved: [],
@@ -413,6 +415,14 @@ describe("eject", () => {
         const result = await app.run(["eject", "--force", "--dry-run"]);
 
         expect(result.stdout.split("\n")[0]).toBe(WOULD_REMOVE_TITLE);
+      });
+
+      it("names each file a dry run would remove", async () => {
+        const app = await aPatchedApp();
+
+        const result = await app.run(["eject", "--force", "--dry-run"]);
+
+        expect(result).toPrint("Would remove app/login/page.tsx");
       });
 
       it("names each file it removed", async () => {

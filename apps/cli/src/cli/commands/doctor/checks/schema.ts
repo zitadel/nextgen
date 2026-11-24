@@ -47,7 +47,10 @@ export class SchemaCheck extends AbstractSanityCheck {
    * `.zitadel/schemas/` is a warning, not a failure: projects created before
    * editable config existed were seeded server-side and have no local schema
    * files, and there is no safe auto-fix that could invent them. A warning
-   * the rules raise is reported the same way.
+   * the rules raise is reported the same way, and one that cannot be read
+   * fails the way every check does. A project with no schema files only
+   * warns, however its other files read, as it did before the rules were one
+   * pass.
    *
    * @param ctx - The project to check.
    * @returns The outcome: a failure, a warning, or a pass.
@@ -58,11 +61,8 @@ export class SchemaCheck extends AbstractSanityCheck {
         return undefined;
       });
       if (found === undefined) {
-        // A file that cannot be read fails the way every check does.
         return await super.run(ctx);
       }
-      // A project with no schema files only warns, however its other files
-      // read, as it did before the rules were one pass.
       const brokenSchemas = found.config.broken.filter((file) => {
         return file.kind === "schema";
       });

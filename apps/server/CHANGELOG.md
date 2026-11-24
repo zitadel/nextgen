@@ -1,5 +1,13 @@
 # @zitadel/server
 
+## 0.9.0
+
+### Minor Changes
+
+- [#2978](https://github.com/zitadel/nextgen/pull/2978) [`a106883`](https://github.com/zitadel/nextgen/commit/a106883f23592c2715d74477bcfa0d9b0d5067db) - Add project invitations to the console: the project's Settings now has a Members page, where an Invitations tab creates, replaces and cancels invitation links beside the people who have access, and the page a link opens to accept or decline.
+
+- [#3066](https://github.com/zitadel/nextgen/pull/3066) [`15cfcc3`](https://github.com/zitadel/nextgen/commit/15cfcc3e861a584936aac54dd4735b856bf73027) - Remove Add admin from the console's Members page: a colleague is given access to a project with an invitation link, and the Members tab lists and revokes access.
+
 ## 0.8.0
 
 ### Minor Changes

@@ -194,7 +194,10 @@ export class PublishCredentials extends WizardStep<
     this.reportPublished(
       idVariable,
       clientId,
-      this.deps.suggest({ id: "variable:set", args: { name: idVariable } }),
+      this.deps.suggest({
+        id: "variable:set",
+        args: { name: idVariable },
+      }),
     );
     this.reportPublished(
       secret.name,
