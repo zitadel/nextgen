@@ -91,7 +91,7 @@ test("/telemetry/mixpanel/* reaches Mixpanel's EU API", async ({ request }) => {
 // function (ADR 076, as amended).
 test("the server gets its own root paths, the website every other", async ({ request }) => {
   const server = ["/livez", "/readyz", "/api/v1/readyz"];
-  const website = ["/robots.txt", "/.env", "/wp-login.php", "/userss/me"];
+  const website = ["/xmlrpc.php", "/.env", "/wp-login.php", "/userss/me"];
   const wrong: string[] = [];
   for (const path of server) {
     const response = await request.get(path);
