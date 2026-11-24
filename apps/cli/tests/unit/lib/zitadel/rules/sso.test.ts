@@ -76,6 +76,20 @@ const ACME_COPY = anOidcConnection({
 });
 
 /**
+ * A second schema that lists `acme` but defines no `email`, as one of two
+ * schemas the connection `acme.json` maps into.
+ */
+const NO_EMAIL_SCHEMA = aSchemaListing(["acme"], {
+  objectType: "contractor",
+  properties: { phone: { "x-unique": "project" } },
+});
+
+/**
+ * Where {@link NO_EMAIL_SCHEMA} sits when it is the file `field.json`.
+ */
+const NO_EMAIL_PATH = ".zitadel/schemas/field.json";
+
+/**
  * The ids of the two rules that judge a verified key.
  */
 const VERIFICATION_RULES: readonly string[] = [
@@ -383,6 +397,19 @@ describe("SSO_RULES", () => {
     }
 
     /**
+     * Two schemas that both list `acme`: `staff.json`, which defines `email`,
+     * and `field.json`, which does not.
+     *
+     * @returns The schema documents, by file name.
+     */
+    function twoSchemas(): Readonly<Record<string, JsonObject>> {
+      return {
+        [SCHEMA_FILE]: aSchemaListing(["acme"]),
+        "field.json": NO_EMAIL_SCHEMA,
+      };
+    }
+
+    /**
      * A flow whose entry step offers `acme` and whose other steps are as given.
      *
      * @param step - Keys to set on the entry step in place of the routed ones.
@@ -576,6 +603,13 @@ describe("SSO_RULES", () => {
           'claim_mapping target "emial" is not a property of any schema in the project, so it looks mistyped. Did you mean "email"?',
       },
       {
+        rule: "sso/missing-mapping-target",
+        severity: "warning",
+        documents: agreeing(ACME, { schemas: twoSchemas() }),
+        file: CONNECTION_PATH,
+        message: `claim_mapping target "email" is not a property of ${NO_EMAIL_PATH}, which list "acme" in sso.providers`,
+      },
+      {
         rule: "sso/orphaned-mapping-target",
         severity: "error",
         documents: agreeing(
@@ -688,6 +722,19 @@ describe("SSO_RULES", () => {
         documents: agreeing(anOidcConnection({ subject_claim: "oid" })),
       },
       { rule: "sso/claim-type-mismatch", documents: agreeing(ACME) },
+      { rule: "sso/missing-mapping-target", documents: agreeing(ACME) },
+      {
+        rule: "sso/missing-mapping-target",
+        documents: agreeing(ACME, {
+          schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]), "field.json": aSchemaListing([]) },
+        }),
+      },
+      {
+        rule: "sso/missing-mapping-target",
+        documents: agreeing(anOidcConnection({ claim_mapping: { emial: "email" } }), {
+          schemas: twoSchemas(),
+        }),
+      },
       { rule: "sso/inert-connection", documents: agreeing(ACME) },
       {
         rule: "sso/inert-connection",
