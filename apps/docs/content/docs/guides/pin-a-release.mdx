@@ -1,0 +1,143 @@
+---
+title: Pin your app to a release
+description:
+  Make each build of your app keep the sign-in configuration it was built
+  against, so the two roll out and roll back together.
+---
+
+Zitadel serves each sign-in the newest release deployed to the app's origin. A
+[release](/docs/concepts/releases-and-deployments#release) is a snapshot of
+your `.zitadel/` configuration. Your app's code and its sign-in configuration
+ship separately, so they can fall out of step:
+
+- **You roll your app back on the host.** The old code comes back, but Zitadel
+  keeps serving the newer configuration, with steps or providers the old code
+  was never built for.
+- **A tab still runs the previous build.** Hosts keep serving the old bundle for
+  a while after a deploy. Its next sign-in gets the new configuration.
+- **A preview branch is pushed twice.** A tab still open on the first push gets
+  the second push's configuration.
+
+Pinning fixes this. The build bakes in the release ID that `zitadel deploy`
+printed. The login component sends it as `X-Zitadel-Release` when a sign-in
+starts, and Zitadel serves that release for as long as it was deployed to the
+origin and is not revoked.
+
+Pinning is opt-in. A build pinned right after a deploy gets the release it
+would have been served anyway; the pin only matters in the cases above.
+
+## Before you start
+
+- **An app and project from `zitadel setup`**, with the login component
+  (`<zitadel-login>`) on its sign-in page. Follow the
+  [Quickstart](/docs/get-started/quickstart).
+- **A build that can run the CLI.** The build needs `ZITADEL_URL`,
+  `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, the values setup wrote to
+  `.env.local`, as environment variables on your host.
+- **The app's origin registered with the project.** `zitadel origin list` shows
+  them ([Origins and previews](/docs/concepts/origins-and-previews)).
+
+## Deploy in the build and keep the release ID
+
+Run `zitadel deploy` as part of the build command, and pass the release ID it
+prints to the framework build. With Next.js:
+
+```sh
+export NEXT_PUBLIC_ZITADEL_RELEASE="$(npx @zitadel/cli@latest deploy --non-interactive --json | jq -r '.data.release_id')"
+next build
+```
+
+`deploy` prints the same value as a line you can paste into an env file:
+
+```text
+NEXT_PUBLIC_ZITADEL_RELEASE=rel_01KB3F7Y4Q2M8XVN
+```
+
+For a pull-request build, run `zitadel preview` instead of `deploy`. Its
+`--json` output carries the same `data.release_id`.
+
+Deploying before the app build is safe with pinning: builds that are already
+live keep the release they pinned. If the app build fails after the deploy,
+the new configuration is live for unpinned clients only.
+
+## Pass the release to the login component
+
+Give the release to `configureZitadel`, next to the project ID:
+
+```tsx
+"use client";
+import { configureZitadel } from "@zitadel/sdk-next/client";
+
+configureZitadel({
+  projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID!,
+  proxyPath: "/__nextgen",
+  release: process.env.NEXT_PUBLIC_ZITADEL_RELEASE,
+});
+```
+
+- **Nuxt** reads `NUXT_PUBLIC_ZITADEL_RELEASE`; set it instead of the Next.js
+  variable and change no code.
+- **Angular** takes `release` in its own `configureZitadel`.
+- **A plain HTML page** sets the `release` attribute on `<zitadel-login>`.
+
+An empty value pins nothing, so a local build without the variable behaves as
+before.
+
+## Check that the pin holds
+
+1. Open the sign-in page of the build you just deployed. In the browser's
+   developer tools, the `POST` to `/__nextgen/…/flows` carries
+   `X-Zitadel-Release: rel_…`.
+2. Change something visible in `.zitadel/`, such as a label in the login flow,
+   and run `zitadel deploy` without rebuilding the app.
+3. Reload the sign-in page. It still shows the old label: the build keeps its
+   release. A request without the header, such as `curl` to the flow API, gets
+   the new one.
+
+## Handle a refused pin
+
+A pin is refused when the build and the project's deployments are out of
+step. The login component shows the reason, and its `zitadel-flow-error` event
+carries the code:
+
+| Code | Cause | Fix |
+| --- | --- | --- |
+| `rel.not_deployed` | The release was never deployed to this origin, for example a staging build served on the production URL. | Rebuild the app on the origin it runs on. |
+| `rel.revoked` | The release was revoked. | Reload the page to get a newer build; redeploy the app if none is live. |
+| `rel.not_found` | The release ID belongs to another project. | Check `ZITADEL_PROJECT_ID` in the build. |
+| `rel.reference_invalid` | The variable holds something other than a release ID, such as a digest. | Bake in `data.release_id`, not `data.content_hash`. |
+
+For a revoked release, tell the user to reload rather than reloading for them:
+a host still serving the old bundle would loop.
+
+```ts
+document.querySelector("zitadel-login")?.addEventListener("zitadel-flow-error", (event) => {
+  if (event.detail.code === "rel.revoked") {
+    showReloadBanner();
+  }
+});
+```
+
+## Revoke what must not come back
+
+The header is not a credential. Anyone can send any release ID that was ever
+deployed to your origin, including releases you replaced because they were
+less secure. After a deploy that tightens security, revoke the older releases:
+
+```sh
+npx @zitadel/cli@latest deployment list --origin https://app.example.com
+npx @zitadel/cli@latest release revoke <release id>
+```
+
+[Revoked releases](/docs/concepts/releases-and-deployments#revoked-releases)
+explains what revoking costs.
+
+## Limits
+
+- A configuration fix reaches pinned builds only once they are rebuilt, or once
+  the release they pin is revoked.
+- Native and mobile apps should not pin: a release ID in a store binary stays
+  there for months.
+- The pin applies to sign-ins your app starts with the login component. An
+  OpenID Connect authorization request from another client ignores it.
+- A request with no `Origin` cannot pin; it gets `rel.not_deployed`.

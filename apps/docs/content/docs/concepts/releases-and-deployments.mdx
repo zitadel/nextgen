@@ -1,6 +1,6 @@
 ---
 title: Releases and deployments
-description: How a release snapshots your project's configuration, how a deployment makes it live, and how to roll back or revoke one.
+description: How a release snapshots your project's configuration, how a deployment makes it live, how a build pins one, and how to roll back or revoke one.
 ---
 
 A release is a snapshot of your project's configuration. A deployment makes it live on the project's [origins](/docs/concepts/origins-and-previews). Deploying is how an edit to `.zitadel/` reaches users. The [deploy guide](/docs/guides/deploy) has the commands.
@@ -21,15 +21,56 @@ A deployment freezes the project's [variables](/docs/concepts/repo-config#variab
 
 Each origin is served the release of the newest deployment to it. A request with no origin, such as the CLI's or your backend's, and the console get the newest primary deployment's release; with no primary deployment yet, they are refused (`rel.no_default`). A sign-in stays on the release it started with, even if a newer deployment lands meanwhile.
 
+## Pinning a release
+
+By default, each sign-in gets the newest release deployed to its origin. A build of your app can pin the release it was built against instead. It keeps getting that release after later deploys, so the app and its sign-in configuration roll out and roll back together. The [pin a release guide](/docs/guides/pin-a-release) has the steps.
+
+The build sends the release ID, `rel_` followed by letters and digits, in the `X-Zitadel-Release` header when it starts a flow. `zitadel deploy` and `zitadel preview` print it as `NEXT_PUBLIC_ZITADEL_RELEASE=rel_…`.
+
+- The request's origin still picks the target. The pin then picks among the releases deployed to that origin, and the sign-in runs on the newest deployment of the pinned release there.
+- A pin never deploys a release, and never reaches a release deployed only to another origin or another project.
+- Later steps of the sign-in send nothing: the flow keeps the deployment it started on.
+
+| The pinned release | Answer |
+| --- | --- |
+| was deployed to the origin and is not revoked | served |
+| was never deployed to the origin, or the request has no origin | `409 rel.not_deployed` |
+| is revoked | `409 rel.revoked` |
+| is not a release of the project | `404 rel.not_found` |
+| is not a release ID | `400 rel.reference_invalid` |
+
+A release stays pinnable until it is revoked. Nothing else ages it out.
+
+Native and mobile apps should not pin. A release ID baked into a store binary stays there for months, long after the release should have been revoked.
+
 ## Rollback
 
 `zitadel deployment rollback` deploys an earlier primary deployment's release again, with the variable values it froze. Without an ID it undoes the last deploy. Users keep their data and schema revision; a rollback only changes configuration.
 
 ## Revoked releases
 
-`zitadel release revoke <id>` stops a release from being served or deployed again (`409 rel.revoked`), for example one with a broken flow that a rollback could bring back.
+`zitadel release revoke <id>` stops a release from being served, pinned or deployed again (`409 rel.revoked`).
 
-- A release an origin still serves cannot be revoked (`409 rel.in_use`). The command names the first three origins that serve it and counts the rest; `--json` lists them all. Deploying another release frees a primary origin; `zitadel preview rm` frees a preview, which also frees itself when it expires.
-- Revoking rarely affects users, because a sign-in keeps the release it started on. It fails at its next step only if it started before the newer deployment and is still running when you revoke.
+Revoking is how you take a configuration out of reach for good. The `X-Zitadel-Release` header is not a credential: anyone can send it from browser developer tools or `curl`, with any release ID. A pin cannot reach a release that was never deployed to the request's origin. Every release that was ever deployed there, though, stays selectable until it is revoked. That includes the ones you replaced because they were less secure. A forged pin can bring back:
+
+- a weaker password policy, since the pinned release's policies apply to sign-up and password changes;
+- a login flow from before you required a second factor;
+- an identity provider you removed, or a test provider;
+- old branding.
+
+So revoke a release once it is replaced, if its configuration must not come back. Do this after every deploy that tightens security.
+
+1. Deploy the replacement. A release an origin still serves cannot be revoked (`409 rel.in_use`).
+2. List what was deployed to the origin with `zitadel deployment list --origin <origin>`.
+3. Revoke each older release whose configuration is weaker: `zitadel release revoke <id>`.
+
+What revoking costs:
+
+- **It is one release at a time.** If you tighten security in your fiftieth release, the forty-nine before it stay pinnable until you revoke each one.
+- **A revoked release cannot be deployed or rolled back to either.** Revoke only what you will never want back.
+- **Builds that pin it break.** Their next sign-in gets `rel.revoked` until they are rebuilt or the page is reloaded to a newer build. Show that error to the user.
+- **A sign-in in progress fails at its next step** if it runs on the revoked release.
+
+`rel.in_use` names the first three origins that still serve the release and counts the rest; `--json` lists them all. Deploying another release frees a primary origin; `zitadel preview rm` frees a preview, which also frees itself when it expires.
 
 Every origin of a project shares the same users and sessions; only configuration differs. Users that must stay apart, such as staging's, belong in a second project: a separate [environment](/docs/concepts/repo-config#environments).

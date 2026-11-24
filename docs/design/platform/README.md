@@ -32,6 +32,7 @@ Both sets of documents are siblings. The flow engine docs can be read standalone
 | [Project Secret](secret.md) | Revised (pass 3) | The server-issued bearer token that authenticates SDK/CLI calls. Dual-secret model (project + preview), storage in `.zitadel/secret`, rotation at claim. |
 | [Configuration Surface](configuration-surface.md) | Revised (pass 3) | `zitadel.json` specification. Declared-issuer model, renderer modes, `npx zitadel push`, what uploads and what stays local, silent repo-wins drift.      |
 | [Claim Flow](claim-flow.md) | Revised (pass 3) | The transaction that attaches ownership to a project. Auth methods, team resolution, what changes at claim, failure modes, agent boundary.               |
+| [Release pinning](release-pinning.md) | Implemented | `X-Zitadel-Release`: a build keeps the release it was built against, refused pins, the revocation trade-off, release-scoped events. |
 | [Project vs. Team Modeling](project-team-modeling.md) | Draft | Defines the decision heuristics to choose between a **Project** and a **Team** in the Zitadel next-generation architecture with worked examples.         |
 | **API specs** |                  |                                                                                                                                                          |
 | [Claim API OpenAPI](api/claim-api.yaml) | Revised (pass 3) | Anonymous project create with `preview_origins`, dual-secret response, claim init/complete, team domain-match.                                           |
