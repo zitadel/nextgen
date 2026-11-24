@@ -283,9 +283,9 @@ describe("webhooks screen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add webhook" }));
 
     await waitFor(() => expect(url).toHaveAttribute("aria-invalid", "true"));
-    expect(url).toHaveAccessibleDescription(/webhook: invalid: url is not a URL with a host/);
+    expect(url).toHaveAccessibleDescription(/Webhook: invalid: url is not a URL with a host/);
     // On the field, not repeated above the buttons.
-    expect(screen.getAllByText("webhook: invalid: url is not a URL with a host")).toHaveLength(1);
+    expect(screen.getAllByText("Webhook: invalid: url is not a URL with a host")).toHaveLength(1);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 
     await userEvent.type(url, "a");
@@ -310,7 +310,7 @@ describe("webhooks screen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add webhook" }));
 
     expect(
-      await screen.findByText("the project has reached its limit of 10 webhooks"),
+      await screen.findByText("The project has reached its limit of 10 webhooks"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Endpoint URL")).not.toHaveAttribute("aria-invalid");
   });
@@ -334,7 +334,7 @@ describe("webhooks screen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add webhook" }));
 
     expect(
-      await screen.findByText("insufficient permissions to manage webhooks"),
+      await screen.findByText("Insufficient permissions to manage webhooks"),
     ).toBeInTheDocument();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });

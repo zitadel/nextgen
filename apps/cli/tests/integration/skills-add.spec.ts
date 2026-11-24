@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import { anApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -132,11 +132,11 @@ describe("skills add", () => {
           data: {
             title: WOULD_ADD,
             dry_run: true,
+            verb: "add",
+            topic: "skills",
             skills: SKILLS,
             directories: DIRECTORIES,
-            next_commands: [
-              expectedPublicCliCommand(`skills add --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
-            ],
+            next_commands: [expectedPublicCliCommand(`skills add --cwd ${app.path}`)],
           },
           warnings: [],
         });
@@ -220,9 +220,7 @@ describe("skills add", () => {
 
         const result = await app.run(["skills", "add", "--dry-run"]);
 
-        expect(result).toSay(
-          expectedPublicCliCommand(`skills add --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
-        );
+        expect(result).toSay(expectedPublicCliCommand(`skills add --cwd ${app.path}`));
       });
 
       it("says each skill folder once", async () => {

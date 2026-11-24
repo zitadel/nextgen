@@ -1,0 +1,8 @@
+name: revision_id
+in: path
+required: true
+description: |
+  The revision ID: the `revision_id` that `publishApplication` (`POST /applications`)
+  or `getApplication` returns, or that a release pins.
+schema:
+  $ref: '../schemas/application-revision-id.yaml'

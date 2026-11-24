@@ -26,6 +26,7 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 		{domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}), http.StatusConflict},
 		{domain.ErrDeploymentInvalid().WithMessage("bad"), http.StatusBadRequest},
 		{domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, []string{"GONE"}), http.StatusBadRequest},
+		{domain.ErrDeploymentVariablesNotSecret(domain.DeploymentOriginKindPrimary, []string{"PLAIN"}), http.StatusBadRequest},
 		{domain.ErrDeploymentPermissionDenied(), http.StatusForbidden},
 	}
 	for _, tc := range cases {
@@ -92,7 +93,7 @@ func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
 // The 400 names the kind and every missing variable on details, sorted.
 func TestDeploymentVariablesMissingResponse(t *testing.T) {
 	err := domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPreview, []string{"GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"})
-	resp, ok := deploymentVariablesMissingResponse(t.Context(), err)
+	resp, ok := deploymentVariablesResponse(t.Context(), err)
 	require.True(t, ok)
 	body, isMissing := resp.GetDeploymentVariablesMissing()
 	require.True(t, isMissing)
@@ -104,8 +105,23 @@ func TestDeploymentVariablesMissingResponse(t *testing.T) {
 	}, body.Details)
 }
 
-func TestDeploymentVariablesMissingResponseIgnoresOtherErrors(t *testing.T) {
-	_, ok := deploymentVariablesMissingResponse(t.Context(), domain.ErrDeploymentInvalid())
+// The 400 names the kind and every plain variable a client names as its
+// secret.
+func TestDeploymentVariablesNotSecretResponse(t *testing.T) {
+	err := domain.ErrDeploymentVariablesNotSecret(domain.DeploymentOriginKindPrimary, []string{"SHOP_WEB_SECRET"})
+	resp, ok := deploymentVariablesResponse(t.Context(), err)
+	require.True(t, ok)
+	body, isNotSecret := resp.GetDeploymentVariablesNotSecret()
+	require.True(t, isNotSecret)
+	assert.Equal(t, err.Code, body.Code)
+	assert.Equal(t, api.DeploymentVariablesNotSecretDetails{
+		Kind:  api.DeploymentKindPrimary,
+		Names: []string{"SHOP_WEB_SECRET"},
+	}, body.Details)
+}
+
+func TestDeploymentVariablesResponseIgnoresOtherErrors(t *testing.T) {
+	_, ok := deploymentVariablesResponse(t.Context(), domain.ErrDeploymentInvalid())
 	assert.False(t, ok)
 }
 

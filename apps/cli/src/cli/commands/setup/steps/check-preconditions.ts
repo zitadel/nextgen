@@ -1,5 +1,5 @@
 import { isObject } from "@/lib/json";
-import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { interpolate, type Refusal, refusalError } from "@/cli/core/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import { LocalServerError, ZitadelRuntime } from "@/lib/server";
 import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";

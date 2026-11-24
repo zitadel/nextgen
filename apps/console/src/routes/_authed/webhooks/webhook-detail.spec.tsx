@@ -191,7 +191,7 @@ describe("webhook detail", () => {
     const types = details.getByRole("combobox", { name: "Event types" });
     await waitFor(() => expect(types).toHaveAttribute("aria-invalid", "true"));
     expect(types).toHaveAccessibleDescription(
-      "webhook: invalid: event_types[1] is not an event type the server writes",
+      "Webhook: invalid: event_types[1] is not an event type the server writes",
     );
   });
 
@@ -294,14 +294,14 @@ describe("webhook detail", () => {
 
     await userEvent.click(card("Delivery").getByRole("button", { name: "Disable" }));
     expect(
-      await card("Delivery").findByText("insufficient permissions to manage webhooks"),
+      await card("Delivery").findByText("Insufficient permissions to manage webhooks"),
     ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Delete webhook" }));
     const confirm = within(await screen.findByRole("alertdialog", { name: "Delete webhook?" }));
     await userEvent.click(confirm.getByRole("button", { name: "Delete webhook" }));
     expect(
-      await confirm.findByText("insufficient permissions to manage webhooks"),
+      await confirm.findByText("Insufficient permissions to manage webhooks"),
     ).toBeInTheDocument();
   });
 });

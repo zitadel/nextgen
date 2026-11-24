@@ -1,7 +1,7 @@
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { ZitadelRuntime } from "@/lib/server";
 import { Environment } from "@/lib/environment";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { WizardStep } from "@/lib/wizard";
 
 /**

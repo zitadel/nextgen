@@ -1,5 +1,23 @@
 # @zitadel/api
 
+## 0.9.0
+
+No changes in this release.
+
+## 0.8.0
+
+### Minor Changes
+
+- [#2885](https://github.com/zitadel/nextgen/pull/2885) [`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c) - A release bundle's `oauth: { "enabled": true }` now takes effect: the server stores it as an OAuth settings revision, `GET /oauth_settings/{oauth_settings_id}` reads that revision back instead of answering 501, and every new revision is recorded as an `oauth_settings.created` event. On a server started with `oauth.enabled`, each primary origin the release is deployed to serves the project's RFC 8414 metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>`. The console's release detail lists the pinned OAuth settings. The platform project's issuer follows `oauth.enabled` itself: the server's own platform release carries the OAuth settings, so a restart keeps them.
+  
+  OAuth stays on only while the deployed release carries `oauth`. `zitadel deploy` cannot send it yet and a new release does not copy it from the previous one, so deploying with the CLI turns a project's OAuth off, with no warning.
+
+- [#2897](https://github.com/zitadel/nextgen/pull/2897) [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d) - The API reference now describes `GET /projects/{project_id}/members`, which lists everyone with a role on a project, with each person's strongest role and how they hold it, and an optional `relation` filter. It answers `501` until the list itself ships.
+
+- [#2898](https://github.com/zitadel/nextgen/pull/2898) [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1) - The API now lists everyone with a role on a project. `GET /projects/{project_id}/members` lists each person once, with their strongest role (`viewer`, `editor` or `admin`) and every way they hold it: as an active member of the team that owns the project, which gives `admin`, through a grant to them, or through a grant to a team they belong to. Pass `relation` to list only people with at least that role; `relation=admin` gives the same people as `GET /projects/{project_id}/admins`. Expired grants and people who left a team are left out, and the list is ordered by user id and paginated with `page_token`.
+  
+  Both lists now show every member to every caller who may read them, with each team named. Before, a person whose access came only through a team the caller was not in was left out, so an admin added by a direct grant did not see the project's owners, and a project secret saw only people with a grant of their own. Like the authorization check, a direct user grant is listed only while that user is active.
+
 ## 0.7.0
 
 ### Minor Changes

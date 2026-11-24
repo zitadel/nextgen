@@ -2,7 +2,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
 import ResolveCommand from "@/cli/commands/variable/resolve";
-import { parseArg } from "@tests/helpers/inputs";
+import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import {
   aProjectDirectory,
   PLATFORM_URL,
@@ -323,5 +323,20 @@ describe("deployment_id", () => {
       message: expect.stringContaining("must be a deployment ID"),
       hint: "List the deployments to find one, or omit it to read the live deployment.",
     });
+  });
+});
+
+describe("variable resolve --fields", () => {
+  it.each(["name", "secret", "value", "preview.value"])(
+    "accepts %s, which a variable carries under --json",
+    async (path) => {
+      await expect(parseFlag(ResolveCommand.flags.fields, path, "fields")).resolves.toEqual([path]);
+    },
+  );
+
+  it("refuses a field a variable does not carry", async () => {
+    await expect(
+      parseFlag(ResolveCommand.flags.fields, "no_such_field", "fields"),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 });

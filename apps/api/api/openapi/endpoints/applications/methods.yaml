@@ -31,6 +31,12 @@ post:
     is refused with `app.invalid`, whose details identify the
     setting.
 
+    An application a release declares has one writer, the release: a slug
+    one holds is refused with `app.declared`. Edit its file under
+    `.zitadel/applications/` and deploy instead. A client here leaves
+    `secret` out, which only a release sets; one that sets it is refused with
+    `app.invalid`.
+
     If the document is refused, no change is stored and an existing
     application keeps its current revision.
   tags:
@@ -108,6 +114,7 @@ post:
                 id: app_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: apprev_01KWHF2XY6RN7F0N9WD3P2E4YM
                 slug: shop
+                declared: false
                 created_at: '2026-11-06T09:11:00Z'
                 updated_at: '2026-11-07T14:20:00Z'
                 definition:
@@ -153,6 +160,7 @@ post:
                 id: app_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
                 slug: shop
+                declared: false
                 created_at: '2026-11-06T09:11:00Z'
                 updated_at: '2026-11-06T09:11:00Z'
                 definition:
@@ -208,6 +216,9 @@ post:
 
         Or another revision of the same application was created at the same
         instant (`app.revision_conflict`). Send the document again.
+
+        Or a release declares the application (`app.declared`). Change its
+        file under `.zitadel/applications/` and deploy.
       content:
         application/json:
           schema:

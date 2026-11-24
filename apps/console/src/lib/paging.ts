@@ -5,6 +5,9 @@
  */
 export const LIST_PAGE_SIZE = 25;
 
+/** The most rows the server returns in one page (`limit`), for reads that go to the end. */
+export const MAX_PAGE_SIZE = 100;
+
 /**
  * Follow a cursor to the end. The screens that need a whole collection,
  * resolving slugs or computing "Used by", have no API that answers them

@@ -10,11 +10,11 @@ import (
 	"github.com/ianlancetaylor/jsonschema/types"
 )
 
-// attributeValidation validates user attributes with `format` asserted (ADR
+// AttributeValidation validates user attributes with `format` asserted (ADR
 // 009 §5). JSON Schema 2020-12 only annotates `format` by default, and the
 // validator follows suit unless asked. A format name the validator does not
 // know stays an annotation.
-var attributeValidation = &jsonschema.ValidateOpts{ValidateFormat: true}
+var AttributeValidation = &jsonschema.ValidateOpts{ValidateFormat: true}
 
 func init() {
 	format.RegisterFormatValidator("email", assertEmailFormat)
@@ -49,5 +49,5 @@ func AttributeFormatValid(name, value string) bool {
 	if err := json.Unmarshal(document, &schema); err != nil {
 		return true
 	}
-	return schema.ValidateWithOpts(value, attributeValidation) == nil
+	return schema.ValidateWithOpts(value, AttributeValidation) == nil
 }

@@ -8,7 +8,7 @@ pulls: [2187]
 `zitadel api` calls any operation of the Zitadel API with your project's server and secret, including the ones no command covers yet.
 
 - Name an operation by its `operationId`, `zitadel api queryUsers`, or by its path, `zitadel api /users/query`. `zitadel api ls` lists them.
-- Set query parameters and body fields with `-F name=value`, typed by the operation's schema, or pass a whole body with `--input`.
+- Set query parameters and body fields with `-F name=value`, typed by the operation's schema, or pass a whole body with `--file`.
 - Follow every page with `--paginate`, and preview the request as cURL with `--dry-run`.
 - With `--json`, the response body comes back as `data`.
 

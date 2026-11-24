@@ -100,7 +100,9 @@ describe("user schemas list", () => {
     await renderAt("/schemas");
 
     expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Business" })).toBeInTheDocument();
+    const name = await screen.findByRole("link", { name: "Business" });
+    // The name is text alone, with no icon beside it (D17).
+    expect(name.querySelector("svg")).toBeNull();
 
     // Only the enabled methods — password is declared but off.
     expect(screen.getByText("Passkey")).toBeInTheDocument();

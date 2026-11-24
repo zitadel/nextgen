@@ -13,7 +13,7 @@ import (
 
 const (
 	createApplicationStmt = `INSERT INTO applications ` +
-		`(project_id, id, slug, created_at) VALUES (?, ?, ?, ?)`
+		`(project_id, id, slug, declared, created_at) VALUES (?, ?, ?, ?, ?)`
 
 	createApplicationRevisionStmt = `INSERT INTO application_revisions ` +
 		`(project_id, id, application_id, document, created_at) VALUES (?, ?, ?, ?, ?)`
@@ -24,7 +24,7 @@ const (
 	// No FOR UPDATE; see lockIDPConnectionStmt.
 	lockApplicationStmt = `SELECT id FROM applications WHERE project_id = ? AND id = ?`
 
-	applicationQuery = `SELECT a.project_id, a.id, a.slug, r.id, r.document, a.created_at, r.created_at
+	applicationQuery = `SELECT a.project_id, a.id, a.slug, a.declared, r.id, r.document, a.created_at, r.created_at
 FROM applications a
 JOIN application_revisions r
   ON r.project_id = a.project_id AND r.application_id = a.id`
@@ -50,6 +50,12 @@ JOIN application_revisions r
 	listApplicationClientSecretsStmt = `SELECT project_id, id, application_client_id, secret_hash, created_at` +
 		` FROM application_client_secrets` +
 		` WHERE project_id = ? AND application_client_id = ? ORDER BY created_at, id`
+
+	getApplicationSecretVariableStmt = `SELECT project_id, name, application_client_id, created_at` +
+		` FROM application_secret_variables WHERE project_id = ? AND name = ?`
+
+	createApplicationSecretVariableStmt = `INSERT INTO application_secret_variables ` +
+		`(project_id, name, application_client_id, created_at) VALUES (?, ?, ?, ?)`
 )
 
 var _ service.ApplicationStatements = (*applicationStatements)(nil)
@@ -83,6 +89,7 @@ func (s applicationStatements) CreateApplication(ctx context.Context, entity *do
 			entity.ProjectID,
 			entity.ID,
 			entity.Slug,
+			entity.IsDeclared,
 			now,
 		); err != nil {
 			return wrapError(err)
@@ -155,10 +162,23 @@ func (s applicationStatements) LockApplication(ctx context.Context, projectID, i
 
 // GetApplication implements [service.ApplicationStatements].
 func (s applicationStatements) GetApplication(ctx context.Context, filter database.Filter[domain.ApplicationField]) (*domain.Application, error) {
+	return s.getOne(ctx, filter, newestApplicationRevision)
+}
+
+// GetApplicationRevision implements [service.ApplicationStatements].
+func (s applicationStatements) GetApplicationRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error) {
+	// No newest-revision conjunct: a pinned read must reach a superseded row.
+	return s.getOne(ctx, database.And(
+		database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID),
+		database.Equal(database.Col(domain.ApplicationFieldRevisionID), revisionID),
+	))
+}
+
+func (s applicationStatements) getOne(ctx context.Context, filter database.Filter[domain.ApplicationField], conjuncts ...string) (*domain.Application, error) {
 	var compiler statementCompiler
 	if err := compileRead(&compiler, applicationQuery, &database.ListOptions[domain.ApplicationField]{
 		Filter: filter,
-	}, application.Schema, newestApplicationRevision); err != nil {
+	}, application.Schema, conjuncts...); err != nil {
 		return nil, err
 	}
 	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
@@ -171,6 +191,24 @@ func (s applicationStatements) GetApplication(ctx context.Context, filter databa
 		return nil, wrapError(err)
 	}
 	return entity, nil
+}
+
+// ListApplicationRevisions implements [service.ApplicationStatements].
+func (s applicationStatements) ListApplicationRevisions(ctx context.Context, projectID, applicationID string, limit uint32) ([]*domain.Application, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, applicationQuery, application.RevisionsListOptions(projectID, applicationID, limit), application.Schema); err != nil {
+		return nil, err
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	revisions, err := collectRows(rows, scanApplication)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return revisions, nil
 }
 
 // ListApplicationClients implements [service.ApplicationStatements].
@@ -244,6 +282,45 @@ func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context,
 	return secrets, nil
 }
 
+// GetApplicationSecretVariable implements [service.ApplicationStatements].
+func (s applicationStatements) GetApplicationSecretVariable(ctx context.Context, projectID, name string) (*domain.ApplicationSecretVariable, error) {
+	rows, err := s.client.Query(ctx, getApplicationSecretVariableStmt, projectID, name)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	variable, err := collectExactlyOneRow(rows, func(rows *sql.Rows) (*domain.ApplicationSecretVariable, error) {
+		var (
+			variable    domain.ApplicationSecretVariable
+			createdNano int64
+		)
+		if err := rows.Scan(&variable.ProjectID, &variable.Name, &variable.ApplicationClientID, &createdNano); err != nil {
+			return nil, err
+		}
+		variable.CreatedAt = timeFromUnixNano(createdNano)
+		return &variable, nil
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return variable, nil
+}
+
+// CreateApplicationSecretVariable implements [service.ApplicationStatements].
+func (s applicationStatements) CreateApplicationSecretVariable(ctx context.Context, variable *domain.ApplicationSecretVariable) error {
+	now := nowUnixNano()
+	if _, err := s.client.Exec(ctx, createApplicationSecretVariableStmt,
+		variable.ProjectID,
+		variable.Name,
+		variable.ApplicationClientID,
+		now,
+	); err != nil {
+		return wrapError(err)
+	}
+	variable.CreatedAt = timeFromUnixNano(now)
+	return nil
+}
+
 func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*domain.ApplicationClient, now int64) error {
 	for _, client := range clients {
 		if _, err := tx.Exec(ctx, createApplicationClientStmt,
@@ -267,7 +344,7 @@ func scanApplication(rows *sql.Rows) (*domain.Application, error) {
 		document                 string
 		createdNano, updatedNano int64
 	)
-	if err := rows.Scan(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.RevisionID, &document, &createdNano, &updatedNano); err != nil {
+	if err := rows.Scan(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.IsDeclared, &entity.RevisionID, &document, &createdNano, &updatedNano); err != nil {
 		return nil, err
 	}
 	entity.Document = []byte(document)

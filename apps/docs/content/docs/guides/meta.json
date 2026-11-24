@@ -4,6 +4,7 @@
     "local-runtime",
     "edit-login-flow",
     "deploy",
+    "manage-project-access",
     "password-policy",
     "test-policies",
     "test-your-app",

@@ -199,7 +199,7 @@ describe("webhookRefusal", () => {
       field: "url",
     });
     expect(webhookRefusal(cause, "fallback")).toEqual({
-      message: "the url is not a URL with a host",
+      message: "The url is not a URL with a host",
       field: "url",
     });
   });
@@ -219,7 +219,7 @@ describe("webhookRefusal", () => {
   it("leaves a refusal that names no field to the form", () => {
     const limit = refusal(409, "webhook.limit_reached", "the project has reached its limit");
     expect(webhookRefusal(limit, "fallback")).toEqual({
-      message: "the project has reached its limit",
+      message: "The project has reached its limit",
     });
     const other = refusal(400, "req.invalid", "The request is invalid.", { fields: ["enabled"] });
     expect(webhookRefusal(other, "fallback")).toEqual({ message: "The request is invalid." });
