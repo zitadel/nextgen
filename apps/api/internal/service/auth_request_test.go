@@ -191,6 +191,18 @@ func TestAuthRequestService_RedeemCode(t *testing.T) {
 			reach: reachIssue,
 		},
 		{
+			// A token for it would have exp equal to iat.
+			name: "session_ends_within_a_second",
+			session: func() *domain.Session {
+				s := activeSession(new("user_1"))
+				s.ExpiresAt = time.Now().Add(400 * time.Millisecond)
+				return s
+			}(),
+			reach:      reachSession,
+			wantErr:    domain.ErrAuthCodeInvalid(),
+			wantReason: domain.AuthRequestExchangeReasonSessionNotActive,
+		},
+		{
 			name: "issued_for_a_session_without_expiry",
 			session: func() *domain.Session {
 				s := activeSession(new("user_1"))

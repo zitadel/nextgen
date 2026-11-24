@@ -245,6 +245,11 @@ func redemptionRefusal(ctx context.Context, stmts AllStatements, request *domain
 	if session.State() != domain.SessionStateActive || session.UserID == nil || *session.UserID != request.UserID {
 		return domain.AuthRequestExchangeReasonSessionNotActive, nil, nil
 	}
+	// The token's exp stores whole seconds, so a session that ends within a
+	// second would give a token with exp equal to iat.
+	if !session.ExpiresAt.IsZero() && session.ExpiresAt.Before(now.Add(time.Second)) {
+		return domain.AuthRequestExchangeReasonSessionNotActive, nil, nil
+	}
 	_, err = stmts.GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), request.ProjectID),
 		database.Equal(database.Col(domain.UserFieldID), request.UserID),
