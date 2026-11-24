@@ -138,6 +138,10 @@ nothing serves ([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.m
   which Next serves at the root.
 - Link another app with a plain `<a>` (`app/links.ts`), never `next/link`.
 - `/llms.txt` (`app/llms.txt/route.ts`) links paths on the same host.
+- `/robots.txt` and `/sitemap.xml` (`app/crawlers.ts`) speak for the whole
+  host; only production's build lets crawlers in. List a new page there.
+- `/.well-known/security.txt` redirects to zitadel.com's (`next.config.ts`),
+  the source `SECURITY.md` names; never serve a copy.
 
 ## Checks
 
