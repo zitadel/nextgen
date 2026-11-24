@@ -4,7 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anUndeployedEnvironment, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 
@@ -131,6 +131,28 @@ describe("variable resolve", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "resolve", "--fields", "name", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "variable",
+          "resolve",
+          "--fields",
+          "no_such_field",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("is a miss when nothing is deployed", async () => {
         const app = await anUndeployedEnvironment();
 
@@ -170,6 +192,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -197,6 +220,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -238,6 +262,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "TOKEN", secret: true }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -263,6 +288,7 @@ describe("variable resolve", () => {
             title: `${deployed.deployment_id} froze no variables for ${LIVE_ORIGINS.join(", ")}`,
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -288,6 +314,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "BANNER", secret: false, value: "a\u001b[2Jwiped" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
             origins: LIVE_ORIGINS,
@@ -313,6 +340,7 @@ describe("variable resolve", () => {
             title: expect.stringMatching(/^dep_\w+ froze no variables for /),
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             deployment_id: expect.stringMatching(/^dep_/),
             origins: [origin],
@@ -439,6 +467,7 @@ describe("variable resolve", () => {
             title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
+            truncated: false,
             next_page_token: null,
             deployment_id: deploymentId,
           },
@@ -460,6 +489,7 @@ describe("variable resolve", () => {
             title: `${firstDeploymentId} froze no variables`,
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             deployment_id: firstDeploymentId,
           },

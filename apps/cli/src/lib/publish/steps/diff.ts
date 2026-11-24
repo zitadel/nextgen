@@ -98,9 +98,7 @@ export const diffStep: Step = {
     // a diff against the newest says nothing about the others.
     const learned = learnedFrom(touched, releases.size);
 
-    const referenced = ctx.config.branding.all.flatMap((branding) => {
-      return branding.listReferencedPaths(ctx.store);
-    });
+    const referenced = ctx.referenced;
     if (ctx.json) {
       const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
       if (files === null) {

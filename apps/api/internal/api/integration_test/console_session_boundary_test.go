@@ -68,9 +68,9 @@ func TestConsoleSessionForeignTargetIsIndistinguishable(t *testing.T) {
 	require.NotEmpty(t, flows.FlowDefinitions)
 	flowID := flows.FlowDefinitions[0].ID
 
-	created, err := otherSecret.CreateBranding(t.Context(), &api.Branding{
+	created, err := otherSecret.PublishBranding(t.Context(), &api.Branding{
 		Layout: api.NewOptBrandingLayout(api.BrandingLayoutSplit),
-	}, api.CreateBrandingParams{ProjectID: api.ProjectID(other.ID)})
+	}, api.PublishBrandingParams{ProjectID: api.ProjectID(other.ID)})
 	require.NoError(t, err)
 	revision, ok := created.(*api.BrandingRevisionResponse)
 	require.True(t, ok, helpers.MustMarshal(t, created))

@@ -1,6 +1,6 @@
 get:
   operationId: getGrant
-  x-zitadel-cli: grants get
+  x-zitadel-cli: grant get
   summary: Get a grant by ID
   # Grants are not registered in `resource_scope_index`, which is why the
   # project scope is required on the query, as it is for events.
@@ -9,15 +9,15 @@ get:
 
     This API manages grants that bind a user or team to the viewer, editor or
     admin role. An expired grant is still returned, so you can revoke it with
-    `deleteGrant` (`DELETE /grants/{id}`) before you grant the same binding again. Authorization still
+    `deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization still
     ignores expired grants. Send `project_id` as well as the grant ID.
     Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
     (`relation=team`) rows and grants of another project all return `404`.
 
-    `expand=principal` adds envelope fields on `user` or `team`. For project
-    secrets it requires `user.read` and `team.read` in addition to `project.read`.
-    A user-bound console session that already passed the project check may expand
-    without those scopes.
+    `expand=principal` adds envelope fields on `user` or `team`. Expanding
+    requires read access to the principal's home project (the platform project
+    when the server has one), for project secrets and for console sessions alike.
+    A caller without it gets `403` `user.permission_denied`.
 
     Authenticate with a project secret (`oauth2`) or a console session cookie
     (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
@@ -74,7 +74,7 @@ get:
 
 delete:
   operationId: deleteGrant
-  x-zitadel-cli: grants delete
+  x-zitadel-cli: grant delete
   summary: Revoke a grant
   description: |
     Revokes a grant this API manages and emits `authz.revoked`.

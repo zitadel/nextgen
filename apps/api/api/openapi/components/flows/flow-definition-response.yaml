@@ -15,7 +15,7 @@ properties:
     readOnly: true
     description: |
       The user schema this flow operates on: the same object
-      `getSchemaById` (`GET /schemas/{id}`) returns. Present only when the request asked for it
+      `getSchema` (`GET /schemas/{schema_id}`) returns. Present only when the request asked for it
       with `expand=user_schema`; `null` when it was requested but the
       referenced schema no longer resolves or the caller may not read it.
     oneOf:

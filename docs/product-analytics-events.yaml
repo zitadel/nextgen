@@ -411,10 +411,10 @@ properties:
   policy_source:
     type: string
     values: [files, release]
-    description: What `policies test` evaluated its cases against, the policy files or a release.
+    description: What `policy test` evaluated its cases against, the policy files or a release.
   case_count:
     type: number
-    description: How many cases `policies test` ran; never a case name or an input.
+    description: How many cases `policy test` ran; never a case name or an input.
   failed_count:
     type: number
     description: How many of those cases did not hold.
@@ -424,6 +424,16 @@ properties:
   variable_count:
     type: number
     description: How many variables `variables list` found.
+  role:
+    type: string
+    values: [project_viewer, project_editor, project_admin]
+    description: The role an invitation grants, its type and role combined; never a name, an id or the link.
+  invitation_journey_id:
+    type: string
+    description: >-
+      The invitation's `journey_id`, which a replacement keeps: a random
+      correlation id, not a resource id, joining a journey's events to time
+      acceptance (ADR 086 §9). Never the token, the link or the invitation id.
   operation:
     type: string
     description: The `operationId` `zitadel api` called, never a path, an id or a field.
@@ -495,6 +505,22 @@ components:
         trigger: A command failed.
         destinations: [mixpanel, vercel]
         properties: [status, reason, exit_code, duration_ms]
+      invitation_created:
+        status: emitted
+        trigger: >-
+          `invitation create`, including `--replaces`, after the API confirms
+          the create. The Vercel copy keeps only the header's keys, never the
+          journey.
+        destinations: [mixpanel, vercel]
+        properties: [role, invitation_journey_id]
+      invitation_cancelled:
+        status: emitted
+        trigger: >-
+          `invitation cancel`, after the API confirms the cancel (ADR 086's
+          amendment). The Vercel copy keeps only the header's keys, never the
+          journey.
+        destinations: [mixpanel, vercel]
+        properties: [role, invitation_journey_id]
       flow_started:
         status: planned
         plan: "#2200"
@@ -568,7 +594,7 @@ components:
       branding:eject: [design]
       deploy: [resources, origin_count]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
-      policies:test: [policy_source, case_count, failed_count]
+      policy:test: [policy_source, case_count, failed_count]
       start: [runtime]
       variable:get: [is_secret]
       variable:list: [variable_count]
@@ -605,6 +631,41 @@ components:
           Analytics Plus's limit.
         destinations: [vercel]
         properties: [page, utm_source, utm_medium, utm_campaign, referrer_host]
+      invitation_created:
+        status: emitted
+        plan: "#2859"
+        trigger: >-
+          The API confirmed an invitation made from the project's Invitations
+          settings, a replacement (`Regenerate link`) included. Only the cloud build
+          sends it, to Vercel like `copied_command`; Mixpanel follows once the
+          Console has a sink for it.
+        destinations: [vercel, mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_accepted:
+        status: emitted
+        plan: "#2859"
+        trigger: >-
+          The API confirmed the accept on the invitation page. Sent like
+          `invitation_created`.
+        destinations: [vercel, mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_rejected:
+        status: emitted
+        plan: "#2859"
+        trigger: >-
+          The API confirmed the decline on the invitation page. Sent like
+          `invitation_created`.
+        destinations: [vercel, mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_cancelled:
+        status: emitted
+        plan: "#2859"
+        trigger: >-
+          The API confirmed the cancel of a pending invitation in the project's
+          Invitations list. Removing an expired or a declined one sends nothing:
+          that link was already dead. Sent like `invitation_created`.
+        destinations: [vercel, mixpanel]
+        properties: [role, invitation_journey_id]
       viewed_page:
         status: planned
         plan: "#2233"

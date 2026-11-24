@@ -1,7 +1,8 @@
-import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { Environment, type EnvironmentKey } from "@/lib/environment";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { CommandResult } from "@/cli/core";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { ReadCommand } from "@/cli/commands/bases";
 
 /** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
@@ -21,10 +22,11 @@ const REDACTED = "••••••••";
  * and which source supplied each value. It never prints a secret in full, so
  * the output is safe to paste into a bug report.
  */
-export default class Env extends Tabulatable(EnvironmentCommand) {
+export default class Env extends ReadCommand {
   static override description =
     "Show which server and project resolve, and where each value came from.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> env",
@@ -32,10 +34,15 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> env --env-file ./infra/acme-staging.env",
   ];
 
-  protected async execute(): Promise<JsonEnvelope> {
+  /**
+   * Shows the environment this run resolves, with its secrets redacted.
+   *
+   * @returns The environment.
+   */
+  protected async execute(): Promise<CommandResult> {
     const { name, values, consulted } = this.environment;
 
-    const resolved = ENVIRONMENT_KEYS.flatMap((key) => {
+    const resolved = Environment.KEYS.flatMap((key) => {
       const entry = values[key];
       if (!entry) {
         return [];
@@ -62,7 +69,7 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
     const variables = await this.tabulate(["variable", "value", "source"], resolved);
     const sources = await this.tabulate(["source", "present", "supplied"], lookups);
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         environment: {
@@ -83,6 +90,6 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
         sections: [],
         lines: [...variables.split("\n"), "", "Consulted, in order:", ...sources.split("\n")],
       },
-    });
+    };
   }
 }

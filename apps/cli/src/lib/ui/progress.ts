@@ -1,9 +1,9 @@
 import { log } from "@clack/prompts";
 
-import { log as narration } from "@/lib/log";
 import { Once } from "@/lib/once";
 
 import { stripColumnMarks } from "./layout";
+import { log as cliLog } from "./log";
 import { GUIDE, MARK } from "./marks";
 import { DrawnSpinner } from "./spinner";
 
@@ -51,6 +51,8 @@ export interface Drawing {
    * and a `│` above its answer would make it look like a wizard.
    */
   readonly chained: boolean;
+  /** Says one line in the chain with the given mark, for a run nobody is watching. */
+  narrate(symbol: string, text: string): void;
   /** Opens the chain, so the first thing drawn is under its heading. */
   open(): void;
   /** The chain's spacing is settled; what follows needs no blank guide line. */
@@ -86,15 +88,15 @@ export class Progress {
     const lines: Line[] = [];
     const report = Progress.collect(lines);
     if (!this.drawing.interactive) {
-      narration.start(label);
+      this.narrate(MARK.started, label);
       const result = await work(report).catch((error: unknown) => {
-        narration.fail(`${label} failed`);
+        cliLog.fail(`${label} failed`);
         throw error;
       });
       for (const { verb, subject } of lines) {
-        narration.info(`${verb} ${subject}`);
+        this.narrate(MARK.info, `${verb} ${subject}`);
       }
-      narration.done(done?.(result) ?? label);
+      this.narrate(MARK.done, done?.(result) ?? label);
 
       return result;
     }
@@ -122,21 +124,21 @@ export class Progress {
    */
   begin(label: string): Step {
     if (!this.drawing.interactive) {
-      narration.start(label);
+      this.narrate(MARK.started, label);
       const narrated = new Once();
 
       return {
         detail: (text) => {
-          return narration.info(text);
+          return this.narrate(MARK.info, text);
         },
         done: (text) => {
           return narrated.run(() => {
-            return narration.done(text ?? label);
+            return this.narrate(MARK.done, text ?? label);
           });
         },
         fail: (text) => {
           return narrated.run(() => {
-            return narration.fail(text ?? `${label} failed`);
+            return cliLog.fail(text ?? `${label} failed`);
           });
         },
       };
@@ -206,6 +208,21 @@ export class Progress {
   }
 
   /**
+   * Says one line of a run nobody is watching, in the chain with its mark, or
+   * as a plain line outside a chain.
+   *
+   * @param symbol - The mark the line carries in a chain.
+   * @param text - The line.
+   */
+  private narrate(symbol: string, text: string): void {
+    if (this.drawing.chained) {
+      this.drawing.narrate(symbol, text);
+      return;
+    }
+    cliLog.info(text);
+  }
+
+  /**
    * Writes one line under a result, in the chain's gutter, or indented under
    * it for a normal command. {@link draw} draws its rows one at a time and
    * says so, since a row on its own has nothing to line up with; what a caller
@@ -213,7 +230,7 @@ export class Progress {
    */
   private detail(text: string): void {
     if (!this.drawing.chained) {
-      narration.plain(stripColumnMarks(`  ${text}`));
+      cliLog.info(stripColumnMarks(`  ${text}`));
       return;
     }
     this.line(GUIDE, text);
@@ -229,7 +246,7 @@ export class Progress {
    */
   private line(symbol: string, text: string): void {
     if (!this.drawing.chained) {
-      narration.plain(stripColumnMarks(text));
+      cliLog.info(stripColumnMarks(text));
       return;
     }
     log.message(stripColumnMarks(text), {

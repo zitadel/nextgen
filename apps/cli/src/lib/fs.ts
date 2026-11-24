@@ -1,6 +1,6 @@
-import { access, readdir, readFile, stat } from "node:fs/promises";
+import { access, lstat, readdir, readFile, stat } from "node:fs/promises";
 
-import { isErrno } from "./errors";
+import { isErrno } from "./errno";
 
 /**
  * Whether anything exists at `path`. Any failure to look, not only a missing
@@ -85,6 +85,27 @@ export async function readDirIfExists(path: string): Promise<string[]> {
 export async function pathExistsStrict(path: string): Promise<boolean> {
   try {
     await access(path);
+    return true;
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Whether an entry exists at `path`, a link counting as an entry even when what
+ * it points at is missing. False only when nothing is there; any other failure
+ * to look throws.
+ *
+ * @param path - What to look for.
+ * @returns Whether an entry is there.
+ * @throws Any `lstat` error other than the entry being missing.
+ */
+export async function entryExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
     return true;
   } catch (error) {
     if (isErrno(error, "ENOENT")) {

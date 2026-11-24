@@ -4803,6 +4803,14 @@
         },
         {
           "kind": "js",
+          "name": "brandingDeclarations",
+          "declaration": {
+            "name": "brandingDeclarations",
+            "module": "./orchestrator/index.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "buildBrandingStylesheet",
           "declaration": {
             "name": "buildBrandingStylesheet",
@@ -6075,6 +6083,30 @@
         },
         {
           "kind": "function",
+          "name": "brandingDeclarations",
+          "return": {
+            "type": {
+              "text": "Record<string, string>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "branding",
+              "type": {
+                "text": "Branding | undefined"
+              }
+            },
+            {
+              "name": "side",
+              "type": {
+                "text": "ResolvableSide"
+              }
+            }
+          ],
+          "description": "The `--zl-*` values one side of a revision paints, as buildBrandingStylesheet\nemits them for that side: the shared type and shape, the side's palette over it.\nFor a host that sets them on an element's `style` rather than adopting a sheet."
+        },
+        {
+          "kind": "function",
           "name": "applyBaseTokens",
           "return": {
             "type": {
@@ -6140,6 +6172,14 @@
           "name": "buildBrandingStylesheet",
           "declaration": {
             "name": "buildBrandingStylesheet",
+            "module": "src/orchestrator/branding-to-tokens.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "brandingDeclarations",
+          "declaration": {
+            "name": "brandingDeclarations",
             "module": "src/orchestrator/branding-to-tokens.ts"
           }
         },
@@ -6450,6 +6490,14 @@
           "name": "applyBrandingTokens",
           "declaration": {
             "name": "applyBrandingTokens",
+            "module": "./branding-to-tokens.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "brandingDeclarations",
+          "declaration": {
+            "name": "brandingDeclarations",
             "module": "./branding-to-tokens.js"
           }
         },
@@ -8268,7 +8316,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flow/{id}` instead of `POST /flow` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
+              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flows/{flow_id}` instead of `POST /flows` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
               "attribute": "resume-flow-id"
             },
             {
@@ -9441,7 +9489,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flow/{id}` instead of `POST /flow` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
+              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flows/{flow_id}` instead of `POST /flows` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
               "fieldName": "resumeFlowId"
             },
             {

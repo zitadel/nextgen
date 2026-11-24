@@ -1,10 +1,5 @@
-import {
-  addExactCommandFor,
-  detectPackageManager,
-  inDirectory,
-  type PackageCommand,
-  runPackageCommand,
-} from "@/lib/package-manager";
+import { Output } from "@/lib/ui/output";
+import { type PackageCommand, PM } from "@/lib/pm";
 
 import { InstallError } from "./errors";
 import type { UpgradePlan } from "./plan";
@@ -42,7 +37,7 @@ export type InstallerOptions = Readonly<{
    * Whether a package manager's progress must stay off stdout, which a command
    * that prints one machine-readable result needs.
    */
-  redirectStdoutToStderr: boolean;
+  redirectStdoutToStderr?: boolean;
 }>;
 
 /**
@@ -76,11 +71,11 @@ export class PackageInstaller {
       return undefined;
     }
     const { cwd, typedCwd } = this.options;
-    const manager = await detectPackageManager(cwd);
-    const run = addExactCommandFor(manager, [...plan.specs]);
+    const manager = await PM.detect(cwd);
+    const run = manager.addExact([...plan.specs]);
     return {
       run,
-      shown: inDirectory(run, typedCwd, cwd),
+      shown: run.inDirectory(typedCwd, cwd),
     };
   }
 
@@ -92,9 +87,9 @@ export class PackageInstaller {
    */
   async install(install: PlannedInstall): Promise<void> {
     try {
-      await runPackageCommand(install.run, {
+      await install.run.run({
         cwd: this.options.cwd,
-        redirectStdoutToStderr: this.options.redirectStdoutToStderr,
+        redirectStdoutToStderr: this.options.redirectStdoutToStderr ?? Output.json,
       });
     } catch (error) {
       throw new InstallError(install.shown, error);

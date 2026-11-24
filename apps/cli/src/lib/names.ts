@@ -28,6 +28,20 @@ export function named(name: string): string {
   });
 }
 
+/**
+ * `given_name` and `givenName` as `given-name`, the way a flag is spelled on
+ * the command line.
+ *
+ * @param name - A name spelled in snake_case, camelCase or kebab-case.
+ * @returns The name in kebab-case.
+ */
+export function kebab(name: string): string {
+  return name
+    .replaceAll("_", "-")
+    .replace(/([a-z\d])([A-Z])/gu, "$1-$2")
+    .toLowerCase();
+}
+
 /** `values` keyed as {@link Named} spells each of its names. */
 export function byName<Values extends object>(values: Values): ByName<Values> {
   return Object.fromEntries(

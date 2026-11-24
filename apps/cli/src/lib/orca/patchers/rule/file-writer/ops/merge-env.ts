@@ -1,9 +1,9 @@
-import { envLine } from "@/lib/fs-safe";
 import {
   type Change,
   Operation,
   type Source,
 } from "@/lib/orca/patchers/rule/file-writer/operation";
+import { EnvFile } from "@/lib/project/env-file";
 
 /**
  * Adds the entries an `.env` file does not hold yet.
@@ -44,7 +44,7 @@ export class MergeEnvOp extends Operation<"merge-env"> {
           return line;
         }
 
-        return envLine(name, value);
+        return EnvFile.line(name, value);
       })
       .join("\n");
     const held = new Set(
@@ -60,7 +60,7 @@ export class MergeEnvOp extends Operation<"merge-env"> {
     });
     const header = comment[0] !== undefined && !existing.includes(comment[0]) ? comment : [];
     const lines = missing.map(([name, value]) => {
-      return envLine(name, value);
+      return EnvFile.line(name, value);
     });
 
     if (missing.length === 0) {

@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
+
+/** A project whose server is on this machine, so there is no remote console to open instead. */
+const ON_THIS_MACHINE = { ZITADEL_URL: "http://localhost:8080" };
 
 /** The two ways a person reads a run, which must say the same thing. */
 const SHOWN = [
@@ -24,7 +25,7 @@ describe("console", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        const result = await app.run(["console", "--json"]);
+        const result = await app.runWithoutServer(["console", "--json"], ON_THIS_MACHINE);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
@@ -44,7 +45,7 @@ describe("console", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        const result = await app.run(["console", "--json"]);
+        const result = await app.runWithoutServer(["console", "--json"], ON_THIS_MACHINE);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
@@ -64,7 +65,7 @@ describe("console", () => {
         const app = await aSetUpApp();
         platform.refusesConnections();
 
-        const result = await app.run(["console", "--json"]);
+        const result = await app.runWithoutServer(["console", "--json"], ON_THIS_MACHINE);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
@@ -85,7 +86,10 @@ describe("console", () => {
       const app = await aSetUpApp();
 
       await app.inEveryRendering((how) =>
-        app.run(how.json ? ["console", "--json"] : ["console"], how.env),
+        app.runWithoutServer(how.json ? ["console", "--json"] : ["console"], {
+          ...how.env,
+          ...ON_THIS_MACHINE,
+        }),
       );
     });
 
@@ -93,7 +97,7 @@ describe("console", () => {
       it("refuses a project with no local runtime behind it, and says to start one", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["console", "--json"]);
+        const result = await app.runWithoutServer(["console", "--json"], ON_THIS_MACHINE);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
@@ -107,10 +111,31 @@ describe("console", () => {
         });
       });
 
+      it("opens the console of a project on the hosted cloud, not a local one", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.runWithoutServer(["console", "--no-open", "--json"], {
+          ZITADEL_URL: "https://preview.zitadel.com",
+        });
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: CLI_VERSION,
+          command: "console",
+          source: "https://preview.zitadel.com",
+          data: {
+            title: "Console",
+            console_url: "https://preview.zitadel.com/console/",
+            browser_opened: false,
+          },
+          warnings: [],
+        });
+      });
+
       it("refuses a directory that was never set up", async () => {
         const app = await anApp();
 
-        const result = await app.run(["console", "--json"]);
+        const result = await app.runWithoutServer(["console", "--json"], ON_THIS_MACHINE);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
@@ -128,7 +153,7 @@ describe("console", () => {
         const app = await aSetUpApp();
         const started = await app.startLocalServer();
 
-        const result = await app.run(["console", "--json"]);
+        const result = await app.runWithoutServer(["console", "--json"], ON_THIS_MACHINE);
 
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
@@ -161,6 +186,8 @@ describe("console", () => {
           data: {
             title: "Would mint a console sign-in link (dry run)",
             dry_run: true,
+            verb: "mint",
+            topic: "console",
             signed_in_as: "admin@zitadel.localhost",
             next_commands: [expectedPublicCliCommand(app.againAsRun("console"))],
           },
@@ -194,6 +221,8 @@ describe("console", () => {
           data: {
             title: "Would mint a console sign-in link (dry run)",
             dry_run: true,
+            verb: "mint",
+            topic: "console",
             signed_in_as: "admin@zitadel.localhost",
             next_commands: [expectedPublicCliCommand(app.againAsRun("console"))],
           },
@@ -233,7 +262,7 @@ describe("console", () => {
       it("refuses a project with no local runtime, on stderr, once", async () => {
         const app = await aSetUpApp();
 
-        const result = await shown(() => app.run(["console"]));
+        const result = await shown(() => app.runWithoutServer(["console"], ON_THIS_MACHINE));
 
         expect(result.stdout).toBe("");
         expect(result).toSayOnce("No local admin in this directory or its parents");
@@ -242,7 +271,7 @@ describe("console", () => {
       it("suggests starting the server, once", async () => {
         const app = await aSetUpApp();
 
-        const result = await shown(() => app.run(["console"]));
+        const result = await shown(() => app.runWithoutServer(["console"], ON_THIS_MACHINE));
 
         expect(result).toSayOnce(expectedPublicCliCommand(`start --cwd ${app.path}`));
       });

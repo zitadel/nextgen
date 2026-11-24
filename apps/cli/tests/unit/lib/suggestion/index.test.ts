@@ -5,59 +5,41 @@ import { aSuggest } from "@tests/helpers/suggestions";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 import {
+  Spelling,
+  WHAT_CHANGED,
+  andTheRest,
   commandOf,
-  type Declared,
   declaredOf,
   distinct,
-  type FlagsOf,
-  type HelpNext,
   helpOf,
-  andTheRest,
   isSuggestion,
-  type Next,
-  renderSuggestion,
-  type SuggestedCommand,
-  type SuggestionId,
-  type Suggestion,
   pipedFrom,
   readingFrom,
+  renderSuggestion,
   shellCommand,
   shellSteps,
-  suggestedCommandOf,
   spelled,
+  suggestedCommandOf,
   suggestionWords,
-  WHAT_CHANGED,
+  type Declared,
+  type FlagsOf,
+  type HelpNext,
+  type Next,
+  type SuggestedCommand,
+  type Suggestion,
+  type SuggestionId,
 } from "@/lib/suggestion";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import {
-  addExactCommandFor,
-  devCommandFor,
-  inDirectory,
-  installCommandFor,
-  type PackageCommand,
-  removeCommandFor,
-} from "@/lib/package-manager";
-import { CLI_BINARY, CLI_PACKAGE_NAME } from "@/lib/public-cli";
+import { type PackageCommand, PM } from "@/lib/pm";
+import { CliPackage } from "@/lib/upgrade";
 
 const VERSION = "1.0.0-alpha.25";
 
-/** An add given a valued option before its verb, as a workspace filter is. */
-const FILTERED_ADD: PackageCommand = {
-  command: "pnpm",
-  verb: "add",
-  operands: ["x"],
-  args: ["--filter", "app", "add", "x"],
-  display: "pnpm --filter app add x",
-};
+/** An add given a valued option before its verb, as a directory flag is. */
+const FILTERED_ADD = PM.named("pnpm").add(["x"]).inDirectory("app", "/abs/app");
 
 /** A run of this CLI's binary as a project script. */
-const CLI_RUN: PackageCommand = {
-  command: "yarn",
-  verb: "run",
-  operands: [CLI_BINARY],
-  args: ["run", CLI_BINARY],
-  display: `yarn run ${CLI_BINARY}`,
-};
+const CLI_RUN = PM.named("yarn").script(Spelling.BINARY);
 
 /** An SDK pinned at an exact version, as a dependency check installs it. */
 const SDK_PIN = "@zitadel/sdk-next@1.0.0";
@@ -100,15 +82,15 @@ describe("FlagsOf", () => {
 
 describe("NextTable", () => {
   it("names a generated resource command under each verb its descriptor has", () => {
-    expectTypeOf<"users:get">().toExtend<SuggestionId>();
+    expectTypeOf<"user:get">().toExtend<SuggestionId>();
     expectTypeOf<"release:list">().toExtend<SuggestionId>();
-    expectTypeOf<"sessions:revoke">().toExtend<SuggestionId>();
-    expectTypeOf<"teams:deactivate">().toExtend<SuggestionId>();
+    expectTypeOf<"session:revoke">().toExtend<SuggestionId>();
+    expectTypeOf<"team:deactivate">().toExtend<SuggestionId>();
   });
 
   it("names no generated command for a verb its descriptor lacks", () => {
-    expectTypeOf<"events:create">().not.toExtend<SuggestionId>();
-    expectTypeOf<"sessions:delete">().not.toExtend<SuggestionId>();
+    expectTypeOf<"event:create">().not.toExtend<SuggestionId>();
+    expectTypeOf<"session:delete">().not.toExtend<SuggestionId>();
   });
 });
 
@@ -161,15 +143,6 @@ describe("a suggestion", () => {
     expect(checked({ id: "deployment:list", flags: { all: true } })).toBeDefined();
   });
 
-  it("does not compile with a flag whose dependsOn is left out", () => {
-    // @ts-expect-error --force depends on --fix
-    checked({ id: "doctor", flags: { force: true } });
-    // @ts-expect-error --fix given off does not satisfy it
-    checked({ id: "doctor", flags: { force: true, fix: false } });
-
-    expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
-  });
-
   it("takes a value left to fill in for any flag that takes one", () => {
     expect(aSuggest({}, VERSION)({ id: "start", flags: { port: "<port>" } })).toBe(
       "npx @zitadel/cli@1.0.0-alpha.25 start --port '<port>'",
@@ -191,8 +164,8 @@ describe("a suggestion", () => {
     checked({ id: "deplyo" });
     // @ts-expect-error a suggestion names its target by id, never as a command line
     checked({ id: "deploy --dry-run" });
-    // @ts-expect-error the generated `events` resource has no create
-    checked({ id: "events:create" });
+    // @ts-expect-error the generated `event` resource has no create
+    checked({ id: "event:create" });
   });
 
   it("is not a command line until a run renders it", () => {
@@ -308,12 +281,12 @@ describe("shellCommand", () => {
 
   it("does not compile for a runner", () => {
     // @ts-expect-error a runner runs whatever it is given, the CLI included
-    shellCommand("npx", CLI_PACKAGE_NAME);
+    shellCommand("npx", CliPackage.NAME);
   });
 
   it("does not compile for a package manager", () => {
     // @ts-expect-error a package manager's command goes through suggestedCommandOf
-    shellCommand("pnpm", "dlx", CLI_PACKAGE_NAME);
+    shellCommand("pnpm", "dlx", CliPackage.NAME);
   });
 
   it("takes a word that only names the CLI, as a commit message does", () => {
@@ -325,10 +298,10 @@ describe("shellCommand", () => {
 
 describe("suggestedCommandOf", () => {
   it.each<[string, PackageCommand]>([
-    ["an install", addExactCommandFor("npm", [SDK_PIN])],
-    ["a script in another directory", inDirectory(devCommandFor("npm"), "app", "/abs/app")],
-    ["an install in a directory named exec", inDirectory(installCommandFor("pnpm"), "exec", "/x")],
-    ["a removal of a package named like the CLI", removeCommandFor("npm", [CLI_BINARY])],
+    ["an install", PM.named("npm").addExact([SDK_PIN])],
+    ["a script in another directory", PM.named("npm").dev().inDirectory("app", "/abs/app")],
+    ["an install in a directory named exec", PM.named("pnpm").install().inDirectory("exec", "/x")],
+    ["a removal of a package named like the CLI", PM.named("npm").remove([Spelling.BINARY])],
   ])("is %s as its display shows it", (_what, command) => {
     expect(suggestedCommandOf(command)).toBe(command.display);
   });
@@ -355,7 +328,7 @@ describe("suggestedCommandOf", () => {
 describe("shellSteps", () => {
   it("runs each command after the one before it worked", () => {
     expect(
-      shellSteps(shellCommand("cd", "app"), suggestedCommandOf(removeCommandFor("npm", ["x"]))),
+      shellSteps(shellCommand("cd", "app"), suggestedCommandOf(PM.named("npm").remove(["x"]))),
     ).toBe("cd app && npm uninstall x");
   });
 });
@@ -547,36 +520,36 @@ describe("suggestionWords, for a target only known at run time", () => {
 
   it("refuses a flag the target requires, left out", () => {
     expect(() => {
-      return suggestionWords("users:list", { args: { id: "1" } }, LIST, {});
-    }).toThrow("users:list requires --kind");
+      return suggestionWords("user:list", { args: { id: "1" } }, LIST, {});
+    }).toThrow("user:list requires --kind");
   });
 
   it("refuses two flags the target declares exclusive", () => {
     expect(() => {
       return suggestionWords(
-        "users:list",
+        "user:list",
         { args: { id: "1" }, flags: { kind: "k", all: true, pageToken: "t" } },
         LIST,
         {},
       );
-    }).toThrow("users:list refuses --all with --page-token");
+    }).toThrow("user:list refuses --all with --page-token");
   });
 
   it("refuses a flag whose dependsOn is left out", () => {
     expect(() => {
       return suggestionWords(
-        "users:list",
+        "user:list",
         { args: { id: "1" }, flags: { kind: "k", force: true } },
         LIST,
         {},
       );
-    }).toThrow("users:list takes --force only with --fix");
+    }).toThrow("user:list takes --force only with --fix");
   });
 
   it("refuses an argument the target requires, left out", () => {
     expect(() => {
-      return suggestionWords("users:list", { flags: { kind: "k" } }, LIST, {});
-    }).toThrow("users:list requires its id");
+      return suggestionWords("user:list", { flags: { kind: "k" } }, LIST, {});
+    }).toThrow("user:list requires its id");
   });
 });
 

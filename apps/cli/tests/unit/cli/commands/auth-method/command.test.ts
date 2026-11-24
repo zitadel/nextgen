@@ -2,22 +2,24 @@ import { mkdir } from "node:fs/promises";
 import { runCommand } from "@tests/helpers/run-cli";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { Config, Errors } from "@oclif/core";
 
 import { readSchemaTarget, type SchemaTarget } from "@/cli/commands/auth-method/command";
 import AuthMethodPasskeyDisable from "@/cli/commands/auth-method/passkey/disable";
+import AuthMethodPasskeyEnable from "@/cli/commands/auth-method/passkey/enable";
+import AuthMethodPasswordEnable from "@/cli/commands/auth-method/password/enable";
 import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
-import { recordLog } from "@tests/helpers/log";
+import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import {
   defaultSchema,
   makeProject,
@@ -26,7 +28,7 @@ import {
   writeJson,
 } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asOneLine, asTerminal, useTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -131,6 +133,17 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
   }
 
   /**
+   * What the change did, as the lines of a result.
+   *
+   * @param change - The change.
+   * @param written - The paths it wrote.
+   * @returns The lines.
+   */
+  saying(change: Change, written?: readonly string[]): string[] {
+    return this.said(change, written);
+  }
+
+  /**
    * Makes a change that may leave no way to sign in, without a run.
    *
    * @param target - The schema the change is to.
@@ -186,15 +199,8 @@ function printed(talk: Person): string {
   ].join("\n");
 }
 
-useTerminal();
-
-beforeEach(() => {
-  vi.spyOn(process.stdout, "write").mockImplementation(() => {
-    return true;
-  });
-  vi.spyOn(process.stderr, "write").mockImplementation(() => {
-    return true;
-  });
+it.beforeEach(({ terminal }) => {
+  terminal.tty(true);
   vi.spyOn(console, "log").mockImplementation(() => {
     return undefined;
   });
@@ -504,6 +510,7 @@ describe("AuthMethodCommand", () => {
               cwd,
             ],
             expect.anything(),
+            expect.anything(),
           ],
         },
       });
@@ -544,6 +551,7 @@ describe("AuthMethodCommand", () => {
               "--cwd",
               cwd,
             ],
+            expect.anything(),
             expect.anything(),
           ],
         },
@@ -596,41 +604,95 @@ describe("AuthMethodCommand", () => {
   });
 });
 
+describe("MethodEnableCommand", () => {
+  it("previews turning on the method its subclass names, and writes nothing", async ({ dir }) => {
+    const cwd = await makeProject(dir, {
+      schemas: {
+        "default-human-user": aSchema({ password: { enabled: true }, passkey: { enabled: false } }),
+      },
+    });
+
+    const result = await AuthMethodPasskeyEnable.run(
+      ["--cwd", cwd, "--no-telemetry", "--dry-run"],
+      CONFIG,
+    );
+
+    expect(result).toMatchObject({ status: "ok", data: { dry_run: true } });
+    expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
+      enabled: false,
+    });
+  });
+
+  it("turns on the method its subclass names", async ({ dir }) => {
+    const cwd = await makeProject(dir, {
+      schemas: {
+        "default-human-user": aSchema({ password: { enabled: true }, passkey: { enabled: false } }),
+      },
+    });
+
+    await AuthMethodPasskeyEnable.run(["--cwd", cwd, "--no-telemetry"], CONFIG);
+
+    expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
+      enabled: true,
+    });
+  });
+
+  it("turns on another method for another subclass, and leaves passkey alone", async ({ dir }) => {
+    const cwd = await makeProject(dir, {
+      schemas: {
+        "default-human-user": aSchema({ password: { enabled: false }, passkey: { enabled: true } }),
+      },
+    });
+
+    await AuthMethodPasswordEnable.run(["--cwd", cwd, "--no-telemetry"], CONFIG);
+
+    const methods = await readJson(cwd, SCHEMA_FILE);
+    expect(methods).toHaveProperty(["x-auth-methods", "password"], { enabled: true });
+    expect(methods).toHaveProperty(["x-auth-methods", "passkey"], { enabled: true });
+  });
+});
+
 describe("AuthMethodCommand.write", () => {
   it("says it wrote a file the change creates", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const recorded = recordLog();
+    const change = aNewSchema(read);
 
-    await writer.writeChange(read, aNewSchema(read));
+    const written = await writer.writeChange(read, change);
 
-    recorded.stop();
-    expect(recorded.said).toEqual([{ level: "done", text: `Wrote ${NEW_SCHEMA_FILE}` }]);
+    expect(writer.saying(change, written)).toEqual([`Wrote ${NEW_SCHEMA_FILE}`]);
   });
 
   it("says it updated a file the change edits", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const recorded = recordLog();
+    const change = read.config.schemas.enable(read.schema, "password");
 
-    await writer.writeChange(read, read.config.schemas.enable(read.schema, "password"));
+    const written = await writer.writeChange(read, change);
 
-    recorded.stop();
-    expect(recorded.said).toEqual([{ level: "done", text: `Updated ${SCHEMA_FILE}` }]);
+    expect(writer.saying(change, written)).toEqual([`Updated ${SCHEMA_FILE}`]);
   });
 
   it("says it removed a file the change deletes", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const recorded = recordLog();
+    const change = read.config.schemas.remove(SCHEMA_FILE);
 
-    await writer.writeChange(read, read.config.schemas.remove(SCHEMA_FILE));
+    const written = await writer.writeChange(read, change);
 
-    recorded.stop();
-    expect(recorded.said).toEqual([{ level: "done", text: `Removed ${SCHEMA_FILE}` }]);
+    expect(writer.saying(change, written)).toEqual([`Removed ${SCHEMA_FILE}`]);
+  });
+
+  it("says it would remove a file the change deletes, when nothing is written", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
+    const read = await target(cwd);
+    const writer = new ChangeWriter([], CONFIG);
+    const change = read.config.schemas.remove(SCHEMA_FILE);
+
+    expect(writer.saying(change)).toEqual([`Would remove ${SCHEMA_FILE}`]);
   });
 
   it("writes the change to the Project", async ({ dir }) => {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	api "go.zitadel.com/zitadel/v5/api"
@@ -24,7 +25,7 @@ import (
 
 // These tests park the provider's result on the attempt through the same
 // statements the callback route uses, then drive the resolution through
-// GET /flow/{id}. The route itself is covered in sso_callback_flow_test.go.
+// GET /flows/{flow_id}. The route itself is covered in sso_callback_flow_test.go.
 
 // ssoResolutionFixture is a project with the sso login flow definition, one
 // connection, and a team users can be created in.
@@ -41,7 +42,7 @@ func newSSOResolutionFixture(t *testing.T, connection api.IdpConnection) *ssoRes
 	t.Helper()
 	f := newIdpFixture(t)
 	created := f.create(t, connection)
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: ssoLoginFlowDefinition(defaultSchemaURL()),
 	})
@@ -90,7 +91,7 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, session *domain.Session) 
 
 func (f *ssoResolutionFixture) getStep(t *testing.T, flow ssoFlow) api.GetFlowStepRes {
 	t.Helper()
-	resp, err := f.client.GetFlowStep(t.Context(), api.GetFlowStepParams{ID: flow.id, Zflow: flow.zflow})
+	resp, err := f.client.GetFlowStep(t.Context(), api.GetFlowStepParams{FlowID: flow.id, Zflow: flow.zflow})
 	require.NoError(t, err)
 	return resp
 }
@@ -158,7 +159,7 @@ func (f *ssoResolutionFixture) useRevisionedSchema(t *testing.T) string {
 	first := f.publishRevisionedSchema(t, 1)
 	definition := ssoLoginFlowDefinition(ssoRevisionedObjectType)
 	definition.Name = "sso-revisioned-login"
-	resp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: definition,
 	})
@@ -303,7 +304,7 @@ func TestSSOResolutionSubmitAfterHandoffReturns409(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email": jx.Raw(`"alice@example.com"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow})
+	}, api.SubmitFlowStepParams{FlowID: flow.id, Zflow: flow.zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.ErrorDetails{}, resp, helpers.MustMarshal(t, resp))
 	assert.Equal(t, "flow.restart_required", string(resp.(*api.ErrorDetails).Code))
@@ -337,7 +338,7 @@ func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
 	assert.False(t, got.HandoffToken.Set)
 	// The unverified email cannot create a user, so the identity is collected;
 	// this definition does not route that outcome.
-	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "a collected identity stays parked for the prefill")
 }
@@ -438,7 +439,7 @@ func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	step := resp.(*api.FlowResponseHeaders).Response.Step
 	assert.Equal(t, "identifier", step.Name)
-	assert.Equal(t, domain.FlowStepErrorSSOCreationDisabled, step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOCreationDisabled, step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "the parked result stays, so a lost response can show the error again")
 
@@ -497,7 +498,7 @@ func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	got := resp.(*api.FlowResponseHeaders).Response
 	assert.Equal(t, "identifier", got.Step.Name)
-	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)
 	attempt := f.attempt(t, flow)
 	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)

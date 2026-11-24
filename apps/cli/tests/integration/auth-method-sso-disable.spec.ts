@@ -360,7 +360,7 @@ describe("auth-method sso disable", () => {
             source: "",
             code: "E_CONFIRMATION_REQUIRED",
             message: `${SCHEMA_FILE} would have no way to sign in left`,
-            hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
+            hint: `Enable another method first. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
                 `auth-method sso disable --provider google --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
@@ -370,6 +370,9 @@ describe("auth-method sso disable", () => {
               ),
               expectedPublicCliCommand(
                 `auth-method passkey enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `auth-method sso enable --provider '<name>' --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
             details: {
@@ -406,6 +409,19 @@ describe("auth-method sso disable", () => {
                   "auth-method",
                   "passkey",
                   "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+                [
+                  "auth-method",
+                  "sso",
+                  "enable",
+                  "--provider",
+                  "<name>",
                   "--schema",
                   SCHEMA,
                   "--server",
@@ -610,6 +626,8 @@ describe("auth-method sso disable", () => {
               notices: [GOOGLE_STAYS_NOTICE, STEPS_STAY_NOTICE],
               title: "Would remove google from default-human-user (dry run)",
               dry_run: true,
+              verb: "remove",
+              topic: "provider",
               next_args: [
                 [
                   "auth-method",
@@ -657,6 +675,8 @@ describe("auth-method sso disable", () => {
               ],
               title: "Would remove google from default-human-user (dry run)",
               dry_run: true,
+              verb: "remove",
+              topic: "provider",
               next_args: [
                 [
                   "auth-method",
@@ -718,6 +738,8 @@ describe("auth-method sso disable", () => {
               notices: [],
               title: "default-human-user does not offer google, so nothing would change (dry run)",
               dry_run: true,
+              verb: "remove",
+              topic: "provider",
               next_args: [
                 [
                   "auth-method",

@@ -1,4 +1,5 @@
-import type { LogLevel } from "@/lib/log";
+import type { LogLevel } from "./log";
+import { Output } from "./output";
 
 /**
  * One line of narration as a normal command, or code with nobody to draw it,
@@ -18,4 +19,18 @@ export function writePlain(level: LogLevel, text: string): void {
     return;
   }
   (level === "fail" ? process.stderr : process.stdout).write(`${text}\n`);
+}
+
+/**
+ * A line the person must have while the command waits on them, such as a link
+ * to open. It is written to a pipe as to a terminal, so a script can act on it
+ * before the command ends, and never under `--json`, where stdout is the
+ * envelope's.
+ *
+ * @param text - The line, without a trailing newline.
+ */
+export function announce(text: string): void {
+  if (!Output.json) {
+    writePlain("info", text);
+  }
 }

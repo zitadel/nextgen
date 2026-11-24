@@ -1,7 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Layers3 } from "lucide-react";
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import {
   DETAIL_BODY,
   DETAIL_STACK,
@@ -39,7 +38,7 @@ export const Route = createFileRoute("/_authed/releases/$releaseId")({
     const projectId = requireProjectScope(deps.project);
     // Scoped to the selected project: an id of another project reads as not
     // found, exactly as an unknown one does.
-    const release = await api.getReleaseById(params.releaseId, { project_id: projectId });
+    const release = await api.getRelease(params.releaseId, { project_id: projectId });
     // Every pointer in parallel: a release pins a handful, and each read
     // fails soft inside `resolvePointer`, so one unreadable revision costs
     // its row's document, not the screen.
@@ -63,13 +62,10 @@ function ReleaseDetail() {
         icon={Layers3}
         title={release.id}
         status={<ReleaseStatusBadge status={releaseStatus(release)} live={live} />}
-        meta={
-          <>
-            <MetaValue label="Release ID" value={release.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(release.metadata.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Release ID", value: release.id, copyable: true },
+          { label: "Created", value: formatDate(release.metadata.created_at) },
+        ]}
         action={
           // A revoked release can never be served again, so there is nothing
           // to do with it. A new deployment lands in the card below.

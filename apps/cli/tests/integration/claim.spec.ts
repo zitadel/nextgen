@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, MOCK_SERVER_URL, type ScaffoldedApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 
@@ -196,7 +196,10 @@ describe("claim", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Nothing was claimed (dry run)",
+            title: "Would claim project proj_prod (dry run)",
+            verb: "claim",
+            topic: "project",
+            id: "proj_prod",
             project_id: "proj_prod",
             would: "Open a browser to claim this project.",
             next_commands: [
@@ -318,6 +321,7 @@ describe("claim", () => {
             project_id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             team_id: expect.stringMatching(/^team-[0-9a-f]{12}$/),
             claimed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/),
+            console_url: `${MOCK_SERVER_URL}/ui/console/`,
           },
         });
         expect(data.team_id).toMatch(/^team-/);
@@ -342,7 +346,10 @@ describe("claim", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Nothing was claimed (dry run)",
+            title: expect.stringMatching(/^Would claim project proj-[0-9a-f]{12} \(dry run\)$/),
+            verb: "claim",
+            topic: "project",
+            id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             project_id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             would:
               "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
@@ -368,7 +375,10 @@ describe("claim", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Nothing was claimed (dry run)",
+            title: expect.stringMatching(/^Would claim project proj-[0-9a-f]{12} \(dry run\)$/),
+            verb: "claim",
+            topic: "project",
+            id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             project_id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             would: "Create a link to claim this project.",
             next_commands: [
@@ -447,6 +457,16 @@ describe("claim", () => {
         expect(result).toSayOnce("This project already belongs to a team");
       }, 30000);
 
+      it("prints the console link of a project already claimed", async () => {
+        const app = await aSetUpApp();
+        platform.completesTheNextClaim();
+        await app.run(WAITING_FOR_A_BROWSER);
+
+        const result = await shown(() => app.run(["claim", "--no-open"]));
+
+        expect(result).toPrintRow("Console", `${MOCK_SERVER_URL}/ui/console/`);
+      }, 30000);
+
       it("prints the link to open and the command that waits for it", async () => {
         const app = await aSetUpApp();
 
@@ -471,7 +491,20 @@ describe("claim", () => {
           app.run(["claim", "--no-open", "--timeout", "5", "--dry-run"]),
         );
 
-        expect(result).toSayOnce("Nothing was claimed (dry run)");
+        const [, id] = /Would claim project (\S+) \(dry run\)/.exec(result.stdout) ?? [];
+
+        expect(id).toMatch(/^proj-[0-9a-f]{12}$/);
+        expect(result).toSayOnce(`Would claim project ${id} (dry run)`);
+      });
+
+      it("says what the real claim would do", async () => {
+        const app = await aSetUpApp();
+
+        const result = await shown(() =>
+          app.run(["claim", "--no-open", "--timeout", "5", "--dry-run"]),
+        );
+
+        expect(result).toSayOnce("Open a browser to claim this project");
       });
 
       it("prints the claim it planned, once", async () => {

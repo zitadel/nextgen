@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, asTerminal, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { offTerminal } from "@tests/helpers/terminal";
+import { offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 
@@ -34,6 +34,7 @@ describe("env list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -67,6 +68,7 @@ describe("env list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -88,6 +90,22 @@ describe("env list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["env", "list", "--fields", "name", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["env", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("lists the environments bound in this directory", async () => {
         const app = await aSetUpApp();
         const { ZITADEL_PROJECT_ID } = await app.developmentValues();
@@ -122,6 +140,7 @@ describe("env list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -153,6 +172,7 @@ describe("env list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -194,6 +214,7 @@ describe("env list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "production", source: "--env" },
           },
@@ -231,6 +252,7 @@ describe("env list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
           },
@@ -253,6 +275,7 @@ describe("env list", () => {
             title: "No environments found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
             resolved: { name: "development", source: "default" },
             next_commands: [expectedPublicCliCommand(`env add '<name>' --cwd ${app.path}`)],

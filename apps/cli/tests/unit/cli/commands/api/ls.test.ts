@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 
 /** `api ls` reads the spec the CLI was built with, so it contacts nothing. */

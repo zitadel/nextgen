@@ -19,7 +19,7 @@ export const cli = "npx @zitadel/cli@latest";
 /** What the CLI needs before it runs a resource command. */
 const context = "# Run where `zitadel setup` wrote .zitadel/secret.";
 
-/** The command the spec names for an operation, without the binary: `users create`. */
+/** The command the spec names for an operation, without the binary: `user create`. */
 export function namedCliCommand(operation: OperationObject): string | undefined {
   const command: unknown = (operation as Record<string, unknown>)["x-zitadel-cli"];
   return typeof command === "string" ? command : undefined;
@@ -27,7 +27,7 @@ export function namedCliCommand(operation: OperationObject): string | undefined 
 
 /**
  * The command that runs an operation, without the binary: the one the spec
- * names (`users create`), else `api` for one `zitadel api` can call.
+ * names (`user create`), else `api` for one `zitadel api` can call.
  */
 export function cliCommand(
   operation: OperationObject,
@@ -64,6 +64,13 @@ export function cliSample(
     return variableFits(verb, kind, request)
       ? variables(verb, positionals, kind, request)
       : apiSample(operation, path, request);
+  }
+
+  if (topic === "invitation" && (verb === "create" || verb === "list")) {
+    const flags = invitationFlags(verb, request);
+    return flags === undefined
+      ? apiSample(operation, path, request)
+      : `${context}\n${line([`${cli} ${command}`], flags)}`;
   }
 
   const flags: string[] = [];
@@ -176,6 +183,41 @@ function variables(
     ...(prompts ? ["# Each set prompts for the value, or reads it from stdin."] : []),
     ...commands,
   ].join("\n");
+}
+
+/** Every invitation status, which `invitation list` lists only when asked. */
+const INVITATION_STATUSES = ["pending", "accepted", "rejected", "expired"];
+
+// The invitation commands take flags, not `--data`: `create` says a project
+// invitation with `--relation`, `--name` and `--replaces`, and `list` filters
+// with `--status`, once per status, and `--type`. A team invitation has no flag yet, so it is
+// `undefined` and the sample is the api call.
+function invitationFlags(verb: string, request: RequestData): string[] | undefined {
+  if (verb === "list") {
+    const requested = request.query.status?.values ?? [];
+    // Without `--status` the command leaves accepted invitations out, which the
+    // unfiltered request does not, so the sample names every status.
+    const statuses = requested.length === 0 ? INVITATION_STATUSES : requested;
+    const type = request.query.type?.values[0];
+    return [
+      ...statuses.flatMap((status) =>
+        typeof status === "string" ? [`--status ${word(status)}`] : [],
+      ),
+      ...(typeof type === "string" ? [`--type ${word(type)}`] : []),
+      ...listFlags(request),
+    ];
+  }
+  const body = record(request.body);
+  if (body.type !== "project_member") return undefined;
+  const { relation } = record(body.project_member);
+  const { name } = record(body.metadata);
+  return [
+    ...(typeof relation === "string" ? [`--relation ${word(relation)}`] : []),
+    ...(typeof name === "string" ? [`--name ${word(name)}`] : []),
+    ...(typeof body.replaces_invitation_id === "string"
+      ? [`--replaces ${word(body.replaces_invitation_id)}`]
+      : []),
+  ];
 }
 
 /** One command: on a line while it fits the repo's 100 columns, else a flag a line, as cURL is. */

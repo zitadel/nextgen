@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
@@ -525,10 +525,10 @@ describe("env add", () => {
           source: "",
           code: "E_VALIDATION",
           message: "No server supplied",
-          hint: `Pass --server. For example: ${expectedPublicCliCommand(`env add production --server https://api.zitadel.cloud --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`)}`,
+          hint: `Pass --server. For example: ${expectedPublicCliCommand(`env add production --server https://preview.zitadel.com --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`)}`,
           next_commands: [
             expectedPublicCliCommand(
-              `env add production --server https://api.zitadel.cloud --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`,
+              `env add production --server https://preview.zitadel.com --project proj_x --app-url https://app.example.com --force --cwd ${app.path}`,
             ),
           ],
         });
@@ -561,7 +561,9 @@ describe("env add", () => {
           command: "env:add",
           source: "",
           data: {
-            title: "Would add the production environment, bound to a new project (dry run)",
+            title: "Would add the production environment bound to a new project (dry run)",
+            verb: "add",
+            topic: "environment",
             dry_run: true,
             environment: "production",
             file: ".env.production.local",
@@ -595,7 +597,9 @@ describe("env add", () => {
           command: "env:add",
           source: "",
           data: {
-            title: "Would add the production environment, bound to proj_x (dry run)",
+            title: "Would add the production environment bound to proj_x (dry run)",
+            verb: "add",
+            topic: "environment",
             dry_run: true,
             environment: "production",
             file: ".env.production.local",
@@ -638,7 +642,7 @@ describe("env add", () => {
         );
 
         expect(result).toPrint(
-          "Would add the production environment, bound to a new project (dry run)",
+          "Would add the production environment bound to a new project (dry run)",
         );
       });
 
@@ -783,7 +787,7 @@ describe("env add", () => {
           "--dry-run",
         ]);
 
-        expect(result).toPrint("Would add the production environment, bound to a new project");
+        expect(result).toPrint("Would add the production environment bound to a new project");
       });
     });
 

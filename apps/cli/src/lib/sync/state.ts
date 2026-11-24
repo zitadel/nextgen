@@ -1,7 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { errorMessage, isErrno, ZitadelError } from "@/lib/errors";
+import { errorMessage, ZitadelError } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import { isObject } from "@/lib/json";
 
 import type { ScaffoldManifest, StoredState } from "./types.js";

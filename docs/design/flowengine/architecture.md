@@ -48,7 +48,7 @@ sequenceDiagram
     participant S as FlowService
     participant SM as StateMachine
 
-    Note over C,SM: POST /flow — no cookie yet
+    Note over C,SM: POST /flows — no cookie yet
     C->>H: CreateFlow
     H->>S: Resolve, then Start
     S->>SM: Start
@@ -57,7 +57,7 @@ sequenceDiagram
     H->>K: sealState(_zflow)
     H-->>C: 201 + Set-Cookie
 
-    Note over C,SM: GET /flow/{id}
+    Note over C,SM: GET /flows/{flow_id}
     C->>H: GetFlowStep (_zflow cookie)
     H->>K: openState(_zflow)
     K-->>H: *FlowState
@@ -67,7 +67,7 @@ sequenceDiagram
     S-->>H: FlowStepResult
     H-->>C: 200 + buildFlowResponse
 
-    Note over C,SM: POST /flow/{id}/submit
+    Note over C,SM: POST /flows/{flow_id}/submit
     C->>H: SubmitFlowStep (_zflow cookie + body)
     H->>K: openState(_zflow)
     K-->>H: *FlowState
@@ -167,12 +167,19 @@ Interface every `on_success` mutation satisfies. One implementation today:
 ### `FlowAuthAttemptService` (`internal/domain/flow_auth_attempt.go`)
 
 A narrow interface over the auth-attempt service. The state machine sees
-`Start`, `SubmitIdentifier`, `SubmitPassword`, the two-phase passkey legs
-(`IssuePasskeyChallenge`/`SubmitPasskey`), the two-phase registration legs
-(`IssuePasskeyRegistrationChallenge`/`SubmitPasskeyRegistration`, ADR 056),
-and `Handoff`. Identifier no-match and password rejection both surface as
+`Start`, `SubmitIdentifier`, `SubmitPassword`, the two legs of every
+two-phase ceremony (`IssueChallenge`/`VerifyChallenge`), and `Handoff`.
+Identifier no-match and password rejection both surface as
 `ErrAuthAttemptProofRejected`, which the state machine routes
 (`user_not_found`) or re-renders (step error) accordingly.
+
+`IssueChallenge` takes a `FlowChallengeParams` value, one type per check
+(`FlowPasskeyChallengeParams`, `FlowPasskeyRegistrationChallengeParams`, ADR
+056); `VerifyChallenge` takes the check type and the client's proof bytes. A
+new ceremony adds a params type and an entry in the engine's
+`challengeMethods` table (`flowengine/challenge.go`), which declares the
+check, the step error of a rejected or stale proof, and whether the ceremony
+binds its user at issue, may create it, or cannot be backed out of.
 
 The registration verify leg is atomic in the attempt service: for a
 provisional ceremony it applies the create-user actions (built by a factory

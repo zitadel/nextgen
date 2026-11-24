@@ -1,43 +1,23 @@
-import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { Config } from "@oclif/core";
 
 import Api, { readOperation } from "@/cli/commands/api/index";
 
 import { ZitadelError } from "@/lib/errors";
-import { it } from "@tests/helpers/fixtures";
+import { atScreenRecording as it } from "@tests/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { type Answer, answering } from "@tests/helpers/keyboard";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by
 // running the command class from source, where `input` is the one module that
 // asks.
 
-const tty = {
-  stdout: Object.getOwnPropertyDescriptor(process.stdout, "isTTY"),
-  stdin: Object.getOwnPropertyDescriptor(process.stdin, "isTTY"),
-};
-
-function restore(stream: NodeJS.WriteStream | NodeJS.ReadStream, found?: PropertyDescriptor) {
-  if (found === undefined) {
-    delete (stream as { isTTY?: boolean }).isTTY;
-  } else {
-    Object.defineProperty(stream, "isTTY", found);
-  }
-}
-
-beforeEach(() => {
-  Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-  Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
-});
-
 afterEach(() => {
-  restore(process.stdout, tty.stdout);
-  restore(process.stdin, tty.stdin);
   vi.restoreAllMocks();
 });
 
@@ -65,8 +45,6 @@ async function api(dir: string, ...argv: string[]) {
 
 /** Run `zitadel api` from source in `cwd`. */
 async function apiIn(cwd: string, ...argv: string[]) {
-  vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   const config = await Config.load({ root: cliPackageRoot });
   return Api.run(
@@ -200,5 +178,38 @@ describe("zitadel api, answering a call at a terminal", () => {
     const shown = stripAnsi(res.stdout);
     expect(shown).toContain("Called getLive");
     expect(shown).toContain("serving");
+  });
+
+  it("leaves the --field values out of the run it suggests again", async ({ dir }) => {
+    const cwd = await makeProject(dir, { linked: true });
+
+    const res = await asTerminal(() =>
+      runCliForTest([
+        "api",
+        "getLive",
+        "--file",
+        "-",
+        "-F",
+        "attributes.password=hunter2",
+        "--json",
+        "--cwd",
+        cwd,
+        "--no-telemetry",
+      ]),
+    );
+
+    expect(res.stdout + res.stderr).not.toContain("hunter2");
+  });
+
+  it("suggests the run again with a path when --file - has nothing piped in", async ({ dir }) => {
+    const cwd = await makeProject(dir, { linked: true });
+
+    const res = await asTerminal(() =>
+      runCliForTest(["api", "getLive", "--file", "-", "--json", "--cwd", cwd, "--no-telemetry"]),
+    );
+
+    expect(JSON.parse(res.stdout)).toMatchObject({
+      next_commands: [expect.stringContaining("api getLive --file '<path>'")],
+    });
   });
 });

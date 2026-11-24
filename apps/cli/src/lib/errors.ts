@@ -14,6 +14,7 @@ import type { Suggested } from "./suggestion";
 import {
   ConflictError as ConfigConflictError,
   ConfigError,
+  BrokenFlowsError,
   NotFoundError as ConfigNotFoundError,
 } from "./zitadel";
 
@@ -194,6 +195,9 @@ function configErrorCode(error: ConfigError): ZitadelErrorCode {
  */
 const OCLIF_HELP = /\n *See more help with --help\s*$/;
 
+/** What oclif says of a flag typed twice, which carries no help footer of its own. */
+const OCLIF_REPEATED = /^Flag --[\w-]+ can only be specified once$/u;
+
 /** The heading oclif puts over the flags it rejected, which nothing else writes. */
 const OCLIF_PREAMBLE = /^The following errors? occurred:\n/;
 
@@ -220,6 +224,12 @@ export type FailureText = {
  * like any other command the CLI suggests.
  */
 export function failureText(message: string): FailureText {
+  if (OCLIF_REPEATED.test(message)) {
+    return {
+      sentence: message,
+      misuse: true,
+    };
+  }
   if (!OCLIF_HELP.test(message)) {
     return {
       sentence: message,
@@ -273,6 +283,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
+      ...(error instanceof BrokenFlowsError && error.hint?.includes("deploy --dry-run")
+        ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
+        : {}),
     });
   }
 
@@ -534,11 +547,6 @@ function isZodLikeError(error: unknown): boolean {
     "issues" in error &&
     Array.isArray((error as { issues: unknown }).issues)
   );
-}
-
-/** Whether a caught error is the given `errno` code. */
-export function isErrno(error: unknown, code: string): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
 /** The message of a caught value, whatever it is. */

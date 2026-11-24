@@ -21,6 +21,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/service"
@@ -42,14 +43,14 @@ type stubSSOCallback struct {
 	in    service.FlowSSOCallbackInput
 	out   service.FlowSSOCallbackOutput
 	err   error
-	// serverSpan is the server span context Process found in the holder.
+	// serverSpan is the span context Process ran under.
 	serverSpan trace.SpanContext
 }
 
 func (s *stubSSOCallback) Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
 	s.calls++
 	s.in = in
-	s.serverSpan = middleware.GetServerSpanContext(ctx)
+	s.serverSpan = trace.SpanContextFromContext(ctx)
 	return s.out, s.err
 }
 
@@ -289,15 +290,15 @@ func TestIDPCallbackHandler_SetsTheOperationID(t *testing.T) {
 	assert.Equal(t, "idpCallback", operationID)
 }
 
-// The route is not an ogen operation, so it starts its own server span: the
-// service and storage spans below it are sampled with it, and the request
-// line reads its IDs from the holder.
-func TestIDPCallbackHandler_StartsAServerSpan(t *testing.T) {
+// The route is not an ogen operation, so it names the request's server span
+// itself and starts none: the service and storage spans run below the one
+// span the request has.
+func TestIDPCallbackHandler_NamesTheServerSpan(t *testing.T) {
 	t.Parallel()
 	ctx := middleware.WithOperationIDContext(t.Context(), "")
 	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}}
 	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
-	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(httptest.NewRecorder(), req)
+	middleware.WithServerSpan(otel.GetTracerProvider())(callbackMux(t, api.NewIDPCallbackHandler(stub))).ServeHTTP(httptest.NewRecorder(), req)
 
 	require.True(t, stub.serverSpan.IsValid())
 	// Other tests in this package run the handler in parallel, so only the
@@ -322,7 +323,7 @@ func TestIDPCallbackHandler_LogsTheFailureBeforeRefusingTheTarget(t *testing.T) 
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
 	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{
 		ReturnTarget: "https://app.example.com//evil.example/login",
-		Failure:      domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+		Failure:      domain.FlowStepFailed(flowengine.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
 		ProjectID:    "proj-1",
 		Slug:         "google",
 	}}
@@ -337,7 +338,7 @@ func TestIDPCallbackHandler_LogsTheFailureBeforeRefusingTheTarget(t *testing.T) 
 	require.NoError(t, json.Unmarshal(lines[0], &failure))
 	require.NoError(t, json.Unmarshal(lines[1], &refusal))
 	assert.Equal(t, "WARN", failure["level"])
-	assert.Equal(t, domain.FlowStepErrorSSOFailed, failure["step_error"])
+	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, failure["step_error"])
 	assert.Equal(t, "google", failure["slug"])
 	assert.Contains(t, fmt.Sprint(failure["error"]), "server_error")
 	assert.Equal(t, "ERROR", refusal["level"])
@@ -352,7 +353,7 @@ func TestIDPCallbackHandler_LogsTheFailureWhenStoringItFailed(t *testing.T) {
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
 	stub := &stubSSOCallback{
 		out: service.FlowSSOCallbackOutput{
-			Failure:   domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+			Failure:   domain.FlowStepFailed(flowengine.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
 			ProjectID: "proj-1",
 			Slug:      "google",
 		},

@@ -10,7 +10,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import {
-  type GetReleaseById200,
+  type GetRelease200,
   ListEventsCategoryItem,
   ListEventsStatusClassItem,
   ListFlowDefinitionsRevisions,
@@ -24,31 +24,31 @@ import {
 } from "@/lib/backend/model";
 import {
   CreateGrantBody,
-  CreateIdpBody,
+  PublishIdpBody,
   CreateTeamBody,
   CreateUserBody,
-  GetBrandingByIdResponse,
+  GetBrandingResponse,
   GetFlowDefinitionResponse,
   GetGrantResponse,
-  GetIdpByIdResponse,
+  GetIdpResponse,
   GetPolicyResponse,
   GetProjectResponse,
-  GetReleaseByIdParams,
-  GetReleaseByIdResponse,
-  GetSchemaByIdResponse,
+  GetReleaseParams,
+  GetReleaseResponse,
+  GetSchemaResponse,
   GetSessionParams,
   GetSessionResponse,
   GetTeamResponse,
-  GetUserByIDParams,
-  GetUserByIDResponse,
+  GetUserParams,
+  GetUserResponse,
   ListBrandingResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
   ListPoliciesResponse,
   ListReleasesResponse,
   ListSchemasResponse,
-  PatchProjectBody,
-  PatchUserByIDBody,
+  UpdateProjectBody,
+  UpdateUserBody,
   PublishPolicyBody,
   QueryGrantsBody,
   QueryGrantsResponse,
@@ -80,12 +80,13 @@ import {
   type UpdateSpec,
   type WriteResult,
   type WriteShape,
-} from "@/lib/oclif/crud";
-import { CommandGroups } from "@/lib/oclif/groups";
-import type { Tabulate } from "@/lib/oclif/tabulatable";
+} from "@/cli/core/crud";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { Tabulate } from "@/cli/core/tabulatable";
+import { ServerCommand } from "@/cli/commands/server-command";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
-const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
+const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -95,8 +96,16 @@ const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
  */
 export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 
-// Builders that infer a verb's body type from its Zod schema, so `call` gets
-// the typed body straight from `parseOrThrow` — no cast from `Json`.
+/**
+ * Builds a resource's `create` verb, inferring the body type from its Zod
+ * schema so `call` gets the typed body straight from `parseOrThrow`, with no
+ * cast from `Json`.
+ *
+ * @param schema The schema the body is parsed with.
+ * @param call Sends the parsed body to the platform.
+ * @param shape How the verb's flags and examples are shaped.
+ * @returns The verb's spec.
+ */
 export const create = <B, C>(
   schema: Schema<B>,
   call: (ctx: Platform, body: B) => Promise<C>,
@@ -109,6 +118,15 @@ export const create = <B, C>(
   };
 };
 
+/**
+ * Builds a resource's `update` verb, inferring the body type from its Zod
+ * schema like `create` does.
+ *
+ * @param schema The schema the body is parsed with.
+ * @param call Sends the id and the parsed body to the platform.
+ * @param shape How the verb's flags and examples are shaped, and its `check`.
+ * @returns The verb's spec.
+ */
 export const update = <B, U>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<U>,
@@ -121,8 +139,10 @@ export const update = <B, U>(
   };
 };
 
-// Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
-// entry written as a plain object cannot skip the checks.
+/**
+ * Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
+ * entry written as a plain object cannot skip the checks.
+ */
 const checked = Symbol("checked");
 
 /** Carries, for the type system alone, the verbs a descriptor's commands take. */
@@ -150,45 +170,58 @@ type Checked = ResourceDescriptor<Platform> & { readonly [checked]: true };
 /** A registry of descriptors `resource()` checked: the type `RESOURCES` satisfies. */
 export type CheckedRegistry = ResourceRegistry<Platform> & Readonly<Record<string, Checked>>;
 
-// The fields of `T`, each of any type: what a response schema must parse into
-// at least. A schema copied from another operation names other fields. The
-// types below them may differ: a schema applies the spec's defaults, and types
-// a recursive field as `unknown` where the generated type spells it out.
+/**
+ * The fields of `T`, each of any type: what a response schema must parse into
+ * at least. A schema copied from another operation names other fields. The
+ * types below them may differ: a schema applies the spec's defaults, and types
+ * a recursive field as `unknown` where the generated type spells it out.
+ */
 type FieldsOf<T> = { [K in keyof T]: unknown };
 
-// What a write must answer with: a record carrying the resource's id under
-// `Id`, or the empty answer `WriteResult` allows (`grants create` by
-// identifier answers 202).
+/**
+ * What a write must answer with: a record carrying the resource's id under
+ * `Id`, or the empty answer `WriteResult` allows (`grant create` by
+ * identifier answers 202).
+ */
 type Written<Id extends string> = Readonly<Record<Id, unknown>> | Exclude<WriteResult, Json>;
 
-// What a structured query's body filters and sorts by: the enums of its
-// `filter[].field`, `filter[].operation` and `sorting.field`.
+/** One entry of a structured query's `filter`, the source of what it filters by. */
 type BodyFilter<B> = B extends { filter?: readonly (infer F)[] | null } ? F : never;
+
+/** The enum of a structured query's `filter[].field`. */
 type BodyFilterField<B> = BodyFilter<B> extends { field: infer N } ? N & string : never;
+
+/** The enum of a structured query's `filter[].operation`. */
 type BodyFilterOperation<B> = BodyFilter<B> extends { operation: infer O } ? O & string : never;
+
+/** The enum of a structured query's `sorting.field`. */
 type BodySortField<B> = B extends { sorting?: infer S }
   ? NonNullable<S> extends { field: infer N }
     ? N & string
     : never
   : never;
 
-// A structured query's filter: a field and operations its body takes. The body
-// carries every value as one free-form scalar, so `values` and `default` are
-// plain strings, and repeats of a field all apply, so none widens.
+/**
+ * A structured query's filter: a field and operations its body takes. The body
+ * carries every value as one free-form scalar, so `values` and `default` are
+ * plain strings, and repeats of a field all apply, so none widens.
+ */
 type QueryFilter<B> = FilterField & {
   readonly field: BodyFilterField<B>;
   readonly operations: readonly BodyFilterOperation<B>[];
   readonly combine?: undefined;
 };
 
-// What a `GET` query parameter takes: one entry of it, when it repeats.
+/** What a `GET` query parameter takes: one entry of it, when it repeats. */
 type ParamValue<V> = NonNullable<V> extends readonly (infer E)[] ? E : NonNullable<V>;
 
-// A `GET` list's filter: a query parameter, which carries a value as it is and
-// so filters only by `equals`, and whose `values` and `default` are of the type
-// it takes; or a range, sent as one parameter per operation, which only
-// `range()` makes. A parameter that takes a list widens with each repeat, so
-// it says so, and one that takes a single value cannot.
+/**
+ * A `GET` list's filter: a query parameter, which carries a value as it is and
+ * so filters only by `equals`, and whose `values` and `default` are of the type
+ * it takes; or a range, sent as one parameter per operation, which only
+ * `range()` makes. A parameter that takes a list widens with each repeat, so
+ * it says so, and one that takes a single value cannot.
+ */
 type GetFilter<B> =
   | {
       [K in keyof B & string]: FilterField & {
@@ -207,8 +240,10 @@ type GetFilter<B> =
       readonly [ranged]: true;
     });
 
-// Marks the operations and parameters `range()` paired; a `GET` list takes no
-// other range, so none can offer an operation it has no parameter for.
+/**
+ * Marks the operations and parameters `range()` paired; a `GET` list takes no
+ * other range, so none can offer an operation it has no parameter for.
+ */
 const ranged = Symbol("ranged");
 
 /**
@@ -226,18 +261,22 @@ export const range = <const M extends { readonly [O in Operation]?: string }>(
   };
 };
 
-// A list's filters and sorts, checked against the request it sends. A list with
-// a `body` is a structured query, sorted by a field the body names. A `GET` list
-// orders by one implicit field of its item, so its sort names that field, and
-// `sortParam` the parameter carrying the direction.
+/**
+ * A list's filters and sorts, checked against the request it sends. A list with
+ * a `body` is a structured query, sorted by a field the body names. A `GET` list
+ * orders by one implicit field of its item, so its sort names that field, and
+ * `sortParam` the parameter carrying the direction.
+ */
 type QueryList<B> = Readonly<{
   body: Schema<B>;
   filters?: readonly NoInfer<QueryFilter<B>>[];
   sorts?: readonly NoInfer<BodySortField<B>>[];
   sortParam?: undefined;
 }>;
-// A `GET` list whose call parameter is untyped has a request of any key, which
-// would check nothing, so it takes no filters or `sortParam` at all.
+/**
+ * A `GET` list whose call parameter is untyped has a request of any key, which
+ * would check nothing, so it takes no filters or `sortParam` at all.
+ */
 type GetList<B, T> = Readonly<{
   body?: undefined;
   filters?: string extends keyof B ? never : readonly NoInfer<GetFilter<B>>[];
@@ -251,30 +290,48 @@ type Query<K extends keyof ZitadelClient> = Omit<
   "project_id"
 >;
 
-// Infers a list's page `P` from `call` and its item `T` from `items`, which
-// reads the list off that page, and checks `item` against `T`. Infers a
-// structured query's request type `B` from its `body` schema, and a `GET` list's
-// from its call's parameter, which must be typed (`params: Query<"listX">`) for
-// the list to take filters or a `sortParam`. `items` comes after `call`, so the
-// page is known when `items` is read.
+/**
+ * Builds a resource's `list` verb. Infers a list's page `P` from `call` and its
+ * item `T` from `items`, which reads the list off that page, and checks `item`
+ * against `T`. Infers a structured query's request type `B` from its `body`
+ * schema, and a `GET` list's from its call's parameter, which must be typed
+ * (`params: Query<"listX">`) for the list to take filters or a `sortParam`.
+ * `items` comes after `call`, so the page is known when `items` is read.
+ *
+ * @param spec The list as written.
+ * @returns The same spec, typed.
+ */
 export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
   spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> } & (QueryList<B> | GetList<B, T>),
 ): NoInfer<ListSpec<Platform, B, P, T>> => {
   return spec;
 };
 
-// Infers the record `get` answers with, so `sections` reads it typed.
+/**
+ * Builds a resource's `get` verb, inferring the record it answers with so
+ * `sections` reads it typed.
+ *
+ * @param spec The verb as written.
+ * @returns The same spec, typed.
+ */
 export const get = <R, S extends FieldsOf<R> = FieldsOf<R>>(
   spec: GetSpec<Platform, R> & { response?: Schema<S> },
 ): NoInfer<GetSpec<Platform, R>> => {
   return spec;
 };
 
-// Checks a resource's paths against what its verbs answer with: `columns` name
-// fields of a listed item, `heading` and `detail` fields of the record `get`
-// answers with, and `idField` a field of both that `create` and `update`
-// answer with. It builds `idOf` from `idField`, the typed read a write's
-// suggested `get` takes its id from.
+/**
+ * Checks a resource's paths against what its verbs answer with: `columns` name
+ * fields of a listed item, `heading` and `detail` fields of the record `get`
+ * answers with, and `idField` a field of both that `create` and `update`
+ * answer with. It builds `idOf` from `idField`, the typed read a write's
+ * suggested `get` takes its id from.
+ *
+ * @typeParam Ops The descriptor as written, so the command table knows which
+ * verbs it has.
+ * @param descriptor The resource as written.
+ * @returns The descriptor, marked checked.
+ */
 export const resource = <
   P,
   T,
@@ -283,7 +340,6 @@ export const resource = <
   CB extends Json,
   UB extends Json,
   Id extends keyof T & keyof R & string,
-  // The descriptor as written, so the command table knows which verbs it has.
   Ops extends Readonly<{ create?: unknown; update?: unknown; delete?: unknown }>,
 >(
   descriptor: Ops &
@@ -310,10 +366,15 @@ export const resource = <
   };
 };
 
-// The filter operations each `POST /<resource>/query` endpoint takes (ADR 031),
-// from its own body's enum, so a query that gains one offers it. `starts_with`
-// is in every body's enum, but only the fields that name it take it, so those
-// list it themselves.
+/**
+ * The filter operations each `POST /<resource>/query` endpoint takes (ADR 031),
+ * from its own body's enum, so a query that gains one offers it. `starts_with`
+ * is in every body's enum, but only the fields that name it take it, so those
+ * list it themselves.
+ *
+ * @param operations The operation enum of one query's body.
+ * @returns Every operation in it but `starts_with`.
+ */
 const general = <O extends string>(operations: Readonly<Record<string, O>>): O[] => {
   return Object.values(operations).filter((operation) => {
     return operation !== "starts_with";
@@ -349,7 +410,7 @@ const OPERATIONS: readonly Operation[] = [
 
 /** A release's pointers as an indented table, one pinned revision per row. */
 export const releasePointers = async (
-  release: Pick<GetReleaseById200, "pointers">,
+  release: Pick<GetRelease200, "pointers">,
   tabulate: Tabulate,
 ): Promise<string> => {
   const { pointers } = release;
@@ -372,16 +433,72 @@ const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
  * absent: they are published from `.zitadel/**` through `deploy`
  * (ADR 007, ADR 035), and an imperative write path would fork that source of
  * truth. Adding a backend resource is adding an entry here.
+ *
+ * Config resources (ADR 035) are read-only here: they are authored as files
+ * under `.zitadel/` and shipped through a release, so a write verb would be a
+ * second writer over the same state, and reading what the server currently
+ * holds is how you check that a deploy landed.
+ *
+ * A user's `identifier` is their login handle (their email under the default
+ * schema), which is why it is a column where the schema URL it replaced, being
+ * identical on every row, is not. The users query sends no `project_id`: it
+ * defaults to the token's own project, the only one a project secret can list.
+ * A user update's `dry_run` is the global `--dry-run`'s, never a body field of
+ * its own, and its `check` runs the update with `dry_run` set because a server
+ * from before `dry_run` refuses the field rather than applying the patch, so a
+ * dry run needs no check of the server first.
+ *
+ * A team's DELETE deactivates it and leaves it readable (ADR 024), so its
+ * command is named after that rather than claiming the team is gone. A
+ * session's endpoint terminates it rather than removing a record, so its
+ * command says `revoke`: `delete` would tell the caller it is gone.
+ *
+ * `GET /events` spells its filters as flat query parameters, and a range as
+ * two of them. Declaring the parameter each operation travels as lets the
+ * caller write the same `field=operation:value` they write for every other
+ * resource, with no grammar invented that the endpoint cannot honour. It
+ * orders by `occurred_at` and takes only the direction.
+ *
+ * A grant names exactly one of `user` and `team`, which the required fields
+ * alone cannot say, so its create example names the principal itself.
+ *
+ * Identity provider connections carry ADR 063's shape already: a fixed `id`
+ * shared by every revision, and a `revision_id` per revision. The revision
+ * routes are not modelled, because the CLI has no grammar for a sub-resource
+ * listing yet, so `idp revisions` is deliberately absent. The create body nests
+ * the connection under `idp`; rooted there, the flags and `--set` paths address
+ * the connection itself (`--oidc-issuer`), and `--file` takes the same document
+ * as `.zitadel/idps/<slug>.json`. A slug that already exists is revised rather
+ * than duplicated. The generated schema makes the `oidc` block optional because
+ * it cannot say that the protocol requires it, so the create example spells it
+ * out.
+ *
+ * A schema, a flow definition and a policy are addressed by a name as well as
+ * by an id (object type, flow name, operation), so their argument is named for
+ * the thing rather than for one of its spellings: the operation is what a
+ * policy's file is named after and what a developer knows it by. Editing a
+ * schema mints a new revision rather than changing the old one, and publishing
+ * a flow under an existing name mints a new row, so their unfiltered lists are
+ * histories of the same objects. Someone typing `schema list` means "what
+ * schemas do I have", which is one row each, so `revisions` defaults to the
+ * latest (the console made the same choice).
+ *
+ * Operation policies (ADR 066) are carried from `.zitadel/policies/` by
+ * `deploy`, so only read here (`policy test` is a hand-written command). A
+ * project has one policy per operation, and the list shows each at its newest
+ * revision; the revision routes are not modelled, for the reason `idp` gives.
+ * A policy id names the policy; a catalogued operation resolves through the
+ * list's filter, which answers with the operation's policy or nothing. Anything
+ * else names no policy: sending it as the filter would be refused as a
+ * malformed query rather than reported as not found.
  */
 export const RESOURCES = {
-  users: resource({
-    group: CommandGroups.usersAndTeams,
+  user: resource({
+    group: CommandGroups.usersAndAccess,
     groupOrder: 1,
     singular: "user",
-    idSchema: GetUserByIDParams.shape.user_id,
+    idSchema: GetUserParams.shape.user_id,
     idField: "id",
-    // `identifier` is the user's login handle (their email under the default
-    // schema); the schema URL it replaced is identical on every row.
     columns: ["id", "identifier", "metadata.status", "metadata.created_at"],
     heading: "identifier",
     detail: [
@@ -431,8 +548,6 @@ export const RESOURCES = {
         },
       ],
       sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
-      // No project_id: the users query defaults to the token's own project,
-      // which is the only one a project secret can list.
       call: ({ client }, body) => {
         return client.queryUsers(body);
       },
@@ -441,24 +556,21 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client }, id) => {
-        return client.getUserByID(id);
+        return client.getUser(id);
       },
-      response: GetUserByIDResponse,
+      response: GetUserResponse,
     }),
     create: create(CreateUserBody, ({ client, projectId }, body) => {
       return client.createUser(body, { project_id: projectId });
     }),
-    // dry_run is the global --dry-run's, never a body field of its own.
     update: update(
       USER_UPDATE_BODY,
       ({ client }, id, body) => {
-        return client.patchUserByID(id, body);
+        return client.updateUser(id, body);
       },
       {
-        // A server from before dry_run refuses the field rather than applying
-        // the patch, so a dry run needs no check of the server first.
         check: ({ client }, id, body) => {
-          return client.patchUserByID(id, {
+          return client.updateUser(id, {
             ...body,
             dry_run: true,
           });
@@ -467,13 +579,13 @@ export const RESOURCES = {
     ),
     delete: {
       call: ({ client }, id, consent) => {
-        return consent.unlock(client).deleteUserByID(id);
+        return consent.unlock(client).deleteUser(id);
       },
     },
   }),
 
-  teams: resource({
-    group: CommandGroups.usersAndTeams,
+  team: resource({
+    group: CommandGroups.usersAndAccess,
     groupOrder: 2,
     singular: "team",
     idField: "id",
@@ -516,18 +628,17 @@ export const RESOURCES = {
     update: update(UpdateTeamBody, ({ client }, id, body) => {
       return client.updateTeam(id, body);
     }),
-    // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
-    // command is named after that rather than claiming the team is gone.
     delete: {
       verb: "deactivate",
       call: ({ client }, id, consent) => {
-        return consent.unlock(client).deleteTeam(id);
+        return consent.unlock(client).deactivateTeam(id);
       },
     },
   }),
 
-  sessions: resource({
-    group: CommandGroups.authentication,
+  session: resource({
+    group: CommandGroups.usersAndAccess,
+    groupOrder: 4,
     singular: "session",
     idSchema: GetSessionParams.shape.session_id,
     idField: "session_id",
@@ -568,8 +679,6 @@ export const RESOURCES = {
       },
       response: GetSessionResponse,
     }),
-    // The endpoint terminates the session rather than removing a record, so
-    // the command says `revoke`. `delete` would tell the caller it is gone.
     delete: {
       verb: "revoke",
       call: ({ client }, id, consent) => {
@@ -578,8 +687,9 @@ export const RESOURCES = {
     },
   }),
 
-  events: resource({
-    group: CommandGroups.diagnostics,
+  event: resource({
+    group: CommandGroups.apiAndEvents,
+    groupOrder: 1,
     singular: "event",
     idField: "id",
     columns: ["id", "event_type", "category", "actor_id", "occurred_at"],
@@ -596,12 +706,7 @@ export const RESOURCES = {
       "occurred_at",
     ],
     list: list({
-      item: ListEventsResponse.shape.data.element,
-      // `GET /events` spells its filters as flat query parameters, and a range
-      // as two of them. Declaring the parameter each operation travels as lets
-      // the caller write the same `field=operation:value` they write for every
-      // other resource, with no grammar invented that the endpoint cannot
-      // honour.
+      item: ListEventsResponse.shape.events.element,
       filters: [
         {
           field: "category",
@@ -665,7 +770,6 @@ export const RESOURCES = {
           }),
         },
       ],
-      // The endpoint orders by `occurred_at` and takes only the direction.
       sorts: ["occurred_at"],
       sortParam: "order",
       call: ({ client, projectId }: Platform, params: Query<"listEvents">) => {
@@ -684,8 +788,8 @@ export const RESOURCES = {
     }),
   }),
 
-  grants: resource({
-    group: CommandGroups.usersAndTeams,
+  grant: resource({
+    group: CommandGroups.usersAndAccess,
     groupOrder: 3,
     singular: "grant",
     idField: "id",
@@ -733,10 +837,10 @@ export const RESOURCES = {
     create: create(
       CreateGrantBody,
       ({ client, projectId }, body) => {
-        return client.createGrant(body, { project_id: projectId });
+        return client.createGrant(body, { project_id: projectId }).then((grant) => {
+          return grant ?? undefined;
+        });
       },
-      // A grant names exactly one of `user` and `team`, which the required
-      // fields alone cannot say, so the example names the principal itself.
       { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
@@ -746,12 +850,9 @@ export const RESOURCES = {
     },
   }),
 
-  // Identity provider connections. They carry ADR 063's shape already:
-  // a fixed `id` shared by every revision, and a `revision_id` per revision.
-  // The revision routes are not modelled here — the CLI has no grammar for a
-  // sub-resource listing yet, so `idps revisions` is deliberately absent.
-  idps: resource({
-    group: CommandGroups.authentication,
+  idp: resource({
+    group: CommandGroups.signIn,
+    groupOrder: 2,
     singular: "identity provider connection",
     plural: "identity provider connections",
     idField: "id",
@@ -780,31 +881,26 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client, projectId }, id) => {
-        return client.getIdpById(id, { project_id: projectId });
+        return client.getIdp(id, { project_id: projectId });
       },
-      response: GetIdpByIdResponse,
+      response: GetIdpResponse,
     }),
-    // The body nests the connection under `idp`. Rooted there, the flags and
-    // `--set` paths address the connection itself (`--oidc-issuer`), and
-    // `--file` takes the same document as `.zitadel/idps/<slug>.json`. A slug
-    // that already exists is revised rather than duplicated.
     create: create(
-      CreateIdpBody,
+      PublishIdpBody,
       ({ client, projectId }, body) => {
-        return client.createIdp(body, { project_id: projectId });
+        return client.publishIdp(body, { project_id: projectId });
       },
       {
         root: "idp",
-        // The `oidc` block is optional to the generated schema, which cannot
-        // say that the protocol requires it, so the example spells it out.
         example:
           "--slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email",
       },
     ),
   }),
 
-  projects: resource({
-    group: CommandGroups.configuration,
+  project: resource({
+    group: CommandGroups.projectSettings,
+    groupOrder: 1,
     singular: "project",
     idField: "id",
     columns: ["id", "name", "created_at"],
@@ -832,21 +928,16 @@ export const RESOURCES = {
       },
       response: GetProjectResponse,
     }),
-    update: update(PatchProjectBody, ({ client }, id, body) => {
-      return client.patchProject(id, body);
+    update: update(UpdateProjectBody, ({ client }, id, body) => {
+      return client.updateProject(id, body);
     }),
   }),
 
-  // Configuration resources (ADR 035) are read-only here. They are authored as
-  // files under `.zitadel/` and shipped through a release, so a write verb
-  // would be a second writer over the same state; reading what the server
-  // currently holds is how you check that a deploy landed.
-  schemas: resource({
-    group: CommandGroups.configuration,
+  schema: resource({
+    group: CommandGroups.signIn,
+    groupOrder: 3,
     singular: "schema",
     idField: "id",
-    // Addressed by object type as well as by revision id, so the argument is
-    // named for the thing rather than for one of its two spellings.
     idArg: "schema",
     idDescription: "object type (current revision) or revision id",
     columns: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
@@ -867,10 +958,6 @@ export const RESOURCES = {
           field: "revisions",
           operations: ["equals"],
           values: Object.values(ListSchemasRevisions),
-          // Editing a schema mints a new revision rather than changing the old
-          // one, so the unfiltered list is a history: the same object type over
-          // and over. Someone typing `schemas list` means "what schemas do I
-          // have", which is one row each. The console made the same choice.
           default: ListSchemasRevisions.latest,
         },
       ],
@@ -886,7 +973,7 @@ export const RESOURCES = {
       },
     }),
     get: get({
-      response: GetSchemaByIdResponse,
+      response: GetSchemaResponse,
       call: ({ client, projectId }, reference) => {
         const schemaService = new SchemaService(client, projectId);
         return schemaService.get(reference);
@@ -895,10 +982,11 @@ export const RESOURCES = {
   }),
 
   release: resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.releases,
+    groupOrder: 4,
     singular: "release",
     plural: "releases",
-    idSchema: GetReleaseByIdParams.shape.release_id,
+    idSchema: GetReleaseParams.shape.release_id,
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
@@ -924,21 +1012,21 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client, projectId }, id) => {
-        return client.getReleaseById(id, { project_id: projectId });
+        return client.getRelease(id, { project_id: projectId });
       },
-      response: GetReleaseByIdResponse,
+      response: GetReleaseResponse,
       sections: async (release, tabulate) => {
         return [await releasePointers(release, tabulate)];
       },
     }),
   }),
 
-  "flow-definitions": resource({
-    group: CommandGroups.configuration,
+  "flow-definition": resource({
+    group: CommandGroups.signIn,
+    groupOrder: 5,
     singular: "flow definition",
     plural: "flow definitions",
     idField: "id",
-    // Addressed by flow name as well as by revision id; see `schemas`.
     idArg: "flow",
     idDescription: "flow name (newest revision) or revision id",
     columns: ["id", "flow_definition.name", "created_at"],
@@ -959,9 +1047,6 @@ export const RESOURCES = {
           field: "revisions",
           operations: ["equals"],
           values: Object.values(ListFlowDefinitionsRevisions),
-          // Publishing under an existing name mints a new row, so the
-          // unfiltered list is a history of the same flows. Same reasoning as
-          // `schemas`: a bare list is the current flows.
           default: ListFlowDefinitionsRevisions.latest,
         },
       ],
@@ -986,7 +1071,8 @@ export const RESOURCES = {
   }),
 
   branding: resource({
-    group: CommandGroups.configuration,
+    group: CommandGroups.signIn,
+    groupOrder: 4,
     singular: "branding revision",
     plural: "branding revisions",
     idField: "id",
@@ -994,16 +1080,16 @@ export const RESOURCES = {
     heading: "id",
     detail: ["id", "created_at"],
     list: list({
-      // `GET /branding` answers with the array itself and takes no cursor, so
-      // the paging flags are not generated for it.
-      paged: false,
-      item: ListBrandingResponse.element,
-      call: ({ client, projectId }) => {
+      item: ListBrandingResponse.shape.branding.element,
+      call: ({ client, projectId }: Platform, params: Query<"listBranding">) => {
         const brandingService = new BrandingService(client, projectId);
-        return brandingService.list();
+        return brandingService.page(params);
       },
       items: (page) => {
-        return page;
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
       },
     }),
     get: get({
@@ -1011,21 +1097,15 @@ export const RESOURCES = {
         const brandingService = new BrandingService(client, projectId);
         return brandingService.get(id);
       },
-      response: GetBrandingByIdResponse,
+      response: GetBrandingResponse,
     }),
   }),
 
-  // Operation policies (ADR 066). Configuration: carried from
-  // .zitadel/policies/ by `deploy`, so only read here (`policies test` is a
-  // hand-written command). A project has one
-  // policy per operation, and the list shows each at its newest revision.
-  // The revision routes are not modelled, for the reason `idps` gives.
-  policies: resource({
-    group: CommandGroups.configuration,
+  policy: resource({
+    group: CommandGroups.signIn,
+    groupOrder: 6,
     singular: "policy",
     idField: "id",
-    // Addressed by operation as well as by id: the operation is what the
-    // file is named after and what a developer knows the policy by.
     idArg: "policy",
     idDescription: "policy id or operation",
     columns: ["id", "operation", "revision_id", "updated_at"],
@@ -1052,10 +1132,6 @@ export const RESOURCES = {
     }),
     get: get({
       response: GetPolicyResponse,
-      // An id names the policy; a catalogued operation resolves through the
-      // list's filter, which answers with the operation's policy or nothing.
-      // Anything else names no policy: sending it as the filter would be
-      // refused as a malformed query rather than reported as not found.
       call: async ({ client, projectId }, ref) => {
         const policyService = new PolicyService(client, projectId);
         if (ref.startsWith("pol_")) {
@@ -1063,7 +1139,7 @@ export const RESOURCES = {
         }
         const notFound = () => {
           return new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
-            hint: `List the project's policies with the policies list command. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
+            hint: `List the project's policies with the policy list command. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
           });
         };
         const operation = POLICY_OPERATIONS.find((known) => {
@@ -1085,25 +1161,29 @@ export const RESOURCES = {
 /**
  * The `<resource> <verb>` commands, ready for the explicit command table. They
  * connect like every command that talks to a project (see
- * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
+ * `EnvironmentCommand`), so they take `--env` and `--env-file` too. A
+ * `${{ NAME }}` reference to a project variable (ADR 062) names a credential
+ * without revealing it, and is the only form a connection's `client_secret`
+ * takes, so it may stand on a command line.
  */
-export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
-  operations: OPERATIONS,
-  // A `${{ NAME }}` reference to a project variable (ADR 062) names a
-  // credential without revealing it, and is the only form a connection's
-  // `client_secret` takes, so it may stand on a command line.
-  references: {
-    matches: isVariableReference,
-    example: "'${{ NAME }}'",
+export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(
+  RESOURCES,
+  {
+    operations: OPERATIONS,
+    references: {
+      matches: isVariableReference,
+      example: "'${{ NAME }}'",
+    },
+    connect: async (open) => {
+      const { client, projectId } = await open();
+      return {
+        client,
+        projectId,
+      };
+    },
   },
-  connect: async (open) => {
-    const { client, projectId } = await open();
-    return {
-      client,
-      projectId,
-    };
-  },
-});
+  ServerCommand,
+);
 
 /**
  * A generated resource command as a suggestion is checked against it. Its
@@ -1113,14 +1193,14 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
  */
 type ResourceTarget = Readonly<{ args: LooseArgs; flags: Interfaces.FlagInput }>;
 
-/** The ids of a registry entry's commands: `users:list`, `sessions:revoke`. */
+/** The ids of a registry entry's commands: `user:list`, `session:revoke`. */
 type IdsOf<Topic extends string, Entry> = Entry extends {
   readonly [verbs]?: infer Verb extends string;
 }
   ? `${Topic}:${Verb}`
   : never;
 
-/** Every generated resource command a run can suggest, by id (`users:get`). */
+/** Every generated resource command a run can suggest, by id (`user:get`). */
 export type ResourceTable = {
   readonly [Id in {
     [Topic in keyof typeof RESOURCES & string]: IdsOf<Topic, (typeof RESOURCES)[Topic]>;

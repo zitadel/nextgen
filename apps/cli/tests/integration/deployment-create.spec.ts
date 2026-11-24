@@ -8,7 +8,7 @@ import {
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
@@ -189,7 +189,10 @@ describe("deployment create", () => {
           status: "ok",
           data: {
             dry_run: true,
-            title: `Would deploy ${releaseId} to primary (dry run)`,
+            title: `Would deploy release ${releaseId} to primary (dry run)`,
+            verb: "deploy",
+            topic: "deployment",
+            id: releaseId,
             release_id: releaseId,
             targets: "primary",
             next_commands: [
@@ -328,12 +331,6 @@ describe("deployment create", () => {
           code: "E_VALIDATION",
           message: "Nonexistent flag: --origin",
           next_commands: [expectedPublicCliCommand("deployment create --help")],
-          details: {
-            original: {
-              name: "Error",
-              message: "Nonexistent flag: --origin\nSee more help with --help",
-            },
-          },
         });
       });
 
@@ -459,7 +456,7 @@ describe("deployment create", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toPrint(`Would deploy ${releaseId} to primary (dry run)`);
+        expect(result).toPrint(`Would deploy release ${releaseId} to primary (dry run)`);
       });
 
       it("suggests the real deployment after a dry run, once", async () => {

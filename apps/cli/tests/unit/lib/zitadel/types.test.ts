@@ -3,7 +3,7 @@ import { beforeEach, describe, expect } from "vitest";
 import { Git } from "@/lib/git/git";
 import { CONFIG_DIRECTORIES, DiskStore, RELEASE_POLICY_GLOBS, ZitadelConfig } from "@/lib/zitadel";
 import { aPasswordPolicy } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { commitAll, git, isolateGit, write } from "@tests/helpers/git-repo";
 
 /**

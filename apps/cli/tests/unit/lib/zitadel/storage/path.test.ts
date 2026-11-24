@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { describe, expect } from "vitest";
 
 import { Path } from "@/lib/zitadel/storage/path";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 describe("Path.of", () => {
   it("resolves segments against the working directory", () => {

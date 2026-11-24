@@ -1,14 +1,82 @@
-import { readZitadelSecret } from "@/lib/project";
+import { join } from "node:path";
+
+import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
+import { Dotenv } from "@/lib/environment";
+import { Project } from "@/lib/project";
+import { ZitadelRuntime } from "@/lib/server";
+import { Runtime } from "@/lib/runtime";
 
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
-/** Verifies `.zitadel/secret` exists and parses. */
+/**
+ * The env file the CLI reads, which setup fills with the project's credentials.
+ */
+const DEVELOPMENT_ENV_FILE = ".env.development.local";
+
+/**
+ * Verifies `.zitadel/secret` exists and parses. A missing file is rebuilt from
+ * the credentials `.env.development.local` holds and the origins the server
+ * reports for the project.
+ */
 export class SecretCheck extends AbstractSanityCheck {
   readonly name = "secret";
   readonly path = ".zitadel/secret";
   protected readonly summary = ".zitadel/secret parses";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    await readZitadelSecret(ctx.cwd);
+    await Project.at(ctx.cwd).secret();
+  }
+
+  /**
+   * Rebuilds a missing `.zitadel/secret`; leaves a present file alone, since a
+   * file that exists but is damaged may hold what no other copy does.
+   *
+   * @param ctx - The project to repair.
+   * @throws When the file is missing and `.env.development.local` cannot supply
+   *   the project's id, server and secrets.
+   */
+  override async fix(ctx: CheckContext): Promise<void> {
+    if (await Project.at(ctx.cwd).hasSecret()) {
+      return;
+    }
+    const env = await Dotenv.at(join(ctx.cwd, DEVELOPMENT_ENV_FILE)).read();
+    const projectId = env?.ZITADEL_PROJECT_ID;
+    const projectSecret = env?.ZITADEL_PROJECT_SECRET;
+    const previewSecret = env?.ZITADEL_PREVIEW_TOKEN;
+    if (!projectId || !projectSecret || !previewSecret) {
+      throw new Error(
+        `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
+      );
+    }
+    const config = await Project.at(ctx.cwd).config();
+    const configured = config.data.project;
+    if (projectId !== configured) {
+      throw new Error(
+        `${DEVELOPMENT_ENV_FILE} names project ${projectId} but zitadel.json names ${typeof configured === "string" ? configured : "no project"}, so its secrets are not restored`,
+      );
+    }
+    if (ctx.dryRun) {
+      return;
+    }
+    const project = await new ProjectService(
+      createZitadelClient({
+        userAgent: Runtime.current().userAgent(),
+        baseUrl: config.server ?? ZitadelRuntime.DEFAULT,
+        token: projectSecret,
+        signal: ctx.signal,
+      }),
+    ).get(projectId);
+    if (project.id !== projectId) {
+      throw new Error(`The server returned project ${project.id}, not ${projectId}`);
+    }
+    const origins = Origins.wrap(project.origins);
+    await Project.at(ctx.cwd).writeSecret({
+      project_id: project.id,
+      project_secret: projectSecret,
+      preview_secret: previewSecret,
+      primary_origins: [...origins.primary],
+      preview_origins: [...origins.preview],
+      created_at: project.created_at,
+    });
   }
 }

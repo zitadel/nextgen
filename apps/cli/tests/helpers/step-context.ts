@@ -1,6 +1,5 @@
 import { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
 import type { StepContext } from "@/lib/publish/pipeline";
-import { aSuggest } from "@tests/helpers/suggestions";
 import { type ConfigStore, type ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
@@ -54,8 +53,12 @@ export function aStepContext(overrides: StepContextOverrides = {}): StepContext 
     color: false,
     config,
     store,
+    referenced:
+      fields.referenced ??
+      config.branding.all.flatMap((branding) => {
+        return branding.listReferencedPaths(store);
+      }),
     bundle: fields.bundle ?? bundleOf(fields.config, store),
-    suggest: aSuggest({ env: "staging" }),
     ...fields,
   };
 }

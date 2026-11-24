@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { Cmd } from "@/lib/cmd";
-import { useLocalServers } from "@tests/helpers/local-server";
+import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aSetUpApp,
+  aSetUpReactApp,
   MOCK_SERVER_URL,
   SETUP_ORIGIN,
   type ScaffoldedApp,
@@ -12,7 +13,6 @@ import {
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
 
@@ -82,7 +82,7 @@ const CHECK = {
   secretPermissions: {
     name: "secret-permissions",
     status: "pass",
-    message: ".zitadel/secret has 0600 permissions",
+    message: ".zitadel/secret is as private as its filesystem allows",
     path: ".zitadel/secret",
     category: "credentials",
   },
@@ -188,6 +188,15 @@ const CHECK = {
     message: "Project is not on a server where teams apply",
     path: ".zitadel/secret",
     category: "project",
+  },
+};
+
+/** A passing doctor run whose managed-files check passed. */
+const MANAGED_FILES_PASSING = {
+  data: {
+    checks: expect.arrayContaining([
+      expect.objectContaining({ name: "managed-files", status: "pass" }),
+    ]),
   },
 };
 
@@ -603,6 +612,61 @@ describe("doctor", () => {
         expect((await before.changes()).added).toContain("app/login/page.tsx");
       });
 
+      it("restores a project secret the developer deleted", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLocalSecret();
+        const before = await app.snapshot();
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({ status: "ok", data: { ok: true } });
+        expect((await before.changes()).added).toContain(".zitadel/secret");
+      });
+
+      it("moves a Vite app's dev proxy that fixes the server's address onto ZITADEL_URL", async () => {
+        const app = await aSetUpReactApp();
+        await app.fixesItsServerAddress();
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(app.envelopeOf(result)).toMatchObject(MANAGED_FILES_PASSING);
+      });
+
+      describe("in an app an older setup left with .env.example ignored", () => {
+        it("passes with a warning", async () => {
+          const app = await aSetUpApp();
+          await app.leftByAnOlderSetup(asAnOlderSetupLeft(SVELTEKIT_GITIGNORE));
+
+          const result = await app.doctor();
+
+          expect(app.envelopeOf(result)).toMatchObject({
+            status: "ok",
+            data: { ok: true, title: "Checks passed with warnings" },
+          });
+        });
+
+        it("lets git commit .env.example once --fix has run", async () => {
+          const app = await aSetUpApp();
+          await app.leftByAnOlderSetup(asAnOlderSetupLeft(SVELTEKIT_GITIGNORE));
+
+          await app.doctor(["--fix"]);
+
+          expect(await app.committableFiles()).toContain(".env.example");
+        });
+
+        it.each([".zitadel/secret", ".env.local", ".env.development.local"])(
+          "keeps git from committing %s once --fix has run",
+          async (name) => {
+            const app = await aSetUpApp();
+            await app.leftByAnOlderSetup(asAnOlderSetupLeft(SVELTEKIT_GITIGNORE));
+
+            await app.doctor(["--fix"]);
+
+            expect(await app.committableFiles()).not.toContain(name);
+          },
+        );
+      });
+
       it("removes nothing while repairing", async () => {
         const app = await aSetUpApp();
         await app.deleteProjectFile("app/login/page.tsx");
@@ -794,13 +858,6 @@ describe("doctor", () => {
           code: "E_VALIDATION",
           message: "All of the following must be provided when using --force: --fix",
           next_commands: [expectedPublicCliCommand("doctor --help")],
-          details: {
-            original: {
-              name: "Error",
-              message:
-                "The following error occurred:\n  All of the following must be provided when using --force: --fix\nSee more help with --help",
-            },
-          },
         });
       });
     });

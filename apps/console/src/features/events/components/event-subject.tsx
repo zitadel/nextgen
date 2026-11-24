@@ -4,6 +4,27 @@ import { cn } from "@/lib/utils";
 import { eventSubject, type ProjectEvent } from "@/features/events/model";
 
 /**
+ * An API request's response status. The number says it; the colour only
+ * draws the eye to a failure.
+ */
+export function RequestStatus({ status }: { status: number }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0",
+        status >= 500
+          ? "text-destructive"
+          : status >= 400
+            ? "text-warning"
+            : "text-muted-foreground",
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+/**
  * What the event was about: an API request as its method, operation and
  * status, any other event as the record it touched. Events' rows and the
  * Overview's recent activity draw it alike.
@@ -18,19 +39,7 @@ export function EventSubject({ event }: { event: ProjectEvent }) {
         <span className="text-foreground truncate">
           {subject.method} {subject.route}
         </span>
-        {/* The number says it; the colour only draws the eye to a failure. */}
-        <span
-          className={cn(
-            "shrink-0",
-            subject.status >= 500
-              ? "text-destructive"
-              : subject.status >= 400
-                ? "text-warning"
-                : "text-muted-foreground",
-          )}
-        >
-          {subject.status}
-        </span>
+        <RequestStatus status={subject.status} />
       </span>
     );
   }

@@ -1,7 +1,7 @@
 language js
 
 // Every destructive operation in the CLI takes a Consent (apps/cli/src/lib/
-// consent.ts), which only a confirmation makes. The type system enforces it;
+// consent/consent.ts), which only a confirmation makes. The type system enforces it;
 // these are the ways around the type system, closed here: casting something
 // to a Consent, minting one outside the mixin that asks for it, casting a
 // client to reach what it hides, reaching the unnarrowed client, calling the
@@ -16,7 +16,7 @@ or {
     $filename <: r".*/apps/cli/src/.*",
     $client <: r"(?i)^[\w.]*client$|^[\w.]*client\(\)$",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
     register_diagnostic(span=$bypass, message="Never cast a client: its destructive operations are reached only through Consent.unlock.", severity="error")
   },
   or {
@@ -25,7 +25,7 @@ or {
     `{ $_ } = Consent`
   } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
-    $filename <: not r".*/apps/cli/src/lib/oclif/destructive\.ts$",
+    $filename <: not r".*/apps/cli/src/cli/core/destructive\.ts$",
     register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(), which take --force and the terminal from the run.", severity="error")
   },
   or {
@@ -61,10 +61,10 @@ or {
   `fetch($_)` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/publish/steps/asset-probe\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/local-server/runtime\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/server/local/runtime\.ts$",
     $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
     $filename <: not r".*/apps/cli/src/lib/upgrade/channel\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/release-notes\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/upgrade/release-notes\.ts$",
     register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/backend/client or OperationService in lib/backend, which gate destructive operations.", severity="error")
   },
   `Consent.prototype` as $bypass where {
@@ -78,7 +78,7 @@ or {
   } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
     register_diagnostic(span=$bypass, message="Use the client from lib/backend/client, whose destructive operations only Consent.unlock reaches.", severity="error")
   },
   or {
@@ -87,13 +87,14 @@ or {
   } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
     register_diagnostic(span=$bypass, message="Reach the destructive operations through Consent.unlock, which is the only caller of allowDestructive.", severity="error")
   },
   `kind: "confirm"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
-    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/input\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/ui/asker\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/ui/prompter\.ts$",
     register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(); a plain question is kind \"yes-no\".", severity="error")
   }
 }

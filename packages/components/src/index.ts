@@ -83,6 +83,7 @@ export {
   ZitadelLogout,
   ZitadelSession,
   applyBrandingTokens,
+  brandingDeclarations,
   buildBrandingStylesheet,
   resolveTheme,
   ThemeController,

@@ -167,13 +167,16 @@ describe("auth-method password disable", () => {
             source: "",
             code: "E_CONFIRMATION_REQUIRED",
             message: `${SCHEMA_FILE} would have no way to sign in left`,
-            hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
+            hint: `Enable another method first. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
                 `auth-method password disable --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
                 `auth-method passkey enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `auth-method sso enable --provider '<name>' --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
             details: {
@@ -197,6 +200,19 @@ describe("auth-method password disable", () => {
                   "auth-method",
                   "passkey",
                   "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+                [
+                  "auth-method",
+                  "sso",
+                  "enable",
+                  "--provider",
+                  "<name>",
                   "--schema",
                   SCHEMA,
                   "--server",
@@ -265,6 +281,11 @@ describe("auth-method password disable", () => {
             code: "E_VALIDATION",
             message: `Disabling password in ${SCHEMA_FILE} would break a login flow that still uses it:\n  - ${FLOW_FILE}: step "password" collects password\n    Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists.\n  - ${FLOW_FILE}: step "register-password" collects password\n    Left with no field or sign-in method. Targeted by register.submit.`,
             hint: `Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. Delete a step left with no field or sign-in method: retarget the transitions listed for it. ${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+            next_commands: [
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+            ],
             details: {
               file: SCHEMA_FILE,
               issues: [
@@ -386,6 +407,8 @@ describe("auth-method password disable", () => {
               notices: [{ severity: "warning", message: WOULD_LEAVE_NONE_WARNING }],
               title: "Would disable password for default-human-user (dry run)",
               dry_run: true,
+              verb: "disable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",
@@ -439,6 +462,8 @@ describe("auth-method password disable", () => {
               notices: [{ severity: "warning", message: NO_ACTIVE_FLOW_WARNING }],
               title: "Nothing to disable for default-human-user (dry run)",
               dry_run: true,
+              verb: "disable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",

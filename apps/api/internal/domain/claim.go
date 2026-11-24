@@ -20,7 +20,7 @@ const ClaimChallengeTTL = 10 * time.Minute
 // claimed (the epic's 14-day lifetime, enforced at claim time; ADR 046
 // §Non-goals records that nothing deletes the project when it closes).
 // The CLI prints the deadline this constant enforces; keep its copy in
-// apps/cli/src/lib/claim-state.ts in sync.
+// apps/cli/src/lib/claim/claim.ts (`Claim.WINDOW_DAYS`) in sync.
 const ClaimWindow = 14 * 24 * time.Hour
 
 // NewClaimChallengeToken mints the plaintext challenge token and the stored

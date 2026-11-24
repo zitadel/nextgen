@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/service"
@@ -113,7 +114,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return nil, normalizeFlowError(err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
-	if state.ID != params.ID {
+	if state.ID != params.FlowID {
 		return nil, domain.ErrFlowNotFound()
 	}
 	// Admit Origin before reading the sealed release: a project that refuses
@@ -173,7 +174,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			}
 			proof = b
 		}
-		submitReq.ChallengeResponse = &domain.FlowChallengeResponse{
+		submitReq.ChallengeResponse = &flowengine.FlowChallengeResponse{
 			ChallengeID: cr.ChallengeID.Value,
 			Method:      cr.Method.Value,
 			Proof:       proof,
@@ -272,7 +273,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(ctx, err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
-	if state.ID != params.ID {
+	if state.ID != params.FlowID {
 		return mapFlowGetError(ctx, domain.ErrFlowNotFound())
 	}
 	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
@@ -390,7 +391,7 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 		// Path=/ ensures that each Set-Cookie replaces the previous one in
 		// the browser's cookie jar rather than accumulating — without an
 		// explicit path the browser derives the path from the request URI,
-		// which differs across /flow and /flow/{id}/submit endpoints.
+		// which differs across /flows and /flows/{flow_id}/submit endpoints.
 		Path: "/",
 	}
 	if clear {
@@ -404,7 +405,7 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 
 // buildFlowResponse assembles the wire response for a flow step. Branding is
 // the revision the request's release pins (ADR 040).
-func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepResult, terminal bool) api.FlowResponse {
+func (h *Handler) buildFlowResponse(ctx context.Context, result flowengine.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
@@ -423,7 +424,7 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 	return resp
 }
 
-func toFlowStep(step *domain.FlowStep) api.FlowStep {
+func toFlowStep(step *flowengine.FlowStep) api.FlowStep {
 	if step == nil {
 		return api.FlowStep{}
 	}
@@ -473,11 +474,11 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 // toFlowStepChallenge maps a pending domain ceremony into the API step's
 // challenge object. Options carries the protocol options JSON (for passkey,
 // PublicKeyCredentialRequestOptions) verbatim for the browser.
-func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
+func toFlowStepChallenge(c flowengine.FlowStepChallenge) api.FlowStepChallenge {
 	out := api.FlowStepChallenge{}
 	if c.Method != "" {
 		switch c.Method {
-		case domain.FlowChallengeMethodPasskeyRegister:
+		case flowengine.FlowChallengeMethodPasskeyRegister:
 			out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskeyRegister)
 		default:
 			out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
@@ -498,17 +499,17 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
 // without port) and the allowed origin from the browser Origin header. Returns
 // nil when the origin has no host.
-func passkeyRPFromOrigin(origin url.URL) *domain.FlowPasskeyRP {
+func passkeyRPFromOrigin(origin url.URL) *flowengine.FlowPasskeyRP {
 	if origin.Hostname() == "" {
 		return nil
 	}
-	return &domain.FlowPasskeyRP{
+	return &flowengine.FlowPasskeyRP{
 		RPID:    origin.Hostname(),
 		Origins: []string{origin.String()},
 	}
 }
 
-func toStepTexts(t domain.FlowStepTexts) api.StepTexts {
+func toStepTexts(t flowengine.FlowStepTexts) api.StepTexts {
 	out := api.StepTexts{}
 	if t.TitleKey != "" {
 		out.TitleKey = api.NewOptString(t.TitleKey)
@@ -583,7 +584,7 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	return &out
 }
 
-func toFlowStepActions(actions []domain.FlowAction) []api.FlowStepAction {
+func toFlowStepActions(actions []flowengine.FlowAction) []api.FlowStepAction {
 	out := make([]api.FlowStepAction, len(actions))
 	for i, a := range actions {
 		out[i] = api.FlowStepAction{
@@ -743,7 +744,7 @@ func normalizeFlowError(err error) error {
 // is the user's to act on, so a server fault behind it, such as a provider
 // the engine could not reach, is a Warn rather than an Error; so is an SSO
 // setup that cannot work.
-func logFlowStepFailure(ctx context.Context, projectID string, step *domain.FlowStep) {
+func logFlowStepFailure(ctx context.Context, projectID string, step *flowengine.FlowStep) {
 	failure := step.Failure
 	if failure == nil {
 		failure = domain.FlowStepFailed(*step.Error, nil)

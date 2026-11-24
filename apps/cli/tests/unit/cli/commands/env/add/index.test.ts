@@ -1,14 +1,13 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import type { SetupServer } from "msw/node";
-import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import EnvAdd from "@/cli/commands/env/add";
 import {
@@ -18,7 +17,7 @@ import {
   stripAnsi,
 } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const personAnswering = (...answers: Answer[]) => answering(...answers);
@@ -47,17 +46,14 @@ it.beforeEach(({ server }) => {
   );
 });
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function makeProject(framework: string | undefined = "next"): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-env-add-"));
-  dirs.push(cwd);
+/**
+ * Makes a project of a framework in a directory.
+ *
+ * @param cwd - The directory to make the project in.
+ * @param framework - The framework `zitadel.json` names, or none when undefined.
+ * @returns The directory.
+ */
+async function makeProject(cwd: string, framework: string | undefined = "next"): Promise<string> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(
     join(cwd, "zitadel.json"),
@@ -144,8 +140,8 @@ describe("env add", () => {
     const suggested = (envelope: { data: Added }): string[] =>
       (envelope.data as unknown as { next_commands: string[] }).next_commands;
 
-    it("names the new environment in every follow-up, not this run's", async () => {
-      const cwd = await makeProject("next");
+    it("names the new environment in every follow-up, not this run's", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd, "--app-url", PRIMARY_ORIGIN);
 
@@ -155,16 +151,18 @@ describe("env add", () => {
       }
     });
 
-    it("quotes the app-url placeholder a person reads, so a paste cannot redirect", async () => {
-      const cwd = await makeProject("next");
+    it("quotes the app-url placeholder a person reads, so a paste cannot redirect", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd, "--project", "proj_existing");
 
       expect(out).toContain("origin add '<your-app-url>' --kind primary");
     });
 
-    it("offers the deploy that makes the new environment serve .zitadel/", async () => {
-      const cwd = await makeProject("next");
+    it("offers the deploy that makes the new environment serve .zitadel/", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd, "--app-url", PRIMARY_ORIGIN);
 
@@ -173,8 +171,8 @@ describe("env add", () => {
       );
     });
 
-    it("offers no deploy when the project has no origin for one to land on", async () => {
-      const cwd = await makeProject("next");
+    it("offers no deploy when the project has no origin for one to land on", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd);
 
@@ -183,8 +181,10 @@ describe("env add", () => {
       );
     });
 
-    it("tells a person to give the environment an origin before deploying to it", async () => {
-      const cwd = await makeProject("next");
+    it("tells a person to give the environment an origin before deploying to it", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd);
 
@@ -195,35 +195,37 @@ describe("env add", () => {
       );
     });
 
-    it("heads its answer with the environment it added, not the file it happened to write", async () => {
-      const cwd = await makeProject("next");
+    it("heads its answer with the environment it added, not the file it happened to write", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd);
 
       expect(out).toContain(
-        "Added the production environment, bound to proj_new .env.production.local holds",
+        "Added the production environment, bound to proj_new Created project proj_new Wrote .env.production.local .env.production.local holds",
       );
       expect(out).not.toContain("Summary");
     });
 
-    it("names the file whose variables it lists, rather than calling it 'it'", async () => {
-      const cwd = await makeProject("next");
+    it("names the file whose variables it lists, rather than calling it 'it'", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd);
 
       expect(out).toContain(".env.production.local holds ZITADEL_URL,");
     });
 
-    it("reports no deployment when it made none", async () => {
-      const cwd = await makeProject("next");
+    it("reports no deployment when it made none", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd);
 
       expect((envelope.data as unknown as { deployment: unknown }).deployment).toBeNull();
     });
 
-    it("offers no deploy for a project it only bound", async () => {
-      const cwd = await makeProject("next");
+    it("offers no deploy for a project it only bound", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await addBound(cwd);
 
@@ -232,8 +234,8 @@ describe("env add", () => {
       );
     });
 
-    it("says what the environment serves until something is deployed to it", async () => {
-      const cwd = await makeProject("next");
+    it("says what the environment serves until something is deployed to it", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd);
 
@@ -242,8 +244,8 @@ describe("env add", () => {
       );
     });
 
-    it("names the deploy a person should run, against the new environment", async () => {
-      const cwd = await makeProject("next");
+    it("names the deploy a person should run, against the new environment", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd, "--app-url", PRIMARY_ORIGIN);
 
@@ -254,32 +256,34 @@ describe("env add", () => {
       );
     });
 
-    it("names the deploy a person should run only once", async () => {
-      const cwd = await makeProject("next");
+    it("names the deploy a person should run only once", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = stripAnsi(await addRendered(cwd, "--app-url", PRIMARY_ORIGIN));
 
       expect(out.split("deploy --message '<what changed>'")).toHaveLength(2);
     });
 
-    it("names the check of what resolves only once", async () => {
-      const cwd = await makeProject("next");
+    it("names the check of what resolves only once", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = stripAnsi(await addRendered(cwd));
 
       expect(out.split(" env --env-file ")).toHaveLength(2);
     });
 
-    it("offers no origin add without an app URL to add", async () => {
-      const cwd = await makeProject("next");
+    it("offers no origin add without an app URL to add", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd);
 
       expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
     });
 
-    it("offers no origin add when the file holds no project secret to run it with", async () => {
-      const cwd = await makeProject("next");
+    it("offers no origin add when the file holds no project secret to run it with", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(
         cwd,
@@ -292,8 +296,8 @@ describe("env add", () => {
       expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
     });
 
-    it("quotes an IPv6 app origin in the follow-up a person reads", async () => {
-      const cwd = await makeProject("next");
+    it("quotes an IPv6 app origin in the follow-up a person reads", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(
         cwd,
@@ -308,16 +312,20 @@ describe("env add", () => {
       );
     });
 
-    it("tells a person the origin step waits on the project secret when none was written", async () => {
-      const cwd = await makeProject("next");
+    it("tells a person the origin step waits on the project secret when none was written", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd, "--project", "proj_existing");
 
       expect(out).toContain("once ZITADEL_PROJECT_SECRET is in .env.production.local");
     });
 
-    it("names the app origin it already has in the step that waits on the secret", async () => {
-      const cwd = await makeProject("next");
+    it("names the app origin it already has in the step that waits on the secret", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const out = await addRendered(cwd, "--project", "proj_existing", "--app-url", PRIMARY_ORIGIN);
 
@@ -326,16 +334,18 @@ describe("env add", () => {
       );
     });
 
-    it("offers no origin add for a project it created, which already holds the app URL", async () => {
-      const cwd = await makeProject("next");
+    it("offers no origin add for a project it created, which already holds the app URL", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd, "--app-url", PRIMARY_ORIGIN);
 
       expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
     });
 
-    it("restricts a bound project to the app's origin first", async () => {
-      const cwd = await makeProject("next");
+    it("restricts a bound project to the app's origin first", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await addBound(cwd, "--app-url", PRIMARY_ORIGIN);
 
@@ -345,8 +355,8 @@ describe("env add", () => {
     });
   });
 
-  it("keeps --project in the retry it suggests for a missing server", async () => {
-    const cwd = await makeProject("next");
+  it("keeps --project in the retry it suggests for a missing server", async ({ dir }) => {
+    const cwd = await makeProject(dir, "next");
 
     const result = await runCliForTest([
       "env",
@@ -364,8 +374,8 @@ describe("env add", () => {
     expect(envelope.next_commands?.[0]).toContain("--project proj_existing");
   });
 
-  it("names --cwd once in the retry it suggests for a missing server", async () => {
-    const cwd = await makeProject("next");
+  it("names --cwd once in the retry it suggests for a missing server", async ({ dir }) => {
+    const cwd = await makeProject(dir, "next");
 
     const result = await runCliForTest([
       "env",
@@ -382,8 +392,10 @@ describe("env add", () => {
   });
 
   describe("the file it writes", () => {
-    it("holds the server, the project and both credentials, and the framework's twin of the id", async () => {
-      const cwd = await makeProject("next");
+    it("holds the server, the project and both credentials, and the framework's twin of the id", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       await add(cwd);
 
@@ -399,16 +411,16 @@ describe("env add", () => {
       );
     });
 
-    it("is readable by its owner alone", async () => {
-      const cwd = await makeProject();
+    it("is readable by its owner alone", async ({ dir }) => {
+      const cwd = await makeProject(dir);
 
       await add(cwd);
 
       expect((await stat(join(cwd, ".env.production.local"))).mode & 0o777).toBe(0o600);
     });
 
-    it("keeps that mode when --force rewrites a looser file", async () => {
-      const cwd = await makeProject();
+    it("keeps that mode when --force rewrites a looser file", async ({ dir }) => {
+      const cwd = await makeProject(dir);
       await writeFile(join(cwd, ".env.production.local"), "OLD=1\n", { mode: 0o644 });
 
       await add(cwd, "--force");
@@ -416,8 +428,10 @@ describe("env add", () => {
       expect((await stat(join(cwd, ".env.production.local"))).mode & 0o777).toBe(0o600);
     });
 
-    it("refuses a --server that is not an http(s) URL, before creating anything", async () => {
-      const cwd = await makeProject();
+    it("refuses a --server that is not an http(s) URL, before creating anything", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir);
 
       const result = await runCliForTest([
         "env",
@@ -435,8 +449,8 @@ describe("env add", () => {
       expect(created).toEqual([]);
     });
 
-    it("is left alone, and no project created, when it already exists", async () => {
-      const cwd = await makeProject();
+    it("is left alone, and no project created, when it already exists", async ({ dir }) => {
+      const cwd = await makeProject(dir);
       await writeFile(join(cwd, ".env.production.local"), "OLD=1\n");
 
       const { envelope } = await add(cwd);
@@ -446,7 +460,7 @@ describe("env add", () => {
       expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toBe("OLD=1\n");
     });
 
-    it("names the twin each framework reads the project id under", async () => {
+    it("names the twin each framework reads the project id under", async ({ dir }) => {
       const twins: Record<string, string | undefined> = {
         next: "NEXT_PUBLIC_ZITADEL_PROJECT_ID",
         nuxt: "NUXT_PUBLIC_ZITADEL_PROJECT_ID",
@@ -458,7 +472,7 @@ describe("env add", () => {
         angular: undefined,
       };
       for (const [framework, twin] of Object.entries(twins)) {
-        const cwd = await makeProject(framework);
+        const cwd = await makeProject(join(dir, framework), framework);
 
         await add(cwd);
 
@@ -470,8 +484,8 @@ describe("env add", () => {
       }
     });
 
-    it("binds an existing project without inventing its credentials", async () => {
-      const cwd = await makeProject();
+    it("binds an existing project without inventing its credentials", async ({ dir }) => {
+      const cwd = await makeProject(dir);
 
       await add(cwd, "--project", "proj_existing");
 
@@ -486,8 +500,8 @@ describe("env add", () => {
       expect(created).toEqual([]);
     });
 
-    it("records the normalized --app-url as ZITADEL_ISSUER", async () => {
-      const cwd = await makeProject();
+    it("records the normalized --app-url as ZITADEL_ISSUER", async ({ dir }) => {
+      const cwd = await makeProject(dir);
 
       await add(cwd, "--app-url", `${PRIMARY_ORIGIN}/some/path`);
 
@@ -498,16 +512,18 @@ describe("env add", () => {
   });
 
   describe("the project it creates", () => {
-    it("is named after the directory and the environment, without seeded defaults", async () => {
-      const cwd = await makeProject();
+    it("is named after the directory and the environment, without seeded defaults", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir);
 
       await add(cwd);
 
       expect(created).toEqual([{ name: `${basename(cwd)}-production`, seed_defaults: false }]);
     });
 
-    it("registers the app's own URL as a primary origin", async () => {
-      const cwd = await makeProject();
+    it("registers the app's own URL as a primary origin", async ({ dir }) => {
+      const cwd = await makeProject(dir);
 
       await add(cwd, "--app-url", `${PRIMARY_ORIGIN}/some/path`);
 
@@ -518,7 +534,7 @@ describe("env add", () => {
   });
 
   describe("the variables it prints for the platform", () => {
-    it.each([
+    it.for([
       [
         "next",
         [
@@ -577,8 +593,8 @@ describe("env add", () => {
       ],
     ] as Array<[string, string[], string[]]>)(
       "lists, for %s, the production and preview scopes",
-      async (framework, production, preview) => {
-        const cwd = await makeProject(framework);
+      async ([framework, production, preview], { dir }) => {
+        const cwd = await makeProject(join(dir, framework), framework);
 
         const { envelope } = await add(cwd);
 
@@ -587,9 +603,11 @@ describe("env add", () => {
       },
     );
 
-    it("lists the same three variables for the pipeline whatever the framework", async () => {
+    it("lists the same three variables for the pipeline whatever the framework", async ({
+      dir,
+    }) => {
       for (const framework of ["next", "react", "angular"]) {
-        const cwd = await makeProject(framework);
+        const cwd = await makeProject(join(dir, framework), framework);
 
         const { envelope } = await add(cwd);
 
@@ -601,8 +619,10 @@ describe("env add", () => {
       }
     });
 
-    it("marks the project secret and the preview token as secrets and gives no value for them", async () => {
-      const cwd = await makeProject("next");
+    it("marks the project secret and the preview token as secrets and gives no value for them", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope, result } = await add(cwd);
 
@@ -621,8 +641,8 @@ describe("env add", () => {
       expect(result.stdout).not.toContain("pk_new_preview");
     });
 
-    it("gives the app URL as the issuer, as an origin", async () => {
-      const cwd = await makeProject("next");
+    it("gives the app URL as the issuer, as an origin", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd, "--app-url", `${PRIMARY_ORIGIN}/login`);
 
@@ -631,8 +651,8 @@ describe("env add", () => {
       ).toBe(PRIMARY_ORIGIN);
     });
 
-    it("leaves the issuer a placeholder when no app URL was given", async () => {
-      const cwd = await makeProject("next");
+    it("leaves the issuer a placeholder when no app URL was given", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd);
 
@@ -641,8 +661,8 @@ describe("env add", () => {
       ).toMatch(/^</);
     });
 
-    it("refuses an app URL that is not an http(s) URL", async () => {
-      const cwd = await makeProject("next");
+    it("refuses an app URL that is not an http(s) URL", async ({ dir }) => {
+      const cwd = await makeProject(dir, "next");
 
       const { envelope } = await add(cwd, "--app-url", "ftp://app.acme.com");
 
@@ -650,8 +670,10 @@ describe("env add", () => {
       expect(created).toEqual([]);
     });
 
-    it("does not tell the user to copy a secret from a file that never received one", async () => {
-      const cwd = await makeProject("next");
+    it("does not tell the user to copy a secret from a file that never received one", async ({
+      dir,
+    }) => {
+      const cwd = await makeProject(dir, "next");
 
       const result = await runCliForTest([
         "env",
@@ -673,8 +695,8 @@ describe("env add", () => {
   });
 
   describe("the name", () => {
-    it("must be usable in a file name", async () => {
-      const cwd = await makeProject();
+    it("must be usable in a file name", async ({ dir }) => {
+      const cwd = await makeProject(dir);
 
       const result = await runCliForTest([
         "env",
@@ -700,8 +722,8 @@ describe("env add", () => {
  */
 describe("env add asked on a terminal", () => {
   /** A project holding resources that validate, so a deploy can be built from it. */
-  async function makeDeployableProject(): Promise<string> {
-    const cwd = await makeProject("next");
+  async function makeDeployableProject(dir: string): Promise<string> {
+    const cwd = await makeProject(dir, "next");
     const defaults = join(
       dirname(fileURLToPath(import.meta.url)),
       "../../../../../../../../packages/config/defaults",
@@ -730,10 +752,7 @@ describe("env add asked on a terminal", () => {
         HttpResponse.json({ id: "rel_1", content_hash: "sha256:abc" }, { status: 201 }),
       ),
       http.post(`${SERVER}/api/v1/deployments`, () =>
-        HttpResponse.json(
-          { id: "dep_1", targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }] },
-          { status: 201 },
-        ),
+        HttpResponse.json({ id: "dep_1", targets: [{ origin: PRIMARY_ORIGIN }] }, { status: 201 }),
       ),
     );
   }
@@ -761,8 +780,8 @@ describe("env add asked on a terminal", () => {
     return { envelope: result, shown: talk.plain(), asked: talk.asked() };
   };
 
-  it("deploys the project when the offer is accepted", async ({ server }) => {
-    const cwd = await makeDeployableProject();
+  it("deploys the project when the offer is accepted", async ({ dir, server }) => {
+    const cwd = await makeDeployableProject(dir);
     platformDeploys(server);
 
     const { envelope, asked } = await adding(cwd, [true]);
@@ -775,8 +794,8 @@ describe("env add asked on a terminal", () => {
     expect(asked).toContain(OFFER);
   });
 
-  it("asks where the server and the app are, as questions", async () => {
-    const cwd = await makeDeployableProject();
+  it("asks where the server and the app are, as questions", async ({ dir }) => {
+    const cwd = await makeDeployableProject(dir);
     const talk = personAnswering(SERVER, "");
 
     await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd], cliPackageRoot));
@@ -787,16 +806,16 @@ describe("env add asked on a terminal", () => {
     ]);
   });
 
-  it("deploys nothing when the offer is declined", async () => {
-    const cwd = await makeDeployableProject();
+  it("deploys nothing when the offer is declined", async ({ dir }) => {
+    const cwd = await makeDeployableProject(dir);
 
     const { envelope } = await adding(cwd, [false]);
 
     expect((envelope as { data: { deployment: unknown } }).data.deployment).toBeNull();
   });
 
-  it("still names the deploy after the offer is declined", async () => {
-    const cwd = await makeDeployableProject();
+  it("still names the deploy after the offer is declined", async ({ dir }) => {
+    const cwd = await makeDeployableProject(dir);
 
     const { envelope } = await adding(cwd, [false]);
 
@@ -807,8 +826,8 @@ describe("env add asked on a terminal", () => {
     ).toBe(true);
   });
 
-  it("binds the environment even when the deploy fails", async ({ server }) => {
-    const cwd = await makeDeployableProject();
+  it("binds the environment even when the deploy fails", async ({ dir, server }) => {
+    const cwd = await makeDeployableProject(dir);
     platformRefusesTheRelease(server);
 
     const { envelope } = await adding(cwd, [true]);
@@ -817,8 +836,8 @@ describe("env add asked on a terminal", () => {
     expect((envelope as { data: { deployment: unknown } }).data.deployment).toBeNull();
   });
 
-  it("warns, naming the deploy to re-run, when the deploy fails", async ({ server }) => {
-    const cwd = await makeDeployableProject();
+  it("warns, naming the deploy to re-run, when the deploy fails", async ({ dir, server }) => {
+    const cwd = await makeDeployableProject(dir);
     platformRefusesTheRelease(server);
 
     const { envelope } = await adding(cwd, [true]);
@@ -826,16 +845,16 @@ describe("env add asked on a terminal", () => {
     expect((envelope as { warnings: string[] }).warnings.join("\n")).toContain("deploy --message");
   });
 
-  it("never asks for a project it only bound", async () => {
-    const cwd = await makeDeployableProject();
+  it("never asks for a project it only bound", async ({ dir }) => {
+    const cwd = await makeDeployableProject(dir);
 
     const { asked } = await adding(cwd, [], "--project", "proj_existing");
 
     expect(asked).not.toContain(OFFER);
   });
 
-  it("never asks when the environment has no origin for a deploy to land on", async () => {
-    const cwd = await makeDeployableProject();
+  it("never asks when the environment has no origin for a deploy to land on", async ({ dir }) => {
+    const cwd = await makeDeployableProject(dir);
 
     const talk = personAnswering("");
 
@@ -846,8 +865,8 @@ describe("env add asked on a terminal", () => {
     expect(talk.asked()).not.toContain(OFFER);
   });
 
-  it("ends on one footer saying which project it created, and on which server", async () => {
-    const cwd = await makeDeployableProject();
+  it("ends on one footer saying which project it created, and on which server", async ({ dir }) => {
+    const cwd = await makeDeployableProject(dir);
 
     const { shown } = await adding(cwd, [false]);
 

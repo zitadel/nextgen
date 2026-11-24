@@ -1,4 +1,4 @@
-import type { BoxAction } from "@/lib/box";
+import type { BoxAction } from "./box";
 import { Facts } from "@/lib/ui/layout";
 
 /**
@@ -87,6 +87,6 @@ export const textOf = (summary: Summary): string => {
   return [
     summary.title,
     ...(summary.sections.length === 0 ? [] : ["", new Facts(summary.sections).render()]),
-    ...(summary.lines === undefined ? [] : ["", ...summary.lines]),
+    ...(summary.lines === undefined || summary.lines.length === 0 ? [] : ["", ...summary.lines]),
   ].join("\n");
 };

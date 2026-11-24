@@ -1,11 +1,12 @@
 import { createZitadelClient, IdpService } from "@/lib/backend";
+import { ZitadelRuntime } from "@/lib/server";
 import { isCancellation } from "@/lib/errors";
-import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
 import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
 
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
+import { Project } from "@/lib/project";
 
 /**
  * What one read of the configuration found.
@@ -46,7 +47,10 @@ export class SchemaCheck extends AbstractSanityCheck {
    * `.zitadel/schemas/` is a warning, not a failure: projects created before
    * editable config existed were seeded server-side and have no local schema
    * files, and there is no safe auto-fix that could invent them. A warning
-   * the rules raise is reported the same way.
+   * the rules raise is reported the same way, and one that cannot be read
+   * fails the way every check does. A project with no schema files only
+   * warns, however its other files read, as it did before the rules were one
+   * pass.
    *
    * @param ctx - The project to check.
    * @returns The outcome: a failure, a warning, or a pass.
@@ -57,11 +61,8 @@ export class SchemaCheck extends AbstractSanityCheck {
         return undefined;
       });
       if (found === undefined) {
-        // A file that cannot be read fails the way every check does.
         return await super.run(ctx);
       }
-      // A project with no schema files only warns, however its other files
-      // read, as it did before the rules were one pass.
       const brokenSchemas = found.config.broken.filter((file) => {
         return file.kind === "schema";
       });
@@ -185,15 +186,15 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   private async deployedConnections(ctx: CheckContext): Promise<ReadonlySet<string> | undefined> {
     try {
-      const secret = await readZitadelSecret(ctx.cwd);
-      const server = readProjectServer(await readZitadelConfig(ctx.cwd));
+      const secret = await Project.at(ctx.cwd).secret();
+      const server = (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
       const client = createZitadelClient({
-        userAgent: userAgent(),
+        userAgent: Runtime.current().userAgent(),
         baseUrl: server,
-        token: secret.project_secret,
+        token: secret.data.project_secret,
         signal: ctx.signal,
       });
-      return await new IdpService(client, secret.project_id).deployedSlugs();
+      return await new IdpService(client, secret.data.project_id).deployedSlugs();
     } catch (error) {
       if (isCancellation(error)) {
         throw error;

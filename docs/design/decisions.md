@@ -1,5 +1,8 @@
 # Design Decisions
 
+> [!NOTE]
+> The [Console UI pattern guides](console/ui-patterns/README.md) expand the reusable design targets recorded in D47 and D48 below. The guides are design specifications, not evidence of implementation; [Console styling](../../apps/console/docs/styling.md) remains the technical baseline until the implementation and documentation are reconciled. This decisions log remains active.
+
 ---
 
 ## Open questions
@@ -10,11 +13,222 @@
 - [x] **Projects in navigation** — main nav (key-resource consistency) vs. top context dropdown only. Depends on whether the API can list multiple projects (no API design yet); may be skipped for MVP since there's only one project. *(owner: Julia / eng)* → Resolved by D27: the account sidebar, with the top context dropdown and the logo.
 - [ ] **"Team" naming** — overloaded (customer-portal team vs. organization/tenant); consider "organization" or "tenant" instead. Note: a Teams API is already built. *(owner: team)*
 - [ ] **Project name scheme** — nature words (e.g. "River") vs. random words for generated project names. *(owner: Julia)*
+- [ ] **Environment lifecycle & default set** — `dev`, `staging`, and `prod` are currently seeded as a temporary implementation detail, not a required deployment pipeline. Define whether projects can start with one or multiple environments, custom names, and how create / rename / retire works. See #528 / #965. *(owner: product / eng)*
+- [ ] **When are environment-specific IDP credentials captured?** — the connection is environment-independent and credential values belong to the target environment, but it is still open whether the CLI asks for them during provider setup, after selecting an environment, or only when a deploy finds required values missing. This must also work when production credentials do not exist yet during initial setup. *(owner: CLI / eng / design)*
+- [ ] **Variables/secrets across deployments and rollback** — clarify whether environment values are snapshotted per deployment, what happens when a secret is rotated, and which values a rollback resolves. Also clarify whether snapshotting is purely backend behavior or affects the CLI model. *(owner: eng)*
+- [ ] **IDP delete semantics** — define what deleting an IDP connection means when it may be referenced by one or more user schemas / flows. Delete may be deferred from the first iteration until those semantics are defined. *(owner: product / eng)*
+- [ ] **Enterprise SSO naming & downstream configuration surface** — settle the product terminology (e.g. "Enterprise SSO" vs. another term) and the concrete downstream-admin surface: embeddable component/module, API, or both. Do not assume the ZITADEL Console is the required surface. *(owner: team)*
+- [ ] **Font loading for Zitadel-served login** — `font_url` property vs. a hosted font picker vs. custom CSS overrides; needs a CSP answer before it can be designed. *(owner: Max)*
+- [ ] **Relative vs. absolute asset paths** — a relative logo path typed into the console resolves against the customer's app, not the console; decide what we validate and how the field explains it. *(owner: Max)*
+- [ ] **Code ↔ console sync** — the CLI can publish but has no `fetch`/`pull`, so a console edit and a local `branding.json` can silently diverge. Blocks making branding editable (D75). *(owner: eng)*
+- [ ] **Environments & releases** — how a branding change travels deploy → environment → production, and what that means for the branding screen. Workshop being scheduled. *(owner: Vitor)*
+- [ ] **Named themes beyond light/dark** — the schema should later take e.g. a "navy" theme; not in this iteration, but the contract must not close the door. *(owner: Max)*
+- [ ] **Last-admin protection** — you can currently remove every admin, leaving the account without one. Tim says enforcing "can't delete the final role" is hard because roles are flexible; asked whether the API can block it temporarily so we don't build on a broken default. Design shows remove/revoke as if it were unrestricted until confirmed. Spec issue incoming. *(owner: eng / Tim)*
+- [x] **How invites are delivered** — three options on the table: (a) temp email service that creates the user and mails credentials + a reset-password service on first login, (b) an automation listening to the "user invited" event that triggers an invite mail, (c) show a generated password in the UI after inviting and let the inviter forward it manually. A fourth idea came up in the call: a shareable invite link (needs generation + expiry). No transactional email infrastructure exists today. Blocks the modal copy — "their sign-up link stops working" is only correct for the link option. *(owner: Sylvana / eng)* → Resolved: an invitation is a link the inviter shares (#2978).
+- [ ] **Console login: dogfooding & customization** — the console uses the same login we sell as a product (Alex and Olivia want exactly that), but the login-v2-in-cloud lesson applies: a shared login you can't customize means you can't change anything without changing it globally. Needs a customization story — "sooner rather than later", and it's not API-blocked. *(owner: Liam / Max)*
+- [x] **Display names, long-term** — the given name + family name → email → user ID fallback (D56) is a stopgap. A proper solution (e.g. a schema annotation marking the identifier/display attribute — existed once, was dropped as unused; machine accounts need a configurable display name) is needed everywhere users appear: teams, sessions, activity log ("an ID is useless when you're investigating"). Deliberately parked until the raw version is out and people react. *(owner: team)* → Resolved by ADR 058: a schema designates `x-display` and `x-identifier`.
+- [x] **Search as a global concept** — dropped from the MVP everywhere (D58); before it returns, define how search should behave console-wide (plain text filter vs. advanced criteria, inside the table vs. above it vs. the overarching search) instead of per-page one-offs. *(owner: Julia / team)* → Resolved by D32, D37 and D39.
+- [ ] **Appearance placement in navigation** — currently modelled as a top-level nav item. Counter-argument (Max): branding belongs to the login journey — you define flows, then style them — so it should sit with Login flows. Possible middle ground: a main-nav group holding Flows / Authentication / Appearance. Not decided; deliberately parked. *(owner: Julia / team)*
+- [ ] **Appearance: what's code-managed vs. client-side** — layout/template, logo and hero image URL look like server-side schema; colours, fonts and CSS look like client application. Needs clarifying before the read-only preview can claim to show "everything". *(owner: Julia / Vitor)*
+- [ ] **Layout options per template** — "basic layout options provided by the selected design" is undefined. Need a comprehensive list of what each of the five built-in layouts includes (e.g. logo placement). No issue describes them yet. *(owner: Julia / eng)*
+- [ ] **Editing branding in the console** — if config lives in code but is editable in the console, we need a sync story (a `sync` command was floated and immediately flagged as re-inventing git). Explicitly deferred: read-only first, revisit when we know whether users actually want to do it locally. *(future)*
+- [ ] **Light/dark switch in the login** — the dev-only toggle is still in; open whether it stays as a user-facing switch or follows the system setting. *(owner: Julia / Liam)*
+- [ ] **Login vs. console visual alignment** — whether to fully restyle the login flow to match the console (CTA height, labels, button styles differ today) or keep it slightly different for MVP. Parked; revisit once light/dark tokens land. *(owner: design / eng)*
+- [x] **Applications** — no owner identified and no backend mention yet. Design to ask around for who owns applications. *(owner: design)* → Resolved: applications are in the API and the console (#3214).
+- [ ] **Glossary + data model** — the team wants a vocabulary table (term → the real thing in the mechanic) plus an ER / data-model diagram, ideally generated from the DB once it's settled. Needed to keep the tenant/team/project terminology unambiguous. *(owner: eng / design)*
+- [ ] **User membership vs. roles** — when adding a user, which tenant(s)/project(s) they belong to and the role within each is still tangled (multi-select of teams/projects + per-context role). Revisit when building the add-user UI; not resolved by the tenant rename. *(owner: design / eng)*
 - [ ] **Later** — user-list filter to distinguish end-users from admin/account users. *(future)*
 
 ---
 
 ## Decisions
+
+### D92 · Enterprise SSO configuration must reach the customer's customer — 2026-09-09
+B2B / Enterprise SSO has a different configuration boundary from social login. The ZITADEL operator can configure or enable the capability, but a downstream customer's admin must be able to configure their own SAML/OIDC connection without using the ZITADEL CLI.
+
+That configuration surface belongs in the ZITADEL customer's product and may be provided through an embeddable component/module or API; it is not assumed to be the ZITADEL Console.
+
+→ Keep exact naming and delivery mechanism open.
+
+### D91 · CLI is command-driven, not workflow-driven — 2026-09-09 · [standing]
+The post-claim CLI should optimize for direct commands, good defaults, validation, developers, automation, and agents — not a state-machine / terminal UI that walks users through long end-to-end wizards.
+
+Users should be able to enter at the command relevant to their task. Interactive prompts can support individual commands but are not the primary architecture.
+
+→ Rework guided CLI journeys accordingly, including the current IDP setup concept.
+
+### D90 · Deployment review belongs inside deploy — 2026-09-09
+Do not expose "Review deployment" as a separate action.
+
+The user chooses Deploy; the relevant changes / diff are shown as part of that operation before confirmation.
+
+This keeps reviewing attached to the action that will actually make the configuration live and aligns with the removal of a separate `plan` step.
+
+### D89 · One deployment workflow; no separate promotion flow for MVP — 2026-09-09
+Deploying an existing release onto another environment is the same underlying deployment operation as deploying it anywhere else.
+
+For MVP, do not introduce a separate user-facing promotion workflow. The user selects the release, selects the target environment, reviews the change, and deploys it.
+
+A dedicated `promote` helper may be reconsidered later if actual usage shows that it adds value.
+
+→ Align the CLI direction in ADR 035 and #539 with this decision. The underlying release / environment / deployment architecture remains unchanged.
+
+### D88 · Environment order is not enforced — 2026-09-09 · [standing]
+Do not require a fixed `dev → staging → prod` progression.
+
+A deployment explicitly targets an environment; users may deploy directly to whichever environment they need.
+
+The currently seeded `dev`, `staging`, and `prod` environments are temporary implementation scaffolding, not a mandatory product workflow.
+
+### D87 · IDP configuration is environment-independent; credential values are not — 2026-09-09 · [standing]
+An IDP connection is configuration that can travel unchanged with a release.
+
+Credential values required by that connection are resolved for the target environment rather than baked into the connection or release. Secret values are not stored in the connection configuration.
+
+For MVP, values do not need to be automatically copied between environments; requiring missing target-environment values again is acceptable.
+
+→ Exact credential-capture timing remains open.
+
+### D86 · IDP connections are reusable across user schemas — 2026-09-09
+An identity-provider connection is a centrally managed configuration object, not configuration nested under one user schema.
+
+The same connection can be enabled for multiple user schemas / authentication flows and should be reused rather than duplicated per schema.
+
+Users may conceptually approach configuration from either the user-schema side or the provider side; both operate on the same underlying connection.
+
+### D85 · Branding customization targets the login widget, not the page — 2026-09-02 · [standing]
+Everything in the branding scope applies to `<zitadel-login>` — the card, its fields, buttons and type. The page around it (split screen, hero, marketing copy) belongs to the customer in the embedded model and to page templates/chrome in the Zitadel-served model. Two different products; don't mix their knobs into one settings screen.
+
+### D84 · Ship the whole branding property set at once — 2026-09-02
+Drop the idea of staging the API by customization level (the L1 / L2 / full-control tiering). The design system and palette already exist, so a "basic subset" API saves no implementation time — and every property we hold back is a future contract conflict. Ship the full object from #1046, designed for extensibility (named themes, per-element shape), and let the console expose a subset. *(Max)*
+→ Max adds the follow-ups to #1046 and marks it ready to implement; Vitor reviews before the API work starts.
+
+### D83 · Basic vs. advanced is a console grouping, not a permission or API split — 2026-09-02
+Anyone allowed to edit branding may edit every property — no restricted tier. The console instead hides the secondary palette (surface, muted, border, link, success/warning/error) behind collapsibles/an advanced mode, grouped by where the colors are actually used and with a short description each. Success/warning/error get a hint that leaving the defaults means leaving the accessible path.
+
+### D82 · Basic is a subset, not combined inputs — 2026-09-02
+The basic view shows the real properties (primary color, logo per mode, body font, radius), just fewer of them. Anything hidden stays at its maintained default — no derived or bundled inputs behind a single control. A primary color on the default background has to look fine on its own.
+
+### D81 · Theme mode decides which palette sections the console shows — 2026-09-02
+`theme.mode` isn't only a preview toggle: light-only hides the dark palette, dark-only hides the light one, auto/system shows both. Today's screen always shows both, which is how customers ended up tuning dark values into the light theme and shipping black text on a dark surface.
+
+### D80 · The console warns on contrast, it doesn't block — 2026-09-02
+We own the design system and know which token lands on which surface, so the console can compute the contrast for each pair and flag the ones that fail. Show a warning next to the offending value ("you're using the light theme with a dark background") — no hard validation, no auto-correction.
+
+### D79 · No asset uploads — logos and images are strings — 2026-09-02 · [standing]
+`logo_url` and any later image property take a path or URL that the customer hosts, following Auth0. Avoids blob upload APIs, size limits, format rules and SVG script injection — and the embedded widget only ever applies the string anyway. The console therefore shows the path, not a thumbnail.
+
+### D78 · Font family is a name; the customer loads the font — 2026-09-02
+`typography.font_family` is a free-text input (not a dropdown of hosted fonts). The widget renders inside the customer's application, so the font is already loaded there and their CSP governs it — we only say which family the headings and body use. No font hosting and no `font_url` for embedded login in this iteration.
+
+### D77 · No branding preview in the console (embedded login) — 2026-09-02
+The console can't render a truthful preview: it doesn't have the customer's fonts, relative asset paths resolve against their app, and local code overrides always win. Editing loop is: change the value in the console, reload your own login route — the widget pulls the config from the API. Preview becomes a real question once Zitadel-served login exists.
+
+### D76 · Page background stays out of branding — 2026-09-02
+Repeated Auth0/login-v2 request, but in the embedded model we don't own the page background. What customers actually want to restyle is the card, which is `surface`. Background belongs to the page templates/chrome and is authored in Liquid.
+
+### D75 · Branding ships read-only in the console — 2026-09-02
+Same posture as schemas and flows (D0b): code is the source of truth, the console displays. Editable branding needs the revision/deploy lifecycle and a CLI `fetch`/`pull` — without them, editing in both places drifts and there's no answer for out-of-sync. Design the full editable screen now and ship it with the controls disabled, so it can be switched on as soon as revisions land. *(Vitor)*
+→ Vitor schedules the environments & releases workshop (Fri or next week) so design knows the lifecycle.
+
+### D74 · Accessibility is guaranteed for default templates only — 2026-08-19 · [standing]
+We render our own accessible components and ensure the default templates work — that's what we guarantee (aim: WCAG AA, the level Okta/Auth0 commit to; nobody guarantees AAA). The moment a customer overrides a template with custom markup, the appearance variables no longer apply and accessibility is theirs. Must be stated in the docs and API docs. Two follow-ups: a contrast warning in Appearance (the only thing users can really break is text-on-background contrast, in light *and* dark mode), and a Lighthouse accessibility check in CI so a regression fails the build.
+→ Julia specs the contrast warning; eng evaluates Lighthouse in CI.
+
+### D73 · Appearance gets a JSON/YAML view — 2026-08-19
+Appearance is configuration and comes out of the API as a schema, so show the raw output the same way flows do. Customers replacing the default template need to know what the API gives them. Reuse the existing JSON/YAML toggle component.
+
+### D72 · Five built-in login layouts — 2026-08-19
+The layouts a user can pick while scaffolding: centered, minimal, split, split reverse, hero. They already render in the CLI-scaffolded login (Flo built them, Liam updated them for the new login — it's purely how the divs are aligned; the form components are the current designed ones). The shadcn library already covers most of these in Figma; the hero layout is the gap. The existing hero variant needs redesigning — the image should be a full background/section, not a picture placed behind a headline.
+→ Julia designs hero + updates the layout variants; Liam walks through the running versions.
+
+### D71 · Appearance is read-only for Alpha — 2026-08-19 · [standing]
+The Appearance section previews what's set in code: layout, colours & typography, logo / hero / background imagery, text content (headings, descriptions, button labels), and the layout options of the chosen design. Switchable across sign-up, password login, passkey login, passkey registration and the validation/error states, with a light/dark toggle and a rendered preview plus code. Branding is the rare case where a visual representation in the console genuinely earns its place — but editing comes later, once we know how console-vs-code editing should work at all. Language: English only for now; custom languages stay client-side.
+
+### D70 · Schema list stays as it is — 2026-08-19 · [superseded by D17]
+Question raised: now that users, projects and teams all use the same table, should the schema list become a table too (name, fields, authentication, created) instead of the directory/card view? Decision: no, not now. It's already built, and we shouldn't iterate on something we haven't released — ship the first iteration, then ask users whether the different representation bothers them. Revisits, but does not overturn, D0a.
+
+### D69 · Metadata block on every detail view — 2026-08-19 · [standing]
+The flow detail carries flow ID + created + last changed as meta items; add the same block to the schema detail. Detail pages should share interface rules, interaction patterns and information positions regardless of resource.
+
+### D68 · Flow steps show actions, not just fields — 2026-08-19
+The steps table lists fields *and* actions, showing each action's kind or name (e.g. `submit`, `passkey`). Rationale (Max): you open a flow to answer "is my flow correct?" — a table that only shows fields forces you to read the table *and* scroll the JSON. Most actions are navigation (`submit` on every step, so it reads repetitive), but passkey triggers matter and omitting them makes the table a misleading interpretation of the flow.
+→ Julia adds actions to the steps table; Vitor shared an example of the action kinds in chat.
+
+### D67 · Flows list is a table — 2026-08-19
+Flows follow the users/sessions/teams table pattern rather than the drill-down card view. Columns: name, purpose, connected user schema, last changed. Last changed, not created date — more relevant to the user. Purpose and user schema still have to be exposed on the API (the contract currently has name and status only) — small change, likely a quick win. The detail keeps steps, code block and metadata, and states the connected user schema as a link straight through to that schema. Card-style drill-down broke down here: those fields are too hard to read in that form. Future iteration: a static diagram of the step connections next to the flow.
+
+### D66 · Toasts are the standard notification pattern — 2026-08-19 · [standing]
+Sonner toasts for invite sent, invite revoked, invite resent, member removed and "you left <team>" — and for creating/adding anything else. They stack and dismiss themselves after a set time. Confirmation modals stay for the destructive actions (remove, revoke); resending needs no confirmation.
+
+### D65 · Admin list actions: remove, revoke, resend — 2026-08-19
+Resend invite is in, even though the issue scoped it out: without it, a lost invitation forces you to delete and re-invite. Remove shows a confirm modal — "they immediately lose access to this team's project, their user account isn't deleted, and their other team memberships aren't affected" — slightly verbose, but unambiguous. Revoke tells the user the invitation stops working; exact wording depends on the invite mechanism (open question above).
+
+### D64 · One role for now: project admin — 2026-08-19
+Claiming makes you project admin; anyone you invite is also project admin. The owner/admin split comes out of the members table for now, along with the "a team needs at least one owner" rule — that idea is kept for later (two roles make the last-admin problem solvable by requiring an owner). Doesn't solve the last-admin problem in the meantime; see open questions.
+
+### D63 · Settings is its own area: account vs. workspace — 2026-08-12 · re-confirmed 2026-08-19 · [amended by D29 and D40]
+Settings opens from the user popover at the bottom of the sidebar and swaps in a dedicated settings navigation with a way back to the app — the Vercel/Linear pattern — reserving room for the many settings items still to come. Two sections from the start: account/personal (profile) and workspace (members/admins; teams later). Settings pages run narrower than portal pages so input fields align — these pages are for changing values, not displaying them.
+
+### D62 · Profile settings show email only — 2026-08-12 · re-confirmed 2026-08-19 · [superseded by D16]
+Claiming asks for nothing but an email address, so there is no first/last name to edit — and the email can't be changed either, so even that field is read-only. The emptiest interface we've shipped. No delete-account or leave-team actions yet, and no user-schema fields pulled in. Revisit once SSO can supply profile data, or when billing needs more (name, billing address) from cloud customers.
+
+### D61 · Invitations hold only an email — 2026-08-12
+An invitation is not a user: there's no schema behind it, just the email address needed to send it; the user object is created only when the invite is accepted (via claiming). So the invite modal asks for the email only, and pending rows are essentially email rows. Later, internal invitations can become schema-based (an internal/team schema deciding what to collect). Copy: members are removed "from this project" — not "organization".
+
+### D60 · Session detail: minimal, one view — 2026-08-12
+Cut the rich metadata down to what answers "it works, this is the user, this is how they authenticated": authentication factors with their Verified timestamps, plus IP address and user agent (network *and* device). Everything else waits for real demand — this page isn't threat-hunting yet. User information reuses the user-detail component rendered read-only (all schema attributes are fetchable from the session). No tabs or toggles — bare information in one view. The page title follows the display-name logic (D56). Wording: keep "Verified" (= when that factor was entered during authentication); "logged in" would wrongly imply the whole authentication completed even when an MFA step follows. Revisit if users stumble over it.
+
+### D59 · Revoked sessions leave the list — 2026-08-12
+Revoke stays as the session action; a revoked session disappears from the list rather than lingering with a revoked state — the audit log is where you find it afterwards. Revoking needs a confirm modal: the session is terminated immediately and the user has to authenticate again to start a new one.
+
+### D58 · No search anywhere in the MVP — 2026-08-12 · [superseded by D32]
+Drop the search field console-wide, not just per page: at test scale there's a handful of users and sessions, the current field is static anyway, and search deserves a global concept before it returns (see open question). Extends D5's no-filter/no-sort stance.
+
+### D57 · Session list: name, email, user ID — 2026-08-12
+Sessions don't render schema columns (that's the user list): the API returns name and email, matched best-effort by property name on the backend — fragile, acceptable. Name combines given + family name into one field. Company column removed — a session listing is not a user-schema listing. The user ID joins the table as identifying info at the front of the row: it correlates sessions of the same user even when name matching comes up empty (machine users).
+
+### D56 · Display name: given + family name → email → user ID — 2026-08-12 · [superseded by ADR 058's `x-display`]
+Already merged: the front end derives a display name from given/family name if present, falls back to email, then to user ID — the same logic everywhere a user is titled (user detail, session detail). Good enough for now; machine accounts will mostly end at the ID. The real solution — an identifier/display-name annotation in the schema — is a parked open question.
+
+### D55 · User list ships as the raw merged table — 2026-08-12 · [superseded by D23]
+With multiple schemas, the list shows every column of every schema in one table; users without a property get a dash, horizontal scroll takes the width (per D4/D5). Explicitly ship the "mumbo jumbo" and let people react, rather than pre-solving the five possible display fixes now — claiming is close, the dynamic columns are already built (twice), and unreleased work shouldn't grow scope. Column order arrives random from the backend (unordered map); the front end sorts alphabetically as a stopgap, proper (schema-defined) ordering needs its ticket.
+
+### D54 · Login UI: pure CSS on own tokens, not shadcn/ui — 2026-08-05 · [standing]
+The login app has to run inside many different frameworks and is built as web/lit components, so it can't use the shadcn/ui React library or Tailwind. Rebuild it with pure CSS that maps the design tokens to our own CSS classes (the original "legacy" / `zl-`-prefixed token approach), not shadcn or Tailwind classes. Reuse the same token styles for visual consistency, but add a prominent note in Figma and in code: *"don't use shadcn — the CSS is done manually."* There is no light theme in these variables today. → Design provides light + dark mode values and applies them to the correct color tokens; whether to fully align the login look with the console is a separate open question.
+
+### D53 · Schema nested attributes show the whole schema — 2026-08-05
+Clicking a nested attribute (e.g. `address`) does not drill into a partial view or scroll to just that attribute — always display the full schema, because a schema is applied as a whole. Refines D14. Schemas stay view-only / apply-locally (D0b).
+
+### D52 · Tenant list & detail (renamed from teams) — 2026-08-05 · [not carried out: the console and the API still say "team"]
+Tenants reuse the user-list pattern: name, status, creation date; searchable; toggle by active/inactive status; "add tenant" opens the right-side drawer (D15) and lands back on the list with a success toast. The three-dot context menu is minimal for now — "view resource" only (delete, turnkey, and other sub-actions come later, consistently everywhere). Tenant detail: tenant name (editable), tenant ID (renamed from "team ID"), primary domain, creation date. Generate an identicon-style icon for tenants (à la GitHub / Vercel) rather than picking a fixed org glyph.
+
+### D51 · Projects: drop "owning team"; claiming ≠ new tenant — 2026-08-05
+Confirms D11's "no owning-team label": ownership is implicit (single context, one visible team), so the field is removed and not editable. Keep the (now lighter) info box — more fields will come later. Project detail keeps project ID, issuer URL, created date, and an editable project name. Claiming another project via onboarding adds that project to your account/team; it does **not** create a new tenant — a tenant belongs to a project. MVP: multiple tenants are possible, but only one project.
+
+### D50 · Term / data model: project = instance, tenant = organization, team = account — 2026-08-05 · [not carried out: the console and the API still say "team"]
+Same backend JSON model as today — only the words change. Hierarchy: a project (the instance, e.g. "River") contains one or more tenants (organizations, e.g. "Acme"); the account "team" (the Zitadel cloud account, shown bottom-left, holding account users / billing) sits above. "Multi-tenancy" = a project is multi-tenant-capable; tenants live within a project. → The team wants a glossary (term → real mechanic) and an ER / data-model diagram generated from the DB once it's settled (see open questions).
+
+### D49 · Naming: "tenant" for the organization; "team" reserved for the account side — 2026-08-05 · [not carried out: the console and the API still say "team"]
+Resolves the parked "Team" naming question. The organization concept (the multi-tenant org living inside a project) is now called **tenant** everywhere in the UI — "organization" was the alternative, but "tenant" matches how we sell it (multi-tenancy) and how customers already think. "Team" stays reserved for the account / cloud-account side (account users: owner, admin, billing), shown bottom-left. Renaming teams → tenants in the UI does not touch the underlying model, only the labels (tenant ID, add tenant, etc.). Going with it now per the "if you're opinionated, ship it and we can change it later" guidance; will still surface it as a Slack mention/poll, but proceeding so MVP work isn't blocked. → Design updates the UI and this MD; flag if a root problem surfaces.
+
+### D47 · Reusable Console UI polishing patterns — 2026-11-23 · [standing]
+The seven [UI-01–UI-07 guides](console/ui-patterns/README.md) are the approved reusable design targets and verification criteria for Console polishing. They do not change code or supersede valid product, routing, accessibility or backend contracts. `apps/console/docs/styling.md` remains the description of current technical implementation; an implementation PR must reconcile changed components and that baseline together.
+
+The approved differences from the current technical baseline are: **44px** resource-list headers with `muted-foreground` labels for comfortable density (preserving **56px** body rows and existing **40px** compact lists); resource-name and secondary-reference links without hover underline (secondary references change from muted to foreground on hover); **vertical** row-menu ellipsis; and **12px monospace** resource identifiers where applicable, retaining the existing layout-aware middle truncation and full-value Copy. Preserve table widths, pinned columns, native link behavior and focus affordances. Do not apply resource-list header changes to panel-table heads or compact Events.
+
+The guides also record shared targets for real-route row navigation; actionable `+N` overflow; externally directed link indications; consistent page title → optional truthful metadata → content; field-semantic date/time formatting and the existing 24-hour relative rule; existing Card/Badge semantics; first-use versus filtered-empty feedback; contextual success/error/loading behavior; optional-field markers, blur/submit validation and useful helper placement; **FormSheet for Create**, while existing detail-page edits remain inline unless separately decided; and explicit destructive confirmations. These are reusable patterns, not authorization to redesign screen-specific columns, navigation, permissions, API states or page widths. Existing relevant D-decisions (including D5, D13, D15, D19, D27, D35, D40 and D41) still apply. Users-specific changes are D48.
+
+### D48 · Users table exposes Columns and uses schema-resolved identity — 2026-11-23 · [standing]
+Amends **only** D23's right-click-only Columns affordance and its mandatory identifier-property chip. The Users table exposes a visible text-labelled **Columns** control at the right of its table toolbar, while existing optional-property pinning remains available; the reviewed primary identity is the server-resolved `x-display` name with the designated `x-identifier` beneath (ID as fallback; ADR 058 §3a), without redundant property-type chips. The existing **ID column** remains independent of the user's identifier property. Preserve D23's column-width and horizontal-scroll rules, pinned properties, Attributes popover, sticky row action and the relevant identity card. This is a design target; implementation PRs, including any already open Users-table work, must align with it separately.
+
+### D46 · Events' rows lead with the time, and an open event stands beside the list — 2026-11-13
+Amends D30 and D45. A pass on the team's comments, measured against Vercel's Logs, which Events follows (D30). Supabase's log explorer was the other reference raised; its filters stand in a second column beside the navigation, and Events keeps its one sidebar that swaps to its own list, as Vercel's does.
+Vercel's rows lead with the time (`NOV 13 11:23:29.02`), go on with the short columns and end in the free text, and its panel opens under the toolbar and over the tail of the rows, so no control and no leading column is hidden. Events' drawer is a sheet, full height and 520px wide, and its rows ended in the time: at 1440px an open event hid the Actor and Time columns, the row menus, Live, Refresh and Export and two fifths of the search field, whose suggestions opened as wide as the field and so across the drawer.
+Rows now lead with Time: the day, then the clock time to the millisecond. The year is written only for a day older than eleven months; the whole moment is on hover and in the drawer. The API requests view has the request's own columns, as Vercel's Request Logs have: method and operation, status, duration and actor, in place of an Event column that read `request.api` on every row. From `xl` (1280px), where the two fit side by side, the list's page ends a gutter before the drawer (`Page`'s `besideSheet`), and the table scrolls in its card with the time and the type in view. Narrower, the drawer still covers the list's right, and the search's suggestions end where the drawer starts.
+The drawer's body follows the form sheets (D15, the Deploy release sheet): its parts 16px either side of a rule, under the sheets' 14/20 heading in place of a page card's 16/20. An empty list under a user, operation or status filter says that events recorded before the server had the filter are not matched (root ADR 048 leaves them unfilled), since an event of that age still offers the filter. A filter's prefix typed without its value (`actor:`) is no longer read as an ID.
+The sidebar's filters are groups, as Vercel's are: a filter's name folds its control away, and folded over a value it says how many are set. A filter of a few values shows them all as checkboxes, any number ticked and none meaning every one: the categories, a request's status classes with what each means, and how a sign-in ended. So Category and Outcome take several values, as Status did, each one range of an index; a link with one value still reads. The time stays a list to choose from and the types, some fifty, a list to search. The Status list's "Only failed requests" row is gone: `4xx` and `5xx` are two boxes in sight.
+→ Not done, of what Vercel's Logs draws: the count beside a value (the API has none, D5), monospaced rows at 26px, the volume strip over the list, and a panel that leaves the top bar free.
 
 ### D45 · Events lists sign-ins, and tells a login flow as one — 2026-11-12
 Amends D30. One sign-in wrote about ten loose rows, which nothing in the list tied together, an actor that changed within it, and an abandoned attempt that looked like a real sign-in. Vercel groups by what its server already knows, never by the rows a page happens to hold: Logs chooses Runtime Logs or Request Logs ("logs grouped by request"), Traces chooses Spans or Traces, a selected unit opens its parts in a pane, and Group By exists only for metrics. Events follows it. A **Sign-ins** view joins the view picker: one row per sign-in, read as the events a sign-in ends in (`session.established` and the failure types), each one range of the type index, so pages fill and no sign-in is cut at a page's edge. A row says how it ended, whose account (by name) and its session; an Outcome filter replaces the category and the type there. A `session.established` without a user is an anonymous session the type index cannot tell apart, and says "Session opened". The drawer heads a login flow with what it came to ("Signed up with single sign-on", failed, abandoned or in progress, only when it holds the whole flow), its user, start and duration, and places each step on a track by its time since the first, as a trace's waterfall does. In the flat views, the open event's login flow (or else its request) is marked among the loaded rows, and an `auth.attempt.created` whose flow neither handed off, nor gave a session, nor was refused within an attempt's lifetime (15 minutes) reads Abandoned, under no filter but the view and a start of the time. The drawer calls a flow failed only once its attempt has expired; until then a refused step is still in progress. Users are named by what they are called now, read once per user; events keep IDs. Not done: the method and duration on a list row (the outcome event does not carry them), and one actor per sign-in, which is the server's actor rule (events-for-people decision 4).
@@ -50,7 +264,7 @@ Search lists the root's screens with what is above every project, reading Accoun
 → Design review of the root's sidebar, which is long for someone who administers the platform, and of Profile at `/account`.
 
 ### D41 · Configuration and resources share one detail layout — 2026-11-11 · [standing]
-Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks.
+Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks. The header is the title over one line of identity values, 16px apart, and the body starts 36px under it. Only resources (projects, teams, users, releases) lead the title with an icon tile. A user's email is the line's first value, unlabelled. A value with nothing behind it yet (a project's issuer, a team's primary domain, a user's last sign-in) is left out; the designs keep it for later. An identity provider keeps a link to its list above the title (amends D13): that list is a tab of Authentication, so the sidebar alone does not lead back to it.
 → Designs follow the shared layout.
 
 ### D40 · A project's Settings opens its own list, as the root Settings do — 2026-11-11 · [standing]
@@ -62,7 +276,7 @@ Amends D37, which with no project selected found only pages, projects and the ac
 → Searching every project from Projects and Settings while one is selected is a product call (2026-11-11) that may be reversed.
 
 ### D38 · The events screen is named Events — 2026-11-11
-Amends D30, which named the screen Logs for now, as in Vercel. Every other surface already says events: `GET /events`, `zitadel events list`, the route, the API reference and the event webhooks, which deliver these same events. And "logs" already names something else: `zitadel logs` prints the local server's output, and a self-hosted server writes logs of its own, which root ADR 048 keeps apart from events. The sidebar row, the list's heading and Overview's link now read Events; the views keep their names (Audit events, API requests, All), and nothing else about the screen changes.
+Amends D30, which named the screen Logs for now, as in Vercel. Every other surface already says events: `GET /events`, `zitadel event list`, the route, the API reference and the event webhooks, which deliver these same events. And "logs" already names something else: `zitadel logs` prints the local server's output, and a self-hosted server writes logs of its own, which root ADR 048 keeps apart from events. The sidebar row, the list's heading and Overview's link now read Events; the views keep their names (Audit events, API requests, All), and nothing else about the screen changes.
 
 ### D37 · Search ranks every kind in one list, and says where each is — 2026-11-10 · [standing]
 Amends D32, which grouped what the palette found by kind and named the selected project only in its pages' heading. Side by side with Vercel's Find: there one list of a handful of rows puts the best match first, the current project's before the team's (`Logs · cloud` above `Logs · zitadel`), and says beneath every row where it is. Ours put a page of the project and a project of that name in two groups (Branding, test-branding), named no project on a user's row, listed two projects of one name alike, and said "Nothing matches" without saying it had looked in one project, or in none. Once something is typed the palette is now one list of at most eight rows, ranked by how the name matches (whole, start, a word's start, inside), or the second line the server matched it on (a user's identifier), then the selected project's before what is above it, then pages, actions, users, teams, configuration, projects and the account; with no project selected its pages come after the projects, since one opens only once a project is chosen. Beneath each: the project, after a hit's own second line; a project's host or else its ID (D21); Settings for its pages and Account for the account's other rows; and "Choose a project" for a project's page while none is selected (D22). With nothing found it names the project it searched, or says one is needed, and until the server has answered it says "Searching…" instead. Before anything is typed it stays a menu in groups (D33), its Projects opening as the switcher does: the selected and recent ones, then the rest by name while one page holds them all, and past one page the first of them, so it never opens on none.
@@ -121,9 +335,9 @@ The sidebar is one project's screens, so Projects leaves it: the logo and the pr
 
 ### D23 · The Users table pins properties; the rest reads in one Attributes column — 2026-10-24
 Supersedes D4. Showing every schema property as a column made wide schemas scroll the table and pushed the row menu out of reach. By default the table shows User, Attributes, Status, Member of, ID and the row menu. Right-clicking the table (a long press on touch) opens a Columns menu that pins properties as columns, grouped by schema when the list mixes them; there is no toolbar button for it, and a right-click on a link keeps the browser's own menu; pins are per viewer, kept in the browser per project, schema and property. Every unpinned attribute reads in one fixed-width Attributes cell (`givenName: Maya · company: Acme · +3`) that opens the user's full attributes: a Fields tab first (the schema's labels, formatted values, each object inline one level deep and anything deeper opened in place, capped at 12 rows with a link to the user), then JSON and YAML. User schemas have no server limit on size or nesting, so the popover stays a quick look rather than growing with them. The row menu is sticky, so it is reachable at any width, and so is the User column from 640px (on a phone the two would leave no room between them).
-Identity: the identifier stays in the User cell (no Identifier column, D20), but always with its property as a chip (`email`, `username`) instead of a tooltip, since a list that mixes schemas signs people in with different properties. Hovering the user opens an identity card: schema, what they sign in with, display name, memberships, lifecycle owner and created date, with a line on what `x-identifier` and `x-display` decide. Chosen over bringing the Identifier column back, which repeats the identifier whenever a schema designates no display name.
+Identity: the identifier stays in the User cell (no Identifier column, D20), under the display name when there is one. Hovering the user opens an identity card: schema, what they sign in with, display name, memberships, lifecycle owner and created date. Chosen over bringing the Identifier column back, which repeats the identifier whenever a schema designates no display name. Amended (#2605): no chip names the identifier's property (`email`, `username`), in the cell or the card, and the card carries no line on what `x-identifier` and `x-display` decide: the card is about the user, and schema mechanics belong to the schema's documentation.
 Teams: the column is "Member of", since it lists memberships; a `pending` or `inactive` membership carries a tag. The team that owns a user's lifecycle is a different relation (ADR 024) and shows in the identity card, not the column.
-→ Design review of the Columns menu, the Attributes cell and its popover, the identifier chip and the identity card.
+→ Design review of the Columns menu, the Attributes cell and its popover, and the identity card.
 
 ### D22 · The sidebar lists every screen, and asks for a project when one is needed — 2026-10-23 · [standing]
 As in Vercel, the sidebar lists the project's screens before a project is selected, rather than Projects alone. Opening one without a selection goes to Projects first: the page is headed "Continue to Teams" (or whichever screen), that screen's entry is the one marked in the sidebar, and choosing a project goes on to it. Arriving at the console (`/`) with nothing selected lands on Projects itself, not on the way to Users, since it asked for no screen. Amends Console ADR 0001.
@@ -143,6 +357,8 @@ Every console surface (cards, tables, panels, dialogs, drawers, alerts, tab stri
 ### D17 · Every directory is a resource table — 2026-10-07 · [standing]
 User schemas and Login flows draw the same data table as Users, Teams and Projects: a name column with the resource icon, the resource's own columns, a date, and the row menu. The stacked card rows broke on narrow widths. Supersedes D7 and the schema half of D0a. The schema id leaves the list row for the detail header card, which matches Login flows (refines D10).
 
+Amended (#2733): the User schemas name column shows the name as text, without the resource icon.
+
 ### D16 · Profile is generated from the person's own schema; the identifier is read-only — 2026-09-30, amended 2026-10-16 · [standing]
 Claiming asks for nothing but an email address, and the identifier cannot be changed, so the schema's `x-identifier` (the email by default) is a disabled field. Amended: Profile is generated from the person's own user schema as Add user is — every property is a row; strings and numbers are editable and saved through `PATCH /users/me`, anything a text input cannot round-trip (a boolean) is read-only. The platform project's schema adds an optional `name` designated as `x-display`, so the people operating Zitadel can name themselves; the account menu offers it while none is set.
 
@@ -152,7 +368,7 @@ Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui 
 ### D14 · Schema attributes shown as a simple list — 2026-07-31
 On the schema detail, list the pre-populated attributes as a flat, scannable list — not an accordion or a left-nav list (schema setup will get complex, so keep the detail page roomy rather than nesting). If a schema's attribute list gets long, reuse the user-list pattern: search bar + horizontal scroll + "Load more." Rows open the detail on click (shadcn/ui list-item standard).
 
-### D13 · No back buttons or breadcrumbs (console-wide) — 2026-07-31 · [standing]
+### D13 · No back buttons or breadcrumbs (console-wide) — 2026-07-31 · [standing, amended by D41]
 Vercel-style navigation: no back button and no breadcrumbs anywhere in the console — you move back up via the left-side nav. (Login-flow equivalent is D9.)
 
 ### D12 · Brand colors applied — 2026-07-31 · [standing]

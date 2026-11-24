@@ -1,7 +1,7 @@
 import type {
-  GetReleaseById200,
-  GetReleaseById200PointersItem,
-  GetReleaseById200PointersItemKind,
+  GetRelease200,
+  GetRelease200PointersItem,
+  GetRelease200PointersItemKind,
   ListReleases200ReleasesItem,
 } from "@zitadel/api/generated/model";
 
@@ -19,12 +19,12 @@ import { type UserSchema, schemaDisplayName } from "@/features/schemas/model";
  */
 
 /** `GET /releases/{release_id}`. */
-export type Release = GetReleaseById200;
+export type Release = GetRelease200;
 
 /** One pinned revision. */
-export type ReleasePointer = GetReleaseById200PointersItem;
+export type ReleasePointer = GetRelease200PointersItem;
 
-export type ReleasePointerKind = GetReleaseById200PointersItemKind;
+export type ReleasePointerKind = GetRelease200PointersItemKind;
 
 /** The two states a release has: `revoked_at` is set or it is not. */
 export type ReleaseStatus = "active" | "revoked";
@@ -47,6 +47,7 @@ export const POINTER_KINDS: readonly {
   { kind: "branding", label: "Branding", noun: "branding" },
   { kind: "idp", label: "Identity providers", noun: "connection" },
   { kind: "policy", label: "Policies", noun: "policy" },
+  { kind: "oauth", label: "OAuth settings", noun: "settings" },
 ];
 
 /** A pointer with the revision it names read, or not. */
@@ -70,8 +71,8 @@ export interface ResolvedPointer {
  * still says which resource the pointer pins.
  *
  * Schema, identity provider and policy ids are unique per project only, so
- * those reads name the selected project; the flow and branding reads take the
- * revision id alone.
+ * those reads name the selected project; the flow, branding and OAuth settings
+ * reads take the revision id alone.
  */
 export async function resolvePointer(
   pointer: ReleasePointer,
@@ -81,7 +82,7 @@ export async function resolvePointer(
   try {
     switch (pointer.kind) {
       case "schema": {
-        const body = await api.getSchemaById(pointer.revision_id, { project_id: projectId });
+        const body = await api.getSchema(pointer.revision_id, { project_id: projectId });
         const schema = body.schema as UserSchema;
         return { ...base, name: schemaDisplayName(schema, pointer.handle), document: schema };
       }
@@ -94,11 +95,15 @@ export async function resolvePointer(
         };
       }
       case "branding": {
-        const body = await api.getBrandingById(pointer.revision_id);
+        const body = await api.getBranding(pointer.revision_id);
         return { ...base, name: handleName(pointer), document: body.branding };
       }
+      case "oauth": {
+        const body = await api.getOAuthSettings(pointer.revision_id);
+        return { ...base, name: handleName(pointer), document: body.oauth };
+      }
       case "idp": {
-        const body = await api.getIdpRevisionById(pointer.revision_id, { project_id: projectId });
+        const body = await api.getIdpRevision(pointer.revision_id, { project_id: projectId });
         return { ...base, name: handleName(pointer), document: body.definition };
       }
       case "policy": {
@@ -120,8 +125,8 @@ export async function resolvePointer(
 }
 
 /**
- * The name a pointer takes from its handle. Branding, identity providers and
- * policies are always named this way, so their rows read the same whether or
+ * The name a pointer takes from its handle. Branding, identity providers,
+ * policies and OAuth settings are always named this way, so their rows read the same whether or
  * not the revision could be read; schemas and flows fall back to it.
  */
 function handleName(pointer: ReleasePointer): string {

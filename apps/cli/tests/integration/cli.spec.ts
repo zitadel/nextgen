@@ -1,8 +1,11 @@
+import { execFile } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import {
@@ -11,9 +14,10 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
+const execFileAsync = promisify(execFile);
 
 /** `"auth-method sso enable --flag"` and `"auth-method:sso:enable"` name the same id. */
 function commandIdFromArgs(args: string): string | undefined {
@@ -39,12 +43,12 @@ async function typescriptFiles(dir: string): Promise<string[]> {
   return files;
 }
 
-/** Every command id the source suggests through `publicCliCommand` or copy. */
+/** Every command id the source suggests through `Spelling#command` or copy. */
 async function suggestedCommandIds(): Promise<Set<string>> {
   const commands = new Set<string>();
   for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
     const source = await readFile(file, "utf8");
-    for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
+    for (const match of source.matchAll(/Spelling\.at\([^)]*\)\.command\(\s*(["`])([^"`$]*)/g)) {
       const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
@@ -303,7 +307,7 @@ describe("the cli", () => {
         const listed = await runCliForTest(["commands", "--json"]);
         expect(listed).toSucceed();
         const visible = new Set(
-          (parseJson(listed.stdout) as Array<{ id?: unknown }>)
+          (parseJson(listed.stdout) as { data: { result: Array<{ id?: unknown }> } }).data.result
             .map((command) => command.id)
             .filter((id): id is string => typeof id === "string"),
         );
@@ -360,12 +364,6 @@ describe("the cli", () => {
           code: "E_VALIDATION",
           message: "Nonexistent flag: -Z",
           next_commands: [expectedPublicCliCommand("resources --help")],
-          details: {
-            original: {
-              name: "Error",
-              message: "Nonexistent flag: -Z\nSee more help with --help",
-            },
-          },
         });
       });
 
@@ -387,7 +385,7 @@ describe("the cli", () => {
        * real process streams, so a run in this harness emits no escape byte
        * whatever the flags say — a check for their absence would hold against
        * any implementation, broken ones included. What a run decides is pinned
-       * in `tests/unit/lib/oclif/base-source.test.ts`, and that no command
+       * in `tests/unit/cli/core/base-source.test.ts`, and that no command
        * decides for itself is enforced by `biome-plugins/no-own-colour.grit`.
        */
       it("accepts --no-color", async () => {
@@ -423,16 +421,16 @@ describe("the cli", () => {
     describe("for a command that does not exist", () => {
       describe("--json", () => {
         it("prints one error envelope naming the command and the topic's help", async () => {
-          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
 
           expect(parseJson(result.stdout)).toEqual({
             status: "error",
             cli_version: cliVersion.version,
-            command: "teams:delete",
+            command: "team:delete",
             source: "",
             code: "E_VALIDATION",
-            message: "teams delete is not a zitadel command",
-            next_commands: [expectedPublicCliCommand("teams --help")],
+            message: "team delete is not a zitadel command",
+            next_commands: [expectedPublicCliCommand("team --help")],
           });
         });
 
@@ -467,6 +465,23 @@ describe("the cli", () => {
           });
         });
 
+        it("names the word that is no command however many words follow it", async () => {
+          const words = Array.from({ length: 6000 }, (_, at) => {
+            return `w${at}`;
+          });
+
+          const result = await execFileAsync(
+            process.execPath,
+            [join(cliPackageRoot, "bin/run.js"), "frobnicate", ...words, "--json"],
+            { env: { ...process.env, DO_NOT_TRACK: "1" }, maxBuffer: 1 << 24 },
+          ).catch((failed: { stdout: string; code: number }) => failed);
+
+          expect(parseJson(result.stdout)).toMatchObject({
+            code: "E_VALIDATION",
+            message: "frobnicate is not a zitadel command",
+          });
+        });
+
         const refusals = [
           [
             "a short typo of a subcommand",
@@ -490,6 +505,22 @@ describe("the cli", () => {
             "DEPLOY",
             "DEPLOY is not a zitadel command",
             ["deploy --help"],
+            127,
+          ],
+          [
+            "the plural of a noun alone",
+            ["policies"],
+            "policies",
+            "policies is not a zitadel command",
+            ["policy --help"],
+            127,
+          ],
+          [
+            "a word after a plural that is no command of its noun",
+            ["policies", "lst"],
+            "policy:lst",
+            "policy lst is not a zitadel command",
+            ["policy list --help", "policy --help"],
             127,
           ],
           [
@@ -697,7 +728,7 @@ describe("the cli", () => {
         });
 
         it("writes nothing to stderr", async () => {
-          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
 
           expect(result.stderr).toBe("");
         });
@@ -705,21 +736,21 @@ describe("the cli", () => {
 
       describe("piped", () => {
         it("prints the error on stderr", async () => {
-          const result = await offTerminal(() => runCliForTest(["teams", "delete", "x"]));
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
 
           expect(result.stderr).toBe(
             [
-              "Error: teams delete is not a zitadel command (E_VALIDATION)",
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
               "",
               "Next:",
-              `  $ ${expectedPublicCliCommand("teams --help")}`,
+              `  $ ${expectedPublicCliCommand("team --help")}`,
               "",
             ].join("\n"),
           );
         });
 
         it("prints nothing on stdout", async () => {
-          const result = await offTerminal(() => runCliForTest(["teams", "delete", "x"]));
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
 
           expect(result.stdout).toBe("");
         });
@@ -728,15 +759,15 @@ describe("the cli", () => {
       describe("rendered for a terminal", () => {
         it("prints the error and offers no prompt to run another command", async () => {
           const result = await asTerminal(() =>
-            runCliForTest(["teams", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
+            runCliForTest(["team", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
           );
 
           expect(result.stderr).toBe(
             [
-              "Error: teams delete is not a zitadel command (E_VALIDATION)",
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
               "",
               "Next:",
-              `  $ ${expectedPublicCliCommand("teams --help")}`,
+              `  $ ${expectedPublicCliCommand("team --help")}`,
               "",
             ].join("\n"),
           );

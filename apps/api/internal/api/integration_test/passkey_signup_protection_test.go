@@ -10,7 +10,7 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	api "go.zitadel.com/zitadel/v5/api"
 )
@@ -48,7 +48,7 @@ func TestPasskeySignupRequiresTheSignupProof(t *testing.T) {
 	client, err := helpers.NewApiClient(testServer.URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
-	def, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: passkeySignupFlowDefinition(defaultSchemaURL())})
+	def, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: passkeySignupFlowDefinition(defaultSchemaURL())})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, def, helpers.MustMarshal(t, def))
 	deployPrimary(t, project.ID)
@@ -67,7 +67,7 @@ func TestPasskeySignupRequiresTheSignupProof(t *testing.T) {
 	issued, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "passkey_register",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{"email": jx.Raw(`"passkey-signup@example.com"`)}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: mustExtractZflow(t, start.SetCookie), Origin: api.NewOptURI(*origin)})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: mustExtractZflow(t, start.SetCookie), Origin: api.NewOptURI(*origin)})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, issued, helpers.MustMarshal(t, issued))
 	ceremony := issued.(*api.FlowResponseHeaders)
@@ -94,7 +94,7 @@ func TestPasskeySignupRequiresTheSignupProof(t *testing.T) {
 			Proof:       api.NewOptFlowSubmitRequestChallengeResponseProof(attestation),
 		}),
 	}
-	params := api.SubmitFlowStepParams{ID: flowID, Zflow: cookie}
+	params := api.SubmitFlowStepParams{FlowID: flowID, Zflow: cookie}
 
 	missing, err := client.SubmitFlowStep(t.Context(), req, params)
 	require.NoError(t, err)
@@ -125,11 +125,11 @@ func TestPasskeySignupRequiresTheSignupProof(t *testing.T) {
 	taken, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "passkey_register",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{"email": jx.Raw(`"passkey-signup@example.com"`)}),
-	}, api.SubmitFlowStepParams{ID: restart.Response.ID, Zflow: mustExtractZflow(t, restart.SetCookie), Origin: api.NewOptURI(*origin)})
+	}, api.SubmitFlowStepParams{FlowID: restart.Response.ID, Zflow: mustExtractZflow(t, restart.SetCookie), Origin: api.NewOptURI(*origin)})
 	require.NoError(t, err)
 	refused := badRequestStep(t, taken).Step
 	require.Equal(t, "register", refused.Name)
-	require.Equal(t, domain.FlowStepErrorUserAlreadyExists, refused.Error.Value)
+	require.Equal(t, flowengine.FlowStepErrorUserAlreadyExists, refused.Error.Value)
 	require.False(t, refused.Challenge.Set, "a taken email issues no ceremony")
 }
 
@@ -157,7 +157,7 @@ func TestPasskeySignupFallsBackToAPasswordWithTheSignupProof(t *testing.T) {
 			"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 		}),
 	})
-	def, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: definition})
+	def, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: definition})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, def, helpers.MustMarshal(t, def))
 	deployPrimary(t, project.ID)
@@ -171,7 +171,7 @@ func TestPasskeySignupFallsBackToAPasswordWithTheSignupProof(t *testing.T) {
 	email := api.FlowSubmitRequestFields{"email": jx.Raw(`"passkey-fallback@example.com"`)}
 
 	issued, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{Action: "passkey_register", Fields: api.NewOptFlowSubmitRequestFields(email)},
-		api.SubmitFlowStepParams{ID: flowID, Zflow: mustExtractZflow(t, start.SetCookie), Origin: api.NewOptURI(*origin)})
+		api.SubmitFlowStepParams{FlowID: flowID, Zflow: mustExtractZflow(t, start.SetCookie), Origin: api.NewOptURI(*origin)})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, issued, helpers.MustMarshal(t, issued))
 	ceremony := issued.(*api.FlowResponseHeaders)
@@ -181,7 +181,7 @@ func TestPasskeySignupFallsBackToAPasswordWithTheSignupProof(t *testing.T) {
 	proofs := currentSignupProofs(t, client, flowID, cookie)
 	require.True(t, proofs.IsSet(), "the ceremony step serves the puzzle")
 	fallback, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{Action: "submit", Fields: api.NewOptFlowSubmitRequestFields(email), GateProofs: proofs},
-		api.SubmitFlowStepParams{ID: flowID, Zflow: cookie})
+		api.SubmitFlowStepParams{FlowID: flowID, Zflow: cookie})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, fallback, helpers.MustMarshal(t, fallback))
 	password := fallback.(*api.FlowResponseHeaders)
@@ -193,7 +193,7 @@ func TestPasskeySignupFallsBackToAPasswordWithTheSignupProof(t *testing.T) {
 		Action:     "submit",
 		Fields:     api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{"x-auth-methods#password": jx.Raw(`"correct-horse-battery-staple"`)}),
 		GateProofs: proofs,
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: mustExtractZflow(t, password.SetCookie)})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: mustExtractZflow(t, password.SetCookie)})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, done, helpers.MustMarshal(t, done))
 	require.True(t, done.(*api.FlowResponseHeaders).Response.Step.Complete.Set, helpers.MustMarshal(t, done))

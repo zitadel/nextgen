@@ -21,6 +21,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/invitation"
+	"github.com/zitadel/nextgen/internal/storage/oauthsettings"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
@@ -74,12 +75,13 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("grants_expires_at", func(t *testing.T) { battleGrantsExpiresAt(t, d) })
 		t.Run("authorized_projects", func(t *testing.T) { battleAuthorizedProjects(t, d) })
 		t.Run("authorized_projects_created_at", func(t *testing.T) { battleAuthorizedProjectsByCreation(t, d) })
-		t.Run("project_admins", func(t *testing.T) { battleProjectAdmins(t, d) })
+		t.Run("project_members", func(t *testing.T) { battleProjectMembers(t, d) })
 		t.Run("authorized_projects_name", func(t *testing.T) { battleAuthorizedProjectsByName(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
+		t.Run("oauth_settings", func(t *testing.T) { battleOAuthSettings(t, d) })
 		t.Run("releases", func(t *testing.T) { battleReleases(t, d) })
 		t.Run("invitations", func(t *testing.T) { battleInvitations(t, d) })
 		t.Run("deployments", func(t *testing.T) { battleDeployments(t, d) })
@@ -367,10 +369,10 @@ func battleAuthorizedProjectsByName(t *testing.T, d dialect) {
 	}, func(p *domain.Project) string { return p.ID }, 2)
 }
 
-// battleProjectAdmins drains the admins of a project with five people granted
+// battleProjectMembers drains the members of a project with five people granted
 // admin directly, each also holding a delegated second row, which must not
 // take a second place on a page.
-func battleProjectAdmins(t *testing.T, d dialect) {
+func battleProjectMembers(t *testing.T, d dialect) {
 	t.Helper()
 	home, schemaURL := ensureUserTestProject(t, d.stmts)
 	projectID := ensureProject(t, d.stmts)
@@ -388,13 +390,13 @@ func battleProjectAdmins(t *testing.T, d dialect) {
 		want = append(want, userID)
 	}
 	slices.Sort(want)
-	orderAsc := database.OrderBy[domain.ProjectAdminField]{
-		Columns:   []database.Column[domain.ProjectAdminField]{database.Col(domain.ProjectAdminFieldUserID)},
+	orderAsc := database.OrderBy[domain.ProjectMemberField]{
+		Columns:   []database.Column[domain.ProjectMemberField]{database.Col(domain.ProjectMemberFieldUserID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
-		return d.stmts.ListProjectAdmins(t.Context(), projectID, "", page)
-	}, func(r *domain.ProjectAdminRecord) string { return r.UserID }, 2)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ProjectMemberField]) (*database.ListResult[*domain.ProjectMemberRecord], error) {
+		return d.stmts.ListProjectMembers(t.Context(), projectID, "", page)
+	}, func(r *domain.ProjectMemberRecord) string { return r.UserID }, 2)
 }
 
 // battleGrantsExpiresAt pages a mix of nil and set expires_at values sorted by
@@ -579,6 +581,35 @@ func battleBrandings(t *testing.T, d dialect) {
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListBrandings(unfilteredListCtx(t), opts)
 		}, func(b *domain.Branding) string { return b.ID })
+		assertDrainMatch(t, want, got)
+	})
+}
+
+func battleOAuthSettings(t *testing.T, d dialect) {
+	t.Helper()
+	projectID, _ := uniqueOAuthSettingsIDs(t)
+	ensureOAuthSettingsProject(t, d.stmts, projectID)
+	want := make([]string, 0, 5)
+	for range 5 {
+		entity := sampleOAuthSettings(projectID, "")
+		require.NoError(t, d.stmts.CreateOAuthSettings(t.Context(), entity))
+		want = append(want, entity.ID)
+	}
+	filter := database.Equal(database.Col(domain.OAuthSettingsFieldProjectID), projectID)
+	orderAsc := oauthsettings.NewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.OAuthSettingsField]) (*database.ListResult[*domain.OAuthSettings], error) {
+		return d.stmts.ListOAuthSettings(unfilteredListCtx(t), &database.ListOptions[domain.OAuthSettingsField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(s *domain.OAuthSettings) string { return s.ID }, 2)
+
+	t.Run("newest_first_helper", func(t *testing.T) {
+		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.OAuthSettings], error) {
+			opts := oauthsettings.ListOptions(projectID, 2)
+			opts.Pagination.Cursor = cursor
+			return d.stmts.ListOAuthSettings(unfilteredListCtx(t), opts)
+		}, func(s *domain.OAuthSettings) string { return s.ID })
 		assertDrainMatch(t, want, got)
 	})
 }
@@ -885,7 +916,7 @@ func battleInvitations(t *testing.T, d dialect) {
 
 	t.Run("newest_first_helper", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Invitation], error) {
-			opts := invitation.ListOptions(projectID, new(domain.InvitationStatusPending), nil, now, 2)
+			opts := invitation.ListOptions(projectID, []domain.InvitationStatus{domain.InvitationStatusPending}, nil, now, 2)
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListInvitations(t.Context(), opts)
 		}, func(i *domain.Invitation) string { return i.ID })

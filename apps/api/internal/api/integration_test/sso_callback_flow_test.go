@@ -22,6 +22,7 @@ import (
 	iapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	api "go.zitadel.com/zitadel/v5/api"
@@ -163,7 +164,7 @@ func (f *ssoCallbackFixture) submitSSO(t *testing.T, flow ssoFlow) (authorize *u
 	body, err := submission.MarshalJSON()
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.APIBaseURL(t)+"/flow/"+flow.id+"/submit", strings.NewReader(string(body)))
+		harness.APIBaseURL(t)+"/flows/"+flow.id+"/submit", strings.NewReader(string(body)))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", "https://login.example.test")
@@ -276,7 +277,7 @@ func TestSSOCallbackEventsJoinTheLoginFlow(t *testing.T) {
 	page, ok := listed.(*api.ListEventsResponse)
 	require.True(t, ok, helpers.MustMarshal(t, listed))
 	var types []string
-	for _, event := range page.Data {
+	for _, event := range page.Events {
 		raw, err := event.MarshalJSON()
 		require.NoError(t, err)
 		var envelope struct {
@@ -325,7 +326,7 @@ func TestSSOCallbackOnAnotherConnectionsPathIsRefused(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
 	step := stepResp.(*api.FlowResponseHeaders).Response.Step
 	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
-	assert.Equal(t, domain.FlowStepErrorSSOFailed, step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, step.Error.Value)
 	assert.Equal(t, "identifier", step.Name, "the flow stays on the step the sign-in started from")
 }
 
@@ -347,7 +348,7 @@ func TestSSOCallbackChecksTheIssuerParameter(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
 	step := stepResp.(*api.FlowResponseHeaders).Response.Step
 	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
-	assert.Equal(t, domain.FlowStepErrorSSOFailed, step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, step.Error.Value)
 
 	retry, retryCookie := f.submitSSO(t, flow)
 	resp = f.callback(t, f.returnPath(t), "state="+url.QueryEscape(retry.Query().Get("state"))+"&code=the-code&iss="+url.QueryEscape(f.provider.srv.URL), retryCookie)
@@ -401,7 +402,7 @@ func TestSSOCallbackProviderDeclineRendersCancelledAndAllowsARetry(t *testing.T)
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
 	step := stepResp.(*api.FlowResponseHeaders).Response.Step
 	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
-	assert.Equal(t, domain.FlowStepErrorSSOCancelled, step.Error.Value)
+	assert.Equal(t, flowengine.FlowStepErrorSSOCancelled, step.Error.Value)
 	assert.Equal(t, "identifier", step.Name, "the flow stays on the step the sign-in started from")
 
 	retry, retryCookie := f.submitSSO(t, flow)

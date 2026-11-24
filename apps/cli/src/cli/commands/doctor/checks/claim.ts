@@ -1,7 +1,14 @@
-import { CLAIM_WINDOW_DAYS, claimState, FRESH_DIRECTORY } from "@/lib/claim-state";
-import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
+import { Claim } from "@/lib/claim";
+import { ZitadelRuntime } from "@/lib/server";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { Project } from "@/lib/project";
+
+/**
+ * What a project on a local or self-hosted server is told: it has no team to
+ * attach to, so the check passes rather than warning about an impossible action.
+ */
+const NO_TEAMS_MESSAGE = "Project is not on a server where teams apply";
 
 /**
  * Reports whether the project is attached to a team, reading `claimed_at` and
@@ -23,26 +30,39 @@ export class ClaimCheck implements SanityCheck {
   readonly name = "claim";
   readonly path = ".zitadel/secret";
 
+  /**
+   * Reads the claim state and reports it as a pass or a warning.
+   *
+   * Whether the server is the cloud is read from `zitadel.json`, not the
+   * command's own source: `doctor` pins its source to the local runtime URL, so
+   * asking it where the project lives would report every project as local. A
+   * missing or unparseable secret or config is already reported, loudly and with
+   * a repair path, by the `secret` and `config` checks, and nothing wraps a
+   * throw here, so swallowing it is what keeps a broken project reporting its
+   * real problem instead of crashing the whole battery on a nudge. The window
+   * classification travels in `details` so the doctor envelope's advisory can
+   * switch to the same reconciliation wording; the claim command itself stays
+   * suggested either way, since the local record may be stale and the server
+   * answers authoritatively.
+   *
+   * @param ctx - The directory and suggestions the check runs with.
+   * @returns The outcome of the check.
+   */
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const state = await readZitadelSecret(ctx.cwd)
+    const state = await Project.at(ctx.cwd)
+      .secret()
       .then(async (secret) => {
-        return claimState({
-          secret,
-          // From `zitadel.json`, not the command's own source: `doctor` pins its
-          // source to the local runtime URL, so asking it where the project lives
-          // would report every project as local.
-          server: readProjectServer(await readZitadelConfig(ctx.cwd)),
+        return Claim.state({
+          secret: secret.data,
+          cloud: ZitadelRuntime.fromUrl(
+            (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
+          ).isCloud(),
         });
       })
       .catch(() => {
         return undefined;
       });
     if (state === undefined) {
-      // A missing or unparseable secret/config is already reported, loudly and
-      // with a repair path, by the `secret` and `config` checks. Implementing
-      // `SanityCheck` directly means nothing wraps a throw here, so swallowing
-      // it is what keeps a broken project reporting its real problem instead of
-      // crashing the whole battery on a nudge.
       return {
         name: this.name,
         status: "pass",
@@ -52,19 +72,18 @@ export class ClaimCheck implements SanityCheck {
     }
 
     if (state.kind === "detached") {
-      // The window classification travels in `details` so the doctor
-      // envelope's advisory can switch to the same reconciliation wording;
-      // the claim command itself stays suggested either way, since the local
-      // record may be stale and the server answers authoritatively.
       const claim = ctx.suggest({ id: "claim" });
       const message = state.claimable
-        ? `Claim your project within ${CLAIM_WINDOW_DAYS} days of creation to make it ` +
+        ? `Claim your project within ${Claim.WINDOW_DAYS} days of creation to make it ` +
           "permanent and start collaborating with your team. Until then, your project " +
           `is temporary and its data may be lost. Run ${claim}.`
-        : `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
+        : `The local record says this project's ${Claim.WINDOW_DAYS}-day claim window has ` +
           `closed. Run ${claim} to reconcile: a project claimed from another ` +
           "machine confirms its team, and one never claimed can no longer be claimed. " +
-          `${ctx.suggest({ id: "setup", flags: { cwd: FRESH_DIRECTORY } })} in a fresh directory gets you a new project you can claim.`;
+          `${ctx.suggest({
+            id: "setup",
+            flags: { cwd: Claim.FRESH_DIRECTORY },
+          })} in a fresh directory gets you a new project you can claim.`;
       return {
         name: this.name,
         status: "warn",
@@ -80,9 +99,7 @@ export class ClaimCheck implements SanityCheck {
       message:
         state.kind === "attached"
           ? `Project is attached to team ${state.team_id}`
-          : // Local and self-hosted servers have no team to attach to, so the
-            // check passes rather than warning about an impossible action.
-            "Project is not on a server where teams apply",
+          : NO_TEAMS_MESSAGE,
       path: this.path,
     };
   }

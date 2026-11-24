@@ -1,5 +1,6 @@
 post:
   operationId: createInvitation
+  x-zitadel-cli: invitation create
   summary: Create an invitation
   description: |
     Creates an invitation for a project, or replaces an existing one, and
@@ -8,15 +9,15 @@ post:
     Send `type` and the object named after it. `project_member` takes
     `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
     and `role`, and answers `501` `not_implemented` until team invitations
-    ship. Optional `metadata.name` labels who the link is for. Optional
-    `replaces_invitation_id` replaces that invitation: the new row keeps the
-    original's `journey_id`, and the original is deleted in the same
-    transaction unless it was accepted.
+    ship. Optional `metadata.name` (1–200 characters) labels who the link is
+    for. Optional `replaces_invitation_id` replaces that invitation: the new
+    row keeps the original's `journey_id`, and the original is deleted in the
+    same transaction unless it was accepted.
 
     The `link` appears only in this response. Share it out of band; whoever
     opens it and is signed in can redeem the role. It expires in 72 hours.
     Refused for an unclaimed project, on a server without a platform project,
-    and when the project's pending-invitation cap is reached.
+    and when the project already has 100 pending unexpired invitations.
 
     Authenticate with a project secret (`oauth2`) or a console session cookie
     (`sessionCookie`). Creation needs the same project `admin` check as
@@ -114,13 +115,17 @@ post:
 
 get:
   operationId: listInvitations
+  x-zitadel-cli: invitation list
   summary: List invitations
   description: |
     Lists a project's invitations, newest first, in any status, paginated with
     `limit` and `page_token`.
 
-    Optional `status` and `type` filters narrow the page. `expired` is derived
-    on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+    Optional `status` and `type` filters narrow the page. Repeat `status` to
+    match any of several statuses, for example
+    `status=pending&status=expired&status=rejected`. `expired` is derived on
+    read from `expires_at`. `expand=inviter` adds `inviter` to each
+    invitation. Authenticate with a project secret (`oauth2`) or
     a console session cookie (`sessionCookie`). Listing needs the same project
     `admin` check as `createGrant` (`POST /grants`).
   tags:
@@ -136,9 +141,16 @@ get:
     - name: status
       in: query
       required: false
-      description: Only invitations with this status.
+      description: |
+        Only invitations with this status. Repeat the parameter to match any
+        of several statuses.
+      style: form
+      explode: true
       schema:
-        $ref: invitation-status.yaml
+        type: array
+        uniqueItems: true
+        items:
+          $ref: invitation-status.yaml
     - name: type
       in: query
       required: false
@@ -148,6 +160,17 @@ get:
         enum:
           - project_member
           - team_member
+    - name: expand
+      in: query
+      required: false
+      description: Related objects to embed on each returned invitation.
+      style: form
+      explode: true
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: invitation-expand.yaml
   responses:
     '200':
       description: A page of the project's invitations.

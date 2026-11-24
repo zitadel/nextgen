@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
@@ -79,6 +79,64 @@ describe("deployment get", () => {
     });
 
     describe("--json", () => {
+      it("refuses a field the record lacks", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "get",
+          deployed.deployment_id ?? "",
+          "--fields",
+          "no_such_field",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("cuts the data to the fields chosen", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "get",
+          deployed.deployment_id ?? "",
+          "--fields",
+          "id,metadata.reason",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toEqual({
+          title: `Read ${deployed.deployment_id}`,
+          id: deployed.deployment_id,
+          metadata: { reason: "deploy" },
+        });
+      });
+
+      it("carries a field the platform reports as null, as null", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "get",
+          deployed.deployment_id ?? "",
+          "--fields",
+          "metadata.deployed_by",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toEqual({
+          title: `Read ${deployed.deployment_id}`,
+          metadata: { deployed_by: null },
+        });
+      });
+
       it("reads back a deployment by id", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -277,6 +335,41 @@ describe("deployment get", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("prints only the fields chosen", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "get",
+          deployed.deployment_id ?? "",
+          "--fields",
+          "status",
+        ]);
+
+        expect(result).toPrintRow("status", "live");
+        expect(result).not.toPrintRow("release_id");
+        expect(result).not.toPrint("variables");
+      });
+
+      it("leaves a field the platform reports as null out of the rows", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "get",
+          deployed.deployment_id ?? "",
+          "--fields",
+          "metadata.deployed_by",
+        ]);
+
+        expect(result).toSucceed();
+        expect(result).not.toPrintRow("deployed_by");
+      });
+
       it.each(RENDERINGS)("shows the deployment's facts, %s", async (_how, colour) => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin(PRIMARY_ORIGIN);
@@ -342,28 +435,14 @@ describe("deployment get", () => {
         },
       );
 
-      it("prints the record whole, piped, so a script can read it", async () => {
+      it("prints the record as plain text, piped, and JSON only with --json", async () => {
         const app = await aSetUpApp();
         const deployed = await app.deployData();
 
         const result = await app.run(["deployment", "get", deployed.deployment_id ?? ""]);
 
-        expect(JSON.parse(result.stdout)).toEqual({
-          id: deployed.deployment_id,
-          project_id: expect.stringMatching(/^proj-/),
-          release_id: deployed.release_id,
-          targets: [{ origin: "http://localhost:3000" }],
-          kind: "primary",
-          status: "live",
-          deployed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/),
-          metadata: {
-            reason: "deploy",
-            message: "Initial deployment from setup",
-            rollback_to: null,
-            deployed_by: null,
-            deployed_by_type: "service",
-          },
-        });
+        expect(result).toPrintRow("id", deployed.deployment_id ?? "");
+        expect(result).toPrintNoJson();
       });
 
       it("explains a refusal with the message the envelope carries", async () => {

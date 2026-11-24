@@ -12,7 +12,7 @@ import "time"
 // that only makes sense at the top level.
 type FlowState struct {
 	// ID is the flow handle minted at Start. The handler verifies it
-	// matches the path (`/flow/{id}/...`) to reject path/cookie mismatches.
+	// matches the path (`/flows/{flow_id}/...`) to reject path/cookie mismatches.
 	ID string
 
 	// ProjectID scopes the flow to a single tenant.
@@ -102,7 +102,7 @@ type FlowState struct {
 // FlowPendingChallenge records the server-issued challenge the next
 // submit must satisfy. The binding (id + method) is threaded through the
 // cookie so the verify step can locate it; Options carries the
-// client-facing ceremony options so a GET /flow re-render can re-emit
+// client-facing ceremony options so a GET /flows re-render can re-emit
 // them without re-issuing.
 type FlowPendingChallenge struct {
 	// ID is the challenge identifier returned by the auth-attempt
@@ -209,16 +209,14 @@ func (s *FlowState) ClearPendingChallenge() {
 }
 
 type CollectedFlowData struct {
-	UserData    map[string]any
-	UserID      string
-	AuthMethods CollectedAuthMethodData
+	UserData map[string]any
+	UserID   string
+	// AuthMethods holds the credentials submitted for `x-auth-methods`
+	// fields, keyed by method name (e.g. [AuthMethodPassword]).
+	AuthMethods map[string]string `json:",omitempty"`
 	// SSOConflictConnectionID is the connection whose sign-in collided with
 	// the bound user (user_already_exists from an external identity). The
 	// steps shown to that user leave this provider out: choosing it again
 	// collides again. Cleared with the bound user.
 	SSOConflictConnectionID string `json:",omitempty"`
-}
-
-type CollectedAuthMethodData struct {
-	Password string
 }

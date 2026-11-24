@@ -80,7 +80,7 @@ For each selected provider:
   for adding the provider later.
 * **JSON output (`data.idps`):** under `--json` the journey contributes an
   `idps` entry to the result envelope's command payload
-  (`apps/cli/src/lib/oclif/types.ts`), mirroring the announce step per provider:
+  (`apps/cli/src/cli/core/types.ts`), mirroring the announce step per provider:
   slug, template, the connection's callback URI per environment, excluded environments with the
   declaration kind as reason, console URL, the variable the connection
   references for the secret, and whether that variable is set.
@@ -537,7 +537,7 @@ never presented as proof that sign-in works.
 * **Secret-free previews:** previews display only the reference
   (`${{ GOOGLE_CLIENT_SECRET }}`), never a value.
   Update previews show a field diff: the syncer reads the stored connection
-  through `GET /idps/{id}`, and refuses a body whose `client_secret` comes
+  through `GET /idps/{idp_id}`, and refuses a body whose `client_secret` comes
   back as a value rather than a reference, so a resolved secret stops the
   plan instead of being printed into it.
 * **Delete:** a local file delete schedules a platform delete; what the server

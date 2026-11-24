@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "0.6.0",
+  "version": "0.9.0",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -43,6 +43,11 @@
       "@zitadel/source": "./src/middleware.ts",
       "types": "./dist/middleware.d.mts",
       "import": "./dist/middleware.mjs"
+    },
+    "./session": {
+      "@zitadel/source": "./src/session.ts",
+      "types": "./dist/session.d.mts",
+      "import": "./dist/session.mjs"
     }
   },
   "publishConfig": {

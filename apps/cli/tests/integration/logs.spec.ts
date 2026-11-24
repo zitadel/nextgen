@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { LOGGED_LINES, useLocalServers } from "@tests/helpers/local-server";
+import { LOGGED_LINES } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
 
@@ -104,6 +103,19 @@ describe("logs", () => {
           message: "Local Zitadel runtime has not been started",
           hint: "Start the local server first.",
           next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
+        });
+      });
+
+      it("refuses to follow when the environment turned JSON mode on", async () => {
+        const app = await aSetUpApp();
+        const started = await app.startLocalServer({ shape: "logging" });
+
+        const result = await app.run(["logs", "--follow"], { ZITADEL_CONTENT_TYPE: "json" });
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          source: `http://localhost:${app.localPortOf(started)}`,
         });
       });
 

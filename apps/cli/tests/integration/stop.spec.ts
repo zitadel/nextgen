@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
 
@@ -235,6 +233,8 @@ describe("stop", () => {
           source: `http://localhost:${app.localPortOf(started)}`,
           data: {
             dry_run: true,
+            verb: "stop",
+            topic: "server",
             title: "Would stop the local Zitadel server (dry run)",
             runtime: {
               backend: "binary",
@@ -270,6 +270,8 @@ describe("stop", () => {
           source: "http://localhost:8080",
           data: {
             dry_run: true,
+            verb: "stop",
+            topic: "server",
             title: "Would stop the local Zitadel server (dry run)",
             runtime: {
               backend: "missing",
@@ -294,6 +296,8 @@ describe("stop", () => {
           source: "http://localhost:8080",
           data: {
             dry_run: true,
+            verb: "stop",
+            topic: "server",
             title: "Would stop host-wide managed local runtime processes (dry run)",
             sweep: { supported: true, scope: "host", count: 0, processes: [] },
             next_commands: [expectedPublicCliCommand(`stop --all --cwd ${app.path}`)],

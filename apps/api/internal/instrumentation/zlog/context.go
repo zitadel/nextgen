@@ -9,12 +9,21 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 )
 
+type withoutAttrsKey struct{}
+
 func WithLoggingContext(ctx context.Context, logger *slog.Logger) context.Context {
 	return slogctx.NewCtx(ctx, logger)
 }
 
 func GetLoggingContext(ctx context.Context) *slog.Logger {
 	return slogctx.FromCtx(ctx)
+}
+
+// WithoutAttrs marks ctx so that a line logged with it drops the attributes
+// named keys, at any depth. It is for lines of code this server does not own,
+// which carry values the server keeps out of its log.
+func WithoutAttrs(ctx context.Context, keys ...string) context.Context {
+	return context.WithValue(ctx, withoutAttrsKey{}, keys)
 }
 
 func Log(ctx context.Context, level slog.Level, msg string, args ...any) {

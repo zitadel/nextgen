@@ -10,6 +10,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -33,7 +34,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: combinedPasswordFlowDefinition(schemaURL),
 	})
@@ -64,15 +65,15 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, flipResp, helpers.MustMarshal(t, flipResp))
 	flipOK := flipResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	require.Equal(t, api.NewOptFlowStepPurpose(api.FlowStepPurposeRegister), flipOK.Response.Step.Purpose)
-	require.Equal(t, api.NewOptNilString(domain.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
+	require.Equal(t, api.NewOptNilString(flowengine.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
 		"the user asked to sign in, so the sign-up says why")
 	zflow = mustExtractZflow(t, flipOK.SetCookie)
 
@@ -84,8 +85,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, idResp, helpers.MustMarshal(t, idResp))
@@ -101,8 +102,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, pwResp, helpers.MustMarshal(t, pwResp))
@@ -207,7 +208,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: purposeNavFlowDefinition(schemaURL),
 	})
@@ -331,7 +332,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: purposeNavFlowDefinition(schemaURL),
 	})
@@ -417,8 +418,8 @@ func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action
 		req.Fields = api.NewOptFlowSubmitRequestFields(fields)
 	}
 	resp, err := client.SubmitFlowStep(t.Context(), req, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))

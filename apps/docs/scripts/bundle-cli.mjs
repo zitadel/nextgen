@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const docsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 // The CLI's commands as data, which the CLI's reference test writes from its
-// command table (apps/cli/tests/unit/lib/oclif/reference.test.ts).
+// command table (apps/cli/tests/unit/cli/core/reference.test.ts).
 const input = require.resolve("@zitadel/cli/command-reference.json");
 // The CLI's changelog, which Changesets writes on every release.
 const changelog = require.resolve("@zitadel/cli/CHANGELOG.md");

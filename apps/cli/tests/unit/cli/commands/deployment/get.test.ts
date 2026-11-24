@@ -1,35 +1,24 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import type { SetupServer } from "msw/node";
+import { describe, expect } from "vitest";
 
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import DeploymentGet from "@/cli/commands/deployment/get";
-import { parseArg } from "@tests/helpers/inputs";
+import { it } from "@tests/fixtures";
+import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
-const SERVER = "https://api.zitadel.cloud";
-const server = setupServer();
-const dirs: string[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-afterEach(async () => {
-  server.resetHandlers();
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+const SERVER = "https://preview.zitadel.com";
 
 const DEPLOYMENT = {
   id: "dep_1",
   project_id: "proj_test",
   release_id: "rel_1",
-  targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
+  targets: [{ origin: PRIMARY_ORIGIN }],
   kind: "primary",
   status: "live",
   metadata: { reason: "deploy" },
@@ -41,12 +30,16 @@ const FROZEN = { HOST: "app.acme.com", TOKEN: { secret: true } };
 /**
  * Builds a project the deployment can be read from.
  *
+ * @param server - The server that answers for the platform.
+ * @param cwd - The directory to build the project in.
  * @param variableReads - Receives the URL of each request for the frozen set, which only a terminal makes.
- * @returns The project's directory.
+ * @returns Once the project is built.
  */
-async function aProject(variableReads: string[] = []): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-deployment-get-"));
-  dirs.push(cwd);
+async function aProject(
+  server: SetupServer,
+  cwd: string,
+  variableReads: string[] = [],
+): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(
     join(cwd, ".zitadel/secret"),
@@ -65,7 +58,6 @@ async function aProject(variableReads: string[] = []): Promise<string> {
       return HttpResponse.json(FROZEN);
     }),
   );
-  return cwd;
 }
 
 const read = (cwd: string) =>
@@ -82,8 +74,8 @@ const read = (cwd: string) =>
   ]);
 
 describe("deployment get", () => {
-  it("lays the record out the way every other get does", async () => {
-    const cwd = await aProject();
+  it("lays the record out the way every other get does", async ({ server, dir: cwd }) => {
+    await aProject(server, cwd);
 
     const res = await asTerminal(() => read(cwd));
 
@@ -97,8 +89,11 @@ describe("deployment get", () => {
     expect(res.stdout).not.toMatch(/^ {2}(id|release|reason|origins|deployed)/m);
   });
 
-  it("names each field as the wire names it, not in words of its own", async () => {
-    const cwd = await aProject();
+  it("names each field as the wire names it, not in words of its own", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await aProject(server, cwd);
 
     const res = await asTerminal(() => read(cwd));
 
@@ -108,8 +103,11 @@ describe("deployment get", () => {
     expect(res.stdout).not.toMatch(/^release {2,}/m);
   });
 
-  it("tables the set the deployment froze under the fields, a secret masked", async () => {
-    const cwd = await aProject();
+  it("tables the set the deployment froze under the fields, a secret masked", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await aProject(server, cwd);
 
     const res = await asTerminal(() => read(cwd));
 
@@ -120,19 +118,36 @@ describe("deployment get", () => {
     expect(res.stdout).toMatch(/^ {2,}TOKEN {2,}\(secret\)$/m);
   });
 
-  it("gives a pipe the record itself, as every other get does", async () => {
-    const cwd = await aProject();
+  it("gives a pipe the plain text, and JSON only with --json", async ({ server, dir: cwd }) => {
+    await aProject(server, cwd);
 
     const res = await read(cwd);
 
-    expect(JSON.parse(res.stdout)).toMatchObject({ id: "dep_1", kind: "primary" });
+    expect(res.stdout).toMatch(/id\s+dep_1/);
+    expect(() => {
+      JSON.parse(res.stdout);
+    }).toThrow();
   });
 
-  it("asks for the frozen set only for the rendering that names it", async () => {
+  it("asks for the frozen set only for a rendering a person reads, never for --json", async ({
+    server,
+    dir: cwd,
+  }) => {
     const variableReads: string[] = [];
-    const cwd = await aProject(variableReads);
+    await aProject(server, cwd, variableReads);
 
-    await read(cwd);
+    await runCliForTest([
+      "deployment",
+      "get",
+      "dep_1",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--no-telemetry",
+      "--json",
+    ]);
     expect(variableReads).toHaveLength(0);
 
     await asTerminal(() => read(cwd));
@@ -161,6 +176,17 @@ describe("deployment_id", () => {
       code: "E_VALIDATION",
       message: expect.stringContaining("must be a deployment ID"),
       hint: "List the deployments to find one.",
+    });
+  });
+
+  describe("--fields", () => {
+    it("refuses a field a deployment does not carry, naming the ones it does", async () => {
+      await expect(
+        parseFlag(DeploymentGet.flags.fields, "no_such_field", "fields"),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        hint: expect.stringContaining("release_id"),
+      });
     });
   });
 });

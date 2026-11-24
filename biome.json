@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -16,13 +16,18 @@
       "!**/*.html",
       "!**/*.json",
       "!**/*.jsonc",
+      "!**/*.md",
+      "!**/*.mdx",
+      "!**/*.yaml",
+      "!**/*.yml",
       "!**/*.svelte",
       "!**/*.vue",
       "!**/mockServiceWorker.js",
       "!**/generated",
       "!**/dist",
       "!**/out-tsc",
-      "!**/.nuxt-typecheck"
+      "!**/.nuxt-typecheck",
+      "!**/conformance/fixtures"
     ]
   },
   "formatter": {
@@ -99,7 +104,8 @@
         "./biome-plugins/no-consent-bypass.grit",
         "./biome-plugins/no-flag-alias.grit",
         "./biome-plugins/no-cli-spelling-read.grit",
-        "./biome-plugins/no-own-colour.grit"
+        "./biome-plugins/no-own-colour.grit",
+        "./biome-plugins/no-command-emit.grit"
       ]
     },
     {

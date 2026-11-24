@@ -1,4 +1,7 @@
 import {
+  acceptInvitation,
+  expireInvitation,
+  rejectInvitation,
   completeClaimChallenge,
   resetPlatformStore,
   setupPlatformHandlers,
@@ -27,6 +30,25 @@ const OriginRequest = z.object({
 const ProjectRequest = z.object({
   name: z.string().optional(),
 });
+
+/** A request the mock platform answered. */
+export interface ObservedRequest {
+  readonly method: string;
+  readonly path: string;
+}
+
+/** Every request the mock platform has been asked since the last spec ended. */
+const observed: ObservedRequest[] = [];
+
+/**
+ * The requests the mock platform has answered so far, in order, so a run can be
+ * held to what it asked of the platform by comparing the list before and after.
+ *
+ * @returns A copy of the list.
+ */
+export function requestsObserved(): readonly ObservedRequest[] {
+  return [...observed];
+}
 
 /** What the platform was asked to publish, for a surface the mock does not keep. */
 export interface Captured<T> {
@@ -120,6 +142,9 @@ export interface PlatformMock {
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
 
+  /** Makes the project's live previews unreadable while everything else answers. */
+  cannotListPreviews(): void;
+
   /**
    * Refuses every read of a variable, as a credential without `variable.read`
    * does, while a deployment and the project still answer. A command that reads
@@ -184,6 +209,14 @@ export interface PlatformMock {
   revokesAHostileReleaseId(): string;
 
   /**
+   * Answers a release revoke with `409 rel.in_use` naming a primary origin that
+   * holds a terminal escape sequence.
+   *
+   * @returns The origin it will name.
+   */
+  refusesRevokeNamingAHostileOrigin(): string;
+
+  /**
    * Answers a user query with a page cursor holding a terminal escape
    * sequence, which the footer and the next-page command both name.
    *
@@ -206,6 +239,44 @@ export interface PlatformMock {
    * deploy lands between a deploy's inspection and its write.
    */
   racesTheNextDeploy(): void;
+
+  /**
+   * Answers every invitation create with one fixed invitation whose id and link
+   * hold a terminal escape sequence, as a compromised server would.
+   *
+   * @returns The link it will answer with.
+   */
+  mintsAHostileInvitation(): string;
+
+  /**
+   * Answers every invitation read and list with one invitation whose name holds
+   * a terminal escape sequence, as an administrator could have typed it.
+   *
+   * @returns The name it will answer with.
+   */
+  servesAHostileInvitation(): string;
+
+  /**
+   * Accepts the invitation, as the person it was for redeeming its link would.
+   *
+   * @param invitationId - The invitation to accept.
+   */
+  acceptsInvitation(invitationId: string): void;
+
+  /**
+   * Declines the invitation, as the person it was for following its link and
+   * declining would.
+   *
+   * @param invitationId - The invitation to decline.
+   */
+  declinesInvitation(invitationId: string): void;
+
+  /**
+   * Lets the invitation expire, as 72 hours passing would.
+   *
+   * @param invitationId - The invitation to expire.
+   */
+  expiresInvitation(invitationId: string): void;
 
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
@@ -232,6 +303,25 @@ export interface PlatformMock {
   npmRegistryIsDown(): void;
 }
 
+/** A pending viewer invitation as the API answers one, for a handler that answers a fixed one. */
+function hostileInvitation(id: string, metadata: { name: string } | null): Record<string, unknown> {
+  return {
+    id,
+    project_id: "proj_1",
+    type: "project_member",
+    project_member: { relation: "viewer" },
+    metadata,
+    status: "pending",
+    created_by: null,
+    created_by_type: "service",
+    created_at: "2026-01-01T00:00:00Z",
+    expires_at: "2026-01-04T00:00:00Z",
+    journey_id: "journey_1",
+    responded_by: null,
+    responded_at: null,
+  };
+}
+
 const NPM_DIST_TAGS = "https://registry.npmjs.org/-/package/:name/dist-tags";
 const GITHUB_RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
 
@@ -240,9 +330,17 @@ export function usePlatformMock(): PlatformMock {
   const server = setupServer(...setupPlatformHandlers());
   const watchers: NodeJS.Timeout[] = [];
 
+  server.events.on("request:start", ({ request }) => {
+    observed.push({
+      method: request.method,
+      path: new URL(request.url).pathname,
+    });
+  });
+
   beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
   afterAll(() => server.close());
   afterEach(() => {
+    observed.splice(0);
     for (const watcher of watchers.splice(0)) {
       clearInterval(watcher);
     }
@@ -522,6 +620,23 @@ export function usePlatformMock(): PlatformMock {
       return id;
     },
 
+    refusesRevokeNamingAHostileOrigin() {
+      const origin = "https://evil\u001b[2Jwiped.example.com";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1", kind: "primary" }] },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      return origin;
+    },
+
     pagesWithAHostileCursor() {
       const cursor = "cur-\u001b[2Jwiped";
       server.use(
@@ -626,12 +741,62 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
+    cannotListPreviews() {
+      server.use(
+        http.get("*/projects/:projectId/previews", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
+        ),
+      );
+    },
+
     cannotReadConnections() {
       server.use(
         http.get("*/idps/:id", () =>
           HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
         ),
       );
+    },
+
+    mintsAHostileInvitation() {
+      const link = "https://console.example.com/invitations/accept#token=\u001b[2Jwiped";
+      server.use(
+        http.post("*/invitations", () => {
+          return HttpResponse.json(
+            { ...hostileInvitation("inv-\u001b[2Jwiped", null), link },
+            { status: 201 },
+          );
+        }),
+      );
+      return link;
+    },
+
+    servesAHostileInvitation() {
+      const name = "Ada\u001b[2Jwiped";
+      const invitation = hostileInvitation("inv_hostile", { name });
+      server.use(
+        http.get("*/invitations", () => {
+          return HttpResponse.json({ invitations: [invitation], next_page_token: null });
+        }),
+        http.get("*/invitations/:id", () => {
+          return HttpResponse.json(invitation);
+        }),
+        http.delete("*/invitations/:id", () => {
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      return name;
+    },
+
+    acceptsInvitation(invitationId) {
+      acceptInvitation(invitationId);
+    },
+
+    declinesInvitation(invitationId) {
+      rejectInvitation(invitationId);
+    },
+
+    expiresInvitation(invitationId) {
+      expireInvitation(invitationId);
     },
 
     recovers() {

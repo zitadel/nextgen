@@ -1,33 +1,25 @@
 import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  realpath,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { parseEnv, promisify } from "node:util";
 
 import { snapshotPlatformStore } from "@zitadel/api-mock/platform";
-import { expect, vi } from "vitest";
+import { expect, onTestFinished, vi } from "vitest";
 import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { COMMANDS } from "@/index";
+import { EXIT_CODES } from "@/lib/errors";
 import { parseJsonOrUndefined } from "@/lib/json";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** How long a run gets to unwind after an interrupt before the test gives up on it. */
 const INTERRUPT_GRACE_MS = 10_000;
@@ -44,8 +36,10 @@ export type InterruptedRun = Readonly<{
 }>;
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
-import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
-import { assertRunnableSuggestions } from "./suggestions";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
+import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
+import { assertRunnableSuggestions, assertSuggestionsCarryTheRun } from "./suggestions";
+import { holdingADryRunToNothing } from "@tests/helpers/dry-run";
 
 const execFileAsync = promisify(execFile);
 
@@ -543,6 +537,39 @@ export class ScaffoldedApp {
     }
   }
 
+  /**
+   * The paths the next commit of everything would take: those under version
+   * control, and those outside it that no ignore rule keeps out. Read from git,
+   * which decides it, without committing.
+   */
+  async committableFiles(): Promise<string[]> {
+    const { stdout } = await execFileAsync(
+      "git",
+      [
+        "-c",
+        "core.quotePath=false",
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "-z",
+      ],
+      { cwd: this.path },
+    );
+    return stdout.split("\0").filter((line) => line !== "");
+  }
+
+  /**
+   * Puts an app set up without git in the state a setup before this CLI left a
+   * SvelteKit app in: `gitignore` as its `.gitignore`, and everything it does
+   * not ignore committed, so `.env.example`, which it ignores, never was.
+   */
+  async leftByAnOlderSetup(gitignore: string): Promise<void> {
+    await this.replaceGitignore(gitignore);
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await this.commitEverything();
+  }
+
   /** Commits everything outstanding, as the developer would before deploying. */
   async commitEverything(): Promise<void> {
     await execFileAsync("git", ["add", "--all"], { cwd: this.path });
@@ -1023,7 +1050,7 @@ export class ScaffoldedApp {
               process.execPath,
               [
                 join(cliPackageRoot, "bin/run.js"),
-                ...["start", "--cwd", this.path, "--server", MOCK_SERVER_URL],
+                ...["start", "--cwd", this.path],
                 ...["--port", port, "--json"],
               ],
               { env },
@@ -1103,43 +1130,42 @@ export class ScaffoldedApp {
     await new Promise<void>((listening) => {
       stalled.listen(port, "127.0.0.1", listening);
     });
-    const startedAt = Date.now();
-    try {
-      const result = await new Promise<CliResult>((resolve) => {
-        execFile(
-          process.execPath,
-          [
-            join(cliPackageRoot, "bin/run.js"),
-            ...["status", "--json", "--cwd", this.path],
-            ...["--server", `http://127.0.0.1:${String(port)}`],
-          ],
-          {
-            env: {
-              ...process.env,
-              DO_NOT_TRACK: "1",
-            },
-          },
-          (error, stdout, stderr) => {
-            return resolve({
-              exitCode: typeof error?.code === "number" ? error.code : 0,
-              stdout,
-              stderr,
-            });
-          },
-        );
-      });
-      return {
-        result,
-        elapsedMs: Date.now() - startedAt,
-      };
-    } finally {
+    onTestFinished(async () => {
       stalled.closeAllConnections();
       await new Promise<void>((closed) => {
         stalled.close(() => {
           return closed();
         });
       });
-    }
+    });
+    const startedAt = Date.now();
+    const result = await new Promise<CliResult>((resolve) => {
+      execFile(
+        process.execPath,
+        [
+          join(cliPackageRoot, "bin/run.js"),
+          ...["status", "--json", "--cwd", this.path],
+          ...["--server", `http://127.0.0.1:${String(port)}`],
+        ],
+        {
+          env: {
+            ...process.env,
+            DO_NOT_TRACK: "1",
+          },
+        },
+        (error, stdout, stderr) => {
+          return resolve({
+            exitCode: typeof error?.code === "number" ? error.code : 0,
+            stdout,
+            stderr,
+          });
+        },
+      );
+    });
+    return {
+      result,
+      elapsedMs: Date.now() - startedAt,
+    };
   }
 
   /**
@@ -1167,63 +1193,62 @@ export class ScaffoldedApp {
     await new Promise<void>((listening) => {
       stalled.listen(port, "127.0.0.1", listening);
     });
-    try {
-      return await new Promise<InterruptedRun>((resolve, reject) => {
-        const child = spawn(
-          process.execPath,
-          [
-            join(cliPackageRoot, "bin/run.js"),
-            ...["status", "--json", "--cwd", this.path],
-            ...["--server", `http://127.0.0.1:${String(port)}`],
-          ],
-          {
-            env: {
-              ...process.env,
-              DO_NOT_TRACK: "1",
-            },
-          },
-        );
-        const out: string[] = [];
-        const err: string[] = [];
-        child.stdout.on("data", (chunk: Buffer) => {
-          out.push(chunk.toString());
-        });
-        child.stderr.on("data", (chunk: Buffer) => {
-          err.push(chunk.toString());
-        });
-        reached.interrupt = () => {
-          child.kill("SIGINT");
-        };
-        // A run that neither unwinds nor dies would otherwise hold the suite
-        // until its own deadline, and the failure would read as a timeout
-        // somewhere else rather than as a command that ignored the interrupt.
-        const gaveUp = setTimeout(() => {
-          child.kill("SIGKILL");
-          reject(new Error(`status kept running ${String(INTERRUPT_GRACE_MS)}ms after SIGINT`));
-        }, INTERRUPT_GRACE_MS);
-        child.on("close", (code, signal) => {
-          clearTimeout(gaveUp);
-          // A run the signal killed outright never installed its handler, which
-          // is a different failure from one that unwound: it answers no exit
-          // code and names the signal instead, so neither reads as the other.
-          const run = {
-            exitCode: code,
-            signal,
-            stdout: out.join(""),
-            stderr: err.join(""),
-          };
-          assertNothingDrivesTheTerminal(run, ["status"]);
-          return resolve(run);
-        });
-      });
-    } finally {
+    onTestFinished(async () => {
       stalled.closeAllConnections();
       await new Promise<void>((closed) => {
         stalled.close(() => {
           return closed();
         });
       });
-    }
+    });
+    return await new Promise<InterruptedRun>((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        [
+          join(cliPackageRoot, "bin/run.js"),
+          ...["status", "--json", "--cwd", this.path],
+          ...["--server", `http://127.0.0.1:${String(port)}`],
+        ],
+        {
+          env: {
+            ...process.env,
+            DO_NOT_TRACK: "1",
+          },
+        },
+      );
+      const out: string[] = [];
+      const err: string[] = [];
+      child.stdout.on("data", (chunk: Buffer) => {
+        out.push(chunk.toString());
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        err.push(chunk.toString());
+      });
+      reached.interrupt = () => {
+        child.kill("SIGINT");
+      };
+      // A run that neither unwinds nor dies would otherwise hold the suite
+      // until its own deadline, and the failure would read as a timeout
+      // somewhere else rather than as a command that ignored the interrupt.
+      const gaveUp = setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(new Error(`status kept running ${String(INTERRUPT_GRACE_MS)}ms after SIGINT`));
+      }, INTERRUPT_GRACE_MS);
+      child.on("close", (code, signal) => {
+        clearTimeout(gaveUp);
+        // A run the signal killed outright never installed its handler, which
+        // is a different failure from one that unwound: it answers no exit
+        // code and names the signal instead, so neither reads as the other.
+        const run = {
+          exitCode: code,
+          signal,
+          stdout: out.join(""),
+          stderr: err.join(""),
+        };
+        assertNothingDrivesTheTerminal(run, ["status"]);
+        return resolve(run);
+      });
+    });
   }
 
   /** Add a primary origin, so a deploy to `primary` has somewhere to land. */
@@ -1238,6 +1263,46 @@ export class ScaffoldedApp {
       "--json",
     ]);
     expect(result, "origin add should have succeeded").toSucceed();
+  }
+
+  /**
+   * Invite someone into the project with `invitation create`.
+   *
+   * @returns The invitation's id.
+   */
+  async invite(): Promise<string> {
+    const result = await this.cli(["invitation", "create", "--relation", "viewer", "--json"]);
+    expect(result, "invitation create should have succeeded").toSucceed();
+    return this.envelopeOf<{ id: string }>(result).data.id;
+  }
+
+  /** The ids of the project's invitations in every status, newest first, as `invitation list` reports them. */
+  async invitationIds(): Promise<string[]> {
+    const result = await this.cli([
+      "invitation",
+      "list",
+      "--all",
+      ...["pending", "accepted", "rejected", "expired"].flatMap((status) => ["--status", status]),
+      "--json",
+    ]);
+    expect(result, "invitation list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: { id: string }[] }>(result).data.items.map((invitation) => {
+      return invitation.id;
+    });
+  }
+
+  /** Everything `invitation list --all --json` prints, for a value that must not be in it. */
+  async invitationListing(): Promise<string> {
+    const result = await this.cli(["invitation", "list", "--all", "--json"]);
+    expect(result, "invitation list should have succeeded").toSucceed();
+    return result.stdout + result.stderr;
+  }
+
+  /** Everything `invitation get --json` prints for one invitation, for a value that must not be in it. */
+  async invitationReading(invitationId: string): Promise<string> {
+    const result = await this.cli(["invitation", "get", invitationId, "--json"]);
+    expect(result, "invitation get should have succeeded").toSucceed();
+    return result.stdout + result.stderr;
   }
 
   /** How many deployments the project serves, as `deployment list` reports them. */
@@ -1293,6 +1358,28 @@ export class ScaffoldedApp {
     const result = await this.run(["preview", "--origin", url, "--json"]);
     expect(result, "preview should have succeeded").toSucceed();
     return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
+  /**
+   * The expiry `preview list` shows for a preview, read back as a developer
+   * would, to arrange what another command is expected to print.
+   *
+   * @param url - The preview URL that was deployed.
+   * @returns The expiry `preview list` reports for it.
+   * @throws Error when `preview list` does not show the preview.
+   */
+  async previewExpiry(url: string): Promise<string> {
+    const result = await this.run(["preview", "list", "--json"]);
+    const { items } = this.envelopeOf<{ items: { origin: string; expires_at: string }[] }>(
+      result,
+    ).data;
+    const found = items.find((item) => {
+      return item.origin === url;
+    });
+    if (found === undefined) {
+      throw new Error(`preview list does not show ${url}`);
+    }
+    return found.expires_at;
   }
 
   /** `deploy --dry-run`: validates and shows the diff without writing. */
@@ -1407,7 +1494,7 @@ export class ScaffoldedApp {
    * `--cwd` every run is given, so a spec states the whole suggestion.
    */
   againAsRun(command: string): string {
-    return `${command} --server ${MOCK_SERVER_URL} --cwd ${this.path}`;
+    return `${command}${takesServer(command.split(" ")) ? ` --server ${MOCK_SERVER_URL}` : ""} --cwd ${this.path}`;
   }
 
   /** For output oclif owns rather than our envelope: `--help`, `--version`. */
@@ -1417,10 +1504,17 @@ export class ScaffoldedApp {
 
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
-    const result = await runCliForTest([...args, "--cwd", this.path], env);
+    const ran = [...args, "--cwd", this.path];
+    const run = (): Promise<CliResult> => {
+      return runCliForTest(ran, env);
+    };
+    const result = args.includes("--dry-run")
+      ? await holdingADryRunToNothing(args.join(" "), this.path, run)
+      : await run();
     assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
+      assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);
     }
     return result;
   }
@@ -1442,6 +1536,31 @@ export class ScaffoldedApp {
         ...(dryRun ? ["--dry-run"] : []),
       ]),
     );
+  }
+
+  /**
+   * `variable set --input <source>`, with `stdin` piped in for `--input -`.
+   */
+  setVariableFrom(source: string, stdin = ""): Promise<CliResult> {
+    return this.pipingStdin(stdin, () =>
+      this.cli(["variable", "set", "--input", source, "--json"]),
+    );
+  }
+
+  /**
+   * `variable set --input <document>` with `words` typed beside it, as a person mixing the two would.
+   */
+  setVariableFromBeside(document: string, ...words: string[]): Promise<CliResult> {
+    return this.cli(["variable", "set", "--input", document, ...words, "--json"]);
+  }
+
+  /**
+   * `variable set --input @<file>`, with `contents` written to `file` in the project first.
+   */
+  async setVariableFromFile(file: string, contents: string): Promise<CliResult> {
+    await this.writeProjectFile(file, contents);
+
+    return this.setVariableFrom(`@${join(this.path, file)}`);
   }
 
   /** `variable set` without `--json`, for a spec asserting what the developer reads. */
@@ -1585,16 +1704,16 @@ export class ScaffoldedApp {
 
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
-    return this.listed<RegisteredIdp>("idps");
+    return this.listed<RegisteredIdp>("idp");
   }
 
   /** The policies the platform holds, each at its newest revision. */
   publishedPolicies(): Promise<PublishedPolicy[]> {
-    return this.listed<PublishedPolicy>("policies");
+    return this.listed<PublishedPolicy>("policy");
   }
 
   publishedSchemas(): Promise<PublishedSchema[]> {
-    return this.listed<PublishedSchema>("schemas");
+    return this.listed<PublishedSchema>("schema");
   }
 
   /** The one schema a scaffolded project publishes. */
@@ -1603,7 +1722,7 @@ export class ScaffoldedApp {
   }
 
   publishedFlows(): Promise<PublishedFlow[]> {
-    return this.listed<PublishedFlow>("flow-definitions");
+    return this.listed<PublishedFlow>("flow-definition");
   }
 
   /** The one login flow a scaffolded project publishes. */
@@ -1639,7 +1758,7 @@ export class ScaffoldedApp {
   }
 
   /**
-   * The auth methods the published user schema names, as `schemas list`
+   * The auth methods the published user schema names, as `schema list`
    * reports them.
    *
    * @returns The schema's `x-auth-methods`, empty when it names none.
@@ -1904,6 +2023,20 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /** Gives the app `contents` as its `.gitignore`, as its framework's generator or the developer left it. */
+  replaceGitignore(contents: string): Promise<void> {
+    return this.writeProjectFile(".gitignore", contents);
+  }
+
+  /**
+   * Gives the Vite app's dev proxy the target setup fixed in it, the server it
+   * ran against, before the proxy read `ZITADEL_URL`.
+   */
+  async fixesItsServerAddress(): Promise<void> {
+    const config = await this.readProjectFile(VITE_CONFIG);
+    await this.writeProjectFile(VITE_CONFIG, withFixedAddress(config, MOCK_SERVER_URL));
+  }
+
   /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
   async hasInstalled(name: string, version: string): Promise<void> {
     await mkdir(join(this.path, "node_modules", name), { recursive: true });
@@ -2007,6 +2140,11 @@ export class ScaffoldedApp {
     return this.deleteProjectFile(`.zitadel/meta/${dialect}.json`);
   }
 
+  /** Removes the local secret, as a developer who deleted `.zitadel/secret` would. */
+  losesItsLocalSecret(): Promise<void> {
+    return this.deleteProjectFile(".zitadel/secret");
+  }
+
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
@@ -2051,9 +2189,9 @@ export class ScaffoldedApp {
     );
   }
 
-  /** Runs `zitadel policies test` with `args`. */
+  /** Runs `zitadel policy test` with `args`. */
   testPolicies(args: string[] = []): Promise<CliResult> {
-    return this.run(["policies", "test", "--non-interactive", ...args]);
+    return this.run(["policy", "test", "--non-interactive", ...args]);
   }
 
   /** Removes the committed password policy file, as the developer owning it would. */
@@ -2212,13 +2350,22 @@ export class ScaffoldedApp {
     env: NodeJS.ProcessEnv = {},
     { envelope = true }: { envelope?: boolean } = {},
   ): Promise<CliResult> {
-    const result = await runCliForTest(
-      [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL],
-      env,
-    );
+    const ran = [
+      ...args,
+      "--cwd",
+      this.path,
+      ...(takesServer(args) ? ["--server", MOCK_SERVER_URL] : []),
+    ];
+    const run = (): Promise<CliResult> => {
+      return runCliForTest(ran, env);
+    };
+    const result = args.includes("--dry-run")
+      ? await holdingADryRunToNothing(args.join(" "), this.path, run)
+      : await run();
     assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
+      assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);
     }
     return result;
   }
@@ -2499,6 +2646,12 @@ function assertAJsonBodyParses(result: { stdout: string }, where: string): void 
   }
 }
 
+/** The envelope a `--json` run printed: an empty one when it printed none, which the contract check refuses. */
+function envelopeIn(result: CliResult): { next_commands?: string[]; data?: unknown } {
+  const parsed = parseJsonOrUndefined(result.stdout);
+  return typeof parsed === "object" && parsed !== null ? parsed : {};
+}
+
 /**
  * The envelope contract, checked on every `--json` invocation a spec makes.
  *
@@ -2530,6 +2683,13 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   expect(envelope.status, `${where}: status missing or unknown`).toMatch(/^(ok|skipped|error)$/);
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
+    expect(
+      Object.keys(EXIT_CODES),
+      `${where}: error code ${envelope.code} is not one the CLI documents`,
+    ).toContain(envelope.code);
+    expect(result.stdout, `${where}: a framework's own wording reached the envelope`).not.toContain(
+      "See more help with",
+    );
   }
   const contract = ContractEnvelope.parse(parsed);
   assertRunnableSuggestions(where, contract);
@@ -2669,7 +2829,7 @@ type ContractEnvelope = z.infer<typeof ContractEnvelope>;
  * a positional argument that happens to be the word `list` (e.g. `variable get
  * list`) is never misread as a list command. A `list` command (and `resources`,
  * the one collection not named `… list`) must use the canonical
- * `{ items, count, next_page_token }` envelope (`listData`); any command that
+ * `{ items, count, truncated, next_page_token }` envelope (`listData`); any command that
  * emits `items` must carry `count` and `next_page_token`; a delete command must
  * confirm with `deleted: true` (`deletedData`), and no command anywhere may use
  * `removed`. A dry run has its own preview shape, so it is exempt. A divergent
@@ -2707,6 +2867,11 @@ function assertDataShape(where: string, envelope: ContractEnvelope): void {
       token === null || typeof token === "string",
       `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
     ).toBe(true);
+    const truncated = "truncated" in data ? data.truncated : undefined;
+    expect(
+      truncated,
+      `${where}: a list envelope says whether more remain in \`truncated\`, true exactly when it has a cursor`,
+    ).toBe(token !== null);
   }
   if (verb === "rm" || verb === "delete" || verb === "remove") {
     expect(
@@ -2722,10 +2887,7 @@ function assertDataShape(where: string, envelope: ContractEnvelope): void {
 
 /**
  * A minimal app in a temp directory, the pre-existing-app posture setup
- * scaffolds into. The dir is left under the OS temp dir rather than deleted on
- * teardown: CI runners are ephemeral and the OS reclaims `tmpdir()` entries, so
- * skipping the recursive delete avoids the transient ENOTEMPTY/EBUSY race it can
- * hit on a busy filesystem (the CLI awaits every write, so nothing is in flight).
+ * scaffolds into. The directory is removed when the test ends.
  */
 export async function anApp({
   nextVersion = "^16.0.0",
@@ -2734,7 +2896,7 @@ export async function anApp({
   nextVersion?: string;
   usesClaudeCode?: boolean;
 } = {}): Promise<ScaffoldedApp> {
-  const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
+  const path = await scratchDir("zitadel-next-");
   if (usesClaudeCode) {
     await mkdir(join(path, ".claude"), { recursive: true });
   }
@@ -2760,12 +2922,57 @@ export async function anApp({
   return new ScaffoldedApp(path);
 }
 
+/** A Vite app's config, into which setup merges the dev proxy. */
+const VITE_CONFIG = "vite.config.ts";
+
+/** A React app as create-vite's react-ts template leaves it, before setup. */
+export async function aReactApp(): Promise<ScaffoldedApp> {
+  const path = await scratchDir("zitadel-react-");
+  await mkdir(join(path, "src"), { recursive: true });
+  const files = {
+    "package.json": JSON.stringify(
+      {
+        name: "demo-react-app",
+        private: true,
+        type: "module",
+        scripts: { dev: "vite" },
+        dependencies: { react: "^19.0.0", "react-dom": "^19.0.0" },
+        devDependencies: { vite: "^8.0.0" },
+      },
+      null,
+      2,
+    ),
+    ".gitignore": "node_modules\n",
+    "index.html":
+      '<!doctype html>\n<html>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n',
+    "src/main.tsx":
+      'import { createRoot } from "react-dom/client";\nimport App from "./App.tsx";\n\ncreateRoot(document.getElementById("root")!).render(<App />);\n',
+    "src/App.tsx": "export default function App() {\n  return null;\n}\n",
+    [VITE_CONFIG]: BARE_VITE_CONFIG,
+  };
+  for (const [relativePath, contents] of Object.entries(files)) {
+    await writeFile(join(path, relativePath), contents);
+  }
+  return new ScaffoldedApp(path);
+}
+
+/**
+ * A React app already through `setup`, for specs about its dev proxy. Setup
+ * replaces create-vite's own `src/App.tsx` only when forced.
+ */
+export async function aSetUpReactApp(): Promise<ScaffoldedApp> {
+  const app = await aReactApp();
+  const result = await app.setup(["--no-git", "--force", "--framework", "react"]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
+}
+
 /**
  * An empty directory for setup to create a new app in, under a name npm
  * accepts for a package unless a `name` says otherwise.
  */
 export async function aNewAppDirectory(name = "my-app"): Promise<ScaffoldedApp> {
-  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  const parent = await scratchDir("zitadel-new-");
   const path = join(parent, name);
   await mkdir(path);
   return new ScaffoldedApp(path);
@@ -2776,7 +2983,7 @@ export async function aNewAppDirectory(name = "my-app"): Promise<ScaffoldedApp> 
  * one that does: how `--cwd` names the folder a new app should live in.
  */
 export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
-  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  const parent = await scratchDir("zitadel-new-");
   return new ScaffoldedApp(join(parent, "my-app"));
 }
 
@@ -2866,7 +3073,7 @@ async function fakePackageManager(
   exitCode = 0,
   slow = false,
 ): Promise<{ binDir: string; logPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
+  const binDir = await scratchDir("zitadel-fake-pm-");
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
   await writeFile(
@@ -2896,7 +3103,7 @@ type UpgradeBehavior = {
 async function fakeNpx(
   outcome: "done" | "issues" | "broken" | "slow",
 ): Promise<{ binDir: string; logPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-npx-"));
+  const binDir = await scratchDir("zitadel-fake-npx-");
   const logPath = join(binDir, "npx.log");
   const answer = {
     done: '{"status":"ok"}',
@@ -2921,7 +3128,7 @@ ${outcome === "slow" ? "setTimeout(() => {" : ""}process.stdout.write(${JSON.str
 
 /** A `git` on PATH that runs the real one for everything but `commit`, which it refuses. Returns its directory. */
 async function gitThatCannotCommit(): Promise<string> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-git-no-commit-"));
+  const binDir = await scratchDir("zitadel-git-no-commit-");
   const { stdout } = await execFileAsync("sh", ["-c", "command -v git"]);
   await writeFile(
     join(binDir, "git"),
@@ -2933,7 +3140,7 @@ async function gitThatCannotCommit(): Promise<string> {
 
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
+  const binDir = await scratchDir("zitadel-fake-docker-");
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
   await writeFile(
@@ -2951,3 +3158,25 @@ if (args[0] === "version") process.stdout.write("27.0.0\\n");
 
 /** The one terminal harness, re-exported for the specs that reached for it here. */
 export { asTerminal };
+
+/**
+ * Whether the command a run names takes `--server`, so a run is given one only
+ * where it means something.
+ *
+ * @param args - The words of the run, the command first.
+ * @returns True when the command declares `--server`, or when no command is named.
+ */
+function takesServer(args: readonly string[]): boolean {
+  const words = args.filter((arg) => {
+    return !arg.startsWith("-");
+  });
+  const id = words
+    .map((_, dropped) => {
+      return words.slice(0, words.length - dropped).join(":");
+    })
+    .find((candidate) => {
+      return candidate in COMMANDS;
+    });
+
+  return id === undefined || "server" in (COMMANDS[id]?.baseFlags ?? {});
+}

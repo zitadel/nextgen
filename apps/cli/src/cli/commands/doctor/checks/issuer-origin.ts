@@ -1,4 +1,5 @@
 import { configuredIssuer } from "@/cli/commands/doctor/patch-context";
+import { ZitadelRuntime } from "@/lib/server";
 import {
   createZitadelClient,
   DeploymentService,
@@ -7,17 +8,11 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { errorMessage, isCancellation } from "@/lib/errors";
-import {
-  readProjectServer,
-  readZitadelConfig,
-  readZitadelSecret,
-  writeZitadelSecret,
-  type ZitadelSecret,
-} from "@/lib/project";
-import { userAgent } from "@/lib/user-agent";
-import { reportWarning } from "@/lib/warnings";
+import { Runtime } from "@/lib/runtime";
+import { warnings } from "@/lib/ui";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { Project, type ProjectSecret } from "@/lib/project";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -26,7 +21,7 @@ type Finding =
       readonly status: "warn";
       readonly pattern: string;
       readonly server: string;
-      readonly secret: ZitadelSecret;
+      readonly secret: ProjectSecret;
       readonly client: ZitadelClient;
     };
 
@@ -66,7 +61,10 @@ export class IssuerOriginCheck implements SanityCheck {
       message:
         `The project has no primary origin to deploy to: it holds ${finding.pattern} as a ` +
         "preview origin, as setup 0.1.0 registered it. Run " +
-        `${ctx.suggest({ id: "doctor", flags: { fix: true } })} to make it primary.`,
+        `${ctx.suggest({
+          id: "doctor",
+          flags: { fix: true },
+        })} to make it primary.`,
       details: {
         pattern: finding.pattern,
         server: finding.server,
@@ -94,24 +92,26 @@ export class IssuerOriginCheck implements SanityCheck {
       return;
     }
     const { client, pattern, secret, server } = finding;
+    const held = secret.data;
     const consent = await ctx.consent({
       verb: "replace",
       name: `replace the preview origin ${pattern} with a primary one`,
-      message: `Replace the preview origin ${pattern} with a primary one in project ${secret.project_id} on ${server.replace(/^https?:\/\//, "")}?`,
+      message: `Replace the preview origin ${pattern} with a primary one in project ${held.project_id} on ${server.replace(/^https?:\/\//, "")}?`,
     });
     if (consent === undefined) {
       return;
     }
-    const originService = new OriginService(consent.unlock(client), secret.project_id);
+    const originService = new OriginService(consent.unlock(client), held.project_id);
     await originService.promote(pattern);
-    await writeZitadelSecret(ctx.cwd, {
-      ...secret,
-      primary_origins: [...secret.primary_origins, pattern],
-      preview_origins: secret.preview_origins.filter((recorded) => {
-        return recorded !== pattern;
-      }),
-    });
-    const extended = await new DeploymentService(client, secret.project_id)
+    await secret
+      .with({
+        primary_origins: [...held.primary_origins, pattern],
+        preview_origins: held.preview_origins.filter((recorded) => {
+          return recorded !== pattern;
+        }),
+      })
+      .write();
+    const extended = await new DeploymentService(client, held.project_id)
       .extendPrimary(pattern, `Made ${pattern} a primary origin`)
       .catch((error: unknown) => {
         if (isCancellation(error)) {
@@ -120,27 +120,39 @@ export class IssuerOriginCheck implements SanityCheck {
         return undefined;
       });
     if (extended?.outcome !== "deployed" && extended?.outcome !== "unchanged") {
-      reportWarning(
+      warnings.report(
         `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
       );
     }
   }
 }
 
+/**
+ * Reads the project's recorded origins and the server's, and finds whether the
+ * configured issuer is held as a preview origin. A missing or unparseable
+ * secret or config is the `secret` and `config` checks' to report, with a
+ * repair path, so it passes here as skipped. Cancelling is not a check that
+ * could not read: the person asked `doctor` to stop, so it stops rather than
+ * passing a check it skipped.
+ *
+ * @param cwd - The project folder.
+ * @param signal - The run's cancellation.
+ * @returns The finding.
+ * @throws The cancellation, when the person stopped the run.
+ */
 async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
-  const records = await readZitadelSecret(cwd)
+  const records = await Project.at(cwd)
+    .secret()
     .then(async (secret) => {
       return {
         secret,
-        server: readProjectServer(await readZitadelConfig(cwd)),
+        server: (await Project.at(cwd).config()).server ?? ZitadelRuntime.DEFAULT,
       };
     })
     .catch(() => {
       return undefined;
     });
   if (records === undefined) {
-    // A missing or unparseable secret or config is the `secret` and `config`
-    // checks' to report, with a repair path.
     return {
       status: "pass",
       message: "Skipped: could not read the project files that record its origins",
@@ -155,13 +167,13 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     };
   }
   const recorded = Origins.wrap([
-    ...secret.primary_origins.map((pattern) => {
+    ...secret.data.primary_origins.map((pattern) => {
       return {
         pattern,
         kind: "primary",
       };
     }),
-    ...secret.preview_origins.map((pattern) => {
+    ...secret.data.preview_origins.map((pattern) => {
       return {
         pattern,
         kind: "preview",
@@ -176,20 +188,18 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   }
 
   const client = createZitadelClient({
-    userAgent: userAgent(),
+    userAgent: Runtime.current().userAgent(),
     baseUrl: server,
-    token: secret.project_secret,
+    token: secret.data.project_secret,
     signal,
   });
-  const originService = new OriginService(client, secret.project_id);
+  const originService = new OriginService(client, secret.data.project_id);
   const read = await originService
     .list()
     .then((origins) => {
       return { origins };
     })
     .catch((error: unknown) => {
-      // Cancelling is not a check that could not read: the person asked
-      // `doctor` to stop, so it stops rather than passing a check it skipped.
       if (isCancellation(error)) {
         throw error;
       }

@@ -1,4 +1,4 @@
-import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
+import type { GetVariable200, ListVariables200 } from "@zitadel/api/generated/model";
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
@@ -97,7 +97,7 @@ const NAME_MAX_LENGTH = 255;
  * @returns The names that hold a value of that kind, with the value.
  */
 function valuesOfKind(
-  body: GetVariables200,
+  body: ListVariables200,
   kind: VariableKind,
 ): Readonly<Record<string, VariableValue>> {
   return Object.fromEntries(
@@ -282,7 +282,7 @@ export class Variable {
    * @param body - What a read without a kind answered.
    * @returns The variables, sorted by name.
    */
-  static inventory(body: GetVariables200): readonly Variable[] {
+  static inventory(body: ListVariables200): readonly Variable[] {
     return Object.entries(body)
       .map(([name, byKind]) => {
         const primary = byKind.primary === undefined ? undefined : heldOf(byKind.primary);
@@ -372,7 +372,7 @@ export class VariableService extends ApiService {
    */
   async inventory(): Promise<readonly Variable[]> {
     return Variable.inventory(
-      await this.client.getVariables({
+      await this.client.listVariables({
         project_id: this.projectId,
       }),
     );
@@ -456,7 +456,7 @@ export class VariableService extends ApiService {
     }
     const written =
       (
-        await this.client.updateVariables(
+        await this.client.setVariables(
           {
             [name]: {
               value,
@@ -559,8 +559,8 @@ export class VariableService extends ApiService {
    * @param kind - Which values to read.
    * @returns The values and the secrets named without disclosure.
    */
-  private async read(kind: VariableKind): Promise<GetVariables200> {
-    return this.client.getVariables({
+  private async read(kind: VariableKind): Promise<ListVariables200> {
+    return this.client.listVariables({
       project_id: this.projectId,
       kind,
     });

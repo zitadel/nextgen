@@ -4,7 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anUndeployedEnvironment, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { PREVIEW_PATTERN, PREVIEW_URL } from "@tests/helpers/records";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],
@@ -452,7 +452,10 @@ describe("deployment rollback", () => {
           status: "ok",
           data: {
             dry_run: true,
-            title: `Would roll back to ${first.deployment_id} (dry run)`,
+            title: `Would roll back deployment ${first.deployment_id} (dry run)`,
+            verb: "roll back",
+            topic: "deployment",
+            id: first.deployment_id,
             deployment_id: first.deployment_id,
             dropped_origins: [],
             restored_origins: [],
@@ -530,7 +533,10 @@ describe("deployment rollback", () => {
           status: "ok",
           data: {
             dry_run: true,
-            title: `Would roll back to ${first.deployment_id} (dry run)`,
+            title: `Would roll back deployment ${first.deployment_id} (dry run)`,
+            verb: "roll back",
+            topic: "deployment",
+            id: first.deployment_id,
             deployment_id: first.deployment_id,
             dropped_origins: ["https://c.example.com"],
             restored_origins: [],
@@ -572,7 +578,10 @@ describe("deployment rollback", () => {
           status: "ok",
           data: {
             dry_run: true,
-            title: `Would roll back to ${first.deployment_id} (dry run)`,
+            title: `Would roll back deployment ${first.deployment_id} (dry run)`,
+            verb: "roll back",
+            topic: "deployment",
+            id: first.deployment_id,
             deployment_id: first.deployment_id,
             dropped_origins: [],
             restored_origins: ["https://b.example.com"],
@@ -610,7 +619,10 @@ describe("deployment rollback", () => {
           status: "ok",
           data: {
             dry_run: true,
-            title: `Would roll back to ${first.deployment_id} (dry run)`,
+            title: `Would roll back deployment ${first.deployment_id} (dry run)`,
+            verb: "roll back",
+            topic: "deployment",
+            id: first.deployment_id,
             deployment_id: first.deployment_id,
             dropped_origins: [pattern],
             restored_origins: [],
@@ -1139,7 +1151,7 @@ describe("deployment rollback", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toPrint(`Would roll back to ${first.deployment_id} (dry run)`);
+        expect(result).toPrint(`Would roll back deployment ${first.deployment_id} (dry run)`);
       });
 
       it("suggests the real rollback after a dry run, once", async () => {

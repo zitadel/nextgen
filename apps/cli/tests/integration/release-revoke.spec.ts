@@ -151,6 +151,14 @@ describe("release revoke", () => {
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
 
+    it("holds its invariants in every rendering of a refusal naming a hostile origin", async () => {
+      const app = await aSetUpApp();
+      const args = ["release", "revoke", await aRelease(app), "--force"];
+      platform.refusesRevokeNamingAHostileOrigin();
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("refuses a deployment id, which is not a release id, without asking", async () => {
         const app = await aSetUpApp();
@@ -299,30 +307,19 @@ describe("release revoke", () => {
           hint: expect.any(String),
           next_commands: expect.any(Array),
           details: {
-            status: 409,
-            url: expect.stringMatching(
-              new RegExp(
-                `/api/v1/releases/${served.release_id}/revoke\\?project_id=proj-[0-9a-f]+$`,
-              ),
-            ),
-            body: {
-              code: "rel.in_use",
-              message: "release: still served by an origin",
-              details: {
-                origins: [
-                  {
-                    origin: "http://localhost:3000",
-                    deployment_id: served.deployment_id,
-                    kind: "primary",
-                  },
-                  {
-                    origin: "https://app.example.com",
-                    deployment_id: served.deployment_id,
-                    kind: "primary",
-                  },
-                ],
+            release_id: served.release_id,
+            origins: [
+              {
+                origin: "http://localhost:3000",
+                deployment_id: served.deployment_id,
+                kind: "primary",
               },
-            },
+              {
+                origin: "https://app.example.com",
+                deployment_id: served.deployment_id,
+                kind: "primary",
+              },
+            ],
           },
         });
       });
@@ -394,7 +391,10 @@ describe("release revoke", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: `Would revoke ${releaseId} (dry run)`,
+              title: `Would revoke release ${releaseId} (dry run)`,
+              verb: "revoke",
+              topic: "release",
+              id: releaseId,
               release_id: releaseId,
               next_commands: [
                 expectedPublicCliCommand(app.againAsRun(`release revoke ${releaseId} --force`)),
@@ -564,7 +564,7 @@ describe("release revoke", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toPrint(`Would revoke ${releaseId} (dry run)`);
+        expect(result).toPrint(`Would revoke release ${releaseId} (dry run)`);
       });
 
       it("suggests revoking for real after a dry run once", async () => {

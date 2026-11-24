@@ -1,6 +1,8 @@
 import { OriginService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
+import { ReadCommand } from "@/cli/commands/bases";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["pattern", "kind"] as const;
@@ -12,21 +14,34 @@ const COLUMNS = ["pattern", "kind"] as const;
  * project state, so the server is the authority. An empty list means every
  * origin is admitted until the first pattern is added.
  */
-export default class OriginList extends Tabulatable(EnvironmentCommand) {
+export default class OriginList extends ReadCommand {
   static override description = "List the origin patterns on the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> origin list",
     "<%= config.bin %> origin list --plain",
   ];
   static override flags = {
+    fields: fieldsFlag({
+      fallback: ["pattern"],
+      shape: {
+        known: new Set(["pattern", "kind"]),
+        open: [],
+      },
+    }),
     plain: plainFlag,
   };
 
-  protected async execute({ flags }: Admitted<typeof OriginList>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const originService = new OriginService(client, projectId);
+  /**
+   * Lists the origin patterns on the project.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The patterns, as a list.
+   */
+  protected async execute({ flags }: Admitted<typeof OriginList>): Promise<CommandResult> {
+    const originService = await this.service(OriginService);
     const origins = await originService.list();
 
     const items = origins.all;
@@ -37,7 +52,7 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
     const page = null;
     const extra = {};
 
-    return this.emitList(flags, {
+    return this.listed(flags, {
       columns,
       rows,
       items,

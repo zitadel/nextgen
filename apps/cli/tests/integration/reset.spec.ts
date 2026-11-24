@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
 
@@ -239,6 +237,8 @@ describe("reset", () => {
           source: "http://localhost:8080",
           data: {
             dry_run: true,
+            verb: "reset",
+            topic: "server",
             title: "Would reset the local Zitadel server runtime (dry run)",
             runtime: {
               backend: "missing",
@@ -264,6 +264,8 @@ describe("reset", () => {
           source: `http://localhost:${app.localPortOf(started)}`,
           data: {
             dry_run: true,
+            verb: "reset",
+            topic: "server",
             title: "Would reset the local Zitadel server runtime (dry run)",
             runtime: {
               backend: "binary",

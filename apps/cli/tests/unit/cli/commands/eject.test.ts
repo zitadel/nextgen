@@ -1,27 +1,19 @@
-import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import Eject from "@/cli/commands/eject";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { asTerminal } from "@tests/helpers/terminal";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { stripAnsi } from "@tests/helpers/run-cli";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 function eject(cwd: string, extra: string[] = []) {
-  return runCliForTest([
-    "eject",
-    "--cwd",
-    cwd,
-    "--json",
-    "--server",
-    "https://api.zitadel.cloud",
-    ...extra,
-  ]);
+  return runCliForTest(["eject", "--cwd", cwd, "--json", ...extra]);
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -33,16 +25,15 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-const tempDirs: string[] = [];
-
 /**
  * Builds a managed project with the full set of files eject is expected to
  * touch: config/state/secret/schemas, a managed login page (with marker), an
  * unmanaged register page (no marker), and a .env.local.
+ *
+ * @param cwd - The empty directory to build the project in.
+ * @returns Once the files are written.
  */
-async function makeManagedProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-"));
-  tempDirs.push(cwd);
+async function makeManagedProject(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
   await mkdir(join(cwd, "app/login"), { recursive: true });
@@ -59,22 +50,22 @@ async function makeManagedProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/flows/default.json"), JSON.stringify({ name: "default" }));
   await writeFile(
     join(cwd, "app/login/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function L() {}\n`,
   );
   // Register page lacks the managed marker, so eject must preserve it.
   await writeFile(join(cwd, "app/register/page.tsx"), "export default function R() {}\n");
   await writeFile(join(cwd, ".env.local"), "ZITADEL_PROJECT_ID=proj-001\n");
-  return cwd;
 }
 
 /**
  * Builds a managed Vue (Vite) project — the patcher merges its dev proxy into
  * `vite.config.ts` via an `edit`, which eject can't reverse, so it must surface
  * the file as a manual cleanup step rather than deleting it.
+ *
+ * @param cwd - The empty directory to build the project in.
+ * @returns Once the files are written.
  */
-async function makeManagedViteProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-vite-"));
-  tempDirs.push(cwd);
+async function makeManagedViteProject(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await mkdir(join(cwd, "src"), { recursive: true });
   await writeFile(
@@ -83,18 +74,49 @@ async function makeManagedViteProject(): Promise<string> {
   );
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
-  await writeFile(join(cwd, "src/App.vue"), `<!-- ${MANAGED_MARKER} -->\n<template></template>\n`);
+  await writeFile(
+    join(cwd, "src/App.vue"),
+    `<!-- ${ManagedFile.MARKER} -->\n<template></template>\n`,
+  );
   await writeFile(join(cwd, "vite.config.ts"), "export default {};\n");
-  return cwd;
+}
+
+/**
+ * An Angular app this CLI set up: its launcher, the module the launcher wrote, and the managed root component.
+ *
+ * @param cwd - The empty directory to build the project in.
+ * @returns Once the files are written.
+ */
+async function makeManagedAngularProject(cwd: string): Promise<void> {
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "src/app"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      scripts: { dev: "node zitadel-ng.cjs serve", build: "node zitadel-ng.cjs build" },
+      dependencies: { "@angular/core": "^22.0.0" },
+    }),
+  );
+  await writeFile(join(cwd, "angular.json"), JSON.stringify({ projects: { demo: {} } }));
+  await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
+  await writeFile(join(cwd, "src/app/app.ts"), `${ManagedFile.MARKER}\nexport class App {}\n`);
+  await writeFile(join(cwd, "zitadel-ng.cjs"), `${ManagedFile.MARKER}\n`);
+  await writeFile(
+    join(cwd, "src/app/zitadel-project.ts"),
+    'export const ZITADEL_PROJECT_ID = "proj-001";\n',
+  );
 }
 
 /**
  * A Nuxt 4 app as an older setup left it: the two plugins setup used to write
  * (one still managed, one the user took over) beside a managed page.
+ *
+ * @param cwd - The empty directory to build the project in.
+ * @returns Once the files are written.
  */
-async function makeOlderNuxtProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-nuxt-"));
-  tempDirs.push(cwd);
+async function makeOlderNuxtProject(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await mkdir(join(cwd, "app/pages"), { recursive: true });
   await mkdir(join(cwd, "app/plugins"), { recursive: true });
@@ -110,31 +132,21 @@ async function makeOlderNuxtProject(): Promise<string> {
   await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
   await writeFile(
     join(cwd, "app/pages/login.vue"),
-    `<script setup>\n// ${MANAGED_MARKER}\n</script>\n`,
+    `<script setup>\n// ${ManagedFile.MARKER}\n</script>\n`,
   );
   await writeFile(
     join(cwd, "app/plugins/zitadel-components.client.ts"),
-    `// ${MANAGED_MARKER}\nimport "@zitadel/components";\n`,
+    `// ${ManagedFile.MARKER}\nimport "@zitadel/components";\n`,
   );
   await writeFile(
     join(cwd, "app/plugins/auth.server.ts"),
     "export default defineNuxtPlugin(() => {});\n",
   );
-  return cwd;
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
-
 describe("eject command", () => {
-  it("refuses to run without --force in non-interactive mode", async () => {
-    const cwd = await makeManagedProject();
+  it("refuses to run without --force in non-interactive mode", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const res = await eject(cwd);
 
@@ -147,8 +159,8 @@ describe("eject command", () => {
     expect(await exists(join(cwd, ".zitadel"))).toBe(true);
   });
 
-  it("removes managed files and the .zitadel dir when forced", async () => {
-    const cwd = await makeManagedProject();
+  it("removes managed files and the .zitadel dir when forced", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const res = await eject(cwd, ["--force"]);
 
@@ -189,8 +201,8 @@ describe("eject command", () => {
 
   // One sentence, in the past tense, with no full stop: the chain closes on
   // it, and "Zitadel ejected, and the remote project is untouched." was two.
-  it("closes on one sentence saying what it did", async () => {
-    const cwd = await makeManagedProject();
+  it("closes on one sentence saying what it did", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const res = await eject(cwd, ["--force"]);
 
@@ -199,8 +211,8 @@ describe("eject command", () => {
     );
   });
 
-  it("answers a dry run as one, saying what it would do", async () => {
-    const cwd = await makeManagedProject();
+  it("answers a dry run as one, saying what it would do", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const res = await eject(cwd, ["--dry-run"]);
 
@@ -214,8 +226,10 @@ describe("eject command", () => {
     });
   });
 
-  it("reports what would be removed in dry-run without touching the filesystem", async () => {
-    const cwd = await makeManagedProject();
+  it("reports what would be removed in dry-run without touching the filesystem", async ({
+    dir: cwd,
+  }) => {
+    await makeManagedProject(cwd);
 
     const res = await eject(cwd, ["--force", "--dry-run"]);
 
@@ -233,8 +247,8 @@ describe("eject command", () => {
     expect(await exists(join(cwd, ".env.local"))).toBe(true);
   });
 
-  it("strips guidance sections and deletes scaffold-created husks", async () => {
-    const cwd = await makeManagedProject();
+  it("strips guidance sections and deletes scaffold-created husks", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
     const begin = "<!-- zitadel:guidance:begin -->";
     const end = "<!-- zitadel:guidance:end -->";
     // Scaffold-created AGENTS.md: nothing but the header around the managed
@@ -271,8 +285,10 @@ describe("eject command", () => {
     expect(readme).not.toContain("Authentication (Zitadel)");
   });
 
-  it("surfaces in-place config edits as manual steps for edit-based frameworks", async () => {
-    const cwd = await makeManagedViteProject();
+  it("surfaces in-place config edits as manual steps for edit-based frameworks", async ({
+    dir: cwd,
+  }) => {
+    await makeManagedViteProject(cwd);
 
     const res = await eject(cwd, ["--force"]);
 
@@ -291,8 +307,38 @@ describe("eject command", () => {
     expect(await exists(join(cwd, "vite.config.ts"))).toBe(true);
   });
 
-  it("removes the managed Nuxt plugins an older setup wrote and keeps an edited one", async () => {
-    const cwd = await makeOlderNuxtProject();
+  it("has an Angular app's scripts moved back from its launcher, among the manual steps", async ({
+    dir: cwd,
+  }) => {
+    await makeManagedAngularProject(cwd);
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        manual_steps: expect.arrayContaining([
+          'Restore the "dev" script in package.json (setup added the script, or pinned its dev-server port), and run every script that runs "node zitadel-ng.cjs" with "ng" again',
+        ]),
+      },
+    });
+  });
+
+  it("removes an Angular app's launcher and the module it wrote", async ({ dir: cwd }) => {
+    await makeManagedAngularProject(cwd);
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        files_removed: expect.arrayContaining(["zitadel-ng.cjs", "src/app/zitadel-project.ts"]),
+      },
+    });
+  });
+
+  it("removes the managed Nuxt plugins an older setup wrote and keeps an edited one", async ({
+    dir: cwd,
+  }) => {
+    await makeOlderNuxtProject(cwd);
 
     await eject(cwd, ["--force"]);
 
@@ -300,10 +346,7 @@ describe("eject command", () => {
     expect(await exists(join(cwd, "app/plugins/auth.server.ts"))).toBe(true);
   });
 
-  it("emits a skipped envelope when there is nothing to eject", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
-    tempDirs.push(cwd);
-
+  it("emits a skipped envelope when there is nothing to eject", async ({ dir: cwd }) => {
     const res = await eject(cwd, ["--force"]);
 
     expect(res.exitCode).toBe(0);
@@ -312,10 +355,7 @@ describe("eject command", () => {
     expect(json.reason).toBe("nothing-to-eject");
   });
 
-  it("suggests setup in the envelope when there is nothing to eject", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
-    tempDirs.push(cwd);
-
+  it("suggests setup in the envelope when there is nothing to eject", async ({ dir: cwd }) => {
     const res = await eject(cwd, ["--force"]);
 
     expect(parseJson(res.stdout)).toMatchObject({
@@ -323,10 +363,7 @@ describe("eject command", () => {
     });
   });
 
-  it("suggests setup in the envelope on a dry run with nothing to eject", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
-    tempDirs.push(cwd);
-
+  it("suggests setup in the envelope on a dry run with nothing to eject", async ({ dir: cwd }) => {
     const res = await eject(cwd, ["--dry-run"]);
 
     expect(parseJson(res.stdout)).toMatchObject({
@@ -336,8 +373,8 @@ describe("eject command", () => {
 
   it.for(["zitadel.json", ".env.local", "Remove the Zitadel configuration block from vite.config"])(
     "tells a person on the terminal about %s",
-    async (line) => {
-      const cwd = await makeManagedViteProject();
+    async (line, { dir: cwd }) => {
+      await makeManagedViteProject(cwd);
       await writeFile(join(cwd, ".env.local"), "ZITADEL_PROJECT_ID=proj-001\n");
 
       const res = await runCliForTest(["eject", "--cwd", cwd, "--force"]);
@@ -355,16 +392,16 @@ describe("eject asked on a terminal", () => {
     return { result, shown: talk.shown(), talk };
   };
 
-  it("asks whether to remove the managed files and local state", async () => {
-    const cwd = await makeManagedProject();
+  it("asks whether to remove the managed files and local state", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const { talk } = await ejecting(cwd, false);
 
     expect(talk.asked()).toEqual(["Remove the managed files and local Zitadel state?"]);
   });
 
-  it("is skipped, removing nothing, when the answer is no", async () => {
-    const cwd = await makeManagedProject();
+  it("is skipped, removing nothing, when the answer is no", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const { result } = await ejecting(cwd, false);
 
@@ -375,8 +412,8 @@ describe("eject asked on a terminal", () => {
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 
-  it("removes the managed files when the answer is yes", async () => {
-    const cwd = await makeManagedProject();
+  it("removes the managed files when the answer is yes", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const { result } = await ejecting(cwd, true);
 
@@ -386,16 +423,16 @@ describe("eject asked on a terminal", () => {
 
   // A declined run changed nothing, so its summary says what is still there
   // rather than repeating the refusal the closing line already made.
-  it("says what a declined run left in place", async () => {
-    const cwd = await makeManagedProject();
+  it("says what a declined run left in place", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const { shown } = await ejecting(cwd, false);
 
     expect(stripAnsi(shown)).toContain("Nothing was removed. Zitadel is still set up in this app.");
   });
 
-  it("offers the eject command again when the answer is no", async () => {
-    const cwd = await makeManagedProject();
+  it("offers the eject command again when the answer is no", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const { shown } = await ejecting(cwd, false);
 
@@ -403,8 +440,10 @@ describe("eject asked on a terminal", () => {
     expect(stripAnsi(shown)).toMatch(/\$ .* eject --cwd /);
   });
 
-  it("offers the eject command again in the envelope when the answer is no", async () => {
-    const cwd = await makeManagedProject();
+  it("offers the eject command again in the envelope when the answer is no", async ({
+    dir: cwd,
+  }) => {
+    await makeManagedProject(cwd);
 
     const { result } = await ejecting(cwd, false);
 
@@ -413,26 +452,25 @@ describe("eject asked on a terminal", () => {
     });
   });
 
-  it("ends a declined run on the one dim footer", async () => {
-    const cwd = await makeManagedProject();
+  it("ends a declined run on the one dim footer", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const { shown } = await ejecting(cwd, false);
 
     expect(stripAnsi(shown).trimEnd().split("\n").at(-1)).toBe("Cancelled");
   });
 
-  it("never shows a person the reason the envelope carries", async () => {
-    const cwd = await makeManagedProject();
+  it("never shows a person the reason the envelope carries", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const { shown } = await ejecting(cwd, false);
 
     expect(stripAnsi(shown)).not.toContain("eject-cancelled");
   });
 
-  it("points an app that was never set up at setup, not at the reason token", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
-    tempDirs.push(cwd);
-
+  it("points an app that was never set up at setup, not at the reason token", async ({
+    dir: cwd,
+  }) => {
     const { shown } = await ejecting(cwd, true);
 
     expect(stripAnsi(shown)).toContain(
@@ -440,17 +478,14 @@ describe("eject asked on a terminal", () => {
     );
   });
 
-  it("offers setup to an app that had nothing to remove", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
-    tempDirs.push(cwd);
-
+  it("offers setup to an app that had nothing to remove", async ({ dir: cwd }) => {
     const { shown } = await ejecting(cwd, true);
 
     expect(stripAnsi(shown)).toContain("Set it up whenever you like:");
   });
 
-  it("does not ask on a dry run, which removes nothing", async () => {
-    const cwd = await makeManagedProject();
+  it("does not ask on a dry run, which removes nothing", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     const talk = answering();
 
@@ -459,8 +494,8 @@ describe("eject asked on a terminal", () => {
     expect(talk.asked()).toEqual([]);
   });
 
-  it("fails, removing nothing, when the person walks away", async () => {
-    const cwd = await makeManagedProject();
+  it("fails, removing nothing, when the person walks away", async ({ dir: cwd }) => {
+    await makeManagedProject(cwd);
 
     await expect(ejecting(cwd)).rejects.toThrow();
 

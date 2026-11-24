@@ -2,18 +2,18 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
 import ResolveCommand from "@/cli/commands/variable/resolve";
-import { parseArg } from "@tests/helpers/inputs";
+import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import {
   aProjectDirectory,
   PLATFORM_URL,
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
-const { server, dirs } = usePlatformServer();
+const { server } = usePlatformServer();
 
 /** One deployment as the live list answers it. */
 function aDeployment(id: string, origin: string) {
@@ -47,7 +47,6 @@ async function aProject(options: {
     id: "proj_1",
     secret: "sk_proj_1",
   });
-  dirs.push(cwd);
   server.use(
     http.get(`${SERVER}/api/v1/deployments`, () => {
       return HttpResponse.json({
@@ -324,5 +323,20 @@ describe("deployment_id", () => {
       message: expect.stringContaining("must be a deployment ID"),
       hint: "List the deployments to find one, or omit it to read the live deployment.",
     });
+  });
+});
+
+describe("variable resolve --fields", () => {
+  it.each(["name", "secret", "value", "preview.value"])(
+    "accepts %s, which a variable carries under --json",
+    async (path) => {
+      await expect(parseFlag(ResolveCommand.flags.fields, path, "fields")).resolves.toEqual([path]);
+    },
+  );
+
+  it("refuses a field a variable does not carry", async () => {
+    await expect(
+      parseFlag(ResolveCommand.flags.fields, "no_such_field", "fields"),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 });

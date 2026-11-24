@@ -21,7 +21,7 @@ describe("api", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        const result = await app.api("getVariables");
+        const result = await app.api("listVariables");
 
         expect(result).toFailWith("E_NOT_FOUND");
         expect(app.envelopeOf(result)).toEqual({
@@ -45,7 +45,7 @@ describe("api", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        const result = await app.api("getVariables");
+        const result = await app.api("listVariables");
 
         expect(result).toFailWith("E_NETWORK");
         expect(app.envelopeOf(result)).toEqual({
@@ -69,7 +69,7 @@ describe("api", () => {
         const app = await aSetUpApp();
         const waiting = platform.hangs();
 
-        const result = app.api("getVariables");
+        const result = app.api("listVariables");
         await waiting;
         pressCtrlC();
 
@@ -132,9 +132,20 @@ describe("api", () => {
       await app.addPrimaryOrigin();
       await app.setVariable("BANNER", "a\u001b[2Jwiped");
       await app.deployData();
-      const args = ["api", "getVariables"];
+      const args = ["api", "listVariables"];
 
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
+    it.each([
+      ["a dot segment", ".."],
+      ["a control character", "a\u0007b"],
+    ])("refuses %s as a path value", async (_what, value) => {
+      const app = await aSetUpApp();
+
+      const result = await app.api("getSession", value);
+
+      expect(result).toFailWith("E_VALIDATION");
     });
 
     describe("--json", () => {
@@ -173,7 +184,7 @@ describe("api", () => {
       it("writes what its fields say", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.api("updateVariables", "-F", "FOO=bar");
+        const result = await app.api("setVariables", "-F", "FOO=bar");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -186,10 +197,10 @@ describe("api", () => {
         expect(app.envelopeOf(await app.getVariable("FOO")).data).toMatchObject({ value: "bar" });
       });
 
-      it("writes the body piped in with --input -", async () => {
+      it("writes the body piped in with --file -", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.apiPiping('{"FOO":"bar"}', "updateVariables", "--input", "-");
+        const result = await app.apiPiping('{"FOO":"bar"}', "setVariables", "--file", "-");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -206,7 +217,7 @@ describe("api", () => {
         const app = await aSetUpApp();
         const { ZITADEL_PROJECT_ID } = await app.developmentValues();
 
-        const result = await app.api("updateVariables", "-F", "FOO=bar", "--dry-run");
+        const result = await app.api("setVariables", "-F", "FOO=bar", "--dry-run");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -214,9 +225,9 @@ describe("api", () => {
           command: "api",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Would call updateVariables (dry run)",
+            title: "Would call setVariables (dry run)",
             dry_run: true,
-            operation: "updateVariables",
+            operation: "setVariables",
             method: "PATCH",
             url: `http://mock.zitadel.test/api/v1/variables?project_id=${ZITADEL_PROJECT_ID}`,
             body: { FOO: "bar" },
@@ -251,7 +262,7 @@ describe("api", () => {
         const app = await aSetUpApp();
         const { ZITADEL_PROJECT_ID } = await app.developmentValues();
 
-        const result = await app.api("updateVariables", "-F", "FOO=a\u001b[2Jb", "--dry-run");
+        const result = await app.api("setVariables", "-F", "FOO=a\u001b[2Jb", "--dry-run");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -259,9 +270,9 @@ describe("api", () => {
           command: "api",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Would call updateVariables (dry run)",
+            title: "Would call setVariables (dry run)",
             dry_run: true,
-            operation: "updateVariables",
+            operation: "setVariables",
             method: "PATCH",
             url: `http://mock.zitadel.test/api/v1/variables?project_id=${ZITADEL_PROJECT_ID}`,
             body: { FOO: "a\u001b[2Jb" },
@@ -295,7 +306,7 @@ describe("api", () => {
       it("sends nothing with --dry-run", async () => {
         const app = await aSetUpApp();
 
-        await app.api("updateVariables", "-F", "FOO=bar", "--dry-run");
+        await app.api("setVariables", "-F", "FOO=bar", "--dry-run");
 
         expect(await app.projectVariables()).toEqual([]);
       });
@@ -326,7 +337,7 @@ describe("api", () => {
 
         const result = await app.runWithoutServer([
           "api",
-          "getVariables",
+          "listVariables",
           "--non-interactive",
           "--json",
         ]);
@@ -347,7 +358,7 @@ describe("api", () => {
 
         const result = await app.runWithoutServer([
           "api",
-          "getVariables",
+          "listVariables",
           "--non-interactive",
           "--json",
         ]);
@@ -504,7 +515,11 @@ describe("api", () => {
         it("repeats nothing of a refused request's body, and says to run it again with --force", async () => {
           const app = await aSetUpApp();
 
-          const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
+          const result = await app.api(
+            "removeProjectPreview",
+            "-F",
+            "origin=https://pr-1.example.com",
+          );
 
           expect(app.envelopeOf(result)).toEqual({
             status: "error",
@@ -512,10 +527,10 @@ describe("api", () => {
             command: "api",
             source: "http://mock.zitadel.test",
             code: "E_CONFIRMATION_REQUIRED",
-            message: "Cannot call removePreview without --force in non-interactive mode",
-            hint: `Ask a person first: Call removePreview in ${await app.projectPlace()}? Remove a preview. Once they agree, run the same command again, with its --field values or the pipe into --input, and add --force.`,
+            message: "Cannot call removeProjectPreview without --force in non-interactive mode",
+            hint: `Ask a person first: Call removeProjectPreview in ${await app.projectPlace()}? Remove a preview. Once they agree, run the same command again, with its --field values or the pipe into --file, and add --force.`,
             details: {
-              question: `Call removePreview in ${await app.projectPlace()}? Remove a preview.`,
+              question: `Call removeProjectPreview in ${await app.projectPlace()}? Remove a preview.`,
             },
           });
         });
@@ -542,7 +557,7 @@ describe("api", () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        const result = await app.api("updateVariables", "-F", "FOO:=null");
+        const result = await app.api("setVariables", "-F", "FOO:=null");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -556,8 +571,8 @@ describe("api", () => {
       });
 
       it.each([
-        ["a dry run", ["getVariables", "--dry-run"]],
-        ["a call", ["getVariables"]],
+        ["a dry run", ["listVariables", "--dry-run"]],
+        ["a call", ["listVariables"]],
       ])("never carries the project secret, in %s", async (_what, args) => {
         const app = await aSetUpApp();
 
@@ -583,7 +598,7 @@ describe("api", () => {
         const app = await aSetUpApp();
         const { ZITADEL_PROJECT_ID } = await app.developmentValues();
 
-        const result = await app.apiRendered("getVariables", "--dry-run");
+        const result = await app.apiRendered("listVariables", "--dry-run");
 
         expect(result.stdout).toBe(
           `curl -X GET 'http://mock.zitadel.test/api/v1/variables?project_id=${ZITADEL_PROJECT_ID}' \\\n  -H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"\n`,
@@ -593,7 +608,7 @@ describe("api", () => {
       it("prints a dry run's body once, in its curl line", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.apiRendered("updateVariables", "-F", "FOO=bar", "--dry-run");
+        const result = await app.apiRendered("setVariables", "-F", "FOO=bar", "--dry-run");
 
         expect(result.stdout.split('-d \'{"FOO":"bar"}\'')).toHaveLength(2);
       });
@@ -604,7 +619,7 @@ describe("api", () => {
       it("names the project secret rather than writing it out", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.apiRendered("getVariables", "--dry-run");
+        const result = await app.apiRendered("listVariables", "--dry-run");
 
         expect(result).toPrint('-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"');
         expect(result.stdout + result.stderr).not.toContain(
@@ -633,12 +648,7 @@ describe("api", () => {
       it("spells out a control character in a dry run's body the way JSON does", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.apiRendered(
-          "updateVariables",
-          "-F",
-          "FOO=a\u001b[2Jb",
-          "--dry-run",
-        );
+        const result = await app.apiRendered("setVariables", "-F", "FOO=a\u001b[2Jb", "--dry-run");
 
         expect(result.stdout).toContain(`-d '{"FOO":"a\\u001b[2Jb"}'`);
         expect(result.stdout).not.toContain("\u001b");

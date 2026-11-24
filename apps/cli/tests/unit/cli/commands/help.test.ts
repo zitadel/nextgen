@@ -1,11 +1,11 @@
-import { mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Plugin } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { COMMAND_GROUPS } from "@/lib/oclif/groups";
+import { COMMAND_GROUPS } from "@/cli/commands/groups";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import {
   expectedPublicCliCommand,
@@ -26,56 +26,61 @@ Usage
 Run a command below. Use \`zitadel <command> --help\` to see its options.
 
 Getting started
-  setup             Create a Zitadel project and scaffold local auth
-  start             Start a local Zitadel server
-  status            Summarize the local Zitadel server and project state
-  claim             Claim this project to make it permanent
-  skills            Give coding agents the Zitadel skills
+  setup            Create a Zitadel project and scaffold local auth
+  claim            Claim this project to make it permanent
+  doctor           Verify local runtime and project state
+  skills           Give coding agents the Zitadel skills
+  tests            Add end-to-end tests of the sign-in
 
-Local development
-  console           Open the local console, signed in as the local admin
-  logs              Show local Zitadel server logs
-  stop              Stop the local Zitadel server
-  reset             Delete the local Zitadel server runtime and data
-  eject             Remove managed files and local Zitadel state
-  tests             Add end-to-end tests of the sign-in
+Local server
+  start            Start a local Zitadel server
+  stop             Stop the local Zitadel server
+  status           Summarize the local Zitadel server and project state
+  logs             Show local Zitadel server logs
+  console          Open the console of the server the project uses
+  reset            Delete the local Zitadel server runtime and data
+  eject            Remove managed files and local Zitadel state
 
-Users and teams
-  users             Create and manage users
-  teams             Create and manage teams
-  grants            Manage access grants
+Users and access
+  user             Create and manage users
+  team             Create and manage teams
+  grant            Manage access grants
+  session          View and revoke sessions
+  invitation       Invite people into the project with a link
 
-Authentication
-  auth-method       Configure how users sign in
-  idps              Manage identity provider connections
-  sessions          View and revoke sessions
+Sign-in
+  auth-method      Configure how users sign in
+  idp              Manage identity provider connections
+  schema           View user schemas
+  branding         Manage the login branding
+  flow-definition  View login flows
+  policy           View and test policies
 
-Configuration and releases
-  deploy            Apply your local configuration to Zitadel
-  preview           Deploy and manage pull-request preview URLs
-  pull              Rebuild your .zitadel/ files from a release
-  branding          Manage the login branding
-  deployment        Deploy releases and roll them back
-  env               Show and bind environments
-  flow-definitions  View login flows
-  origin            Manage the project's allowed origins
-  policies          View and test policies
-  projects          View and update projects
-  release           Build and manage releases
-  schemas           View user schemas
-  variable          Manage project variables
+Project settings
+  project          View and update projects
+  env              Show and bind environments
+  origin           Manage the project's allowed origins
+  variable         Manage project variables
+  upgrade          Upgrade this project to the latest Zitadel release
 
-Diagnostics and utilities
-  doctor            Verify local runtime and project state
-  upgrade           Upgrade this project to the latest Zitadel release
-  api               Call any operation of the Zitadel API
-  autocomplete      Display autocomplete installation instructions
-  commands          List all zitadel commands
-  events            View events
-  resources         List the resources this CLI manages
-  search            Search for a command
-  version           Show the CLI version
-  which             Show which plugin a command is in
+Releases
+  deploy           Apply your local configuration to Zitadel
+  preview          Deploy and manage pull-request preview URLs
+  pull             Rebuild your .zitadel/ files from a release
+  release          Build and manage releases
+  deployment       Deploy releases and roll them back
+
+API and events
+  event            View events
+  api              Call any operation of the Zitadel API
+  resources        List the resources this CLI manages
+
+CLI
+  commands         List all zitadel commands
+  search           Search for a command
+  autocomplete     Display autocomplete installation instructions
+  version          Show the CLI version
+  which            Show which plugin a command is in
 
 Flags
   -h, --help  Show help for command
@@ -92,9 +97,13 @@ Examples
  * and an `oclif.manifest.json` generated the way `build` (`oclif manifest`)
  * generates it, so oclif loads commands from the manifest instead of scanning
  * `dist/commands`. `node_modules` is linked so the plugins resolve.
+ *
+ * @param root - The empty directory to lay the package out in.
+ * @returns The manifest's path and the package root.
  */
-async function stagePublishedPackage(): Promise<{ manifestPath: string; root: string }> {
-  const root = await mkdtemp(join(tmpdir(), "zitadel-cli-published-"));
+async function stagePublishedPackage(
+  root: string,
+): Promise<{ manifestPath: string; root: string }> {
   await Promise.all([
     writeFile(join(root, "package.json"), await readFile(join(cliPackageRoot, "package.json"))),
     symlink(join(cliPackageRoot, "dist"), join(root, "dist")),
@@ -138,15 +147,33 @@ describe("root help", () => {
   });
 
   it("leaves topic help to oclif", async () => {
-    const { exitCode, stdout } = await runCliForTest(["schemas", "--help"]);
+    const { exitCode, stdout } = await runCliForTest(["schema", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(stripAnsi(stdout)).toContain("schemas list");
+    expect(stripAnsi(stdout)).toContain("schema list");
+  });
+
+  it("shows a noun's help when asked under its plural", async () => {
+    const { stdout } = await runCliForTest(["schemas", "--help"]);
+
+    expect(stripAnsi(stdout)).toContain("USAGE\n  $ zitadel schema COMMAND");
+  });
+
+  it("shows a command's help as it is declared when asked under its noun's plural", async () => {
+    const { stdout } = await runCliForTest(["schemas", "list", "--help"]);
+
+    expect(stripAnsi(stdout)).toContain("USAGE\n  $ zitadel schema list");
+  });
+
+  it("lists no plural among a noun's commands", async () => {
+    const { stdout } = await runCliForTest(["schema", "--help"]);
+
+    expect(stripAnsi(stdout)).not.toContain("schemas ");
   });
 
   it.each([
     { label: "a command", argv: ["claim", "--help"] },
-    { label: "a family of commands", argv: ["users", "--help"] },
+    { label: "a family of commands", argv: ["user", "--help"] },
   ])("ends the help for $label with where to find every command", async ({ argv }) => {
     const { exitCode, stdout } = await runCliForTest(argv);
 
@@ -160,13 +187,17 @@ describe("root help", () => {
   it("keeps each family of commands in one group, and describes it with a topic", async () => {
     const { stdout } = await runCliForTest(["commands", "--json"]);
     const commands = (
-      parseJson(stdout) as Array<{
-        id: string;
-        aliases: string[];
-        pluginName?: string;
-        group?: string;
-      }>
-    )
+      parseJson(stdout) as {
+        data: {
+          result: Array<{
+            id: string;
+            aliases: string[];
+            pluginName?: string;
+            group?: string;
+          }>;
+        };
+      }
+    ).data.result
       .filter((command) => command.pluginName === "@zitadel/cli")
       .filter((command) => !command.aliases.includes(command.id));
     const groupsOf = new Map<string, Set<string | undefined>>();
@@ -189,13 +220,17 @@ describe("root help", () => {
     expect(exitCode).toBe(0);
     const groups: readonly string[] = COMMAND_GROUPS;
     const ungrouped = (
-      parseJson(stdout) as Array<{
-        id: string;
-        aliases: string[];
-        pluginName?: string;
-        group?: unknown;
-      }>
-    )
+      parseJson(stdout) as {
+        data: {
+          result: Array<{
+            id: string;
+            aliases: string[];
+            pluginName?: string;
+            group?: unknown;
+          }>;
+        };
+      }
+    ).data.result
       .filter((command) => command.pluginName === "@zitadel/cli")
       .filter((command) => !command.aliases.includes(command.id))
       .filter((command) => typeof command.group !== "string" || !groups.includes(command.group))
@@ -206,8 +241,8 @@ describe("root help", () => {
 });
 
 describe("root help from the published manifest", () => {
-  it("renders the same groups when commands load from oclif.manifest.json", async () => {
-    const { root } = await stagePublishedPackage();
+  it("renders the same groups when commands load from oclif.manifest.json", async ({ dir }) => {
+    const { root } = await stagePublishedPackage(dir);
 
     const { exitCode, stdout, stderr } = await runCliForTest(["--help"], {}, root);
 
@@ -216,8 +251,8 @@ describe("root help from the published manifest", () => {
     expect(stripAnsi(stdout)).toBe(ROOT_HELP);
   });
 
-  it("reads the groups from the manifest, not from dist", async () => {
-    const { manifestPath, root } = await stagePublishedPackage();
+  it("reads the groups from the manifest, not from dist", async ({ dir }) => {
+    const { manifestPath, root } = await stagePublishedPackage(dir);
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
       commands: Record<string, { group?: string; groupOrder?: number }>;
     };
@@ -232,6 +267,6 @@ describe("root help from the published manifest", () => {
 
     const text = stripAnsi(stdout);
     expect(text).not.toContain("Getting started\n  setup ");
-    expect(text).toMatch(/Diagnostics and utilities\n(?:.*\n)* {2}setup {2}/);
+    expect(text).toMatch(/CLI\n(?:.*\n)* {2}setup {2}/);
   });
 });

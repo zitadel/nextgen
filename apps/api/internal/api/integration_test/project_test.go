@@ -16,6 +16,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/passwap/argon2"
@@ -40,16 +41,16 @@ func (stubFlowService) Resolve(_ context.Context, _ service.ResolveFlowRequest) 
 	return nil, nil
 }
 
-func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (domain.FlowStepResult, error) {
-	return domain.FlowStepResult{}, nil
+func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (flowengine.FlowStepResult, error) {
+	return flowengine.FlowStepResult{}, nil
 }
 
-func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (domain.FlowStepResult, error) {
-	return domain.FlowStepResult{}, nil
+func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (flowengine.FlowStepResult, error) {
+	return flowengine.FlowStepResult{}, nil
 }
 
-func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (domain.FlowStepResult, error) {
-	return domain.FlowStepResult{}, nil
+func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (flowengine.FlowStepResult, error) {
+	return flowengine.FlowStepResult{}, nil
 }
 
 // stubAuthAttemptService satisfies [service.AuthAttemptService] while doing nothing.
@@ -192,17 +193,17 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	// The shipped default offers no passkey: the preset does.
 	identifierStep, ok := flowDef.FindStep("identifier")
 	require.True(t, ok)
-	assert.NotContains(t, actionNames(identifierStep.Actions), domain.FlowActionPasskey)
+	assert.NotContains(t, actionNames(identifierStep.Actions), flowengine.FlowActionPasskey)
 
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
 	assert.Equal(t, []domain.Field{"x-auth-methods#password"}, passwordStep.Fields)
-	assert.NotContains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
+	assert.NotContains(t, actionNames(passwordStep.Actions), flowengine.FlowActionPasskey)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
 	assert.Equal(t, []domain.Field{"email"}, registerStep.Fields)
-	assert.NotContains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
+	assert.NotContains(t, actionNames(registerStep.Actions), flowengine.FlowActionPasskeyRegister)
 
 	registerPasswordStep, ok := flowDef.FindStep("register-password")
 	require.True(t, ok)
@@ -211,7 +212,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
 	// Registration completes directly — no passkey upsell step; passkey
 	// registration is offered up front on the register step instead.
-	assert.Equal(t, "done", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+	assert.Equal(t, "done", registerPasswordStep.Transitions[flowengine.FlowActionSubmit].Target)
 
 	_, ok = flowDef.FindStep("passkey-upsell")
 	assert.False(t, ok)
@@ -337,7 +338,7 @@ func TestProjectSessionCaller(t *testing.T) {
 	})
 
 	t.Run("granted person renames the project", func(t *testing.T) {
-		resp, err := grantee.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString(project.Name + " renamed")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		resp, err := grantee.UpdateProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString(project.Name + " renamed")}, api.UpdateProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
@@ -356,12 +357,12 @@ func TestProjectSessionCaller(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 
-		patchResp, err := viewer.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("viewer rename")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		patchResp, err := viewer.UpdateProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("viewer rename")}, api.UpdateProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchProjectErrorResponseStatusCode{}, patchResp, helpers.MustMarshal(t, patchResp))
-		denied := patchResp.(*api.PatchProjectErrorResponseStatusCode)
+		require.IsType(t, &api.UpdateProjectErrorResponseStatusCode{}, patchResp, helpers.MustMarshal(t, patchResp))
+		denied := patchResp.(*api.UpdateProjectErrorResponseStatusCode)
 		assert.Equal(t, http.StatusForbidden, denied.StatusCode)
-		assert.Equal(t, api.PatchProjectErrorResponseType(domain.ErrProjectPermissionDenied().Code), denied.Response.Type)
+		assert.Equal(t, api.UpdateProjectErrorResponseType(domain.ErrProjectPermissionDenied().Code), denied.Response.Type)
 	})
 
 	t.Run("no foothold is not found", func(t *testing.T) {
@@ -375,9 +376,9 @@ func TestProjectSessionCaller(t *testing.T) {
 		require.NoError(t, err)
 		assertProjectResponse(t, &api.GetProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message}, resp)
 
-		patchResp, err := stranger.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("taken")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		patchResp, err := stranger.UpdateProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("taken")}, api.UpdateProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchProjectNotFound{}, patchResp, helpers.MustMarshal(t, patchResp))
+		require.IsType(t, &api.UpdateProjectNotFound{}, patchResp, helpers.MustMarshal(t, patchResp))
 	})
 }
 
@@ -404,7 +405,7 @@ func TestPatchProject(t *testing.T) {
 		origins   []domain.Origin
 		projectID api.ProjectID
 		req       *api.PatchProjectRequest
-		want      api.PatchProjectRes
+		want      api.UpdateProjectRes
 	}{
 		{
 			name: "rename",
@@ -423,29 +424,29 @@ func TestPatchProject(t *testing.T) {
 		{
 			name: "absent name",
 			req:  &api.PatchProjectRequest{},
-			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{
 			name: "null name",
 			req:  &api.PatchProjectRequest{Name: api.OptNilString{Set: true, Null: true}},
-			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{
 			name: "empty name",
 			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("")},
-			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{
 			name:      "nonexistent project",
 			projectID: "does_not_exist",
 			req:       validRenameTo,
-			want:      &api.PatchProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+			want:      &api.UpdateProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
 		},
 		{
 			name:      "foreign project",
 			projectID: api.ProjectID(foreign.ID),
 			req:       validRenameTo,
-			want:      &api.PatchProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+			want:      &api.UpdateProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
 		},
 	}
 
@@ -462,8 +463,8 @@ func TestPatchProject(t *testing.T) {
 
 			projectID := cmp.Or(tc.projectID, api.ProjectID(project.ID))
 
-			resp, err := client.PatchProject(t.Context(), tc.req,
-				api.PatchProjectParams{ProjectID: projectID},
+			resp, err := client.UpdateProject(t.Context(), tc.req,
+				api.UpdateProjectParams{ProjectID: projectID},
 			)
 			assert.NoError(t, err)
 			assertProjectResponse(t, tc.want, resp)
@@ -502,9 +503,9 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 	})
 
 	t.Run("sets a method and reads it back", func(t *testing.T) {
-		got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+		got, err := client.UpdateProject(t.Context(), &api.PatchProjectRequest{
 			PasswordHash: api.NewOptNilPasswordHashPolicy(argon2id),
-		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.UpdateProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		patched, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
@@ -522,9 +523,9 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 	})
 
 	t.Run("a rename leaves the method alone", func(t *testing.T) {
-		got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+		got, err := client.UpdateProject(t.Context(), &api.PatchProjectRequest{
 			Name: api.NewOptNilString(helpers.ProjectName()),
-		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.UpdateProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		renamed, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
@@ -532,9 +533,9 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 	})
 
 	t.Run("null gives the project back to the server default", func(t *testing.T) {
-		got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+		got, err := client.UpdateProject(t.Context(), &api.PatchProjectRequest{
 			PasswordHash: api.OptNilPasswordHashPolicy{Set: true, Null: true},
-		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.UpdateProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		cleared, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
@@ -561,11 +562,11 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 			},
 		} {
 			t.Run(name, func(t *testing.T) {
-				got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+				got, err := client.UpdateProject(t.Context(), &api.PatchProjectRequest{
 					PasswordHash: api.NewOptNilPasswordHashPolicy(policy),
-				}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+				}, api.UpdateProjectParams{ProjectID: api.ProjectID(project.ID)})
 				require.NoError(t, err)
-				bad, ok := got.(*api.PatchProjectBadRequest)
+				bad, ok := got.(*api.UpdateProjectBadRequest)
 				require.True(t, ok, helpers.MustMarshal(t, got))
 				assert.Equal(t, api.ErrorCode(invalid.Code), bad.Code)
 			})
@@ -789,7 +790,7 @@ func TestQueryProjects(t *testing.T) {
 }
 
 // assertProjectResponse covers every operation answering with a project body:
-// getProject and patchProject (the detail body), and each item of
+// getProject and updateProject (the detail body), and each item of
 // queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {
 	t.Helper()
@@ -843,15 +844,15 @@ func assertProjectResponse(t *testing.T, want, got any) {
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
-	case *api.PatchProjectBadRequest:
-		require.IsType(t, &api.PatchProjectBadRequest{}, got, helpers.MustMarshal(t, got))
-		actual := got.(*api.PatchProjectBadRequest)
+	case *api.UpdateProjectBadRequest:
+		require.IsType(t, &api.UpdateProjectBadRequest{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.UpdateProjectBadRequest)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
-	case *api.PatchProjectNotFound:
-		require.IsType(t, &api.PatchProjectNotFound{}, got, helpers.MustMarshal(t, got))
-		actual := got.(*api.PatchProjectNotFound)
+	case *api.UpdateProjectNotFound:
+		require.IsType(t, &api.UpdateProjectNotFound{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.UpdateProjectNotFound)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)

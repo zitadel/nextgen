@@ -1,14 +1,13 @@
-import { resolveEnvironment } from "@/lib/environment";
-import { type FrameworkFacts, issuerFromPort, type Orca } from "@/lib/orca";
+import { join } from "node:path";
+import { ZitadelRuntime } from "@/lib/server";
+import { parseEnv } from "node:util";
+
+import { Environment } from "@/lib/environment";
+import { readIfReadable } from "@/lib/fs";
+import { issuerFromPort, Orca } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import {
-  readPreset,
-  readRendererId,
-  readUseCase,
-  readZitadelConfig,
-  readZitadelSecret,
-} from "@/lib/project";
-import { readScaffoldManifest } from "@/lib/scaffold-manifest";
+import { Project } from "@/lib/project";
+import { CliPackage } from "@/lib/upgrade";
 
 /**
  * Reconstructs a {@link PatchContext} from the on-disk project (config,
@@ -20,47 +19,68 @@ import { readScaffoldManifest } from "@/lib/scaffold-manifest";
  * is part of the plan again, for example). Schema and flow config are
  * user-editable sync resources, not patcher inputs, so nothing here reads
  * them.
+ *
+ * The posture is restored as setup recorded it: a manifest-less scaffold
+ * cannot answer the fresh-vs-pre-existing hinge, and it is always full-page
+ * (ADR 044).
+ *
+ * The issuer is the one setup configured, else the one the scaffold's dev port
+ * implies, else the framework's own URL; a file the resolver cannot read leaves
+ * it to those fallbacks rather than failing the repair. `developmentServerUrl`
+ * is `ZITADEL_URL` as `.env.development.local` sets it, which the base ops keep
+ * and Vite ranks above the other env files; `undefined` when the file does not
+ * set it or cannot be read.
  */
 export async function loadPatchContext(
   cwd: string,
   orca: Orca,
   cliVersion: string,
 ): Promise<PatchContext> {
-  const config = await readZitadelConfig(cwd);
-  const secret = await readZitadelSecret(cwd);
+  const config = await Project.at(cwd).config();
+  const secret = await Project.at(cwd).secret();
   const framework = await orca.detect(cwd);
-  const scaffold = await readScaffoldManifest(cwd);
+  const scaffold = await Orca.readManifest(cwd);
+  const configured = await configuredIssuer(cwd);
+  const issuerScaffold = configured === undefined ? await Orca.readManifest(cwd) : undefined;
+  const issuer =
+    configured ??
+    (typeof issuerScaffold?.dev_port === "number"
+      ? issuerFromPort(issuerScaffold.dev_port)
+      : framework.url);
+  const developmentEnv = await readIfReadable(join(cwd, ".env.development.local"));
   return {
     framework,
-    rendererId: readRendererId(config),
-    issuer: await resolveIssuer(cwd, framework),
-    server: typeof config.server === "string" ? config.server : "",
+    rendererId: config.rendererId,
+    issuer,
+    server: typeof config.data.server === "string" ? config.data.server : "",
+    defaultServer: ZitadelRuntime.DEFAULT,
     cliVersion,
+    sdkVersion: CliPackage.at(cliVersion).selector(),
     scaffoldedFramework: scaffold?.scaffolded_framework,
-    // Restore the posture setup recorded: a manifest-less scaffold cannot answer
-    // the fresh-vs-pre-existing hinge, and it is always full-page (ADR 044).
     posture: scaffold?.posture ?? "page",
-    preset: readPreset(config),
-    useCase: readUseCase(config),
+    preset: config.preset,
+    useCase: config.useCase,
+    developmentServerUrl:
+      developmentEnv === undefined ? undefined : parseEnv(developmentEnv).ZITADEL_URL,
     project: {
-      id: secret.project_id,
-      project_secret: secret.project_secret,
-      preview_secret: secret.preview_secret,
+      id: secret.data.project_id,
+      project_secret: secret.data.project_secret,
+      preview_secret: secret.data.preview_secret,
       origins: [
-        ...(secret.primary_origins ?? []).map((pattern) => {
+        ...(secret.data.primary_origins ?? []).map((pattern) => {
           return {
             pattern,
             kind: "primary" as const,
           };
         }),
-        ...secret.preview_origins.map((pattern) => {
+        ...secret.data.preview_origins.map((pattern) => {
           return {
             pattern,
             kind: "preview" as const,
           };
         }),
       ],
-      created_at: secret.created_at,
+      created_at: secret.data.created_at,
     },
   };
 }
@@ -73,7 +93,8 @@ export async function loadPatchContext(
  * `undefined` when no file sets it, or one the resolver cannot read.
  */
 export async function configuredIssuer(cwd: string): Promise<string | undefined> {
-  return resolveEnvironment({
+  return Environment.resolve({
+    servers: ZitadelRuntime,
     cwd,
     env: {},
   }).then(
@@ -84,18 +105,4 @@ export async function configuredIssuer(cwd: string): Promise<string | undefined>
       return undefined;
     },
   );
-}
-
-async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
-  // A file the resolver cannot read leaves the issuer to the fallbacks below
-  // rather than failing the repair.
-  const issuer = await configuredIssuer(cwd);
-  if (issuer !== undefined) {
-    return issuer;
-  }
-  const scaffold = await readScaffoldManifest(cwd);
-  if (typeof scaffold?.dev_port === "number") {
-    return issuerFromPort(scaffold.dev_port);
-  }
-  return facts.url;
 }

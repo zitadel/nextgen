@@ -8,8 +8,8 @@ import {
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal, RENDERINGS } from "@tests/helpers/terminal";
-import { PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { asTerminal, offTerminal, RENDERINGS } from "@tests/fixtures/terminal";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -82,6 +82,22 @@ describe("deployment list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["deployment", "list", "--fields", "id", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["deployment", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("is empty before anything is deployed", async () => {
         const app = await anUndeployedEnvironment();
 
@@ -97,6 +113,7 @@ describe("deployment list", () => {
             title: "No deployments found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -153,6 +170,7 @@ describe("deployment list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -185,6 +203,7 @@ describe("deployment list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -224,6 +243,7 @@ describe("deployment list", () => {
               },
             ],
             count: 1,
+            truncated: true,
             next_page_token: "1",
             next_commands: [
               expectedPublicCliCommand(
@@ -325,6 +345,7 @@ describe("deployment list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -447,6 +468,29 @@ describe("deployment list", () => {
           "deploy",
           "http://localhost:3000, https://app.example.com",
           /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
+          "primary",
+          "",
+        );
+      });
+
+      it("prints the expiry preview list shows for a preview, piped", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        await app.previewData(PREVIEW_URL);
+        const expires = await app.previewExpiry(PREVIEW_URL);
+
+        const result = await offTerminal(() =>
+          app.run(["deployment", "list", "--live", "--plain"]),
+        );
+
+        expect(result).toPrintPlainRow(
+          /^dep_/,
+          /^rel_/,
+          "deploy",
+          PREVIEW_URL,
+          /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
+          "preview",
+          expires,
         );
       });
 

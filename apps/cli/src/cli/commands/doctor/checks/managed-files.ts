@@ -4,17 +4,12 @@ import { join } from "node:path";
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
 import { readIfReadable } from "@/lib/fs";
 import type { ConfigWiringStatus, EjectActions } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
-import { readRendererId, readZitadelConfig } from "@/lib/project";
-import {
-  hashScaffoldFile,
-  readScaffoldManifest,
-  writeScaffoldManifest,
-} from "@/lib/scaffold-manifest";
 import { updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { Project } from "@/lib/project";
+import { Orca } from "@/lib/orca";
 
 /**
  * Per-file classification reported in the check's `details`:
@@ -54,7 +49,7 @@ export class ManagedFilesCheck implements SanityCheck {
   readonly name = "managed-files";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const manifest = await readScaffoldManifest(ctx.cwd);
+    const manifest = await Orca.readManifest(ctx.cwd);
     const evaluated = manifest
       ? await evaluateManifest(ctx.cwd, manifest)
       : await evaluateTemplates(ctx);
@@ -154,12 +149,15 @@ export class ManagedFilesCheck implements SanityCheck {
       );
     }
     if (unverifiable.length > 0) {
-      warnings.push(
-        `unverifiable managed config wiring (manual review required): ${unverifiable
-          .map((s) => {
+      const eachReasonOnce = [
+        ...new Set(
+          unverifiable.map((s) => {
             return s.reason ? `${s.path} (${s.reason})` : s.path;
-          })
-          .join(", ")}`,
+          }),
+        ),
+      ];
+      warnings.push(
+        `unverifiable managed config wiring (manual review required): ${eachReasonOnce.join(", ")}`,
       );
     }
     for (const leftover of removable) {
@@ -198,9 +196,23 @@ export class ManagedFilesCheck implements SanityCheck {
    * repair also materializes the manifest from the marker-bearing files now
    * on disk, completing the migration ADR 042 promises — adopted files stay
    * the user's and are not recorded.
+   *
+   * A pristine retired alternate request boundary (hash-proven CLI bytes, such
+   * as Next 15's middleware.ts after an upgrade) is removed so the current
+   * boundary can be installed without the framework rejecting the pair. A
+   * user-modified or adopted alternate is a conflict: it stays, and the current
+   * boundary is excluded from the repair, since creating proxy.ts beside an
+   * edited middleware.ts would break the build outright. A dry run deletes
+   * nothing and keeps the exclusion, so the preview stays safe. A conditional
+   * file (one the plan writes only on an app setup created) absent before the
+   * repair and present after it is one the repair wrote: a template added since
+   * this app's setup, such as the route layouts. In the manifest, a retired
+   * entry whose file stays absent is dropped, and a path the repair newly
+   * introduced is adopted with its class and on-disk hash, a conditional one
+   * only when this repair wrote it.
    */
   async fix(ctx: CheckContext): Promise<void> {
-    const manifest = await readScaffoldManifest(ctx.cwd);
+    const manifest = await Orca.readManifest(ctx.cwd);
     const missingBefore = manifest ? await missingManifestPaths(ctx.cwd, manifest) : [];
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     const patcher = ctx.orca.patcherFor(patchCtx.framework.id);
@@ -208,13 +220,6 @@ export class ManagedFilesCheck implements SanityCheck {
       framework: patchCtx.framework,
       rendererId: patchCtx.rendererId,
     });
-    // Boundary migration: a *pristine* retired alternate (hash-proven CLI
-    // bytes, e.g. Next 15's middleware.ts after an upgrade) is removed so the
-    // current boundary can be installed without the framework rejecting the
-    // pair. A user-modified or adopted alternate is a conflict: it stays, and
-    // the current boundary is excluded from the repair — creating proxy.ts
-    // beside an edited middleware.ts would break the build outright. Dry-run
-    // deletes nothing and keeps the exclusion, so the preview stays safe.
     const boundaries = await detectBoundaryConflicts(actions, ctx.cwd, manifest);
     const excludePaths = boundaries
       .filter((b) => {
@@ -232,9 +237,6 @@ export class ManagedFilesCheck implements SanityCheck {
         }
       }
     }
-    // A conditional file (one the plan writes only on an app setup created)
-    // absent now and present after the repair is one the repair wrote: a
-    // template added since this app's setup, such as the route layouts.
     const conditional = new Set(actions.conditionalFiles ?? []);
     const conditionalAbsent: string[] = [];
     for (const path of conditional) {
@@ -265,21 +267,20 @@ export class ManagedFilesCheck implements SanityCheck {
     if (missingBefore.length === 0 && removed.length === 0 && conditionalWritten.size === 0) {
       return;
     }
-    // A retired entry whose file stays absent is dropped, and a path the repair
-    // newly introduced is adopted with its class and on-disk hash, a conditional
-    // one only when this repair wrote it.
     const current = new Set(actions.markedFiles);
     const files: Record<string, ScaffoldFileEntry> = {};
     for (const [path, entry] of Object.entries(manifest.files)) {
       const contents = await readIfReadable(join(ctx.cwd, path));
-      if (contents === undefined && (!current.has(path) || conditional.has(path))) {
-        continue; // retired by a template migration and gone from disk
+      const retiredAndGone =
+        contents === undefined && (!current.has(path) || conditional.has(path));
+      if (retiredAndGone) {
+        continue;
       }
       files[path] =
         contents !== undefined && missingBefore.includes(path)
           ? {
               ...entry,
-              hash: hashScaffoldFile(contents),
+              hash: Orca.scaffoldHash(contents),
             }
           : entry;
     }
@@ -288,9 +289,9 @@ export class ManagedFilesCheck implements SanityCheck {
         continue;
       }
       const contents = await readIfReadable(join(ctx.cwd, path));
-      if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
+      if (contents !== undefined && Orca.isManaged(contents)) {
         files[path] = {
-          hash: hashScaffoldFile(contents),
+          hash: Orca.scaffoldHash(contents),
           class: actions.fileClasses?.[path] ?? "presentation",
         };
       }
@@ -331,8 +332,8 @@ async function detectBoundaryConflicts(
       const entry = manifest?.files[retired];
       const pristine =
         entry !== undefined &&
-        contents.includes(MANAGED_MARKER) &&
-        hashScaffoldFile(contents) === entry.hash;
+        Orca.isManaged(contents) &&
+        Orca.scaffoldHash(contents) === entry.hash;
       conflicts.push({
         current,
         retired,
@@ -391,7 +392,7 @@ async function materializeManifest(
         continue;
       }
       const contents = await readIfReadable(join(ctx.cwd, path));
-      if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
+      if (contents !== undefined && Orca.isManaged(contents)) {
         marked.push(path);
       }
     }
@@ -405,13 +406,13 @@ async function materializeManifest(
     ) {
       return;
     }
-    await writeScaffoldManifest({
+    await Orca.writeManifest({
       cwd: ctx.cwd,
       actions,
       written: marked,
     });
   } catch {
-    // state.json unreadable or the write raced — stays in template mode.
+    return;
   }
 }
 
@@ -479,12 +480,10 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
     return undefined;
   }
   try {
-    const config = await readZitadelConfig(ctx.cwd).catch(() => {
-      return {} as Record<string, unknown>;
-    });
+    const config = await Project.at(ctx.cwd).configOrEmpty();
     return ctx.orca.patcherFor(framework.id).artifacts({
       framework,
-      rendererId: readRendererId(config),
+      rendererId: config.rendererId,
     });
   } catch {
     return undefined;
@@ -495,13 +494,13 @@ function stateFor(contents: string | undefined, hash: string | undefined): Scaff
   if (contents === undefined) {
     return "missing";
   }
-  if (!contents.includes(MANAGED_MARKER)) {
+  if (!Orca.isManaged(contents)) {
     return "adopted";
   }
   if (hash === undefined) {
     return "managed";
   }
-  return hashScaffoldFile(contents) === hash ? "pristine" : "edited";
+  return Orca.scaffoldHash(contents) === hash ? "pristine" : "edited";
 }
 
 async function missingManifestPaths(cwd: string, manifest: ScaffoldManifest): Promise<string[]> {

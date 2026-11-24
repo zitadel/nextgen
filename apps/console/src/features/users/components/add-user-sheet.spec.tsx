@@ -45,7 +45,7 @@ function stubSchemas(schemas: Record<string, Record<string, unknown>>) {
   server.use(
     http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     // The list carries the documents (#921), so the sheet needs no per-schema
-    // stubs — a reintroduced `GET /schemas/{id}` has no handler here.
+    // stubs — a reintroduced `GET /schemas/{schema_id}` has no handler here.
     http.get(SCHEMAS_URL, () =>
       HttpResponse.json({
         schemas: Object.entries(schemas).map(([id, body]) => ({
@@ -84,7 +84,7 @@ describe("add user sheet", () => {
   });
 
   it("orders fields deterministically despite the API's randomised key order", async () => {
-    // `GET /schemas/{id}` serialises `properties` from a Go map, so the same
+    // `GET /schemas/{schema_id}` serialises `properties` from a Go map, so the same
     // request returns different key orders — observed live. Sorting by key is the
     // minimum needed to stop the form shuffling between openings; the authored
     // order belongs in the API response, not in a curated list here.
@@ -321,9 +321,18 @@ describe("add user sheet", () => {
     // Two schemas across the pages, so nothing is preselected.
     await waitFor(() => expect(picker).toHaveTextContent("Select schema"));
 
+    // No leading glyph on the trigger.
+    expect(picker.querySelector("svg.lucide-braces")).toBeNull();
     await userEvent.click(picker);
-    expect(await screen.findByRole("option", { name: /Business/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Minimal/ })).toBeInTheDocument();
+    // The schema's name is each option's only line: no list of its properties.
+    expect(await screen.findByRole("option", { name: "Business" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Minimal" })).toBeInTheDocument();
+    // A property name it does not draw still finds the schemas that collect it.
+    await userEvent.type(screen.getByPlaceholderText("Search schemas"), "companyName");
+    await waitFor(() =>
+      expect(screen.queryByRole("option", { name: "Minimal" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("option", { name: "Business" })).toBeInTheDocument();
     // The Users list behind the sheet walks the same pages for its filter
     // before the sheet opens; the sheet's own walk is the last two reads.
     expect(askedTokens.slice(-2)).toEqual([null, "tok_2"]);
@@ -375,7 +384,7 @@ describe("add user sheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("a user already exists with the given unique attributes");
+    expect(alert).toHaveTextContent("A user already exists with the given unique attributes");
     expect(alert).not.toHaveTextContent(/returned 409/);
   });
 
@@ -604,7 +613,7 @@ describe("add user sheet", () => {
 
     await userEvent.type(await screen.findByLabelText("Email"), "a@b");
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("taken");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Taken");
 
     // Valid when submitted, so the first keystroke is not yet a mistake.
     const nick = screen.getByLabelText("Nick");

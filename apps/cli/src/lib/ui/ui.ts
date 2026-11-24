@@ -1,6 +1,8 @@
 import type { Audience } from "./audience";
+import { Asker, type Session } from "./asker";
+import { Box } from "./box";
 import { Chain } from "./chain";
-import { Narration } from "./narration";
+import { LogPrinter } from "./log-printer";
 import type { Presentation } from "./presentation";
 import type { Report, Step } from "./progress";
 import type { Confirmer, Questions } from "./questions";
@@ -24,37 +26,61 @@ import type { Summary } from "./summary";
  *       message: "Would you like to sync the origins?",
  *     });
  *     if (!go) {
- *       return this.emit({
+ *       return {
  *         status: "skipped",
  *         reason: "sync-cancelled",
  *         summary: { title: "Cancelled", sections: [] },
- *       });
+ *       };
  *     }
  *     await this.ui.task("Syncing the origins", () => sync());
- *     return this.emit({
+ *     return {
  *       status: "ok",
  *       data: {},
  *       summary: { title: "Synced the origins", sections: [] },
- *     });
+ *     };
  *   }
  * }
  * ```
  *
- * {@link describe}, {@link bridgeNarration} and {@link finish} are the base
- * command's, not a command's: they name the chain, draw narration into it
+ * {@link describe}, {@link printLogs} and {@link finish} are the base
+ * command's, not a command's: they name the chain, draw what `log` says into it
  * and close it on the result the command returned. A command that reaches for
  * them is a command drawing outside its own chain. The chain opens itself at
  * the first thing a person sees, so nothing opens it by hand.
  */
 export class Ui {
   private readonly chain: Chain;
-  private readonly narration: Narration;
+  private readonly printer: LogPrinter;
   /** Whether a command took its own ending away as text ({@link ending}). */
   private handedOver = false;
 
+  /**
+   * Questions answered from a session instead of from a run's audience, for
+   * a caller that has no chain: a test, or a library handed its own session.
+   * A command reaches its questions as `this.ask`.
+   *
+   * @param session - Who can answer, and how a prompt is drawn.
+   * @returns The questions, bound to the session.
+   */
+  static asker(session: Session): Questions & Confirmer {
+    return Asker.for(session);
+  }
+
+  /**
+   * Wraps content to the terminal so a frame drawn around it never exceeds the
+   * window, for a caller that draws a frame of its own.
+   *
+   * @param message - The content to wrap.
+   * @param columns - The terminal's width. Defaults to stdout's.
+   * @returns The content, wrapped to fit inside a frame.
+   */
+  static wrap(message: string, columns?: number): string {
+    return Box.at(columns).wrap(message);
+  }
+
   constructor(audience: Audience, presentation: Presentation = "wizard") {
     this.chain = new Chain(audience, presentation);
-    this.narration = new Narration(this.chain);
+    this.printer = new LogPrinter(this.chain);
   }
 
   /** Whether anything is drawn: false under `--json`, `--non-interactive` and no terminal. */
@@ -123,7 +149,7 @@ export class Ui {
 
   /**
    * Draws what the command and the library code under it say with `log`, until
-   * {@link releaseNarration}. A wizard draws it in its chain with a mark; a
+   * {@link stopPrintingLogs}. A wizard draws it in its chain with a mark; a
    * normal command says it as plain lines, because a warning must not be what
    * turns a normal command into a wizard.
    *
@@ -135,16 +161,16 @@ export class Ui {
    * @param options - `debug` also draws the detail that only `--debug` asks for;
    *   `silent` draws nothing, for `--json`.
    */
-  bridgeNarration(options: { debug?: boolean; silent?: boolean } = {}): void {
-    this.narration.install(options);
+  printLogs(options: { debug?: boolean; silent?: boolean } = {}): void {
+    this.printer.install(options);
   }
 
   /**
-   * Stops drawing narration. The base command calls it when the command ends,
+   * Stops drawing what `log` says. The base command calls it when the command ends,
    * so the next command in this process starts from a clean slate.
    */
-  releaseNarration(): void {
-    this.narration.restore();
+  stopPrintingLogs(): void {
+    this.printer.restore();
   }
 
   /**

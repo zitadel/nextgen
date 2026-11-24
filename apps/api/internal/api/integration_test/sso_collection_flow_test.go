@@ -10,12 +10,13 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // These tests resolve an unlinked identity into the register-sso step through
-// GET /flow/{id}, then submit that step. Like the resolution tests they run
+// GET /flows/{flow_id}, then submit that step. Like the resolution tests they run
 // sequentially.
 
 // ssoCollectionFixture is an sso resolution fixture whose flows start on a
@@ -55,7 +56,7 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 		"dependentRequired": {"country": ["zip"]}
 	}`)
 	submit := api.StepAction{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)}
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: f.projectID(),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "sso-collection",
@@ -202,7 +203,7 @@ func TestSSOCollectionSubmitEditedVerifiedEmailIsRefused(t *testing.T) {
 
 	resp := f.submit(t, flow, map[string]string{"email": "mallory@example.com", "username": "mallory"})
 
-	f.requireStepError(t, flow, resp, "sub-new", domain.FlowStepErrorSSOVerifiedUniqueValueChanged)
+	f.requireStepError(t, flow, resp, "sub-new", flowengine.FlowStepErrorSSOVerifiedUniqueValueChanged)
 	for _, email := range []string{"alice@example.com", "mallory@example.com"} {
 		_, err := f.userByEmail(t, email)
 		require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user holds %s", email)
@@ -284,7 +285,7 @@ func TestSSOCollectionSubmitInvalidUserShowsStepError(t *testing.T) {
 
 	resp := f.submit(t, flow, map[string]string{"email": "alice@example.com", "username": "alice", "country": "DE"})
 
-	f.requireStepError(t, flow, resp, "sub-new", domain.FlowStepErrorSSOUserInvalid)
+	f.requireStepError(t, flow, resp, "sub-new", flowengine.FlowStepErrorSSOUserInvalid)
 	_, err := f.userByEmail(t, "alice@example.com")
 	require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created")
 

@@ -38,13 +38,13 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
-	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
@@ -71,12 +71,20 @@ import (
 // silent "a key was minted for you" into a startup failure.
 const flagDisableMasterKeyGeneration = "disable-master-key-generation"
 
+// flagSeed turns seeding at start off. It is on by default: a server started
+// by hand has no deploy step that seeded its database.
+const flagSeed = "seed"
+
 func NewCommand() *cobra.Command {
 	var configPath string
 	var userFiles []string
 	var applyMigrations bool
+	seedAtStart := true
 
 	runServer := func(cmd *cobra.Command, _ []string) error {
+		if !seedAtStart && len(userFiles) > 0 {
+			return fmt.Errorf("--user-file is imported by seeding: drop --%s=false, or pass the file to the seed command", flagSeed)
+		}
 		overrides, err := flagOverrides(cmd.Flags())
 		if err != nil {
 			return err
@@ -85,7 +93,7 @@ func NewCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return run(cmd.Context(), cfg, userFiles, applyMigrations)
+		return run(cmd.Context(), cfg, userFiles, phases{migrate: applyMigrations, seed: seedAtStart, serve: true})
 	}
 
 	root := &cobra.Command{
@@ -96,19 +104,21 @@ func NewCommand() *cobra.Command {
 		RunE:          runServer,
 	}
 	root.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
-	addServerFlags(root, &applyMigrations, &userFiles)
+	addServerFlags(root, &applyMigrations, &seedAtStart, &userFiles)
 
 	serverCmd := &cobra.Command{
 		Use:           "server",
 		Short:         "Run the server",
+		Args:          noArguments,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE:          runServer,
 	}
-	addServerFlags(serverCmd, &applyMigrations, &userFiles)
+	addServerFlags(serverCmd, &applyMigrations, &seedAtStart, &userFiles)
 
 	root.AddCommand(serverCmd)
 	root.AddCommand(newMigrateCommand(&configPath))
+	root.AddCommand(newSeedCommand(&configPath))
 	return root
 }
 
@@ -132,11 +142,37 @@ func flagOverrides(flags *pflag.FlagSet) ([]configOverride, error) {
 	return overrides, nil
 }
 
-func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]string) {
+// noArguments refuses positional arguments. A subcommand otherwise takes any
+// and ignores them, and a boolean flag reads no value from the next argument:
+// `--seed false` would leave seeding on and drop the "false".
+func noArguments(_ *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return fmt.Errorf("unexpected argument %q: this command takes no arguments, and a boolean flag takes its value after \"=\" (--flag=false)", args[0])
+}
+
+func addServerFlags(cmd *cobra.Command, applyMigrations, seedAtStart *bool, userFiles *[]string) {
 	cmd.Flags().BoolVar(applyMigrations, "migrate", false, "Apply database migrations before serving")
+	cmd.Flags().BoolVar(seedAtStart, flagSeed, true, "Seed the database before serving; false for a server whose deployment ran the seed command")
 	cmd.Flags().StringArrayVar(userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
 	cmd.Flags().Bool(flagDisableMasterKeyGeneration, false,
 		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
+}
+
+// phases are the parts of a start. The server command runs them in one
+// process, migrating only on request. A deployment that migrates and seeds as
+// it deploys runs the migrate and seed commands there and serves alone, so
+// that starting an instance writes nothing.
+type phases struct {
+	// migrate applies the database migrations.
+	migrate bool
+	// seed writes what the configuration asks the database to hold: the
+	// platform project and the release the server ships for it, the bootstrap
+	// users, and the platform operators.
+	seed bool
+	// serve listens for requests; without it the run ends once it has seeded.
+	serve bool
 }
 
 // run is the server's lifetime. Its result is named so that the deferred report
@@ -145,7 +181,7 @@ func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]stri
 // function-scoped err the defer used to check, so those failures went
 // unreported (#1409); the `x, err :=` returns reused that err, but it held the
 // unwrapped cause rather than the value returned.
-func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) (err error) {
+func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err error) {
 	sfs := &ShutdownFuncs{}
 	defer func() {
 		// Logged before the shutdown funcs run: one of them shuts down the
@@ -158,7 +194,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		// process would exit 0.
 		if shutdownErr := sfs.Exec(context.WithoutCancel(ctx)); shutdownErr != nil {
 			slog.Error("shutdown error", slogctx.Err(shutdownErr))
-			err = errors.Join(err, shutdownErr)
+			// What a seeding wrote is committed by now. A telemetry flush or
+			// a pool close that fails afterwards must not report it as failed:
+			// a deployment would fail its build over a database it seeded.
+			if do.serve {
+				err = errors.Join(err, shutdownErr)
+			}
 			return
 		}
 		slog.Info("shut down application")
@@ -181,7 +222,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
 	setMemoryLimit()
 
-	pool, err := startDatabase(ctx, cfg, applyMigrations)
+	pool, err := startDatabase(ctx, cfg, do.migrate)
 	if err != nil {
 		return err
 	}
@@ -283,16 +324,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		cfg.Origins.SharedHosts,
 	)
 
-	// Bootstrap runs here rather than straight after the migrations because it
-	// creates the project's keys and so needs the project service, which needs
-	// the key service. It must still precede the user import: that import
-	// creates a bare project row for any project id a bootstrap user names, and
-	// a project row that already exists would make this a no-op and leave the
-	// platform project without keys.
-	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
-		return fmt.Errorf("failed to bootstrap platform project: %w", err)
-	}
-
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
@@ -316,13 +347,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
-	invitationService := service.NewInvitationService(serviceDBPool, keyService, consoleBase, cfg.Platform.ResolvedProjectID())
+	invitationService := service.NewInvitationService(serviceDBPool, keyService, grantService, userRefs, api.InviterAdminCheck(cfg.Platform.ResolvedProjectID()), consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
+	oauthSettingsService := service.NewOAuthSettingsService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator())
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
+	authRequestService := service.NewAuthRequestService(serviceDBPool)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password
@@ -341,29 +374,34 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		brandingService,
 		idpConnectionService,
 		policyService,
+		oauthSettingsService,
 		builtinBases,
 	)
-	// The console signs operators in to the platform project from the public
-	// base, the first console origin, so that project serves a deployed release
-	// there like any other project. Before the user import, which needs the
-	// platform user schema this release stores.
-	if cfg.Platform.BootstrapProject {
-		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
-			return fmt.Errorf("failed to deploy the platform project: %w", err)
+	// Everything above only wires services, and nothing below writes what a
+	// seeding does: the seeding is this one call, for the seed command and for
+	// a server that seeds as it starts.
+	if do.seed {
+		seeding := seeder{
+			pool:          serviceDBPool,
+			projects:      projectService,
+			releases:      releaseService,
+			deployments:   deploymentService,
+			hashes:        passwordHasher,
+			builtinBases:  builtinBases,
+			consoleOrigin: consoleHosts[0],
 		}
+		if err := seeding.seed(ctx, cfg, userFiles); err != nil {
+			return err
+		}
+	}
+	if !do.serve {
+		slog.Info("database seeded")
+		return nil
+	}
+	if cfg.Platform.BootstrapProject {
 		for _, origin := range consoleHosts[1:] {
 			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
 		}
-	}
-
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
-	// After the import, so a bootstrap admin named in platform.operators
-	// exists by the time it is granted (ADR 075 §4).
-	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
-		return fmt.Errorf("failed to reconcile platform operators: %w", err)
 	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
@@ -407,21 +445,21 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		schemaStore,
 		serviceDBPool,
 		signupProtection)
-	stateMachine := domain.NewFlowStateMachine(
-		storageSchemaResolver,
+	stateMachine := flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
+		Schemas: storageSchemaResolver,
 		// The raw statements: the state machine only hands this store to the
 		// resolver, which follows the namespace itself, so the aliasing wrapper
 		// would only double the reads of a miss.
-		serviceDBPool.Statements(),
-		fields,
-		createUserHandler,
-		flowAuth,
-		service.NewFlowSSOProviderResolver(idpConnectionService),
-		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
-		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
-		passwordPolicy,
-		time.Now,
-	)
+		SchemaStore:   serviceDBPool.Statements(),
+		Fields:        fields,
+		CreateUser:    createUserHandler,
+		AuthAttempts:  flowAuth,
+		SSOProviders:  service.NewFlowSSOProviderResolver(idpConnectionService),
+		SSOIdentities: service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
+		SSORedirects:  service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
+		Passwords:     passwordPolicy,
+		Now:           time.Now,
+	})
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases, signupProtection)
@@ -437,7 +475,19 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// otherwise reports the current state for operators.
 	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
+		// A start that does not seed finds no platform project where none was
+		// seeded: say where it comes from, since nothing here creates it. Any
+		// other failure, an unreachable database among them, is not about
+		// seeding.
+		if !do.seed && cfg.Platform.BootstrapProject && errors.Is(err, domain.ErrProjectNotFound()) {
+			return fmt.Errorf("the platform project does not exist: the seed command creates it, and a server started with --%s=false does not: %w", flagSeed, err)
+		}
 		return fmt.Errorf("failed to resolve the default project: %w", err)
+	}
+	// A start that does not seed cannot repair what differs from its
+	// seeding, and nothing else would say so before the next deployment.
+	if !do.seed && cfg.Platform.BootstrapProject {
+		reportPlatformDrift(ctx, consoleHosts[0], defaultProject, deploymentService)
 	}
 	if defaultProject != nil {
 		slog.Info("default project resolved", slog.String("project_id", defaultProject.ID))
@@ -502,7 +552,14 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithInvitationService(invitationService).WithReadinessCheck(pool),
+		).
+			WithPersonalTeamEnsurer(personalTeams).
+			WithBuiltinSchemaBases(builtinBases).
+			WithRuntimeResolver(runtimeResolver).
+			WithPolicyService(policyService).
+			WithOAuthSettingsService(oauthSettingsService).
+			WithInvitationService(invitationService).
+			WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
@@ -513,9 +570,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to build api servers: %w", err)
 	}
 
-	// The OAuth authorization server (ADR 081), behind oauth.enabled. Until
-	// a project can enable OAuth, no origin is admitted as an issuer and no
-	// project has it enabled, so every issuer answers 404.
+	// The OAuth authorization server (ADR 081), behind oauth.enabled. A
+	// project's primary origins are its issuers, and the release deployed to
+	// an origin decides whether that issuer answers.
 	var oauthHandlers *oauth.Handlers
 	if cfg.OAuth.Enabled {
 		publicBase, err := url.Parse(cfg.Server.PublicBase)
@@ -532,8 +589,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		oauthHandlers = oauth.New(oauth.Config{
 			PublicBase:      publicBase,
 			PlatformEnabled: cfg.Platform.ResolvedProjectID() == domain.PlatformProjectID,
-			Admission:       oauth.DenyAll{},
-			Settings:        oauth.NotEnabled{},
+			Admission:       oauth.NewProjectAdmission(projectService, consoleHosts),
+			Settings:        oauth.NewReleaseSettings(runtimeResolver, oauthSettingsService),
+			Clients:         applicationService,
+			AuthRequests:    authRequestService,
 		})
 	}
 
@@ -549,7 +608,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           withIncomingTraceContext(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), mux),
+		Handler:           withTracing(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), telemetry.TracerProvider(), mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -567,16 +626,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		close(serverErr)
 	}()
 
+	// Re-wraps what a master key that is being rotated out still wraps. With
+	// one master key configured it has nothing to look for and returns at once.
+	//
 	// TODO: on a multi-replica deployment, the migration can happen multiple
 	//       times. This is not a problem since the migration will not remove
 	//       any keys. So nothing breaks. But there is no need to recompute the
 	//       same thing multiple times.
 	go func() {
-		slog.Info("migrate keys to latest master key")
 		if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
 			slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
 		}
-		slog.Debug("master key migration done")
 	}()
 
 	select {
@@ -590,6 +650,20 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return nil
 	case err := <-serverErr:
 		return err
+	}
+}
+
+// reportPlatformDrift logs how the platform project differs from what a
+// seeding with this server's configuration leaves. It reads once and never
+// fails a start: what it finds is for the next seeding to repair.
+func reportPlatformDrift(ctx context.Context, consoleOrigin string, project *domain.Project, deployments *service.DeploymentService) {
+	problem, err := platform.CheckSeeded(ctx, consoleOrigin, project, deployments)
+	if err != nil {
+		slog.Warn("platform project: could not check what its seeding left", slogctx.Err(err))
+		return
+	}
+	if problem != "" {
+		slog.Error("platform project: " + problem + "; the seed command repairs it, which a deployment runs as it deploys")
 	}
 }
 
@@ -1110,6 +1184,14 @@ func buildHTTPMux(
 	// 1.0.0 (ADR 077).
 	api.MountAPI(mux, chain, observe, apiServers)
 	return securityheaders.Middleware(mux), nil
+}
+
+// withTracing is the edge of the server's handler chain: what an incoming
+// trace context means (withIncomingTraceContext), then the server span of the
+// request (middleware.WithServerSpan), in front of every mount of next and
+// all their middleware.
+func withTracing(cfg instrumentation.TraceConfig, propagator propagation.TextMapPropagator, provider trace.TracerProvider, next http.Handler) http.Handler {
+	return withIncomingTraceContext(cfg, propagator, middleware.WithServerSpan(provider)(next))
 }
 
 // withIncomingTraceContext decides what an incoming trace context means for

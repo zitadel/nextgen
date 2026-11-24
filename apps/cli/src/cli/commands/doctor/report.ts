@@ -1,8 +1,8 @@
 import wrapAnsi from "wrap-ansi";
 
-import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
+import { type NextSteps, renderNextSteps } from "@/cli/core/next-steps";
 import type { Suggest } from "@/lib/suggestion";
-import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
+import { style } from "@/lib/ui/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import type { CheckOutcome } from "./checks";
@@ -82,7 +82,9 @@ export function categoryOf(checkName: string): CheckCategory {
 /**
  * The checks as the envelope carries them: each with its category, and a
  * warning's remedy written into its details as `remedy_command`, after what
- * the check found.
+ * the check found. Each branch destructures the check it narrowed: a remedy
+ * comes only with details that are an object, which destructuring both at once
+ * would forget.
  *
  * @param checks - The checks, as they ran.
  * @returns The checks for the envelope.
@@ -90,8 +92,6 @@ export function categoryOf(checkName: string): CheckCategory {
 export function withCategories(
   checks: readonly CheckOutcome[],
 ): Array<Omit<CheckOutcome, "remedy"> & { category: CheckCategory }> {
-  // Each branch destructures the check it narrowed: a remedy comes only with
-  // details that are an object, which destructuring both at once would forget.
   return checks.map((check) => {
     const category = categoryOf(check.name);
     if (check.remedy === undefined) {
@@ -99,17 +99,21 @@ export function withCategories(
       return { ...found, category };
     }
     const { remedy, ...found } = check;
-    return { ...found, details: { ...found.details, remedy_command: remedy }, category };
+    return {
+      ...found,
+      details: { ...found.details, remedy_command: remedy },
+      category,
+    };
   });
 }
 
 type RowStatus = CheckOutcome["status"] | "skip";
 
 const ROW_MARK: Record<RowStatus, string> = {
-  pass: statusColor.pass("[✓]"),
-  warn: statusColor.warn("[!]"),
-  fail: statusColor.fail("[✗]"),
-  skip: dim("[-]"),
+  pass: style.statusColor.pass("[✓]"),
+  warn: style.statusColor.warn("[!]"),
+  fail: style.statusColor.fail("[✗]"),
+  skip: style.dim("[-]"),
 };
 
 export type DoctorReportInput = {
@@ -145,6 +149,12 @@ export type DoctorReport = {
  * collapsed when everything in it passed, with what needs attention indented
  * below its row and the command that repairs it pulled out to copy. `--verbose`
  * expands every row. Only for people: the envelope carries the same checks.
+ * A category with no checks to show this run says why, and what to do about it,
+ * if anything. The commands that repair what a category reports are its
+ * non-passing checks' remedies; `upgrade` re-pins the app's packages too, so it
+ * stands in for the pin check's own command, which would align them with this
+ * older CLI. A run that passed closes on its title, so only a failure, which has none,
+ * says its verdict at the end.
  */
 export function doctorReport(input: DoctorReportInput): DoctorReport {
   const lines: string[] = [];
@@ -153,7 +163,15 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     const checks = input.checks.filter((check) => {
       return categoryOf(check.name) === category.id;
     });
-    const skipped = skipReason(category.id, input);
+    const skipped =
+      category.id === "local_server" && input.hostedServer !== undefined
+        ? { reason: `not used, this project's server is ${input.hostedServer}` }
+        : category.id === "project" && !input.projectConfigured
+          ? {
+              reason: "no zitadel.json in this directory",
+              command: input.suggest({ id: "setup" }),
+            }
+          : undefined;
     if (skipped !== undefined) {
       lines.push(row("skip", category.label, skipped.reason));
       if (skipped.command !== undefined) {
@@ -165,17 +183,33 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     if (checks.length === 0) {
       continue;
     }
-    lines.push(row(worstOf(checks), category.label, summaryOf(category.id, checks, input)));
+    const worst = checks.some((check) => {
+      return check.status === "fail";
+    })
+      ? "fail"
+      : checks.some((check) => {
+            return check.status === "warn";
+          })
+        ? "warn"
+        : "pass";
+    lines.push(row(worst, category.label, summaryOf(category.id, checks, input)));
     lines.push(...detailLines(checks, input, shownCommands));
-    for (const remedy of remediesOf(category.id, checks)) {
+    const remedies = checks
+      .filter((check) => {
+        return check.status !== "pass";
+      })
+      .flatMap((check) => {
+        return check.remedy === undefined ? [] : [check.remedy];
+      });
+    for (const remedy of category.id === "versions"
+      ? remedies.slice(0, 1)
+      : [...new Set(remedies)]) {
       if (!shownCommands.has(remedy)) {
         lines.push(remedyLine(remedy));
         shownCommands.add(remedy);
       }
     }
   }
-  // A run that passed closes on its title, so only a failure, which has
-  // none, says its verdict here.
   const failed = input.checks.some((check) => {
     return check.status === "fail";
   });
@@ -184,10 +218,28 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     lines.push("");
   }
   if (failed) {
-    lines.push(conclusion(input.checks));
+    const affected = (status: CheckOutcome["status"]): number => {
+      return new Set(
+        input.checks
+          .filter((check) => {
+            return check.status === status;
+          })
+          .map((c) => {
+            return categoryOf(c.name);
+          }),
+      ).size;
+    };
+    const categories = (count: number): string => {
+      return new Intl.PluralRules("en").select(count) === "one"
+        ? "1 category"
+        : `${String(count)} categories`;
+    };
+    lines.push(
+      `${style.mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`,
+    );
   }
   if (showsHint) {
-    lines.push(dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
+    lines.push(style.dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
   }
   const shownActions = new Set(
     (input.fixes ?? [])
@@ -215,49 +267,19 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
 export function renderDoctorReport(input: DoctorReportInput): string {
   const { lines, next } = doctorReport(input);
   const block = renderNextSteps(next);
-  return [strong("Zitadel doctor"), "", ...lines, ...(block === "" ? [] : ["", block])].join("\n");
-}
-
-/** Why a category has no checks to show this run, and what to do about it, if anything. */
-function skipReason(
-  category: CheckCategory,
-  input: DoctorReportInput,
-): { reason?: string; command?: string } | undefined {
-  if (category === "local_server" && input.hostedServer !== undefined) {
-    return { reason: `not used, this project's server is ${input.hostedServer}` };
-  }
-  if (category === "project" && !input.projectConfigured) {
-    return {
-      reason: "no zitadel.json in this directory",
-      command: input.suggest({ id: "setup" }),
-    };
-  }
-  return undefined;
+  return [style.strong("Zitadel doctor"), "", ...lines, ...(block === "" ? [] : ["", block])].join(
+    "\n",
+  );
 }
 
 function row(status: RowStatus, label: string, summary: string | undefined): string {
-  const title = status === "pass" || status === "skip" ? label : strong(label);
+  const title = status === "pass" || status === "skip" ? label : style.strong(label);
   return [
     `${ROW_MARK[status]} ${title}${" ".repeat(LABEL_WIDTH - label.length)}`,
-    ...(summary === undefined || summary === "" ? [] : [dim(summary)]),
+    ...(summary === undefined || summary === "" ? [] : [style.dim(summary)]),
   ]
     .join("  ")
     .trimEnd();
-}
-
-function worstOf(checks: readonly CheckOutcome[]): CheckOutcome["status"] {
-  if (
-    checks.some((check) => {
-      return check.status === "fail";
-    })
-  ) {
-    return "fail";
-  }
-  return checks.some((check) => {
-    return check.status === "warn";
-  })
-    ? "warn"
-    : "pass";
 }
 
 /** The one-line summary a row shows; what needs attention is listed below it instead. */
@@ -267,10 +289,13 @@ function summaryOf(
   input: DoctorReportInput,
 ): string | undefined {
   if (category === "versions") {
-    const latest = detailsOf(
-      checks.find((check) => {
-        return check.name === "cli-version";
-      }),
+    const versionDetails = checks.find((check) => {
+      return check.name === "cli-version";
+    })?.details;
+    const latest = (
+      typeof versionDetails === "object" && versionDetails !== null
+        ? (versionDetails as Record<string, unknown>)
+        : undefined
     )?.latest;
     return typeof latest === "string"
       ? `CLI ${input.cliVersion}, ${latest} available`
@@ -296,17 +321,13 @@ function checksCount(count: number): string {
   return new Intl.PluralRules("en").select(count) === "one" ? "1 check" : `${String(count)} checks`;
 }
 
-function detailsOf(check: CheckOutcome | undefined): Record<string, unknown> | undefined {
-  const details = check?.details;
-  return typeof details === "object" && details !== null
-    ? (details as Record<string, unknown>)
-    : undefined;
-}
-
 /**
  * What a row expands to. Several checks can fail for one cause, as every check
  * that reads a missing `.zitadel/secret` does, so a collapsed row says a message
- * only once; `--verbose` lists every check, by name.
+ * only once; `--verbose` lists every check, by name. Each line's control
+ * characters are spelled out because only a passing check's line is dimmed, and
+ * a check that failed names what it read — a server's answer, a registry's
+ * version, a path — in a line nothing else would spell out.
  */
 function detailLines(
   checks: readonly CheckOutcome[],
@@ -323,13 +344,22 @@ function detailLines(
       continue;
     }
     seen.add(check.message);
-    // Spelled out here because only a passing check's line is dimmed, and a
-    // check that failed names what it read — a server's answer, a registry's
-    // version, a path — in a line nothing else would spell out.
     const text = escapeControlCharacters(
       input.verbose ? `${check.name}: ${check.message}` : check.message,
     );
-    lines.push(detailLine(check.status, check.status === "pass" ? dim(text) : text, input));
+    const shown = check.status === "pass" ? style.dim(text) : text;
+    const wrapped = !input.columns
+      ? shown
+      : wrapAnsi(shown, Math.max(20, input.columns - DETAIL_INDENT), { hard: false });
+    const [first = "", ...rest] = wrapped.split("\n");
+    lines.push(
+      [
+        `    ${style.mark[check.status]} ${first}`,
+        ...rest.map((line) => {
+          return `${" ".repeat(DETAIL_INDENT)}${line}`;
+        }),
+      ].join("\n"),
+    );
     const fix = input.fixes?.find((candidate) => {
       return candidate.check === check.name;
     });
@@ -341,59 +371,6 @@ function detailLines(
   return lines;
 }
 
-function detailLine(
-  status: CheckOutcome["status"],
-  text: string,
-  input: DoctorReportInput,
-): string {
-  const wrapped = !input.columns
-    ? text
-    : wrapAnsi(text, Math.max(20, input.columns - DETAIL_INDENT), { hard: false });
-  const [first = "", ...rest] = wrapped.split("\n");
-  return [
-    `    ${mark[status]} ${first}`,
-    ...rest.map((line) => {
-      return `${" ".repeat(DETAIL_INDENT)}${line}`;
-    }),
-  ].join("\n");
-}
-
-/**
- * The commands that repair what a category reports. `upgrade` re-pins the app's
- * packages too, so it stands in for the pin check's own command, which would
- * align them with this older CLI.
- */
-function remediesOf(category: CheckCategory, checks: readonly CheckOutcome[]): string[] {
-  const remedies = checks
-    .filter((check) => {
-      return check.status !== "pass";
-    })
-    .flatMap((check) => {
-      return check.remedy === undefined ? [] : [check.remedy];
-    });
-  return category === "versions" ? remedies.slice(0, 1) : [...new Set(remedies)];
-}
-
 function remedyLine(remedy: string): string {
-  return `    ${arrow} ${command(remedy)}`;
-}
-
-function conclusion(checks: readonly CheckOutcome[]): string {
-  const affected = (status: CheckOutcome["status"]): number => {
-    return new Set(
-      checks
-        .filter((check) => {
-          return check.status === status;
-        })
-        .map((c) => {
-          return categoryOf(c.name);
-        }),
-    ).size;
-  };
-  const categories = (count: number): string => {
-    return new Intl.PluralRules("en").select(count) === "one"
-      ? "1 category"
-      : `${String(count)} categories`;
-  };
-  return `${mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
+  return `    ${style.arrow} ${style.command(remedy)}`;
 }

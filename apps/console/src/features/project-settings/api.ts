@@ -22,7 +22,7 @@ export async function readDeployedPasswordPolicy(
   if (releaseId === undefined) {
     return undefined;
   }
-  const release = await api.getReleaseById(releaseId, { project_id: projectId });
+  const release = await api.getRelease(releaseId, { project_id: projectId });
   const pointer = release.pointers.find(
     (candidate) => candidate.kind === "policy" && candidate.handle === PASSWORD_SET,
   );
@@ -36,4 +36,22 @@ export async function readDeployedPasswordPolicy(
     throw new Error(`the release pins a ${revision.operation} revision as the password policy`);
   }
   return { config: revision.config };
+}
+
+/**
+ * Who has access to a project and how: the people with live admin access
+ * (`GET /projects/{id}/admins`, #1462) and the project's grants, which add the
+ * rows that list leaves out. One page each: a project's admins are a handful;
+ * add paging with the first project that needs it. The grants' principal refs
+ * carry the names, so nothing is expanded.
+ *
+ * The two are the same viewer check on the same project and succeed or fail
+ * as one.
+ */
+export async function readProjectAccess(projectId: string) {
+  const [admins, grants] = await Promise.all([
+    api.listProjectAdmins(projectId, { limit: 100 }),
+    api.queryGrants({ limit: 100 }, { project_id: projectId }),
+  ]);
+  return { admins: admins.admins, grants: grants.grants };
 }

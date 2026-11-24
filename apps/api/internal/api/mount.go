@@ -75,20 +75,21 @@ func NewServers(h api.Handler, sec api.SecurityHandler, opts ...api.ServerOption
 // only (request ID, logging, recover — no CSRF or session). The probes answer
 // at their root paths, and the root alias takes every other path: mounts
 // registered on mux for paths of their own, the console's and the IdP
-// callbacks', win over it. Both the API and the root alias take the
-// deprecated `targets: ["primary"]` on createDeployment until 1.0.0.
+// callbacks', win over it. Until 1.0.0 both the API and the root alias take
+// the deprecated `targets: ["primary"]` on createDeployment, and answer the
+// flow operations at their deprecated `/flow` paths.
 func MountAPI(mux *http.ServeMux, chain, observe func(http.Handler) http.Handler, servers Servers) {
 	// Exact path ahead of the prefix catch-all; observe only so tools need
 	// no CSRF or session cookie.
 	mux.Handle(openapibundled.Path, observe(openAPIDocumentHandler()))
-	prefixed := chain(withLegacyPrimaryTargets(servers.API))
+	prefixed := chain(withLegacyPrimaryTargets(withLegacyFlowPath(servers.API)))
 	mux.Handle(client.PathPrefix+"/", prefixed)
 	mux.Handle(client.PathPrefix, prefixed)
 	probes := chain(servers.Probes)
 	for _, path := range probePaths {
 		mux.Handle(path, probes)
 	}
-	mux.Handle("/", chain(withRootPathDeprecation(withLegacyPrimaryTargets(servers.Root))))
+	mux.Handle("/", chain(withRootPathDeprecation(withLegacyPrimaryTargets(withLegacyFlowPath(servers.Root)))))
 }
 
 // rootPathDeprecatedSince is the day the API moved under client.PathPrefix,

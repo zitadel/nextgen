@@ -11,7 +11,7 @@ A project is the top-level container and the data boundary. Every user, session,
 
 ## Team
 
-A team groups users inside a project. In a SaaS app it can represent one of the app's tenants, such as a paying customer or a B2B end-customer, depending on which project it lives in.
+A team groups users inside a project. In a SaaS app it can represent one of the app's tenants, such as a paying customer or a B2B end-customer, depending on which project it lives in. In the platform project, teams are the owning and access groups for customer projects. How roster membership differs from user lifecycle ownership: [Access and memberships](/docs/concepts/access-and-memberships#team-memberships-vs-lifecycle-ownership).
 
 ## User
 
@@ -19,10 +19,10 @@ A user is an identity inside a project. Users can be self-owned or team-owned de
 
 ## Claim
 
-A project is created first and claimed later. Claiming attaches it to your team. A claimed project is one that carries an active owning-team grant. Claim is shipped end to end: the `zitadel claim` command, the OpenAPI endpoints, the server handlers, and the console claim page. The console claim page is the browser leg, where you sign in on the platform project and complete the claim.
+A project is created first and claimed later. Claiming attaches it to your team. A claimed project is one that carries an active owning-team grant. On a server with a platform project, claim is required before you invite collaborators or create grants for foreign principals ([Access and memberships](/docs/concepts/access-and-memberships)). Claim is shipped end to end: the `zitadel claim` command, the OpenAPI endpoints, the server handlers, and the console claim page. The console claim page is the browser leg, where you sign in on the platform project and complete the claim.
 
 A local project skips the browser leg by default. `zitadel start` creates a local admin, `admin@zitadel.localhost`, with a team of its own, and `zitadel setup --server local` attaches the new project to that team, so a local project is owned by the local admin from the moment setup finishes. `zitadel claim` then reports it as already owned; it is the fallback for when that step failed.
 
 ## Console
 
-The console is the management UI: the people who run a project use it to manage its users, teams, schemas, and login flows, as far as their grants allow. Your app's users never need it. They sign up and sign in in your app, through [`<zitadel-login>`](/docs/sdks/components) and the project's login flow. The console signs in with the same component, so its sign-in page can look like your app's; an account without a grant can sign in there, but finds nothing to manage.
+The console is the management UI: the people who run a project use it to manage its users, teams, schemas, and login flows, as far as their grants and invitations allow ([Access and memberships](/docs/concepts/access-and-memberships)). Your app's users never need it. They sign up and sign in in your app, through [`<zitadel-login>`](/docs/sdks/components) and the project's login flow. The console signs in with the same component, so its sign-in page can look like your app's; an account without a grant can sign in there, but finds nothing to manage.
