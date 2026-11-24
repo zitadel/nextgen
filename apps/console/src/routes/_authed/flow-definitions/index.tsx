@@ -10,7 +10,6 @@ import {
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
-  ResourceEmptyRow,
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
@@ -19,8 +18,8 @@ import {
   RowMenu,
 } from "@/components/resource-list";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { InlineCode } from "@/components/ui/inline-code";
-import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
+import { CLI_DEPLOY, CliCommand } from "@/components/cli-hint";
+import { ResourceEmpty } from "@/components/resource-empty";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
 import {
@@ -28,11 +27,11 @@ import {
   type FlowDefinitionEntry,
   flowDisplayName,
   flowPurposeSummary,
-  flowStepNames,
 } from "@/features/flow-definitions/model";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { schemaDisplayName } from "@/features/schemas/model";
 import { Page } from "@/components/layout";
+import { DOCS_URL } from "@/lib/docs";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
   // Order 5: Users sits at 3, Authentication at 4.
@@ -85,34 +84,40 @@ function LoginFlowsScreen() {
     <Page>
       <ResourceTitle>Login flows</ResourceTitle>
 
-      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
-        {/* The same resource table as the other directories (D17). Six columns
-            need more room than four, so the table's own minimum width is wider
-            than the shared one; the step chips wrap within their column, so a
-            flow with many steps grows its row rather than the table. */}
-        <Table className={`${RESOURCE_TABLE_FIXED} min-w-[52rem]`}>
-          <TableHeader>
-            <ResourceHeaderRow>
-              <ResourceHeadCell className="w-[20%]">Name</ResourceHeadCell>
-              <ResourceHeadCell className="w-[16%]">Purposes</ResourceHeadCell>
-              <ResourceHeadCell className="w-[30%]">Steps</ResourceHeadCell>
-              <ResourceHeadCell className="w-[14%]">User schema</ResourceHeadCell>
-              <ResourceHeadCell className="w-[11%]">Last change</ResourceHeadCell>
-              <ResourceMenuHead className="w-[9%]" />
-            </ResourceHeaderRow>
-          </TableHeader>
-          <TableBody>
-            {flows.length === 0 ? (
-              <ResourceEmptyRow colSpan={6}>This project has no login flows.</ResourceEmptyRow>
-            ) : (
-              flows.map((flow) => <FlowRowItem key={flow.id} {...flow} />)
-            )}
-          </TableBody>
-        </Table>
-        <CliHint>
-          Edit the definitions locally, then deploy your changes with{" "}
-          <CliCommand>{CLI_DEPLOY}</CliCommand>.
-        </CliHint>
+      <div className={RESOURCE_TABLE_TOP}>
+        {flows.length === 0 ? (
+          <ResourceEmpty
+            icon={Workflow}
+            title="No login flows yet"
+            docsHref={`${DOCS_URL}/guides/edit-login-flow`}
+          >
+            Create a login flow locally, then deploy it with{" "}
+            <span className="whitespace-nowrap">
+              <CliCommand>{CLI_DEPLOY}</CliCommand>.
+            </span>
+          </ResourceEmpty>
+        ) : (
+          // The same resource table as the other directories (D17): four
+          // equal data columns and the row menu.
+          <div className={RESOURCE_TABLE_WRAP}>
+            <Table className={RESOURCE_TABLE_FIXED}>
+              <TableHeader>
+                <ResourceHeaderRow>
+                  <ResourceHeadCell>Name</ResourceHeadCell>
+                  <ResourceHeadCell>Purpose</ResourceHeadCell>
+                  <ResourceHeadCell>User schema</ResourceHeadCell>
+                  <ResourceHeadCell>Last change</ResourceHeadCell>
+                  <ResourceMenuHead className="w-20" />
+                </ResourceHeaderRow>
+              </TableHeader>
+              <TableBody>
+                {flows.map((flow) => (
+                  <FlowRowItem key={flow.id} {...flow} />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     </Page>
   );
@@ -123,7 +128,6 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
   const navigate = useNavigate();
   const name = flowDisplayName(definition);
   const purposes = flowPurposeSummary(definition);
-  const steps = flowStepNames(definition);
 
   return (
     <ResourceRow
@@ -144,13 +148,6 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
         </div>
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>{purposes}</TableCell>
-      <TableCell className={RESOURCE_CELL}>
-        <div className="flex flex-wrap gap-1.5">
-          {steps.map((step) => (
-            <InlineCode key={step}>{step}</InlineCode>
-          ))}
-        </div>
-      </TableCell>
       <TableCell className={`${RESOURCE_CELL} truncate text-sm`}>
         {schemaName &&
           (schemaId ? (

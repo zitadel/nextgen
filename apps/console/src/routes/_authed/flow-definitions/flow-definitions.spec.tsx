@@ -2,6 +2,8 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { CLI_DEPLOY } from "@/components/cli-hint";
+import { DOCS_URL } from "@/lib/docs";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -79,10 +81,16 @@ describe("login flows list", () => {
   it("shows the empty state when there are no flow definitions", async () => {
     server.use(http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [] })));
     await renderAt("/flow-definitions");
-    expect(await screen.findByText("This project has no login flows.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No login flows yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText(CLI_DEPLOY)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Read documentation" })).toHaveAttribute(
+      "href",
+      `${DOCS_URL}/guides/edit-login-flow`,
+    );
   });
 
-  it("renders a row with its humanised name, purposes, steps and schema", async () => {
+  it("renders a row with its humanised name, purpose and schema", async () => {
     server.use(http.get(FLOWS_URL, () => HttpResponse.json(listResponse())));
     await renderAt("/flow-definitions");
 
@@ -91,8 +99,10 @@ describe("login flows list", () => {
     expect(await screen.findByRole("link", { name: "Default login" })).toBeInTheDocument();
     // Fixed order, not the object's: the response lists `register` first.
     expect(screen.getByText("Login + Register")).toBeInTheDocument();
-    expect(screen.getByText("identifier")).toBeInTheDocument();
-    expect(screen.getByText("passkey-upsell")).toBeInTheDocument();
+    // The steps read on the flow's own page, and a populated list carries no
+    // CLI hint under it.
+    expect(screen.queryByText("passkey-upsell")).not.toBeInTheDocument();
+    expect(screen.queryByText(/deploy your changes/)).not.toBeInTheDocument();
     // The schema name comes from the `expand=user_schema` embed, not the id,
     // and links to the schema it names.
     const schema = screen.getByRole("link", { name: "Minimal" });
@@ -193,6 +203,9 @@ describe("login flow detail", () => {
     expect(screen.getByRole("cell", { name: "submit, passkey" })).toBeInTheDocument();
     // A terminal step collects nothing and offers nothing.
     expect(screen.getAllByRole("cell", { name: "—" })).toHaveLength(2);
+    // The selected source tab controls the panel that shows the source.
+    const json = screen.getByRole("tab", { name: "JSON", selected: true });
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("id", json.getAttribute("aria-controls"));
   });
 
   it("names the newest revision of the schema in the selected project", async () => {

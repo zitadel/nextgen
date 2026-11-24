@@ -603,7 +603,8 @@ describe("user schema detail", () => {
     await renderAt("/schemas/sch_business");
     await screen.findByRole("heading", { name: "Business" });
 
-    const code = () => screen.getByRole("tabpanel").querySelector("pre")?.textContent;
+    // The viewer's panel sits inside the page's Fields panel.
+    const code = () => screen.getAllByRole("tabpanel").at(-1)?.querySelector("pre")?.textContent;
     expect(code()).toContain('"objectType": "human-user"');
 
     await userEvent.click(screen.getByRole("tab", { name: "YAML" }));

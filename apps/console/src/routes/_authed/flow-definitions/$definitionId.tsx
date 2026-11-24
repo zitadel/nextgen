@@ -113,7 +113,7 @@ function FlowDefinitionDetail() {
               <TableHead className={`${HEAD_CELL} pr-2`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody className="[&_tr:last-child]:border-b">
+          <TableBody>
             {steps.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={3} className="h-16 px-2 text-center text-muted-foreground">
