@@ -696,9 +696,8 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 
 // handleCancelInvitationRequest handles cancelInvitation operation.
 //
-// Deletes a pending or rejected invitation. A pending invitation's link can no longer be redeemed; a
-// rejected one's row and metadata are removed. An accepted or expired invitation answers the same
-// opaque `404` as a miss. Expired invitations keep their row until a later cleanup job removes them.
+// Deletes a pending, expired or rejected invitation, with its metadata. A pending invitation's link
+// can no longer be redeemed. An accepted invitation answers the same opaque `404` as a miss.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests

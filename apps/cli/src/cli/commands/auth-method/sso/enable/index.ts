@@ -201,6 +201,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             report: (change) => {
               this.report(change);
             },
+            said: (change) => {
+              return this.said(change);
+            },
           }),
         )
         .step(new CollectCredentials())
@@ -223,6 +226,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         )
         .step(
           new ShowResult({
+            said: (change, written) => {
+              return this.said(change, written);
+            },
             followUps: (changed, leading) => {
               return this.followUps(changed, leading);
             },

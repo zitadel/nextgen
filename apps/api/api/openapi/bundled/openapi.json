@@ -9661,7 +9661,7 @@
         "operationId": "cancelInvitation",
         "x-zitadel-cli": "invitation cancel",
         "summary": "Cancel an invitation",
-        "description": "Deletes a pending or rejected invitation. A pending invitation's link can\nno longer be redeemed; a rejected one's row and metadata are removed. An\naccepted or expired invitation answers the same opaque `404` as a miss.\nExpired invitations keep their row until a later cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Deletes a pending, expired or rejected invitation, with its metadata. A\npending invitation's link can no longer be redeemed. An accepted\ninvitation answers the same opaque `404` as a miss.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9708,7 +9708,7 @@
             }
           },
           "404": {
-            "description": "Invitation or project not found, or the invitation is no longer\npending.\n",
+            "description": "Invitation or project not found, or the invitation was accepted.\n",
             "content": {
               "application/json": {
                 "schema": {

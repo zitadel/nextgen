@@ -1867,11 +1867,11 @@
     {
       "id": "invitation cancel",
       "group": "Users and access",
-      "description": "Cancel a pending invitation so its link stops working, or remove a declined one.",
+      "description": "Cancel a pending invitation so its link stops working, or remove an expired or declined one.",
       "args": [
         {
           "name": "invitation_id",
-          "description": "The invitation to cancel. Omit it to pick a pending or declined one."
+          "description": "The invitation to cancel. Omit it to pick a pending, expired or declined one."
         }
       ],
       "flags": [
