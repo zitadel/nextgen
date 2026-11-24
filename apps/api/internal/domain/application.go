@@ -274,7 +274,7 @@ func (app *Application) ReviseDeclaredApplication(stored []*ApplicationClient, n
 		return nil, nil, ErrApplicationFieldImmutable(immutable)
 	}
 
-	toAdd, _ := slice_util.DiffFunc(oldClients, newDoc.Clients, func(a ApplicationClientDocument, b ApplicationClientDocument) bool { return a.Slug == b.Slug })
+	toAdd, _ := slice_util.DiffFunc(oldClients, newDoc.Clients, func(stored, declared ApplicationClientDocument) bool { return stored.Slug == declared.Slug })
 	if err := validateNoReservedClientIDs(newDoc, toAdd); err != nil {
 		return nil, nil, err
 	}

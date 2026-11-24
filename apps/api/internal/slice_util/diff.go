@@ -6,25 +6,25 @@ import (
 	"github.com/ahmetb/go-linq/v5"
 )
 
-func DiffFunc[E any](a []E, b []E, equalsFunc func(a E, b E) bool) (addedInA []E, removedFromA []E) {
-	notAdded := make([]E, 0, len(b))
+func DiffFunc[E any](from []E, to []E, equal func(f E, t E) bool) (added []E, removed []E) {
+	kept := make([]E, 0, len(to))
 
-	for _, eb := range b {
-		isAdded := !slices.ContainsFunc(a, func(ea E) bool {
-			return equalsFunc(eb, ea)
+	for _, t := range to {
+		isAdded := !slices.ContainsFunc(from, func(f E) bool {
+			return equal(f, t)
 		})
 		if isAdded {
-			addedInA = append(addedInA, eb)
+			added = append(added, t)
 		} else {
-			notAdded = append(notAdded, eb)
+			kept = append(kept, t)
 		}
 	}
 
-	removedFromA = linq.FromSlice(a).
-		Where(func(ea E) bool {
-			return !slices.ContainsFunc(notAdded, func(e E) bool { return equalsFunc(ea, e) })
+	removed = linq.FromSlice(from).
+		Where(func(f E) bool {
+			return !slices.ContainsFunc(kept, func(t E) bool { return equal(f, t) })
 		}).
 		ToSlice()
 
-	return addedInA, removedFromA
+	return added, removed
 }
