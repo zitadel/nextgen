@@ -59,32 +59,24 @@ const ORIGIN = {
 } as const satisfies Refused<string>;
 
 /**
- * Reads a `--ttl` value, turning what `Ttl` refuses into the CLI's own validation error.
- *
- * @param input - The value as it was typed.
- * @returns The parsed TTL.
- * @throws {ZitadelError} `E_VALIDATION`, with `Ttl`'s message and hint, when it is not a TTL.
- */
-function readTtl(input: string): Ttl {
-  try {
-    return Ttl.parse(input);
-  } catch (error) {
-    if (error instanceof TtlError) {
-      throw new ZitadelError("E_VALIDATION", error.message, { hint: error.hint });
-    }
-    throw error;
-  }
-}
-
-/**
- * How long a preview stays live, as `7d`, `12h` or `90m`. `readTtl` refuses a
- * value that is not a duration, in its own words; the schema refuses one
- * outside the server's fixed limits of a minute and 365 days.
+ * How long a preview stays live, as `7d`, `12h` or `90m`. A value that is not
+ * a duration is refused as `E_VALIDATION` with `Ttl`'s own message and hint;
+ * the schema refuses one outside the server's fixed limits of a minute and
+ * 365 days.
  */
 const TTL = {
   schema: z
     .string()
-    .transform(readTtl)
+    .transform((input) => {
+      try {
+        return Ttl.parse(input);
+      } catch (error) {
+        if (error instanceof TtlError) {
+          throw new ZitadelError("E_VALIDATION", error.message, { hint: error.hint });
+        }
+        throw error;
+      }
+    })
     .refine((ttl) => {
       return ttl.ms >= TTL_MINIMUM_MS && ttl.ms <= TTL_MAXIMUM_MS;
     }),

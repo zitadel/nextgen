@@ -11,23 +11,6 @@ import { BaseCommand } from "@/cli/core";
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
 
-/** One operation as `api ls` lists it. */
-function entryOf(operation: Operation) {
-  return {
-    id: operation.id,
-    method: operation.method,
-    path: operation.path,
-    summary: operation.summary,
-    tag: operation.tag,
-    auth: operation.auth,
-    callable: operation.uncallable === undefined,
-    parameters: operation.parameters,
-    body: operation.body,
-    paging: operation.paging,
-    command: operation.cli,
-  };
-}
-
 /**
  * `zitadel api ls` — the operations `zitadel api` can call, from the spec the
  * CLI was built with. It talks to no server, so the answer is the same
@@ -86,7 +69,9 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
   }
 
   /**
-   * Lists the operations the CLI can call, narrowed by a filter and a tag.
+   * Lists the operations the CLI can call, narrowed by a filter and a tag. Each
+   * is listed with its parameters, body and paging, which is what an agent
+   * needs to build the call.
    *
    * @param input - The flags and arguments the command accepts.
    * @returns The operations as a list.
@@ -96,7 +81,19 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
       filter: args.filter,
       tag: flags.tag,
     }).map((operation) => {
-      return entryOf(operation);
+      return {
+        id: operation.id,
+        method: operation.method,
+        path: operation.path,
+        summary: operation.summary,
+        tag: operation.tag,
+        auth: operation.auth,
+        callable: operation.uncallable === undefined,
+        parameters: operation.parameters,
+        body: operation.body,
+        paging: operation.paging,
+        command: operation.cli,
+      };
     });
 
     const view = {

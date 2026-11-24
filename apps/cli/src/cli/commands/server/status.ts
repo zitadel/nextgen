@@ -424,6 +424,12 @@ export default class Status extends ProjectCommand {
 
     const title = "Checked the status of the project";
 
+    const framework =
+      project.lifecycle === "configured"
+        ? (await Project.at(this.cwd).configOrEmpty()).frameworkId
+        : undefined;
+    const offersTests = framework !== undefined && new TestKit(framework).supported();
+
     return {
       status: "ok",
       data: {
@@ -467,20 +473,9 @@ export default class Status extends ProjectCommand {
         overview: Spelling.at(this.cliVersion).exploreAllCommands(),
       },
       next: {
-        actions: nextActionsFor(
-          project,
-          users,
-          project.lifecycle === "configured" && (await this.offersTests()),
-          this.suggest,
-        ),
+        actions: nextActionsFor(project, users, offersTests, this.suggest),
         commands: nextCommandsFor(serverLifecycle, project, users, this.suggest),
       },
     };
-  }
-
-  /** Whether `tests add` writes a suite for the framework `zitadel.json` records. */
-  private async offersTests(): Promise<boolean> {
-    const framework = (await Project.at(this.cwd).configOrEmpty()).frameworkId;
-    return framework !== undefined && new TestKit(framework).supported();
   }
 }

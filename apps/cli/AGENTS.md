@@ -178,7 +178,8 @@
   still export several values each.
 - Keep a loose file at the root of `src/lib` to a utility that knows nothing of Zitadel or the
   CLI; `errors.ts` is the one known exception.
-- A domain lib under `src/lib` never imports `lib/oclif` or `cli/core`; `upgrade` builds only on the small
+- No file under `src/lib` imports anything under `src/cli`, with no exception
+  (`tests/unit/lib/oclif/layering.test.ts`); `upgrade` builds only on the small
   utilities `tests/unit/lib/upgrade/layering.test.ts` lists.
 - `src/lib/upgrade` takes each of Zitadel's defaults (`defaults.ts`, `config.ts`) as an option, so a
   test or another product can swap it; the `upgrade` command does the CLI's part, `doctor --fix` too.

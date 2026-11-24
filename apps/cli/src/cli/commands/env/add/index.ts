@@ -31,36 +31,6 @@ const FILE_EXISTS_REFUSAL = {
   hint: "Pass --force to overwrite it.",
 } as const satisfies Refusal;
 
-/**
- * The `.env.<name>.local` file this run writes. One that already exists is a
- * conflict unless `--force` says it may be overwritten.
- */
-async function environmentFile(
-  cwd: string,
-  name: string,
-  force: boolean,
-): Promise<{ file: string; path: string }> {
-  const file = Project.envFileName(name);
-  const path = join(cwd, file);
-  const exists = await stat(path).then(
-    () => {
-      return true;
-    },
-    () => {
-      return false;
-    },
-  );
-  if (exists && !force) {
-    throw refusalError(FILE_EXISTS_REFUSAL, {
-      file,
-    });
-  }
-  return {
-    file,
-    path,
-  };
-}
-
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
 
@@ -118,11 +88,6 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
     ok: true,
     value: typed,
   };
-}
-
-/** Lines under a blank line that sets them apart, or nothing when there are none. */
-function guidanceBlock(lines: string[]): string[] {
-  return lines.length === 0 ? [] : ["", ...lines];
 }
 
 /**
@@ -480,6 +445,7 @@ export default class EnvAdd extends Promptable(Previewable(ChoosingServerCommand
           ]
         : [];
     const deployGuidance = [...undeployedGuidance, ...originFirstGuidance];
+    const guidance = [...originGuidance, ...deployGuidance];
 
     const title = `Added the ${args.name} environment, bound to ${projectId}`;
 
@@ -515,7 +481,7 @@ export default class EnvAdd extends Promptable(Previewable(ChoosingServerCommand
                 `Deployed ${deployment.contentHash} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
               ]),
           `${environment.file} holds ${Object.keys(values).join(", ")}.`,
-          ...guidanceBlock([...originGuidance, ...deployGuidance]),
+          ...(guidance.length === 0 ? [] : ["", ...guidance]),
           "",
           "The deployed app never reads that file. Set these where it is built and run.",
           "",
@@ -559,7 +525,8 @@ export default class EnvAdd extends Promptable(Previewable(ChoosingServerCommand
 
   /**
    * What both a dry run and the real run settle before anything is written:
-   * the environment's file, the server, the app URL and the names the project
+   * the `.env.<name>.local` file this run writes, which is a conflict when it
+   * already exists unless `--force` says it may be overwritten, the server, the app URL and the names the project
    * is bound with. `--server` resolves to an origin as it does everywhere,
    * before anything else is read; one that was not given is asked for. The
    * rerun suggested for the question keeps every choice this run made, so
@@ -571,7 +538,25 @@ export default class EnvAdd extends Promptable(Previewable(ChoosingServerCommand
    */
   private async gathered({ args, flags }: Pick<Admitted<typeof EnvAdd>, "args" | "flags">) {
     const { cwd, nonInteractive } = this.meta;
-    const environment = await environmentFile(cwd, args.name, flags.force);
+    const file = Project.envFileName(args.name);
+    const path = join(cwd, file);
+    const exists = await stat(path).then(
+      () => {
+        return true;
+      },
+      () => {
+        return false;
+      },
+    );
+    if (exists && !flags.force) {
+      throw refusalError(FILE_EXISTS_REFUSAL, {
+        file,
+      });
+    }
+    const environment = {
+      file,
+      path,
+    };
     const givenServer = await this.givenServer();
     const config = await Project.at(cwd).config();
     const frameworkId = config.frameworkId;

@@ -256,7 +256,9 @@ export default class Stop extends LocalServerCommand(
         ["Data", record.data_dir],
       ];
       const { stopped, outcome } = await server.stop();
-      const title = this.stoppedTitle(stopped);
+      const title = stopped
+        ? "Local Zitadel server stopped"
+        : "Local Zitadel server was not running";
 
       return {
         status: "ok",
@@ -283,7 +285,9 @@ export default class Stop extends LocalServerCommand(
         ["Data", record.data_dir],
       ];
       const { stopped } = await server.stop();
-      const title = this.stoppedTitle(stopped);
+      const title = stopped
+        ? "Local Zitadel server stopped"
+        : "Local Zitadel server was not running";
 
       return {
         status: "ok",
@@ -308,7 +312,9 @@ export default class Stop extends LocalServerCommand(
         ["Container", containerName],
       ];
       const { stopped } = await server.stop();
-      const title = this.stoppedTitle(stopped);
+      const title = stopped
+        ? "Local Zitadel server stopped"
+        : "Local Zitadel server was not running";
 
       return {
         status: "ok",
@@ -326,20 +332,6 @@ export default class Stop extends LocalServerCommand(
           sections: [section(undefined, ...facts)],
         },
       };
-    }
-  }
-
-  /**
-   * What the result calls the outcome.
-   *
-   * @param stopped - Whether there was a running server to stop.
-   * @returns The headline: stopped, or that nothing was running.
-   */
-  private stoppedTitle(stopped: boolean): string {
-    if (stopped) {
-      return "Local Zitadel server stopped";
-    } else {
-      return "Local Zitadel server was not running";
     }
   }
 }

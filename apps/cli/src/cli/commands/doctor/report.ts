@@ -149,7 +149,11 @@ export type DoctorReport = {
  * collapsed when everything in it passed, with what needs attention indented
  * below its row and the command that repairs it pulled out to copy. `--verbose`
  * expands every row. Only for people: the envelope carries the same checks.
- * A run that passed closes on its title, so only a failure, which has none,
+ * A category with no checks to show this run says why, and what to do about it,
+ * if anything. The commands that repair what a category reports are its
+ * non-passing checks' remedies; `upgrade` re-pins the app's packages too, so it
+ * stands in for the pin check's own command, which would align them with this
+ * older CLI. A run that passed closes on its title, so only a failure, which has none,
  * says its verdict at the end.
  */
 export function doctorReport(input: DoctorReportInput): DoctorReport {
@@ -159,7 +163,15 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     const checks = input.checks.filter((check) => {
       return categoryOf(check.name) === category.id;
     });
-    const skipped = skipReason(category.id, input);
+    const skipped =
+      category.id === "local_server" && input.hostedServer !== undefined
+        ? { reason: `not used, this project's server is ${input.hostedServer}` }
+        : category.id === "project" && !input.projectConfigured
+          ? {
+              reason: "no zitadel.json in this directory",
+              command: input.suggest({ id: "setup" }),
+            }
+          : undefined;
     if (skipped !== undefined) {
       lines.push(row("skip", category.label, skipped.reason));
       if (skipped.command !== undefined) {
@@ -171,9 +183,27 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     if (checks.length === 0) {
       continue;
     }
-    lines.push(row(worstOf(checks), category.label, summaryOf(category.id, checks, input)));
+    const worst = checks.some((check) => {
+      return check.status === "fail";
+    })
+      ? "fail"
+      : checks.some((check) => {
+            return check.status === "warn";
+          })
+        ? "warn"
+        : "pass";
+    lines.push(row(worst, category.label, summaryOf(category.id, checks, input)));
     lines.push(...detailLines(checks, input, shownCommands));
-    for (const remedy of remediesOf(category.id, checks)) {
+    const remedies = checks
+      .filter((check) => {
+        return check.status !== "pass";
+      })
+      .flatMap((check) => {
+        return check.remedy === undefined ? [] : [check.remedy];
+      });
+    for (const remedy of category.id === "versions"
+      ? remedies.slice(0, 1)
+      : [...new Set(remedies)]) {
       if (!shownCommands.has(remedy)) {
         lines.push(remedyLine(remedy));
         shownCommands.add(remedy);
@@ -188,7 +218,25 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     lines.push("");
   }
   if (failed) {
-    lines.push(conclusion(input.checks));
+    const affected = (status: CheckOutcome["status"]): number => {
+      return new Set(
+        input.checks
+          .filter((check) => {
+            return check.status === status;
+          })
+          .map((c) => {
+            return categoryOf(c.name);
+          }),
+      ).size;
+    };
+    const categories = (count: number): string => {
+      return new Intl.PluralRules("en").select(count) === "one"
+        ? "1 category"
+        : `${String(count)} categories`;
+    };
+    lines.push(
+      `${style.mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`,
+    );
   }
   if (showsHint) {
     lines.push(style.dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
@@ -224,23 +272,6 @@ export function renderDoctorReport(input: DoctorReportInput): string {
   );
 }
 
-/** Why a category has no checks to show this run, and what to do about it, if anything. */
-function skipReason(
-  category: CheckCategory,
-  input: DoctorReportInput,
-): { reason?: string; command?: string } | undefined {
-  if (category === "local_server" && input.hostedServer !== undefined) {
-    return { reason: `not used, this project's server is ${input.hostedServer}` };
-  }
-  if (category === "project" && !input.projectConfigured) {
-    return {
-      reason: "no zitadel.json in this directory",
-      command: input.suggest({ id: "setup" }),
-    };
-  }
-  return undefined;
-}
-
 function row(status: RowStatus, label: string, summary: string | undefined): string {
   const title = status === "pass" || status === "skip" ? label : style.strong(label);
   return [
@@ -251,21 +282,6 @@ function row(status: RowStatus, label: string, summary: string | undefined): str
     .trimEnd();
 }
 
-function worstOf(checks: readonly CheckOutcome[]): CheckOutcome["status"] {
-  if (
-    checks.some((check) => {
-      return check.status === "fail";
-    })
-  ) {
-    return "fail";
-  }
-  return checks.some((check) => {
-    return check.status === "warn";
-  })
-    ? "warn"
-    : "pass";
-}
-
 /** The one-line summary a row shows; what needs attention is listed below it instead. */
 function summaryOf(
   category: CheckCategory,
@@ -273,10 +289,13 @@ function summaryOf(
   input: DoctorReportInput,
 ): string | undefined {
   if (category === "versions") {
-    const latest = detailsOf(
-      checks.find((check) => {
-        return check.name === "cli-version";
-      }),
+    const versionDetails = checks.find((check) => {
+      return check.name === "cli-version";
+    })?.details;
+    const latest = (
+      typeof versionDetails === "object" && versionDetails !== null
+        ? (versionDetails as Record<string, unknown>)
+        : undefined
     )?.latest;
     return typeof latest === "string"
       ? `CLI ${input.cliVersion}, ${latest} available`
@@ -300,13 +319,6 @@ function summaryOf(
 
 function checksCount(count: number): string {
   return new Intl.PluralRules("en").select(count) === "one" ? "1 check" : `${String(count)} checks`;
-}
-
-function detailsOf(check: CheckOutcome | undefined): Record<string, unknown> | undefined {
-  const details = check?.details;
-  return typeof details === "object" && details !== null
-    ? (details as Record<string, unknown>)
-    : undefined;
 }
 
 /**
@@ -335,7 +347,19 @@ function detailLines(
     const text = escapeControlCharacters(
       input.verbose ? `${check.name}: ${check.message}` : check.message,
     );
-    lines.push(detailLine(check.status, check.status === "pass" ? style.dim(text) : text, input));
+    const shown = check.status === "pass" ? style.dim(text) : text;
+    const wrapped = !input.columns
+      ? shown
+      : wrapAnsi(shown, Math.max(20, input.columns - DETAIL_INDENT), { hard: false });
+    const [first = "", ...rest] = wrapped.split("\n");
+    lines.push(
+      [
+        `    ${style.mark[check.status]} ${first}`,
+        ...rest.map((line) => {
+          return `${" ".repeat(DETAIL_INDENT)}${line}`;
+        }),
+      ].join("\n"),
+    );
     const fix = input.fixes?.find((candidate) => {
       return candidate.check === check.name;
     });
@@ -347,59 +371,6 @@ function detailLines(
   return lines;
 }
 
-function detailLine(
-  status: CheckOutcome["status"],
-  text: string,
-  input: DoctorReportInput,
-): string {
-  const wrapped = !input.columns
-    ? text
-    : wrapAnsi(text, Math.max(20, input.columns - DETAIL_INDENT), { hard: false });
-  const [first = "", ...rest] = wrapped.split("\n");
-  return [
-    `    ${style.mark[status]} ${first}`,
-    ...rest.map((line) => {
-      return `${" ".repeat(DETAIL_INDENT)}${line}`;
-    }),
-  ].join("\n");
-}
-
-/**
- * The commands that repair what a category reports. `upgrade` re-pins the app's
- * packages too, so it stands in for the pin check's own command, which would
- * align them with this older CLI.
- */
-function remediesOf(category: CheckCategory, checks: readonly CheckOutcome[]): string[] {
-  const remedies = checks
-    .filter((check) => {
-      return check.status !== "pass";
-    })
-    .flatMap((check) => {
-      return check.remedy === undefined ? [] : [check.remedy];
-    });
-  return category === "versions" ? remedies.slice(0, 1) : [...new Set(remedies)];
-}
-
 function remedyLine(remedy: string): string {
   return `    ${style.arrow} ${style.command(remedy)}`;
-}
-
-function conclusion(checks: readonly CheckOutcome[]): string {
-  const affected = (status: CheckOutcome["status"]): number => {
-    return new Set(
-      checks
-        .filter((check) => {
-          return check.status === status;
-        })
-        .map((c) => {
-          return categoryOf(c.name);
-        }),
-    ).size;
-  };
-  const categories = (count: number): string => {
-    return new Intl.PluralRules("en").select(count) === "one"
-      ? "1 category"
-      : `${String(count)} categories`;
-  };
-  return `${style.mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
 }

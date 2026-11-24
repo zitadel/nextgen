@@ -5,7 +5,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
+import type { UserSchema } from "@/lib/zitadel";
 import { dryRunResult } from "@/cli/core/crud/shared";
 
 /**
@@ -117,6 +117,13 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
    * When only a flow still offered the provider, the result says so, because the
    * schema itself did not change.
    *
+   * When nothing offers the connection any more, the result says how to remove
+   * it: the file before the next deploy, and its variables once that deploy is
+   * live. In the other order the live release would offer a provider whose
+   * credentials are gone, and the deploy would refuse a connection whose
+   * variables are missing. The `variable rm` commands carry the run's own
+   * scope, so they reach the project this run named.
+   *
    * @param input.flags - The provider, the schema and the environment flags.
    * @returns The result, with how to remove a connection nothing offers any more.
    * @throws {@link ZitadelError} When no provider is named, the schema cannot be
@@ -162,7 +169,24 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
     this.report(change);
     const followUps = this.followUps(change.changed);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
-    const actions = unused === undefined ? [] : this.removalActions(unused);
+    const unusedVariables =
+      unused?.variables.map((name) => {
+        return this.suggest({
+          id: "variable:rm",
+          args: { name },
+        });
+      }) ?? [];
+    const actions =
+      unused === undefined
+        ? []
+        : [
+            `To stop publishing the connection, delete ${unused.connection.path} before the deploy below.`,
+            ...(unusedVariables.length === 0
+              ? []
+              : [
+                  `Once that deploy is live, remove its credentials: ${new Intl.ListFormat("en", { type: "conjunction" }).format(unusedVariables)}`,
+                ]),
+          ];
 
     const title = escapeControlCharacters(
       change.changed ? `Removed ${provider} from ${where}` : unchanged,
@@ -206,35 +230,5 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
       schema: schema.name,
       offered,
     });
-  }
-
-  /**
-   * How to remove a connection nothing offers any more: the file before the
-   * next deploy, and its variables once that deploy is live.
-   *
-   * @remarks
-   * In the other order the live release would offer a provider whose
-   * credentials are gone, and the deploy would refuse a connection whose
-   * variables are missing. The `variable rm` commands carry the run's own
-   * scope, so they reach the project this run named.
-   *
-   * @param unused - The connection, and the variables only it reads.
-   * @returns The actions, the file's deletion first.
-   */
-  private removalActions(unused: UnusedConnection): readonly string[] {
-    const deletion = `To stop publishing the connection, delete ${unused.connection.path} before the deploy below.`;
-    if (unused.variables.length === 0) {
-      return [deletion];
-    }
-    const commands = unused.variables.map((name) => {
-      return this.suggest({
-        id: "variable:rm",
-        args: { name },
-      });
-    });
-    return [
-      deletion,
-      `Once that deploy is live, remove its credentials: ${new Intl.ListFormat("en", { type: "conjunction" }).format(commands)}`,
-    ];
   }
 }

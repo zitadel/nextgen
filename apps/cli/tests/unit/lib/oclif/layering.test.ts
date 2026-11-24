@@ -17,15 +17,6 @@ const LAYER = posix.join("lib", "oclif");
 const GENERIC = ["lib/plural", "lib/terminal-text"];
 
 /**
- * Domain libs that still reach into the layer, each one a dependency pointing
- * the wrong way. The list only shrinks: a new one fails the test. `lib/telemetry/consent`
- * wants a type the envelope owns, and `lib/api/call`
- * is the `zitadel api`
- * argument parser, which reads the generated commands' own helpers.
- */
-const INBOUND = ["lib/api/call.ts", "lib/telemetry/consent.ts"];
-
-/**
  * A path as this file reads one: `readdir` answers in the platform's
  * separator, and every path here is compared as a module specifier is written.
  */
@@ -116,7 +107,7 @@ describe("the oclif layer", () => {
     expect(bagged).toEqual([]);
   });
 
-  it("is imported by no domain lib, so the dependency runs one way only", async () => {
+  it("is imported by no file under lib, so the dependency runs one way only", async () => {
     const inbound: string[] = [];
     const libs = (await readdir(join(root, "lib"), { recursive: true }))
       .filter((file) => {
@@ -124,20 +115,13 @@ describe("the oclif layer", () => {
       })
       .map((file) => {
         return posix.join("lib", asSpecifier(file));
-      })
-      .filter((file) => {
-        return !file.startsWith(`${LAYER}/`) && !INBOUND.includes(file);
       });
 
     for (const file of libs) {
       const source = await readFile(join(root, file), "utf8");
       for (const match of source.matchAll(LOCAL_IMPORT)) {
         const target = resolveFromSrc(file, match[1] ?? "");
-        if (
-          [LAYER, "cli/core"].some((layer) => {
-            return target === layer || target.startsWith(`${layer}/`);
-          })
-        ) {
+        if (target === "cli" || target.startsWith("cli/")) {
           inbound.push(`${file} -> ${target}`);
         }
       }

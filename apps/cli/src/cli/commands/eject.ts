@@ -59,47 +59,6 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
   }
 }
 
-/**
- * Builds the `next_commands` envelope field — manual follow-ups `eject` can't
- * safely run itself: deleting the `.env*.ejected-*` backups it created (only
- * when some were made), and uninstalling the SDK packages the patcher added
- * (the CLI never modifies the user's `package.json` + lockfile +
- * `node_modules` directly; it just suggests the command). Only the backups
- * eject actually created are named (each `backedUp` entry is
- * `<rel> -> <backup>`), so the destructive glob cannot also sweep up unrelated
- * `.env*.ejected-*` files a user happens to keep.
- *
- * @param backedUp - The `<rel> -> <backup>` entries eject created.
- * @param dependencies - The SDK packages the patcher added.
- * @param dir - `--cwd` as typed: the backups and the package.json are in that
- *   directory, so a command run from the shell's would miss them or touch
- *   another project.
- * @param packageManager - The project's own, since another one would write a
- *   lockfile of its own.
- * @returns The follow-up commands, in the order they are suggested.
- */
-function assembleNextCommands(
-  backedUp: ReadonlyArray<string>,
-  dependencies: ReadonlyArray<string>,
-  dir: string | undefined,
-  packageManager: PM,
-): ReadonlyArray<SuggestedCommand> {
-  const inDir = (command: SuggestedCommand) => {
-    return dir === undefined ? command : shellSteps(shellCommand("cd", Cmd.quote(dir)), command);
-  };
-  const commands: SuggestedCommand[] = [];
-  if (backedUp.length > 0) {
-    const patterns = backedUp.map((entry) => {
-      return `${Cmd.quote(entry.split(" -> ")[0] ?? "")}.ejected-*`;
-    });
-    commands.push(inDir(shellCommand("rm", "-f", ...patterns)));
-  }
-  for (const dep of dependencies) {
-    commands.push(inDir(suggestedCommandOf(packageManager.remove([dep]))));
-  }
-  return commands;
-}
-
 /** What {@link ejectProject} did, or with `"plan"` would do. */
 type Ejection = {
   actions: EjectActions;
@@ -242,6 +201,17 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
  * with nothing of ours in it would otherwise be reported as having had Zitadel
  * removed.
  *
+ * The follow-ups are the manual steps `eject` cannot safely run itself:
+ * deleting the `.env*.ejected-*` backups it created (only when some were made),
+ * and uninstalling the SDK packages the patcher added (the CLI never modifies
+ * the user's `package.json`, lockfile or `node_modules` directly; it just
+ * suggests the command). Only the backups eject actually created are named
+ * (each `backedUp` entry is `<rel> -> <backup>`), so the destructive glob
+ * cannot also sweep up unrelated `.env*.ejected-*` files a user happens to keep.
+ * They run in `--cwd` as typed, since the backups and the package.json are in
+ * that directory, and use the project's own package manager, since another one
+ * would write a lockfile of its own.
+ *
  * @param cwd - The project directory.
  * @param ejection - What the ejection did, or would do.
  * @param dir - `--cwd` as typed, for the follow-up commands.
@@ -355,6 +325,12 @@ function ejected(
   }
 
   const title = "Removed Zitadel from this app, leaving the remote project untouched";
+  const inDir = (command: SuggestedCommand) => {
+    return dir === undefined ? command : shellSteps(shellCommand("cd", Cmd.quote(dir)), command);
+  };
+  const patterns = backedUp.map((entry) => {
+    return `${Cmd.quote(entry.split(" -> ")[0] ?? "")}.ejected-*`;
+  });
 
   return {
     status: "ok",
@@ -370,7 +346,14 @@ function ejected(
       sections: [],
       lines: terminalLines,
     },
-    next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir, packageManager) },
+    next: {
+      commands: [
+        ...(backedUp.length > 0 ? [inDir(shellCommand("rm", "-f", ...patterns))] : []),
+        ...actions.dependencies.map((dep) => {
+          return inDir(suggestedCommandOf(packageManager.remove([dep])));
+        }),
+      ],
+    },
   };
 }
 

@@ -38,6 +38,7 @@ import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
 import { assertRunnableSuggestions, assertSuggestionsCarryTheRun } from "./suggestions";
+import { holdingADryRunToNothing } from "@tests/helpers/dry-run";
 
 const execFileAsync = promisify(execFile);
 
@@ -1503,7 +1504,12 @@ export class ScaffoldedApp {
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const ran = [...args, "--cwd", this.path];
-    const result = await runCliForTest(ran, env);
+    const run = (): Promise<CliResult> => {
+      return runCliForTest(ran, env);
+    };
+    const result = args.includes("--dry-run")
+      ? await holdingADryRunToNothing(args.join(" "), this.path, run)
+      : await run();
     assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
@@ -2344,7 +2350,12 @@ export class ScaffoldedApp {
     { envelope = true }: { envelope?: boolean } = {},
   ): Promise<CliResult> {
     const ran = [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL];
-    const result = await runCliForTest(ran, env);
+    const run = (): Promise<CliResult> => {
+      return runCliForTest(ran, env);
+    };
+    const result = args.includes("--dry-run")
+      ? await holdingADryRunToNothing(args.join(" "), this.path, run)
+      : await run();
     assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);

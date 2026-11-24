@@ -152,7 +152,8 @@ The server evaluates every case, so the command needs a connection to it. By def
   /**
    * Evaluate the test cases and report each one. When a case fails the results
    * are the explanation: the hint shows them on a terminal, and under `--json`
-   * they travel in the error's details.
+   * they travel in the error's details. The cases run against a release's
+   * policies, warning when it is revoked, or the project's files.
    *
    * @param input.args - The operation to test, if only one.
    * @param input.flags - `--release`.
@@ -193,13 +194,32 @@ The server evaluates every case, so the command needs a connection to it. By def
 
     const policyService = await this.service(PolicyService);
     const releaseService = await this.service(ReleaseService);
-    const policies = await this.policiesUnderTest(
-      config,
-      operations,
-      flags.release,
-      policyService,
-      releaseService,
-    );
+    const policyFiles =
+      flags.release === undefined ? config.policies.selectPolicies(operations) : undefined;
+    if (policyFiles !== undefined && policyFiles.issues.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
+        details: { issues: policyFiles.issues },
+        hint: policyFiles.issues.join("\n"),
+      });
+    }
+    const fromRelease =
+      flags.release === undefined
+        ? undefined
+        : await this.policiesFromRelease(releaseService, policyService, flags.release);
+    if (fromRelease?.revoked) {
+      warnings.report(`Release ${flags.release} is revoked, so no origin serves its policies.`);
+    }
+    const policies: ReadonlyMap<string, PolicyUnderTest> =
+      fromRelease?.policies ??
+      new Map(
+        (policyFiles?.documents ?? []).map((policy): readonly [string, PolicyUnderTest] => {
+          const underTest: PolicyUnderTest = {
+            config: policy.config,
+            source: { file: policy.path },
+          };
+          return [policy.operation, underTest];
+        }),
+      );
 
     const results = await this.runPolicyTests(policyService, tests, policies);
     const cases = results.flatMap((result) => {
@@ -246,67 +266,6 @@ The server evaluates every case, so the command needs a connection to it. By def
         lines: escapeControlCharacters(pretty).split("\n").slice(0, -2),
       },
     };
-  }
-
-  /**
-   * The policies the cases run against: a release's, warning when it is
-   * revoked, or the project's files.
-   *
-   * @param config - The project's configuration.
-   * @param operations - The operations to read the policies of; every one when empty.
-   * @param release - The release `--release` named, if any.
-   * @param policyService - Where a release's revisions are read.
-   * @param releaseService - Where the release is read.
-   * @returns The rules of each operation's policy, by operation.
-   * @throws {@link ZitadelError} With `E_VALIDATION` when a policy file asked
-   *   for has a problem, naming each one.
-   */
-  private async policiesUnderTest(
-    config: ZitadelConfig,
-    operations: readonly string[],
-    release: string | undefined,
-    policyService: PolicyService,
-    releaseService: ReleaseService,
-  ): Promise<ReadonlyMap<string, PolicyUnderTest>> {
-    if (release === undefined) {
-      return this.policiesFromFiles(config, operations);
-    }
-    const fromRelease = await this.policiesFromRelease(releaseService, policyService, release);
-    if (fromRelease.revoked) {
-      warnings.report(`Release ${release} is revoked, so no origin serves its policies.`);
-    }
-    return fromRelease.policies;
-  }
-
-  /**
-   * The project's policies of some operations, to test against.
-   *
-   * @param config - The project's configuration.
-   * @param operations - The operations to read the policies of; every one when empty.
-   * @returns The rules of each operation's policy file, by operation.
-   * @throws {@link ZitadelError} With `E_VALIDATION` when a policy file asked
-   *   for has a problem, naming each one.
-   */
-  private policiesFromFiles(
-    config: ZitadelConfig,
-    operations: readonly string[],
-  ): ReadonlyMap<string, PolicyUnderTest> {
-    const selected = config.policies.selectPolicies(operations);
-    if (selected.issues.length > 0) {
-      throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
-        details: { issues: selected.issues },
-        hint: selected.issues.join("\n"),
-      });
-    }
-    return new Map(
-      selected.documents.map((policy): readonly [string, PolicyUnderTest] => {
-        const underTest: PolicyUnderTest = {
-          config: policy.config,
-          source: { file: policy.path },
-        };
-        return [policy.operation, underTest];
-      }),
-    );
   }
 
   /**
@@ -483,8 +442,9 @@ The server evaluates every case, so the command needs a connection to it. By def
    *
    * @param results - Each test file's outcome.
    * @param release - The release the run was told to test against, if any.
-   * @returns Each test file under a heading naming the policy it ran against, a
-   *   line per case, and on a failed case what was expected and what the server
+   * @returns Each test file under a heading naming where its policy came from
+   *   (a file, a release's revision, or none, so nothing is enforced), a line
+   *   per case, and on a failed case what was expected and what the server
    *   decided; then the totals.
    */
   protected renderPolicyTestResults(
@@ -492,11 +452,28 @@ The server evaluates every case, so the command needs a connection to it. By def
     release?: string,
   ): string {
     const lines = results.flatMap((result) => {
-      const heading = `${result.operation}  (${this.describePolicy(result.policy, release)})`;
+      const policy = result.policy;
+      const origin =
+        policy === null && release === undefined
+          ? "no policy file, nothing enforced"
+          : policy === null
+            ? `release ${release} pins no policy, nothing enforced`
+            : "file" in policy
+              ? policy.file
+              : `release ${release}, revision ${policy.revision_id}`;
       return [
-        heading,
+        `${result.operation}  (${origin})`,
         ...result.cases.map((testCase) => {
-          return this.describeCase(testCase);
+          if (testCase.passed) {
+            return `  ✓ ${testCase.name}`;
+          }
+          const expected = this.describeDecision(testCase.expected);
+          const actual = this.describeDecision({
+            allowed: testCase.actual.allowed,
+            code: testCase.actual.code,
+            violations: Object.keys(testCase.actual.violations ?? {}),
+          });
+          return `  ✗ ${testCase.name}: expected ${expected}, got ${actual}`;
         }),
       ];
     });
@@ -509,46 +486,6 @@ The server evaluates every case, so the command needs a connection to it. By def
     const failed = cases.length - passed;
     const totals = failed === 0 ? `${passed} passed` : `${passed} passed, ${failed} failed`;
     return [...lines, "", totals].join("\n");
-  }
-
-  /**
-   * Where a test file's policy came from, as its heading names it.
-   *
-   * @param policy - Where the policy came from.
-   * @param release - The release the run was told to test against, if any.
-   * @returns The words for the heading.
-   */
-  private describePolicy(policy: PolicySource, release: string | undefined): string {
-    if (policy === null && release === undefined) {
-      return "no policy file, nothing enforced";
-    }
-    if (policy === null) {
-      return `release ${release} pins no policy, nothing enforced`;
-    }
-    if ("file" in policy) {
-      return policy.file;
-    }
-    return `release ${release}, revision ${policy.revision_id}`;
-  }
-
-  /**
-   * One case's line.
-   *
-   * @param testCase - The case's outcome.
-   * @returns A tick and its name, or on a failure what was expected and what the
-   *   server decided.
-   */
-  private describeCase(testCase: PolicyCaseResult): string {
-    if (testCase.passed) {
-      return `  ✓ ${testCase.name}`;
-    }
-    const expected = this.describeDecision(testCase.expected);
-    const actual = this.describeDecision({
-      allowed: testCase.actual.allowed,
-      code: testCase.actual.code,
-      violations: Object.keys(testCase.actual.violations ?? {}),
-    });
-    return `  ✗ ${testCase.name}: expected ${expected}, got ${actual}`;
   }
 
   /**

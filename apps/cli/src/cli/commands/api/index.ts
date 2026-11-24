@@ -1,10 +1,9 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { ApiCall, type PathValues } from "@/lib/api";
+import { ApiCall, type PathValues } from "@/cli/core/crud/api-call";
 import {
   type ApiRequest,
-  type ApiResponse,
   createZitadelClient,
   InvalidError,
   Operation,
@@ -21,9 +20,8 @@ import { type Admitted, CREDENTIALS, type CommandResult, nonBlankString } from "
 import { reads, type Refused } from "@/cli/core/flags";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { Suggested } from "@/lib/suggestion";
-import { json, prose, type Rendering } from "@/lib/oclif/rendering";
+import { json, prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { Summary } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
 import { Promptable } from "@/cli/core/promptable";
 import { Destructive } from "@/cli/core/destructive";
@@ -305,7 +303,10 @@ export default class Api extends Destructive(
   }
 
   /**
-   * Says what the command would call, without calling it.
+   * Says what the command would call, without calling it. Prints the cURL
+   * command that sends the request. The project secret is never written out: an
+   * operation that needs it reads it from `$ZITADEL_PROJECT_SECRET`, as the API
+   * reference's cURL samples do, in double quotes so the shell expands it.
    *
    * @param input - The flags and arguments the command accepts.
    * @returns The result of the dry run.
@@ -319,7 +320,17 @@ export default class Api extends Destructive(
         pathValuesFromWords(target, argv, args.operation !== undefined, projectId),
       ),
     );
-    const curl = prose(this.curlFor(request, server));
+    const curl = prose(
+      [
+        `curl -X ${request.operation.method} ${quote(request.operation.urlOn(server, request))}`,
+        ...(request.operation.auth === "secret"
+          ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
+          : []),
+        ...(request.body === undefined
+          ? []
+          : ["-H 'Content-Type: application/json'", `-d ${quote(JSON.stringify(request.body))}`]),
+      ].join(" \\\n  "),
+    );
     const title = `Would call ${request.operation.id} (dry run)`;
 
     return {
@@ -348,6 +359,14 @@ export default class Api extends Destructive(
   /**
    * Calls the operation. The question a person is asked is the one a refusal
    * hands to whoever must ask them.
+   *
+   * A JSON body is spelled the way JSON spells a control character, because
+   * this is the command a script pipes into `jq`: the terminal spelling would
+   * write `\x9b` for a C1 character, which is not an escape JSON has, and the
+   * body would not parse. A text body and the note about an empty one are a
+   * person's to read, so they take the spelling a person reads. The body is
+   * the server's, not the CLI's, so the ending writes it as it came instead of
+   * folding it to the width of the terminal.
    *
    * @param input - The flags and arguments the command accepts.
    * @returns The result of the call.
@@ -403,14 +422,30 @@ export default class Api extends Destructive(
       throw error;
     });
 
-    const answer = this.answered(operation.id, response);
+    if (response.body === undefined) {
+      return {
+        status: "ok",
+        data: null,
+        verbatim: true,
+        ...(Output.screen ? {} : { pretty: prose("") }),
+        summary: {
+          title: `No content (${response.status})`,
+          sections: [],
+        },
+      };
+    }
+    const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
 
     return {
       status: "ok",
-      data: response.body ?? null,
+      data: response.body,
       verbatim: true,
-      ...(answer.pretty === undefined ? {} : { pretty: answer.pretty }),
-      summary: answer.summary,
+      ...(Output.screen ? {} : { pretty }),
+      summary: {
+        title: `Called ${operation.id}`,
+        sections: [],
+        lines: pretty.text.split("\n"),
+      },
     };
   }
 
@@ -459,46 +494,6 @@ export default class Api extends Destructive(
       target,
       built,
       question,
-    };
-  }
-
-  /**
-   * What the call answered: the ending a person at a terminal sees, and the
-   * rendering a pipe is given when that differs from it.
-   *
-   * A JSON body is spelled the way JSON spells a control character, because
-   * this is the command a script pipes into `jq`: the terminal spelling would
-   * write `\x9b` for a C1 character, which is not an escape JSON has, and the
-   * body would not parse. A text body and the note about an empty one are a
-   * person's to read, so they take the spelling a person reads. The body is
-   * the server's, not the CLI's, so the ending writes it as it came instead of
-   * folding it to the width of the terminal.
-   *
-   * @param operationId - The operation that was called.
-   * @param response - The answer the call got.
-   * @returns The ending, and the rendering when a script is given something else.
-   */
-  private answered(
-    operationId: string,
-    response: ApiResponse,
-  ): { summary: Summary; pretty?: Rendering } {
-    if (response.body === undefined) {
-      return {
-        summary: {
-          title: `No content (${response.status})`,
-          sections: [],
-        },
-        ...(Output.screen ? {} : { pretty: prose("") }),
-      };
-    }
-    const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
-    return {
-      summary: {
-        title: `Called ${operationId}`,
-        sections: [],
-        lines: pretty.text.split("\n"),
-      },
-      ...(Output.screen ? {} : { pretty }),
     };
   }
 
@@ -629,27 +624,5 @@ export default class Api extends Destructive(
       });
     }
     return filled;
-  }
-
-  /**
-   * The cURL command that sends a request, which a dry run prints. The project
-   * secret is never written out: an operation that needs it reads it from
-   * `$ZITADEL_PROJECT_SECRET`, as the API reference's cURL samples do, in
-   * double quotes so the shell expands it.
-   *
-   * @param request - The request.
-   * @param server - The server it is sent to.
-   * @returns The command.
-   */
-  private curlFor(request: ApiRequest, server: string): string {
-    return [
-      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(server, request))}`,
-      ...(request.operation.auth === "secret"
-        ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
-        : []),
-      ...(request.body === undefined
-        ? []
-        : ["-H 'Content-Type: application/json'", `-d ${quote(JSON.stringify(request.body))}`]),
-    ].join(" \\\n  ");
   }
 }

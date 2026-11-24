@@ -199,17 +199,6 @@ export function fileList(paths: readonly string[], dryRun: boolean): string[] {
 }
 
 /**
- * Warn that a release pins a resource `pull` cannot rebuild on disk yet. A
- * reported warning rides the envelope (BaseCommand merges them), so a `--json`
- * caller sees it too.
- */
-function reportSkipped(resource: PinnedResource): void {
-  warnings.report(
-    `The release pins ${resource.kind} "${resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
-  );
-}
-
-/**
  * `zitadel pull [target]` — rebuild `.zitadel/` from the revisions a released
  * snapshot pins, the inverse of `deploy`.
  *
@@ -268,10 +257,6 @@ export default class Pull extends ChangeCommand {
       }
       return [outcome.resource];
     });
-
-    for (const resource of skipped) {
-      reportSkipped(resource);
-    }
 
     const files = `${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"}`;
 
@@ -334,10 +319,6 @@ export default class Pull extends ChangeCommand {
       return [outcome.resource];
     });
 
-    for (const resource of skipped) {
-      reportSkipped(resource);
-    }
-
     const files = `${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"}`;
 
     const title = `Pulled ${files} from ${escapeControlCharacters(release.id)}`;
@@ -380,10 +361,16 @@ export default class Pull extends ChangeCommand {
    * so the files land in that order and the first failure in it is the one
    * raised.
    *
+   * It refuses a pull in which two pinned resources would be written to one
+   * file, before anything is written, so the working copy stays untouched: each
+   * change is computed against the configuration as it was loaded, so the
+   * second write over a shared file would silently replace the first.
+   *
    * @param target - What to pull.
    * @returns The store, the release, and what became of each pinned resource.
    * @throws {@link ZitadelError} With `E_NOT_FOUND` when `latest` is asked for
-   *   and nothing is deployed.
+   *   and nothing is deployed, and with `E_CONFLICT` naming both handles and the
+   *   file when two outcomes target the same path.
    */
   private async gathered(target: PullTarget) {
     const store = new DiskStore(this.cwd);
@@ -424,28 +411,6 @@ export default class Pull extends ChangeCommand {
     const outcomes: PullOutcome[] = attempts.flatMap((attempt) => {
       return attempt.kind === "done" ? [attempt.outcome] : [];
     });
-    this.refuseSharedFiles(outcomes);
-
-    return {
-      store,
-      release,
-      outcomes,
-    };
-  }
-
-  /**
-   * Refuse a pull in which two pinned resources would be written to one file.
-   *
-   * @remarks
-   * Each change is computed against the configuration as it was loaded, so the
-   * second write over a shared file would silently replace the first. This
-   * runs before anything is written, so the working copy stays untouched.
-   *
-   * @param outcomes - What became of each pinned resource, in pin order.
-   * @throws {@link ZitadelError} With `E_CONFLICT` naming both handles and the
-   *   file when two outcomes target the same path.
-   */
-  private refuseSharedFiles(outcomes: readonly PullOutcome[]): void {
     const owners = new Map<string, PulledResource>();
     for (const outcome of outcomes) {
       if (outcome.kind !== "pulled") {
@@ -462,6 +427,19 @@ export default class Pull extends ChangeCommand {
       }
       owners.set(outcome.resource.path, outcome.resource);
     }
+    for (const outcome of outcomes) {
+      if (outcome.kind === "skipped") {
+        warnings.report(
+          `The release pins ${outcome.resource.kind} "${outcome.resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
+        );
+      }
+    }
+
+    return {
+      store,
+      release,
+      outcomes,
+    };
   }
 
   /**

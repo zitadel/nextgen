@@ -3,15 +3,15 @@ import { text } from "node:stream/consumers";
 
 import { ZitadelError } from "@/lib/errors";
 import { read } from "@/cli/core/flags";
-import { SAFE_ID } from "@/cli/core/crud/shared";
+import { SAFE_ID } from "./shared";
 import { parseJsonObject } from "@/lib/json";
 import type { ApiRequest, Operation, Target } from "@/lib/backend";
 import * as schemas from "@/lib/backend/schemas";
-import { fragmentOf, readAssignment } from "@/cli/core/crud/assign";
-import { mergeDocuments, typedValue } from "@/cli/core/crud/document";
-import { describeBody } from "@/cli/core/crud/fields";
-import type { Schema } from "@/cli/core/crud/types";
-import { nodeAt, unwrap, type ZodLike } from "@/cli/core/crud/zod";
+import { fragmentOf, readAssignment } from "./assign";
+import { mergeDocuments, typedValue } from "./document";
+import { describeBody } from "./fields";
+import type { Schema } from "./types";
+import { nodeAt, unwrap, type ZodLike } from "./zod";
 import type { Suggested } from "@/lib/suggestion";
 
 /** The flag a field is given with, which errors name. */

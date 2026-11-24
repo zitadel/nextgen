@@ -15,7 +15,6 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
 import {
   AmbiguousSchemaError,
-  type BrokenFile,
   BrokenFilesError,
   type Change,
   CONFIG_DIRECTORIES,
@@ -151,6 +150,15 @@ const AMBIGUOUS_SCHEMA_REFUSAL = {
  * flows. Every file is held to its contract, so a broken file is refused rather
  * than left out of what the run edits.
  *
+ * A broken schema file is no schema, so a Project whose only (or named)
+ * schema is broken would be told it has none. When no schema can be chosen
+ * because the file that would have been is broken, the broken file is what the
+ * person has to fix, so that is what is refused: with no `--schema`, every
+ * broken schema file, since none is valid; with one, those named by it. Any
+ * other way of failing to choose, such as several valid schemas and none named,
+ * is refused as it is, whatever else is broken: the broken file is reported
+ * once a schema is chosen.
+ *
  * @param input - The run's directory and what `--schema` named.
  * @returns What the run read.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
@@ -163,7 +171,32 @@ export async function readSchemaTarget(input: {
 }): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
   const loaded = await ZitadelConfig.loadUnchecked(store);
-  const schema = chosenOrBroken(loaded, input.schema);
+  try {
+    loaded.schemas.resolve(input.schema);
+  } catch (error) {
+    if (error instanceof SchemaNotFoundError) {
+      const brokenSchemas = loaded.broken.filter((file) => {
+        return file.kind === "schema";
+      });
+      const name = input.schema?.endsWith(".json")
+        ? input.schema.slice(0, -".json".length)
+        : input.schema;
+      const broken =
+        input.schema === undefined
+          ? brokenSchemas
+          : brokenSchemas.filter((file) => {
+              return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
+            });
+      if (broken.length > 0) {
+        throw new BrokenFilesError(
+          broken.flatMap((file) => {
+            return file.problems;
+          }),
+        );
+      }
+    }
+  }
+  const schema = chosenSchema(loaded.schemas, input.schema);
   if (schema.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
       file: schema.path,
@@ -181,70 +214,6 @@ export async function readSchemaTarget(input: {
     schemaFlag,
     schemaGiven: input.schema === undefined ? undefined : schemaFlag,
   };
-}
-
-/**
- * The schema a run is about, from a configuration no file of which has been
- * held to its contract yet.
- *
- * @remarks
- * A broken schema file is no schema, so a Project whose only (or named)
- * schema is broken would be told it has none. When no schema can be chosen
- * because the file that would have been is broken, the broken file is what the
- * person has to fix, so that is what is refused. Any other way of failing to
- * choose, such as several valid schemas and none named, is refused as it is,
- * whatever else is broken: the broken file is reported once a schema is chosen.
- *
- * @param config - The configuration, read without refusing a broken file.
- * @param requested - What `--schema` named, if anything.
- * @returns The chosen schema.
- * @throws {@link BrokenFilesError} Naming the broken schema file the run
- *   would have chosen.
- * @throws {@link ZitadelError} When no schema, or more than one, fits
- *   `--schema` and no broken schema file is the one it asks for.
- */
-function chosenOrBroken(config: ZitadelConfig, requested: string | undefined): UserSchema {
-  try {
-    config.schemas.resolve(requested);
-  } catch (error) {
-    if (error instanceof SchemaNotFoundError) {
-      const broken = brokenCandidates(config, requested);
-      if (broken.length > 0) {
-        throw new BrokenFilesError(
-          broken.flatMap((file) => {
-            return file.problems;
-          }),
-        );
-      }
-    }
-  }
-  return chosenSchema(config.schemas, requested);
-}
-
-/**
- * The broken schema files that would have been chosen, had they not been
- * broken.
- *
- * @param config - The configuration, read without refusing a broken file.
- * @param requested - What `--schema` named, if anything.
- * @returns With no `--schema`, every broken schema file, since none is valid;
- *   with one, those named by it; none when a valid schema exists to choose
- *   from, or no broken file fits.
- */
-function brokenCandidates(
-  config: ZitadelConfig,
-  requested: string | undefined,
-): readonly BrokenFile[] {
-  const broken = config.broken.filter((file) => {
-    return file.kind === "schema";
-  });
-  if (requested === undefined) {
-    return broken;
-  }
-  const name = requested.endsWith(".json") ? requested.slice(0, -".json".length) : requested;
-  return broken.filter((file) => {
-    return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
-  });
 }
 
 /**

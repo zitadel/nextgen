@@ -6,7 +6,6 @@ import {
   LocalRuntime,
   NoFreePortError,
   PortInUseError,
-  type RuntimeMetadata,
   ServerStartError,
   ServerStopError,
 } from "@/lib/server";
@@ -14,7 +13,7 @@ import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
 import type { NextSteps } from "@/cli/core/next-steps";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import { Guidance, shellCommand, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
+import { Guidance, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -151,97 +150,6 @@ const NOT_READY_REASONS = {
 } as const;
 
 /**
- * What a start that ended with a running server reports.
- *
- * @param title - The headline: ready, or already running.
- * @param record - The server's record.
- * @param suggest - Builds the commands to suggest next.
- * @returns The result to emit.
- */
-function started(title: string, record: RuntimeMetadata, suggest: Suggest): CommandResult {
-  const urls = {
-    api: record.server_url,
-    console: `${record.server_url}/ui/console/`,
-  };
-  const next: NextSteps<SuggestedCommand> = {
-    actions: [
-      "Create an app with authentication. Run setup in this directory or a subdirectory.",
-      "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-      new Guidance(suggest).serverLog(),
-    ],
-    commands: [
-      suggest({
-        id: "setup",
-        flags: { server: "local" },
-      }),
-    ],
-  };
-
-  if (record.backend === "binary") {
-    return {
-      status: "ok",
-      data: {
-        title,
-        runtime: {
-          backend: "binary",
-          pid: record.pid,
-          log_path: record.log_path,
-          server_package: record.server_package,
-          server_version: record.server_version,
-          port: record.port,
-          data_dir: record.data_dir,
-          env: record.env ?? LocalRuntime.NO_ENV,
-        },
-        urls,
-      },
-      summary: {
-        title,
-        sections: [
-          section(
-            undefined,
-            ["Process", String(record.pid)],
-            ["API", urls.api],
-            ["Console", urls.console],
-            ["Data", record.data_dir],
-          ),
-        ],
-      },
-      next,
-    };
-  } else {
-    return {
-      status: "ok",
-      data: {
-        title,
-        runtime: {
-          backend: "docker",
-          container_name: record.container_name,
-          container_id: record.container_id,
-          image: record.image,
-          port: record.port,
-          data_dir: record.data_dir,
-          env: record.env ?? LocalRuntime.NO_ENV,
-        },
-        urls,
-      },
-      summary: {
-        title,
-        sections: [
-          section(
-            undefined,
-            ["Container", record.container_name],
-            ["API", urls.api],
-            ["Console", urls.console],
-            ["Data", record.data_dir],
-          ),
-        ],
-      },
-      next,
-    };
-  }
-}
-
-/**
  * `zitadel start`: starts this folder's server, or finds it already running.
  * The envelope's `source` names the port the run asked for before a server
  * exists, and the port it actually got afterwards, so an agent that follows it
@@ -374,7 +282,8 @@ export default class Start extends LocalServerCommand(
   }
 
   /**
-   * Starts the local server, or says it is already running.
+   * Starts the local server, or says it is already running, and reports the
+   * server that is running either way.
    *
    * @param input - The flags and arguments the command accepts.
    * @returns The result of the run.
@@ -450,10 +359,88 @@ export default class Start extends LocalServerCommand(
       });
     this.meta = { ...this.meta, source: record.server_url };
 
-    if (alreadyRunning) {
-      return started("Local Zitadel server is already running", record, this.suggest);
+    const title = alreadyRunning
+      ? "Local Zitadel server is already running"
+      : "Local Zitadel server is ready";
+    const urls = {
+      api: record.server_url,
+      console: `${record.server_url}/ui/console/`,
+    };
+    const next: NextSteps<SuggestedCommand> = {
+      actions: [
+        "Create an app with authentication. Run setup in this directory or a subdirectory.",
+        "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
+        new Guidance(this.suggest).serverLog(),
+      ],
+      commands: [
+        this.suggest({
+          id: "setup",
+          flags: { server: "local" },
+        }),
+      ],
+    };
+
+    if (record.backend === "binary") {
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "binary",
+            pid: record.pid,
+            log_path: record.log_path,
+            server_package: record.server_package,
+            server_version: record.server_version,
+            port: record.port,
+            data_dir: record.data_dir,
+            env: record.env ?? LocalRuntime.NO_ENV,
+          },
+          urls,
+        },
+        summary: {
+          title,
+          sections: [
+            section(
+              undefined,
+              ["Process", String(record.pid)],
+              ["API", urls.api],
+              ["Console", urls.console],
+              ["Data", record.data_dir],
+            ),
+          ],
+        },
+        next,
+      };
     } else {
-      return started("Local Zitadel server is ready", record, this.suggest);
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "docker",
+            container_name: record.container_name,
+            container_id: record.container_id,
+            image: record.image,
+            port: record.port,
+            data_dir: record.data_dir,
+            env: record.env ?? LocalRuntime.NO_ENV,
+          },
+          urls,
+        },
+        summary: {
+          title,
+          sections: [
+            section(
+              undefined,
+              ["Container", record.container_name],
+              ["API", urls.api],
+              ["Console", urls.console],
+              ["Data", record.data_dir],
+            ),
+          ],
+        },
+        next,
+      };
     }
   }
 

@@ -75,51 +75,9 @@ const UNKNOWN_DESIGN_REFUSAL = {
   hint: `Pick one of: ${DESIGN_CATALOG}.`,
 } as const satisfies Refusal;
 
-/**
- * The `parse` of `--design`: a design the CLI ships or one that was retired,
- * and as unknown where it names neither. A retired one is refused by name in
- * `execute`, where the follow-up it suggests can carry the run's `--cwd`,
- * which a refusal raised while the flags parse has not read yet.
- */
-async function readsDesign(
-  given: string,
-  command: unknown,
-  definition: { name: string },
-): Promise<string> {
-  const design = await reads({
-    schema: filled,
-    refusal: {
-      message: "{input} was given an empty value",
-      hint: "Pass a value for {input}, or omit it entirely.",
-    },
-  })(given, command, definition);
-  if (!isRetiredDesign(design) && !isBrandingDesign(design)) {
-    throw refusalError(UNKNOWN_DESIGN_REFUSAL, { design: `"${design}"` });
-  }
-  return design;
-}
-
 /** Whether `value` names a design the CLI ships. */
 function isBrandingDesign(value: string): value is BrandingDesign {
   return (BRANDING_DESIGNS as readonly string[]).includes(value);
-}
-
-/** Whether `value` names a retired design. */
-function isRetiredDesign(value: string): boolean {
-  return (RETIRED_BRANDING_DESIGNS as readonly string[]).includes(value);
-}
-
-/**
- * Lets a conflict pass, as a README that is already there is kept, never overwritten.
- *
- * @param error - What the write threw.
- * @throws The error, unless it is a conflict.
- */
-function swallowConflict(error: unknown): void {
-  if (error instanceof ZitadelError && error.code === "E_CONFLICT") {
-    return;
-  }
-  throw error;
 }
 
 /**
@@ -143,7 +101,11 @@ export default class BrandingEject extends Promptable(Previewable(ServerCommand(
   /**
    * `--design` carries no oclif `options`: a retired design is refused by
    * name, with a pointer to where page layout lives, rather than by oclif's
-   * generic "expected one of".
+   * generic "expected one of". Its `parse` accepts a design the CLI ships or
+   * one that was retired, and refuses as unknown one that names neither. A
+   * retired one is refused by name in `ejected`, where the follow-up it
+   * suggests can carry the run's `--cwd`, which a refusal raised while the
+   * flags parse has not read yet.
    */
   static override flags = {
     force: Flags.boolean({
@@ -151,7 +113,22 @@ export default class BrandingEject extends Promptable(Previewable(ServerCommand(
       description: "Overwrite an existing branding file.",
     }),
     design: Flags.custom<string>({
-      parse: readsDesign,
+      parse: async (given, command, definition) => {
+        const design = await reads({
+          schema: filled,
+          refusal: {
+            message: "{input} was given an empty value",
+            hint: "Pass a value for {input}, or omit it entirely.",
+          },
+        })(given, command, definition);
+        if (
+          !(RETIRED_BRANDING_DESIGNS as readonly string[]).includes(design) &&
+          !isBrandingDesign(design)
+        ) {
+          throw refusalError(UNKNOWN_DESIGN_REFUSAL, { design: `"${design}"` });
+        }
+        return design;
+      },
     })({
       description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
@@ -276,7 +253,22 @@ export default class BrandingEject extends Promptable(Previewable(ServerCommand(
     if (!(await Project.at(this.cwd).hasConfig())) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
-    const design = flags.design ?? (await this.promptDesign(this.nonInteractive));
+    const design =
+      flags.design ??
+      (this.nonInteractive
+        ? DEFAULT_BRANDING_DESIGN
+        : await this.ask.select({
+            name: "design",
+            message: "Which design would you like to start from?",
+            initialValue: DEFAULT_BRANDING_DESIGN,
+            options: BRANDING_DESIGNS.map((design) => {
+              return {
+                value: design,
+                label: BRANDING_DESIGN_INFO[design].label,
+                hint: BRANDING_DESIGN_INFO[design].hint,
+              };
+            }),
+          }));
     this.recordTelemetry({
       design,
       force: flags.force,
@@ -340,7 +332,12 @@ export default class BrandingEject extends Promptable(Previewable(ServerCommand(
       join(CONFIG_DIRECTORIES.branding, "README.md"),
       Spelling.at(this.cliVersion).normalizeProse(brandingReadmeContent()),
       false,
-    ).catch(swallowConflict);
+    ).catch((error: unknown) => {
+      if (error instanceof ZitadelError && error.code === "E_CONFLICT") {
+        return;
+      }
+      throw error;
+    });
     const brandingMeta = MetaSchemas.of(this.cliVersion).only((file) => {
       return file.path === `${META_SCHEMA_DIR}/branding.json`;
     });
@@ -359,23 +356,5 @@ export default class BrandingEject extends Promptable(Previewable(ServerCommand(
       filesWritten,
       unchanged,
     };
-  }
-
-  private async promptDesign(nonInteractive: boolean): Promise<BrandingDesign> {
-    if (nonInteractive) {
-      return DEFAULT_BRANDING_DESIGN;
-    }
-    return this.ask.select({
-      name: "design",
-      message: "Which design would you like to start from?",
-      initialValue: DEFAULT_BRANDING_DESIGN,
-      options: BRANDING_DESIGNS.map((design) => {
-        return {
-          value: design,
-          label: BRANDING_DESIGN_INFO[design].label,
-          hint: BRANDING_DESIGN_INFO[design].hint,
-        };
-      }),
-    });
   }
 }

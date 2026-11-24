@@ -313,14 +313,19 @@ export type WarningFix = { check: string; action: string; command: SuggestedComm
  * command for one check is also a `fix`, which the report shows under that
  * check's row instead of among the next steps.
  *
- * The claim check classifies the window (details.claimable). Once it looks
+ * The claim check classifies the window (details.claimable); absent or
+ * malformed details mean "not closed". Once it looks
  * closed the advisory switches to reconciliation wording, but the claim
  * command stays suggested either way: the local record can be stale (claimed
  * from another machine reads detached), and the server checks the grant
  * before the window, so running claim is safe and answers authoritatively.
  * `upgrade` already moves the pins, so aligning them with an older CLI as well
  * would send them backwards from where it leaves them. The issuer-origin
- * repair removes the origin and adds it back, which needs consent.
+ * repair removes the origin and adds it back, which needs consent. The
+ * meta-schemas warning is repaired only when it lists a missing or outdated
+ * file this CLI's `--fix` writes: not when the project pins a newer
+ * `@zitadel/*` version, whose own doctor writes them, and a file behind a
+ * symlink, or one the CLI cannot read, only gets the warning's reason.
  *
  * @param warnings - The checks that warned.
  * @param suggest - Renders a suggestion with the run's own scope.
@@ -368,9 +373,14 @@ export function advisoryForWarnings(
         `Claim this project with ${suggest({ id: "claim" })} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
       );
     } else {
+      const claimDetails = claimWarning.details;
+      const claimWindowClosed =
+        typeof claimDetails === "object" &&
+        claimDetails !== null &&
+        (claimDetails as { claimable?: unknown }).claimable === false;
       fix(
         "claim",
-        claimWindowClosed(claimWarning)
+        claimWindowClosed
           ? Claim.windowClosedNudge(
               local({ id: "claim" }),
               local({
@@ -387,7 +397,16 @@ export function advisoryForWarnings(
   const managedRuntimeWarning = warnings.find((check) => {
     return check.name === "managed-runtime-processes";
   });
-  if (hasManagedRuntimeProcesses(managedRuntimeWarning)) {
+  const managedRuntimeDetails = managedRuntimeWarning?.details;
+  const hasManagedRuntimeProcesses =
+    managedRuntimeWarning?.status === "warn" &&
+    typeof managedRuntimeDetails === "object" &&
+    managedRuntimeDetails !== null &&
+    "supported" in managedRuntimeDetails &&
+    (managedRuntimeDetails as { supported?: unknown }).supported === true &&
+    Array.isArray((managedRuntimeDetails as { processes?: unknown }).processes) &&
+    ((managedRuntimeDetails as { processes?: unknown[] }).processes?.length ?? 0) > 0;
+  if (hasManagedRuntimeProcesses) {
     fix(
       "managed-runtime-processes",
       "Check the other local Zitadel servers before starting another; stop --all stops every one.",
@@ -432,13 +451,17 @@ export function advisoryForWarnings(
     );
   }
 
-  if (
-    hasRepairableMetaSchemas(
-      warnings.find((check) => {
-        return check.name === "meta-schemas";
-      }),
-    )
-  ) {
+  const metaSchemasWarning = warnings.find((check) => {
+    return check.name === "meta-schemas";
+  });
+  const metaSchemasDetails = metaSchemasWarning?.details as
+    | { missing?: unknown[]; outdated?: unknown[]; newer_pin?: unknown }
+    | undefined;
+  const hasRepairableMetaSchemas =
+    metaSchemasWarning?.status === "warn" &&
+    metaSchemasDetails?.newer_pin === undefined &&
+    (metaSchemasDetails?.missing?.length ?? 0) + (metaSchemasDetails?.outdated?.length ?? 0) > 0;
+  if (hasRepairableMetaSchemas) {
     fix(
       "meta-schemas",
       "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
@@ -538,102 +561,6 @@ async function runEnvironmentChecks(input: {
       },
     ),
   ];
-}
-
-/**
- * Reads the claim check's window classification out of its details. Absent
- * or malformed details mean "not closed". The classification only selects
- * the advisory wording (deadline nudge vs reconciliation); the claim
- * command stays suggested either way, because the local record may be stale
- * and running claim lets the server answer authoritatively.
- */
-function claimWindowClosed(check: CheckOutcome): boolean {
-  const details = check.details;
-  return (
-    typeof details === "object" &&
-    details !== null &&
-    (details as { claimable?: unknown }).claimable === false
-  );
-}
-
-/**
- * Whether the meta-schemas warning lists a missing or outdated file that this
- * CLI's `--fix` writes: not when the project pins a newer `@zitadel/*`
- * version, whose own doctor writes them. A file behind a symlink, or one the
- * CLI cannot read, only gets the warning's reason.
- */
-function hasRepairableMetaSchemas(check: CheckOutcome | undefined): boolean {
-  if (check?.status !== "warn") {
-    return false;
-  }
-  const details = check.details as
-    | { missing?: unknown[]; outdated?: unknown[]; newer_pin?: unknown }
-    | undefined;
-  return (
-    details?.newer_pin === undefined &&
-    (details?.missing?.length ?? 0) + (details?.outdated?.length ?? 0) > 0
-  );
-}
-
-function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
-  if (!check || check.status !== "warn") {
-    return false;
-  }
-  const details = check.details;
-  return (
-    typeof details === "object" &&
-    details !== null &&
-    "supported" in details &&
-    (details as { supported?: unknown }).supported === true &&
-    Array.isArray((details as { processes?: unknown }).processes) &&
-    ((details as { processes?: unknown[] }).processes?.length ?? 0) > 0
-  );
-}
-
-/** The project `.zitadel/secret` records, or nothing when it cannot be read. */
-async function secretProjectId(cwd: string): Promise<string | undefined> {
-  return (await Project.at(cwd).hasSecret())
-    ? Project.at(cwd)
-        .secret()
-        .then(
-          (secret) => {
-            return secret.data.project_id;
-          },
-          () => {
-            return undefined;
-          },
-        )
-    : undefined;
-}
-
-/**
- * Whether an env file sets `ZITADEL_PROJECT_ID` to this project. It is read
- * through the resolver, as `claim --env-file` would read it, with the process
- * environment left out so only the file answers. The file must carry the
- * credential too: for one it lacks, a pinned claim would take whatever secret
- * the shell exports and send it along for this project.
- */
-async function namesProject(
-  path: string,
-  projectId: Promise<string | undefined>,
-): Promise<boolean> {
-  const id = await projectId;
-  if (id === undefined || !existsSync(path)) {
-    return false;
-  }
-  return Environment.resolve({
-    servers: ZitadelRuntime,
-    cwd: dirname(path),
-    env: {},
-    envFile: path,
-  }).then(
-    ({ values }) => {
-      return values.ZITADEL_PROJECT_ID?.value === id && values.ZITADEL_PROJECT_SECRET !== undefined;
-    },
-    () => {
-      return false;
-    },
-  );
 }
 
 /**
@@ -878,7 +805,18 @@ export default class Doctor extends Destructive(
     const warnings = checks.filter((check) => {
       return check.status === "warn";
     });
-    const projectId = await secretProjectId(this.cwd);
+    const projectId = (await Project.at(this.cwd).hasSecret())
+      ? await Project.at(this.cwd)
+          .secret()
+          .then(
+            (secret) => {
+              return secret.data.project_id;
+            },
+            () => {
+              return undefined;
+            },
+          )
+      : undefined;
     const projectServer = hasConfig
       ? await Project.at(this.cwd)
           .config()
@@ -905,10 +843,27 @@ export default class Doctor extends Destructive(
           return false;
         },
       ));
-    const claimSuggest = (await namesProject(
-      join(this.cwd, ".env.development.local"),
-      Promise.resolve(projectId),
-    ))
+    const developmentEnvFile = join(this.cwd, ".env.development.local");
+    const namesProject =
+      projectId !== undefined &&
+      existsSync(developmentEnvFile) &&
+      (await Environment.resolve({
+        servers: ZitadelRuntime,
+        cwd: dirname(developmentEnvFile),
+        env: {},
+        envFile: developmentEnvFile,
+      }).then(
+        ({ values }) => {
+          return (
+            values.ZITADEL_PROJECT_ID?.value === projectId &&
+            values.ZITADEL_PROJECT_SECRET !== undefined
+          );
+        },
+        () => {
+          return false;
+        },
+      ));
+    const claimSuggest = namesProject
       ? this.suggestWith({
           ...this.scope(),
           envFile: projectEnvFile(flags.cwd, ".env.development.local"),

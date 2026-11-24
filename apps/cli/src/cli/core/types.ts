@@ -1,6 +1,7 @@
 import type { ZitadelClient } from "@/lib/backend";
 import type { Environment } from "@/lib/environment";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import type { FlagVariable as EnvironmentVariable } from "@/lib/telemetry/consent";
 import type { Summary } from "@/lib/ui";
 import type { BaseCommand } from "./base";
 import type { NextSteps, StepsShown } from "./next-steps";
@@ -90,17 +91,7 @@ export type GlobalOptions = {
  * reads it declares it and reads it by `name`, and the CLI reference lists it
  * beside the flag (`FLAG_VARIABLES` in `./base`).
  */
-export type FlagVariable = {
-  readonly name: string;
-  /**
-   * The global flag it stands in for, without `--`: a base flag, or `server`,
-   * which `ServerCommand` adds to every command.
-   */
-  readonly flag: keyof (typeof BaseCommand)["baseFlags"] | "server";
-  readonly description: string;
-  /** How it ranks against the flag and the other sources of the setting. */
-  readonly precedence: string;
-};
+export type FlagVariable = EnvironmentVariable<keyof (typeof BaseCommand)["baseFlags"] | "server">;
 
 /**
  * What a command body returns to {@link import("./base").BaseCommand.emit}: a

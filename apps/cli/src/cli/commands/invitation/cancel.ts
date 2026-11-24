@@ -67,27 +67,6 @@ function describe(invitation: Invitation): string {
 }
 
 /**
- * Who an invitation is for and where it stands, beside its id in the picker.
- * The name is whatever an administrator typed; the picker draws hints as given.
- */
-function cancellableHint(invitation: Invitation): string {
-  const whom = invitation.metadata?.name;
-  return escapeControlCharacters(`${whom === undefined ? "" : `${whom}, `}${standing(invitation)}`);
-}
-
-/** Where a cancellable invitation stands: when it expires, expired, or declined. */
-function standing(invitation: Invitation): string {
-  switch (invitation.status) {
-    case "pending":
-      return `expires ${invitation.expires_at}`;
-    case "expired":
-      return `expired ${invitation.expires_at}`;
-    default:
-      return "declined";
-  }
-}
-
-/**
  * `zitadel invitation cancel [invitation_id]` — cancel a pending invitation,
  * so its link can no longer be redeemed, or remove an expired or declined one.
  * Without an id it offers the pending, expired and declined invitations to
@@ -136,7 +115,11 @@ export default class InvitationCancel extends Destructive(
    * Cancels the invitation, after asking. A bare cancel picked its invitation,
    * which a retry must name. Only a pending invitation counts as cancelled in
    * telemetry: a declined journey already ended with invitation_rejected, and
-   * an expired one counts as not accepted.
+   * an expired one counts as not accepted. A person is offered the pending,
+   * expired and declined invitations when none is named, and a script is told
+   * to name one. A named invitation is read before anyone is asked, so the
+   * question can name it and an accepted one is refused: the server answers
+   * that cancel with the same 404 as a miss.
    *
    * @param input - The flags and arguments of the run.
    * @returns The run's envelope.
@@ -145,7 +128,34 @@ export default class InvitationCancel extends Destructive(
     if (args.invitationId === undefined && this.nonInteractive) {
       throw refusalError(NO_ID_REFUSAL, {});
     }
-    const target = args.invitationId ?? (await this.pickCancellable());
+    const listed =
+      args.invitationId === undefined
+        ? await (await this.service(InvitationService)).cancellable()
+        : [];
+    if (args.invitationId === undefined && listed.length === 0) {
+      throw refusalError(NOTHING_CANCELLABLE_REFUSAL, {});
+    }
+    const target =
+      args.invitationId ??
+      (await this.ask.select({
+        name: "invitation id",
+        message: "Which invitation would you like to cancel?",
+        retry: this.suggest({ id: "invitation:list" }),
+        options: listed.map((invitation) => {
+          const whom = invitation.metadata?.name;
+          const standing =
+            invitation.status === "pending"
+              ? `expires ${invitation.expires_at}`
+              : invitation.status === "expired"
+                ? `expired ${invitation.expires_at}`
+                : "declined";
+          return {
+            value: invitation,
+            label: invitation.id,
+            hint: escapeControlCharacters(`${whom === undefined ? "" : `${whom}, `}${standing}`),
+          };
+        }),
+      }));
     const invitationId = typeof target === "string" ? target : target.id;
 
     return await this.confirmed({
@@ -160,8 +170,14 @@ export default class InvitationCancel extends Destructive(
       prepare: async () => {
         const invitation =
           typeof target === "string"
-            ? await this.readCancellable(await this.service(InvitationService), target)
+            ? await (await this.service(InvitationService)).get(target)
             : target;
+        if (invitation.status === "accepted") {
+          throw refusalError(NOT_CANCELLABLE_REFUSAL, {
+            id: invitation.id,
+            status: invitation.status,
+          });
+        }
 
         return { invitation };
       },
@@ -189,49 +205,5 @@ export default class InvitationCancel extends Destructive(
         };
       },
     });
-  }
-
-  /**
-   * The pending, expired or declined invitation a person picks when the command line
-   * named none.
-   * A script is told to name one instead.
-   */
-  private async pickCancellable(): Promise<Invitation> {
-    const invitationService = await this.service(InvitationService);
-    const cancellable = await invitationService.cancellable();
-    if (cancellable.length === 0) {
-      throw refusalError(NOTHING_CANCELLABLE_REFUSAL, {});
-    }
-    return this.ask.select({
-      name: "invitation id",
-      message: "Which invitation would you like to cancel?",
-      retry: this.suggest({ id: "invitation:list" }),
-      options: cancellable.map((invitation) => {
-        return {
-          value: invitation,
-          label: invitation.id,
-          hint: cancellableHint(invitation),
-        };
-      }),
-    });
-  }
-
-  /**
-   * The invitation the command line named, read before anyone is asked, so
-   * the question can name it and one a cancel cannot delete is refused:
-   * the server answers that cancel with the same 404 as a miss.
-   */
-  private async readCancellable(
-    invitationService: InvitationService,
-    invitationId: string,
-  ): Promise<Invitation> {
-    const invitation = await invitationService.get(invitationId);
-    if (invitation.status === "accepted") {
-      throw refusalError(NOT_CANCELLABLE_REFUSAL, {
-        id: invitation.id,
-        status: invitation.status,
-      });
-    }
-    return invitation;
   }
 }

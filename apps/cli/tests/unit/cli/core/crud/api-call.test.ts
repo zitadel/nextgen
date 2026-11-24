@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import { describe, expect } from "vitest";
 
 import { Operation } from "@/lib/backend";
-import { ApiCall } from "@/lib/api";
+import { ApiCall } from "@/cli/core/crud/api-call";
 import { it } from "@tests/fixtures";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 

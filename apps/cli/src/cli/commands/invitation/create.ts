@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import type { Parsed } from "@zitadel/config/idp";
 
 import {
   type Invitation,
@@ -80,20 +79,6 @@ const REPLACES_ACCEPTED_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * A typed answer to who the invitation is for, held to the rule `--name` is,
- * except that a blank answer skips it and comes back empty.
- */
-function parseAnsweredName(value: string): Parsed<string> {
-  if (value.trim() === "") {
-    return { ok: true, value: "" };
-  }
-  const parsed = NAME_SCHEMA.safeParse(value);
-  return parsed.success
-    ? { ok: true, value: parsed.data }
-    : { ok: false, problem: parsed.error.issues[0]?.message ?? "it is not valid" };
-}
-
-/**
  * `zitadel invitation create` — invite someone into the project with a link.
  *
  * Asks who the invitation is for and which role it grants, confirms, and
@@ -148,7 +133,8 @@ export default class InvitationCreate extends Promptable(ChangeCommand) {
   }
 
   /**
-   * Sends the invitation.
+   * Sends the invitation. A person is asked before the link is made; creating
+   * is not destructive, and a script that passed its flags has already decided.
    *
    * @param input - The flags and arguments of the run.
    * @returns The run's envelope.
@@ -156,7 +142,19 @@ export default class InvitationCreate extends Promptable(ChangeCommand) {
   protected async apply({ flags }: Admitted<typeof InvitationCreate>): Promise<CommandResult> {
     const { name, relation, replaced } = await this.intended(flags);
     const invitationService = await this.service(InvitationService);
-    if (!(await this.askToCreate(name ?? replaced?.metadata?.name, relation, replaced?.id))) {
+    const whom =
+      (name ?? replaced?.metadata?.name) === undefined
+        ? "an invitation"
+        : `an invitation for ${name ?? replaced?.metadata?.name}`;
+    const replacing = replaced?.id === undefined ? "" : `, replacing ${replaced.id}`;
+    if (
+      !this.nonInteractive &&
+      !(await this.ask.yesNo({
+        name: "creation",
+        message: `Create ${whom} as ${relation}${replacing}?`,
+        initialValue: true,
+      }))
+    ) {
       return {
         status: "skipped",
         reason: "create-cancelled",
@@ -203,29 +201,13 @@ export default class InvitationCreate extends Promptable(ChangeCommand) {
   }
 
   /**
-   * Who the invitation is for, asked of a person and left out for a script:
-   * the API takes none, so a run with nobody to ask goes on without it. A blank
-   * answer leaves it out too.
-   */
-  private async askName(): Promise<string | undefined> {
-    if (this.nonInteractive) {
-      return undefined;
-    }
-    const answer = await this.ask.text({
-      name: "name",
-      message: "Who is this invitation for?",
-      placeholder: "Shown to other administrators; leave blank to skip",
-      flag: "--name",
-      parse: parseAnsweredName,
-    });
-    return answer === "" ? undefined : answer;
-  }
-
-  /**
    * What the invitation is for, settled the same way for a dry run and a real
    * run. The original is read before anything is asked, a dry run included, so
    * an accepted one is refused first and a dry run predicts what the run does.
    * A replacement without a name keeps the original's, so it is not asked.
+   * Who it is for is asked of a person and left out for a script, as is a blank
+   * answer: the API takes none. The role is asked when `--relation` did not
+   * give it, and an accepted original is refused, as the server would.
    *
    * @param flags - The flags the command was given.
    * @returns The name, the relation and the invitation it replaces.
@@ -239,69 +221,55 @@ export default class InvitationCreate extends Promptable(ChangeCommand) {
     replaced: Invitation | undefined;
   }> {
     const replaced =
-      flags.replaces === undefined ? undefined : await this.readReplaced(flags.replaces);
-    const name = flags.name ?? (replaced === undefined ? await this.askName() : undefined);
-    const relation = flags.relation ?? (await this.askRelation());
+      flags.replaces === undefined
+        ? undefined
+        : await (await this.service(InvitationService)).get(flags.replaces);
+    if (replaced?.status === "accepted") {
+      throw refusalError(REPLACES_ACCEPTED_REFUSAL, { id: replaced.id });
+    }
+    const answer =
+      flags.name === undefined && replaced === undefined && !this.nonInteractive
+        ? await this.ask.text({
+            name: "name",
+            message: "Who is this invitation for?",
+            placeholder: "Shown to other administrators; leave blank to skip",
+            flag: "--name",
+            parse: (value) => {
+              if (value.trim() === "") {
+                return { ok: true, value: "" };
+              }
+              const parsed = NAME_SCHEMA.safeParse(value);
+              return parsed.success
+                ? { ok: true, value: parsed.data }
+                : { ok: false, problem: parsed.error.issues[0]?.message ?? "it is not valid" };
+            },
+          })
+        : undefined;
+    const name = flags.name ?? (answer === "" ? undefined : answer);
+    const relation =
+      flags.relation ??
+      (await this.ask.select({
+        name: "relation",
+        message: "Which role should whoever accepts receive on the project?",
+        flag: "--relation",
+        retry: this.suggest({
+          id: "invitation:create",
+          flags: { relation: "viewer" },
+        }),
+        initialValue: "viewer",
+        options: RELATIONS.map((relation) => {
+          return {
+            value: relation,
+            label: relation,
+            hint: RELATION_HINTS[relation],
+          };
+        }),
+      }));
 
     return {
       name,
       relation,
       replaced,
     };
-  }
-
-  /**
-   * The invitation `--replaces` names, read before anything is asked: the
-   * server refuses to replace one that was accepted.
-   */
-  private async readReplaced(invitationId: string): Promise<Invitation> {
-    const invitationService = await this.service(InvitationService);
-    const invitation = await invitationService.get(invitationId);
-    if (invitation.status === "accepted") {
-      throw refusalError(REPLACES_ACCEPTED_REFUSAL, { id: invitation.id });
-    }
-    return invitation;
-  }
-
-  /** The role the invitation grants, asked when `--relation` did not give it. */
-  private async askRelation(): Promise<InvitationRelation> {
-    return this.ask.select({
-      name: "relation",
-      message: "Which role should whoever accepts receive on the project?",
-      flag: "--relation",
-      retry: this.suggest({
-        id: "invitation:create",
-        flags: { relation: "viewer" },
-      }),
-      initialValue: "viewer",
-      options: RELATIONS.map((relation) => {
-        return {
-          value: relation,
-          label: relation,
-          hint: RELATION_HINTS[relation],
-        };
-      }),
-    });
-  }
-
-  /**
-   * Whether to make the link, asked of a person only: creating is not
-   * destructive, and a script that passed its flags has already decided.
-   */
-  private async askToCreate(
-    name: string | undefined,
-    relation: InvitationRelation,
-    replaces: string | undefined,
-  ): Promise<boolean> {
-    if (this.nonInteractive) {
-      return true;
-    }
-    const whom = name === undefined ? "an invitation" : `an invitation for ${name}`;
-    const replacing = replaces === undefined ? "" : `, replacing ${replaces}`;
-    return this.ask.yesNo({
-      name: "creation",
-      message: `Create ${whom} as ${relation}${replacing}?`,
-      initialValue: true,
-    });
   }
 }

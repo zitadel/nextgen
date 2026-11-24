@@ -13,7 +13,7 @@ import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
-import { type DependencyInstall, type PackageCommand, PM } from "@/lib/pm";
+import { type PackageCommand, PM } from "@/lib/pm";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
@@ -197,7 +197,14 @@ export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
   }
 
   /**
-   * Writes the test suite and installs what it needs.
+   * Writes the test suite and installs what it needs. The steps no suggested
+   * command may take are said in prose, run in the app: a package manager's
+   * suggestion only installs, removes or runs a project's script, so
+   * installing Playwright's browser, and running Playwright when the app's own
+   * `test:e2e` runs something else, are not commands. The commands are what the
+   * reader runs next, from the shell's directory, with the app's package
+   * manager: the install when this run skipped it, then the suite, through the
+   * project's script when that script is the suite's.
    *
    * @param input - The flags the command accepts.
    * @returns The envelope of the run.
@@ -276,8 +283,20 @@ export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
         }),
       },
       next: {
-        actions: this.nextActions(ownScript),
-        commands: this.nextCommands(packageManager, install, installCommand, ownScript, flags.cwd),
+        actions: [
+          `Install Playwright's Chromium once, in ${this.cwd}: npx playwright install chromium`,
+          ...(runsTheSuite(ownScript)
+            ? []
+            : [
+                `The app's own ${TestKit.SCRIPT.name} script runs ${String(ownScript)}, so run the suite with Playwright in ${this.cwd}: npx playwright test`,
+              ]),
+        ],
+        commands: [
+          ...(install.status === "skipped" ? [this.shown(installCommand, flags.cwd)] : []),
+          ...(runsTheSuite(ownScript)
+            ? [this.shown(packageManager.script(TestKit.SCRIPT.name), flags.cwd)]
+            : []),
+        ],
       },
     };
   }
@@ -286,7 +305,14 @@ export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
    * Plans the test suite against the project: both runs judge the same plan,
    * so a conflict refuses either before a file is written.
    *
+   * The framework is the one `zitadel.json` records for the project. An app with
+   * a Playwright config under another name than the suite's is refused; one
+   * under the suite's own name is the file writer's to compare. The manifest is
+   * the dependencies `package.json` declares, in any section, and its scripts.
+   *
    * @returns The project's framework and manifest, the plan, and what writing it would do.
+   * @throws The not-a-project refusal without `zitadel.json` or a framework in it.
+   * @throws The framework refusal when the framework has no suite.
    */
   private async planned(): Promise<{
     framework: string;
@@ -294,35 +320,6 @@ export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
     plan: ScaffoldPlan;
     planned: ScaffoldResult;
   }> {
-    const framework = await this.projectFramework();
-    await this.refuseAnotherPlaywrightConfig();
-    const manifest = await this.manifest();
-    const plan = new TestKit(framework).plan({
-      cliVersion: this.cliVersion,
-      declared: manifest.dependencies,
-      scripts: new Set(Object.keys(manifest.scripts)),
-    });
-    const planned = await new FileWriter({
-      cwd: this.cwd,
-      dryRun: true,
-      force: this.force,
-    }).scaffold(plan);
-
-    return {
-      framework,
-      manifest,
-      plan,
-      planned,
-    };
-  }
-
-  /**
-   * The framework `zitadel.json` records for the project.
-   *
-   * @throws The not-a-project refusal without `zitadel.json` or a framework in it.
-   * @throws The framework refusal when the framework has no suite.
-   */
-  private async projectFramework(): Promise<string> {
     if (!(await Project.at(this.cwd).hasConfig())) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
@@ -340,72 +337,40 @@ export default class TestsAdd extends Previewable(ServerCommand(BaseCommand)) {
         frameworks: TestKit.FRAMEWORKS,
       });
     }
-    return framework;
-  }
-
-  /**
-   * Refuses an app with a Playwright config under another name than the
-   * suite's; one under the suite's own name is the file writer's to compare.
-   */
-  private async refuseAnotherPlaywrightConfig(): Promise<void> {
     for (const config of TestKit.CONFIG_NAMES) {
       if (config !== TestKit.CONFIG && (await pathExists(join(this.cwd, config)))) {
         throw refusalError(PLAYWRIGHT_CONFIG_REFUSAL, { config });
       }
     }
-  }
-
-  /** The dependencies `package.json` declares, in any section, and its scripts. */
-  private async manifest(): Promise<Manifest> {
-    const manifest = await PM.manifest(this.cwd).catch(() => undefined);
-    if (manifest === undefined) {
+    const packageJson = await PM.manifest(this.cwd).catch(() => undefined);
+    if (packageJson === undefined) {
       throw refusalError(MANIFEST_REFUSAL, {});
     }
-    return {
+    const manifest: Manifest = {
       dependencies: new Set(
-        [manifest.dependencies, manifest.devDependencies].flatMap((section) => {
+        [packageJson.dependencies, packageJson.devDependencies].flatMap((section) => {
           return section === undefined ? [] : Object.keys(section);
         }),
       ),
-      scripts: isObject(manifest.scripts) ? manifest.scripts : {},
+      scripts: isObject(packageJson.scripts) ? packageJson.scripts : {},
     };
-  }
+    const plan = new TestKit(framework).plan({
+      cliVersion: this.cliVersion,
+      declared: manifest.dependencies,
+      scripts: new Set(Object.keys(manifest.scripts)),
+    });
+    const planned = await new FileWriter({
+      cwd: this.cwd,
+      dryRun: true,
+      force: this.force,
+    }).scaffold(plan);
 
-  /**
-   * The steps no suggested command may take: a package manager's suggestion
-   * only installs, removes or runs a project's script, so installing
-   * Playwright's browser, and running Playwright when the app's own
-   * `test:e2e` runs something else, are said in prose, run in the app.
-   */
-  private nextActions(ownScript: unknown): string[] {
-    return [
-      `Install Playwright's Chromium once, in ${this.cwd}: npx playwright install chromium`,
-      ...(runsTheSuite(ownScript)
-        ? []
-        : [
-            `The app's own ${TestKit.SCRIPT.name} script runs ${String(ownScript)}, so run the suite with Playwright in ${this.cwd}: npx playwright test`,
-          ]),
-    ];
-  }
-
-  /**
-   * What the reader runs next, from the shell's directory, with the app's
-   * package manager: the install when this run skipped it, then the suite,
-   * through the project's script when that script is the suite's.
-   */
-  private nextCommands(
-    packageManager: PM,
-    install: DependencyInstall,
-    installCommand: PackageCommand,
-    ownScript: unknown,
-    cwdFlag: string | undefined,
-  ): SuggestedCommand[] {
-    return [
-      ...(install.status === "skipped" ? [this.shown(installCommand, cwdFlag)] : []),
-      ...(runsTheSuite(ownScript)
-        ? [this.shown(packageManager.script(TestKit.SCRIPT.name), cwdFlag)]
-        : []),
-    ];
+    return {
+      framework,
+      manifest,
+      plan,
+      planned,
+    };
   }
 
   /** A package manager command as the reader runs it, from the shell's directory. */
