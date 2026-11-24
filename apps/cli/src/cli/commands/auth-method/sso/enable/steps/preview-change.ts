@@ -26,7 +26,7 @@ const NOTHING_PUBLISHED: PublishedCredentials = {
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"flags" | "summary" | "preview" | "names" | "claims" | "target" | "provider">;
+type Needs = Fact<"flags" | "summary" | "preview" | "names" | "claims" | "provider">;
 
 /**
  * What the step is given by the command.

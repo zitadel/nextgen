@@ -540,23 +540,22 @@ export function mappingLines(change: DocumentChange<Connection>): string[] {
  * @param needs - What was read and decided.
  * @returns The lines, one per statement.
  */
-export function registrationLines(needs: Fact<"target" | "provider" | "summary">): string[] {
-  const { schema } = needs.target;
+export function registrationLines(needs: Fact<"provider" | "summary">): string[] {
   const { summary, provider } = needs;
+  const name = escapeControlCharacters(provider.displayName, { keepLayout: false });
 
   return [
-    `Editing ${escapeControlCharacters(schema.path)}${schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(schema.methods.join(", "))}` : ""}`,
     ...(summary.reused
       ? []
       : [
-          `${escapeControlCharacters(provider.displayName, { keepLayout: false })} needs an OAuth application.`,
+          `${name} has to know about your app before it lets anyone sign in. Create an OAuth application there and give it the redirect URL below. ${name} sends people back to that address after they sign in.`,
         ]),
     ...[summary.callbackUri, ...summary.deployedCallbackUris].map((uri) => {
-      return `Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`;
+      return `Redirect URL   ${escapeControlCharacters(uri, { keepLayout: false })}`;
     }),
     ...(summary.previewCallbackUris.length > 0
       ? [
-          "Each preview URL needs its own callback URI at the provider, since it takes no wildcards:",
+          "Each preview URL needs its own redirect URL at the provider, since it takes no wildcards:",
           ...summary.previewCallbackUris.map((uri) => {
             return `  ${escapeControlCharacters(uri, { keepLayout: false })}`;
           }),
@@ -566,7 +565,7 @@ export function registrationLines(needs: Fact<"target" | "provider" | "summary">
       ? []
       : [
           provider.consoleUrl === undefined
-            ? `Register it as a client at ${escapeControlCharacters(provider.issuer)}, with the callback URI above.`
+            ? "Create it in your provider's admin console as an OpenID Connect (OAuth) application. It gives you a client ID and a client secret, which we ask for next."
             : `Create it at   ${escapeControlCharacters(provider.consoleUrl)}`,
         ]),
   ];
