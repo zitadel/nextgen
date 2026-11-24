@@ -34,7 +34,7 @@ async function recordedDimensions(): Promise<string[]> {
 
 describe("environment telemetry dimensions", () => {
   it("records the credential kind and whether a file was used", async () => {
-    expect(await recordedDimensions()).toEqual(["credential", "has_env_file", "project_hash"]);
+    expect(await recordedDimensions()).toEqual(["credential", "has_env_file"]);
   });
 
   it("records only dimensions the event catalog defines", async () => {

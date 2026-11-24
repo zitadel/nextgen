@@ -44,9 +44,9 @@ export function vercelEventKeys(dimension?: string): readonly string[] {
 
 export const FIRST_RUN_NOTICE =
   "Zitadel CLI collects anonymous usage analytics to help improve the tool. " +
-  "It never collects your name, email, server URLs, file contents or secrets, " +
-  "and a project appears only as a one-way hash. Opt out any time with " +
-  "DO_NOT_TRACK=1, ZITADEL_TELEMETRY=0, or the --no-telemetry flag.";
+  "It never collects your name, email, project IDs, server URLs, file contents " +
+  "or secrets. Opt out any time with DO_NOT_TRACK=1, ZITADEL_TELEMETRY=0, " +
+  "or the --no-telemetry flag.";
 
 type DeviceFacts = {
   readonly osLabel: string;

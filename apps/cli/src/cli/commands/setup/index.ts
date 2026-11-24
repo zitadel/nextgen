@@ -79,7 +79,6 @@ import { Promptable } from "@/cli/core/promptable";
 import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { BaseCommand } from "@/cli/core";
-import { projectHash } from "@/lib/telemetry/dimensions/project-hash";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
@@ -613,11 +612,8 @@ export default class Setup extends Telemetered(
           suggest: this.suggest,
           ui: this.ui,
         }),
-        (state) => {
-          this.annotate({
-            setup_stage: "project_created",
-            project_hash: projectHash.value(state.project.id),
-          });
+        () => {
+          this.annotate({ setup_stage: "project_created" });
         },
       )
       .step(

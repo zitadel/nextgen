@@ -13,7 +13,6 @@ import { Consent } from "@/lib/consent";
 import { CREDENTIALS } from "@/cli/core/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/cli/core/environment-command";
 import type { ConnectOptions } from "@/cli/core/types";
-import { projectHash } from "@/lib/telemetry/dimensions/project-hash";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { asTerminal } from "@tests/fixtures/terminal";
 import { Previewable } from "@/cli/core/previewable";
@@ -395,7 +394,6 @@ describe("EnvironmentCommand.connect", () => {
     expect(telemetry).toEqual({
       credential: "preview",
       has_env_file: true,
-      project_hash: projectHash.value("proj_staging"),
     });
   });
 
@@ -410,7 +408,6 @@ describe("EnvironmentCommand.connect", () => {
     expect(telemetry).toEqual({
       credential: "project",
       has_env_file: false,
-      project_hash: projectHash.value("proj_staging"),
     });
   });
 });

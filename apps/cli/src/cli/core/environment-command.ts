@@ -6,7 +6,6 @@ import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags } from "./environment-flags";
 import { byName } from "@/lib/names";
-import { projectHash } from "@/lib/telemetry/dimensions/project-hash";
 import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
@@ -42,7 +41,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
       ...super.describe(),
       credential: this.credentialUsed?.credential,
       has_env_file: this.credentialUsed?.hasEnvFile,
-      project_hash: projectHash.value(this.environment?.values.ZITADEL_PROJECT_ID?.value),
     };
   }
 
