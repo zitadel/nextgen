@@ -81,7 +81,7 @@ function stubPage(
         updated_at: "2026-07-08T09:00:00Z",
       }),
     ),
-    http.get(`${API}/projects/:id/admins`, () => HttpResponse.json({ admins: [] })),
+    http.get(`${API}/projects/:id/members`, () => HttpResponse.json({ members: [] })),
     http.post(`${API}/grants/query`, () => HttpResponse.json({ grants: [] })),
     http.get(INVITATIONS_URL, ({ request }) => {
       const params = new URL(request.url).searchParams;

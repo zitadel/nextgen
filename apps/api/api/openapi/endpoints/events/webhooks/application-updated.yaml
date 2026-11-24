@@ -3,8 +3,9 @@ post:
   operationId: applicationUpdated
   summary: application.updated
   description: |
-    A registered application was revised. The payload holds the new
-    revision, the name when it changed, and the clients the revision added.
+    An application was revised, through the API or by a release build. The
+    payload holds the new revision, the name when it changed, and the
+    clients the revision added.
 
     The body is the event as `GET /events` returns it.
   tags:

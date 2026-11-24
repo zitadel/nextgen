@@ -1,6 +1,8 @@
 import { api } from "@/api/zitadel";
 import { livePrimaryReleaseId } from "@/features/deployments/deployment";
+import { MAX_PAGE_SIZE, readAllPages } from "@/lib/paging";
 
+import type { Grant, Member } from "./members";
 import type { PasswordPolicyConfig } from "./password-policy";
 
 /** The operation the password policy governs, which is the handle a release pins it under. */
@@ -39,19 +41,29 @@ export async function readDeployedPasswordPolicy(
 }
 
 /**
- * Who has access to a project and how: the people with live admin access
- * (`GET /projects/{id}/admins`, #1462) and the project's grants, which add the
- * rows that list leaves out. One page each: a project's admins are a handful;
- * add paging with the first project that needs it. The grants' principal refs
- * carry the names, so nothing is expanded.
- *
- * The two are the same viewer check on the same project and succeed or fail
- * as one.
+ * Everything the members table groups: the people with a role on the project
+ * (`GET /projects/{id}/members`) and the project's grants. Both are read to
+ * the end, because a row gathers a person's or a team's entries from every
+ * page of either.
  */
-export async function readProjectAccess(projectId: string) {
-  const [admins, grants] = await Promise.all([
-    api.listProjectAdmins(projectId, { limit: 100 }),
-    api.queryGrants({ limit: 100 }, { project_id: projectId }),
+export async function readProjectMembers(
+  projectId: string,
+): Promise<{ members: Member[]; grants: Grant[] }> {
+  const [members, grants] = await Promise.all([
+    readAllPages(async (pageToken) => {
+      const page = await api.listProjectMembers(projectId, {
+        limit: MAX_PAGE_SIZE,
+        page_token: pageToken,
+      });
+      return { items: page.members, next: page.next_page_token };
+    }),
+    readAllPages(async (pageToken) => {
+      const page = await api.queryGrants(
+        { limit: MAX_PAGE_SIZE, page_token: pageToken },
+        { project_id: projectId },
+      );
+      return { items: page.grants, next: page.next_page_token };
+    }),
   ]);
-  return { admins: admins.admins, grants: grants.grants };
+  return { members, grants };
 }

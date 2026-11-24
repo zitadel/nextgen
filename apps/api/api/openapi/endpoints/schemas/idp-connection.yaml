@@ -133,12 +133,13 @@ properties:
         description: "Either a literal, when all environments use the same client, or a `${{ NAME }}` reference to a variable, when each environment has its own client."
       client_secret:
         type: string
-        pattern: ^\$\{\{ *[A-Za-z0-9_]+ *\}\}$
-        x-zitadel-pattern-message: "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself"
+        pattern: ^\$\{\{ *[A-Za-z0-9_]{1,255} *\}\}$
+        x-zitadel-pattern-message: "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself, naming a variable of at most 255 characters"
         description: 'A reference to the variable holding the client secret, never the secret itself.
           A secret may only be referenced as the entire value: text around the placeholder would be rendered
           into the resolved credential, so it is rejected. The server resolves it against the environment
-          serving the request.'
+          serving the request, and a deploy is refused while the variable has no value or holds a plain
+          value instead of a secret.'
       token_endpoint_auth_method:
         type: string
         enum:
