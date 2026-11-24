@@ -1063,6 +1063,59 @@ func (s *AppClientIDTakenDetails) init() AppClientIDTakenDetails {
 
 // Merged schema.
 // Ref: #
+type AppDeclared struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppDeclaredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppDeclared) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppDeclared) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppDeclared) GetDetails() OptAppDeclaredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppDeclared) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppDeclared) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppDeclared) SetDetails(val OptAppDeclaredDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppDeclaredDetails map[string]jx.Raw
+
+func (s *AppDeclaredDetails) init() AppDeclaredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type AppFieldImmutable struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -1275,6 +1328,59 @@ func (s *AppPermissionDeniedDetails) init() AppPermissionDeniedDetails {
 
 // Merged schema.
 // Ref: #
+type AppRegistered struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppRegisteredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppRegistered) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppRegistered) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppRegistered) GetDetails() OptAppRegisteredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppRegistered) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppRegistered) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppRegistered) SetDetails(val OptAppRegisteredDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppRegisteredDetails map[string]jx.Raw
+
+func (s *AppRegisteredDetails) init() AppRegisteredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type AppRevisionConflict struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -1326,8 +1432,9 @@ func (s *AppRevisionConflictDetails) init() AppRevisionConflictDetails {
 	return m
 }
 
-// An application that authenticates its users via Zitadel, with its OAuth clients. The document is the
-// `application` field of the `publishApplication` (`POST /applications`) body.
+// An application that authenticates its users via Zitadel, with its OAuth clients. The document is a
+// `.zitadel/applications/<slug>.json` file, which a release declares, or the `application` field of
+// the `publishApplication` (`POST /applications`) body, which registers it.
 // Ref: #
 type Application struct {
 	// Editor affordance: path or URL of this schema so editors validate and autocomplete the file. Ignored
@@ -1399,7 +1506,8 @@ type ApplicationClient struct {
 	// set, the id never changes: a later revision may leave it out, but may not provide a different one.
 	// No two clients in the project share an id, and an id is never reused once a client has held it. A
 	// new client may not supply an id that starts with `client_` or `dcr_`: those prefixes mark ids the
-	// server generates. A server-generated id sent back unchanged in a revision is accepted.
+	// server generates. A server-generated id sent back unchanged in a revision is accepted. A client
+	// declared in a release must set it.
 	ClientID OptString `json:"client_id"`
 	// A `confidential` client runs where a secret can be kept, such as a web app's backend, and
 	// authenticates with one at the token endpoint. Public clients, which hold no secret, are not
@@ -1416,8 +1524,19 @@ type ApplicationClient struct {
 	// `[::1]`. A URI is written as the client will send it, with a lowercase host and no fragment, since
 	// it is matched exactly; a loopback URI matches on any port (RFC 8252 §7.3).
 	RedirectUris []string `json:"redirect_uris"`
+	// A reference to the project variable holding the client's secret, never the secret itself, for a
+	// confidential client declared in a release. Required there. A variable stays the client's that first
+	// named it, so no other client in the project can name it. The server reads the value the deployment
+	// serving the request froze, and a deploy is refused while the variable has no value or holds a plain
+	// value instead of a secret.
+	//
+	// A client registered through `POST /applications` leaves it out: the server generates that client's
+	// secret and returns it once.
+	Secret OptString `json:"secret"`
 	// A first-party client belongs to the project's own product and skips consent unless the request asks
-	// for it. An application registered through the API is third-party unless this says otherwise.
+	// for it. A client declared in a release is first-party, and one registered through the API
+	// third-party, unless this says otherwise. The server stores the value in effect, so a response always
+	// carries it.
 	FirstParty OptBool `json:"first_party"`
 }
 
@@ -1449,6 +1568,11 @@ func (s *ApplicationClient) GetGrantTypes() []ApplicationClientGrantTypesItem {
 // GetRedirectUris returns the value of RedirectUris.
 func (s *ApplicationClient) GetRedirectUris() []string {
 	return s.RedirectUris
+}
+
+// GetSecret returns the value of Secret.
+func (s *ApplicationClient) GetSecret() OptString {
+	return s.Secret
 }
 
 // GetFirstParty returns the value of FirstParty.
@@ -1484,6 +1608,11 @@ func (s *ApplicationClient) SetGrantTypes(val []ApplicationClientGrantTypesItem)
 // SetRedirectUris sets the value of RedirectUris.
 func (s *ApplicationClient) SetRedirectUris(val []string) {
 	s.RedirectUris = val
+}
+
+// SetSecret sets the value of Secret.
+func (s *ApplicationClient) SetSecret(val OptString) {
+	s.Secret = val
 }
 
 // SetFirstParty sets the value of FirstParty.
@@ -2078,7 +2207,8 @@ func (s *ApplicationCreatedEventDelegationType) UnmarshalText(data []byte) error
 type ApplicationPayload struct {
 	Slug OptString `json:"slug"`
 	Name OptString `json:"name"`
-	// The `client_id` of each client the write created. Each of them got a new secret.
+	// The `client_id` of each client the write created. A registered application's new client got a new
+	// secret; a declared one's names the variable holding its secret.
 	ClientIds []string `json:"client_ids"`
 	// The revision the write appended.
 	RevisionID string `json:"revision_id"`
@@ -2136,6 +2266,9 @@ type ApplicationResponse struct {
 	// The identifier by which other documents reference the application. Fixed for the life of the
 	// application.
 	Slug string `json:"slug"`
+	// True when a release declares the application, from a file under `.zitadel/applications/`, and only a
+	// deploy revises it. False when it was registered through `createApplication` (`POST /applications`).
+	Declared bool `json:"declared"`
 	// When the application was created.
 	CreatedAt time.Time `json:"created_at"`
 	// When this revision was created. On the newest revision, that is when the application was last
@@ -2158,6 +2291,11 @@ func (s *ApplicationResponse) GetRevisionID() string {
 // GetSlug returns the value of Slug.
 func (s *ApplicationResponse) GetSlug() string {
 	return s.Slug
+}
+
+// GetDeclared returns the value of Declared.
+func (s *ApplicationResponse) GetDeclared() bool {
+	return s.Declared
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -2190,6 +2328,11 @@ func (s *ApplicationResponse) SetSlug(val string) {
 	s.Slug = val
 }
 
+// SetDeclared sets the value of Declared.
+func (s *ApplicationResponse) SetDeclared(val bool) {
+	s.Declared = val
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *ApplicationResponse) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -2205,7 +2348,10 @@ func (s *ApplicationResponse) SetDefinition(val Application) {
 	s.Definition = val
 }
 
-func (*ApplicationResponse) getApplicationRes() {}
+func (*ApplicationResponse) getApplicationRes()         {}
+func (*ApplicationResponse) getApplicationRevisionRes() {}
+
+type ApplicationRevisionID string
 
 // Merged schema.
 // Ref: #
@@ -11821,6 +11967,10 @@ func (*BuildReleaseCreated) buildReleaseRes() {}
 type BuildReleaseErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
 	Type                     BuildReleaseErrorResponseType
+	AppFieldImmutable        AppFieldImmutable
+	AppInvalid               AppInvalid
+	AppRegistered            AppRegistered
+	AppRevisionConflict      AppRevisionConflict
 	AuthUnauthorized         AuthUnauthorized
 	EvtInvalid               EvtInvalid
 	FlowdefInvalid           FlowdefInvalid
@@ -11852,6 +12002,10 @@ type BuildReleaseErrorResponseType string
 
 // Possible values for BuildReleaseErrorResponseType.
 const (
+	AppFieldImmutableBuildReleaseErrorResponse        BuildReleaseErrorResponseType = "app.field_immutable"
+	AppInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "app.invalid"
+	AppRegisteredBuildReleaseErrorResponse            BuildReleaseErrorResponseType = "app.registered"
+	AppRevisionConflictBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "app.revision_conflict"
 	AuthUnauthorizedBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "auth.unauthorized"
 	EvtInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "evt.invalid"
 	FlowdefInvalidBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "flowdef.invalid"
@@ -11877,6 +12031,26 @@ const (
 	FlowdefSchemaFetchFailedBuildReleaseErrorResponse BuildReleaseErrorResponseType = "flowdef.schema_fetch_failed"
 	UnavailableBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "unavailable"
 )
+
+// IsAppFieldImmutable reports whether BuildReleaseErrorResponse is AppFieldImmutable.
+func (s BuildReleaseErrorResponse) IsAppFieldImmutable() bool {
+	return s.Type == AppFieldImmutableBuildReleaseErrorResponse
+}
+
+// IsAppInvalid reports whether BuildReleaseErrorResponse is AppInvalid.
+func (s BuildReleaseErrorResponse) IsAppInvalid() bool {
+	return s.Type == AppInvalidBuildReleaseErrorResponse
+}
+
+// IsAppRegistered reports whether BuildReleaseErrorResponse is AppRegistered.
+func (s BuildReleaseErrorResponse) IsAppRegistered() bool {
+	return s.Type == AppRegisteredBuildReleaseErrorResponse
+}
+
+// IsAppRevisionConflict reports whether BuildReleaseErrorResponse is AppRevisionConflict.
+func (s BuildReleaseErrorResponse) IsAppRevisionConflict() bool {
+	return s.Type == AppRevisionConflictBuildReleaseErrorResponse
+}
 
 // IsAuthUnauthorized reports whether BuildReleaseErrorResponse is AuthUnauthorized.
 func (s BuildReleaseErrorResponse) IsAuthUnauthorized() bool {
@@ -11996,6 +12170,90 @@ func (s BuildReleaseErrorResponse) IsFlowdefSchemaFetchFailed() bool {
 // IsUnavailable reports whether BuildReleaseErrorResponse is Unavailable.
 func (s BuildReleaseErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableBuildReleaseErrorResponse
+}
+
+// SetAppFieldImmutable sets BuildReleaseErrorResponse to AppFieldImmutable.
+func (s *BuildReleaseErrorResponse) SetAppFieldImmutable(v AppFieldImmutable) {
+	s.Type = AppFieldImmutableBuildReleaseErrorResponse
+	s.AppFieldImmutable = v
+}
+
+// GetAppFieldImmutable returns AppFieldImmutable and true boolean if BuildReleaseErrorResponse is AppFieldImmutable.
+func (s BuildReleaseErrorResponse) GetAppFieldImmutable() (v AppFieldImmutable, ok bool) {
+	if !s.IsAppFieldImmutable() {
+		return v, false
+	}
+	return s.AppFieldImmutable, true
+}
+
+// NewAppFieldImmutableBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from AppFieldImmutable.
+func NewAppFieldImmutableBuildReleaseErrorResponse(v AppFieldImmutable) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetAppFieldImmutable(v)
+	return s
+}
+
+// SetAppInvalid sets BuildReleaseErrorResponse to AppInvalid.
+func (s *BuildReleaseErrorResponse) SetAppInvalid(v AppInvalid) {
+	s.Type = AppInvalidBuildReleaseErrorResponse
+	s.AppInvalid = v
+}
+
+// GetAppInvalid returns AppInvalid and true boolean if BuildReleaseErrorResponse is AppInvalid.
+func (s BuildReleaseErrorResponse) GetAppInvalid() (v AppInvalid, ok bool) {
+	if !s.IsAppInvalid() {
+		return v, false
+	}
+	return s.AppInvalid, true
+}
+
+// NewAppInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from AppInvalid.
+func NewAppInvalidBuildReleaseErrorResponse(v AppInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetAppInvalid(v)
+	return s
+}
+
+// SetAppRegistered sets BuildReleaseErrorResponse to AppRegistered.
+func (s *BuildReleaseErrorResponse) SetAppRegistered(v AppRegistered) {
+	s.Type = AppRegisteredBuildReleaseErrorResponse
+	s.AppRegistered = v
+}
+
+// GetAppRegistered returns AppRegistered and true boolean if BuildReleaseErrorResponse is AppRegistered.
+func (s BuildReleaseErrorResponse) GetAppRegistered() (v AppRegistered, ok bool) {
+	if !s.IsAppRegistered() {
+		return v, false
+	}
+	return s.AppRegistered, true
+}
+
+// NewAppRegisteredBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from AppRegistered.
+func NewAppRegisteredBuildReleaseErrorResponse(v AppRegistered) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetAppRegistered(v)
+	return s
+}
+
+// SetAppRevisionConflict sets BuildReleaseErrorResponse to AppRevisionConflict.
+func (s *BuildReleaseErrorResponse) SetAppRevisionConflict(v AppRevisionConflict) {
+	s.Type = AppRevisionConflictBuildReleaseErrorResponse
+	s.AppRevisionConflict = v
+}
+
+// GetAppRevisionConflict returns AppRevisionConflict and true boolean if BuildReleaseErrorResponse is AppRevisionConflict.
+func (s BuildReleaseErrorResponse) GetAppRevisionConflict() (v AppRevisionConflict, ok bool) {
+	if !s.IsAppRevisionConflict() {
+		return v, false
+	}
+	return s.AppRevisionConflict, true
+}
+
+// NewAppRevisionConflictBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from AppRevisionConflict.
+func NewAppRevisionConflictBuildReleaseErrorResponse(v AppRevisionConflict) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetAppRevisionConflict(v)
+	return s
 }
 
 // SetAuthUnauthorized sets BuildReleaseErrorResponse to AuthUnauthorized.
@@ -15240,6 +15498,7 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 //   - two schemas with the same `objectType`;
 //   - two flow definitions with the same `name`;
 //   - two IdP connections with the same `slug`;
+//   - two applications with the same `slug`;
 //   - two policies for the same `operation`;
 //   - a schema without an `objectType`.
 //
@@ -15267,6 +15526,31 @@ type ConfigurationBundle struct {
 	// takes as `idp`. Secrets appear only as `${{ NAME }}` references to variables, never as values, so a
 	// bundle carries no credentials.
 	Idps []IdpConnection `json:"idps"`
+	// Declared applications, one per `.zitadel/applications/<slug>.json`, each the document
+	// `POST /applications` takes as `application`. The handle is `slug`. A release is the only writer of a
+	// declared application: the build refuses a slug an application registered through
+	// `POST /applications` holds, with an `app.registered` entry.
+	//
+	// A declared application differs from a registered one in three ways, each refused with an
+	// `app.invalid` entry naming the setting:
+	//
+	//  - every client sets its `client_id`, so the id is known before any deploy;
+	//  - every confidential client names its secret as a `${{ NAME }}` reference to a variable in
+	//    `secret`, and no two clients in the bundle name the same variable;
+	//  - no two clients in the bundle share a `client_id`. Every client on either side of such a clash is
+	//    refused.
+	//
+	// A `client_id` another client of the project holds, or once held, gets an `app.client_id_taken`
+	// entry, and a variable another client of the project names, or once named, an `app.invalid` entry: a
+	// variable stays the client's that first named it, so no other client is handed its secret. A revision
+	// may not change a client's `client_id` (`app.field_immutable`), even for a client an earlier release
+	// dropped. Unlike on `POST /applications`, a revision may drop a client: the deployments of that
+	// release stop serving it. A deploy is refused while a variable a client names has no value for the
+	// target (`dep.variables_missing`), or holds a plain value instead of a secret
+	// (`dep.variables_not_secret`).
+	//
+	// A declared application's clients are first-party unless their `first_party` says otherwise.
+	Applications []Application `json:"applications"`
 	// Operation policies, one per `.zitadel/policies/<operation>.json`, each the body `POST /policies`
 	// takes. The handle is `operation`: a project has one policy per operation. An unknown setting or a
 	// value outside a setting's bounds is refused while the request is decoded, with `req.invalid` and no
@@ -15301,6 +15585,11 @@ func (s *ConfigurationBundle) GetIdps() []IdpConnection {
 	return s.Idps
 }
 
+// GetApplications returns the value of Applications.
+func (s *ConfigurationBundle) GetApplications() []Application {
+	return s.Applications
+}
+
 // GetPolicies returns the value of Policies.
 func (s *ConfigurationBundle) GetPolicies() []PublishPolicyRequest {
 	return s.Policies
@@ -15329,6 +15618,11 @@ func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
 // SetIdps sets the value of Idps.
 func (s *ConfigurationBundle) SetIdps(val []IdpConnection) {
 	s.Idps = val
+}
+
+// SetApplications sets the value of Applications.
+func (s *ConfigurationBundle) SetApplications(val []Application) {
+	s.Applications = val
 }
 
 // SetPolicies sets the value of Policies.
@@ -15446,6 +15740,9 @@ type CreateApplicationResponse struct {
 	// The identifier by which other documents reference the application. Fixed for the life of the
 	// application.
 	Slug string `json:"slug"`
+	// True when a release declares the application, from a file under `.zitadel/applications/`, and only a
+	// deploy revises it. False when it was registered through `createApplication` (`POST /applications`).
+	Declared bool `json:"declared"`
 	// When the application was created.
 	CreatedAt time.Time `json:"created_at"`
 	// When this revision was created. On the newest revision, that is when the application was last
@@ -15471,6 +15768,11 @@ func (s *CreateApplicationResponse) GetRevisionID() string {
 // GetSlug returns the value of Slug.
 func (s *CreateApplicationResponse) GetSlug() string {
 	return s.Slug
+}
+
+// GetDeclared returns the value of Declared.
+func (s *CreateApplicationResponse) GetDeclared() bool {
+	return s.Declared
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -15506,6 +15808,11 @@ func (s *CreateApplicationResponse) SetRevisionID(val string) {
 // SetSlug sets the value of Slug.
 func (s *CreateApplicationResponse) SetSlug(val string) {
 	s.Slug = val
+}
+
+// SetDeclared sets the value of Declared.
+func (s *CreateApplicationResponse) SetDeclared(val bool) {
+	s.Declared = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -16716,10 +17023,11 @@ func (s *CreateAuthAttemptRequest) SetSessionToken(val OptSessionProofToken) {
 // CreateDeploymentBadRequest represents sum type.
 type CreateDeploymentBadRequest struct {
 	// Type selects the active sum variant, switch on this field.
-	Type                       CreateDeploymentBadRequestType
-	DepInvalid                 DepInvalid
-	DeploymentVariablesMissing DeploymentVariablesMissing
-	ReqInvalid                 ReqInvalid
+	Type                         CreateDeploymentBadRequestType
+	DepInvalid                   DepInvalid
+	DeploymentVariablesMissing   DeploymentVariablesMissing
+	DeploymentVariablesNotSecret DeploymentVariablesNotSecret
+	ReqInvalid                   ReqInvalid
 }
 
 // CreateDeploymentBadRequestType is oneOf type of CreateDeploymentBadRequest.
@@ -16727,9 +17035,10 @@ type CreateDeploymentBadRequestType string
 
 // Possible values for CreateDeploymentBadRequestType.
 const (
-	DepInvalidCreateDeploymentBadRequest                 CreateDeploymentBadRequestType = "dep.invalid"
-	DeploymentVariablesMissingCreateDeploymentBadRequest CreateDeploymentBadRequestType = "dep.variables_missing"
-	ReqInvalidCreateDeploymentBadRequest                 CreateDeploymentBadRequestType = "req.invalid"
+	DepInvalidCreateDeploymentBadRequest                   CreateDeploymentBadRequestType = "dep.invalid"
+	DeploymentVariablesMissingCreateDeploymentBadRequest   CreateDeploymentBadRequestType = "dep.variables_missing"
+	DeploymentVariablesNotSecretCreateDeploymentBadRequest CreateDeploymentBadRequestType = "dep.variables_not_secret"
+	ReqInvalidCreateDeploymentBadRequest                   CreateDeploymentBadRequestType = "req.invalid"
 )
 
 // IsDepInvalid reports whether CreateDeploymentBadRequest is DepInvalid.
@@ -16740,6 +17049,11 @@ func (s CreateDeploymentBadRequest) IsDepInvalid() bool {
 // IsDeploymentVariablesMissing reports whether CreateDeploymentBadRequest is DeploymentVariablesMissing.
 func (s CreateDeploymentBadRequest) IsDeploymentVariablesMissing() bool {
 	return s.Type == DeploymentVariablesMissingCreateDeploymentBadRequest
+}
+
+// IsDeploymentVariablesNotSecret reports whether CreateDeploymentBadRequest is DeploymentVariablesNotSecret.
+func (s CreateDeploymentBadRequest) IsDeploymentVariablesNotSecret() bool {
+	return s.Type == DeploymentVariablesNotSecretCreateDeploymentBadRequest
 }
 
 // IsReqInvalid reports whether CreateDeploymentBadRequest is ReqInvalid.
@@ -16789,6 +17103,27 @@ func NewDeploymentVariablesMissingCreateDeploymentBadRequest(v DeploymentVariabl
 	return s
 }
 
+// SetDeploymentVariablesNotSecret sets CreateDeploymentBadRequest to DeploymentVariablesNotSecret.
+func (s *CreateDeploymentBadRequest) SetDeploymentVariablesNotSecret(v DeploymentVariablesNotSecret) {
+	s.Type = DeploymentVariablesNotSecretCreateDeploymentBadRequest
+	s.DeploymentVariablesNotSecret = v
+}
+
+// GetDeploymentVariablesNotSecret returns DeploymentVariablesNotSecret and true boolean if CreateDeploymentBadRequest is DeploymentVariablesNotSecret.
+func (s CreateDeploymentBadRequest) GetDeploymentVariablesNotSecret() (v DeploymentVariablesNotSecret, ok bool) {
+	if !s.IsDeploymentVariablesNotSecret() {
+		return v, false
+	}
+	return s.DeploymentVariablesNotSecret, true
+}
+
+// NewDeploymentVariablesNotSecretCreateDeploymentBadRequest returns new CreateDeploymentBadRequest from DeploymentVariablesNotSecret.
+func NewDeploymentVariablesNotSecretCreateDeploymentBadRequest(v DeploymentVariablesNotSecret) CreateDeploymentBadRequest {
+	var s CreateDeploymentBadRequest
+	s.SetDeploymentVariablesNotSecret(v)
+	return s
+}
+
 // SetReqInvalid sets CreateDeploymentBadRequest to ReqInvalid.
 func (s *CreateDeploymentBadRequest) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateDeploymentBadRequest
@@ -16819,25 +17154,27 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 // CreateDeploymentErrorResponse represents sum type.
 type CreateDeploymentErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
-	Type                 CreateDeploymentErrorResponseType
-	AuthCsrfInvalid      AuthCsrfInvalid
-	AuthUnauthorized     AuthUnauthorized
-	DepConflict          DepConflict
-	DepInvalid           DepInvalid
-	DepNotFound          DepNotFound
-	DepPermissionDenied  DepPermissionDenied
-	DepVariablesMissing  DepVariablesMissing
-	EnvProjectNotFound   EnvProjectNotFound
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	NotImplemented       NotImplemented
-	ProjNotFound         ProjNotFound
-	ProjOriginNotAllowed ProjOriginNotAllowed
-	RelNotFound          RelNotFound
-	RelRevoked           RelRevoked
-	ReqInvalid           ReqInvalid
-	Unavailable          Unavailable
-	VarDocumentTooDeep   VarDocumentTooDeep
+	Type                  CreateDeploymentErrorResponseType
+	AuthCsrfInvalid       AuthCsrfInvalid
+	AuthUnauthorized      AuthUnauthorized
+	DepConflict           DepConflict
+	DepInvalid            DepInvalid
+	DepNotFound           DepNotFound
+	DepPermissionDenied   DepPermissionDenied
+	DepVariablesMissing   DepVariablesMissing
+	DepVariablesNotSecret DepVariablesNotSecret
+	EnvProjectNotFound    EnvProjectNotFound
+	EvtInvalid            EvtInvalid
+	VarDecryptionFailed   VarDecryptionFailed
+	Internal              Internal
+	NotImplemented        NotImplemented
+	ProjNotFound          ProjNotFound
+	ProjOriginNotAllowed  ProjOriginNotAllowed
+	RelNotFound           RelNotFound
+	RelRevoked            RelRevoked
+	ReqInvalid            ReqInvalid
+	Unavailable           Unavailable
+	VarDocumentTooDeep    VarDocumentTooDeep
 }
 
 // CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
@@ -16845,24 +17182,26 @@ type CreateDeploymentErrorResponseType string
 
 // Possible values for CreateDeploymentErrorResponseType.
 const (
-	AuthCsrfInvalidCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.permission_denied"
-	DepVariablesMissingCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.variables_missing"
-	EnvProjectNotFoundCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "evt.invalid"
-	InternalCreateDeploymentErrorResponse             CreateDeploymentErrorResponseType = "internal"
-	NotImplementedCreateDeploymentErrorResponse       CreateDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "proj.not_found"
-	ProjOriginNotAllowedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "proj.origin_not_allowed"
-	RelNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
-	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
-	VarDocumentTooDeepCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "var.document_too_deep"
+	AuthCsrfInvalidCreateDeploymentErrorResponse       CreateDeploymentErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "dep.variables_missing"
+	DepVariablesNotSecretCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.variables_not_secret"
+	EnvProjectNotFoundCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "evt.invalid"
+	VarDecryptionFailedCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "var.decryption_failed"
+	InternalCreateDeploymentErrorResponse              CreateDeploymentErrorResponseType = "internal"
+	NotImplementedCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "proj.origin_not_allowed"
+	RelNotFoundCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "req.invalid"
+	UnavailableCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether CreateDeploymentErrorResponse is AuthCsrfInvalid.
@@ -16900,6 +17239,11 @@ func (s CreateDeploymentErrorResponse) IsDepVariablesMissing() bool {
 	return s.Type == DepVariablesMissingCreateDeploymentErrorResponse
 }
 
+// IsDepVariablesNotSecret reports whether CreateDeploymentErrorResponse is DepVariablesNotSecret.
+func (s CreateDeploymentErrorResponse) IsDepVariablesNotSecret() bool {
+	return s.Type == DepVariablesNotSecretCreateDeploymentErrorResponse
+}
+
 // IsEnvProjectNotFound reports whether CreateDeploymentErrorResponse is EnvProjectNotFound.
 func (s CreateDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundCreateDeploymentErrorResponse
@@ -16908,6 +17252,11 @@ func (s CreateDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 // IsEvtInvalid reports whether CreateDeploymentErrorResponse is EvtInvalid.
 func (s CreateDeploymentErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidCreateDeploymentErrorResponse
+}
+
+// IsVarDecryptionFailed reports whether CreateDeploymentErrorResponse is VarDecryptionFailed.
+func (s CreateDeploymentErrorResponse) IsVarDecryptionFailed() bool {
+	return s.Type == VarDecryptionFailedCreateDeploymentErrorResponse
 }
 
 // IsInternal reports whether CreateDeploymentErrorResponse is Internal.
@@ -17102,6 +17451,27 @@ func NewDepVariablesMissingCreateDeploymentErrorResponse(v DepVariablesMissing) 
 	return s
 }
 
+// SetDepVariablesNotSecret sets CreateDeploymentErrorResponse to DepVariablesNotSecret.
+func (s *CreateDeploymentErrorResponse) SetDepVariablesNotSecret(v DepVariablesNotSecret) {
+	s.Type = DepVariablesNotSecretCreateDeploymentErrorResponse
+	s.DepVariablesNotSecret = v
+}
+
+// GetDepVariablesNotSecret returns DepVariablesNotSecret and true boolean if CreateDeploymentErrorResponse is DepVariablesNotSecret.
+func (s CreateDeploymentErrorResponse) GetDepVariablesNotSecret() (v DepVariablesNotSecret, ok bool) {
+	if !s.IsDepVariablesNotSecret() {
+		return v, false
+	}
+	return s.DepVariablesNotSecret, true
+}
+
+// NewDepVariablesNotSecretCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from DepVariablesNotSecret.
+func NewDepVariablesNotSecretCreateDeploymentErrorResponse(v DepVariablesNotSecret) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetDepVariablesNotSecret(v)
+	return s
+}
+
 // SetEnvProjectNotFound sets CreateDeploymentErrorResponse to EnvProjectNotFound.
 func (s *CreateDeploymentErrorResponse) SetEnvProjectNotFound(v EnvProjectNotFound) {
 	s.Type = EnvProjectNotFoundCreateDeploymentErrorResponse
@@ -17141,6 +17511,27 @@ func (s CreateDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidCreateDeploymentErrorResponse(v EvtInvalid) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetVarDecryptionFailed sets CreateDeploymentErrorResponse to VarDecryptionFailed.
+func (s *CreateDeploymentErrorResponse) SetVarDecryptionFailed(v VarDecryptionFailed) {
+	s.Type = VarDecryptionFailedCreateDeploymentErrorResponse
+	s.VarDecryptionFailed = v
+}
+
+// GetVarDecryptionFailed returns VarDecryptionFailed and true boolean if CreateDeploymentErrorResponse is VarDecryptionFailed.
+func (s CreateDeploymentErrorResponse) GetVarDecryptionFailed() (v VarDecryptionFailed, ok bool) {
+	if !s.IsVarDecryptionFailed() {
+		return v, false
+	}
+	return s.VarDecryptionFailed, true
+}
+
+// NewVarDecryptionFailedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from VarDecryptionFailed.
+func NewVarDecryptionFailedCreateDeploymentErrorResponse(v VarDecryptionFailed) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetVarDecryptionFailed(v)
 	return s
 }
 
@@ -21310,6 +21701,7 @@ func (*CreateReleaseCreated) createReleaseRes() {}
 type CreateReleaseErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
 	Type                   CreateReleaseErrorResponseType
+	AppRegistered          AppRegistered
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
@@ -21330,6 +21722,7 @@ type CreateReleaseErrorResponseType string
 
 // Possible values for CreateReleaseErrorResponseType.
 const (
+	AppRegisteredCreateReleaseErrorResponse          CreateReleaseErrorResponseType = "app.registered"
 	AuthUnauthorizedCreateReleaseErrorResponse       CreateReleaseErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "evt.invalid"
 	InternalCreateReleaseErrorResponse               CreateReleaseErrorResponseType = "internal"
@@ -21344,6 +21737,11 @@ const (
 	ReqInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "req.invalid"
 	UnavailableCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "unavailable"
 )
+
+// IsAppRegistered reports whether CreateReleaseErrorResponse is AppRegistered.
+func (s CreateReleaseErrorResponse) IsAppRegistered() bool {
+	return s.Type == AppRegisteredCreateReleaseErrorResponse
+}
 
 // IsAuthUnauthorized reports whether CreateReleaseErrorResponse is AuthUnauthorized.
 func (s CreateReleaseErrorResponse) IsAuthUnauthorized() bool {
@@ -21408,6 +21806,27 @@ func (s CreateReleaseErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether CreateReleaseErrorResponse is Unavailable.
 func (s CreateReleaseErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateReleaseErrorResponse
+}
+
+// SetAppRegistered sets CreateReleaseErrorResponse to AppRegistered.
+func (s *CreateReleaseErrorResponse) SetAppRegistered(v AppRegistered) {
+	s.Type = AppRegisteredCreateReleaseErrorResponse
+	s.AppRegistered = v
+}
+
+// GetAppRegistered returns AppRegistered and true boolean if CreateReleaseErrorResponse is AppRegistered.
+func (s CreateReleaseErrorResponse) GetAppRegistered() (v AppRegistered, ok bool) {
+	if !s.IsAppRegistered() {
+		return v, false
+	}
+	return s.AppRegistered, true
+}
+
+// NewAppRegisteredCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from AppRegistered.
+func NewAppRegisteredCreateReleaseErrorResponse(v AppRegistered) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetAppRegistered(v)
+	return s
 }
 
 // SetAuthUnauthorized sets CreateReleaseErrorResponse to AuthUnauthorized.
@@ -25098,6 +25517,59 @@ func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type DepVariablesNotSecret struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptDepVariablesNotSecretDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DepVariablesNotSecret) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DepVariablesNotSecret) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DepVariablesNotSecret) GetDetails() OptDepVariablesNotSecretDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DepVariablesNotSecret) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DepVariablesNotSecret) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DepVariablesNotSecret) SetDetails(val OptDepVariablesNotSecretDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type DepVariablesNotSecretDetails map[string]jx.Raw
+
+func (s *DepVariablesNotSecretDetails) init() DepVariablesNotSecretDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // An immutable record of a release made live on a set of origins. A release is a snapshot of the
 // project's configuration, and a deployment freezes the project's variable values with it. Deploying
 // and rolling back each append one, so the history is the audit trail.
@@ -26364,6 +26836,74 @@ func (s *DeploymentVariablesMissingDetails) SetKind(val DeploymentKind) {
 
 // SetNames sets the value of Names.
 func (s *DeploymentVariablesMissingDetails) SetNames(val []string) {
+	s.Names = val
+}
+
+// The release names variables as a client secret, of an application client or an identity provider,
+// that the project holds as plain values, or as secrets that are not a non-empty string.
+// Ref: #
+type DeploymentVariablesNotSecret struct {
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string                              `json:"message"`
+	Details DeploymentVariablesNotSecretDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DeploymentVariablesNotSecret) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DeploymentVariablesNotSecret) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DeploymentVariablesNotSecret) GetDetails() DeploymentVariablesNotSecretDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DeploymentVariablesNotSecret) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DeploymentVariablesNotSecret) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DeploymentVariablesNotSecret) SetDetails(val DeploymentVariablesNotSecretDetails) {
+	s.Details = val
+}
+
+type DeploymentVariablesNotSecretDetails struct {
+	// The kind whose variable values the deployment would freeze.
+	Kind DeploymentKind `json:"kind"`
+	// Every variable the release names as a client secret that is stored for that kind as a plain value,
+	// or as a secret that is not a non-empty string, sorted.
+	Names []string `json:"names"`
+}
+
+// GetKind returns the value of Kind.
+func (s *DeploymentVariablesNotSecretDetails) GetKind() DeploymentKind {
+	return s.Kind
+}
+
+// GetNames returns the value of Names.
+func (s *DeploymentVariablesNotSecretDetails) GetNames() []string {
+	return s.Names
+}
+
+// SetKind sets the value of Kind.
+func (s *DeploymentVariablesNotSecretDetails) SetKind(val DeploymentKind) {
+	s.Kind = val
+}
+
+// SetNames sets the value of Names.
+func (s *DeploymentVariablesNotSecretDetails) SetNames(val []string) {
 	s.Names = val
 }
 
@@ -35869,6 +36409,255 @@ type GetApplicationNotFound ErrorDetails
 
 func (*GetApplicationNotFound) getApplicationRes() {}
 
+// GetApplicationRevisionErrorResponse represents sum type.
+type GetApplicationRevisionErrorResponse struct {
+	// Type selects the active sum variant, switch on this field.
+	Type                GetApplicationRevisionErrorResponseType
+	AppNotFound         AppNotFound
+	AppPermissionDenied AppPermissionDenied
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// GetApplicationRevisionErrorResponseType is oneOf type of GetApplicationRevisionErrorResponse.
+type GetApplicationRevisionErrorResponseType string
+
+// Possible values for GetApplicationRevisionErrorResponseType.
+const (
+	AppNotFoundGetApplicationRevisionErrorResponse         GetApplicationRevisionErrorResponseType = "app.not_found"
+	AppPermissionDeniedGetApplicationRevisionErrorResponse GetApplicationRevisionErrorResponseType = "app.permission_denied"
+	AuthUnauthorizedGetApplicationRevisionErrorResponse    GetApplicationRevisionErrorResponseType = "auth.unauthorized"
+	InternalGetApplicationRevisionErrorResponse            GetApplicationRevisionErrorResponseType = "internal"
+	NotImplementedGetApplicationRevisionErrorResponse      GetApplicationRevisionErrorResponseType = "not_implemented"
+	ReqInvalidGetApplicationRevisionErrorResponse          GetApplicationRevisionErrorResponseType = "req.invalid"
+	UnavailableGetApplicationRevisionErrorResponse         GetApplicationRevisionErrorResponseType = "unavailable"
+)
+
+// IsAppNotFound reports whether GetApplicationRevisionErrorResponse is AppNotFound.
+func (s GetApplicationRevisionErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundGetApplicationRevisionErrorResponse
+}
+
+// IsAppPermissionDenied reports whether GetApplicationRevisionErrorResponse is AppPermissionDenied.
+func (s GetApplicationRevisionErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedGetApplicationRevisionErrorResponse
+}
+
+// IsAuthUnauthorized reports whether GetApplicationRevisionErrorResponse is AuthUnauthorized.
+func (s GetApplicationRevisionErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetApplicationRevisionErrorResponse
+}
+
+// IsInternal reports whether GetApplicationRevisionErrorResponse is Internal.
+func (s GetApplicationRevisionErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetApplicationRevisionErrorResponse
+}
+
+// IsNotImplemented reports whether GetApplicationRevisionErrorResponse is NotImplemented.
+func (s GetApplicationRevisionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetApplicationRevisionErrorResponse
+}
+
+// IsReqInvalid reports whether GetApplicationRevisionErrorResponse is ReqInvalid.
+func (s GetApplicationRevisionErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetApplicationRevisionErrorResponse
+}
+
+// IsUnavailable reports whether GetApplicationRevisionErrorResponse is Unavailable.
+func (s GetApplicationRevisionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetApplicationRevisionErrorResponse
+}
+
+// SetAppNotFound sets GetApplicationRevisionErrorResponse to AppNotFound.
+func (s *GetApplicationRevisionErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundGetApplicationRevisionErrorResponse
+	s.AppNotFound = v
+}
+
+// GetAppNotFound returns AppNotFound and true boolean if GetApplicationRevisionErrorResponse is AppNotFound.
+func (s GetApplicationRevisionErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
+		return v, false
+	}
+	return s.AppNotFound, true
+}
+
+// NewAppNotFoundGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from AppNotFound.
+func NewAppNotFoundGetApplicationRevisionErrorResponse(v AppNotFound) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
+	s.SetAppNotFound(v)
+	return s
+}
+
+// SetAppPermissionDenied sets GetApplicationRevisionErrorResponse to AppPermissionDenied.
+func (s *GetApplicationRevisionErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedGetApplicationRevisionErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if GetApplicationRevisionErrorResponse is AppPermissionDenied.
+func (s GetApplicationRevisionErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedGetApplicationRevisionErrorResponse(v AppPermissionDenied) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
+}
+
+// SetAuthUnauthorized sets GetApplicationRevisionErrorResponse to AuthUnauthorized.
+func (s *GetApplicationRevisionErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetApplicationRevisionErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetApplicationRevisionErrorResponse is AuthUnauthorized.
+func (s GetApplicationRevisionErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetApplicationRevisionErrorResponse(v AuthUnauthorized) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetApplicationRevisionErrorResponse to Internal.
+func (s *GetApplicationRevisionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetApplicationRevisionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetApplicationRevisionErrorResponse is Internal.
+func (s GetApplicationRevisionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from Internal.
+func NewInternalGetApplicationRevisionErrorResponse(v Internal) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetApplicationRevisionErrorResponse to NotImplemented.
+func (s *GetApplicationRevisionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetApplicationRevisionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetApplicationRevisionErrorResponse is NotImplemented.
+func (s GetApplicationRevisionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from NotImplemented.
+func NewNotImplementedGetApplicationRevisionErrorResponse(v NotImplemented) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetApplicationRevisionErrorResponse to ReqInvalid.
+func (s *GetApplicationRevisionErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetApplicationRevisionErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetApplicationRevisionErrorResponse is ReqInvalid.
+func (s GetApplicationRevisionErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from ReqInvalid.
+func NewReqInvalidGetApplicationRevisionErrorResponse(v ReqInvalid) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetApplicationRevisionErrorResponse to Unavailable.
+func (s *GetApplicationRevisionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetApplicationRevisionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetApplicationRevisionErrorResponse is Unavailable.
+func (s GetApplicationRevisionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetApplicationRevisionErrorResponse returns new GetApplicationRevisionErrorResponse from Unavailable.
+func NewUnavailableGetApplicationRevisionErrorResponse(v Unavailable) GetApplicationRevisionErrorResponse {
+	var s GetApplicationRevisionErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetApplicationRevisionErrorResponseStatusCode wraps GetApplicationRevisionErrorResponse with StatusCode.
+type GetApplicationRevisionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetApplicationRevisionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetApplicationRevisionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetApplicationRevisionErrorResponseStatusCode) GetResponse() GetApplicationRevisionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetApplicationRevisionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetApplicationRevisionErrorResponseStatusCode) SetResponse(val GetApplicationRevisionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetApplicationRevisionErrorResponseStatusCode) getApplicationRevisionRes() {}
+
+type GetApplicationRevisionForbidden ErrorDetails
+
+func (*GetApplicationRevisionForbidden) getApplicationRevisionRes() {}
+
+type GetApplicationRevisionNotFound ErrorDetails
+
+func (*GetApplicationRevisionNotFound) getApplicationRevisionRes() {}
+
+type GetApplicationRevisionUnauthorized ErrorDetails
+
+func (*GetApplicationRevisionUnauthorized) getApplicationRevisionRes() {}
+
 type GetApplicationUnauthorized ErrorDetails
 
 func (*GetApplicationUnauthorized) getApplicationRes() {}
@@ -45115,7 +45904,8 @@ type IdpConnectionOidc struct {
 	ClientID string `json:"client_id"`
 	// A reference to the variable holding the client secret, never the secret itself. A secret may only be
 	// referenced as the entire value: text around the placeholder would be rendered into the resolved
-	// credential, so it is rejected. The server resolves it against the environment serving the request.
+	// credential, so it is rejected. The server resolves it against the environment serving the request,
+	// and a deploy is refused while the variable has no value or holds a plain value instead of a secret.
 	ClientSecret string `json:"client_secret"`
 	// How the client authenticates at the token endpoint.
 	TokenEndpointAuthMethod OptIdpConnectionOidcTokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
@@ -59994,6 +60784,52 @@ func (o OptAppClientIDTakenDetails) Or(d AppClientIDTakenDetails) AppClientIDTak
 	return d
 }
 
+// NewOptAppDeclaredDetails returns new OptAppDeclaredDetails with value set to v.
+func NewOptAppDeclaredDetails(v AppDeclaredDetails) OptAppDeclaredDetails {
+	return OptAppDeclaredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppDeclaredDetails is optional AppDeclaredDetails.
+type OptAppDeclaredDetails struct {
+	Value AppDeclaredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppDeclaredDetails was set.
+func (o OptAppDeclaredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppDeclaredDetails) Reset() {
+	var v AppDeclaredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppDeclaredDetails) SetTo(v AppDeclaredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppDeclaredDetails) Get() (v AppDeclaredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppDeclaredDetails) Or(d AppDeclaredDetails) AppDeclaredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAppFieldImmutableDetails returns new OptAppFieldImmutableDetails with value set to v.
 func NewOptAppFieldImmutableDetails(v AppFieldImmutableDetails) OptAppFieldImmutableDetails {
 	return OptAppFieldImmutableDetails{
@@ -60172,6 +61008,52 @@ func (o OptAppPermissionDeniedDetails) Get() (v AppPermissionDeniedDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAppPermissionDeniedDetails) Or(d AppPermissionDeniedDetails) AppPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppRegisteredDetails returns new OptAppRegisteredDetails with value set to v.
+func NewOptAppRegisteredDetails(v AppRegisteredDetails) OptAppRegisteredDetails {
+	return OptAppRegisteredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppRegisteredDetails is optional AppRegisteredDetails.
+type OptAppRegisteredDetails struct {
+	Value AppRegisteredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppRegisteredDetails was set.
+func (o OptAppRegisteredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppRegisteredDetails) Reset() {
+	var v AppRegisteredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppRegisteredDetails) SetTo(v AppRegisteredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppRegisteredDetails) Get() (v AppRegisteredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppRegisteredDetails) Or(d AppRegisteredDetails) AppRegisteredDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -62978,6 +63860,52 @@ func (o OptDepVariablesMissingDetails) Get() (v DepVariablesMissingDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDepVariablesMissingDetails) Or(d DepVariablesMissingDetails) DepVariablesMissingDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDepVariablesNotSecretDetails returns new OptDepVariablesNotSecretDetails with value set to v.
+func NewOptDepVariablesNotSecretDetails(v DepVariablesNotSecretDetails) OptDepVariablesNotSecretDetails {
+	return OptDepVariablesNotSecretDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDepVariablesNotSecretDetails is optional DepVariablesNotSecretDetails.
+type OptDepVariablesNotSecretDetails struct {
+	Value DepVariablesNotSecretDetails
+	Set   bool
+}
+
+// IsSet returns true if OptDepVariablesNotSecretDetails was set.
+func (o OptDepVariablesNotSecretDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDepVariablesNotSecretDetails) Reset() {
+	var v DepVariablesNotSecretDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDepVariablesNotSecretDetails) SetTo(v DepVariablesNotSecretDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDepVariablesNotSecretDetails) Get() (v DepVariablesNotSecretDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDepVariablesNotSecretDetails) Or(d DepVariablesNotSecretDetails) DepVariablesNotSecretDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -80064,6 +80992,52 @@ func (o OptUserUpdatedPayloadAttributes) Or(d UserUpdatedPayloadAttributes) User
 	return d
 }
 
+// NewOptVarDecryptionFailedDetails returns new OptVarDecryptionFailedDetails with value set to v.
+func NewOptVarDecryptionFailedDetails(v VarDecryptionFailedDetails) OptVarDecryptionFailedDetails {
+	return OptVarDecryptionFailedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarDecryptionFailedDetails is optional VarDecryptionFailedDetails.
+type OptVarDecryptionFailedDetails struct {
+	Value VarDecryptionFailedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarDecryptionFailedDetails was set.
+func (o OptVarDecryptionFailedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarDecryptionFailedDetails) Reset() {
+	var v VarDecryptionFailedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarDecryptionFailedDetails) SetTo(v VarDecryptionFailedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarDecryptionFailedDetails) Get() (v VarDecryptionFailedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarDecryptionFailedDetails) Or(d VarDecryptionFailedDetails) VarDecryptionFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptVarDocumentTooDeepDetails returns new OptVarDocumentTooDeepDetails with value set to v.
 func NewOptVarDocumentTooDeepDetails(v VarDocumentTooDeepDetails) OptVarDocumentTooDeepDetails {
 	return OptVarDocumentTooDeepDetails{
@@ -87933,6 +88907,7 @@ type PublishApplicationErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
 	Type                PublishApplicationErrorResponseType
 	AppClientIDTaken    AppClientIDTaken
+	AppDeclared         AppDeclared
 	AppFieldImmutable   AppFieldImmutable
 	AppInvalid          AppInvalid
 	AppNotFound         AppNotFound
@@ -87952,6 +88927,7 @@ type PublishApplicationErrorResponseType string
 // Possible values for PublishApplicationErrorResponseType.
 const (
 	AppClientIDTakenPublishApplicationErrorResponse    PublishApplicationErrorResponseType = "app.client_id_taken"
+	AppDeclaredPublishApplicationErrorResponse         PublishApplicationErrorResponseType = "app.declared"
 	AppFieldImmutablePublishApplicationErrorResponse   PublishApplicationErrorResponseType = "app.field_immutable"
 	AppInvalidPublishApplicationErrorResponse          PublishApplicationErrorResponseType = "app.invalid"
 	AppNotFoundPublishApplicationErrorResponse         PublishApplicationErrorResponseType = "app.not_found"
@@ -87968,6 +88944,11 @@ const (
 // IsAppClientIDTaken reports whether PublishApplicationErrorResponse is AppClientIDTaken.
 func (s PublishApplicationErrorResponse) IsAppClientIDTaken() bool {
 	return s.Type == AppClientIDTakenPublishApplicationErrorResponse
+}
+
+// IsAppDeclared reports whether PublishApplicationErrorResponse is AppDeclared.
+func (s PublishApplicationErrorResponse) IsAppDeclared() bool {
+	return s.Type == AppDeclaredPublishApplicationErrorResponse
 }
 
 // IsAppFieldImmutable reports whether PublishApplicationErrorResponse is AppFieldImmutable.
@@ -88043,6 +89024,27 @@ func (s PublishApplicationErrorResponse) GetAppClientIDTaken() (v AppClientIDTak
 func NewAppClientIDTakenPublishApplicationErrorResponse(v AppClientIDTaken) PublishApplicationErrorResponse {
 	var s PublishApplicationErrorResponse
 	s.SetAppClientIDTaken(v)
+	return s
+}
+
+// SetAppDeclared sets PublishApplicationErrorResponse to AppDeclared.
+func (s *PublishApplicationErrorResponse) SetAppDeclared(v AppDeclared) {
+	s.Type = AppDeclaredPublishApplicationErrorResponse
+	s.AppDeclared = v
+}
+
+// GetAppDeclared returns AppDeclared and true boolean if PublishApplicationErrorResponse is AppDeclared.
+func (s PublishApplicationErrorResponse) GetAppDeclared() (v AppDeclared, ok bool) {
+	if !s.IsAppDeclared() {
+		return v, false
+	}
+	return s.AppDeclared, true
+}
+
+// NewAppDeclaredPublishApplicationErrorResponse returns new PublishApplicationErrorResponse from AppDeclared.
+func NewAppDeclaredPublishApplicationErrorResponse(v AppDeclared) PublishApplicationErrorResponse {
+	var s PublishApplicationErrorResponse
+	s.SetAppDeclared(v)
 	return s
 }
 
@@ -94720,6 +95722,8 @@ type ReleasePointer struct {
 	//    separately
 	//  - `policy` — the policy's `operation`, so a project's password policy is one resource however
 	//    often it is revised
+	//  - `application` — the application's `slug`, so `shop` and `blog` are separate resources a release
+	//    pins separately
 	//
 	// Resources inside a release reference each other by handle, not by revision ID. The same handle
 	// therefore names the same resource in every release.
@@ -94778,6 +95782,7 @@ const (
 	ReleasePointerKindIdp            ReleasePointerKind = "idp"
 	ReleasePointerKindPolicy         ReleasePointerKind = "policy"
 	ReleasePointerKindOAuth          ReleasePointerKind = "oauth"
+	ReleasePointerKindApplication    ReleasePointerKind = "application"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -94789,6 +95794,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindIdp,
 		ReleasePointerKindPolicy,
 		ReleasePointerKindOAuth,
+		ReleasePointerKindApplication,
 	}
 }
 
@@ -94806,6 +95812,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindPolicy:
 		return []byte(s), nil
 	case ReleasePointerKindOAuth:
+		return []byte(s), nil
+	case ReleasePointerKindApplication:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -94832,6 +95840,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindOAuth:
 		*s = ReleasePointerKindOAuth
+		return nil
+	case ReleasePointerKindApplication:
+		*s = ReleasePointerKindApplication
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -97789,24 +98800,26 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
-	Type                RollbackDeploymentErrorResponseType
-	AuthCsrfInvalid     AuthCsrfInvalid
-	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	DepVariablesMissing DepVariablesMissing
-	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjNotFound        ProjNotFound
-	RelNotFound         RelNotFound
-	RelRevoked          RelRevoked
-	ReqInvalid          ReqInvalid
-	Unavailable         Unavailable
-	VarDocumentTooDeep  VarDocumentTooDeep
+	Type                  RollbackDeploymentErrorResponseType
+	AuthCsrfInvalid       AuthCsrfInvalid
+	AuthUnauthorized      AuthUnauthorized
+	DepConflict           DepConflict
+	DepInvalid            DepInvalid
+	DepNotFound           DepNotFound
+	DepPermissionDenied   DepPermissionDenied
+	DepVariablesMissing   DepVariablesMissing
+	DepVariablesNotSecret DepVariablesNotSecret
+	EnvProjectNotFound    EnvProjectNotFound
+	EvtInvalid            EvtInvalid
+	VarDecryptionFailed   VarDecryptionFailed
+	Internal              Internal
+	NotImplemented        NotImplemented
+	ProjNotFound          ProjNotFound
+	RelNotFound           RelNotFound
+	RelRevoked            RelRevoked
+	ReqInvalid            ReqInvalid
+	Unavailable           Unavailable
+	VarDocumentTooDeep    VarDocumentTooDeep
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -97814,23 +98827,25 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
-	AuthCsrfInvalidRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	DepVariablesMissingRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.variables_missing"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
-	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
-	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
-	UnavailableRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "unavailable"
-	VarDocumentTooDeepRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "var.document_too_deep"
+	AuthCsrfInvalidRollbackDeploymentErrorResponse       RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "dep.variables_missing"
+	DepVariablesNotSecretRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.variables_not_secret"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "evt.invalid"
+	VarDecryptionFailedRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.decryption_failed"
+	InternalRollbackDeploymentErrorResponse              RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "req.invalid"
+	UnavailableRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -97868,6 +98883,11 @@ func (s RollbackDeploymentErrorResponse) IsDepVariablesMissing() bool {
 	return s.Type == DepVariablesMissingRollbackDeploymentErrorResponse
 }
 
+// IsDepVariablesNotSecret reports whether RollbackDeploymentErrorResponse is DepVariablesNotSecret.
+func (s RollbackDeploymentErrorResponse) IsDepVariablesNotSecret() bool {
+	return s.Type == DepVariablesNotSecretRollbackDeploymentErrorResponse
+}
+
 // IsEnvProjectNotFound reports whether RollbackDeploymentErrorResponse is EnvProjectNotFound.
 func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundRollbackDeploymentErrorResponse
@@ -97876,6 +98896,11 @@ func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 // IsEvtInvalid reports whether RollbackDeploymentErrorResponse is EvtInvalid.
 func (s RollbackDeploymentErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidRollbackDeploymentErrorResponse
+}
+
+// IsVarDecryptionFailed reports whether RollbackDeploymentErrorResponse is VarDecryptionFailed.
+func (s RollbackDeploymentErrorResponse) IsVarDecryptionFailed() bool {
+	return s.Type == VarDecryptionFailedRollbackDeploymentErrorResponse
 }
 
 // IsInternal reports whether RollbackDeploymentErrorResponse is Internal.
@@ -98065,6 +99090,27 @@ func NewDepVariablesMissingRollbackDeploymentErrorResponse(v DepVariablesMissing
 	return s
 }
 
+// SetDepVariablesNotSecret sets RollbackDeploymentErrorResponse to DepVariablesNotSecret.
+func (s *RollbackDeploymentErrorResponse) SetDepVariablesNotSecret(v DepVariablesNotSecret) {
+	s.Type = DepVariablesNotSecretRollbackDeploymentErrorResponse
+	s.DepVariablesNotSecret = v
+}
+
+// GetDepVariablesNotSecret returns DepVariablesNotSecret and true boolean if RollbackDeploymentErrorResponse is DepVariablesNotSecret.
+func (s RollbackDeploymentErrorResponse) GetDepVariablesNotSecret() (v DepVariablesNotSecret, ok bool) {
+	if !s.IsDepVariablesNotSecret() {
+		return v, false
+	}
+	return s.DepVariablesNotSecret, true
+}
+
+// NewDepVariablesNotSecretRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepVariablesNotSecret.
+func NewDepVariablesNotSecretRollbackDeploymentErrorResponse(v DepVariablesNotSecret) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepVariablesNotSecret(v)
+	return s
+}
+
 // SetEnvProjectNotFound sets RollbackDeploymentErrorResponse to EnvProjectNotFound.
 func (s *RollbackDeploymentErrorResponse) SetEnvProjectNotFound(v EnvProjectNotFound) {
 	s.Type = EnvProjectNotFoundRollbackDeploymentErrorResponse
@@ -98104,6 +99150,27 @@ func (s RollbackDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool)
 func NewEvtInvalidRollbackDeploymentErrorResponse(v EvtInvalid) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetVarDecryptionFailed sets RollbackDeploymentErrorResponse to VarDecryptionFailed.
+func (s *RollbackDeploymentErrorResponse) SetVarDecryptionFailed(v VarDecryptionFailed) {
+	s.Type = VarDecryptionFailedRollbackDeploymentErrorResponse
+	s.VarDecryptionFailed = v
+}
+
+// GetVarDecryptionFailed returns VarDecryptionFailed and true boolean if RollbackDeploymentErrorResponse is VarDecryptionFailed.
+func (s RollbackDeploymentErrorResponse) GetVarDecryptionFailed() (v VarDecryptionFailed, ok bool) {
+	if !s.IsVarDecryptionFailed() {
+		return v, false
+	}
+	return s.VarDecryptionFailed, true
+}
+
+// NewVarDecryptionFailedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from VarDecryptionFailed.
+func NewVarDecryptionFailedRollbackDeploymentErrorResponse(v VarDecryptionFailed) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetVarDecryptionFailed(v)
 	return s
 }
 
@@ -112932,6 +113999,59 @@ func (s *UserUpdatedPayload) SetAttributes(val OptUserUpdatedPayloadAttributes) 
 type UserUpdatedPayloadAttributes map[string]jx.Raw
 
 func (s *UserUpdatedPayloadAttributes) init() UserUpdatedPayloadAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarDecryptionFailed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarDecryptionFailedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarDecryptionFailed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarDecryptionFailed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarDecryptionFailed) GetDetails() OptVarDecryptionFailedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarDecryptionFailed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarDecryptionFailed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarDecryptionFailed) SetDetails(val OptVarDecryptionFailedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarDecryptionFailedDetails map[string]jx.Raw
+
+func (s *VarDecryptionFailedDetails) init() VarDecryptionFailedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

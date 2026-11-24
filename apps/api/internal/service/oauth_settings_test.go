@@ -18,7 +18,7 @@ import (
 func newMockedReleaseServiceWithOAuth(t *testing.T) (service.ReleaseService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
-	return service.NewReleaseService(pool, nil, nil, nil, nil, nil, service.NewOAuthSettingsService(pool), testBuiltinBases), statements
+	return service.NewReleaseService(pool, nil, nil, nil, nil, nil, nil, service.NewOAuthSettingsService(pool), testBuiltinBases), statements
 }
 
 func TestBuildRelease_AllocatesOAuthSettingsAndCreatesRelease(t *testing.T) {
@@ -218,7 +218,7 @@ func TestBuildRelease_EmitsOAuthSettingsCreated(t *testing.T) {
 	statements.EXPECT().GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).Return(nil, new(database.NoRowFoundError))
 	statements.EXPECT().CreateRelease(gomock.Any(), gomock.Any()).Return(nil)
 
-	svc := service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil, nil, service.NewOAuthSettingsService(service.NewPool(pool)), testBuiltinBases)
+	svc := service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil, nil, nil, service.NewOAuthSettingsService(service.NewPool(pool)), testBuiltinBases)
 	_, err := svc.Build(t.Context(), service.BuildReleaseInput{
 		ProjectID: "proj_1",
 		OAuth:     &service.CreateOAuthSettingsInput{ProjectID: "proj_1", Enabled: true},
