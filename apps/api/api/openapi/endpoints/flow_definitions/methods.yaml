@@ -8,7 +8,7 @@ post:
     A [flow definition](/docs/concepts/flows-and-schemas) is a template that
     defines the sequence of steps (capabilities) for one user journey, such as
     registration, login or password reset. The body follows the flow
-    definition schema, which includes the flow's purpose, audience and steps.
+    definition schema, which includes the flow's purposes and steps.
 
     Every call allocates a new opaque ID. That `id` is the `revision_id` a
     release pins for `kind: flow_definition`.

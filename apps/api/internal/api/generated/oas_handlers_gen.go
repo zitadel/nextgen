@@ -2228,8 +2228,8 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 
 // handleCreateFlowRequest handles createFlow operation.
 //
-// Starts a flow: resolves a flow definition from the request's purpose and audience, and returns the
-// first step.
+// Starts a flow: resolves a flow definition from the request's purpose and optional name, and returns
+// the first step.
 //
 // The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
 // step. It starts a flow here, renders the step it gets back, and submits the user's input with
@@ -17369,7 +17369,7 @@ func (s *Server) handlePublishBrandingRequest(args [0]string, argsEscaped bool, 
 //
 // A [flow definition] is a template that defines the sequence of steps (capabilities) for one user
 // journey, such as registration, login or password reset. The body follows the flow definition schema,
-// which includes the flow's purpose, audience and steps.
+// which includes the flow's purposes and steps.
 //
 // Every call allocates a new opaque ID. That `id` is the `revision_id` a release pins for
 // `kind: flow_definition`.

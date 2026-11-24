@@ -13,14 +13,3 @@ properties:
     type: object
     additionalProperties:
       type: string
-  audience:
-    type: object
-    properties:
-      app_ids:
-        type: array
-        items:
-          type: string
-      team_ids:
-        type: array
-        items:
-          type: string
