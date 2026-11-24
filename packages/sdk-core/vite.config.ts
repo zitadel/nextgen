@@ -16,6 +16,7 @@ export default defineConfig({
         types: resolve(import.meta.dirname, "src/types.ts"),
         jwt: resolve(import.meta.dirname, "src/jwt.ts"),
         middleware: resolve(import.meta.dirname, "src/middleware.ts"),
+        session: resolve(import.meta.dirname, "src/session.ts"),
       },
       formats: ["es" as const],
     },
