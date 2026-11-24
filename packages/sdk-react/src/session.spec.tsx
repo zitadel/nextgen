@@ -5,7 +5,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSession } from "./index";
-import { _resetSessionsForTesting } from "./session";
+import { _resetSessionsForTesting, _sessionEntryCountForTesting } from "./session";
 
 // What the server answers is mapped by getSession() in @zitadel/sdk-core and
 // tested there; these cases cover the hook: its states, the shared read and
@@ -36,6 +36,18 @@ function Name({ project }: { project: ZitadelProject }) {
 
 function Status({ project }: { project: ZitadelProject }) {
   return <span>{useSession({ project }).status}</span>;
+}
+
+function Capture({
+  projectId,
+  onRender,
+}: {
+  projectId: string;
+  onRender: (refresh: () => Promise<void>) => void;
+}) {
+  const { status, refresh } = useSession({ projectId });
+  onRender(refresh);
+  return <span>{status}</span>;
 }
 
 beforeEach(() => {
@@ -157,6 +169,20 @@ describe("useSession()", () => {
   it("renders loading on the server and reads nothing there", () => {
     const project = configureZitadel({ projectId: "proj-1" });
     expect(renderToString(<Status project={project} />)).toContain("loading");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // A long-lived server renders many projects; it must not keep one entry per
+  // project it ever saw, and refresh() there has nothing to read.
+  it("keeps no shared read and refreshes to nothing on the server", async () => {
+    vi.stubGlobal("window", undefined);
+    let refresh: (() => Promise<void>) | undefined;
+
+    const html = renderToString(<Capture projectId="proj-ssr" onRender={(r) => (refresh = r)} />);
+
+    expect(html).toContain("loading");
+    expect(_sessionEntryCountForTesting()).toBe(0);
+    await expect(refresh?.()).resolves.toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

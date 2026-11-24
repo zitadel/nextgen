@@ -116,10 +116,14 @@ function load(entry: Entry, projectId?: string, proxyPath?: string): Promise<voi
 export function useSession(options: UseSessionOptions = {}): UseSessionResult {
   const projectId = options.project?.projectId ?? options.projectId;
   const proxyPath = options.project?.proxyPath ?? options.proxyPath;
-  const entry = entryFor(`${projectId ?? ""}\n${proxyPath ?? ""}`);
+  // A server renders `loading` and reads nothing, so it keeps no entry: a
+  // long-lived server would otherwise hold one per project it ever rendered.
+  const entry =
+    typeof window === "undefined" ? null : entryFor(`${projectId ?? ""}\n${proxyPath ?? ""}`);
 
   const subscribe = React.useCallback(
     (listener: () => void) => {
+      if (!entry) return () => {};
       entry.listeners.add(listener);
       if (!entry.started) void load(entry, projectId, proxyPath);
       return () => {
@@ -130,14 +134,19 @@ export function useSession(options: UseSessionOptions = {}): UseSessionResult {
   );
   const snapshot = React.useSyncExternalStore(
     subscribe,
-    () => entry.snapshot,
+    () => entry?.snapshot ?? loading,
     () => loading,
   );
   const refresh = React.useCallback(
-    () => load(entry, projectId, proxyPath),
+    () => (entry ? load(entry, projectId, proxyPath) : Promise.resolve()),
     [entry, projectId, proxyPath],
   );
   return React.useMemo(() => ({ ...snapshot, refresh }), [snapshot, refresh]);
+}
+
+/** How many shared reads the page holds. **Test-only**. */
+export function _sessionEntryCountForTesting(): number {
+  return entries.size;
 }
 
 /** Forgets every shared read. **Test-only**: each test starts from a fresh page. */

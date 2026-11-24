@@ -40,12 +40,19 @@ export { businessLocales } from "@zitadel/components";
 // sdk-react's runtime exports (`configureZitadel`, ...) on this entry without
 // shipping them. react.test.tsx fails when this list and sdk-react's drift.
 export type {
+  ClientAuthResult,
+  ClientAuthState,
+  ClientSession,
   CreateFlowBodyPurpose,
+  GetSessionOptions,
   isStandardAttributeName,
+  SessionStatus,
   StandardAttributeName,
   StandardAttributeProps,
   StandardAttributes,
   standardAttributes,
+  UseSessionOptions,
+  UseSessionResult,
   WidgetName,
   widgetNames,
   WidgetTag,
