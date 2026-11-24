@@ -188,8 +188,9 @@ func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, fields
 	}
 	taken := false
 	for _, candidate := range candidates {
-		// The new user has no team, so only the claims it would collide with
-		// count: a value unique within some team is still free here.
+		// An attribute can be unique across the whole project (like email) or
+		// only within a team (like a handle). Before the sign-up starts, count
+		// only the values a new user, who has no team, would actually clash with.
 		owner, err := r.ssoIdentities.FindUniqueOwner(pc.ctx, state.ProjectID, state.UserSchemaURL, candidate[0], candidate[1])
 		if errors.Is(err, domain.ErrSSOOwnerOtherSchema) {
 			// Creation would collide, but the flow cannot continue with that
