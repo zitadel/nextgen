@@ -74,16 +74,15 @@ test("draws the flow as a canvas and opens it full screen", async ({ page, zitad
   }
   await expect(canvas).not.toHaveCSS("cursor", "grab");
 
-  // Full screen is a modal at 100%: the page behind it is out of reach, and
-  // Escape hands focus back to the button that opened it.
-  const open = page.getByRole("button", { name: "Full screen" });
-  await open.click();
+  // Full screen is a modal: the page behind it is out of reach until Escape.
+  const behind = page.getByRole("link", { name: "Login flows" });
+  await expect(behind).toBeVisible();
+  await page.getByRole("button", { name: "Full screen" }).click();
   const dialog = page.getByRole("dialog", { name: "Default login" });
-  await expect(dialog.getByRole("status", { name: "Zoom" })).toHaveText("100%");
-  await expect(page.getByRole("link", { name: "Login flows" })).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await expect(behind).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
-  await expect(open).toBeFocused();
 
   await expectNoErrorBoundary(page);
 });

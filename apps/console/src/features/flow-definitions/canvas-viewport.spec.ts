@@ -32,9 +32,12 @@ describe("zoom", () => {
     expect(wheelZoom(1, wheel(3, 1))).toBeCloseTo(wheelZoom(1, wheel(48)));
     expect(wheelZoom(1, wheel(1000))).toBe(wheelZoom(1, wheel(100)));
     // A pinch's small deltas still move, and are not rounded away.
-    expect(wheelZoom(1, wheel(-2, 0, true))).toBeGreaterThan(wheelZoom(1, wheel(-2)));
+    expect(wheelZoom(1, wheel(-2.5, 0, true))).toBeGreaterThan(wheelZoom(1, wheel(-2.5)));
     // A mouse wheel with Ctrl held is a notch, not a pinch: it moves as far as ⌘ and the wheel.
     expect(wheelZoom(1, wheel(100, 0, true))).toBe(wheelZoom(1, wheel(100)));
+    // However small its notch: one line a notch, or three reported in lines.
+    expect(wheelZoom(1, wheel(33, 0, true))).toBe(wheelZoom(1, wheel(33)));
+    expect(wheelZoom(1, wheel(3, 1, true))).toBe(wheelZoom(1, wheel(3, 1)));
     expect(wheelZoom(1, wheel(-1))).not.toBe(1);
   });
 

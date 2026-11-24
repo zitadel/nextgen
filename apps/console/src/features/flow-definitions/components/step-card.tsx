@@ -16,14 +16,16 @@ export function StepCard({
   style,
   dimmed,
   ref,
-  onHighlight,
+  onHover,
+  onFocusChange,
 }: {
   card: CanvasCard;
   logo?: string;
   style: CSSProperties;
   dimmed: boolean;
   ref: Ref<HTMLElement>;
-  onHighlight: (step: string | null) => void;
+  onHover: (step: string | null) => void;
+  onFocusChange: (step: string | null) => void;
 }) {
   const { sketch } = card;
   return (
@@ -32,10 +34,10 @@ export function StepCard({
       aria-label={`Step ${card.name}`}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: focusing a step isolates its transitions
       tabIndex={0}
-      onPointerEnter={() => onHighlight(card.name)}
-      onPointerLeave={() => onHighlight(null)}
-      onFocus={() => onHighlight(card.name)}
-      onBlur={() => onHighlight(null)}
+      onPointerEnter={() => onHover(card.name)}
+      onPointerLeave={() => onHover(null)}
+      onFocus={() => onFocusChange(card.name)}
+      onBlur={() => onFocusChange(null)}
       className={cn(
         "absolute flex flex-col overflow-hidden rounded-md border bg-card font-sans text-card-foreground outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
         dimmed && "opacity-15",

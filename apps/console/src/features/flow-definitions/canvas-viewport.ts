@@ -21,15 +21,14 @@ export function clampZoom(zoom: number): number {
 
 /** Pixels per wheel line and page, for a wheel that reports in those units. */
 const WHEEL_UNIT = [1, 16, 800] as const;
-/** A pinch's events stay well under a mouse wheel's notch of about 100px. */
-const PINCH_MAX_DELTA = 50;
 
 /**
  * The zoom after one zooming wheel event: exponential in the delta, so many
  * small trackpad events and one notch of a mouse wheel cover the same ground.
- * A pinch arrives as ctrl+wheel with small deltas, so it scales faster; a
- * mouse wheel turned with Ctrl held reports whole notches and does not. Not
- * rounded, or a run of small deltas would never move off a step.
+ * A pinch arrives as ctrl+wheel with small fractional deltas, so it scales
+ * faster; a mouse wheel turned with Ctrl held reports whole pixels or lines,
+ * whatever the size of its notch, and does not. Not rounded, or a run of
+ * small deltas would never move off a step.
  */
 export function wheelZoom(
   zoom: number,
@@ -38,7 +37,7 @@ export function wheelZoom(
   const pixels = wheel.deltaY * (WHEEL_UNIT[wheel.deltaMode as 0 | 1 | 2] ?? 1);
   // One notch is about 100px; a larger burst should not jump further.
   const delta = Math.max(-100, Math.min(100, pixels));
-  const pinch = wheel.ctrlKey && Math.abs(pixels) < PINCH_MAX_DELTA;
+  const pinch = wheel.ctrlKey && wheel.deltaMode === 0 && !Number.isInteger(wheel.deltaY);
   const next = zoom * Math.exp(-delta * (pinch ? 0.01 : 0.0015));
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
 }

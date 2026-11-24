@@ -65,6 +65,17 @@ describe("FlowCanvas", () => {
     expect(screen.getByRole("article", { name: "Step unreached" })).toHaveClass("opacity-15");
   });
 
+  it("keeps a focused step isolated when the pointer leaves another card", async () => {
+    const user = userEvent.setup();
+    render(<FlowCanvas definition={DEFINITION} name="Sign in" />);
+    await user.click(screen.getByRole("article", { name: "Step identifier" }));
+    await user.hover(screen.getByRole("article", { name: "Step unreached" }));
+    expect(screen.getByRole("article", { name: "Step identifier" })).toHaveClass("opacity-15");
+    await user.unhover(screen.getByRole("article", { name: "Step unreached" }));
+    expect(screen.getByRole("article", { name: "Step identifier" })).not.toHaveClass("opacity-15");
+    expect(screen.getByRole("article", { name: "Step unreached" })).toHaveClass("opacity-15");
+  });
+
   it("zooms by its controls", async () => {
     const user = userEvent.setup();
     render(<FlowCanvas definition={DEFINITION} name="Sign in" />);
