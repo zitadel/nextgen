@@ -57,8 +57,8 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if conflict, ok := deploymentConflictResponse(ctx, err); ok {
 		return conflict, nil
 	}
-	if missing, ok := deploymentVariablesMissingResponse(ctx, err); ok {
-		return missing, nil
+	if refused, ok := deploymentVariablesResponse(ctx, err); ok {
+		return refused, nil
 	}
 	if err != nil {
 		return nil, err
@@ -258,27 +258,37 @@ func deploymentConflictResponse(ctx context.Context, err error) (*api.Deployment
 	return &resp, true
 }
 
-// deploymentVariablesMissingResponse answers dep.variables_missing with the
-// typed 400, whose details.kind and details.names sit on the body. Through
-// NewError the details would nest under details.details.
-func deploymentVariablesMissingResponse(ctx context.Context, err error) (*api.CreateDeploymentBadRequest, bool) {
+// deploymentVariablesResponse answers dep.variables_missing and
+// dep.variables_not_secret with their typed 400s, whose details.kind and
+// details.names sit on the body. Through NewError the details would nest
+// under details.details.
+func deploymentVariablesResponse(ctx context.Context, err error) (*api.CreateDeploymentBadRequest, bool) {
 	de, ok := errors.AsType[domain.Error](err)
-	if !ok || de.Code != domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code {
-		return nil, false
-	}
-	details, ok := de.Details.(domain.DeploymentVariablesMissingDetails)
 	if !ok {
 		return nil, false
 	}
+	details, ok := de.Details.(domain.DeploymentVariablesDetails)
+	if !ok {
+		return nil, false
+	}
+	var resp api.CreateDeploymentBadRequest
+	switch de.Code {
+	case domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code:
+		resp = api.NewDeploymentVariablesMissingCreateDeploymentBadRequest(api.DeploymentVariablesMissing{
+			Code:    de.Code,
+			Message: de.Message,
+			Details: api.DeploymentVariablesMissingDetails{Kind: api.DeploymentKind(details.Kind), Names: details.Names},
+		})
+	case domain.ErrDeploymentVariablesNotSecret(domain.DeploymentOriginKindPrimary, nil).Code:
+		resp = api.NewDeploymentVariablesNotSecretCreateDeploymentBadRequest(api.DeploymentVariablesNotSecret{
+			Code:    de.Code,
+			Message: de.Message,
+			Details: api.DeploymentVariablesNotSecretDetails{Kind: api.DeploymentKind(details.Kind), Names: details.Names},
+		})
+	default:
+		return nil, false
+	}
 	errlog.Log(ctx, err)
-	resp := api.NewDeploymentVariablesMissingCreateDeploymentBadRequest(api.DeploymentVariablesMissing{
-		Code:    de.Code,
-		Message: de.Message,
-		Details: api.DeploymentVariablesMissingDetails{
-			Kind:  api.DeploymentKind(details.Kind),
-			Names: details.Names,
-		},
-	})
 	return &resp, true
 }
 
@@ -291,7 +301,8 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrDeploymentInvalid().Code, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code:
+	case domain.ErrDeploymentInvalid().Code, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code,
+		domain.ErrDeploymentVariablesNotSecret(domain.DeploymentOriginKindPrimary, nil).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrDeploymentPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

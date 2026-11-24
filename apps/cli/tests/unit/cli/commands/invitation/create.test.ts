@@ -5,7 +5,7 @@ import type { SetupServer } from "msw/node";
 import { afterEach, describe, expect, vi } from "vitest";
 
 import InvitationCreate from "@/cli/commands/invitation/create";
-import { BaseCommand } from "@/lib/oclif/base";
+import { BaseCommand } from "@/cli/core/base";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { answering } from "@tests/helpers/keyboard";

@@ -26,8 +26,6 @@ const (
 		` RETURNING ` + invitationColumns
 	deleteUnacceptedInvitationStmt = `DELETE FROM invitations` +
 		` WHERE project_id = ? AND id = ? AND status <> 'accepted'`
-	deleteCancellableInvitationStmt = `DELETE FROM invitations` +
-		` WHERE project_id = ? AND id = ? AND (status = 'rejected' OR (status = 'pending' AND expires_at > ?))`
 	countPendingInvitationsStmt = `SELECT count(*) FROM invitations` +
 		` WHERE project_id = ? AND status = 'pending' AND expires_at > ?`
 )
@@ -125,11 +123,6 @@ func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projec
 // DeleteUnacceptedInvitation implements [service.InvitationStatements].
 func (s invitationStatements) DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error {
 	return s.execOne(ctx, deleteUnacceptedInvitationStmt, projectID, id)
-}
-
-// DeleteCancellableInvitation implements [service.InvitationStatements].
-func (s invitationStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	return s.execOne(ctx, deleteCancellableInvitationStmt, projectID, id, now.UnixNano())
 }
 
 // CountPendingInvitations implements [service.InvitationStatements].

@@ -19,6 +19,8 @@ func (h *Harness) EnsureApplicationService(t testing.TB) service.ApplicationServ
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaValidator(t),
 			secrets.NewRandomSecretGenerator(),
+			h.EnsureVariableService(t),
+			h.EnsureKeyService(t),
 		)
 	}
 	return h.applicationService.value

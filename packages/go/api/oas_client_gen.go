@@ -89,9 +89,9 @@ type Invoker interface {
 	//
 	// Building writes revisions, so besides `release.write` it needs the write scope of every kind the
 	// bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
-	// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
-	// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
-	// scope. An empty kind needs no scope.
+	// `idp.write`, `application.write`, `policy.write` and `oauth_settings.write`, as the per-kind create
+	// endpoints do. A missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a
+	// token with that scope. An empty kind needs no scope.
 	//
 	// Building a release does not deploy it. A release is not tied to an origin, and the same release can
 	// later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
@@ -101,9 +101,8 @@ type Invoker interface {
 	BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
 	// CancelInvitation invokes cancelInvitation operation.
 	//
-	// Deletes a pending or rejected invitation. A pending invitation's link can no longer be redeemed; a
-	// rejected one's row and metadata are removed. An accepted or expired invitation answers the same
-	// opaque `404` as a miss. Expired invitations keep their row until a later cleanup job removes them.
+	// Deletes a pending, expired or rejected invitation, with its metadata. A pending invitation's link
+	// can no longer be redeemed. An accepted invitation answers the same opaque `404` as a miss.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 	// Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -337,13 +336,13 @@ type Invoker interface {
 	//
 	// Send `type` and the object named after it. `project_member` takes `relation` (`viewer`, `editor` or
 	// `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
-	// invitations ship. Optional `metadata.name` labels who the link is for. Optional
+	// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 	// `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
 	// and the original is deleted in the same transaction unless it was accepted.
 	//
 	// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
 	// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-	// platform project, and when the project's pending-invitation cap is reached.
+	// platform project, and when the project already has 100 pending unexpired invitations.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 	// Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -600,6 +599,17 @@ type Invoker interface {
 	//
 	// GET /applications/{application_id}
 	GetApplication(ctx context.Context, params GetApplicationParams) (GetApplicationRes, error)
+	// GetApplicationRevision invokes getApplicationRevision operation.
+	//
+	// Returns one revision of an application that authenticates its users via Zitadel, by its
+	// `revision_id`, the value a release pins. A declared application is served at the revision its
+	// deployment's release pins, so this is how to read what a release serves. It never returns a client
+	// secret.
+	//
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /applications/revisions/{revision_id}
+	GetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (GetApplicationRevisionRes, error)
 	// GetAuthAttempt invokes getAuthAttempt operation.
 	//
 	// Returns the current state of an authentication attempt, one sign-in round.
@@ -683,9 +693,9 @@ type Invoker interface {
 	// `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
 	// owning-team (`relation=team`) rows and grants of another project all return `404`.
 	//
-	// `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
-	// `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
-	// passed the project check may expand without those scopes.
+	// `expand=principal` adds envelope fields on `user` or `team`. Expanding requires read access to the
+	// principal's home project (the platform project when the server has one), for project secrets and for
+	// console sessions alike. A caller without it gets `403` `user.permission_denied`.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 	// requests follow that scheme's CSRF rules.
@@ -1313,6 +1323,10 @@ type Invoker interface {
 	// rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
 	// details identify the setting.
 	//
+	// An application a release declares has one writer, the release: a slug one holds is refused with
+	// `app.declared`. Edit its file under `.zitadel/applications/` and deploy instead. A client here
+	// leaves `secret` out, which only a release sets; one that sets it is refused with `app.invalid`.
+	//
 	// If the document is refused, no change is stored and an existing application keeps its current
 	// revision.
 	//
@@ -1434,9 +1448,9 @@ type Invoker interface {
 	// (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
 	// (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
 	//
-	// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
-	// additionally requires `user.read` and `team.read`. A user-bound console session that already passed
-	// the project check may expand without those scopes.
+	// `expand: ["principal"]` adds envelope fields on `user` and `team`. Expanding requires read access to
+	// the principal's home project (the platform project when the server has one), for project secrets and
+	// for console sessions alike. A caller without it gets `403` `user.permission_denied`.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 	// requests follow that scheme's CSRF rules.
@@ -2221,9 +2235,9 @@ func (c *Client) sendAddProjectOrigin(ctx context.Context, request *ProjectOrigi
 //
 // Building writes revisions, so besides `release.write` it needs the write scope of every kind the
 // bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
-// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
-// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
-// scope. An empty kind needs no scope.
+// `idp.write`, `application.write`, `policy.write` and `oauth_settings.write`, as the per-kind create
+// endpoints do. A missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a
+// token with that scope. An empty kind needs no scope.
 //
 // Building a release does not deploy it. A release is not tied to an origin, and the same release can
 // later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
@@ -2373,9 +2387,8 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 
 // CancelInvitation invokes cancelInvitation operation.
 //
-// Deletes a pending or rejected invitation. A pending invitation's link can no longer be redeemed; a
-// rejected one's row and metadata are removed. An accepted or expired invitation answers the same
-// opaque `404` as a miss. Expired invitations keep their row until a later cleanup job removes them.
+// Deletes a pending, expired or rejected invitation, with its metadata. A pending invitation's link
+// can no longer be redeemed. An accepted invitation answers the same opaque `404` as a miss.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -3874,13 +3887,13 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 //
 // Send `type` and the object named after it. `project_member` takes `relation` (`viewer`, `editor` or
 // `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
-// invitations ship. Optional `metadata.name` labels who the link is for. Optional
+// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 // `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
 // and the original is deleted in the same transaction unless it was accepted.
 //
 // The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
 // can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-// platform project, and when the project's pending-invitation cap is reached.
+// platform project, and when the project already has 100 pending unexpired invitations.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -6278,6 +6291,178 @@ func (c *Client) sendGetApplication(ctx context.Context, params GetApplicationPa
 	return result, nil
 }
 
+// GetApplicationRevision invokes getApplicationRevision operation.
+//
+// Returns one revision of an application that authenticates its users via Zitadel, by its
+// `revision_id`, the value a release pins. A declared application is served at the revision its
+// deployment's release pins, so this is how to read what a release serves. It never returns a client
+// secret.
+//
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /applications/revisions/{revision_id}
+func (c *Client) GetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (GetApplicationRevisionRes, error) {
+	res, err := c.sendGetApplicationRevision(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetApplicationRevision(ctx context.Context, params GetApplicationRevisionParams) (res GetApplicationRevisionRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getApplicationRevision"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/applications/revisions/{revision_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetApplicationRevisionOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/applications/revisions/"
+	{
+		// Encode "revision_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "revision_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.RevisionID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetApplicationRevisionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetApplicationRevisionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetApplicationRevisionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // GetAuthAttempt invokes getAuthAttempt operation.
 //
 // Returns the current state of an authentication attempt, one sign-in round.
@@ -7190,9 +7375,9 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
 // owning-team (`relation=team`) rows and grants of another project all return `404`.
 //
-// `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
-// `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
-// passed the project check may expand without those scopes.
+// `expand=principal` adds envelope fields on `user` or `team`. Expanding requires read access to the
+// principal's home project (the platform project when the server has one), for project secrets and for
+// console sessions alike. A caller without it gets `403` `user.permission_denied`.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.
@@ -16016,6 +16201,10 @@ func (c *Client) sendLookupInvitation(ctx context.Context, request *InvitationTo
 // rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
 // details identify the setting.
 //
+// An application a release declares has one writer, the release: a slug one holds is refused with
+// `app.declared`. Edit its file under `.zitadel/applications/` and deploy instead. A client here
+// leaves `secret` out, which only a release sets; one that sets it is refused with `app.invalid`.
+//
 // If the document is refused, no change is stored and an existing application keeps its current
 // revision.
 //
@@ -16993,9 +17182,9 @@ func (c *Client) sendPublishSchema(ctx context.Context, request PublishSchemaReq
 // (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
 // (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
 //
-// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
-// additionally requires `user.read` and `team.read`. A user-bound console session that already passed
-// the project check may expand without those scopes.
+// `expand: ["principal"]` adds envelope fields on `user` and `team`. Expanding requires read access to
+// the principal's home project (the platform project when the server has one), for project secrets and
+// for console sessions alike. A caller without it gets `403` `user.permission_denied`.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.

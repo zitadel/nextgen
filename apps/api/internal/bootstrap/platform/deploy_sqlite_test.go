@@ -17,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/policy"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dbtest"
@@ -253,6 +254,7 @@ func newTestReleases(t *testing.T, pool *service.DB, keys service.KeyService) (s
 		service.NewFlowDefinitionService(pool, validator, nil, bases),
 		service.NewBrandingService(pool),
 		service.NewIDPConnectionService(pool, validator),
+		service.NewApplicationService(pool, validator, secrets.NewRandomSecretGenerator(), service.NewVariableService(pool, keys), keys),
 		service.NewPolicyService(pool, engine),
 		service.NewOAuthSettingsService(pool),
 		bases,

@@ -5,13 +5,13 @@ import { DeploymentService, type Variable } from "@/lib/backend";
 import { ListDeploymentVariablesParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { type Refused, taken } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { VariableView } from "@/lib/variable";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ReadCommand } from "@/cli/commands/bases";
 
 /**
  * The deployment `variable resolve` reads. The schema is the API spec's own, so
@@ -57,7 +57,7 @@ const COLUMNS = ["name", "value"] as const;
  * deploy, and a preview origin is only ever served by a pull-request build,
  * never by `deploy`.
  */
-export default class VariableResolve extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class VariableResolve extends ReadCommand {
   static override description = "Show the variables a deployment froze, the live one by default.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;
@@ -90,15 +90,27 @@ export default class VariableResolve extends Tabulatable(ServerCommand(Environme
     plain: plainFlag,
   };
 
+  /**
+   * Shows the variables a named deployment froze, or the live one's.
+   *
+   * The ambiguous refusal is worded here, not from a template, because its next
+   * commands are one per origin, which a refusal template cannot list. The live
+   * list names every origin a deployment still serves, so the answer names
+   * exactly what the resolved map runs on: all of the deployment's origins, the
+   * one asked for among them.
+   *
+   * @param input - The arguments and flags the command accepts.
+   * @returns The envelope of the run.
+   * @throws {ZitadelError} When the deployment and origin are both given, or nothing live matches.
+   */
   protected async execute({
     args,
     flags,
-  }: Admitted<typeof VariableResolve>): Promise<JsonEnvelope> {
+  }: Admitted<typeof VariableResolve>): Promise<CommandResult> {
     if (args.deploymentId !== undefined && flags.origin !== undefined) {
       throw refusalError(DEPLOYMENT_AND_ORIGIN_REFUSAL, {});
     }
-    const { client, projectId } = await this.connect();
-    const deploymentService = new DeploymentService(client, projectId);
+    const deploymentService = await this.service(DeploymentService);
     if (args.deploymentId !== undefined) {
       const items = await deploymentService.variables(args.deploymentId);
       return this.render(flags, args.deploymentId, items, "", {});
@@ -109,15 +121,16 @@ export default class VariableResolve extends Tabulatable(ServerCommand(Environme
         break;
       }
       case "ambiguous": {
-        // The refusal is worded here because its next commands are one per
-        // origin, which a refusal template cannot list.
         throw new ZitadelError(
           "E_VALIDATION",
           "More than one deployment is live; name which origin to resolve with --origin.",
           {
             hint: `Live origins: ${found.origins.join(", ")}.`,
             nextCommands: found.origins.map((entry) => {
-              return this.suggest({ id: "variable:resolve", flags: { origin: entry } });
+              return this.suggest({
+                id: "variable:resolve",
+                flags: { origin: entry },
+              });
             }),
           },
         );
@@ -127,13 +140,23 @@ export default class VariableResolve extends Tabulatable(ServerCommand(Environme
           case "none": {
             throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
               hint: "Deploy first, then resolve its variables.",
-              nextCommands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
+              nextCommands: [
+                this.suggest({
+                  id: "deploy",
+                  flags: { message: WHAT_CHANGED },
+                }),
+              ],
             });
           }
           case "primary": {
             throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}.`, {
               hint: "Deploy to it first, then resolve its variables.",
-              nextCommands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
+              nextCommands: [
+                this.suggest({
+                  id: "deploy",
+                  flags: { message: WHAT_CHANGED },
+                }),
+              ],
             });
           }
           case "preview": {
@@ -155,9 +178,6 @@ export default class VariableResolve extends Tabulatable(ServerCommand(Environme
       }
     }
 
-    // The live list names every origin a deployment still serves, so this names
-    // exactly what the resolved map runs on: all of the deployment's origins,
-    // the one asked for among them.
     const live = found.deployment;
     const items = await deploymentService.variables(live.id);
     const origins = [...live.origins].sort();
@@ -180,7 +200,7 @@ export default class VariableResolve extends Tabulatable(ServerCommand(Environme
     items: readonly Variable[],
     where: string,
     carried: { origins?: string[] },
-  ): Promise<JsonEnvelope> {
+  ): Promise<CommandResult> {
     this.recordTelemetry({
       variable_count: items.length,
     });
@@ -197,7 +217,7 @@ export default class VariableResolve extends Tabulatable(ServerCommand(Environme
       ...carried,
     };
 
-    return this.emitList(flags, {
+    return this.listed(flags, {
       columns,
       rows,
       items,

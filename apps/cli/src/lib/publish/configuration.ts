@@ -110,7 +110,8 @@ export class PublishedConfiguration {
       case "branding":
       case "idp":
       case "policy":
-      case "oauth": {
+      case "oauth":
+      case "application": {
         return undefined;
       }
     }

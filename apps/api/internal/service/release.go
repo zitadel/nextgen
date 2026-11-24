@@ -65,21 +65,25 @@ type releaseService struct {
 	flows    *flowDefinitionService
 	branding *BrandingService
 	idps     *idpConnectionService
-	policies *PolicyService
-	oauth    *OAuthSettingsService
+	// applications writes the applications a release declares.
+	applications *applicationService
+	policies     *PolicyService
+	oauth        *OAuthSettingsService
 	// builtinBases resolves a schema given as a built-in schema's `$id` under
 	// whichever base the project stores it; the release pins the row found.
 	builtinBases domain.BuiltinSchemaBases
 }
 
-// NewReleaseService wires Build's kind writers. flows and idps are the
-// concretes from NewFlowDefinitionService and NewIDPConnectionService.
+// NewReleaseService wires Build's kind writers. flows, idps and applications
+// are the concretes from NewFlowDefinitionService, NewIDPConnectionService and
+// NewApplicationService.
 func NewReleaseService(
 	v2Pool *DB,
 	schemas *SchemaService,
 	flows *flowDefinitionService,
 	branding *BrandingService,
 	idps *idpConnectionService,
+	applications *applicationService,
 	policies *PolicyService,
 	oauth *OAuthSettingsService,
 	builtinBases domain.BuiltinSchemaBases,
@@ -90,6 +94,7 @@ func NewReleaseService(
 		flows:        flows,
 		branding:     branding,
 		idps:         idps,
+		applications: applications,
 		policies:     policies,
 		oauth:        oauth,
 		builtinBases: builtinBases,
@@ -371,6 +376,19 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 				return content, mapRevisionLookupError(err, pointer)
 			}
 			content.IDPConnections = append(content.IDPConnections, connection)
+
+		case domain.ReleasePointerKindApplication:
+			application, err := stmts.GetApplicationRevision(ctx, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			// The release build is a declared application's one writer, and
+			// a registered one is never pinned: it is served at its newest
+			// revision.
+			if !application.IsDeclared {
+				return content, domain.ErrApplicationRegistered().WithDetails(map[string]string{"revision_id": pointer.RevisionID})
+			}
+			content.Applications = append(content.Applications, application)
 
 		case domain.ReleasePointerKindPolicy:
 			revision, err := stmts.GetPolicyRevision(ctx, projectID, pointer.RevisionID)

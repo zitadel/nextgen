@@ -174,7 +174,11 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         await this.deps.ui.task(
           `Running ${command.display}`,
           async () => {
-            const options = { cwd: this.deps.cwd, env: this.deps.env, captureOutput: true };
+            const options = {
+              cwd: this.deps.cwd,
+              env: this.deps.env,
+              captureOutput: true,
+            };
             await (this.deps.run === undefined
               ? command.run(options)
               : this.deps.run(command, options));

@@ -96,6 +96,7 @@ func requireBuildKindScopes(ctx context.Context, bundle api.ConfigurationBundle)
 		{len(bundle.Schemas) > 0, "schema.write", "schemas"},
 		{len(bundle.FlowDefinitions) > 0, "flow_definition.write", "flow_definitions"},
 		{len(bundle.Idps) > 0, "idp.write", "idps"},
+		{len(bundle.Applications) > 0, "application.write", "applications"},
 		{len(bundle.Policies) > 0, "policy.write", "policies"},
 		{bundle.Branding.IsSet(), "branding.write", "branding"},
 		{bundle.OAuth.IsSet(), "oauth_settings.write", "oauth"},
@@ -163,6 +164,14 @@ func mapBuildReleaseRequest(projectID string, req *api.BuildReleaseRequest) (ser
 			return input, domain.ErrReleaseInvalid("idp is not serialisable", err)
 		}
 		input.IDPs = append(input.IDPs, service.BuildIDP{Index: i, Document: doc})
+	}
+
+	for i, application := range req.Bundle.Applications {
+		doc, err := application.MarshalJSON()
+		if err != nil {
+			return input, domain.ErrReleaseInvalid("application is not serialisable", err)
+		}
+		input.Applications = append(input.Applications, service.BuildApplication{Index: i, Document: doc})
 	}
 
 	for i, item := range req.Bundle.Policies {
