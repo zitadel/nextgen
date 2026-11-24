@@ -205,8 +205,9 @@ export const en: Record<string, string> = {
   // NotAllowedError — it fires for login and registration ceremonies alike.
   "error.passkey_cancelled": "The passkey prompt was closed before completing.",
   "error.passkey_timeout": "The passkey request timed out. Please try again.",
-  "error.passkey_not_registered":
-    "This passkey is not registered. Please sign in with your email and password.",
+  // Neutral: the identifier may not be an email, and the account may have no
+  // password.
+  "error.passkey_not_registered": "This passkey is not registered. Please sign in another way.",
   "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
@@ -239,7 +240,14 @@ export const en: Record<string, string> = {
   // --- Notices: why the flow moved between sign-in and sign-up by itself ---
   "notice.user_not_found":
     "We couldn't find an account for that email, so you can create one now. Mistyped it? Fix it in the email field below.",
-  "notice.user_already_exists": "That email already has an account. Sign in to continue.",
+  // On a register step whose identifier field is not an email (`stepNotice`,
+  // liquid.ts).
+  "notice.user_not_found.custom_identifier":
+    "We couldn't find an account with those details, so you can create one now. Mistyped something? Fix it below.",
+  // Shows on the password step, whose `step.identifier` says nothing of the
+  // identifier's type, so it names none: the account chip below shows it.
+  "notice.user_already_exists":
+    "An account with these details already exists. Sign in to continue.",
   "notice.sso_user_not_found":
     "There's no account for this sign-in yet, so you can create one now.",
 
@@ -247,10 +255,14 @@ export const en: Record<string, string> = {
   "error.email_required": "Please enter an email address",
   "error.email_invalid": "Please enter a valid email",
   "error.password_required": "Please enter a password",
-  "error.password_incorrect": "Wrong email or password.",
+  "error.password_incorrect": "Wrong password.",
   "error.email_exists": "An account with this email already exists.",
-  /** Sign-in error, inline on the password field. */
-  "error.invalid_credentials": "Wrong email or password.",
+  /**
+   * Sign-in error, inline on the password field. The server sends it only once
+   * the identifier found the account, so the password is what was wrong,
+   * whatever the identifier is.
+   */
+  "error.invalid_credentials": "Wrong password.",
   "error.required": "This field is required.",
 
   // --- Generic field-rule fallbacks ({0} = field label) ---

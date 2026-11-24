@@ -279,6 +279,26 @@ export function stepTexts(
 }
 
 /**
+ * The key a step's `notice` renders with. Like {@link stepTexts}, a step that
+ * collects an identifier other than an email address asks for the
+ * `notice.<reason>.custom_identifier` variant where the locale has one: the
+ * register step a sign-in moved to sign-up says the email had no account, and
+ * points at an email field it does not show.
+ *
+ * A step that does not collect the identifier, such as the password step a
+ * sign-up moves to sign-in, cannot tell: `step.identifier` carries no type.
+ * Its notices are worded for any identifier instead.
+ */
+export function stepNotice(
+  notice: string,
+  fields: readonly CreateFlow201StepFieldsItem[],
+  locale: Locale,
+): string {
+  const variant = `${notice}${CUSTOM_IDENTIFIER_SUFFIX}`;
+  return collectsCustomIdentifier(fields) && locale[variant] !== undefined ? variant : notice;
+}
+
+/**
  * Whether the step collects the user's identifier and it is not an email
  * address. The server marks the identifier field `autocomplete="username"`
  * whatever its type (`field.yaml`), so that token finds it.

@@ -1,6 +1,6 @@
 import { clearBranding, setupMockHandlers, type MockHandle } from "@zitadel/api-mock";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
-import type { CreateFlow201 } from "@zitadel/api/generated/model";
+import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -145,25 +145,7 @@ describe("<zitadel-login> with an identifier that is not an email", () => {
   });
 
   it("offers the passkey-first fallback without naming the email", async () => {
-    serve({
-      name: "passkey-first",
-      texts: { title_key: "passkey-first.title", description_key: "passkey-first.description" },
-      fields: [],
-      actions: [
-        {
-          name: "passkey",
-          kind: "passkey",
-          text_key: "passkey-first.action.passkey",
-          primary: true,
-        },
-        {
-          name: "email_fallback",
-          kind: "navigate",
-          text_key: "passkey-first.action.email_fallback",
-        },
-      ],
-      gates: {},
-    });
+    serve(passkeyFirstStep());
 
     const root = await mount('zl-button[action="email_fallback"]');
 
@@ -171,4 +153,142 @@ describe("<zitadel-login> with an identifier that is not an email", () => {
       "Sign in another way",
     );
   });
+
+  function notices(root: ShadowRoot): string[] {
+    return Array.from(root.querySelectorAll("zl-alert[data-zl-step-message]"), (alert) =>
+      (alert.textContent ?? "").trim(),
+    );
+  }
+
+  /** The step a sign-in moves to when the typed identifier has no account. */
+  function registerStep(identifier: CreateFlow201StepFieldsItem = EMPLOYEE_NUMBER): Step {
+    return {
+      name: "register",
+      texts: { title_key: "register.title", description_key: "register.description" },
+      fields: [{ ...identifier, text_key: `register.field.${identifier.name}` }],
+      actions: [
+        { name: "submit", kind: "submit", text_key: "register.action.submit", primary: true },
+      ],
+      gates: {},
+      notice: "notice.user_not_found",
+    };
+  }
+
+  describe("the notice that a sign-in moved to sign-up", () => {
+    it("names no email", async () => {
+      serve(registerStep());
+
+      const root = await mount("zl-alert[data-zl-step-message]");
+
+      expect(notices(root)).toEqual([
+        "We couldn't find an account with those details, so you can create one now. Mistyped something? Fix it below.",
+      ]);
+    });
+
+    it("still points at the email field where the identifier is an email", async () => {
+      serve(
+        registerStep({
+          name: "email",
+          type: "email",
+          text_key: "register.field.email",
+          autocomplete: "username",
+          required: true,
+        }),
+      );
+
+      const root = await mount("zl-alert[data-zl-step-message]");
+
+      expect(notices(root)).toEqual([
+        "We couldn't find an account for that email, so you can create one now. Mistyped it? Fix it in the email field below.",
+      ]);
+    });
+
+    it("shows the host's own text instead", async () => {
+      serve(registerStep());
+
+      const root = await mount("zl-alert[data-zl-step-message]", (element) => {
+        element.locales = { en: { "notice.user_not_found": "No employee has that number yet." } };
+      });
+
+      expect(notices(root)).toEqual(["No employee has that number yet."]);
+    });
+
+    it("stays hidden in every language when the host hides it in English", async () => {
+      serve(registerStep());
+
+      const root = await mount('zl-field[name="employee_number"]', (element) => {
+        element.lang = "de";
+        element.locales = { en: { "notice.user_not_found": "" } };
+      });
+
+      expect(notices(root)).toEqual([]);
+    });
+  });
+
+  /** The password step, which carries the identifier but no field for it. */
+  function passwordStep(step: Partial<Step> = {}): Step {
+    return {
+      name: "password",
+      texts: { title_key: "password.title", description_key: "password.description" },
+      fields: [
+        {
+          name: "password",
+          type: "password",
+          text_key: "password.field.password",
+          autocomplete: "current-password",
+          required: true,
+        },
+      ],
+      actions: [
+        { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
+      ],
+      gates: {},
+      identifier: { value: "EMP-1234", autocomplete: "username" },
+      ...step,
+    };
+  }
+
+  it("says a sign-up moved to sign-in without naming the email", async () => {
+    serve(passwordStep({ notice: "notice.user_already_exists" }));
+
+    const root = await mount("zl-alert[data-zl-step-message]");
+
+    expect(notices(root)).toEqual([
+      "An account with these details already exists. Sign in to continue.",
+    ]);
+  });
+
+  it("rejects a wrong password without naming the email", async () => {
+    serve(passwordStep({ error: "error.invalid_credentials" }));
+
+    const root = await mount('zl-field[name="password"][error]');
+
+    expect(root.querySelector('zl-field[name="password"]')?.getAttribute("error")).toBe(
+      "Wrong password.",
+    );
+  });
+
+  it("rejects an unknown passkey without naming the email", async () => {
+    serve(passkeyFirstStep({ error: "error.passkey_not_registered" }));
+
+    const root = await mount("zl-alert[data-zl-step-error]");
+
+    expect(root.querySelector("zl-alert[data-zl-step-error]")?.textContent?.trim()).toBe(
+      "This passkey is not registered. Please sign in another way.",
+    );
+  });
 });
+
+function passkeyFirstStep(step: Partial<Step> = {}): Step {
+  return {
+    name: "passkey-first",
+    texts: { title_key: "passkey-first.title", description_key: "passkey-first.description" },
+    fields: [],
+    actions: [
+      { name: "passkey", kind: "passkey", text_key: "passkey-first.action.passkey", primary: true },
+      { name: "email_fallback", kind: "navigate", text_key: "passkey-first.action.email_fallback" },
+    ],
+    gates: {},
+    ...step,
+  };
+}
