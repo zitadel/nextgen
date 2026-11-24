@@ -589,7 +589,7 @@ describe("project admins", () => {
     await userEvent.click(submit);
 
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "you cannot grant access to yourself",
+      "You cannot grant access to yourself",
     );
   });
 
@@ -628,11 +628,11 @@ describe("project admins", () => {
 
     const dialog = await openRemove("Maya Patel");
     await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
-    expect(await screen.findByText("no such grant")).toBeInTheDocument();
+    expect(await screen.findByText("No such grant")).toBeInTheDocument();
 
     await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
     await openRemove("Maya Patel");
-    expect(screen.queryByText("no such grant")).not.toBeInTheDocument();
+    expect(screen.queryByText("No such grant")).not.toBeInTheDocument();
   });
 
   it("keeps the row when the removal is cancelled", async () => {
