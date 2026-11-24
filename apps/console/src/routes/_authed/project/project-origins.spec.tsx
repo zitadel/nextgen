@@ -177,9 +177,11 @@ describe("project origins", () => {
     await userEvent.type(form.pattern, PREVIEW.pattern);
     await userEvent.click(form.submit);
 
-    // ADR 030: the message is the server's, verbatim, and the field it refused
-    // is marked.
-    expect(await form.dialog.findByText(message)).toBeInTheDocument();
+    // ADR 030: the message is the server's wording, started as a sentence, and
+    // the field it refused is marked.
+    expect(
+      await form.dialog.findByText("A primary origin is an exact URL, no wildcard"),
+    ).toBeInTheDocument();
     expect(form.pattern).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     // The same request would be refused again.
@@ -346,7 +348,7 @@ describe("project origins", () => {
       await userEvent.click(form.save);
 
       // The project ends as it began, and the refusal is the server's own.
-      expect(await form.dialog.findByText("refused")).toBeInTheDocument();
+      expect(await form.dialog.findByText("Refused")).toBeInTheDocument();
       expect(writes).toEqual([
         `remove ${PRIMARY.pattern}`,
         "add primary https://app2.acme.com",
@@ -367,7 +369,7 @@ describe("project origins", () => {
 
       expect(
         await screen.findByText(
-          `${PRIMARY.pattern} was removed, but could not be put back: refused`,
+          `${PRIMARY.pattern} was removed, but could not be put back. Refused`,
         ),
       ).toBeInTheDocument();
     });

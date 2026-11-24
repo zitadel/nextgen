@@ -12,6 +12,7 @@ import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { EXIT_CODES } from "@/lib/errors";
 import { parseJsonOrUndefined } from "@/lib/json";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
@@ -1530,6 +1531,31 @@ export class ScaffoldedApp {
     );
   }
 
+  /**
+   * `variable set --input <source>`, with `stdin` piped in for `--input -`.
+   */
+  setVariableFrom(source: string, stdin = ""): Promise<CliResult> {
+    return this.pipingStdin(stdin, () =>
+      this.cli(["variable", "set", "--input", source, "--json"]),
+    );
+  }
+
+  /**
+   * `variable set --input <document>` with `words` typed beside it, as a person mixing the two would.
+   */
+  setVariableFromBeside(document: string, ...words: string[]): Promise<CliResult> {
+    return this.cli(["variable", "set", "--input", document, ...words, "--json"]);
+  }
+
+  /**
+   * `variable set --input @<file>`, with `contents` written to `file` in the project first.
+   */
+  async setVariableFromFile(file: string, contents: string): Promise<CliResult> {
+    await this.writeProjectFile(file, contents);
+
+    return this.setVariableFrom(`@${join(this.path, file)}`);
+  }
+
   /** `variable set` without `--json`, for a spec asserting what the developer reads. */
   setVariableRendered(name: string, ...args: string[]): Promise<CliResult> {
     return this.cli(["variable", "set", name, ...args]);
@@ -2640,6 +2666,13 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   expect(envelope.status, `${where}: status missing or unknown`).toMatch(/^(ok|skipped|error)$/);
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
+    expect(
+      Object.keys(EXIT_CODES),
+      `${where}: error code ${envelope.code} is not one the CLI documents`,
+    ).toContain(envelope.code);
+    expect(result.stdout, `${where}: a framework's own wording reached the envelope`).not.toContain(
+      "See more help with",
+    );
   }
   const contract = ContractEnvelope.parse(parsed);
   assertRunnableSuggestions(where, contract);
@@ -2779,7 +2812,7 @@ type ContractEnvelope = z.infer<typeof ContractEnvelope>;
  * a positional argument that happens to be the word `list` (e.g. `variable get
  * list`) is never misread as a list command. A `list` command (and `resources`,
  * the one collection not named `… list`) must use the canonical
- * `{ items, count, next_page_token }` envelope (`listData`); any command that
+ * `{ items, count, truncated, next_page_token }` envelope (`listData`); any command that
  * emits `items` must carry `count` and `next_page_token`; a delete command must
  * confirm with `deleted: true` (`deletedData`), and no command anywhere may use
  * `removed`. A dry run has its own preview shape, so it is exempt. A divergent
@@ -2817,6 +2850,11 @@ function assertDataShape(where: string, envelope: ContractEnvelope): void {
       token === null || typeof token === "string",
       `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
     ).toBe(true);
+    const truncated = "truncated" in data ? data.truncated : undefined;
+    expect(
+      truncated,
+      `${where}: a list envelope says whether more remain in \`truncated\`, true exactly when it has a cursor`,
+    ).toBe(token !== null);
   }
   if (verb === "rm" || verb === "delete" || verb === "remove") {
     expect(

@@ -226,7 +226,7 @@ type Parse<T> = (value: string, command: unknown, definition: { name: string }) 
  * @throws {ZitadelError} The declaration's refusal, when the schema refuses
  *   the value.
  */
-function read<T>(refused: Refused<T>, value: string, input: string): T {
+export function read<T>(refused: Refused<T>, value: string, input: string): T {
   const parsed = refused.schema.safeParse(value);
   if (parsed.success) {
     return parsed.data;

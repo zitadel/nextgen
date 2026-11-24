@@ -7,14 +7,6 @@
  */
 
 /**
- * What Settings → Members says on every accepted submit
- * (`apps/console/src/features/project-settings/components/add-admin-dialog.tsx`), whether or not anyone
- * was granted.
- */
-export const NEUTRAL_MESSAGE =
-  "If the user exists in our system, they have been granted access to your project.";
-
-/**
  * The titles the error boundary gives a route whose loader failed
  * (`describeBoundaryError` in `apps/console/src/app-shell/boundaries.tsx`):
  * "No access" for a 403, "Not found" for a 404, "Request failed" for any

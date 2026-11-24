@@ -20,6 +20,13 @@ const drawn = (terminal: Terminal): string[] =>
     .map((line) => line.trimEnd().replace(/^(\S) {2}/, "$1 "))
     .filter((line) => line !== "" && line !== "│" && !line.startsWith("┌"));
 
+/** What a run nobody watches narrated into the chain, each line with its mark. */
+const narrated = (terminal: Terminal): string[] =>
+  stripAnsi(terminal.shown())
+    .split("\n")
+    .map((line) => line.trimEnd().replace(/^(\S) {2}/, "$1 "))
+    .filter((line) => line !== "");
+
 /** `it` with the terminal the run is at and what was said through `log`, which every test records. */
 const it = atScreenRecording.extend<{
   at: (level: string) => string[];
@@ -38,7 +45,7 @@ const it = atScreenRecording.extend<{
   },
   said: ({ at }, use) => {
     return use(() => {
-      return at("plain").map((text) => {
+      return at("info").map((text) => {
         return stripAnsi(text);
       });
     });
@@ -51,14 +58,18 @@ describe("Progress", () => {
       await expect(new Progress(chain(true)).run("Fetching", async () => 42)).resolves.toBe(42);
     });
 
-    it("closes the step as failed when nobody is watching and the work throws", async ({ at }) => {
+    it("closes the step as failed when nobody is watching and the work throws", async ({
+      at,
+      terminal,
+    }) => {
+      terminal.tty(true);
       await expect(
         new Progress(chain(false)).run("Fetching", async () => {
           throw new Error("boom");
         }),
       ).rejects.toThrow("boom");
 
-      expect(at("start")).toEqual(["Fetching"]);
+      expect(narrated(terminal)).toEqual(["◐ Fetching"]);
       expect(at("fail")).toEqual(["Fetching failed"]);
     });
 
@@ -120,15 +131,27 @@ describe("Progress", () => {
       expect(stripAnsi(terminal.shown()).startsWith("┌")).toBe(true);
     });
 
-    it("narrates as plain lines when nobody is watching", async ({ at, terminal }) => {
+    it("narrates nothing when nobody is watching and stdout is not a terminal", async ({
+      terminal,
+    }) => {
+      terminal.tty(false);
+
+      await new Progress(chain(false)).run("Fetching users", async () => {});
+
+      expect(terminal.shown()).toBe("");
+    });
+
+    it("narrates as plain lines when nobody is watching", async ({ terminal }) => {
+      terminal.tty(true);
       await new Progress(chain(false)).run("Fetching users", async (report) => {
         report.done("Wrote", ".env.local");
       });
 
-      expect(terminal.shown()).toBe("");
-      expect(at("start")).toEqual(["Fetching users"]);
-      expect(at("info")).toEqual(["Wrote .env.local"]);
-      expect(at("done")).toEqual(["Fetching users"]);
+      expect(narrated(terminal)).toEqual([
+        "◐ Fetching users",
+        "ℹ Wrote .env.local",
+        "✔ Fetching users",
+      ]);
     });
   });
 
@@ -188,24 +211,28 @@ describe("Progress", () => {
       expect(drawn(terminal)).toEqual(["✖ Detecting framework failed"]);
     });
 
-    it("narrates as plain lines when nobody is watching", ({ at, terminal }) => {
+    it("narrates as plain lines when nobody is watching", ({ terminal }) => {
+      terminal.tty(true);
       const step = new Progress(chain(false)).begin("Detecting framework");
       step.detail("package.json");
       step.done("Detected Next.js");
 
-      expect(terminal.shown()).toBe("");
-      expect(at("info")).toEqual(["package.json"]);
-      expect(at("done")).toEqual(["Detected Next.js"]);
+      expect(narrated(terminal)).toEqual([
+        "◐ Detecting framework",
+        "ℹ package.json",
+        "✔ Detected Next.js",
+      ]);
     });
 
     // Ending once is the step's contract, not the chain's: a caller that ends
     // its step in both a try and a catch must not say so twice off a terminal.
-    it("ends once when nobody is watching, however many times it is ended", ({ at }) => {
+    it("ends once when nobody is watching, however many times it is ended", ({ at, terminal }) => {
+      terminal.tty(true);
       const step = new Progress(chain(false)).begin("Detecting framework");
       step.done("Detected Next.js");
       step.fail("Detected nothing");
 
-      expect(at("done")).toHaveLength(1);
+      expect(narrated(terminal)).toEqual(["◐ Detecting framework", "✔ Detected Next.js"]);
       expect(at("fail")).toEqual([]);
     });
   });

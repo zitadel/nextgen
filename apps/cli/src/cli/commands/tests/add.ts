@@ -127,7 +127,6 @@ export default class TestsAdd extends ServerCommand(BaseCommand) {
       {
         cwd: this.cwd,
         env: this.env,
-        json: this.isJson,
         task: (label, work, done) => {
           return this.ui.task(label, work, done);
         },
