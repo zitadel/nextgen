@@ -1,6 +1,6 @@
 import { Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import {
-  type RefObject,
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -8,14 +8,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal, flushSync } from "react-dom";
-import { resolveLogoUrl } from "@zitadel/components";
+import { flushSync } from "react-dom";
+import { brandingDeclarations, resolveLogoUrl } from "@zitadel/components";
 
 import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
 import { SECTION_HEADING } from "@/components/typography";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { BrandingRevision } from "@/features/branding/branding-palette";
-import { brandingVariables } from "@/features/branding/branding-variables";
 import { useDocumentTheme } from "@/hooks/use-document-theme";
 import { useDragToPan } from "@/hooks/use-drag-to-pan";
 import { useWheel } from "@/hooks/use-wheel";
@@ -26,15 +26,18 @@ import {
   type CanvasHighlight,
   type CardSize,
   type FlowCanvasLayout,
-  ZOOM_STEP,
-  anchoredScroll,
-  clampZoom,
-  fitZoom,
   highlightStep,
   layoutFlowCanvas,
   sameCardSizes,
-  wheelZoom,
 } from "../canvas";
+import {
+  ZOOM_STEP,
+  anchoredScroll,
+  canPan,
+  clampZoom,
+  fitZoom,
+  wheelZoom,
+} from "../canvas-viewport";
 import type { FlowDefinition } from "../model";
 import { StepCard } from "./step-card";
 
@@ -55,10 +58,14 @@ const LEGEND: { kind: CanvasEdgeKind; text: string }[] = [
 
 const DIM = "transition-opacity motion-reduce:transition-none";
 
+/** A zoom level, or the level that fits the canvas in whatever viewport shows it. */
+type ZoomSetting = number | "fit";
+
 /**
  * The definition drawn read-only: a card per step sketching its screen in the
- * project's branding, an arrow per transition. In the card it opens fitted;
- * full screen lifts it over the app shell at 100%.
+ * project's branding, an arrow per transition. In the card it opens fitted
+ * and stays fitted as the viewport changes, until a zoom is chosen; full
+ * screen lifts it over the app shell at 100%.
  */
 export function FlowCanvas({
   definition,
@@ -72,71 +79,66 @@ export function FlowCanvas({
   const [sizes, setSizes] = useState<Record<string, CardSize>>({});
   const canvas = useMemo(() => layoutFlowCanvas(definition, sizes), [definition, sizes]);
   const [full, setFull] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const viewport = useRef<HTMLElement>(null);
+  const [setting, setSetting] = useState<ZoomSetting>("fit");
+  const [view, setView] = useState({ width: 0, height: 0 });
+  const zoom = setting === "fit" ? fitZoom(view, canvas) : setting;
   const toggle = useRef<HTMLButtonElement>(null);
+  const exit = useRef<HTMLButtonElement>(null);
 
   const onMeasure = useCallback((next: Record<string, CardSize>) => {
     setSizes((current) => (sameCardSizes(current, next) ? current : next));
   }, []);
-  const fit = useCallback(() => {
-    const element = viewport.current;
-    if (!element) return;
-    setZoom(fitZoom({ width: element.clientWidth, height: element.clientHeight }, canvas));
-  }, [canvas]);
+  const onFull = (open: boolean) => {
+    setFull(open);
+    setSetting(open ? 1 : "fit");
+  };
 
-  const current = useRef({ zoom, canvas });
-  current.current = { zoom, canvas };
-  const onWheel = useCallback((event: WheelEvent) => {
-    const element = viewport.current;
-    if (!element) return;
+  // Ctrl or ⌘ with the wheel, and a trackpad pinch, zoom around the pointer;
+  // a plain wheel scrolls, the page once the canvas has nothing left to scroll.
+  const onWheel = (event: WheelEvent) => {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    const element = event.currentTarget as HTMLElement;
     event.preventDefault();
-    const from = current.current.zoom;
-    const to = wheelZoom(from, event);
-    if (to === from) return;
+    const to = wheelZoom(zoom, event);
+    if (to === zoom) return;
     const box = element.getBoundingClientRect();
     const scroll = anchoredScroll(
       { left: element.scrollLeft, top: element.scrollTop },
       { x: event.clientX - box.left, y: event.clientY - box.top },
-      { width: element.clientWidth, height: element.clientHeight },
-      current.current.canvas,
-      from,
+      view,
+      canvas,
+      zoom,
       to,
     );
     // The sizer has to grow before the new offsets fit inside it.
-    flushSync(() => setZoom(to));
+    flushSync(() => setSetting(to));
     element.scrollLeft = scroll.left;
     element.scrollTop = scroll.top;
-  }, []);
+  };
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const next =
+      event.key === "+" || event.key === "="
+        ? clampZoom(zoom + ZOOM_STEP)
+        : event.key === "-" || event.key === "_"
+          ? clampZoom(zoom - ZOOM_STEP)
+          : event.key === "0"
+            ? "fit"
+            : undefined;
+    if (next === undefined) return;
+    event.preventDefault();
+    setSetting(next);
+  };
 
-  useLayoutEffect(() => {
-    if (!full) return;
-    setZoom(1);
-    viewport.current?.scrollTo?.(0, 0);
-  }, [full]);
-  useLayoutEffect(() => {
-    if (!full) fit();
-  }, [full, fit]);
-
-  useEffect(() => {
-    if (!full) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFull(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      toggle.current?.focus();
-    };
-  }, [full]);
-
-  const zoomControls = <ZoomControls zoom={zoom} onZoom={setZoom} onFit={fit} />;
+  const zoomControls = <ZoomControls zoom={zoom} onZoom={setSetting} />;
   const stage = (
     <Viewport
       canvas={canvas}
       zoom={zoom}
-      viewport={viewport}
       onWheel={onWheel}
+      onKeyDown={full ? undefined : onKeyDown}
+      onResize={setView}
+      pannable={canPan(view, canvas, zoom)}
       branding={branding}
       onMeasure={onMeasure}
       className={full ? "min-h-0 flex-1" : "h-105 rounded-md border"}
@@ -154,7 +156,7 @@ export function FlowCanvas({
             variant="secondary"
             size="sm"
             className={CARD_ACTION_BUTTON}
-            onClick={() => setFull(true)}
+            onClick={() => onFull(true)}
           >
             <Maximize2 aria-hidden />
             Full screen
@@ -162,51 +164,43 @@ export function FlowCanvas({
         </div>
       }
     >
-      {full ? (
-        createPortal(
-          <div
-            role="dialog"
-            aria-label={`${name} canvas`}
-            className="fixed inset-0 z-50 flex flex-col bg-background"
-          >
-            <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
-              <h2 className={cn(SECTION_HEADING, "mr-auto")}>{name}</h2>
-              <Legend />
-              {zoomControls}
-              <Button
-                autoFocus
-                variant="secondary"
-                size="sm"
-                className={CARD_ACTION_BUTTON}
-                onClick={() => setFull(false)}
-              >
+      {/* The stage moves into the dialog; an empty box of its height keeps the page from jumping. */}
+      {full ? <div className="h-105" /> : stage}
+      <Legend />
+      <Dialog open={full} onOpenChange={onFull}>
+        <DialogContent
+          showCloseButton={false}
+          fullScreen
+          aria-describedby={undefined}
+          onKeyDown={onKeyDown}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            exit.current?.focus();
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            toggle.current?.focus();
+          }}
+        >
+          <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
+            <DialogTitle className={cn(SECTION_HEADING, "mr-auto")}>{name}</DialogTitle>
+            <Legend />
+            {zoomControls}
+            <DialogClose asChild>
+              <Button ref={exit} variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
                 <Minimize2 aria-hidden />
                 Exit full screen
               </Button>
-            </div>
-            {stage}
-          </div>,
-          document.body,
-        )
-      ) : (
-        <>
+            </DialogClose>
+          </div>
           {stage}
-          <Legend />
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
     </DetailSection>
   );
 }
 
-function ZoomControls({
-  zoom,
-  onZoom,
-  onFit,
-}: {
-  zoom: number;
-  onZoom: (zoom: number) => void;
-  onFit: () => void;
-}) {
+function ZoomControls({ zoom, onZoom }: { zoom: number; onZoom: (zoom: ZoomSetting) => void }) {
   return (
     <div className="flex items-center gap-1">
       <Button
@@ -228,7 +222,12 @@ function ZoomControls({
       >
         <Plus aria-hidden />
       </Button>
-      <Button variant="secondary" size="sm" className={CARD_ACTION_BUTTON} onClick={onFit}>
+      <Button
+        variant="secondary"
+        size="sm"
+        className={CARD_ACTION_BUTTON}
+        onClick={() => onZoom("fit")}
+      >
         Fit
       </Button>
     </div>
@@ -236,30 +235,37 @@ function ZoomControls({
 }
 
 /**
- * Scrolls both ways and pans by drag. Cards are measured after each render
- * and reported, so the layout places them by their real size.
+ * Scrolls both ways, and pans by drag when the canvas overflows. Reports its
+ * own size, so the canvas can fit it, and each card's measured size, so the
+ * layout places cards by their real height.
  */
 function Viewport({
   canvas,
   zoom,
-  viewport,
   onWheel,
+  onKeyDown,
+  onResize,
+  pannable,
   branding,
   onMeasure,
   className,
 }: {
   canvas: FlowCanvasLayout;
   zoom: number;
-  viewport: RefObject<HTMLElement | null>;
   onWheel: (event: WheelEvent) => void;
+  onKeyDown?: (event: KeyboardEvent) => void;
+  onResize: (size: { width: number; height: number }) => void;
+  pannable: boolean;
   branding?: BrandingRevision;
   onMeasure: (sizes: Record<string, CardSize>) => void;
   className: string;
 }) {
+  // Its own ref: the card's viewport and the dialog's are mounted in turn.
+  const viewport = useRef<HTMLElement>(null);
   const dragging = useDragToPan(viewport);
   useWheel(viewport, onWheel);
   const side = useDocumentTheme();
-  const variables = useMemo(() => brandingVariables(branding, side), [branding, side]);
+  const variables = useMemo(() => brandingDeclarations(branding, side), [branding, side]);
   const logo = resolveLogoUrl(branding, side);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlight = useMemo(
@@ -268,39 +274,46 @@ function Viewport({
   );
   const cards = useRef(new Map<string, HTMLElement>());
 
-  const measure = useRef(() => {});
-  measure.current = () => {
-    const next: Record<string, CardSize> = {};
-    for (const [name, element] of cards.current) {
-      // Unlaid out (a test's DOM) reads zero: keep the estimate.
-      if (element.offsetHeight === 0) continue;
-      const ports: Record<string, number> = {};
-      for (const control of element.querySelectorAll<HTMLElement>("[data-port]")) {
-        const port = control.dataset.port;
-        if (port) ports[port] = control.offsetTop + control.offsetHeight / 2;
-      }
-      next[name] = { height: element.offsetHeight, ports };
-    }
-    if (Object.keys(next).length > 0) onMeasure(next);
-  };
-  useLayoutEffect(() => measure.current());
-  // Fonts and the logo land after the first paint.
   useEffect(() => {
+    const element = viewport.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      onResize({ width: element.clientWidth, height: element.clientHeight });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [onResize]);
+
+  // Cards are measured once laid out and again whenever one resizes (fonts and
+  // the logo land after the first paint); the observer reports each on observe.
+  useLayoutEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => measure.current());
+    const observer = new ResizeObserver(() => {
+      const next: Record<string, CardSize> = {};
+      for (const [name, element] of cards.current) {
+        const ports: Record<string, number> = {};
+        for (const control of element.querySelectorAll<HTMLElement>("[data-port]")) {
+          const port = control.dataset.port;
+          if (port) ports[port] = control.offsetTop + control.offsetHeight / 2;
+        }
+        next[name] = { height: element.offsetHeight, ports };
+      }
+      onMeasure(next);
+    });
     for (const element of cards.current.values()) observer.observe(element);
     return () => observer.disconnect();
-  }, [canvas.cards]);
+  }, [canvas.cards, onMeasure]);
 
   return (
     <section
       ref={viewport}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region needs focus to scroll
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region needs focus to scroll and to take zoom keys
       tabIndex={0}
       aria-label="Flow canvas"
+      onKeyDown={onKeyDown}
       className={cn(
         "grid overflow-auto bg-background outline-none focus-visible:ring-2",
-        dragging ? "cursor-grabbing select-none" : "cursor-grab",
+        pannable && (dragging ? "cursor-grabbing select-none" : "cursor-grab"),
         className,
       )}
     >
@@ -433,6 +446,7 @@ function Legend() {
         </span>
       ))}
       <span>Hover or focus a step to isolate its transitions</span>
+      <span>Ctrl or ⌘ and scroll to zoom; with the canvas focused, + − and 0</span>
     </div>
   );
 }

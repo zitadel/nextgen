@@ -1,18 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  CANVAS_CARD_WIDTH,
-  MAX_ZOOM,
-  MIN_ZOOM,
-  anchoredScroll,
-  centringInset,
-  clampZoom,
-  fitZoom,
-  highlightStep,
-  layoutFlowCanvas,
-  stepSketch,
-  wheelZoom,
-} from "./canvas";
+import { CANVAS_CARD_WIDTH, edgeId, highlightStep, layoutFlowCanvas, stepSketch } from "./canvas";
 import type { FlowDefinition, FlowStep } from "./model";
 
 /** The shipped `default-login`, as `packages/config/defaults/default-login.json` writes it. */
@@ -148,9 +136,9 @@ describe("layoutFlowCanvas", () => {
     if (!found) throw new Error(`no card ${name}`);
     return found;
   };
-  const edge = (id: string) => {
-    const found = canvas.edges.find((entry) => entry.id === id);
-    if (!found) throw new Error(`no edge ${id}`);
+  const edge = (from: string, label: string) => {
+    const found = canvas.edges.find((entry) => entry.id === edgeId(from, label));
+    if (!found) throw new Error(`no edge ${from}.${label}`);
     return found;
   };
 
@@ -166,12 +154,12 @@ describe("layoutFlowCanvas", () => {
   });
 
   it("tells action, outcome, purpose and entry arrows apart", () => {
-    expect(edge("identifier.submit")).toMatchObject({ kind: "action", label: "submit" });
-    expect(edge("identifier.user_not_found")).toMatchObject({
+    expect(edge("identifier", "submit")).toMatchObject({ kind: "action", label: "submit" });
+    expect(edge("identifier", "user_not_found")).toMatchObject({
       kind: "outcome",
       label: "user_not_found",
     });
-    expect(edge("identifier.register")).toMatchObject({ kind: "purpose", label: "register" });
+    expect(edge("identifier", "register")).toMatchObject({ kind: "purpose", label: "register" });
     expect(canvas.edges.filter((entry) => entry.kind === "entry")).toHaveLength(2);
   });
 
@@ -188,7 +176,7 @@ describe("layoutFlowCanvas", () => {
 
   it("starts an action's arrow at its control", () => {
     const from = card("identifier");
-    const at = start(edge("identifier.submit").path);
+    const at = start(edge("identifier", "submit").path);
     expect(at.x).toBe(from.x + CANVAS_CARD_WIDTH);
     expect(at.y).toBe(from.y + (from.sketch.estimate.ports.submit ?? 0));
   });
@@ -199,21 +187,25 @@ describe("layoutFlowCanvas", () => {
     });
     const from = measured.cards.find((entry) => entry.name === "identifier");
     expect(from?.height).toBe(400);
-    const at = start(measured.edges.find((entry) => entry.id === "identifier.submit")?.path ?? "");
+    const at = start(
+      measured.edges.find((entry) => entry.id === edgeId("identifier", "submit"))?.path ?? "",
+    );
     expect(at.y).toBe((from?.y ?? 0) + 300);
   });
 
   it("leaves from the card's edge when the control was not found", () => {
     const measured = layoutFlowCanvas(DEFAULT_LOGIN, { identifier: { height: 400, ports: {} } });
     const from = measured.cards.find((entry) => entry.name === "identifier");
-    const at = start(measured.edges.find((entry) => entry.id === "identifier.submit")?.path ?? "");
+    const at = start(
+      measured.edges.find((entry) => entry.id === edgeId("identifier", "submit"))?.path ?? "",
+    );
     expect(at.y).not.toBe((from?.y ?? 0) + (from?.sketch.estimate.ports.submit ?? 0));
     expect(at.y).toBeGreaterThan(from?.y ?? 0);
     expect(at.y).toBeLessThan((from?.y ?? 0) + 400);
   });
 
   it("routes a purpose transition that points left as an arc under every card", () => {
-    const back = edge("register.sign_in");
+    const back = edge("register", "sign_in");
     const from = card("register");
     const samples = sample(back.path);
     // Curves only, as every other arrow: no quadratic corners.
@@ -274,91 +266,45 @@ describe("layoutFlowCanvas", () => {
 describe("highlightStep", () => {
   const canvas = layoutFlowCanvas(DEFAULT_LOGIN);
 
-  it("lights the step, its outgoing transitions and their targets", () => {
+  it("lights the step, the transitions into and out of it, and their other ends", () => {
     const lit = highlightStep(canvas, "password");
-    expect([...lit.nodes].sort()).toEqual(["done", "password"]);
-    expect([...lit.edges]).toEqual(["password.submit"]);
+    expect([...lit.nodes].sort()).toEqual([
+      "done",
+      "identifier",
+      "password",
+      "register",
+      "register-password",
+    ]);
+    expect([...lit.edges].sort()).toEqual(
+      [
+        edgeId("identifier", "submit"),
+        edgeId("password", "submit"),
+        edgeId("register", "user_already_exists"),
+        edgeId("register-password", "user_already_exists"),
+      ].sort(),
+    );
   });
 
   it("follows a purpose transition through its pill to the entry step", () => {
     const lit = highlightStep(canvas, "register");
     expect(lit.nodes).toContain("purpose:login");
     expect(lit.nodes).toContain("identifier");
-    expect(lit.edges).toContain("register.sign_in");
+    expect(lit.edges).toContain(edgeId("register", "sign_in"));
     expect(lit.edges).toContain("entry:login");
-    expect(lit.edges).not.toContain("entry:register");
+  });
+
+  it("lights the pill of a purpose the step is the entry of, and the transitions into it", () => {
+    const lit = highlightStep(canvas, "register");
+    expect(lit.nodes).toContain("purpose:register");
+    expect(lit.edges).toContain("entry:register");
+    // `identifier.register` reaches the step through the pill.
+    expect(lit.edges).toContain(edgeId("identifier", "register"));
+    expect(lit.nodes).toContain("identifier");
   });
 });
 
-describe("zoom", () => {
-  it("keeps a level within the controls' range", () => {
-    expect(clampZoom(0)).toBe(MIN_ZOOM);
-    expect(clampZoom(9)).toBe(MAX_ZOOM);
-    expect(clampZoom(0.1 + 0.2)).toBe(0.3);
-  });
-
-  it("zooms in on a wheel up and out on a wheel down, within the range", () => {
-    const wheel = (deltaY: number, deltaMode = 0, ctrlKey = false) => ({
-      deltaY,
-      deltaMode,
-      ctrlKey,
-    });
-    expect(wheelZoom(1, wheel(-100))).toBeGreaterThan(1);
-    expect(wheelZoom(1, wheel(100))).toBeLessThan(1);
-    expect(wheelZoom(MAX_ZOOM, wheel(-100))).toBe(MAX_ZOOM);
-    expect(wheelZoom(MIN_ZOOM, wheel(100))).toBe(MIN_ZOOM);
-    // A notch in lines moves as far as the same notch in pixels, and a burst no further.
-    expect(wheelZoom(1, wheel(3, 1))).toBeCloseTo(wheelZoom(1, wheel(48)));
-    expect(wheelZoom(1, wheel(1000))).toBe(wheelZoom(1, wheel(100)));
-    // A pinch's small deltas still move, and are not rounded away.
-    expect(wheelZoom(1, wheel(-2, 0, true))).toBeGreaterThan(wheelZoom(1, wheel(-2)));
-    expect(wheelZoom(1, wheel(-1))).not.toBe(1);
-  });
-
-  it("centres a canvas that fits and starts one that overflows", () => {
-    expect(centringInset(800, 1000, 0.5)).toBe(150);
-    expect(centringInset(800, 1000, 1)).toBe(0);
-  });
-
-  it("keeps the point under the pointer in place, centred or scrolled", () => {
-    const viewport = { width: 800, height: 400 };
-    const canvas = { width: 2000, height: 600 };
-    const pointer = { x: 200, y: 150 };
-    // The canvas point under the pointer, given a scroll offset at a zoom.
-    const under = (scroll: { left: number; top: number }, zoom: number) => ({
-      x: (scroll.left + pointer.x - centringInset(viewport.width, canvas.width, zoom)) / zoom,
-      y: (scroll.top + pointer.y - centringInset(viewport.height, canvas.height, zoom)) / zoom,
-    });
-
-    // Overflowing both before and after.
-    const scrolled = { left: 300, top: 40 };
-    const deeper = anchoredScroll(scrolled, pointer, viewport, canvas, 1, 1.5);
-    expect(under(deeper, 1.5).x).toBeCloseTo(under(scrolled, 1).x);
-    expect(under(deeper, 1.5).y).toBeCloseTo(under(scrolled, 1).y);
-
-    // Vertically centred at 0.5 (300px of 400), overflowing at 1: the inset
-    // it leaves is counted, so the point holds.
-    const centred = { left: 100, top: 0 };
-    const grown = anchoredScroll(centred, pointer, viewport, canvas, 0.5, 1);
-    expect(under(grown, 1).y).toBeCloseTo(under(centred, 0.5).y);
-    expect(under(grown, 1).x).toBeCloseTo(under(centred, 0.5).x);
-  });
-
-  it("asks for no scroll in an axis where the canvas fits", () => {
-    const next = anchoredScroll(
-      { left: 0, top: 0 },
-      { x: 10, y: 10 },
-      { width: 800, height: 400 },
-      { width: 400, height: 200 },
-      1,
-      0.5,
-    );
-    expect(next).toEqual({ left: 0, top: 0 });
-  });
-
-  it("fits the canvas into the viewport, never above 100%", () => {
-    expect(fitZoom({ width: 500, height: 400 }, { width: 1000, height: 400 })).toBe(0.5);
-    expect(fitZoom({ width: 2000, height: 2000 }, { width: 1000, height: 400 })).toBe(1);
-    expect(fitZoom({ width: 0, height: 0 }, { width: 1000, height: 400 })).toBe(1);
+describe("edgeId", () => {
+  it("keeps names with dots apart", () => {
+    expect(edgeId("a.b", "c")).not.toBe(edgeId("a", "b.c"));
   });
 });

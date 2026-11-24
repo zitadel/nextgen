@@ -56,7 +56,7 @@ describe("FlowCanvas", () => {
     delete document.documentElement.dataset.theme;
   });
 
-  it("dims what a focused step does not lead to", async () => {
+  it("dims what a focused step has no transition to or from", async () => {
     const user = userEvent.setup();
     render(<FlowCanvas definition={DEFINITION} name="Sign in" />);
     await user.click(screen.getByRole("article", { name: "Step identifier" }));
@@ -77,14 +77,41 @@ describe("FlowCanvas", () => {
     expect(level).toHaveTextContent("100%");
   });
 
-  it("zooms by the wheel instead of scrolling", () => {
+  it("zooms by ctrl or cmd and the wheel, and leaves a plain wheel to scroll", () => {
     render(<FlowCanvas definition={DEFINITION} name="Sign in" />);
-    const wheel = new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true });
+    const region = screen.getByRole("region", { name: "Flow canvas" });
+    const plain = new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true });
     act(() => {
-      screen.getByRole("region", { name: "Flow canvas" }).dispatchEvent(wheel);
+      region.dispatchEvent(plain);
     });
-    expect(wheel.defaultPrevented).toBe(true);
+    expect(plain.defaultPrevented).toBe(false);
+    expect(screen.getByRole("status", { name: "Zoom" })).toHaveTextContent("100%");
+
+    const zooming = new WheelEvent("wheel", {
+      deltaY: 100,
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      region.dispatchEvent(zooming);
+    });
+    expect(zooming.defaultPrevented).toBe(true);
     expect(screen.getByRole("status", { name: "Zoom" })).toHaveTextContent("86%");
+  });
+
+  it("zooms by the keyboard while the canvas has focus", async () => {
+    const user = userEvent.setup();
+    render(<FlowCanvas definition={DEFINITION} name="Sign in" />);
+    screen.getByRole("region", { name: "Flow canvas" }).focus();
+    const level = screen.getByRole("status", { name: "Zoom" });
+    await user.keyboard("-");
+    expect(level).toHaveTextContent("90%");
+    await user.keyboard("+");
+    await user.keyboard("+");
+    expect(level).toHaveTextContent("110%");
+    await user.keyboard("0");
+    expect(level).toHaveTextContent("100%");
   });
 
   it("opens full screen at 100% and leaves it by Escape or by its button", async () => {
@@ -94,8 +121,12 @@ describe("FlowCanvas", () => {
     await user.click(screen.getByRole("button", { name: "Zoom out" }));
 
     await user.click(open);
-    const dialog = within(screen.getByRole("dialog", { name: "Sign in canvas" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Sign in" }));
+    expect(dialog.getByRole("button", { name: "Exit full screen" })).toHaveFocus();
     expect(dialog.getByRole("status", { name: "Zoom" })).toHaveTextContent("100%");
+    // The zoom keys work from anywhere in full screen.
+    await user.keyboard("-");
+    expect(dialog.getByRole("status", { name: "Zoom" })).toHaveTextContent("90%");
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(open).toHaveFocus();
@@ -103,5 +134,18 @@ describe("FlowCanvas", () => {
     await user.click(open);
     await user.click(screen.getByRole("button", { name: "Exit full screen" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // The card's own viewport is back, and still zooms.
+    const zooming = new WheelEvent("wheel", {
+      deltaY: 100,
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      screen.getByRole("region", { name: "Flow canvas" }).dispatchEvent(zooming);
+    });
+    expect(zooming.defaultPrevented).toBe(true);
+    expect(screen.getByRole("status", { name: "Zoom" })).toHaveTextContent("86%");
   });
 });

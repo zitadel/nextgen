@@ -1,6 +1,7 @@
 import { graphlib, layout } from "@dagrejs/dagre";
 
 import type { FlowDefinition, FlowStep } from "./model";
+import { type CanvasPoint, sampleSpline, spline } from "./spline";
 
 /**
  * Geometry for the read-only flow canvas: one card per step, laid out left to
@@ -9,19 +10,28 @@ import type { FlowDefinition, FlowStep } from "./model";
  */
 
 export const CANVAS_CARD_WIDTH = 240;
+
+/**
+ * Card dimensions for the first layout, before the cards are measured. They
+ * follow the classes in `step-card.tsx`; a drift only costs one re-layout.
+ */
 const HEADER_HEIGHT = 32;
 const BODY_INSET = 12;
 const ROW_GAP = 8;
 const FOOTER_HEIGHT = 28;
+const ROW_HEIGHT = { field: 52, button: 32, divider: 16, provider: 32, link: 20 } as const;
+
 const PILL_HEIGHT = 28;
 /** One character of the 11px mono labels, to size them before they render. */
 const LABEL_CHAR = 6.7;
 
-const ROW_HEIGHT = { field: 52, button: 32, divider: 16, provider: 32, link: 20 } as const;
-
-export const MIN_ZOOM = 0.1;
-export const MAX_ZOOM = 1.5;
-export const ZOOM_STEP = 0.1;
+/** Purpose arrows that run back under the cards: first lane's gap, its step, the gap between arrows. */
+const LANE_GAP = 12;
+const LANE_SINK = 24;
+const LANE_SPACING = 18;
+const MAX_SINKS = 8;
+/** Room under the lowest arc for its label. */
+const LABEL_ROOM = 24;
 
 export type SketchRowKind = keyof typeof ROW_HEIGHT;
 
@@ -48,10 +58,7 @@ export interface StepSketch {
 
 export type CanvasEdgeKind = "action" | "outcome" | "purpose" | "entry";
 
-export interface CanvasPoint {
-  x: number;
-  y: number;
-}
+export type { CanvasPoint };
 
 export interface CanvasEdge {
   id: string;
@@ -137,11 +144,31 @@ function estimateSize(rows: SketchRow[], footer: boolean): CardSize {
 
 const pillId = (purpose: string) => `purpose:${purpose}`;
 
+/** A transition's arrow id. Names may hold any character, so the pair is encoded, not joined. */
+export function edgeId(from: string, label: string): string {
+  return JSON.stringify([from, label]);
+}
+
+interface Box {
+  name: string;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+interface PlacedNode {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /**
  * Positions for every card, pill and arrow. A step missing from `sizes` is
  * placed by its estimate. Purpose transitions stay out of the ranking: they
  * may point left, and the cycle would pull a pill away from its entry step.
- * They are routed by hand once the rest is placed.
+ * They are routed by {@link PurposeRouter} once the rest is placed.
  */
 export function layoutFlowCanvas(
   definition: FlowDefinition,
@@ -191,7 +218,7 @@ export function layoutFlowCanvas(
       }
       // A cross-flow target names no step here, so there is nothing to point at.
       if (!transition.target || !stepNames.has(transition.target)) continue;
-      const id = `${step.name}.${label}`;
+      const id = edgeId(step.name, label);
       meta.set(id, { kind: actionNames.has(label) ? "action" : "outcome", label });
       graph.setEdge(
         step.name,
@@ -204,7 +231,7 @@ export function layoutFlowCanvas(
 
   layout(graph);
 
-  const node = (name: string) => {
+  const node = (name: string): PlacedNode => {
     const { x = 0, y = 0, width, height } = graph.node(name);
     return { x, y, width, height };
   };
@@ -235,78 +262,30 @@ export function layoutFlowCanvas(
     };
   });
 
-  const graphHeight = graph.graph().height ?? 0;
-  const boxes = steps.map((step) => {
-    const { x, y, height: cardHeight } = node(step.name);
+  const boxes: Box[] = steps.map((step) => {
+    const { x, y, height } = node(step.name);
     const half = CANVAS_CARD_WIDTH / 2;
     return {
       name: step.name,
       left: x - half,
       right: x + half,
-      top: y - cardHeight / 2,
-      bottom: y + cardHeight / 2,
+      top: y - height / 2,
+      bottom: y + height / 2,
     };
   });
-  let height = graphHeight;
-  let lane = graphHeight + 12;
-  // Every purpose arrow goes through `spline`, as the laid-out ones do.
+  const router = new PurposeRouter(graph.graph().height ?? 0, boxes);
   for (const jump of jumps) {
     const from = node(jump.from);
-    const pill = node(pillId(jump.purpose));
-    const top = from.y - from.height / 2;
-    const port = top + (sizeOf(jump.from)?.ports[jump.label] ?? from.height / 2);
-    const right = from.x + CANVAS_CARD_WIDTH / 2;
-    const pillLeft = pill.x - pill.width / 2;
-    let points: CanvasPoint[];
-    let labelAt: CanvasPoint;
-    if (pillLeft >= right) {
-      const mid = (right + pillLeft) / 2;
-      points = [
-        { x: right, y: port },
-        { x: mid, y: port },
-        { x: mid, y: pill.y },
-        { x: pillLeft, y: pill.y },
-      ];
-      labelAt = { x: mid, y: (port + pill.y) / 2 };
-    } else if (Math.abs(pill.x - from.x) < CANVAS_CARD_WIDTH / 2) {
-      // The pill shares the card's column: a short arrow from the edge facing it.
-      const up = pill.y < from.y;
-      const start = from.y + ((up ? -1 : 1) * from.height) / 2;
-      const end = pill.y + ((up ? 1 : -1) * PILL_HEIGHT) / 2;
-      points = [
-        { x: pill.x, y: start },
-        { x: pill.x, y: end },
-      ];
-      labelAt = { x: pill.x + labelWidth(jump.label) / 2 + 6, y: (start + end) / 2 + 10 };
-    } else {
-      // The pill is behind the card: an arc under every row, down from the
-      // card and up into the pill, each arrow in a lane of its own, sunk
-      // until it clears every card between.
-      const others = boxes.filter((box) => box.name !== jump.from);
-      const arc = (depth: number) => [
-        { x: from.x, y: from.y + from.height / 2 },
-        { x: from.x, y: depth },
-        { x: pill.x, y: depth },
-        { x: pill.x, y: pill.y + PILL_HEIGHT / 2 },
-      ];
-      const first = lane;
-      points = arc(lane);
-      for (let sunk = 0; sunk < 8 && crossesBox(points, others); sunk++) {
-        lane += 24;
-        points = arc(lane);
-      }
-      // A card straight under this one is not cleared by sinking: keep the first lane.
-      if (crossesBox(points, others)) {
-        lane = first;
-        points = arc(lane);
-      }
-      const lowest = sampleSpline(points).reduce((low, point) => (point.y > low.y ? point : low));
-      labelAt = lowest;
-      height = Math.max(height, lowest.y + 24);
-      lane += 18;
-    }
+    const port = sizeOf(jump.from)?.ports[jump.label] ?? from.height / 2;
+    const { points, labelAt } = router.route(
+      jump.from,
+      from,
+      port,
+      node(pillId(jump.purpose)),
+      jump.label,
+    );
     edges.push({
-      id: `${jump.from}.${jump.label}`,
+      id: edgeId(jump.from, jump.label),
       kind: "purpose",
       from: jump.from,
       to: pillId(jump.purpose),
@@ -318,15 +297,15 @@ export function layoutFlowCanvas(
 
   return {
     width: graph.graph().width ?? 0,
-    height,
+    height: router.height,
     cards: steps.map((step) => {
-      const { x, y, height: cardHeight } = node(step.name);
+      const { x, y, height } = node(step.name);
       return {
         name: step.name,
         x: x - CANVAS_CARD_WIDTH / 2,
-        y: y - cardHeight / 2,
-        height: cardHeight,
-        sketch: sketches.get(step.name) as StepSketch,
+        y: y - height / 2,
+        height,
+        sketch: sketches.get(step.name) ?? stepSketch(step),
       };
     }),
     pills: purposes.map(([purpose]) => {
@@ -344,6 +323,97 @@ export function layoutFlowCanvas(
   };
 }
 
+/**
+ * Routes purpose arrows by hand, in one of three shapes by where the pill sits:
+ * ahead of the card, in its column, or behind it. Arrows behind it run in
+ * lanes under every card, each lower than the last, and grow the canvas.
+ */
+class PurposeRouter {
+  height: number;
+  private lane: number;
+  private readonly boxes: Box[];
+
+  constructor(graphHeight: number, boxes: Box[]) {
+    this.boxes = boxes;
+    this.height = graphHeight;
+    this.lane = graphHeight + LANE_GAP;
+  }
+
+  route(
+    name: string,
+    from: PlacedNode,
+    port: number,
+    pill: PlacedNode,
+    label: string,
+  ): { points: CanvasPoint[]; labelAt: CanvasPoint } {
+    const right = from.x + CANVAS_CARD_WIDTH / 2;
+    const pillLeft = pill.x - pill.width / 2;
+    if (pillLeft >= right) return this.ahead(from, port, pill, right, pillLeft);
+    if (Math.abs(pill.x - from.x) < CANVAS_CARD_WIDTH / 2)
+      return this.sameColumn(from, pill, label);
+    return this.behind(name, from, pill);
+  }
+
+  /** The pill is to the right: out of the control, across, and in. */
+  private ahead(from: PlacedNode, port: number, pill: PlacedNode, right: number, pillLeft: number) {
+    const portY = from.y - from.height / 2 + port;
+    const mid = (right + pillLeft) / 2;
+    return {
+      points: [
+        { x: right, y: portY },
+        { x: mid, y: portY },
+        { x: mid, y: pill.y },
+        { x: pillLeft, y: pill.y },
+      ],
+      labelAt: { x: mid, y: (portY + pill.y) / 2 },
+    };
+  }
+
+  /** The pill shares the card's column: a short arrow from the edge facing it. */
+  private sameColumn(from: PlacedNode, pill: PlacedNode, label: string) {
+    const up = pill.y < from.y;
+    const start = from.y + ((up ? -1 : 1) * from.height) / 2;
+    const end = pill.y + ((up ? 1 : -1) * PILL_HEIGHT) / 2;
+    return {
+      points: [
+        { x: pill.x, y: start },
+        { x: pill.x, y: end },
+      ],
+      labelAt: { x: pill.x + labelWidth(label) / 2 + 6, y: (start + end) / 2 + 10 },
+    };
+  }
+
+  /**
+   * The pill is behind the card: an arc down from the card, under every row
+   * and up into the pill, sunk lane by lane until it clears every other card.
+   * A card straight under this one is never cleared by sinking, so then the
+   * first lane is kept.
+   */
+  private behind(name: string, from: PlacedNode, pill: PlacedNode) {
+    const others = this.boxes.filter((box) => box.name !== name);
+    const arc = (depth: number) => [
+      { x: from.x, y: from.y + from.height / 2 },
+      { x: from.x, y: depth },
+      { x: pill.x, y: depth },
+      { x: pill.x, y: pill.y + PILL_HEIGHT / 2 },
+    ];
+    const first = this.lane;
+    let points = arc(this.lane);
+    for (let sunk = 0; sunk < MAX_SINKS && crossesBox(points, others); sunk++) {
+      this.lane += LANE_SINK;
+      points = arc(this.lane);
+    }
+    if (crossesBox(points, others)) {
+      this.lane = first;
+      points = arc(this.lane);
+    }
+    const lowest = sampleSpline(points).reduce((low, point) => (point.y > low.y ? point : low));
+    this.height = Math.max(this.height, lowest.y + LABEL_ROOM);
+    this.lane += LANE_SPACING;
+    return { points, labelAt: lowest };
+  }
+}
+
 /** What stays lit while a step is hovered or focused; everything else dims. */
 export interface CanvasHighlight {
   nodes: Set<string>;
@@ -351,21 +421,33 @@ export interface CanvasHighlight {
 }
 
 /**
- * The step, its outgoing transitions and their targets. A purpose transition
- * also lights the pill's entry arrow and the entry step.
+ * The step, the transitions into and out of it and the steps at their other
+ * ends. A purpose transition counts through its pill: one out of the step
+ * lights the pill, its entry arrow and the entry step, and one into a pill
+ * the step is the entry of lights the step it leaves.
  */
 export function highlightStep(canvas: FlowCanvasLayout, step: string): CanvasHighlight {
   const nodes = new Set([step]);
   const edges = new Set<string>();
-  for (const edge of canvas.edges) {
-    if (edge.kind === "entry" || edge.from !== step) continue;
+  const light = (edge: CanvasEdge, other: string) => {
     edges.add(edge.id);
-    nodes.add(edge.to);
+    nodes.add(other);
+  };
+  const entries = canvas.edges.filter((edge) => edge.kind === "entry");
+  const ownPills = new Set(entries.filter((edge) => edge.to === step).map((edge) => edge.from));
+  const targetPills = new Set<string>();
+  for (const edge of canvas.edges) {
+    if (edge.kind === "entry") continue;
+    if (edge.from === step) {
+      light(edge, edge.to);
+      if (edge.kind === "purpose") targetPills.add(edge.to);
+    } else if (edge.to === step || ownPills.has(edge.to)) {
+      light(edge, edge.from);
+    }
   }
-  for (const edge of canvas.edges) {
-    if (edge.kind !== "entry" || !nodes.has(edge.from)) continue;
-    edges.add(edge.id);
-    nodes.add(edge.to);
+  for (const edge of entries) {
+    if (edge.to === step) light(edge, edge.from);
+    else if (targetPills.has(edge.from)) light(edge, edge.to);
   }
   return { nodes, edges };
 }
@@ -388,75 +470,6 @@ export function sameCardSizes(
   });
 }
 
-/** A zoom level kept within the steps the controls offer. */
-export function clampZoom(zoom: number): number {
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(zoom * 100) / 100));
-}
-
-/** Pixels per wheel line and page, for a wheel that reports in those units. */
-const WHEEL_UNIT = [1, 16, 800] as const;
-
-/**
- * The zoom after one wheel event: exponential in the delta, so many small
- * trackpad events and one notch of a mouse wheel cover the same ground. A
- * pinch arrives as ctrl+wheel with small deltas, so it scales faster. Not
- * rounded, or a run of small deltas would never move off a step.
- */
-export function wheelZoom(
-  zoom: number,
-  wheel: { deltaY: number; deltaMode: number; ctrlKey: boolean },
-): number {
-  const pixels = wheel.deltaY * (WHEEL_UNIT[wheel.deltaMode as 0 | 1 | 2] ?? 1);
-  // One notch is about 100px; a larger burst should not jump further.
-  const delta = Math.max(-100, Math.min(100, pixels));
-  const next = zoom * Math.exp(-delta * (wheel.ctrlKey ? 0.01 : 0.0015));
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
-}
-
-/**
- * Where the canvas starts in the viewport along one axis: centred while it
- * fits, at the start once it overflows and scrolls.
- */
-export function centringInset(viewport: number, canvas: number, zoom: number): number {
-  return Math.max(0, (viewport - canvas * zoom) / 2);
-}
-
-/**
- * The scroll offsets that keep the canvas point under `pointer` (relative to
- * the viewport's corner) under it when the zoom goes `from` → `to`, with the
- * canvas centred in any axis where it fits. In an axis where it still fits at
- * `to` there is nothing to scroll, so the centring places it instead.
- */
-export function anchoredScroll(
-  scroll: { left: number; top: number },
-  pointer: CanvasPoint,
-  viewport: { width: number; height: number },
-  canvas: { width: number; height: number },
-  from: number,
-  to: number,
-): { left: number; top: number } {
-  const axis = (offset: number, at: number, view: number, size: number) => {
-    const point = (offset + at - centringInset(view, size, from)) / from;
-    const end = Math.max(0, size * to - view);
-    return Math.min(end, Math.max(0, point * to + centringInset(view, size, to) - at));
-  };
-  return {
-    left: axis(scroll.left, pointer.x, viewport.width, canvas.width),
-    top: axis(scroll.top, pointer.y, viewport.height, canvas.height),
-  };
-}
-
-/** The zoom that shows the whole canvas in the viewport, never above 100%. */
-export function fitZoom(
-  viewport: { width: number; height: number },
-  canvas: { width: number; height: number },
-): number {
-  if (canvas.width <= 0 || canvas.height <= 0 || viewport.width <= 0 || viewport.height <= 0) {
-    return 1;
-  }
-  return clampZoom(Math.min(1, viewport.width / canvas.width, viewport.height / canvas.height));
-}
-
 function pillWidth(purpose: string): number {
   return purpose.length * LABEL_CHAR + 30;
 }
@@ -465,103 +478,7 @@ function labelWidth(label: string): number {
   return label.length * LABEL_CHAR + 14;
 }
 
-/** One piece of a spline: a line, or a cubic with its two control points. */
-type SplinePiece = { to: CanvasPoint; controls?: [CanvasPoint, CanvasPoint] };
-
-/** A smooth curve through the bend points (d3's `curveBasis`), as its start and pieces. */
-function splinePieces(points: CanvasPoint[]): { start: CanvasPoint; pieces: SplinePiece[] } {
-  const mix = (weights: [number, CanvasPoint][], total: number): CanvasPoint => ({
-    x: weights.reduce((sum, [weight, point]) => sum + weight * point.x, 0) / total,
-    y: weights.reduce((sum, [weight, point]) => sum + weight * point.y, 0) / total,
-  });
-  const first = points[0] ?? { x: 0, y: 0 };
-  const last = points[points.length - 1] ?? first;
-  if (points.length < 3) return { start: first, pieces: [{ to: last }] };
-  let [a, b] = points as [CanvasPoint, CanvasPoint];
-  const pieces: SplinePiece[] = [
-    {
-      to: mix(
-        [
-          [5, a],
-          [1, b],
-        ],
-        6,
-      ),
-    },
-  ];
-  const curve = (c: CanvasPoint) => {
-    pieces.push({
-      controls: [
-        mix(
-          [
-            [2, a],
-            [1, b],
-          ],
-          3,
-        ),
-        mix(
-          [
-            [1, a],
-            [2, b],
-          ],
-          3,
-        ),
-      ],
-      to: mix(
-        [
-          [1, a],
-          [4, b],
-          [1, c],
-        ],
-        6,
-      ),
-    });
-    a = b;
-    b = c;
-  };
-  for (const point of points.slice(2)) curve(point);
-  curve(b);
-  pieces.push({ to: b });
-  return { start: first, pieces };
-}
-
-/** The SVG path of {@link splinePieces}: the one function every arrow is drawn by. */
-function spline(points: CanvasPoint[]): string {
-  if (points.length === 0) return "";
-  const round = (value: number) => Math.round(value * 10) / 10;
-  const at = (point: CanvasPoint) => `${round(point.x)},${round(point.y)}`;
-  const { start, pieces } = splinePieces(points);
-  return pieces.reduce(
-    (path, { to, controls }) =>
-      controls ? `${path} C${at(controls[0])} ${at(controls[1])} ${at(to)}` : `${path} L${at(to)}`,
-    `M${at(start)}`,
-  );
-}
-
-/** Points along the curve {@link spline} draws, to test it against the cards. */
-function sampleSpline(points: CanvasPoint[], steps = 12): CanvasPoint[] {
-  const { start, pieces } = splinePieces(points);
-  const samples = [start];
-  let from = start;
-  for (const { to, controls } of pieces) {
-    const [one, two] = controls ?? [from, to];
-    for (let step = 1; step <= steps; step++) {
-      const t = step / steps;
-      const u = 1 - t;
-      samples.push({
-        x: u * u * u * from.x + 3 * u * u * t * one.x + 3 * u * t * t * two.x + t * t * t * to.x,
-        y: u * u * u * from.y + 3 * u * u * t * one.y + 3 * u * t * t * two.y + t * t * t * to.y,
-      });
-    }
-    from = to;
-  }
-  return samples;
-}
-
-function crossesBox(
-  points: CanvasPoint[],
-  boxes: { left: number; right: number; top: number; bottom: number }[],
-): boolean {
+function crossesBox(points: CanvasPoint[], boxes: Box[]): boolean {
   return sampleSpline(points).some((point) =>
     boxes.some(
       (box) =>

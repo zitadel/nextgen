@@ -20,7 +20,13 @@
 import { THEME_SELECTORS, tokens, tokensCss } from "@zitadel/design-tokens";
 
 import { publishedSides } from "./branding.js";
-import type { Branding, BrandingPalette, BrandingShape, BrandingTypography } from "./branding.js";
+import type {
+  Branding,
+  BrandingPalette,
+  BrandingShape,
+  BrandingTypography,
+  ResolvableSide,
+} from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 
 // The corner ramp a brand's single radius value scales. Ratios come from the
@@ -154,6 +160,18 @@ export function buildBrandingStylesheet(branding: Branding | undefined): string 
   }
 
   return blocks.join("\n");
+}
+
+/**
+ * The `--zl-*` values one side of a revision paints, as {@link buildBrandingStylesheet}
+ * emits them for that side: the shared type and shape, the side's palette over it.
+ * For a host that sets them on an element's `style` rather than adopting a sheet.
+ */
+export function brandingDeclarations(
+  branding: Branding | undefined,
+  side: ResolvableSide,
+): Record<string, string> {
+  return { ...collectDeclarations(branding), ...mapPalette(branding?.theme?.[side]?.palette) };
 }
 
 function collectDeclarations(branding: Branding | undefined): Record<string, string> {
