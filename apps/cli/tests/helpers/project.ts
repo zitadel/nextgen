@@ -1050,7 +1050,7 @@ export class ScaffoldedApp {
               process.execPath,
               [
                 join(cliPackageRoot, "bin/run.js"),
-                ...["start", "--cwd", this.path, "--server", MOCK_SERVER_URL],
+                ...["start", "--cwd", this.path],
                 ...["--port", port, "--json"],
               ],
               { env },

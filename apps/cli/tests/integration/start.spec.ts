@@ -2,7 +2,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import { aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
@@ -400,9 +400,7 @@ describe("start", () => {
               api: "http://localhost:8080",
               console: "http://localhost:8080/ui/console/",
             },
-            next_commands: [
-              expectedPublicCliCommand(`start --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
-            ],
+            next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
           },
           warnings: [],
         });
@@ -437,9 +435,7 @@ describe("start", () => {
               console: "http://localhost:9000/ui/console/",
             },
             next_commands: [
-              expectedPublicCliCommand(
-                `start --port 9000 --runtime binary --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
-              ),
+              expectedPublicCliCommand(`start --port 9000 --runtime binary --cwd ${app.path}`),
             ],
           },
           warnings: [],
@@ -481,7 +477,7 @@ describe("start", () => {
             },
             next_commands: [
               expectedPublicCliCommand(
-                `start --runtime docker --image example.test/zitadel:1 --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `start --runtime docker --image example.test/zitadel:1 --cwd ${app.path}`,
               ),
             ],
           },
@@ -564,9 +560,7 @@ describe("start", () => {
         );
 
         expect(result).toSayOnce(
-          expectedPublicCliCommand(
-            `start --port 9000 --runtime binary --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
-          ),
+          expectedPublicCliCommand(`start --port 9000 --runtime binary --cwd ${app.path}`),
         );
       });
 

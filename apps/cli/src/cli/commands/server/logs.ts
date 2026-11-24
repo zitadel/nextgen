@@ -9,7 +9,6 @@ import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { painted, prose } from "@/lib/oclif/rendering";
 import { CommandGroups } from "@/cli/commands/groups";
 import { Output } from "@/lib/ui";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { relatedFlags } from "@/lib/suggestion/relations";
 
@@ -43,7 +42,7 @@ const NOT_STARTED_REFUSAL = {
  * in the folder `start` ran in, or one inside it: the server is found from the
  * nearest `.zitadel/local/` on the way up.
  */
-export default class Logs extends LocalServerCommand(ServerCommand(BaseCommand), "nearest") {
+export default class Logs extends LocalServerCommand(BaseCommand, "nearest") {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
   static override group = CommandGroups.localServer;

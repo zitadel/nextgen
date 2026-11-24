@@ -463,12 +463,6 @@
           ]
         },
         {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
-        },
-        {
           "name": "dry-run",
           "description": "Preview without mutating files or the platform.",
           "type": "boolean"
@@ -496,12 +490,6 @@
           "name": "all",
           "description": "Stop all discovered CLI-managed local Zitadel runtime processes.",
           "type": "boolean"
-        },
-        {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
         },
         {
           "name": "dry-run",
@@ -581,12 +569,6 @@
           "description": "Number of lines to show, counting only those --level shows.",
           "type": "option",
           "default": 200
-        },
-        {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
         }
       ],
       "examples": [
@@ -636,12 +618,6 @@
       "description": "Delete the local Zitadel server runtime and data.",
       "args": [],
       "flags": [
-        {
-          "name": "server",
-          "char": "s",
-          "description": "Override the resolved server URL.",
-          "type": "option"
-        },
         {
           "name": "dry-run",
           "description": "Preview without mutating files or the platform.",

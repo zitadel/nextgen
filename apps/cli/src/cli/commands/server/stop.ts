@@ -4,7 +4,6 @@ import { LocalRuntime } from "@/lib/server";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
@@ -16,10 +15,7 @@ import { dryRunResult } from "@/cli/core/crud/shared";
  * started it. Stopping a folder with no server is not an error: there is
  * nothing to stop, and the result says so.
  */
-export default class Stop extends LocalServerCommand(
-  Previewable(ServerCommand(BaseCommand)),
-  "exact",
-) {
+export default class Stop extends LocalServerCommand(Previewable(BaseCommand), "exact") {
   static override description = "Stop the local Zitadel server.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 2;

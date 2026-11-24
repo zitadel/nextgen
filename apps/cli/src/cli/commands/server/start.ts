@@ -17,7 +17,6 @@ import { Guidance, shellCommand, type SuggestedCommand } from "@/lib/suggestion"
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
@@ -155,10 +154,7 @@ const NOT_READY_REASONS = {
  * exists, and the port it actually got afterwards, so an agent that follows it
  * targets the server that was started.
  */
-export default class Start extends LocalServerCommand(
-  Previewable(ServerCommand(BaseCommand)),
-  "exact",
-) {
+export default class Start extends LocalServerCommand(Previewable(BaseCommand), "exact") {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 1;

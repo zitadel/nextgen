@@ -2,7 +2,6 @@ import { DestroyPermit } from "@/lib/server";
 import type { CommandResult } from "@/cli/core";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { LocalServerCommand } from "@/cli/commands/server-command";
@@ -23,7 +22,7 @@ type ResetTarget =
  * result says so.
  */
 export default class Reset extends Destructive(
-  LocalServerCommand(Previewable(ServerCommand(BaseCommand)), "exact"),
+  LocalServerCommand(Previewable(BaseCommand), "exact"),
   "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
 ) {
   static override description = "Delete the local Zitadel server runtime and data.";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anApp, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
@@ -300,9 +300,7 @@ describe("stop", () => {
             topic: "server",
             title: "Would stop host-wide managed local runtime processes (dry run)",
             sweep: { supported: true, scope: "host", count: 0, processes: [] },
-            next_commands: [
-              expectedPublicCliCommand(`stop --all --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
-            ],
+            next_commands: [expectedPublicCliCommand(`stop --all --cwd ${app.path}`)],
           },
           warnings: [],
         });
@@ -402,9 +400,7 @@ describe("stop", () => {
 
         const result = await shown(() => app.run(["stop", "--all", "--dry-run"]));
 
-        expect(result).toSayOnce(
-          expectedPublicCliCommand(`stop --all --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
-        );
+        expect(result).toSayOnce(expectedPublicCliCommand(`stop --all --cwd ${app.path}`));
       });
     });
   });
