@@ -1,7 +1,8 @@
 import { type Config, Flags } from "@oclif/core";
 
-import { BaseCommand } from "@/lib/oclif/base";
-import { type Tabulate, Tabulatable } from "@/lib/oclif/tabulatable";
+import { BaseCommand } from "@/cli/core/base";
+import type { CommandResult } from "@/cli/core/types";
+import { type Tabulate, Tabulatable } from "@/cli/core/tabulatable";
 
 class Listing extends Tabulatable(BaseCommand) {
   public static override readonly id: string = "thing:list";
@@ -20,12 +21,12 @@ class Listing extends Tabulatable(BaseCommand) {
     } as unknown as Config);
   }
 
-  protected async execute() {
-    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
+  protected async execute(): Promise<CommandResult> {
+    return { summary: { title: "Done", sections: [] }, status: "ok", data: {} };
   }
 
-  drawList(...args: Parameters<Listing["listResult"]>) {
-    return this.listResult(...args);
+  drawList(...args: Parameters<Listing["listed"]>) {
+    return this.listed(...args);
   }
 
   cut(...args: Parameters<Listing["pickFields"]>) {
@@ -62,9 +63,9 @@ class Running extends Drawing {
     /* swallow the envelope */
   }
 
-  protected override async execute() {
+  protected override async execute(): Promise<CommandResult> {
     this.drawn = await this.tabulate(["id"], [{ id: "user_1" }]);
-    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
+    return { summary: { title: "Done", sections: [] }, status: "ok", data: {} };
   }
 }
 

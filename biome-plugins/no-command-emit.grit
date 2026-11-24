@@ -1,0 +1,9 @@
+language js
+
+// A command returns its result and the base command emits it once
+// (apps/cli/src/cli/core/base.ts), so every command reads the same and none
+// writes an envelope of its own.
+`this.emit($_)` as $call where {
+  $filename <: r".*/apps/cli/src/cli/commands/.*",
+  register_diagnostic(span=$call, message="Return the result instead of calling this.emit: the base command emits it.", severity="error")
+}

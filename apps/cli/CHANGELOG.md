@@ -1,5 +1,15 @@
 # @zitadel/cli
 
+## 0.9.0
+
+### Patch Changes
+
+- [#3252](https://github.com/zitadel/nextgen/pull/3252) [`e15e31c`](https://github.com/zitadel/nextgen/commit/e15e31cb1c830242249d72dbe3671d2877d89a48) - A line the CLI logs for a person, such as the wait for the browser step in `claim`, is no longer written to stdout when it is not a terminal, so a script reading a pipe is given only the command's result. `server console` and `env add` now carry their links and the file they wrote in that result. `--debug` detail goes to stderr when stdout is not a terminal.
+- Updated dependencies [[`a106883`](https://github.com/zitadel/nextgen/commit/a106883f23592c2715d74477bcfa0d9b0d5067db), [`15cfcc3`](https://github.com/zitadel/nextgen/commit/15cfcc3e861a584936aac54dd4735b856bf73027)]:
+  - @zitadel/server@0.9.0
+  - @zitadel/api@0.9.0
+  - @zitadel/config@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes

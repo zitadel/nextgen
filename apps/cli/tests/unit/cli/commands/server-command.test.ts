@@ -6,8 +6,9 @@ import {
   LocalServerCommand,
   ServerCommand,
 } from "@/cli/commands/server-command";
-import { type Admitted, BaseCommand, EnvironmentCommand } from "@/lib/oclif";
-import { Destructive } from "@/lib/oclif/destructive";
+import { type Admitted, BaseCommand, EnvironmentCommand } from "@/cli/core";
+import { Destructive } from "@/cli/core/destructive";
+import { Previewable } from "@/cli/core/previewable";
 import { LocalRuntime, PsLocalServers, RealMachine, ZitadelRuntime } from "@/lib/server";
 import { shellCommand } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
@@ -369,10 +370,14 @@ describe("the types a server mixin gives a command", () => {
   });
 
   it("keep the group and the folder rule of a command that is also destructive", () => {
-    class Destroying extends Destructive(LocalServerCommand(BaseCommand, "exact")) {
+    class Destroying extends Destructive(Previewable(LocalServerCommand(BaseCommand, "exact"))) {
       static override group = CommandGroups.localServer;
 
-      protected async execute(): Promise<never> {
+      protected async preview(): Promise<never> {
+        throw new Error("unused");
+      }
+
+      protected async apply(): Promise<never> {
         throw new Error("unused");
       }
     }

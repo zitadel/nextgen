@@ -15,8 +15,8 @@ import {
 import { Claim } from "@/lib/claim";
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor, unpublished } from "@/lib/idp";
-import type { CommandResult } from "@/lib/oclif";
-import { asStepsShown } from "@/lib/oclif/next-steps";
+import type { CommandResult } from "@/cli/core";
+import { asStepsShown } from "@/cli/core/next-steps";
 import { painted } from "@/lib/oclif/rendering";
 import { detectors } from "@/lib/orca/detectors";
 import { PM } from "@/lib/pm";

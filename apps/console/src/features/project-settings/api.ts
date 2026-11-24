@@ -37,3 +37,21 @@ export async function readDeployedPasswordPolicy(
   }
   return { config: revision.config };
 }
+
+/**
+ * Who has access to a project and how: the people with live admin access
+ * (`GET /projects/{id}/admins`, #1462) and the project's grants, which add the
+ * rows that list leaves out. One page each: a project's admins are a handful;
+ * add paging with the first project that needs it. The grants' principal refs
+ * carry the names, so nothing is expanded.
+ *
+ * The two are the same viewer check on the same project and succeed or fail
+ * as one.
+ */
+export async function readProjectAccess(projectId: string) {
+  const [admins, grants] = await Promise.all([
+    api.listProjectAdmins(projectId, { limit: 100 }),
+    api.queryGrants({ limit: 100 }, { project_id: projectId }),
+  ]);
+  return { admins: admins.admins, grants: grants.grants };
+}

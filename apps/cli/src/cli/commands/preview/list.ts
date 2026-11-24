@@ -3,13 +3,15 @@ import { z } from "zod";
 
 import { PreviewService } from "@/lib/backend";
 import { ListProjectPreviewsResponse } from "@/lib/backend/schemas";
-import { fieldPaths } from "@/lib/oclif/crud";
+import { fieldPaths } from "@/cli/core/crud";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, type JsonEnvelope, nonBlankString, PreviewCommand } from "@/lib/oclif";
-import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { reads, type Refused, whole } from "@/cli/core/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Tabulatable } from "@/cli/core/tabulatable";
+import { PreviewCommand } from "@/cli/core";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -74,9 +76,14 @@ export default class PreviewList extends Tabulatable(ServerCommand(PreviewComman
     { all: { exclusive: ["page-token"] } },
   );
 
-  protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const previewService = new PreviewService(client, projectId);
+  /**
+   * Lists the project's live previews, newest first.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The previews, as a list.
+   */
+  protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<CommandResult> {
+    const previewService = await this.service(PreviewService);
     const listed = await previewService.page(
       {
         limit: flags.limit,
@@ -103,7 +110,7 @@ export default class PreviewList extends Tabulatable(ServerCommand(PreviewComman
     };
     const extra = {};
 
-    return this.emitList(flags, {
+    return this.listed(flags, {
       columns,
       rows,
       items,

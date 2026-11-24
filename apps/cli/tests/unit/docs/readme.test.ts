@@ -45,4 +45,48 @@ describe("README.md", () => {
 
     expect([...documented].sort()).toEqual([...listed].sort());
   });
+
+  // A flag added to or removed from a command leaves the front page of the
+  // package documenting one the command does not take, which is the drift a
+  // list of ids cannot see.
+  it("documents exactly the flags each command takes; regenerate it with `turbo run readme --filter=@zitadel/cli`", async () => {
+    const readme = await readFile(join(cliPackageRoot, "README.md"), "utf8");
+    const reference = readme.slice(
+      readme.indexOf("<!-- commands -->"),
+      readme.indexOf("<!-- commandsstop -->"),
+    );
+    const sections = reference.split(/^## `zitadel /m).slice(1);
+    const documented = new Map(
+      sections.map((section): readonly [string, string[]] => {
+        const usage = section.slice(0, section.indexOf("`"));
+        const flags = [...section.matchAll(/^\s+(?:-\w, )?--(?:\[no-\])?([a-z][a-z0-9-]*)/gm)].map(
+          ([, name = ""]) => {
+            return name;
+          },
+        );
+
+        return [idOf(usage), [...new Set(flags)].sort()];
+      }),
+    );
+
+    const listed = new Map(
+      config.commands
+        .filter((command) => {
+          return command.hidden !== true;
+        })
+        .map((command): readonly [string, string[]] => {
+          const flags = Object.entries(command.flags)
+            .filter(([, flag]) => {
+              return flag.hidden !== true;
+            })
+            .map(([name]) => {
+              return name;
+            });
+
+          return [command.id, flags.sort()];
+        }),
+    );
+
+    expect(Object.fromEntries(documented)).toEqual(Object.fromEntries(listed));
+  });
 });

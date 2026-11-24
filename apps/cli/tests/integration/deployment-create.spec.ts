@@ -189,7 +189,10 @@ describe("deployment create", () => {
           status: "ok",
           data: {
             dry_run: true,
-            title: `Would deploy ${releaseId} to primary (dry run)`,
+            title: `Would deploy release ${releaseId} to primary (dry run)`,
+            verb: "deploy",
+            topic: "deployment",
+            id: releaseId,
             release_id: releaseId,
             targets: "primary",
             next_commands: [
@@ -453,7 +456,7 @@ describe("deployment create", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toPrint(`Would deploy ${releaseId} to primary (dry run)`);
+        expect(result).toPrint(`Would deploy release ${releaseId} to primary (dry run)`);
       });
 
       it("suggests the real deployment after a dry run, once", async () => {

@@ -15,8 +15,8 @@ server package they call is described in
 ## The base: `LocalServerCommand` (`src/cli/commands/server-command.ts`)
 
 `LocalServerCommand(Base, folderRule)` is the one base for every command about
-the local server, so none repeats the same things (a `sourceOf`, and the `ps`
-seam). It is a mixin like `Promptable`; the rest of the server family
+the local server, so none repeats the same things (a `sourceOf`, the `ps` seam,
+and the legacy `resolveServer` that names no server). It is a mixin like `Promptable`; the rest of the server family
 (`ServerCommand`, `ChoosingServerCommand`) is in the same module and described
 in [`apps/cli/AGENTS.md`](../../../../AGENTS.md).
 
@@ -33,8 +33,8 @@ in [`apps/cli/AGENTS.md`](../../../../AGENTS.md).
 - It sets no group and takes no `--server`: each command declares its own
   `group`, and one that reads `--server` wraps `ServerCommand` inside it. Each
   names no server before its flags are parsed (`resolveServer` returns none),
-  because its server is the one its folder started, which `sourceOf` reads; for
-  `start`, `stop`, `logs` and `reset` `--server` is accepted and ignored.
+  because its server is the one its folder started, which `sourceOf` reads;
+  `start`, `stop`, `logs` and `reset` do not take `--server`.
 - `status` is the one command about this server that does not extend it: it
   also reads the project's environment, so it extends
   `ServerCommand(EnvironmentCommand)`.

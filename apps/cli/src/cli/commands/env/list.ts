@@ -1,8 +1,8 @@
 import { Environment } from "@/lib/environment";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
-import { ServerCommand } from "@/cli/commands/server-command";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
+import { ReadCommand } from "@/cli/commands/bases";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
@@ -13,7 +13,7 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
  * when it carries one. An environment that lives only in a CI secret store is
  * not visible here, which is correct.
  */
-export default class EnvList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class EnvList extends ReadCommand {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 2;
@@ -30,7 +30,13 @@ export default class EnvList extends Tabulatable(ServerCommand(EnvironmentComman
     plain: plainFlag,
   };
 
-  protected async execute({ flags }: Admitted<typeof EnvList>): Promise<JsonEnvelope> {
+  /**
+   * Lists the environments bound in this directory's `.env` files.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The environments as a list.
+   */
+  protected async execute({ flags }: Admitted<typeof EnvList>): Promise<CommandResult> {
     const { name, values } = this.environment;
 
     const bound = await Environment.bound(this.cwd);
@@ -77,7 +83,7 @@ export default class EnvList extends Tabulatable(ServerCommand(EnvironmentComman
       },
     };
 
-    const listed = await this.listResult(flags, {
+    const result = await this.listed(flags, {
       columns,
       rows,
       items,
@@ -88,13 +94,18 @@ export default class EnvList extends Tabulatable(ServerCommand(EnvironmentComman
       extra,
     });
 
-    return this.emit(
-      items.length === 0
-        ? {
-            ...listed,
-            next: { commands: [this.suggest({ id: "env:add", args: { name: "<name>" } })] },
-          }
-        : listed,
-    );
+    return items.length === 0
+      ? {
+          ...result,
+          next: {
+            commands: [
+              this.suggest({
+                id: "env:add",
+                args: { name: "<name>" },
+              }),
+            ],
+          },
+        }
+      : result;
   }
 }
