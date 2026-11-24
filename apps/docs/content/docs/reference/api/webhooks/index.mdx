@@ -32,6 +32,9 @@ redirect: a `3xx` status is a failure too.
 
 - The server sends the same event again after 5 seconds. After each further
   failure it waits twice as long, up to 1 hour. A success resets the wait.
+- To be left alone for longer, answer `429` or `503` with a `Retry-After`
+  header, in seconds or as a date. The server waits at least that long, up
+  to the same hour.
 - The webhook's later events wait behind the failed one, so they still
   arrive in order. Other webhooks are not held back.
 - `last_error_at` and `last_error_status` hold the last failure;
