@@ -47,9 +47,14 @@ describe("sso/impossible-auto-creation-verification", () => {
   });
 
   it.each([
-    { rule: "sso/impossible-auto-creation-verification", documents: agreeing(ACME) },
     {
       rule: "sso/impossible-auto-creation-verification",
+      why: "the schema requires no unique property",
+      documents: agreeing(ACME),
+    },
+    {
+      rule: "sso/impossible-auto-creation-verification",
+      why: "the connection verifies every required unique property",
       documents: agreeing(
         anOidcConnection({
           claim_mapping: { email: "email", phone: "phone" },
@@ -60,12 +65,14 @@ describe("sso/impossible-auto-creation-verification", () => {
     },
     {
       rule: "sso/impossible-auto-creation-verification",
+      why: "the connection maps no required property, which sso/impossible-auto-creation-data reports",
       documents: agreeing(anOidcConnection({ claim_mapping: {} }), {
         schemas: { [SCHEMA_FILE]: aRequiringSchema() },
       }),
     },
     {
       rule: "sso/impossible-auto-creation-verification",
+      why: "the connection creates no users",
       documents: agreeing(
         anOidcConnection({
           claim_mapping: { email: "email", phone: "phone" },
@@ -76,6 +83,7 @@ describe("sso/impossible-auto-creation-verification", () => {
     },
     {
       rule: "sso/impossible-auto-creation-verification",
+      why: "the required property is not unique",
       documents: agreeing(anOidcConnection({ claim_mapping: { email: "email" } }), {
         schemas: {
           [SCHEMA_FILE]: aSchemaListing(["acme"], {
@@ -85,12 +93,24 @@ describe("sso/impossible-auto-creation-verification", () => {
         },
       }),
     },
-  ] satisfies readonly { readonly rule: string; readonly documents: ConfigDocuments }[])(
-    "$rule stays silent on a project that does not break it",
-    (row) => {
-      const issues = issuesOf(row.rule, row.documents);
-
-      expect(issues).toEqual([]);
+    {
+      rule: "sso/impossible-auto-creation-verification",
+      why: "the unverified property is the one a mistyped key meant, which sso/orphaned-verification-key reports",
+      documents: agreeing(
+        anOidcConnection({
+          claim_mapping: { email: "email", phone: "phone" },
+          verified_claims: { phone: true, emial: true },
+        }),
+        { schemas: { [SCHEMA_FILE]: aRequiringSchema() } },
+      ),
     },
-  );
+  ] satisfies readonly {
+    readonly rule: string;
+    readonly why: string;
+    readonly documents: ConfigDocuments;
+  }[])("$rule stays silent: $why", (row) => {
+    const issues = issuesOf(row.rule, row.documents);
+
+    expect(issues).toEqual([]);
+  });
 });

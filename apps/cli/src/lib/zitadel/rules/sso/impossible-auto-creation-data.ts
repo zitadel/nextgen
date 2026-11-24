@@ -1,11 +1,13 @@
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { propertyName } from "@/lib/zitadel/names";
-import { quote } from "@/lib/zitadel/rules/sso/shared";
+import { closest } from "@/lib/zitadel/utils/spelling";
+import { quote, readableProperties, standing, unreadable } from "@/lib/zitadel/rules/sso/shared";
 
 export const IMPOSSIBLE_AUTO_CREATION_DATA: Rule = defineRule({
   id: "sso/impossible-auto-creation-data",
   severity: "warning",
   each: (config) => {
+    const entries = standing(config);
     return config.flows.pinnedOffers.flatMap((offer) => {
       const connection = offer.connection;
       if (connection === undefined || !connection.createsUsers) {
@@ -20,6 +22,26 @@ export const IMPOSSIBLE_AUTO_CREATION_DATA: Rule = defineRule({
       if (!fillsSomething) {
         return [];
       }
+      const entry = entries.find((candidate) => {
+        return candidate.connection === connection;
+      });
+      // A mapping target no listing schema defines that is the nearest name to
+      // a required property is a typo sso/orphaned-mapping-target reports.
+      const meant =
+        entry === undefined
+          ? []
+          : connection.mappings
+              .filter((row) => {
+                return unreadable(entry, row.property);
+              })
+              .map((row) => {
+                return closest(
+                  row.property,
+                  readableProperties(entry).filter((name) => {
+                    return !connection.maps(name);
+                  }),
+                );
+              });
       const missing = [
         ...new Set(
           offer.schema.requiredByServer.map((path) => {
@@ -27,7 +49,7 @@ export const IMPOSSIBLE_AUTO_CREATION_DATA: Rule = defineRule({
           }),
         ),
       ].filter((name) => {
-        return !connection.maps(propertyName(name));
+        return !connection.maps(propertyName(name)) && !meant.includes(name);
       });
       if (missing.length === 0) {
         return [];

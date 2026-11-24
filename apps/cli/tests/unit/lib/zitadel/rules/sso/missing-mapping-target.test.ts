@@ -45,25 +45,32 @@ describe("sso/missing-mapping-target", () => {
   });
 
   it.each([
-    { rule: "sso/missing-mapping-target", documents: agreeing(ACME) },
     {
       rule: "sso/missing-mapping-target",
+      why: "the one schema that lists the connection defines the target",
+      documents: agreeing(ACME),
+    },
+    {
+      rule: "sso/missing-mapping-target",
+      why: "the schema that lacks the target does not list the connection",
       documents: agreeing(ACME, {
         schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]), "field.json": aSchemaListing([]) },
       }),
     },
     {
       rule: "sso/missing-mapping-target",
+      why: "no listing schema defines the target, which sso/orphaned-mapping-target reports",
       documents: agreeing(anOidcConnection({ claim_mapping: { emial: "email" } }), {
         schemas: twoSchemas(),
       }),
     },
-  ] satisfies readonly { readonly rule: string; readonly documents: ConfigDocuments }[])(
-    "$rule stays silent on a project that does not break it",
-    (row) => {
-      const issues = issuesOf(row.rule, row.documents);
+  ] satisfies readonly {
+    readonly rule: string;
+    readonly why: string;
+    readonly documents: ConfigDocuments;
+  }[])("$rule stays silent: $why", (row) => {
+    const issues = issuesOf(row.rule, row.documents);
 
-      expect(issues).toEqual([]);
-    },
-  );
+    expect(issues).toEqual([]);
+  });
 });

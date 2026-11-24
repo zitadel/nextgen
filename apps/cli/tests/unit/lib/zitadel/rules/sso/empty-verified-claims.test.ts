@@ -49,9 +49,14 @@ describe("sso/empty-verified-claims", () => {
   });
 
   it.each([
-    { rule: "sso/empty-verified-claims", documents: agreeing(ACME) },
     {
       rule: "sso/empty-verified-claims",
+      why: "the connection verifies nothing",
+      documents: agreeing(ACME),
+    },
+    {
+      rule: "sso/empty-verified-claims",
+      why: "the flow's schema does not list the connection, which sso/provider-id reports",
       documents: {
         schemas: { [SCHEMA_FILE]: aSchemaListing(["other"]) },
         connections: {
@@ -65,12 +70,14 @@ describe("sso/empty-verified-claims", () => {
     },
     {
       rule: "sso/empty-verified-claims",
+      why: "the connection verifies a property the flow's schema defines",
       documents: agreeing(
         anOidcConnection({ claim_mapping: { email: "email" }, verified_claims: { email: true } }),
       ),
     },
     {
       rule: "sso/empty-verified-claims",
+      why: "the connection creates no users",
       documents: agreeing(
         anOidcConnection({
           claim_mapping: { email: "email", phone: "phone" },
@@ -82,14 +89,16 @@ describe("sso/empty-verified-claims", () => {
     },
     {
       rule: "sso/empty-verified-claims",
+      why: "no listing schema defines the key, which sso/orphaned-verification-key reports",
       documents: agreeing(anOidcConnection({ verified_claims: { emial: true } })),
     },
-  ] satisfies readonly { readonly rule: string; readonly documents: ConfigDocuments }[])(
-    "$rule stays silent on a project that does not break it",
-    (row) => {
-      const issues = issuesOf(row.rule, row.documents);
+  ] satisfies readonly {
+    readonly rule: string;
+    readonly why: string;
+    readonly documents: ConfigDocuments;
+  }[])("$rule stays silent: $why", (row) => {
+    const issues = issuesOf(row.rule, row.documents);
 
-      expect(issues).toEqual([]);
-    },
-  );
+    expect(issues).toEqual([]);
+  });
 });

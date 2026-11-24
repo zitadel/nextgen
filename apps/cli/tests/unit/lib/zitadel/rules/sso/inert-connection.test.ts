@@ -11,12 +11,28 @@ import {
   issuesOf,
 } from "@tests/helpers/sso-rules";
 
+/**
+ * A schema that points at an external one, whose properties and providers are
+ * not known here.
+ */
+const EXTERNAL_SCHEMA = { kind: "schema-url", url: "https://schemas.test.invalid/remote.json" };
+
 describe("sso/inert-connection", () => {
   it.each([
     {
       rule: "sso/inert-connection",
       severity: "warning",
       documents: { connections: { [CONNECTION_FILE]: ACME } },
+      file: CONNECTION_PATH,
+      message: 'connection "acme" is listed in sso.providers by no schema',
+    },
+    {
+      rule: "sso/inert-connection",
+      severity: "warning",
+      documents: {
+        schemas: { [SCHEMA_FILE]: aSchemaListing(["other"]) },
+        connections: { [CONNECTION_FILE]: ACME },
+      },
       file: CONNECTION_PATH,
       message: 'connection "acme" is listed in sso.providers by no schema',
     },
@@ -40,30 +56,42 @@ describe("sso/inert-connection", () => {
   });
 
   it.each([
-    { rule: "sso/inert-connection", documents: agreeing(ACME) },
     {
       rule: "sso/inert-connection",
+      why: "a schema lists the connection",
+      documents: agreeing(ACME),
+    },
+    {
+      rule: "sso/inert-connection",
+      why: "a flow offers the connection, which sso/provider-id reports",
       documents: {
         schemas: { [SCHEMA_FILE]: aSchemaListing(["other"]) },
         connections: { [CONNECTION_FILE]: ACME },
         flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
       },
     },
-  ] satisfies readonly { readonly rule: string; readonly documents: ConfigDocuments }[])(
-    "$rule stays silent on a project that does not break it",
-    (row) => {
-      const issues = issuesOf(row.rule, row.documents);
-
-      expect(issues).toEqual([]);
+    {
+      rule: "sso/inert-connection",
+      why: "a schema lists a typo of the connection, which sso/connection-resolves reports",
+      documents: {
+        schemas: { [SCHEMA_FILE]: aSchemaListing(["acmee"]) },
+        connections: { [CONNECTION_FILE]: ACME },
+      },
     },
-  );
-
-  it("does not call a deployed connection inert when no schema lists it", () => {
-    const issues = issuesOf(
-      "sso/inert-connection",
-      { connections: { [CONNECTION_FILE]: ACME } },
-      { deployed: new Set(["acme"]) },
-    );
+    {
+      rule: "sso/inert-connection",
+      why: "a schema is external, so which connections it lists cannot be known",
+      documents: {
+        schemas: { [SCHEMA_FILE]: EXTERNAL_SCHEMA },
+        connections: { [CONNECTION_FILE]: ACME },
+      },
+    },
+  ] satisfies readonly {
+    readonly rule: string;
+    readonly why: string;
+    readonly documents: ConfigDocuments;
+  }[])("$rule stays silent: $why", (row) => {
+    const issues = issuesOf(row.rule, row.documents);
 
     expect(issues).toEqual([]);
   });

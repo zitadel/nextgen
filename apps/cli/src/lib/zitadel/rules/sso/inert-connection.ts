@@ -1,19 +1,43 @@
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
-import { quote, standing } from "@/lib/zitadel/rules/sso/shared";
+import { closest } from "@/lib/zitadel/utils/spelling";
+import {
+  heldByBrokenConnection,
+  knownSlugs,
+  quote,
+  standing,
+} from "@/lib/zitadel/rules/sso/shared";
 
 export const INERT_CONNECTION: Rule = defineRule({
   id: "sso/inert-connection",
   severity: "warning",
   // A connection a flow offers but no schema lists is already refused by
-  // sso/provider-id at the step, so it is not reported again here.
+  // sso/provider-id at the step, so it is not reported again here. A schema
+  // that lists a slug with no file, whose nearest connection this is, is a
+  // typo that sso/connection-resolves already reports with a suggestion.
   each: (config) => {
+    if (
+      config.schemas.all.some((schema) => {
+        return schema.isExternal;
+      })
+    ) {
+      return [];
+    }
+    const known = knownSlugs(config);
+    const mistyped = config.schemas.all
+      .flatMap((schema) => {
+        return schema.providers;
+      })
+      .filter((slug) => {
+        return config.connections.find(slug) === undefined && !heldByBrokenConnection(config, slug);
+      })
+      .map((slug) => {
+        return closest(slug, known);
+      });
     return standing(config).filter((entry) => {
       const offered = config.flows.offers.some((offer) => {
         return offer.slug === entry.slug;
       });
-      // A connection the server already has is one `auth-method sso disable`
-      // left behind on purpose, so it is not nagged about.
-      return entry.listing.length === 0 && !offered && !config.connections.isDeployed(entry.slug);
+      return entry.listing.length === 0 && !offered && !mistyped.includes(entry.slug);
     });
   },
   file: (fact) => {

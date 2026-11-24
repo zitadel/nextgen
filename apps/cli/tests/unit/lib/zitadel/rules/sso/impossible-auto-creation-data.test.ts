@@ -40,31 +40,46 @@ describe("sso/impossible-auto-creation-data", () => {
   });
 
   it.each([
-    { rule: "sso/impossible-auto-creation-data", documents: agreeing(ACME) },
     {
       rule: "sso/impossible-auto-creation-data",
+      why: "the schema requires nothing the connection leaves unmapped",
+      documents: agreeing(ACME),
+    },
+    {
+      rule: "sso/impossible-auto-creation-data",
+      why: "the connection maps every required property",
       documents: agreeing(anOidcConnection({ claim_mapping: { email: "email", phone: "phone" } }), {
         schemas: { [SCHEMA_FILE]: aRequiringSchema() },
       }),
     },
     {
       rule: "sso/impossible-auto-creation-data",
+      why: "the connection creates no users",
       documents: agreeing(anOidcConnection({ provisioning: { creation: "disabled" } }), {
         schemas: { [SCHEMA_FILE]: aRequiringSchema() },
       }),
     },
     {
       rule: "sso/impossible-auto-creation-data",
+      why: "the mapping fills nothing, which sso/empty-claim-mapping reports",
       documents: agreeing(anOidcConnection({ claim_mapping: {} }), {
         schemas: { [SCHEMA_FILE]: aRequiringSchema() },
       }),
     },
-  ] satisfies readonly { readonly rule: string; readonly documents: ConfigDocuments }[])(
-    "$rule stays silent on a project that does not break it",
-    (row) => {
-      const issues = issuesOf(row.rule, row.documents);
-
-      expect(issues).toEqual([]);
+    {
+      rule: "sso/impossible-auto-creation-data",
+      why: "the unmapped property is the one a mistyped target meant, which sso/orphaned-mapping-target reports",
+      documents: agreeing(anOidcConnection({ claim_mapping: { email: "email", phon: "phone" } }), {
+        schemas: { [SCHEMA_FILE]: aRequiringSchema() },
+      }),
     },
-  );
+  ] satisfies readonly {
+    readonly rule: string;
+    readonly why: string;
+    readonly documents: ConfigDocuments;
+  }[])("$rule stays silent: $why", (row) => {
+    const issues = issuesOf(row.rule, row.documents);
+
+    expect(issues).toEqual([]);
+  });
 });
