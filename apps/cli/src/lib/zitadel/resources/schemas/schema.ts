@@ -361,6 +361,34 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
   }
 
   /**
+   * The properties the server requires of a created user that must also be
+   * unique, which automatic creation only fills when they arrive verified.
+   *
+   * @remarks
+   * A required path counts when the property at it carries a non-empty
+   * `x-unique` scope. The contract keeps no `x-unique` for a nested property,
+   * so it is read from the body as written. A nested path is named by the
+   * top-level property that holds it.
+   *
+   * @returns The top-level property names, each once, in the order required.
+   */
+  get requiredUniqueByServer(): readonly PropertyName[] {
+    const unique = this.requiredByServer.filter((path) => {
+      const definition = path.split(".").reduce<JsonObject>((node, name) => {
+        return objectAt(objectAt(node, "properties"), name);
+      }, this.body);
+      return typeof definition["x-unique"] === "string" && definition["x-unique"] !== "";
+    });
+    return [
+      ...new Set(
+        unique.map((path) => {
+          return propertyName(path.split(".")[0] ?? path);
+        }),
+      ),
+    ];
+  }
+
+  /**
    * The authentication methods the schema lists, as its contract took them.
    *
    * @remarks

@@ -666,6 +666,19 @@ describe("SSO_RULES", () => {
         message: `step "identifier": "acme" creates users automatically, but ${SCHEMA_PATH} requires "phone" and claim_mapping of ${CONNECTION_PATH} maps no claim to it`,
       },
       {
+        rule: "sso/impossible-auto-creation-verification",
+        severity: "warning",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email", phone: "phone" },
+            verified_claims: { phone: true },
+          }),
+          { schemas: { [SCHEMA_FILE]: aRequiringSchema() } },
+        ),
+        file: FLOW_PATH,
+        message: `step "identifier": "acme" creates users automatically, but ${SCHEMA_PATH} requires unique "email" and verified_claims of ${CONNECTION_PATH} has no entry for "email"`,
+      },
+      {
         rule: "sso/impossible-registration",
         severity: "warning",
         documents: agreeing(anOidcConnection({ provisioning: { creation: "disabled" } }), {
@@ -840,6 +853,44 @@ describe("SSO_RULES", () => {
         rule: "sso/impossible-auto-creation-data",
         documents: agreeing(anOidcConnection({ claim_mapping: {} }), {
           schemas: { [SCHEMA_FILE]: aRequiringSchema() },
+        }),
+      },
+      { rule: "sso/impossible-auto-creation-verification", documents: agreeing(ACME) },
+      {
+        rule: "sso/impossible-auto-creation-verification",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email", phone: "phone" },
+            verified_claims: { email: true, phone: true },
+          }),
+          { schemas: { [SCHEMA_FILE]: aRequiringSchema() } },
+        ),
+      },
+      {
+        rule: "sso/impossible-auto-creation-verification",
+        documents: agreeing(anOidcConnection({ claim_mapping: {} }), {
+          schemas: { [SCHEMA_FILE]: aRequiringSchema() },
+        }),
+      },
+      {
+        rule: "sso/impossible-auto-creation-verification",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email", phone: "phone" },
+            provisioning: { creation: "disabled" },
+          }),
+          { schemas: { [SCHEMA_FILE]: aRequiringSchema() } },
+        ),
+      },
+      {
+        rule: "sso/impossible-auto-creation-verification",
+        documents: agreeing(anOidcConnection({ claim_mapping: { email: "email" } }), {
+          schemas: {
+            [SCHEMA_FILE]: aSchemaListing(["acme"], {
+              required: ["email"],
+              properties: { email: { type: "string" } },
+            }),
+          },
         }),
       },
       { rule: "sso/impossible-registration", documents: agreeing(ACME) },
