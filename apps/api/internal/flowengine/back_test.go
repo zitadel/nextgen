@@ -237,10 +237,10 @@ func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
 	// create_user signals Irreversible on success; test pins the signal.
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Any()).
-		Return(domain.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil)
+		Return(flowengine.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{Token: "handoff_01TEST", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Return(flowengine.FlowHandoffOutput{Token: "handoff_01TEST", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
 		Times(1)
 
 	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
@@ -384,7 +384,7 @@ func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 	// Simulate a ceremony pending on step2. The challenge id is bound to
 	// step2; back must drop it so a downstream verify can't resurrect it
 	// against a different step.
-	advanced.State.PendingChallenge = &domain.FlowPendingChallenge{ID: "ch-1", Method: flowengine.FlowChallengeMethodPasskey}
+	advanced.State.PendingChallenge = &flowengine.FlowPendingChallenge{ID: "ch-1", Method: flowengine.FlowChallengeMethodPasskey}
 
 	afterBack, err := w.sm.Process(t.Context(), def, advanced.State, flowengine.FlowSubmitInput{Action: "back"})
 	require.NoError(t, err)
@@ -456,7 +456,7 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 			SubmitIdentifier(gomock.Any(), identifiedBy("attempt-1", "email", email)).
 			Return("user_alice", nil),
 		w.authAttemptService.EXPECT().
-			SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+			SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.FlowSubmitPasswordInput) bool {
 				return in.AttemptID == "attempt-1" && in.Plain == "not-the-password"
 			})).
 			Return(domain.ErrAuthAttemptProofRejected(nil)),

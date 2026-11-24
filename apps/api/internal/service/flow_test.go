@@ -506,7 +506,7 @@ type fakeStateMachine struct {
 	gotStartInput  flowengine.FlowStartInput
 	gotSubmitInput flowengine.FlowSubmitInput
 	gotProcessDef  *domain.FlowDefinition
-	gotRenderState *domain.FlowState
+	gotRenderState *flowengine.FlowState
 }
 
 func (f *fakeStateMachine) Start(ctx context.Context, in flowengine.FlowStartInput) (flowengine.FlowStepResult, error) {
@@ -515,13 +515,13 @@ func (f *fakeStateMachine) Start(ctx context.Context, in flowengine.FlowStartInp
 	return f.startResult, f.startErr
 }
 
-func (f *fakeStateMachine) Process(_ context.Context, def *domain.FlowDefinition, _ *domain.FlowState, in flowengine.FlowSubmitInput) (flowengine.FlowStepResult, error) {
+func (f *fakeStateMachine) Process(_ context.Context, def *domain.FlowDefinition, _ *flowengine.FlowState, in flowengine.FlowSubmitInput) (flowengine.FlowStepResult, error) {
 	f.gotProcessDef = def
 	f.gotSubmitInput = in
 	return f.processResult, f.processErr
 }
 
-func (f *fakeStateMachine) Render(_ context.Context, _ *domain.FlowDefinition, state *domain.FlowState) (flowengine.FlowStepResult, error) {
+func (f *fakeStateMachine) Render(_ context.Context, _ *domain.FlowDefinition, state *flowengine.FlowState) (flowengine.FlowStepResult, error) {
 	f.gotRenderState = state
 	return f.renderResult, f.renderErr
 }
@@ -573,7 +573,7 @@ func stubSubmitDB(t *testing.T, def *domain.FlowDefinition, attempt *domain.Auth
 func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 
-	state := &domain.FlowState{ProjectID: def.ProjectID}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "start"}}}
 
 	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil)
@@ -593,7 +593,7 @@ func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 // must already be on the actor slot so FromContext can copy flow_id.
 func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	state := &domain.FlowState{ProjectID: def.ProjectID}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "start"}}}
 	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil)
 
@@ -617,7 +617,7 @@ func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
 
 func TestFlowService_Start_PassesRedirectURIThrough(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	state := &domain.FlowState{ProjectID: def.ProjectID}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{}}}
 
 	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil)
@@ -634,7 +634,7 @@ func TestFlowService_Start_PassesRedirectURIThrough(t *testing.T) {
 
 func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	def := newDef("reauth", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeReauth)
-	state := &domain.FlowState{ProjectID: def.ProjectID}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{}}}
 
 	// No CreateSession is wired: supplying a session must reuse it, so any call
@@ -662,7 +662,7 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 
 func TestFlowService_Start_PersistsSession(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	state := &domain.FlowState{ProjectID: def.ProjectID}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{}}}
 
 	ctrl := gomock.NewController(t)
@@ -692,7 +692,7 @@ func TestFlowService_Start_PersistsSession(t *testing.T) {
 
 func TestFlowService_Start_RecordsUserAgent(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	state := &domain.FlowState{ProjectID: def.ProjectID}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{}}}
 
 	ctrl := gomock.NewController(t)
@@ -750,15 +750,15 @@ func TestFlowService_Start_PropagatesStateMachineError(t *testing.T) {
 func TestFlowService_Submit_RefetchesDefinitionAndCallsProcess(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att_1"})
-	processedState := &domain.FlowState{ID: "flow_1"}
+	processedState := &flowengine.FlowState{ID: "flow_1"}
 	sm := &fakeStateMachine{processResult: flowengine.FlowStepResult{State: processedState, Step: &flowengine.FlowStep{Name: "next"}}}
 
 	svc := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{}, nil)
 
-	state := &domain.FlowState{
+	state := &flowengine.FlowState{
 		ID:            "flow_1",
 		ProjectID:     def.ProjectID,
-		FlowProgress:  domain.FlowProgress{DefinitionID: def.ID},
+		FlowProgress:  flowengine.FlowProgress{DefinitionID: def.ID},
 		AuthAttemptID: "att_1",
 	}
 	_, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
@@ -776,7 +776,7 @@ func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
 	repo := stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att_1"})
 	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	sm := &fakeStateMachine{processResult: flowengine.FlowStepResult{
-		State:                 &domain.FlowState{ID: "flow_1"},
+		State:                 &flowengine.FlowState{ID: "flow_1"},
 		Step:                  &flowengine.FlowStep{Name: "done"},
 		HandoffToken:          "ht_abc",
 		HandoffTokenExpiresAt: expiresAt,
@@ -785,10 +785,10 @@ func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
 	svc := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{}, nil)
 
 	res, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
-		State: &domain.FlowState{
+		State: &flowengine.FlowState{
 			ID:            "flow_1",
 			ProjectID:     def.ProjectID,
-			FlowProgress:  domain.FlowProgress{DefinitionID: def.ID},
+			FlowProgress:  flowengine.FlowProgress{DefinitionID: def.ID},
 			AuthAttemptID: "att_1",
 		},
 		Action: "submit",
@@ -802,7 +802,7 @@ func TestFlowService_Submit_PropagatesSSOReturnAndBindingNonce(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att_1"})
 	sm := &fakeStateMachine{processResult: flowengine.FlowStepResult{
-		State:           &domain.FlowState{ID: "flow_1"},
+		State:           &flowengine.FlowState{ID: "flow_1"},
 		Step:            &flowengine.FlowStep{Name: flowengine.FlowStepNameSSORedirect},
 		SSOBindingNonce: "nonce-1",
 	}}
@@ -811,10 +811,10 @@ func TestFlowService_Submit_PropagatesSSOReturnAndBindingNonce(t *testing.T) {
 	svc := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{}, nil)
 
 	res, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
-		State: &domain.FlowState{
+		State: &flowengine.FlowState{
 			ID:            "flow_1",
 			ProjectID:     def.ProjectID,
-			FlowProgress:  domain.FlowProgress{DefinitionID: def.ID},
+			FlowProgress:  flowengine.FlowProgress{DefinitionID: def.ID},
 			AuthAttemptID: "att_1",
 		},
 		Action:        domain.FlowActionSSO,
@@ -853,10 +853,10 @@ func TestFlowService_Submit_DeadAttemptRestartsFlow(t *testing.T) {
 			svc := service.NewFlowService(stubSubmitDB(t, def, tt.attempt), sm, domain.BuiltinSchemaBases{}, nil)
 
 			_, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
-				State: &domain.FlowState{
+				State: &flowengine.FlowState{
 					ID:            "flow_1",
 					ProjectID:     def.ProjectID,
-					FlowProgress:  domain.FlowProgress{DefinitionID: def.ID},
+					FlowProgress:  flowengine.FlowProgress{DefinitionID: def.ID},
 					AuthAttemptID: "att_1",
 				},
 				Action: "submit",
@@ -870,10 +870,10 @@ func TestFlowService_Submit_DeadAttemptRestartsFlow(t *testing.T) {
 func TestFlowService_GetStep_CallsRender(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubGetFlowDefinition(t, def)
-	state := &domain.FlowState{
+	state := &flowengine.FlowState{
 		ID:           "flow_1",
 		ProjectID:    def.ProjectID,
-		FlowProgress: domain.FlowProgress{DefinitionID: def.ID},
+		FlowProgress: flowengine.FlowProgress{DefinitionID: def.ID},
 	}
 	sm := &fakeStateMachine{renderResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "identify"}}}
 
@@ -889,10 +889,10 @@ func TestFlowService_GetStep_CallsRender(t *testing.T) {
 func TestFlowService_GetStep_PropagatesHandoffToken(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubGetFlowDefinition(t, def)
-	state := &domain.FlowState{
+	state := &flowengine.FlowState{
 		ID:           "flow_1",
 		ProjectID:    def.ProjectID,
-		FlowProgress: domain.FlowProgress{DefinitionID: def.ID},
+		FlowProgress: flowengine.FlowProgress{DefinitionID: def.ID},
 	}
 	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	sm := &fakeStateMachine{renderResult: flowengine.FlowStepResult{
@@ -920,7 +920,7 @@ func TestFlowService_Start_ResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
 	}
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	def.UserSchema = "https://schemas.test/builtin/v0/default-human-user.json"
-	state := &domain.FlowState{ProjectID: def.ProjectID}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "start"}}}
 
 	_, err := service.NewFlowService(stubDBWithSchemas(t, stored), sm, bases, nil).Start(withPinnedSchema(t, t.Context(), "human-user", stored.URL), service.StartFlowRequest{
@@ -937,7 +937,7 @@ type countingSignupProtection struct {
 	issued int
 }
 
-func (c *countingSignupProtection) Challenge(context.Context, *domain.FlowState) (*pow.PublicChallenge, error) {
+func (c *countingSignupProtection) Challenge(context.Context, *flowengine.FlowState) (*pow.PublicChallenge, error) {
 	c.issued++
 	return &pow.PublicChallenge{ChallengeID: "ch_pow"}, nil
 }
@@ -964,7 +964,7 @@ func TestFlowService_GetStep_GatesAPasskeyRegistrationThatCreatesItsUser(t *test
 		t.Run(tc.name, func(t *testing.T) {
 			def := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
 			def.Steps = []domain.FlowDefinitionStep{{Name: "start", Actions: []domain.FlowStepAction{{Name: "passkey_register", Kind: domain.FlowActionKindPasskeyRegister}}}}
-			state := &domain.FlowState{ID: "flow-1", ProjectID: def.ProjectID, FlowProgress: domain.FlowProgress{DefinitionID: def.ID}, AuthAttemptID: "att-1"}
+			state := &flowengine.FlowState{ID: "flow-1", ProjectID: def.ProjectID, FlowProgress: flowengine.FlowProgress{DefinitionID: def.ID}, AuthAttemptID: "att-1"}
 			step := &flowengine.FlowStep{Name: "start", Challenge: &flowengine.FlowStepChallenge{Method: tc.method, ChallengeID: "ch-reg-1"}}
 			sm := &fakeStateMachine{renderResult: flowengine.FlowStepResult{State: state, Step: step}}
 
@@ -995,7 +995,7 @@ func TestFlowService_GetStep_GatesAPasskeyRegistrationThatCreatesItsUser(t *test
 func TestFlowService_SignupIssuanceCannotDiscardTransition(t *testing.T) {
 	def := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
 	def.Steps = []domain.FlowDefinitionStep{{Name: "start", OnSuccess: new(domain.FlowOnSuccessCreateUser)}}
-	state := &domain.FlowState{ProjectID: def.ProjectID, FlowProgress: domain.FlowProgress{DefinitionID: def.ID}, AuthAttemptID: "attempt"}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID, FlowProgress: flowengine.FlowProgress{DefinitionID: def.ID}, AuthAttemptID: "attempt"}
 	result := flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "start"}}
 	sm := &fakeStateMachine{startResult: result, processResult: result, renderResult: result}
 	protection := stubSignupProtection{err: domain.ErrFlowRateLimited()}

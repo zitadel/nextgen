@@ -114,14 +114,14 @@ func TestFlowCreateUserWithPassword_PreMintsSharedUserID(t *testing.T) {
 			return fn(ctx, v2TestTx{stmts: f.stmts})
 		})
 
-	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+	out, err := f.handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{
 		ProjectID:     "proj_1",
 		UserSchemaURL: "https://example.test/schema.json",
-		State: &domain.FlowState{
+		State: &flowengine.FlowState{
 			ProjectID:     "proj_1",
 			AuthAttemptID: "att-1",
-			FlowProgress: domain.FlowProgress{
-				CollectedData: domain.CollectedFlowData{
+			FlowProgress: flowengine.FlowProgress{
+				CollectedData: flowengine.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
 					AuthMethods: map[string]string{
 						domain.AuthMethodPassword: "s3cret",
@@ -165,14 +165,14 @@ func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
 			return fn(ctx, v2TestTx{stmts: f.stmts})
 		})
 
-	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+	out, err := f.handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{
 		ProjectID:     "proj_1",
 		UserSchemaURL: "https://example.test/schema.json",
-		State: &domain.FlowState{
+		State: &flowengine.FlowState{
 			ProjectID:     "proj_1",
 			AuthAttemptID: "att-1",
-			FlowProgress: domain.FlowProgress{
-				CollectedData: domain.CollectedFlowData{
+			FlowProgress: flowengine.FlowProgress{
+				CollectedData: flowengine.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
 					AuthMethods: map[string]string{
 						domain.AuthMethodPassword: "s3cret",
@@ -194,14 +194,14 @@ func TestFlowCreateUserWithPassword_PolicyViolationShowsStepError(t *testing.T) 
 
 	// No hash, no transaction: the policy rejects the password first.
 
-	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+	out, err := f.handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{
 		ProjectID:     "proj_1",
 		UserSchemaURL: "https://example.test/schema.json",
-		State: &domain.FlowState{
+		State: &flowengine.FlowState{
 			ProjectID:     "proj_1",
 			AuthAttemptID: "att-1",
-			FlowProgress: domain.FlowProgress{
-				CollectedData: domain.CollectedFlowData{
+			FlowProgress: flowengine.FlowProgress{
+				CollectedData: flowengine.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
 					AuthMethods: map[string]string{
 						domain.AuthMethodPassword: "s3cret",
@@ -220,12 +220,12 @@ func TestFlowCreateUserWithPassword_PolicyViolationShowsStepError(t *testing.T) 
 func TestFlowCreateUserWithPassword_MissingPasswordIsIntegrityError(t *testing.T) {
 	f := newPasswordHandlerFixture(t)
 
-	_, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+	_, err := f.handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{
 		ProjectID:     "proj_1",
 		UserSchemaURL: "https://example.test/schema.json",
-		State: &domain.FlowState{
-			FlowProgress: domain.FlowProgress{
-				CollectedData: domain.CollectedFlowData{
+		State: &flowengine.FlowState{
+			FlowProgress: flowengine.FlowProgress{
+				CollectedData: flowengine.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
 				},
 			},
@@ -239,8 +239,8 @@ func TestFlowCreateUserWithPassword_ProofBeforeUserOrPasswordWork(t *testing.T) 
 		// Nil mutation dependencies deliberately prove that a refused proof never
 		// reaches ID allocation, password hashing, schema lookup or user writes.
 		handler := service.NewFlowCreateUserHandler(nil, noPolicyGate(t), nil, nil, nil, stubSignupProtection{err: refusal})
-		state := &domain.FlowState{ProjectID: "proj_1", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "secret"}}}}
-		_, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: state.ProjectID, State: state})
+		state := &flowengine.FlowState{ProjectID: "proj_1", FlowProgress: flowengine.FlowProgress{CollectedData: flowengine.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "secret"}}}}
+		_, err := handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{ProjectID: state.ProjectID, State: state})
 		require.ErrorIs(t, err, refusal)
 	}
 }
@@ -249,8 +249,8 @@ func TestFlowCreateUserWithPassword_PolicyRefusalDoesNotSpendProof(t *testing.T)
 	gate := newGate(t, fixedPolicy{config: map[string]any{"min_length": 12}}, nil, nil)
 	// Consume would fail if called; no ID, hasher or mutation dependencies exist.
 	handler := service.NewFlowCreateUserHandler(nil, gate, nil, nil, nil, stubSignupProtection{err: domain.ErrFlowProofInvalid()})
-	state := &domain.FlowState{ProjectID: "proj", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "short"}}}}
-	result, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: "proj", State: state})
+	state := &flowengine.FlowState{ProjectID: "proj", FlowProgress: flowengine.FlowProgress{CollectedData: flowengine.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "short"}}}}
+	result, err := handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{ProjectID: "proj", State: state})
 	require.NoError(t, err)
 	require.NotNil(t, result.StepError)
 	require.Equal(t, "error.x-auth-methods#password_min_length", result.StepError.Key)

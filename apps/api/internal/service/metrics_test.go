@@ -277,7 +277,7 @@ func TestAuthAttemptService_VerifyProof_user_metrics(t *testing.T) {
 
 func TestFlowService_metrics(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	state := &domain.FlowState{ProjectID: def.ProjectID, AuthAttemptID: "att-1", FlowProgress: domain.FlowProgress{DefinitionID: def.ID}}
+	state := &flowengine.FlowState{ProjectID: def.ProjectID, AuthAttemptID: "att-1", FlowProgress: flowengine.FlowProgress{DefinitionID: def.ID}}
 	completeStep := &flowengine.FlowStep{Name: "done", Complete: new(domain.FlowStepCompleteRedirect)}
 
 	for _, tc := range []struct {
@@ -287,12 +287,12 @@ func TestFlowService_metrics(t *testing.T) {
 		wantRes metrics.FlowResult
 	}{
 		{"start at a step", func(t *testing.T) error {
-			sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: &domain.FlowState{ProjectID: def.ProjectID}, Step: &flowengine.FlowStep{Name: "start"}}}
+			sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: &flowengine.FlowState{ProjectID: def.ProjectID}, Step: &flowengine.FlowStep{Name: "start"}}}
 			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
 			return err
 		}, metrics.FlowStart, metrics.FlowStep},
 		{"start completes", func(t *testing.T) error {
-			sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: &domain.FlowState{ProjectID: def.ProjectID}, Step: completeStep}}
+			sm := &fakeStateMachine{startResult: flowengine.FlowStepResult{State: &flowengine.FlowState{ProjectID: def.ProjectID}, Step: completeStep}}
 			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
 			return err
 		}, metrics.FlowStart, metrics.FlowComplete},

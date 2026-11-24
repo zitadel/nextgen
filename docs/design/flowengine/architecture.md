@@ -15,10 +15,10 @@ graph TD
     Handler["internal/api/flow.go<br>HTTP handler"]
     Crypter["internal/crypto<br>Crypter (seal/unseal cookie)"]
     Service["internal/service/flow.go<br>FlowService"]
-    SM["internal/domain/flow_state_machine.go<br>FlowStateMachineRuntime"]
+    SM["internal/flowengine/state_machine.go<br>FlowStateMachineRuntime"]
     FR["internal/domain/flow_field_resolver*<br>FlowFieldResolver"]
-    OS["internal/domain/flow_on_success*<br>FlowOnSuccessHandler"]
-    AA["internal/domain/flow_auth_attempt.go<br>FlowAuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
+    OS["internal/flowengine/port_on_success.go<br>FlowOnSuccessHandler"]
+    AA["internal/flowengine/port_auth_attempt.go<br>FlowAuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
 
     AAImpl["service: auth-attempt<br>(FlowAuthAttemptAdapter)"]
     Repo["repository: flow_definitions"]
@@ -82,7 +82,7 @@ Cookie I/O is owned by the handler. The state machine never touches HTTP, cookie
 
 ## Internal components
 
-The components below all live under `internal/domain/` and `internal/service/`.
+The components below all live under `internal/flowengine/`, `internal/domain/` and `internal/service/`.
 
 ### `FlowService` (`internal/service/flow.go`)
 
@@ -99,7 +99,7 @@ Service holds `*service.DB` (v2 statements), the `FlowStateMachine` interface,
 and the `idgen.Generator`. Flow definitions are loaded via
 `ListFlowDefinitions` / `GetFlowDefinitionByID` on `AllStatements`.
 
-### `FlowStateMachineRuntime` (`internal/domain/flow_state_machine.go`)
+### `FlowStateMachineRuntime` (`internal/flowengine/state_machine.go`)
 
 The state machine. Three entry points (`Start`, `Process`, `Render`) and one private pipeline:
 
@@ -158,13 +158,13 @@ Interface (`Resolve` + `Validate`) plus a schema-backed implementation in `flow_
 
 `Validate` walks the resolved fields and returns `FlowFieldValidationErrors` on rule violations — the state machine surfaces those as step errors.
 
-### `FlowOnSuccessHandler` (`internal/domain/flow_on_success.go`)
+### `FlowOnSuccessHandler` (`internal/flowengine/port_on_success.go`)
 
 Interface every `on_success` mutation satisfies. One implementation today:
 
 - `FlowCreateUserWithPasswordHandler` (`internal/service/flow_create_user_with_password_handler.go`) — reads the identifier and password fields from the collected data, hashes the password (argon2id), and applies user creation, password persistence, and the attempt's verified user + password factors (with their `auth.check.succeeded` events) in one transaction. A handler that returns a `UserID` must persist the user's factors itself; the state machine only records the id in flow state.
 
-### `FlowAuthAttemptService` (`internal/domain/flow_auth_attempt.go`)
+### `FlowAuthAttemptService` (`internal/flowengine/port_auth_attempt.go`)
 
 A narrow interface over the auth-attempt service. The state machine sees
 `Start`, `SubmitIdentifier`, `SubmitPassword`, the two legs of every
@@ -192,8 +192,8 @@ the actually-conflicting owner via the collected identifier-class fields.
 ### Domain types worth knowing
 
 - `FlowDefinition` / `FlowDefinitionStep` — the immutable graph (`flow_definition.go`). Steps don't have a `type`; behavior derives from `Fields`, `Actions`, `Gates`, `SSOProviders`, `OnSuccess`, `Complete`, and `Transitions`.
-- `FlowState` / `FlowProgress` — the cookie payload (`flow_state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
-- `FlowStep` — the capability payload returned to the client (`flow_state_machine.go`). `Challenge` carries the issue-leg payload of a two-phase ceremony.
+- `FlowState` / `FlowProgress` — the cookie payload (`flowengine/state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
+- `FlowStep` — the capability payload returned to the client (`flowengine/state_machine.go`). `Challenge` carries the issue-leg payload of a two-phase ceremony.
 - `FlowStepChallenge` / `FlowChallengeResponse` / `FlowPendingChallenge` — the two-phase ceremony contract: a pending challenge the client signs, and the proof it submits back.
 - Reserved key `FlowCollectedUserIDKey` (`_user_id`) — set by the dispatch loop when the auth-attempt identifies the user; gates whether the terminal step mints a handoff. For a provisional passkey registration it carries the server-minted user handle between the issue and verify legs (the persisted challenge, not the cookie, is authoritative for provisional-or-not).
 

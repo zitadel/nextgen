@@ -8,12 +8,13 @@ collects step fields, and runs the passkey and SSO ceremonies.
 It does not own:
 
 - flow definitions and their validation, which live in `domain`;
-- persistence, policy and side effects, which it calls through interfaces
-  `domain` declares and `service` implements;
-- keeping flow state: it takes and returns a `domain.FlowState`, which lives
-  in the browser cookie, sealed by the API layer.
+- persistence, policy and side effects, which it calls through the ports it
+  declares (`port_<subject>.go`) and `service` implements;
+- keeping flow state: it takes and returns the `FlowState` it declares
+  (`state.go`), which lives in the browser cookie, sealed by the API layer.
 
-`flowengine` imports `domain`; `domain` never imports `flowengine`.
+`flowengine` imports `domain`; `domain` never imports `flowengine`. Mocks of
+the ports are generated into `mock` (package `flowenginemock`).
 
 Files by concern: `state_machine.go` (the interface, start and process),
 `action.go` (the table of one handler per action kind, which `Process`

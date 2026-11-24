@@ -206,28 +206,28 @@ func handedOffAttempt(a *domain.AuthAttempt) *domain.AuthAttempt {
 	return a
 }
 
-func loadInput() domain.FlowSSOLoadInput {
-	return domain.FlowSSOLoadInput{ProjectID: ssoProjectID, AttemptID: ssoAttemptID, UserSchemaURL: ssoSchemaURL}
+func loadInput() flowengine.FlowSSOLoadInput {
+	return flowengine.FlowSSOLoadInput{ProjectID: ssoProjectID, AttemptID: ssoAttemptID, UserSchemaURL: ssoSchemaURL}
 }
 
-func collectedInput() domain.FlowSSOLoadInput {
+func collectedInput() flowengine.FlowSSOLoadInput {
 	in := loadInput()
 	in.ResolvedCheckID = "ch-1"
 	return in
 }
 
-func bindInput() domain.FlowSSOBindInput {
-	return domain.FlowSSOBindInput{
+func bindInput() flowengine.FlowSSOBindInput {
+	return flowengine.FlowSSOBindInput{
 		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
 	}
 }
 
-func collisionInput(userID string) domain.FlowSSOBindInput {
-	return domain.FlowSSOBindInput{ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: userID}
+func collisionInput(userID string) flowengine.FlowSSOBindInput {
+	return flowengine.FlowSSOBindInput{ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: userID}
 }
 
-func createInput() domain.FlowSSOCreateInput {
-	return domain.FlowSSOCreateInput{
+func createInput() flowengine.FlowSSOCreateInput {
+	return flowengine.FlowSSOCreateInput{
 		ProjectID:     ssoProjectID,
 		AttemptID:     ssoAttemptID,
 		CheckID:       "ch-1",
@@ -291,7 +291,7 @@ func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptReportsUser(t *testing.T
 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
-	assert.Equal(t, &domain.FlowSSOParkedIdentity{BoundUserID: "user-1", AttemptUserID: "user-1"}, got)
+	assert.Equal(t, &flowengine.FlowSSOParkedIdentity{BoundUserID: "user-1", AttemptUserID: "user-1"}, got)
 }
 
 func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithParkedResultPrefersResult(t *testing.T) {
@@ -346,7 +346,7 @@ func TestFlowSSOIdentityResolver_LoadParked_ErrorResultReportsKey(t *testing.T) 
 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
-	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: flowengine.FlowStepErrorSSOCancelled}, got)
+	assert.Equal(t, &flowengine.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: flowengine.FlowStepErrorSSOCancelled}, got)
 }
 
 func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {
@@ -357,14 +357,14 @@ func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {
 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
-	assert.Equal(t, &domain.FlowSSOParkedIdentity{
+	assert.Equal(t, &flowengine.FlowSSOParkedIdentity{
 		CheckID:          "ch-1",
 		ConnectionID:     "idp-1",
 		Subject:          "sub-1",
 		Claims:           map[string]any{"email": "alice@example.com"},
 		Verified:         map[string]bool{"email": true},
 		CreationDisabled: true,
-		Link:             &domain.FlowSSOLinkedUser{LinkID: "idplink-1", UserID: "user-1"},
+		Link:             &flowengine.FlowSSOLinkedUser{LinkID: "idplink-1", UserID: "user-1"},
 	}, got)
 }
 
@@ -420,7 +420,7 @@ func TestFlowSSOIdentityResolver_LoadParked_OlderRevisionOfSameSchemaResolves(t 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, &domain.FlowSSOLinkedUser{LinkID: "idplink-1", UserID: "user-1"}, got.Link)
+	assert.Equal(t, &flowengine.FlowSSOLinkedUser{LinkID: "idplink-1", UserID: "user-1"}, got.Link)
 }
 
 // The linked user's schema id comes from a stored row, so a revision the
@@ -491,7 +491,7 @@ func TestFlowSSOIdentityResolver_LoadParked_CollisionMarkerReportsCollisionUser(
 			in.ResolvedCheckID = tc.resolvedID
 			got, err := f.resolver.LoadParked(t.Context(), in)
 			require.NoError(t, err)
-			assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
+			assert.Equal(t, &flowengine.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
 		})
 	}
 }
@@ -500,10 +500,10 @@ func TestFlowSSOIdentityResolver_LoadParked_CollisionMarkerReportsCollisionUser(
 // the provider: the flow cannot resolve the identity and must be restarted.
 func TestFlowSSOIdentityResolver_RevisionMissingRestarts(t *testing.T) {
 	t.Parallel()
-	type load func(*service.FlowSSOIdentityResolver, context.Context, domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error)
+	type load func(*service.FlowSSOIdentityResolver, context.Context, flowengine.FlowSSOLoadInput) (*flowengine.FlowSSOParkedIdentity, error)
 	for name, tc := range map[string]struct {
 		load load
-		in   domain.FlowSSOLoadInput
+		in   flowengine.FlowSSOLoadInput
 	}{
 		"LoadParked":    {load: (*service.FlowSSOIdentityResolver).LoadParked, in: loadInput()},
 		"LoadCollected": {load: (*service.FlowSSOIdentityResolver).LoadCollected, in: collectedInput()},
@@ -541,7 +541,7 @@ func TestFlowSSOIdentityResolver_LoadCollected_ReadsResolvedRow(t *testing.T) {
 
 	got, err := f.resolver.LoadCollected(t.Context(), collectedInput())
 	require.NoError(t, err)
-	assert.Equal(t, &domain.FlowSSOParkedIdentity{
+	assert.Equal(t, &flowengine.FlowSSOParkedIdentity{
 		CheckID:      "ch-1",
 		ConnectionID: "idp-1",
 		Subject:      "sub-1",

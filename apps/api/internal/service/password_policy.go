@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -80,9 +81,9 @@ func NewPasswordPolicy(engine *policy.Engine, resolver PolicyResolver, verifier 
 
 var _ PasswordGate = (*PasswordPolicy)(nil)
 
-var _ domain.FlowPasswordPolicy = (*PasswordPolicy)(nil)
+var _ flowengine.FlowPasswordPolicy = (*PasswordPolicy)(nil)
 
-// PasswordLengthBounds implements [domain.FlowPasswordPolicy]: the length
+// PasswordLengthBounds implements [flowengine.FlowPasswordPolicy]: the length
 // bounds of the project's policy, which a flow step that asks for a new
 // password shows and checks before the gate does. Without a policy, or for a
 // bound it leaves unset, the minimum is 0 and the maximum is the domain cap.

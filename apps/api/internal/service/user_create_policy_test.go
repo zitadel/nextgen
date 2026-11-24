@@ -9,6 +9,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
+
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -114,13 +116,13 @@ func TestSignupChallengeTheServerCannotIssue(t *testing.T) {
 	// Any read, lock or budget write fails the test.
 	gate := newUserCreateGate(t, twoChallenges(t), userCreatePolicy{config: map[string]any{"challenge": "turnstile"}})
 	svc := service.NewSignupProtection(servicemocks.NewMockPool(ctrl), nil, gate)
-	_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
+	_, err := svc.Challenge(t.Context(), &flowengine.FlowState{ProjectID: "project", ID: "flow"})
 	require.ErrorIs(t, err, domain.ErrInternal(nil))
 }
 
 func TestSignupChallengeFailsClosedOnAnUnreadablePolicy(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	svc := service.NewSignupProtection(servicemocks.NewMockPool(ctrl), nil, newUserCreateGate(t, mustPolicyEngine(t), failingPolicy{}))
-	_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
+	_, err := svc.Challenge(t.Context(), &flowengine.FlowState{ProjectID: "project", ID: "flow"})
 	require.ErrorIs(t, err, domain.ErrInternal(nil))
 }

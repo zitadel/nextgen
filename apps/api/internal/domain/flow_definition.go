@@ -374,8 +374,8 @@ type FlowStepTransition struct {
 	// [FlowDefinition.TransitionTarget].
 	Target string
 	// Purpose, when non-nil, re-purposes the flow locally: taking this
-	// transition sets [FlowState.CurrentPurpose] to this purpose while the
-	// pinned [FlowState.Purpose] stays untouched. The purpose must be one
+	// transition sets the flow state's CurrentPurpose to this purpose while the
+	// pinned Purpose stays untouched. The purpose must be one
 	// the definition serves, and Target, when set, must be that purpose's
 	// entry step (validated). Mutually exclusive with Action — a transition
 	// either pivots to another flow or re-purposes within this one, never

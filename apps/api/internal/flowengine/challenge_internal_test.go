@@ -19,7 +19,7 @@ func TestChallengeMethods_IssueAndVerifyTheSameCheck(t *testing.T) {
 		declared, ok := challengeMethods[method]
 		require.True(t, ok, "declaration for %s", method)
 		pc := &processCtx{
-			state: &domain.FlowState{},
+			state: &FlowState{},
 			in:    FlowSubmitInput{PasskeyRP: &FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}}},
 		}
 		params, err := declared.params(pc, domain.FlowResolvedFields{})

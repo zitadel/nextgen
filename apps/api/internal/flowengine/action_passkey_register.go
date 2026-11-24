@@ -1,9 +1,5 @@
 package flowengine
 
-import (
-	"github.com/zitadel/nextgen/internal/domain"
-)
-
 // passkeyRegisterHandler handles kind=passkey_register, a two-phase WebAuthn
 // enrollment. The issue leg uses the collected user id (or lets the
 // registration service mint a provisional one), then issues a creation
@@ -48,7 +44,7 @@ func (passkeyRegisterHandler) process(r *FlowStateMachineRuntime, pc *processCtx
 // as long as the ceremony is pending, so a client solves it for whatever it
 // submits next: the password path it falls back to after a cancelled prompt
 // must not be refused for bringing it.
-func (passkeyRegisterHandler) acceptsSignupProof(state *domain.FlowState, in FlowSubmitInput) bool {
+func (passkeyRegisterHandler) acceptsSignupProof(state *FlowState, in FlowSubmitInput) bool {
 	pending := state.PendingChallenge != nil && state.PendingChallenge.Method == FlowChallengeMethodPasskeyRegister
 	// Without a pending registration only its attestation may bring the
 	// proof: an assertion of a sign-in the step also offers creates nobody.
@@ -59,7 +55,7 @@ func (passkeyRegisterHandler) acceptsSignupProof(state *domain.FlowState, in Flo
 // needsPasskeyRegistrationVisitedFields reports whether a passkey_register
 // submission runs the registration ceremony: every leg but the verify leg of
 // an assertion.
-func needsPasskeyRegistrationVisitedFields(state *domain.FlowState, in FlowSubmitInput) bool {
+func needsPasskeyRegistrationVisitedFields(state *FlowState, in FlowSubmitInput) bool {
 	if in.ChallengeResponse == nil {
 		return true
 	}
