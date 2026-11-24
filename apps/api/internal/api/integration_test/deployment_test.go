@@ -1033,6 +1033,21 @@ func TestDeploymentRefusesAMissingVariable(t *testing.T) {
 	}, notSecret.Details)
 	assert.Zero(t, fixture.deploymentCount(t))
 
+	// A secret that is empty refuses it too: the token exchange could never
+	// present it.
+	fixture.setPrimaryVariables(t, api.UpdateVariablesRequest{
+		"GONE": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+			Value:  api.NewStringVariableScalar(""),
+			Secret: true,
+		}),
+	})
+	empty := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentBadRequest{}, empty, helpers.MustMarshal(t, empty))
+	notSecret, ok = empty.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesNotSecret()
+	require.True(t, ok, helpers.MustMarshal(t, empty))
+	assert.Equal(t, []string{"GONE"}, notSecret.Details.Names)
+	assert.Zero(t, fixture.deploymentCount(t))
+
 	fixture.setPrimaryVariables(t, api.UpdateVariablesRequest{
 		"GONE": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
 			Value:  api.NewStringVariableScalar("gone"),

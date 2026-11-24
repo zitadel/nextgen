@@ -17680,6 +17680,50 @@ func (m *MockVariableService) EXPECT() *MockVariableServiceMockRecorder {
 	return m.recorder
 }
 
+// DecryptVariableSetSecrets mocks base method.
+func (m *MockVariableService) DecryptVariableSetSecrets(ctx context.Context, set *domain.VariableSet, names ...string) (map[string]any, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, set}
+	for _, a := range names {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DecryptVariableSetSecrets", varargs...)
+	ret0, _ := ret[0].(map[string]any)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DecryptVariableSetSecrets indicates an expected call of DecryptVariableSetSecrets.
+func (mr *MockVariableServiceMockRecorder) DecryptVariableSetSecrets(ctx, set any, names ...any) *MockVariableServiceDecryptVariableSetSecretsCall {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, set}, names...)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecryptVariableSetSecrets", reflect.TypeOf((*MockVariableService)(nil).DecryptVariableSetSecrets), varargs...)
+	return &MockVariableServiceDecryptVariableSetSecretsCall{Call: call}
+}
+
+// MockVariableServiceDecryptVariableSetSecretsCall wrap *gomock.Call
+type MockVariableServiceDecryptVariableSetSecretsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockVariableServiceDecryptVariableSetSecretsCall) Return(arg0 map[string]any, arg1 error) *MockVariableServiceDecryptVariableSetSecretsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockVariableServiceDecryptVariableSetSecretsCall) Do(f func(context.Context, *domain.VariableSet, ...string) (map[string]any, error)) *MockVariableServiceDecryptVariableSetSecretsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockVariableServiceDecryptVariableSetSecretsCall) DoAndReturn(f func(context.Context, *domain.VariableSet, ...string) (map[string]any, error)) *MockVariableServiceDecryptVariableSetSecretsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // DeleteVariable mocks base method.
 func (m *MockVariableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, name string) error {
 	m.ctrl.T.Helper()

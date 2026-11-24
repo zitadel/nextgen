@@ -177,7 +177,7 @@ func TestDeclaredApplication(t *testing.T) {
 
 // TestDeclaredApplicationDeployVariables covers which variables a deploy
 // needs of a declared application: only its clients' secrets, each stored as
-// a secret.
+// a secret holding a non-empty string.
 func TestDeclaredApplicationDeployVariables(t *testing.T) {
 	t.Parallel()
 	f := newDeploymentFixture(t)
@@ -195,6 +195,20 @@ func TestDeclaredApplicationDeployVariables(t *testing.T) {
 	plain, ok := refused.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesNotSecret()
 	require.True(t, ok, helpers.MustMarshal(t, refused))
 	assert.Equal(t, []string{"BLOG_WEB_SECRET"}, plain.Details.Names)
+
+	for name, value := range map[string]api.VariableScalar{
+		"an empty secret":     api.NewStringVariableScalar(""),
+		"a non-string secret": api.NewFloat64VariableScalar(42),
+	} {
+		f.setPrimaryVariables(t, api.UpdateVariablesRequest{
+			"BLOG_WEB_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{Value: value, Secret: true}),
+		})
+		refused := f.deploy(t, release.ID)
+		require.IsType(t, &api.CreateDeploymentBadRequest{}, refused, name+": "+helpers.MustMarshal(t, refused))
+		unusable, ok := refused.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesNotSecret()
+		require.True(t, ok, name+": "+helpers.MustMarshal(t, refused))
+		assert.Equal(t, []string{"BLOG_WEB_SECRET"}, unusable.Details.Names, name)
+	}
 
 	f.setPrimaryVariables(t, api.UpdateVariablesRequest{
 		"BLOG_WEB_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{

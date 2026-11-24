@@ -27350,6 +27350,22 @@ func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case VarDecryptionFailedCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.decryption_failed")
+		{
+			s := s.VarDecryptionFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -27550,6 +27566,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "evt.invalid":
 					s.Type = EvtInvalidCreateDeploymentErrorResponse
 					found = true
+				case "var.decryption_failed":
+					s.Type = VarDecryptionFailedCreateDeploymentErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateDeploymentErrorResponse
 					found = true
@@ -27629,6 +27648,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EvtInvalidCreateDeploymentErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case VarDecryptionFailedCreateDeploymentErrorResponse:
+		if err := s.VarDecryptionFailed.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateDeploymentErrorResponse:
@@ -113952,6 +113975,40 @@ func (s *OptUserUpdatedPayloadAttributes) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes VarDecryptionFailedDetails as json.
+func (o OptVarDecryptionFailedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes VarDecryptionFailedDetails from json.
+func (o *OptVarDecryptionFailedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptVarDecryptionFailedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(VarDecryptionFailedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptVarDecryptionFailedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptVarDecryptionFailedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes VarDocumentTooDeepDetails as json.
 func (o OptVarDocumentTooDeepDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -145208,6 +145265,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case VarDecryptionFailedRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.decryption_failed")
+		{
+			s := s.VarDecryptionFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -145392,6 +145465,9 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "evt.invalid":
 					s.Type = EvtInvalidRollbackDeploymentErrorResponse
 					found = true
+				case "var.decryption_failed":
+					s.Type = VarDecryptionFailedRollbackDeploymentErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalRollbackDeploymentErrorResponse
 					found = true
@@ -145468,6 +145544,10 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EvtInvalidRollbackDeploymentErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case VarDecryptionFailedRollbackDeploymentErrorResponse:
+		if err := s.VarDecryptionFailed.Decode(d); err != nil {
 			return err
 		}
 	case InternalRollbackDeploymentErrorResponse:
@@ -170395,6 +170475,194 @@ func (s UserUpdatedPayloadAttributes) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserUpdatedPayloadAttributes) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *VarDecryptionFailed) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *VarDecryptionFailed) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("var.decryption_failed")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfVarDecryptionFailed = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes VarDecryptionFailed from json.
+func (s *VarDecryptionFailed) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VarDecryptionFailed to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode VarDecryptionFailed")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfVarDecryptionFailed) {
+					name = jsonFieldsNameOfVarDecryptionFailed[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *VarDecryptionFailed) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VarDecryptionFailed) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s VarDecryptionFailedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s VarDecryptionFailedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes VarDecryptionFailedDetails from json.
+func (s *VarDecryptionFailedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VarDecryptionFailedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode VarDecryptionFailedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s VarDecryptionFailedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VarDecryptionFailedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

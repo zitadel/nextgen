@@ -33,7 +33,8 @@ func (s *DeploymentService) Variables(ctx context.Context, projectID, deployment
 // set already passed the check. Anything else builds the set from the live
 // rows of the deployment's kind, including the empty set, and refuses the
 // deploy when the release names a variable that set does not hold, or names
-// a plain one as a client secret.
+// as a client secret one that is plain or does not decrypt to a non-empty
+// string: a client could never authenticate with it.
 func resolveDeploymentVariableSet(ctx context.Context, variables VariableService, stmts AllStatements, entity *domain.Deployment, release *domain.Release) (*domain.VariableSet, error) {
 	if entity.Metadata.RollbackTo != nil {
 		set, err := variables.ReadDeploymentVariableSet(ctx, stmts, entity.ProjectID, *entity.Metadata.RollbackTo)
@@ -57,19 +58,33 @@ func resolveDeploymentVariableSet(ctx context.Context, variables VariableService
 	for _, entry := range set.Entries {
 		held[entry.Name] = entry
 	}
-	var missing, plain []string
+	var missing, plain, secret []string
 	for _, name := range names {
 		entry, ok := held[name]
 		if !ok {
 			missing = append(missing, name)
 			continue
 		}
-		if secrets[name] && !entry.IsSecret {
+		if !secrets[name] {
+			continue
+		}
+		if entry.IsSecret {
+			secret = append(secret, name)
+		} else {
 			plain = append(plain, name)
 		}
 	}
 	if len(missing) > 0 {
 		return nil, domain.ErrDeploymentVariablesMissing(entity.OriginKind, missing)
+	}
+	values, err := variables.DecryptVariableSetSecrets(ctx, set, secret...)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range secret {
+		if value, _ := values[name].(string); value == "" {
+			plain = append(plain, name)
+		}
 	}
 	if len(plain) > 0 {
 		return nil, domain.ErrDeploymentVariablesNotSecret(entity.OriginKind, plain)

@@ -17164,6 +17164,7 @@ type CreateDeploymentErrorResponse struct {
 	DepVariablesNotSecret DepVariablesNotSecret
 	EnvProjectNotFound    EnvProjectNotFound
 	EvtInvalid            EvtInvalid
+	VarDecryptionFailed   VarDecryptionFailed
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ProjNotFound          ProjNotFound
@@ -17190,6 +17191,7 @@ const (
 	DepVariablesNotSecretCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.variables_not_secret"
 	EnvProjectNotFoundCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "env.project_not_found"
 	EvtInvalidCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "evt.invalid"
+	VarDecryptionFailedCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "var.decryption_failed"
 	InternalCreateDeploymentErrorResponse              CreateDeploymentErrorResponseType = "internal"
 	NotImplementedCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "not_implemented"
 	ProjNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "proj.not_found"
@@ -17249,6 +17251,11 @@ func (s CreateDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 // IsEvtInvalid reports whether CreateDeploymentErrorResponse is EvtInvalid.
 func (s CreateDeploymentErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidCreateDeploymentErrorResponse
+}
+
+// IsVarDecryptionFailed reports whether CreateDeploymentErrorResponse is VarDecryptionFailed.
+func (s CreateDeploymentErrorResponse) IsVarDecryptionFailed() bool {
+	return s.Type == VarDecryptionFailedCreateDeploymentErrorResponse
 }
 
 // IsInternal reports whether CreateDeploymentErrorResponse is Internal.
@@ -17503,6 +17510,27 @@ func (s CreateDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidCreateDeploymentErrorResponse(v EvtInvalid) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetVarDecryptionFailed sets CreateDeploymentErrorResponse to VarDecryptionFailed.
+func (s *CreateDeploymentErrorResponse) SetVarDecryptionFailed(v VarDecryptionFailed) {
+	s.Type = VarDecryptionFailedCreateDeploymentErrorResponse
+	s.VarDecryptionFailed = v
+}
+
+// GetVarDecryptionFailed returns VarDecryptionFailed and true boolean if CreateDeploymentErrorResponse is VarDecryptionFailed.
+func (s CreateDeploymentErrorResponse) GetVarDecryptionFailed() (v VarDecryptionFailed, ok bool) {
+	if !s.IsVarDecryptionFailed() {
+		return v, false
+	}
+	return s.VarDecryptionFailed, true
+}
+
+// NewVarDecryptionFailedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from VarDecryptionFailed.
+func NewVarDecryptionFailedCreateDeploymentErrorResponse(v VarDecryptionFailed) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetVarDecryptionFailed(v)
 	return s
 }
 
@@ -26811,7 +26839,7 @@ func (s *DeploymentVariablesMissingDetails) SetNames(val []string) {
 }
 
 // The release names variables as a client secret, of an application client or an identity provider,
-// that the project holds as plain values.
+// that the project holds as plain values, or as secrets that are not a non-empty string.
 // Ref: #
 type DeploymentVariablesNotSecret struct {
 	Code string `json:"code"`
@@ -26854,7 +26882,7 @@ type DeploymentVariablesNotSecretDetails struct {
 	// The kind whose variable values the deployment would freeze.
 	Kind DeploymentKind `json:"kind"`
 	// Every variable the release names as a client secret that is stored for that kind as a plain value,
-	// sorted.
+	// or as a secret that is not a non-empty string, sorted.
 	Names []string `json:"names"`
 }
 
@@ -80963,6 +80991,52 @@ func (o OptUserUpdatedPayloadAttributes) Or(d UserUpdatedPayloadAttributes) User
 	return d
 }
 
+// NewOptVarDecryptionFailedDetails returns new OptVarDecryptionFailedDetails with value set to v.
+func NewOptVarDecryptionFailedDetails(v VarDecryptionFailedDetails) OptVarDecryptionFailedDetails {
+	return OptVarDecryptionFailedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarDecryptionFailedDetails is optional VarDecryptionFailedDetails.
+type OptVarDecryptionFailedDetails struct {
+	Value VarDecryptionFailedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarDecryptionFailedDetails was set.
+func (o OptVarDecryptionFailedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarDecryptionFailedDetails) Reset() {
+	var v VarDecryptionFailedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarDecryptionFailedDetails) SetTo(v VarDecryptionFailedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarDecryptionFailedDetails) Get() (v VarDecryptionFailedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarDecryptionFailedDetails) Or(d VarDecryptionFailedDetails) VarDecryptionFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptVarDocumentTooDeepDetails returns new OptVarDocumentTooDeepDetails with value set to v.
 func NewOptVarDocumentTooDeepDetails(v VarDocumentTooDeepDetails) OptVarDocumentTooDeepDetails {
 	return OptVarDocumentTooDeepDetails{
@@ -98736,6 +98810,7 @@ type RollbackDeploymentErrorResponse struct {
 	DepVariablesNotSecret DepVariablesNotSecret
 	EnvProjectNotFound    EnvProjectNotFound
 	EvtInvalid            EvtInvalid
+	VarDecryptionFailed   VarDecryptionFailed
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ProjNotFound          ProjNotFound
@@ -98761,6 +98836,7 @@ const (
 	DepVariablesNotSecretRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.variables_not_secret"
 	EnvProjectNotFoundRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "env.project_not_found"
 	EvtInvalidRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "evt.invalid"
+	VarDecryptionFailedRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.decryption_failed"
 	InternalRollbackDeploymentErrorResponse              RollbackDeploymentErrorResponseType = "internal"
 	NotImplementedRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "not_implemented"
 	ProjNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "proj.not_found"
@@ -98819,6 +98895,11 @@ func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 // IsEvtInvalid reports whether RollbackDeploymentErrorResponse is EvtInvalid.
 func (s RollbackDeploymentErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidRollbackDeploymentErrorResponse
+}
+
+// IsVarDecryptionFailed reports whether RollbackDeploymentErrorResponse is VarDecryptionFailed.
+func (s RollbackDeploymentErrorResponse) IsVarDecryptionFailed() bool {
+	return s.Type == VarDecryptionFailedRollbackDeploymentErrorResponse
 }
 
 // IsInternal reports whether RollbackDeploymentErrorResponse is Internal.
@@ -99068,6 +99149,27 @@ func (s RollbackDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool)
 func NewEvtInvalidRollbackDeploymentErrorResponse(v EvtInvalid) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetVarDecryptionFailed sets RollbackDeploymentErrorResponse to VarDecryptionFailed.
+func (s *RollbackDeploymentErrorResponse) SetVarDecryptionFailed(v VarDecryptionFailed) {
+	s.Type = VarDecryptionFailedRollbackDeploymentErrorResponse
+	s.VarDecryptionFailed = v
+}
+
+// GetVarDecryptionFailed returns VarDecryptionFailed and true boolean if RollbackDeploymentErrorResponse is VarDecryptionFailed.
+func (s RollbackDeploymentErrorResponse) GetVarDecryptionFailed() (v VarDecryptionFailed, ok bool) {
+	if !s.IsVarDecryptionFailed() {
+		return v, false
+	}
+	return s.VarDecryptionFailed, true
+}
+
+// NewVarDecryptionFailedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from VarDecryptionFailed.
+func NewVarDecryptionFailedRollbackDeploymentErrorResponse(v VarDecryptionFailed) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetVarDecryptionFailed(v)
 	return s
 }
 
@@ -113896,6 +113998,59 @@ func (s *UserUpdatedPayload) SetAttributes(val OptUserUpdatedPayloadAttributes) 
 type UserUpdatedPayloadAttributes map[string]jx.Raw
 
 func (s *UserUpdatedPayloadAttributes) init() UserUpdatedPayloadAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarDecryptionFailed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarDecryptionFailedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarDecryptionFailed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarDecryptionFailed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarDecryptionFailed) GetDetails() OptVarDecryptionFailedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarDecryptionFailed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarDecryptionFailed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarDecryptionFailed) SetDetails(val OptVarDecryptionFailedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarDecryptionFailedDetails map[string]jx.Raw
+
+func (s *VarDecryptionFailedDetails) init() VarDecryptionFailedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

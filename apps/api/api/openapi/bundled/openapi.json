@@ -26687,7 +26687,7 @@
         ]
       },
       "dep-variables_not_secret": {
-        "description": "Deployment: the release names plain variables as client secrets\n\nError code: dep.variables_not_secret\n",
+        "description": "Deployment: the release names variables as client secrets that are not secret, non-empty strings\n\nError code: dep.variables_not_secret\n",
         "allOf": [
           {
             "$ref": "#/components/schemas/error-details"
@@ -26698,6 +26698,26 @@
               "code": {
                 "type": "string",
                 "const": "dep.variables_not_secret"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "var-decryption_failed": {
+        "description": "Failed to decrypt variable\n\nError code: var.decryption_failed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "var.decryption_failed"
               }
             },
             "required": [
@@ -26770,7 +26790,7 @@
       "deployment-variables-not-secret": {
         "title": "DeploymentVariablesNotSecret",
         "type": "object",
-        "description": "The release names variables as a client secret, of an application client\nor an identity provider, that the project holds as plain values.\n",
+        "description": "The release names variables as a client secret, of an application client\nor an identity provider, that the project holds as plain values, or as\nsecrets that are not a non-empty string.\n",
         "required": [
           "code",
           "message",
@@ -26799,7 +26819,7 @@
               "names": {
                 "type": "array",
                 "minItems": 1,
-                "description": "Every variable the release names as a client secret that is stored\nfor that kind as a plain value, sorted.\n",
+                "description": "Every variable the release names as a client secret that is stored\nfor that kind as a plain value, or as a secret that is not a\nnon-empty string, sorted.\n",
                 "items": {
                   "type": "string"
                 }
@@ -28081,7 +28101,14 @@
         "summary": "dep.variables_not_secret",
         "value": {
           "code": "dep.variables_not_secret",
-          "message": "deployment: the release names plain variables as client secrets"
+          "message": "deployment: the release names variables as client secrets that are not secret, non-empty strings"
+        }
+      },
+      "var-decryption_failed": {
+        "summary": "var.decryption_failed",
+        "value": {
+          "code": "var.decryption_failed",
+          "message": "failed to decrypt variable"
         }
       },
       "var-document_too_deep": {
@@ -37636,6 +37663,9 @@
                   "$ref": "#/components/schemas/evt-invalid"
                 },
                 {
+                  "$ref": "#/components/schemas/var-decryption_failed"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -37676,6 +37706,7 @@
                   "dep.variables_not_secret": "#/components/schemas/dep-variables_not_secret",
                   "env.project_not_found": "#/components/schemas/env-project_not_found",
                   "evt.invalid": "#/components/schemas/evt-invalid",
+                  "var.decryption_failed": "#/components/schemas/var-decryption_failed",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.not_found": "#/components/schemas/proj-not_found",
@@ -37718,6 +37749,9 @@
               },
               "evt.invalid": {
                 "$ref": "#/components/examples/evt-invalid"
+              },
+              "var.decryption_failed": {
+                "$ref": "#/components/examples/var-decryption_failed"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -37854,6 +37888,9 @@
                   "$ref": "#/components/schemas/evt-invalid"
                 },
                 {
+                  "$ref": "#/components/schemas/var-decryption_failed"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -37891,6 +37928,7 @@
                   "dep.variables_not_secret": "#/components/schemas/dep-variables_not_secret",
                   "env.project_not_found": "#/components/schemas/env-project_not_found",
                   "evt.invalid": "#/components/schemas/evt-invalid",
+                  "var.decryption_failed": "#/components/schemas/var-decryption_failed",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.not_found": "#/components/schemas/proj-not_found",
@@ -37932,6 +37970,9 @@
               },
               "evt.invalid": {
                 "$ref": "#/components/examples/evt-invalid"
+              },
+              "var.decryption_failed": {
+                "$ref": "#/components/examples/var-decryption_failed"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"

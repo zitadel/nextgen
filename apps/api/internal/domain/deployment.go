@@ -102,14 +102,14 @@ func ErrDeploymentVariablesMissing(kind DeploymentOriginKind, names []string) Er
 
 // ErrDeploymentVariablesNotSecret refuses a deploy whose release names, as a
 // client secret of an application client or an identity provider, variables
-// the frozen set holds as plain values. names is
-// sorted so the wire order is stable.
+// the frozen set holds as plain values, or as secrets that are not a non-empty
+// string. names is sorted so the wire order is stable.
 func ErrDeploymentVariablesNotSecret(kind DeploymentOriginKind, names []string) Error {
 	sorted := slices.Clone(names)
 	slices.Sort(sorted)
 	return newError(
 		PrefixDeployment.ErrorCodePrefix("variables_not_secret"),
-		"deployment: the release names plain variables as client secrets",
+		"deployment: the release names variables as client secrets that are not secret, non-empty strings",
 		DeploymentVariablesDetails{Kind: kind.String(), Names: sorted},
 		nil,
 	)
