@@ -3,17 +3,7 @@ title: Manage project access
 description: Invite collaborators with a link, grant a role to an existing user or team, check who has access, and revoke or replace it.
 ---
 
-import { Callout } from "fumadocs-ui/components/callout";
-
 Give colleagues `viewer`, `editor`, or `admin` access to a claimed project. Use an **invitation** when you want a 72-hour shareable link. Use a **grant** when you already know a user or team on the platform project, or when you want an expiring grant. [Access and memberships](/docs/concepts/access-and-memberships) explains the model.
-
-<Callout title="Console invitation UI is not shipped yet" type="warn">
-  The server and CLI create invitation links today. The console does not yet host
-  `/invitations/accept` or a Members and Invitations screen. Until that ships,
-  create and manage invitations with the CLI or API, and use Project Settings →
-  Admins in the console only to add or remove existing platform users as
-  admins via grants.
-</Callout>
 
 ## Before you start
 
@@ -23,7 +13,13 @@ Give colleagues `viewer`, `editor`, or `admin` access to a claimed project. Use 
 
 ## Invite a collaborator with a link
 
-Create an invitation and share the one-shot link out of band:
+### In the console
+
+Open Project Settings → **Members** → **Invite member**. Enter a name (a reminder for other admins, not matched to an account), choose `viewer`, `editor`, or `admin`, and create the invitation. Copy the one-shot link and share it out of band. The Invitations tab lists open invitations so you can replace or cancel them.
+
+When the recipient opens the link, the console's `/invitations/accept` page asks them to sign in or sign up on the platform project, then accept or decline. Accept grants the role.
+
+### With the CLI
 
 ```sh
 npx @zitadel/cli@latest invitation create --name "Alex Rivera" --relation editor
@@ -33,11 +29,11 @@ It prints the invitation ID, the link once, and a 72-hour warning. Whoever opens
 
 For scripts and agents, add `--non-interactive --json`. The envelope's `data` carries the invitation and the `link`.
 
-When the recipient opens `{console}/invitations/accept#token=…`, they sign in or sign up on the platform project, then accept or decline. The browser calls the redeem operations on [Invitations](/docs/reference/api/invitations). Until the console hosts that page, redeem through those API operations from a signed-in session, or wait for the console route.
-
 ## Check, replace, or cancel invitations
 
-List open invitations. Accepted ones are hidden by default:
+In the console, use Project Settings → Members → **Invitations**.
+
+With the CLI, list open invitations. Accepted ones are hidden by default:
 
 ```sh
 npx @zitadel/cli@latest invitation list
@@ -69,7 +65,7 @@ Add `--force` when the run is non-interactive.
 
 ## Grant access to an existing user or team
 
-Grant a role when you already know the principal.
+Grant a role from the CLI or API when you already know the principal. The console invites people with a link rather than creating grants by email.
 
 By user identifier (email). The CLI prints `Command completed` and the API answers an opaque `202` with no body, so the call cannot be used to discover whether the account exists:
 
@@ -87,11 +83,11 @@ npx @zitadel/cli@latest grant create --relation editor --team-name platform-ops
 
 Optional `--expires-at <RFC 3339>` stops authorizing after that time. The binding still occupies the unique slot until you revoke it.
 
-In the console, open Project Settings → Admins → **Add admin**. That path creates an `admin` grant for an existing platform user by email. It does not create invitations or `viewer` / `editor` grants.
-
 ## Verify who has access and revoke a grant
 
-List grants for the project, including expired ones so you can revoke them:
+In the console, open Project Settings → **Members** to see who has access.
+
+With the CLI, list grants for the project, including expired ones so you can revoke them:
 
 ```sh
 npx @zitadel/cli@latest grant list
