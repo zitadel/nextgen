@@ -37,6 +37,7 @@ import { Project } from "@/lib/project";
 import { Promptable } from "@/cli/core/promptable";
 import { Previewable } from "@/cli/core/previewable";
 import { BaseCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The shipped designs, as a list for a hint to offer. */
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
@@ -91,7 +92,7 @@ function isBrandingDesign(value: string): value is BrandingDesign {
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends Promptable(Previewable(BaseCommand)) {
+export default class BrandingEject extends Telemetered(Promptable(Previewable(BaseCommand))) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override group = CommandGroups.signIn;
@@ -259,7 +260,7 @@ export default class BrandingEject extends Promptable(Previewable(BaseCommand)) 
               };
             }),
           }));
-    this.recordTelemetry({
+    this.annotate({
       design,
       force: flags.force,
     });

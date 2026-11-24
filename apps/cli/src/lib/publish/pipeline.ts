@@ -26,7 +26,24 @@ export type Learned = {
    * step when it can tell, and left unset when it cannot.
    */
   readonly schemasOrFlowsChanged?: boolean;
+  /**
+   * The kinds of configuration that differ from the live release, as the event
+   * catalog names them: set by the diff step when it can tell, and left unset
+   * when it cannot.
+   */
+  readonly changedConfiguration?: readonly ConfigurationType[];
 };
+
+/**
+ * The kinds of configuration a deployment can change, as the event catalog
+ * names them.
+ */
+export type ConfigurationType =
+  | "user_schema"
+  | "login_flow"
+  | "identity_provider"
+  | "policy"
+  | "branding";
 
 /**
  * What every step is handed. The bundle is built once by the command and shared
@@ -136,6 +153,10 @@ export type StepsOutcome = {
   readonly warnings: readonly string[];
   readonly notices: readonly string[];
   readonly lockouts: readonly Lockout[];
+  /**
+   * What the steps learned in all.
+   */
+  readonly learned: Learned;
 };
 
 /**
@@ -185,7 +206,10 @@ type Progress = {
  * @throws Whatever a step throws, which stops the steps after it.
  */
 export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepsOutcome> {
-  const start: Progress = { outcome: { data: {}, warnings: [], notices: [], lockouts: [] }, ctx };
+  const start: Progress = {
+    outcome: { data: {}, warnings: [], notices: [], lockouts: [], learned: {} },
+    ctx,
+  };
   const done = await steps.reduce(async (previous: Promise<Progress>, step) => {
     const progress = await previous;
     if (!step.runsFor.includes(ctx.mode)) {
@@ -203,6 +227,7 @@ export async function runSteps(steps: readonly Step[], ctx: StepContext): Promis
       warnings: [...progress.outcome.warnings, ...(result.warnings ?? [])],
       notices: [...progress.outcome.notices, ...(result.notices ?? [])],
       lockouts: [...progress.outcome.lockouts, ...(result.lockouts ?? [])],
+      learned: { ...progress.outcome.learned, ...result.learned },
     };
 
     return {

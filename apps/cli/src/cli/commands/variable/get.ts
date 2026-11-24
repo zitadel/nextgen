@@ -8,6 +8,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 import { ReadCommand } from "@/cli/commands/bases";
 import { variableNameArg } from "./name";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -18,7 +19,7 @@ import { variableNameArg } from "./name";
  * no value of the kind asked for is a miss. `--fields` cuts the data and the
  * rows to the dot-paths it names, judged by the record's shape.
  */
-export default class VariableGet extends ReadCommand {
+export default class VariableGet extends Telemetered(ReadCommand) {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;
@@ -60,7 +61,7 @@ export default class VariableGet extends ReadCommand {
   protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<CommandResult> {
     const variableService = await this.service(VariableService);
     const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
-    this.recordTelemetry({
+    this.annotate({
       is_secret: variable.secret,
     });
 

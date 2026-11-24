@@ -84,6 +84,7 @@ import {
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Tabulate } from "@/cli/core/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
 const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
@@ -497,6 +498,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndAccess,
     groupOrder: 1,
     singular: "user",
+    kind: "user",
     idSchema: GetUserParams.shape.user_id,
     idField: "id",
     columns: ["id", "identifier", "metadata.status", "metadata.created_at"],
@@ -588,6 +590,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndAccess,
     groupOrder: 2,
     singular: "team",
+    kind: "team",
     idField: "id",
     columns: ["id", "name", "status", "created_at"],
     heading: "name",
@@ -792,6 +795,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndAccess,
     groupOrder: 3,
     singular: "grant",
+    kind: "grant",
     idField: "id",
     columns: ["id", "user.user_id", "team.team_id", "relation", "created_at", "expires_at"],
     heading: "id",
@@ -841,7 +845,12 @@ export const RESOURCES = {
           return grant ?? undefined;
         });
       },
-      { example: "--relation viewer --user-identifier alice@acme.com" },
+      {
+        example: "--relation viewer --user-identifier alice@acme.com",
+        facts: (body) => {
+          return { access_level: typeof body.relation === "string" ? body.relation : undefined };
+        },
+      },
     ),
     delete: {
       call: ({ client, projectId }, id, consent) => {
@@ -1182,7 +1191,10 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(
       };
     },
   },
-  ServerCommand,
+  // Every generated command connects to a server and reports on its own run.
+  (Base) => {
+    return Telemetered(ServerCommand(Base));
+  },
 );
 
 /**
