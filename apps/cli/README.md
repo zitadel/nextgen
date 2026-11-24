@@ -515,33 +515,46 @@ Add an identity provider to a user schema.
 USAGE
   $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--dry-run] [--schema <value>] [--provider google|custom] [--slug
-    <value>] [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>]
+    <value>] [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>] [--claim <value>...]
+    [--verified-claim <value>...] [--claim-scope <value>]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --env=<value>           Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
-                              platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-  -v, --verbose               Verbose logging.
-      --client-id=<value>     Client id of the application registered with the provider.
-      --[no-]color            Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
-      --debug                 Debug logging.
-      --display-name=<value>  Name shown on the custom connection's sign-in button.
-      --dry-run               Preview without mutating files or the platform.
-      --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. A relative path is
-                              read from the current directory, not from --cwd. Cannot be combined with --env.
-      --input=<value>         The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
-                              positional arguments go under "args". Only the global flags may stand beside it.
-      --issuer=<value>        Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.
-      --provider=<option>     Identity provider to enable, or "custom" for a custom OpenID Connect (OIDC) provider.
-                              <options: google|custom>
-      --schema=<value>        User schema to change, by file name or objectType. Required when the project has more than
-                              one.
-      --scopes=<value>        Scopes the custom connection requests, separated by spaces or commas. Must include openid.
-                              Default: openid profile email.
-      --slug=<value>          Name of the custom connection. Schemas and flows refer to it by this.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with --no-telemetry.
+  -c, --cwd=<value>                Project directory to operate on.
+  -e, --env=<value>                Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the
+                                   hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive            Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>             Override the resolved server URL.
+  -v, --verbose                    Verbose logging.
+      --claim=<value>...           Fill a user-schema property from a provider claim: <property>=<claim>, e.g.
+                                   staffNumber=employee_id:integer. A claim the provider returns as a number or boolean
+                                   says so after a colon (string is the default). Repeatable. Given, it replaces the
+                                   interactive claim questions; the standard claims whose names match the schema are
+                                   mapped either way, and a claim you give replaces the default for its property.
+      --claim-scope=<value>        Extra scopes the mapped claims need before the provider returns them, separated by
+                                   spaces or commas.
+      --client-id=<value>          Client id of the application registered with the provider.
+      --[no-]color                 Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored
+                                   too.
+      --debug                      Debug logging.
+      --display-name=<value>       Name shown on the custom connection's sign-in button.
+      --dry-run                    Preview without mutating files or the platform.
+      --env-file=<value>           Read ZITADEL_* values from this file ahead of the process environment. A relative
+                                   path is read from the current directory, not from --cwd. Cannot be combined with
+                                   --env.
+      --input=<value>              The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag
+                                   names; positional arguments go under "args". Only the global flags may stand beside
+                                   it.
+      --issuer=<value>             Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.
+      --provider=<option>          Identity provider to enable, or "custom" for a custom OpenID Connect (OIDC) provider.
+                                   <options: google|custom>
+      --schema=<value>             User schema to change, by file name or objectType. Required when the project has more
+                                   than one.
+      --scopes=<value>             Scopes the custom connection requests, separated by spaces or commas. Must include
+                                   openid. Default: openid profile email.
+      --slug=<value>               Name of the custom connection. Schemas and flows refer to it by this.
+      --[no-]telemetry             Send anonymous usage analytics. Disable with --no-telemetry.
+      --verified-claim=<value>...  Say how a mapped property is verified: <property>=<claim> names the boolean claim
+                                   that must be true, <property>=true trusts the provider. Repeatable.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -3221,56 +3234,66 @@ USAGE
     next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-router|qwik|angular] [--renderer react]
     [--dev-port <value>] [--skip-install] [--git] [--preset password-first|passkey-first] [--use-case
     minimal|consumer|business] [--password-min-length <value>] [--sso google|custom] [--sso-client-id <value>]
-    [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
+    [--sso-claim <value>...] [--sso-verified-claim <value>...] [--sso-claim-scope <value>] [--sso-slug <value>]
+    [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
 
 FLAGS
-  -c, --cwd=<value>                  Project directory to operate on.
-  -f, --force                        Overwrite managed files that already exist, scaffold into a non-empty directory,
-                                     and remove the previous origin when --dev-port moves the app.
-  -n, --non-interactive              Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>               Override the resolved server URL.
-  -v, --verbose                      Verbose logging.
-      --[no-]color                   Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
-                                     honored too.
-      --debug                        Debug logging.
-      --dev-port=<value>             Dev-server port; also the issuer origin registered with Zitadel. Defaults to the
-                                     detected port. Use distinct ports to run several scaffolded apps side by side. In
-                                     an app already set up, moves it to this port: the dev script, ZITADEL_ISSUER and
-                                     the allowed origin.
-      --dry-run                      Preview without mutating files or the platform.
-      --framework=<option>           Framework to target.
-                                     <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwi
-                                     k-router|qwik|angular>
-      --[no-]git                     Commit the project setup writes, initialising a repository first when there is
-                                     none, so a release records the commit it was built from. Refuses a repository that
-                                     already has uncommitted work. Use --no-git to leave version control alone.
-      --input=<value>                The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag
-                                     names; positional arguments go under "args". Only the global flags may stand beside
-                                     it.
-      --password-min-length=<value>  Minimum password length for the project's password policy, for example 12; 0 sets
-                                     none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change
-                                     it in .zitadel/policies/ later.
-      --preset=<option>              Sign-in preset for the scaffolded schema and login flow (default: password-first).
-                                     <options: password-first|passkey-first>
-      --renderer=<option>            Renderer (default: react). Not yet available: web-component.
-                                     <options: react>
-      --skip-install                 Do not install dependencies after setup updates package.json.
-      --sso=<option>                 Social sign-in provider to enable while scaffolding, e.g. google. Skips the
-                                     wizard's provider question; needs --sso-client-id, and the OAuth application must
-                                     already be registered with the provider. Pipe the client secret in on stdin; never
-                                     pass it as a flag.
-                                     <options: google|custom>
-      --sso-client-id=<value>        Client id of the OAuth application registered with the --sso provider.
-      --sso-display-name=<value>     With --sso custom: the name shown on the sign-in button.
-      --sso-issuer=<value>           With --sso custom: the provider's issuer URL. Its endpoints come from OIDC
-                                     discovery.
-      --sso-scopes=<value>           With --sso custom: the scopes to request, separated by spaces or commas. Must
-                                     include openid. Default: openid profile email.
-      --sso-slug=<value>             With --sso custom: the name of the connection. Schemas and flows refer to it.
-      --[no-]telemetry               Send anonymous usage analytics. Disable with --no-telemetry.
-      --use-case=<option>            Use case for the scaffolded schema fields: who signs in to the app (default:
-                                     minimal).
-                                     <options: minimal|consumer|business>
+  -c, --cwd=<value>                    Project directory to operate on.
+  -f, --force                          Overwrite managed files that already exist, scaffold into a non-empty directory,
+                                       and remove the previous origin when --dev-port moves the app.
+  -n, --non-interactive                Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>                 Override the resolved server URL.
+  -v, --verbose                        Verbose logging.
+      --[no-]color                     Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+                                       honored too.
+      --debug                          Debug logging.
+      --dev-port=<value>               Dev-server port; also the issuer origin registered with Zitadel. Defaults to the
+                                       detected port. Use distinct ports to run several scaffolded apps side by side. In
+                                       an app already set up, moves it to this port: the dev script, ZITADEL_ISSUER and
+                                       the allowed origin.
+      --dry-run                        Preview without mutating files or the platform.
+      --framework=<option>             Framework to target.
+                                       <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|q
+                                       wik-router|qwik|angular>
+      --[no-]git                       Commit the project setup writes, initialising a repository first when there is
+                                       none, so a release records the commit it was built from. Refuses a repository
+                                       that already has uncommitted work. Use --no-git to leave version control alone.
+      --input=<value>                  The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are
+                                       flag names; positional arguments go under "args". Only the global flags may stand
+                                       beside it.
+      --password-min-length=<value>    Minimum password length for the project's password policy, for example 12; 0 sets
+                                       none. Without it, setup sets 15, the NIST minimum for password-only sign-in;
+                                       change it in .zitadel/policies/ later.
+      --preset=<option>                Sign-in preset for the scaffolded schema and login flow (default:
+                                       password-first).
+                                       <options: password-first|passkey-first>
+      --renderer=<option>              Renderer (default: react). Not yet available: web-component.
+                                       <options: react>
+      --skip-install                   Do not install dependencies after setup updates package.json.
+      --sso=<option>                   Social sign-in provider to enable while scaffolding, e.g. google. Skips the
+                                       wizard's provider question; needs --sso-client-id, and the OAuth application must
+                                       already be registered with the provider. Pipe the client secret in on stdin;
+                                       never pass it as a flag.
+                                       <options: google|custom>
+      --sso-claim=<value>...           With --sso: fill a user-schema property from a provider claim,
+                                       <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a
+                                       number or boolean says so after a colon. Repeatable. The standard claims whose
+                                       names match the schema are mapped either way, and a claim you give replaces the
+                                       default for its property.
+      --sso-claim-scope=<value>        With --sso: extra scopes the mapped claims need, separated by spaces or commas.
+      --sso-client-id=<value>          Client id of the OAuth application registered with the --sso provider.
+      --sso-display-name=<value>       With --sso custom: the name shown on the sign-in button.
+      --sso-issuer=<value>             With --sso custom: the provider's issuer URL. Its endpoints come from OIDC
+                                       discovery.
+      --sso-scopes=<value>             With --sso custom: the scopes to request, separated by spaces or commas. Must
+                                       include openid. Default: openid profile email.
+      --sso-slug=<value>               With --sso custom: the name of the connection. Schemas and flows refer to it.
+      --sso-verified-claim=<value>...  With --sso: how a mapped property is verified, <property>=<claim> for the boolean
+                                       claim that must be true or <property>=true to trust the provider. Repeatable.
+      --[no-]telemetry                 Send anonymous usage analytics. Disable with --no-telemetry.
+      --use-case=<option>              Use case for the scaffolded schema fields: who signs in to the app (default:
+                                       minimal).
+                                       <options: minimal|consumer|business>
 
 GLOBAL FLAGS
   --json  Format output as json.
