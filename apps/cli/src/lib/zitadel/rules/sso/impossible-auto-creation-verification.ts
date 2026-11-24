@@ -8,8 +8,8 @@ import { quote, readableProperties, standing, unreadable } from "@/lib/zitadel/r
  *
  * @remarks
  * Why it matters: A claim with no verified_claims entry always arrives unverified, so the
- * automatic creation can never pass and every new user is stopped at the collection step. It is
- * only a warning because the sign-up still works through that step.
+ * automatic creation can never pass. It is only a warning because the project still deploys and
+ * can sign people in.
  *
  * Reported once: A required unique property the connection does not map is named by
  * sso/impossible-auto-creation-data, or by sso/empty-claim-mapping when the mapping fills nothing,
@@ -20,8 +20,7 @@ import { quote, readableProperties, standing, unreadable } from "@/lib/zitadel/r
  * it.
  *
  * Origin: #3287 (Impossible Auto-Creation (Verification) of #1083);
- * docs/design/idp/1-resource-
- * model.md#validator-rules.
+ * docs/design/idp/1-resource-model.md#validator-rules.
  */
 export const IMPOSSIBLE_AUTO_CREATION_VERIFICATION: Rule = defineRule({
   id: "sso/impossible-auto-creation-verification",

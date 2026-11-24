@@ -18,8 +18,7 @@ import { quote } from "@/lib/zitadel/rules/sso/shared";
  * Fix: Verify a property of the schema in verified_claims, or remove verified_claims.
  *
  * Origin: #3287 (Empty verified_claims intersection of #1083);
- * docs/design/idp/2-auth-method-
- * selection.md#validation-rules.
+ * docs/design/idp/2-auth-method-selection.md#validation-rules.
  */
 export const EMPTY_VERIFIED_CLAIMS: Rule = defineRule({
   id: "sso/empty-verified-claims",
