@@ -13,11 +13,84 @@
 - [x] **Projects in navigation** — main nav (key-resource consistency) vs. top context dropdown only. Depends on whether the API can list multiple projects (no API design yet); may be skipped for MVP since there's only one project. *(owner: Julia / eng)* → Resolved by D27: the account sidebar, with the top context dropdown and the logo.
 - [ ] **"Team" naming** — overloaded (customer-portal team vs. organization/tenant); consider "organization" or "tenant" instead. Note: a Teams API is already built. *(owner: team)*
 - [ ] **Project name scheme** — nature words (e.g. "River") vs. random words for generated project names. *(owner: Julia)*
+- [ ] **Last-admin protection** — you can currently remove every admin, leaving the account without one. Tim says enforcing "can't delete the final role" is hard because roles are flexible; asked whether the API can block it temporarily so we don't build on a broken default. Design shows remove/revoke as if it were unrestricted until confirmed. Spec issue incoming. *(owner: eng / Tim)*
+- [x] **How invites are delivered** — three options on the table: (a) temp email service that creates the user and mails credentials + a reset-password service on first login, (b) an automation listening to the "user invited" event that triggers an invite mail, (c) show a generated password in the UI after inviting and let the inviter forward it manually. A fourth idea came up in the call: a shareable invite link (needs generation + expiry). No transactional email infrastructure exists today. Blocks the modal copy — "their sign-up link stops working" is only correct for the link option. *(owner: Sylvana / eng)* → Resolved: an invitation is a link the inviter shares (#2978).
+- [ ] **Console login: dogfooding & customization** — the console uses the same login we sell as a product (Alex and Olivia want exactly that), but the login-v2-in-cloud lesson applies: a shared login you can't customize means you can't change anything without changing it globally. Needs a customization story — "sooner rather than later", and it's not API-blocked. *(owner: Liam / Max)*
+- [x] **Display names, long-term** — the given name + family name → email → user ID fallback (D56) is a stopgap. A proper solution (e.g. a schema annotation marking the identifier/display attribute — existed once, was dropped as unused; machine accounts need a configurable display name) is needed everywhere users appear: teams, sessions, activity log ("an ID is useless when you're investigating"). Deliberately parked until the raw version is out and people react. *(owner: team)* → Resolved by ADR 058: a schema designates `x-display` and `x-identifier`.
+- [x] **Search as a global concept** — dropped from the MVP everywhere (D58); before it returns, define how search should behave console-wide (plain text filter vs. advanced criteria, inside the table vs. above it vs. the overarching search) instead of per-page one-offs. *(owner: Julia / team)* → Resolved by D32, D37 and D39.
+- [ ] **Appearance placement in navigation** — currently modelled as a top-level nav item. Counter-argument (Max): branding belongs to the login journey — you define flows, then style them — so it should sit with Login flows. Possible middle ground: a main-nav group holding Flows / Authentication / Appearance. Not decided; deliberately parked. *(owner: Julia / team)*
+- [ ] **Appearance: what's code-managed vs. client-side** — layout/template, logo and hero image URL look like server-side schema; colours, fonts and CSS look like client application. Needs clarifying before the read-only preview can claim to show "everything". *(owner: Julia / Vitor)*
+- [ ] **Layout options per template** — "basic layout options provided by the selected design" is undefined. Need a comprehensive list of what each of the five built-in layouts includes (e.g. logo placement). No issue describes them yet. *(owner: Julia / eng)*
+- [ ] **Editing branding in the console** — if config lives in code but is editable in the console, we need a sync story (a `sync` command was floated and immediately flagged as re-inventing git). Explicitly deferred: read-only first, revisit when we know whether users actually want to do it locally. *(future)*
+- [ ] **Light/dark switch in the login** — the dev-only toggle is still in; open whether it stays as a user-facing switch or follows the system setting. *(owner: Julia / Liam)*
 - [ ] **Later** — user-list filter to distinguish end-users from admin/account users. *(future)*
 
 ---
 
 ## Decisions
+
+### D74 · Accessibility is guaranteed for default templates only — 2026-08-19 · [standing]
+We render our own accessible components and ensure the default templates work — that's what we guarantee (aim: WCAG AA, the level Okta/Auth0 commit to; nobody guarantees AAA). The moment a customer overrides a template with custom markup, the appearance variables no longer apply and accessibility is theirs. Must be stated in the docs and API docs. Two follow-ups: a contrast warning in Appearance (the only thing users can really break is text-on-background contrast, in light *and* dark mode), and a Lighthouse accessibility check in CI so a regression fails the build.
+→ Julia specs the contrast warning; eng evaluates Lighthouse in CI.
+
+### D73 · Appearance gets a JSON/YAML view — 2026-08-19
+Appearance is configuration and comes out of the API as a schema, so show the raw output the same way flows do. Customers replacing the default template need to know what the API gives them. Reuse the existing JSON/YAML toggle component.
+
+### D72 · Five built-in login layouts — 2026-08-19
+The layouts a user can pick while scaffolding: centered, minimal, split, split reverse, hero. They already render in the CLI-scaffolded login (Flo built them, Liam updated them for the new login — it's purely how the divs are aligned; the form components are the current designed ones). The shadcn library already covers most of these in Figma; the hero layout is the gap. The existing hero variant needs redesigning — the image should be a full background/section, not a picture placed behind a headline.
+→ Julia designs hero + updates the layout variants; Liam walks through the running versions.
+
+### D71 · Appearance is read-only for Alpha — 2026-08-19 · [standing]
+The Appearance section previews what's set in code: layout, colours & typography, logo / hero / background imagery, text content (headings, descriptions, button labels), and the layout options of the chosen design. Switchable across sign-up, password login, passkey login, passkey registration and the validation/error states, with a light/dark toggle and a rendered preview plus code. Branding is the rare case where a visual representation in the console genuinely earns its place — but editing comes later, once we know how console-vs-code editing should work at all. Language: English only for now; custom languages stay client-side.
+
+### D70 · Schema list stays as it is — 2026-08-19 · [superseded by D17]
+Question raised: now that users, projects and teams all use the same table, should the schema list become a table too (name, fields, authentication, created) instead of the directory/card view? Decision: no, not now. It's already built, and we shouldn't iterate on something we haven't released — ship the first iteration, then ask users whether the different representation bothers them. Revisits, but does not overturn, D0a.
+
+### D69 · Metadata block on every detail view — 2026-08-19 · [standing]
+The flow detail carries flow ID + created + last changed as meta items; add the same block to the schema detail. Detail pages should share interface rules, interaction patterns and information positions regardless of resource.
+
+### D68 · Flow steps show actions, not just fields — 2026-08-19
+The steps table lists fields *and* actions, showing each action's kind or name (e.g. `submit`, `passkey`). Rationale (Max): you open a flow to answer "is my flow correct?" — a table that only shows fields forces you to read the table *and* scroll the JSON. Most actions are navigation (`submit` on every step, so it reads repetitive), but passkey triggers matter and omitting them makes the table a misleading interpretation of the flow.
+→ Julia adds actions to the steps table; Vitor shared an example of the action kinds in chat.
+
+### D67 · Flows list is a table — 2026-08-19
+Flows follow the users/sessions/teams table pattern rather than the drill-down card view. Columns: name, purpose, connected user schema, last changed. Last changed, not created date — more relevant to the user. Purpose and user schema still have to be exposed on the API (the contract currently has name and status only) — small change, likely a quick win. The detail keeps steps, code block and metadata, and states the connected user schema as a link straight through to that schema. Card-style drill-down broke down here: those fields are too hard to read in that form. Future iteration: a static diagram of the step connections next to the flow.
+
+### D66 · Toasts are the standard notification pattern — 2026-08-19 · [standing]
+Sonner toasts for invite sent, invite revoked, invite resent, member removed and "you left <team>" — and for creating/adding anything else. They stack and dismiss themselves after a set time. Confirmation modals stay for the destructive actions (remove, revoke); resending needs no confirmation.
+
+### D65 · Admin list actions: remove, revoke, resend — 2026-08-19
+Resend invite is in, even though the issue scoped it out: without it, a lost invitation forces you to delete and re-invite. Remove shows a confirm modal — "they immediately lose access to this team's project, their user account isn't deleted, and their other team memberships aren't affected" — slightly verbose, but unambiguous. Revoke tells the user the invitation stops working; exact wording depends on the invite mechanism (open question above).
+
+### D64 · One role for now: project admin — 2026-08-19
+Claiming makes you project admin; anyone you invite is also project admin. The owner/admin split comes out of the members table for now, along with the "a team needs at least one owner" rule — that idea is kept for later (two roles make the last-admin problem solvable by requiring an owner). Doesn't solve the last-admin problem in the meantime; see open questions.
+
+### D63 · Settings is its own area: account vs. workspace — 2026-08-12 · re-confirmed 2026-08-19 · [amended by D29 and D40]
+Settings opens from the user popover at the bottom of the sidebar and swaps in a dedicated settings navigation with a way back to the app — the Vercel/Linear pattern — reserving room for the many settings items still to come. Two sections from the start: account/personal (profile) and workspace (members/admins; teams later). Settings pages run narrower than portal pages so input fields align — these pages are for changing values, not displaying them.
+
+### D62 · Profile settings show email only — 2026-08-12 · re-confirmed 2026-08-19 · [superseded by D16]
+Claiming asks for nothing but an email address, so there is no first/last name to edit — and the email can't be changed either, so even that field is read-only. The emptiest interface we've shipped. No delete-account or leave-team actions yet, and no user-schema fields pulled in. Revisit once SSO can supply profile data, or when billing needs more (name, billing address) from cloud customers.
+
+### D61 · Invitations hold only an email — 2026-08-12
+An invitation is not a user: there's no schema behind it, just the email address needed to send it; the user object is created only when the invite is accepted (via claiming). So the invite modal asks for the email only, and pending rows are essentially email rows. Later, internal invitations can become schema-based (an internal/team schema deciding what to collect). Copy: members are removed "from this project" — not "organization".
+
+### D60 · Session detail: minimal, one view — 2026-08-12
+Cut the rich metadata down to what answers "it works, this is the user, this is how they authenticated": authentication factors with their Verified timestamps, plus IP address and user agent (network *and* device). Everything else waits for real demand — this page isn't threat-hunting yet. User information reuses the user-detail component rendered read-only (all schema attributes are fetchable from the session). No tabs or toggles — bare information in one view. The page title follows the display-name logic (D56). Wording: keep "Verified" (= when that factor was entered during authentication); "logged in" would wrongly imply the whole authentication completed even when an MFA step follows. Revisit if users stumble over it.
+
+### D59 · Revoked sessions leave the list — 2026-08-12
+Revoke stays as the session action; a revoked session disappears from the list rather than lingering with a revoked state — the audit log is where you find it afterwards. Revoking needs a confirm modal: the session is terminated immediately and the user has to authenticate again to start a new one.
+
+### D58 · No search anywhere in the MVP — 2026-08-12 · [superseded by D32]
+Drop the search field console-wide, not just per page: at test scale there's a handful of users and sessions, the current field is static anyway, and search deserves a global concept before it returns (see open question). Extends D5's no-filter/no-sort stance.
+
+### D57 · Session list: name, email, user ID — 2026-08-12
+Sessions don't render schema columns (that's the user list): the API returns name and email, matched best-effort by property name on the backend — fragile, acceptable. Name combines given + family name into one field. Company column removed — a session listing is not a user-schema listing. The user ID joins the table as identifying info at the front of the row: it correlates sessions of the same user even when name matching comes up empty (machine users).
+
+### D56 · Display name: given + family name → email → user ID — 2026-08-12 · [superseded by ADR 058's `x-display`]
+Already merged: the front end derives a display name from given/family name if present, falls back to email, then to user ID — the same logic everywhere a user is titled (user detail, session detail). Good enough for now; machine accounts will mostly end at the ID. The real solution — an identifier/display-name annotation in the schema — is a parked open question.
+
+### D55 · User list ships as the raw merged table — 2026-08-12 · [superseded by D23]
+With multiple schemas, the list shows every column of every schema in one table; users without a property get a dash, horizontal scroll takes the width (per D4/D5). Explicitly ship the "mumbo jumbo" and let people react, rather than pre-solving the five possible display fixes now — claiming is close, the dynamic columns are already built (twice), and unreleased work shouldn't grow scope. Column order arrives random from the backend (unordered map); the front end sorts alphabetically as a stopgap, proper (schema-defined) ordering needs its ticket.
 
 ### D47 · Reusable Console UI polishing patterns — 2026-11-23 · [standing]
 The seven [UI-01–UI-07 guides](console/ui-patterns/README.md) are the approved reusable design targets and verification criteria for Console polishing. They do not change code or supersede valid product, routing, accessibility or backend contracts. `apps/console/docs/styling.md` remains the description of current technical implementation; an implementation PR must reconcile changed components and that baseline together.
