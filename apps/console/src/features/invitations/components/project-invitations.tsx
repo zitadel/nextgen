@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { CARD_ACTION_BUTTON } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
+import { ResourceEmpty } from "@/components/resource-empty";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -21,15 +22,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
@@ -131,29 +123,11 @@ function InvitationsTable({
   const scroll = useScrollEdges();
 
   if (invitations.length === 0) {
+    // Invite member stays on the tabs' row; the card only says how to start.
     return (
-      <Card className="items-center gap-0 p-6">
-        <Empty className="w-full">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <UserCog aria-hidden className="stroke-[1.5]" />
-            </EmptyMedia>
-            <EmptyTitle>No invitations yet</EmptyTitle>
-            <EmptyDescription>Create a link to invite someone to this project.</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <InviteMemberDialog
-              projectId={projectId}
-              projectName={projectName}
-              onInvited={onChanged}
-            >
-              <Button size="sm" className="px-2.5 text-xs">
-                Invite member
-              </Button>
-            </InviteMemberDialog>
-          </EmptyContent>
-        </Empty>
-      </Card>
+      <ResourceEmpty icon={UserCog} title="No invitations yet">
+        Create a link to invite someone to this project.
+      </ResourceEmpty>
     );
   }
 
