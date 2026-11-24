@@ -102,7 +102,7 @@ const LAD = `${SHOT}ladder/`;
 const RUNGS = [
   {
     beats: 6,
-    cap: "Change a color.",
+    cap: "Change the colors.",
     xfade: 0.15,
     z: [2.3, 2.5],
     c: [
@@ -119,7 +119,7 @@ const RUNGS = [
   },
   {
     beats: 6,
-    cap: "Your font. Your logo.",
+    cap: "Set a font and logo.",
     z: [2.05, 2.2],
     c: [
       [640, 389],
@@ -135,7 +135,7 @@ const RUNGS = [
   },
   {
     beats: 4,
-    cap: "Your fields.",
+    cap: "Add sign-up fields.",
     z: [1.58, 1.7],
     c: [
       [640, 395],
@@ -145,7 +145,7 @@ const RUNGS = [
   },
   {
     beats: 12,
-    cap: "Your page. Your layout.",
+    cap: "Write the page yourself.",
     shots: [
       {
         at: 0,
@@ -188,7 +188,7 @@ const WORDS = [
   "cookies.",
   "password hashing.",
   "passkeys.",
-  "policies.",
+  "audit trail.",
   "rollbacks.",
   "plumbing.",
 ];
@@ -625,13 +625,13 @@ window.seek = function seek(t) {
   // captions
   let cap = "";
   if (t >= S.pre && t < S.buildEnd) {
-    if (T >= 0.35 && T < M.enter1)
-      cap = "Starts Zitadel on your machine. <em>No account. No Docker.</em>";
-    else if (T >= M.enter1 && T < M.enter1 + 9.85) cap = "A few questions. The defaults are fine.";
+    if (T >= 0.35 && T < M.enter1) cap = "Start Zitadel locally. <em>No account. No Docker.</em>";
+    else if (T >= M.enter1 && T < M.enter1 + 9.85)
+      cap = "Answer a few questions. The defaults are fine.";
     else if (T >= M.enter1 + 9.85 && T < M.paste2)
-      cap = "Writes your sign-in, installs it, deploys its config.";
+      cap = "Setup writes your pages and deploys your config.";
     else if (T >= M.paste2 && T < B.registerShown) cap = "Start your app.";
-    else if (T >= B.registerShown) cap = "Sign up, on your own page.";
+    else if (T >= B.registerShown) cap = "Sign up on your own page.";
   }
   // the clock already says the time and "signed in"; the caption adds where it started
   if (t >= S.buildEnd && t < S.turn) cap = "From an empty folder.";
