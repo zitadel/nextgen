@@ -43,7 +43,7 @@ export function captureInvitationToken(
   if (!token) return false;
   try {
     window.sessionStorage.setItem(STORAGE_KEY, token);
-    // A new link is whoever opens it's, not the last link's holder's.
+    // A newly opened link has no holder yet.
     window.sessionStorage.removeItem(HOLDER_KEY);
   } catch {
     // No storage (blocked, or full): the page has no token and says the link
@@ -78,8 +78,10 @@ export function holdInvitationTokenFor(userId: string): string | undefined {
     }
     window.sessionStorage.setItem(HOLDER_KEY, userId);
   } catch {
-    // The token was readable, so storage is there; a failed write only leaves
-    // it without a holder.
+    // Without a recorded holder the next account on the tab would be shown
+    // the token, so it is shown to no one; the page says the link is
+    // unavailable.
+    return undefined;
   }
   return token;
 }

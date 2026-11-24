@@ -105,6 +105,15 @@ describe("holdInvitationTokenFor", () => {
     expect(holdInvitationTokenFor("user_b")).toBe("tok_2");
   });
 
+  it("shows the token to no one when the holder cannot be recorded", () => {
+    open();
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    expect(holdInvitationTokenFor("user_a")).toBeUndefined();
+    write.mockRestore();
+  });
+
   it("has nothing without a token", () => {
     expect(holdInvitationTokenFor("user_a")).toBeUndefined();
   });

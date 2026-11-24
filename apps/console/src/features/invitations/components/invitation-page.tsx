@@ -59,16 +59,30 @@ export function InvitationPage({
   /** Signs out and comes back to this page through sign-in. */
   onSwitchAccount: () => Promise<void>;
 }) {
+  // One action at a time across the card and the account line: joining while
+  // the sign-out is under way would accept as the account being left.
+  const switching = useSubmit(onSwitchAccount, "Could not sign out. Try again.");
+  const [answering, setAnswering] = useState(false);
   return (
     <StandaloneScreen>
-      <InvitationCard state={state} />
-      <SignedInAs account={account} onSwitchAccount={onSwitchAccount} />
+      <InvitationCard state={state} locked={switching.pending} onAnswering={setAnswering} />
+      <SignedInAs account={account} switching={switching} disabled={answering} />
     </StandaloneScreen>
   );
 }
 
 /** The card for the state the invitation is in. */
-function InvitationCard({ state }: { state: InvitationPageState }) {
+function InvitationCard({
+  state,
+  locked,
+  onAnswering,
+}: {
+  state: InvitationPageState;
+  /** Another action on the page is under way. */
+  locked: boolean;
+  /** Told while an accept or decline is under way. */
+  onAnswering: (answering: boolean) => void;
+}) {
   const [outcome, setOutcome] = useState<"declined" | "gone" | undefined>(undefined);
 
   if (state.kind === "error") {
@@ -106,6 +120,8 @@ function InvitationCard({ state }: { state: InvitationPageState }) {
     <OpenInvitation
       token={token}
       invitation={invitation}
+      locked={locked}
+      onAnswering={onAnswering}
       onDeclined={() => setOutcome("declined")}
       onGone={() => setOutcome("gone")}
     />
@@ -113,6 +129,8 @@ function InvitationCard({ state }: { state: InvitationPageState }) {
 }
 
 const BODY = "text-muted-foreground text-sm leading-5";
+const ACCEPT_FAILED = "Could not accept the invitation. Try again.";
+const DECLINE_FAILED = "Could not decline the invitation. Try again.";
 
 /** The card every state of the page is: a hairline box in the standalone column. */
 const CARD =
@@ -121,12 +139,13 @@ const CARD =
 /** Who is signed in, under the card, and the way to another account. */
 function SignedInAs({
   account,
-  onSwitchAccount,
+  switching,
+  disabled,
 }: {
   account: string;
-  onSwitchAccount: () => Promise<void>;
+  switching: ReturnType<typeof useSubmit>;
+  disabled: boolean;
 }) {
-  const switching = useSubmit(onSwitchAccount, "Could not sign out. Try again.");
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-1 text-center">
       <p className={`${BODY} wrap-anywhere`}>
@@ -136,6 +155,7 @@ function SignedInAs({
         variant="link"
         className="text-muted-foreground h-auto px-2.5 py-0"
         loading={switching.pending}
+        disabled={disabled}
         onClick={() => void switching.run()}
       >
         Use another account
@@ -158,11 +178,15 @@ function StatusCard({ title, children }: { title: string; children: ReactNode })
 function OpenInvitation({
   token,
   invitation,
+  locked,
+  onAnswering,
   onDeclined,
   onGone,
 }: {
   token: string;
   invitation: InvitationLookup;
+  locked: boolean;
+  onAnswering: (answering: boolean) => void;
   onDeclined: () => void;
   onGone: () => void;
 }) {
@@ -176,7 +200,20 @@ function OpenInvitation({
     return undefined;
   }
 
-  const accept = useSubmit(async () => {
+  /** Runs an answer with the rest of the page held. */
+  async function answering(answer: () => Promise<void>): Promise<void> {
+    onAnswering(true);
+    try {
+      await answer();
+    } finally {
+      onAnswering(false);
+    }
+  }
+
+  const accept = useSubmit(() => answering(acceptInvitation), ACCEPT_FAILED);
+  const decline = useSubmit(() => answering(declineInvitation), DECLINE_FAILED);
+
+  async function acceptInvitation() {
     let accepted: Awaited<ReturnType<typeof api.acceptInvitation>>;
     try {
       accepted = await api.acceptInvitation({ token });
@@ -193,9 +230,9 @@ function OpenInvitation({
     clearSessionCaches();
     toast.success(`You joined ${invitation.project_name}`);
     await navigate({ to: "/projects" });
-  }, "Could not accept the invitation. Try again.");
+  }
 
-  const decline = useSubmit(async () => {
+  async function declineInvitation() {
     let rejected: Awaited<ReturnType<typeof api.rejectInvitation>>;
     try {
       rejected = await api.rejectInvitation({ token });
@@ -208,9 +245,9 @@ function OpenInvitation({
       invitation_journey_id: rejected.journey_id,
     });
     onDeclined();
-  }, "Could not decline the invitation. Try again.");
+  }
 
-  const busy = accept.pending || decline.pending;
+  const busy = accept.pending || decline.pending || locked;
   const inviter = inviterLabel(invitation);
 
   return (

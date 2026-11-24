@@ -36,7 +36,7 @@ export const Route = createFileRoute("/invitations/accept")({
     return {
       // The identifier first: it is what the person signs in with, and two of
       // their accounts may share a display name.
-      account: session.user?.identifier ?? session.user?.display ?? session.user_id,
+      account: session.user?.identifier || session.user?.display || session.user_id,
       state: await lookupStoredInvitation(session.user_id),
     };
   },
@@ -52,6 +52,10 @@ function InvitationScreen() {
 
   const switchAccount = async () => {
     await signOut();
+    // `signOut` swallows a failed revoke. With the session still there,
+    // `/login` would send the same account straight back, so the token stays
+    // theirs and the page says the sign-out failed.
+    if (await fetchSession()) throw new Error("Could not sign out. Try again.");
     handOverInvitationToken();
     await router.navigate({ to: "/login", search: { next: INVITATION_ACCEPT_PATH } });
   };

@@ -5,7 +5,11 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { trackEvent } from "@/addon/analytics";
-import { captureInvitationToken, readInvitationToken } from "@/features/invitations/token";
+import {
+  captureInvitationToken,
+  holdInvitationTokenFor,
+  readInvitationToken,
+} from "@/features/invitations/token";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
 import { _setRuntimeForTesting } from "../../runtime/runtime";
@@ -195,6 +199,50 @@ describe("invitation page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("other@example.com")).toBeInTheDocument();
     expect(tokens).toEqual([TOKEN, TOKEN]);
+  });
+
+  it("says so when the sign-out failed, and keeps the link with the account", async () => {
+    stubLookup();
+    // The revoke failed: `signOut` swallows that, and the session is still there.
+    signOut.mockImplementation(async () => undefined);
+    const router = await openLink();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Use another account" }));
+
+    expect(await screen.findByText("Could not sign out. Try again.")).toBeInTheDocument();
+    expect(router.state.resolvedLocation?.pathname).toBe("/invitations/accept");
+    expect(screen.getByRole("button", { name: "Join project" })).toBeEnabled();
+    // Still the first account's: another one arriving is not shown it.
+    expect(holdInvitationTokenFor("user_other")).toBeUndefined();
+  });
+
+  it("holds joining while the account is being switched, and the reverse", async () => {
+    stubLookup();
+    let finishSignOut: () => void = () => undefined;
+    signOut.mockImplementation(() => new Promise<void>((resolve) => (finishSignOut = resolve)));
+    await openLink();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Use another account" }));
+    expect(screen.getByRole("button", { name: "Join project" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Decline invitation" })).toBeDisabled();
+    finishSignOut();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Join project" })).toBeEnabled());
+
+    let finishAccept: () => void = () => undefined;
+    stubVerb("accept", () => NOT_FOUND());
+    server.use(
+      http.post(`${API}/invitations/accept`, async () => {
+        await new Promise<void>((resolve) => (finishAccept = resolve));
+        return NOT_FOUND();
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Join project" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Use another account" })).toBeDisabled(),
+    );
+    finishAccept();
+    await screen.findByRole("heading", { name: "Invitation unavailable" });
+    expect(screen.getByRole("button", { name: "Use another account" })).toBeEnabled();
   });
 
   it("drops the link for someone who signs in after the session it was shown to ended", async () => {
