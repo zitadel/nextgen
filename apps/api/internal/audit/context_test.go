@@ -162,6 +162,33 @@ func TestFromContextCarriesTheAuthorizationMark(t *testing.T) {
 	assert.Equal(t, &actor, marked.ActorID)
 }
 
+// TestFromContextCarriesTheRuntime: events built after the request's
+// deployment was bound carry it, those before it and those of a request no
+// deployment served carry none, and a target is set only when one was named.
+func TestFromContextCarriesTheRuntime(t *testing.T) {
+	ctx := WithActorSlot(t.Context())
+	before := FromContext(ctx, domain.EventTypeRequestAPI, domain.EventCategoryRequest)
+	assert.Nil(t, before.DeploymentID)
+	assert.Nil(t, before.ReleaseID)
+	assert.Nil(t, before.Target)
+
+	// The request.api event reads the slot's context, outside the one the
+	// handler bound: the mark planted beside the slot carries it there.
+	BindRuntime(ctx, Runtime{DeploymentID: "dep_1", ReleaseID: "rel_1", Target: "https://app.acme.com"})
+	served := FromContext(WithActorContext(ctx, ActorContext{ProjectID: "proj_1"}), domain.EventTypeRequestAPI, domain.EventCategoryRequest)
+	assert.Equal(t, new("dep_1"), served.DeploymentID)
+	assert.Equal(t, new("rel_1"), served.ReleaseID)
+	assert.Equal(t, new("https://app.acme.com"), served.Target)
+
+	// Without the middleware's slot, the returned context carries it.
+	bound := BindRuntime(t.Context(), Runtime{DeploymentID: "dep_1", ReleaseID: "rel_1"})
+	unslotted := FromContext(bound, domain.EventTypeAuthAttemptCreated, domain.EventCategoryAuth)
+	assert.Equal(t, new("dep_1"), unslotted.DeploymentID)
+	assert.Nil(t, unslotted.Target)
+
+	assert.Nil(t, FromContext(BindRuntime(t.Context(), Runtime{}), domain.EventTypeRequestAPI, domain.EventCategoryRequest).DeploymentID)
+}
+
 // TestMarkAuthorizationWithoutASlotIsANoOp: outside an HTTP request there is no
 // request to mark, and nothing to fail.
 func TestMarkAuthorizationWithoutASlotIsANoOp(t *testing.T) {

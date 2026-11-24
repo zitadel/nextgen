@@ -14,6 +14,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -80,6 +81,80 @@ func TestFlowPinsRelease(t *testing.T) {
 		assert.Equal(t, http.StatusConflict, resp.StatusCode, string(body))
 		assert.Equal(t, domain.ErrReleaseRevoked().Code, errorCode(body), string(body))
 	})
+}
+
+// TestFlowEventsNameTheServingRelease lists the events of flows by the release
+// that served them: a pinned flow's events name the pinned release and its
+// deployment, not the origin's newest, so the two variants of an A/B test of
+// the sign-in read apart. The first release is no longer what the origin
+// serves, so only the pinned flow can have written its events.
+func TestFlowEventsNameTheServingRelease(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	first := fixture.otherReleaseWith(t, "a")
+	second := fixture.otherReleaseWith(t, "b")
+	deployments := map[api.ReleaseID]api.DeploymentID{}
+	for _, release := range []api.ReleaseID{first, second} {
+		deployed := fixture.deploy(t, release)
+		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+		deployments[release] = deployed.(*api.CreateDeploymentCreated).ID
+	}
+
+	for _, pin := range []string{string(first), ""} {
+		resp, body := openPinnedFlow(t, fixture.project, appOrigin, pin)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
+	}
+
+	type listed struct {
+		EventType    string  `json:"event_type"`
+		DeploymentID *string `json:"deployment_id"`
+		ReleaseID    *string `json:"release_id"`
+		Target       *string `json:"target"`
+	}
+	list := func(t *testing.T, params api.ListEventsParams) []listed {
+		t.Helper()
+		params.ProjectID = api.ProjectID(fixture.project)
+		resp, err := fixture.client.ListEvents(t.Context(), params)
+		require.NoError(t, err)
+		page, ok := resp.(*api.ListEventsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		found := make([]listed, 0, len(page.Events))
+		for _, event := range page.Events {
+			raw, err := event.MarshalJSON()
+			require.NoError(t, err)
+			var item listed
+			require.NoError(t, json.Unmarshal(raw, &item))
+			found = append(found, item)
+		}
+		return found
+	}
+
+	// A claimed project: its events are listed.
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: fixture.project, Name: helpers.TeamName()})
+	require.NoError(t, err)
+	harness.SeedOwningTeam(t, fixture.project, team.ID)
+
+	for _, release := range []api.ReleaseID{first, second} {
+		events := list(t, api.ListEventsParams{ReleaseID: api.NewOptString(string(release))})
+		var types []string
+		for _, event := range events {
+			types = append(types, event.EventType)
+			assert.Equal(t, string(release), *event.ReleaseID)
+			require.NotNil(t, event.DeploymentID)
+			assert.Equal(t, string(deployments[release]), *event.DeploymentID)
+			require.NotNil(t, event.Target)
+			assert.Equal(t, appOrigin, *event.Target)
+		}
+		// One flow each: its attempt, and nothing the other flow wrote.
+		assert.Equal(t, []string{string(domain.EventTypeAuthAttemptCreated)}, types, "release %s", release)
+	}
+
+	byDeployment := list(t, api.ListEventsParams{DeploymentID: api.NewOptString(string(deployments[first]))})
+	require.NotEmpty(t, byDeployment)
+	for _, event := range byDeployment {
+		assert.Equal(t, string(first), *event.ReleaseID)
+	}
 }
 
 // openPinnedFlow starts a login flow from origin, pinning release unless it

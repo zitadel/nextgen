@@ -12,19 +12,23 @@ import (
 
 // ListEventsRequest is the input for listing project audit events (ADR 049).
 type ListEventsRequest struct {
-	ProjectID   string
-	Categories  []string
-	EventTypes  []string
-	ActorID     string
-	UserID      string
-	ClientID    string
-	SessionID   string
-	FlowID      string
-	RequestID   string
-	Fingerprint string
-	EntityType  string
-	EntityID    string
-	TeamID      string
+	ProjectID  string
+	Categories []string
+	EventTypes []string
+	ActorID    string
+	UserID     string
+	ClientID   string
+	SessionID  string
+	FlowID     string
+	RequestID  string
+	// ReleaseID and DeploymentID match the events of requests that release or
+	// deployment served.
+	ReleaseID    string
+	DeploymentID string
+	Fingerprint  string
+	EntityType   string
+	EntityID     string
+	TeamID       string
 	// OperationIDs and StatusClasses match request.api events by the
 	// operation they record and the class of their response status
 	// (domain.HTTPStatusClass), each any of the values named.
@@ -260,6 +264,8 @@ func planEventRead(req ListEventsRequest) eventRead {
 	}{
 		{domain.EventFieldRequestID, req.RequestID, false},
 		{domain.EventFieldFlowID, req.FlowID, false},
+		{domain.EventFieldDeploymentID, req.DeploymentID, false},
+		{domain.EventFieldReleaseID, req.ReleaseID, false},
 		{domain.EventFieldSessionID, req.SessionID, true},
 		{domain.EventFieldEntityID, req.EntityID, true},
 		{domain.EventFieldUserID, req.UserID, true},

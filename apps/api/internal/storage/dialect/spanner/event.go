@@ -24,6 +24,7 @@ const (
     entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    deployment_id, release_id, target,
     operation_status, status_class,
     payload, metadata
 FROM events`
@@ -70,6 +71,7 @@ var eventColumns = []string{
 	"entity_type", "entity_id", "user_id",
 	"client_id", "token_id", "delegation_type", "delegation_id", "grantor", "fingerprint",
 	"request_id", "session_id", "flow_id",
+	"deployment_id", "release_id", "target",
 	"operation_status", "status_class",
 	"payload", "metadata",
 }
@@ -142,6 +144,9 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		"request_id":       nullString(event.RequestID),
 		"session_id":       nullString(event.SessionID),
 		"flow_id":          nullString(event.FlowID),
+		"deployment_id":    nullString(event.DeploymentID),
+		"release_id":       nullString(event.ReleaseID),
+		"target":           nullString(event.Target),
 		"operation_status": nullString(events.OperationStatusOf(event)),
 		"status_class":     nullStatusClass(event.StatusClass),
 		"payload":          payload,
@@ -371,6 +376,7 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 		teamID, actorID, actorType, entityType, entityID spanner.NullString
 		userID                                           spanner.NullString
 		requestID, sessionID, flowID                     spanner.NullString
+		deploymentID, releaseID, target                  spanner.NullString
 		operationStatus, statusClass                     spanner.NullString
 		payload, metadata                                spanner.NullJSON
 	)
@@ -381,6 +387,7 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 		&entityType, &entityID, &userID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
+		&deploymentID, &releaseID, &target,
 		&operationStatus, &statusClass,
 		&payload, &metadata,
 	); err != nil {
@@ -402,6 +409,9 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 	ev.RequestID = spannerNullStringPtr(requestID)
 	ev.SessionID = spannerNullStringPtr(sessionID)
 	ev.FlowID = spannerNullStringPtr(flowID)
+	ev.DeploymentID = spannerNullStringPtr(deploymentID)
+	ev.ReleaseID = spannerNullStringPtr(releaseID)
+	ev.Target = spannerNullStringPtr(target)
 	if statusClass.Valid {
 		c := domain.HTTPStatusClass(statusClass.StringVal)
 		ev.StatusClass = &c

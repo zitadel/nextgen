@@ -129,18 +129,19 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// (`null`) included; only the passkey params need it to have a host. With
 	// none, the server's own host stands in for those params only: a caller
 	// with no Origin, such as a native app, is not a browser on that host.
-	originStr := ""
+	originStr, admitted := "", ""
 	if origin, ok := params.Origin.Get(); ok {
 		originStr = origin.String()
 		if originStr != "" {
 			if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
 				return nil, err
 			}
+			admitted, _ = domain.NormalizeOrigin(originStr)
 		}
 	} else if host, ok := requestOriginFromContext(ctx); ok {
 		originStr = host
 	}
-	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
+	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID, admitted)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +281,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	if state.ID != params.FlowID {
 		return mapFlowGetError(ctx, domain.ErrFlowNotFound())
 	}
-	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
+	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID, "")
 	if err != nil {
 		return mapFlowGetError(ctx, err)
 	}

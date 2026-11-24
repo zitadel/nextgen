@@ -111,7 +111,7 @@ func TestWithSealedRuntime_Revoked(t *testing.T) {
 	}, nil)
 
 	h := Handler{releaseService: releases}
-	_, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1")
+	_, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1", "")
 	require.ErrorIs(t, err, domain.ErrReleaseRevoked())
 }
 
@@ -119,7 +119,7 @@ func TestWithSealedRuntime_EmptyIsNoop(t *testing.T) {
 	t.Parallel()
 
 	h := Handler{}
-	ctx, err := h.withSealedRuntime(t.Context(), "proj_1", "", "")
+	ctx, err := h.withSealedRuntime(t.Context(), "proj_1", "", "", "")
 	require.NoError(t, err)
 	require.Nil(t, service.RuntimeResolutionFromContext(ctx))
 }
@@ -144,7 +144,7 @@ func TestWithSealedRuntime_PropagatesDeploymentLookupError(t *testing.T) {
 		releaseService: releases,
 		pool:           service.NewPool(pool),
 	}
-	_, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1")
+	_, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1", "")
 	require.ErrorIs(t, err, lookupErr)
 }
 
@@ -168,7 +168,7 @@ func TestWithSealedRuntime_AttachesDeployment(t *testing.T) {
 		releaseService: releases,
 		pool:           service.NewPool(pool),
 	}
-	ctx, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1")
+	ctx, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1", "")
 	require.NoError(t, err)
 	resolution := service.RuntimeResolutionFromContext(ctx)
 	require.NotNil(t, resolution)
