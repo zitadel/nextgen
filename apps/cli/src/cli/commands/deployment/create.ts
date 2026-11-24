@@ -4,13 +4,13 @@ import { z } from "zod";
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseParams } from "@/lib/backend/schemas";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { reads, type Refused } from "@/lib/oclif/flags";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { reads, type Refused } from "@/cli/core/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ChangeCommand } from "@/cli/commands/bases";
 
 /**
  * The release `--release` deploys. The schema is the API spec's own, so a
@@ -56,7 +56,7 @@ const MESSAGE = {
  * `zitadel deployment create` — deploy an existing release to the project's
  * origins.
  */
-export default class DeploymentCreate extends ServerCommand(EnvironmentCommand) {
+export default class DeploymentCreate extends ChangeCommand {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;
@@ -81,39 +81,42 @@ export default class DeploymentCreate extends ServerCommand(EnvironmentCommand) 
     { release: { required: true } },
   );
 
-  protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
-    // A dry run makes no request, so it answers before the connection — the
-    // order `origin add`/`deploy` use, which keeps the no-mutation promise
-    // literal: deploying an existing release writes a deployment record, and a
-    // dry run must write none.
-    if (this.dryRun) {
-      const title = `Would deploy ${escapeControlCharacters(flags.release)} to primary (dry run)`;
+  /**
+   * Says what would be deployed. A dry run makes no request, so it answers
+   * before the connection: deploying an existing release writes a deployment
+   * record, and a dry run must write none.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The envelope of the dry run.
+   */
+  protected async preview({ flags }: Admitted<typeof DeploymentCreate>): Promise<CommandResult> {
+    const result = dryRunResult({
+      verb: "deploy",
+      topic: "deployment",
+      noun: "release",
+      id: flags.release,
+      clause: "to primary",
+      next: await this.realRun(),
+    });
 
-      return this.emit({
-        status: "ok",
-        data: {
-          dry_run: true,
-          title,
-          release_id: flags.release,
-          targets: "primary",
-        },
-        summary: {
-          title,
-          sections: [],
-        },
-        next: {
-          commands: [
-            this.suggest({
-              id: "deployment:create",
-              flags: { release: flags.release, message: flags.message },
-            }),
-          ],
-        },
-      });
-    }
+    return {
+      ...result,
+      data: {
+        ...(result.data as object),
+        release_id: flags.release,
+        targets: "primary",
+      },
+    };
+  }
 
-    const { client, projectId } = await this.connect();
-    const deploymentService = new DeploymentService(client, projectId);
+  /**
+   * Deploys the release to the project's origins.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The envelope of the run.
+   */
+  protected async apply({ flags }: Admitted<typeof DeploymentCreate>): Promise<CommandResult> {
+    const deploymentService = await this.service(DeploymentService);
     const deployment = await deploymentService.create({
       release_id: flags.release,
       targets: "primary",
@@ -122,7 +125,7 @@ export default class DeploymentCreate extends ServerCommand(EnvironmentCommand) 
 
     const title = `Deployed ${escapeControlCharacters(deployment.release_id)}`;
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -145,6 +148,6 @@ export default class DeploymentCreate extends ServerCommand(EnvironmentCommand) 
               ],
       },
       next: { commands: [this.suggest({ id: "deployment:list" })] },
-    });
+    };
   }
 }

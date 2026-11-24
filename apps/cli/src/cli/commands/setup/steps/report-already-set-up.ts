@@ -1,5 +1,5 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import type { CommandResult } from "@/lib/oclif";
+import type { CommandResult } from "@/cli/core";
 import { ZitadelRuntime } from "@/lib/server";
 import type { Summary } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
