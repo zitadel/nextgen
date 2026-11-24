@@ -212,10 +212,10 @@ describe("start", () => {
           status: "error",
           cli_version: CLI_VERSION,
           command: "start",
-          source: "http://localhost:8080",
+          source: "",
           code: "E_VALIDATION",
-          message: "--image requires --runtime docker",
-          hint: "Pass --runtime docker with --image <tag>, or omit --image for the npm binary runtime.",
+          message: "--runtime=binary cannot also be provided when using --image",
+          next_commands: [expectedPublicCliCommand("start --help")],
         });
       });
 

@@ -114,6 +114,9 @@ describe("what a flag requires of the others", () => {
           ...((flag.dependsOn?.length ?? 0) > 0 && relation?.dependsOn === undefined
             ? ["dependsOn"]
             : []),
+          ...((flag.relationships?.length ?? 0) > 0 && relation?.excludedWhen === undefined
+            ? ["relationships"]
+            : []),
         ];
         return kinds.map((kind) => {
           return `${id} --${name} ${kind}`;

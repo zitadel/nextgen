@@ -15,7 +15,6 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { environmentFlags, projectEnvFile } from "@/cli/core/environment-flags";
 import { reads, type Refused, whole } from "@/cli/core/flags";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import {
   asStepsShown,
   type NextSteps,
@@ -125,13 +124,6 @@ type Checking = Readonly<{
   port: number;
   hostedServer: string | undefined;
 }>;
-
-/** `--force` repairs, so it is meaningless without `--fix`. */
-const FORCE_NEEDS_FIX_REFUSAL = {
-  message: "--force repairs what --fix finds, so it needs --fix.",
-  hint: "Add --fix, or drop --force.",
-  next: [{ id: "doctor", help: true }],
-} as const satisfies Refusal;
 
 /**
  * This doctor run again, as it was typed (its `--port`, `--image` and
@@ -658,6 +650,18 @@ export default class Doctor extends Destructive(
   static override examples = ["<%= config.bin %> doctor", "<%= config.bin %> doctor --fix"];
 
   /**
+   * The flags every command of this kind takes, with `--force` given the one
+   * relation doctor adds: it repairs what `--fix` finds, so it needs `--fix`.
+   */
+  static override baseFlags = {
+    ...super.baseFlags,
+    force: {
+      ...super.baseFlags.force,
+      dependsOn: ["fix"],
+    },
+  };
+
+  /**
    * Doctor's local-runtime checks are about the machine, but with `--env` /
    * `--env-file` it also verifies the environment a command would connect to:
    * the same flags every EnvironmentCommand takes, resolved the same way.
@@ -793,9 +797,6 @@ export default class Doctor extends Destructive(
     flags: Admitted<typeof Doctor>["flags"],
     ctx: CheckContext,
   ): Promise<Examination> {
-    if (flags.force && !flags.fix) {
-      throw refusalError(FORCE_NEEDS_FIX_REFUSAL, {});
-    }
     const { port, hostedServer, cwd } = await this.checks(flags, this.cwd);
     const nearest = await this.started.of(cwd);
     const existingRuntime = nearest?.runtime;

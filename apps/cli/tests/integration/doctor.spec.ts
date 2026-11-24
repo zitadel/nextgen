@@ -854,10 +854,9 @@ describe("doctor", () => {
           status: "error",
           cli_version: CLI_VERSION,
           command: "doctor",
-          source: expect.stringMatching(/^http:\/\/localhost:\d+$/),
+          source: "",
           code: "E_VALIDATION",
-          message: "--force repairs what --fix finds, so it needs --fix.",
-          hint: "Add --fix, or drop --force.",
+          message: "All of the following must be provided when using --force: --fix",
           next_commands: [expectedPublicCliCommand("doctor --help")],
         });
       });

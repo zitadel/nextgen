@@ -15,6 +15,7 @@ import { reads, type Refused, whole } from "@/cli/core/flags";
 import type { NextSteps } from "@/cli/core/next-steps";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Guidance, shellCommand, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import { section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -22,15 +23,6 @@ import { Previewable } from "@/cli/core/previewable";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
-
-/**
- * How an image beside the binary runtime is refused: an image is a container's,
- * and the npm binary runtime has none to run.
- */
-const IMAGE_NEEDS_DOCKER_REFUSAL = {
-  message: "--image requires --runtime docker",
-  hint: "Pass --runtime docker with --image <tag>, or omit --image for the npm binary runtime.",
-} as const satisfies Refusal;
 
 const MIN_PORT = 1;
 const MAX_PORT = 65_535;
@@ -268,19 +260,31 @@ export default class Start extends LocalServerCommand(
     "<%= config.bin %> start --port 8080",
     "<%= config.bin %> start --runtime docker",
   ];
-  static override flags = {
-    image: nonBlankString({ description: "Container image to run." }),
-    port: Flags.custom<number>({
-      parse: reads(PORT),
-    })({
-      description:
-        "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
-    }),
-    runtime: Flags.option({
-      description: "Local runtime backend.",
-      options: LocalRuntime.BACKENDS,
-    })(),
-  };
+  static override flags = relatedFlags(
+    {
+      image: nonBlankString({ description: "Container image to run." }),
+      port: Flags.custom<number>({
+        parse: reads(PORT),
+      })({
+        description:
+          "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
+      }),
+      runtime: Flags.option({
+        description: "Local runtime backend.",
+        options: LocalRuntime.BACKENDS,
+      })(),
+    },
+    {
+      image: {
+        excludedWhen: {
+          flags: ["runtime"],
+          when: (flags: Record<string, unknown>) => {
+            return flags.runtime === "binary";
+          },
+        },
+      },
+    },
+  );
 
   /**
    * The server a start is about: the one this folder's plan names, known before
@@ -461,10 +465,6 @@ export default class Start extends LocalServerCommand(
    * @returns The server of this folder, the request that starts it, and the plan.
    */
   private async planned(flags: Admitted<typeof Start>["flags"]) {
-    if (flags.runtime === "binary" && flags.image !== undefined) {
-      throw refusalError(IMAGE_NEEDS_DOCKER_REFUSAL, {});
-    }
-
     const server = this.serverInThisFolder();
     const request = {
       port: flags.port,

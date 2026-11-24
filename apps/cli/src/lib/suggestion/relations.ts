@@ -17,11 +17,17 @@ export const RELATIONS: unique symbol = Symbol("relations");
 /**
  * What one flag requires of the others: the `exclusive` flags it must not be
  * given with, the `dependsOn` flags it must be given with, and `required` when
- * it must be given at all. Names are the CLI spelling.
+ * it must be given at all. `excludedWhen` names flags it must not be given with
+ * only while `when` holds for the parsed flags, such as an image beside a
+ * runtime that runs none. Names are the CLI spelling.
  */
 export type FlagRelation<Name extends string> = Readonly<{
   exclusive?: readonly (Name | "json")[];
   dependsOn?: readonly (Name | "json")[];
+  excludedWhen?: Readonly<{
+    flags: readonly (Name | "json")[];
+    when: (flags: Record<string, unknown>) => boolean;
+  }>;
   required?: true;
 }>;
 
@@ -82,15 +88,36 @@ export function relatedFlags<
     if (definition === undefined) {
       throw new Error(`flags(): a relation names --${name}, which is not declared`);
     }
-    const { exclusive, dependsOn, required } = relation as {
+    const { exclusive, dependsOn, excludedWhen, required } = relation as {
       exclusive?: readonly string[];
       dependsOn?: readonly string[];
+      excludedWhen?: {
+        flags: readonly string[];
+        when: (flags: Record<string, unknown>) => boolean;
+      };
       required?: true;
     };
     declared[name] = {
       ...definition,
       ...(exclusive === undefined ? {} : { exclusive: [...exclusive] }),
       ...(dependsOn === undefined ? {} : { dependsOn: [...dependsOn] }),
+      ...(excludedWhen === undefined
+        ? {}
+        : {
+            relationships: [
+              {
+                type: "none",
+                flags: excludedWhen.flags.map((flag) => {
+                  return {
+                    name: flag,
+                    when: async (flags: Record<string, unknown>) => {
+                      return excludedWhen.when(flags);
+                    },
+                  };
+                }),
+              },
+            ],
+          }),
       ...(required === undefined ? {} : { required: true }),
     } as Interfaces.Flag<unknown>;
   }

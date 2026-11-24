@@ -3968,10 +3968,7 @@
         {
           "name": "secret",
           "description": "Store the value encrypted. It can be replaced later but never read back.",
-          "type": "boolean",
-          "exclusive": [
-            "as"
-          ]
+          "type": "boolean"
         },
         {
           "name": "as",
