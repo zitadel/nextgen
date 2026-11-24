@@ -26,6 +26,12 @@ type BuildIDP struct {
 	Document []byte
 }
 
+// BuildApplication is one applications[] entry.
+type BuildApplication struct {
+	Index    int
+	Document []byte
+}
+
 // BuildPolicy is one policies[] entry: the operation and the config its
 // template validates.
 type BuildPolicy struct {
@@ -46,6 +52,7 @@ type BuildReleaseInput struct {
 	Schemas         []BuildSchema
 	FlowDefinitions []BuildFlowDefinition
 	IDPs            []BuildIDP
+	Applications    []BuildApplication
 	Policies        []BuildPolicy
 	Branding        *CreateBrandingInput
 	OAuth           *CreateOAuthSettingsInput
@@ -57,6 +64,12 @@ type BuildReleaseInput struct {
 type preparedIDP struct {
 	index    int
 	slug     string
+	document []byte
+}
+
+type preparedApplication struct {
+	index    int
+	doc      domain.ApplicationDocument
 	document []byte
 }
 
@@ -91,6 +104,10 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 
 	preparedSchemas, schemaByHandle := s.prepareBundleSchemas(input, failures)
 	preparedIDPs := s.prepareBundleIDPs(input, failures)
+	preparedApplications, err := s.prepareBundleApplications(input, failures)
+	if err != nil {
+		return nil, err
+	}
 	preparedPolicies, err := s.prepareBundlePolicies(ctx, input, failures)
 	if err != nil {
 		return nil, err
@@ -111,10 +128,10 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 			failures.add(domain.ReleasePointerKindOauth, 0, domain.ReleaseOAuthHandle, err)
 		}
 	}
-	// In-tx checks (flows, schema-URL resolve, IDP immutables) can still add
-	// to the bag. When nothing in-tx can run, surface pure-prepare failures
-	// without opening a transaction.
-	needsInTxChecks := len(input.FlowDefinitions) > 0 || hasSchemaURL(input.Schemas) || len(preparedIDPs) > 0
+	// In-tx checks (flows, schema-URL resolve, IDP immutables, application
+	// writers) can still add to the bag. When nothing in-tx can run, surface
+	// pure-prepare failures without opening a transaction.
+	needsInTxChecks := len(input.FlowDefinitions) > 0 || hasSchemaURL(input.Schemas) || len(preparedIDPs) > 0 || len(preparedApplications) > 0
 	if !needsInTxChecks && len(failures.Resources) > 0 {
 		return nil, failures
 	}
@@ -123,7 +140,12 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 		out         *CreateReleaseOutput
 		contentHash string
 	)
+	// The in-tx checks append to failures, and Spanner replays an aborted
+	// transaction's callback, so each attempt starts from the failures found
+	// before it.
+	preparedFailures := len(failures.Resources)
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		failures.Resources = failures.Resources[:preparedFailures]
 		stmts := tx.Statements()
 
 		// Resolve schema-URL entries before flows so their objectTypes enter
@@ -137,6 +159,9 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 			return err
 		}
 		if err := s.checkBundleIDPImmutables(ctx, stmts, input.ProjectID, preparedIDPs, failures); err != nil {
+			return err
+		}
+		if err := s.checkBundleApplications(ctx, stmts, input.ProjectID, preparedApplications, failures); err != nil {
 			return err
 		}
 		if len(failures.Resources) > 0 {
@@ -174,6 +199,19 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 				return err
 			}
 			content.IDPConnections = append(content.IDPConnections, connection.Connection)
+		}
+		for _, prepared := range preparedApplications {
+			application, err := s.applications.resolveOrCreateDeclared(ctx, stmts, input.ProjectID, prepared.doc, prepared.document)
+			if err != nil {
+				// A refusal here is a concurrent writer's: report it like one
+				// the checks above found.
+				if errors.Is(err, domain.ErrApplicationRevisionConflict()) || !isBundleResourceFailure(err) {
+					return err
+				}
+				failures.add(domain.ReleasePointerKindApplication, prepared.index, prepared.doc.Slug, err)
+				return failures
+			}
+			content.Applications = append(content.Applications, application)
 		}
 		for _, prepared := range preparedPolicies {
 			revision, err := s.policies.resolveOrPublish(ctx, stmts, input.ProjectID, prepared.operation, prepared.config)
@@ -256,17 +294,22 @@ func bundleShapeInput(input BuildReleaseInput) domain.BundleShapeInput {
 	for i, idp := range input.IDPs {
 		idps[i] = domain.BundleShapeIDP{Index: idp.Index, Document: idp.Document}
 	}
+	applications := make([]domain.BundleShapeApplication, len(input.Applications))
+	for i, application := range input.Applications {
+		applications[i] = domain.BundleShapeApplication{Index: application.Index, Document: application.Document}
+	}
 	policies := make([]domain.BundleShapePolicy, len(input.Policies))
 	for i, policy := range input.Policies {
 		policies[i] = domain.BundleShapePolicy{Index: policy.Index, Operation: policy.Operation}
 	}
 	return domain.BundleShapeInput{
-		Schemas:     schemas,
-		Flows:       flows,
-		IDPs:        idps,
-		Policies:    policies,
-		HasBranding: input.Branding != nil,
-		HasOAuth:    input.OAuth != nil,
+		Schemas:      schemas,
+		Flows:        flows,
+		IDPs:         idps,
+		Applications: applications,
+		Policies:     policies,
+		HasBranding:  input.Branding != nil,
+		HasOAuth:     input.OAuth != nil,
 	}
 }
 
@@ -440,6 +483,84 @@ func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *Bu
 	return docs
 }
 
+// prepareBundleApplications validates each bundled application as a declared
+// one, then the rules across the bundle: no two clients share a client_id,
+// and no two name the same secret variable, since a variable holds one
+// client's secret. Every client on either side of a clash is refused, and an
+// application refused for one is still prepared, so checkBundleApplications
+// reports its other refusals in the same answer.
+func (s *releaseService) prepareBundleApplications(input BuildReleaseInput, failures *BundleValidationError) ([]preparedApplication, error) {
+	docs := make([]domain.ApplicationDocument, len(input.Applications))
+	documents := make([][]byte, len(input.Applications))
+	valid := make([]bool, len(input.Applications))
+	clientIDs := map[string]int{}
+	variables := map[string]int{}
+	for i, application := range input.Applications {
+		if shapeFailed(failures, domain.ReleasePointerKindApplication, application.Index) {
+			continue
+		}
+		doc, document, err := s.applications.validate(application.Document, true)
+		if err != nil {
+			if !isBundleResourceFailure(err) {
+				return nil, err
+			}
+			failures.add(domain.ReleasePointerKindApplication, application.Index, doc.Slug, err)
+		}
+		docs[i], documents[i], valid[i] = doc, document, err == nil
+		for _, client := range doc.Clients {
+			if client.ClientID != nil {
+				clientIDs[*client.ClientID]++
+			}
+			if name, ok := client.SecretVariable(); ok {
+				variables[name]++
+			}
+		}
+	}
+	prepared := make([]preparedApplication, 0, len(input.Applications))
+	for i, application := range input.Applications {
+		if !valid[i] {
+			continue
+		}
+		taken := map[string]string{}
+		for j, client := range docs[i].Clients {
+			at := fmt.Sprintf("/clients/%d", j)
+			if clientIDs[*client.ClientID] > 1 {
+				taken[at+"/client_id"] = "another client in the release has this client_id"
+			}
+			if name, ok := client.SecretVariable(); ok && variables[name] > 1 {
+				taken[at+"/secret"] = "another client in the release names this variable"
+			}
+		}
+		if len(taken) > 0 {
+			failures.add(domain.ReleasePointerKindApplication, application.Index, docs[i].Slug, domain.ErrApplicationInvalid(taken, nil))
+		}
+		prepared = append(prepared, preparedApplication{index: application.Index, doc: docs[i], document: documents[i]})
+	}
+	return prepared, nil
+}
+
+// checkBundleApplications runs each bundled application's writer, client_id
+// and secret variable checks before any write, so every refusal lands in the
+// failures bag.
+func (s *releaseService) checkBundleApplications(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	prepared []preparedApplication,
+	failures *BundleValidationError,
+) error {
+	for _, application := range prepared {
+		refusals, err := s.applications.declaredWriteRefusals(ctx, stmts, projectID, application.doc)
+		if err != nil {
+			return err
+		}
+		for _, refusal := range refusals {
+			failures.add(domain.ReleasePointerKindApplication, application.index, application.doc.Slug, refusal)
+		}
+	}
+	return nil
+}
+
 // prepareBundlePolicies validates each bundled policy against its
 // operation's template before the transaction opens, the check
 // `POST /policies` runs, so every refused config lands in the failures bag at
@@ -503,14 +624,15 @@ func (s *releaseService) checkBundleIDPImmutables(
 
 // isBundleResourceFailure reports whether err is a per-resource validation
 // failure that belongs in the Build bag. Infrastructure errors (internal,
-// aborted transactions, raw storage) must bubble so the caller can retry or
-// answer with the real status.
+// unavailable, aborted transactions, raw storage) must bubble so the caller
+// can retry or answer with the real status: in the bag, a Spanner abort,
+// which storage reports as unavailable, would never be retried.
 func isBundleResourceFailure(err error) bool {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok {
 		return false
 	}
-	return de.Code != domain.ErrInternal(nil).Code
+	return de.Code != domain.ErrInternal(nil).Code && de.Code != domain.ErrUnavailable().Code
 }
 
 // autoPinReferences adds project revisions for handles named by the bundle

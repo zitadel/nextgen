@@ -19,6 +19,7 @@ import (
 	gen "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
@@ -32,11 +33,11 @@ type fakeFlowSvc struct {
 	def        *domain.FlowDefinition
 	resolveErr error
 
-	startResult  domain.FlowStepResult
+	startResult  flowengine.FlowStepResult
 	startErr     error
-	submitResult domain.FlowStepResult
+	submitResult flowengine.FlowStepResult
 	submitErr    error
-	getResult    domain.FlowStepResult
+	getResult    flowengine.FlowStepResult
 	getErr       error
 
 	gotStartReq  service.StartFlowRequest
@@ -48,17 +49,17 @@ func (f *fakeFlowSvc) Resolve(_ context.Context, _ service.ResolveFlowRequest) (
 	return f.def, f.resolveErr
 }
 
-func (f *fakeFlowSvc) Start(_ context.Context, req service.StartFlowRequest) (domain.FlowStepResult, error) {
+func (f *fakeFlowSvc) Start(_ context.Context, req service.StartFlowRequest) (flowengine.FlowStepResult, error) {
 	f.gotStartReq = req
 	return f.startResult, f.startErr
 }
 
-func (f *fakeFlowSvc) Submit(_ context.Context, req service.SubmitFlowRequest) (domain.FlowStepResult, error) {
+func (f *fakeFlowSvc) Submit(_ context.Context, req service.SubmitFlowRequest) (flowengine.FlowStepResult, error) {
 	f.gotSubmitReq = req
 	return f.submitResult, f.submitErr
 }
 
-func (f *fakeFlowSvc) GetStep(_ context.Context, req service.GetFlowStepRequest) (domain.FlowStepResult, error) {
+func (f *fakeFlowSvc) GetStep(_ context.Context, req service.GetFlowStepRequest) (flowengine.FlowStepResult, error) {
 	f.gotGetReq = req
 	return f.getResult, f.getErr
 }
@@ -227,9 +228,9 @@ func doRequestWithOrigin(t *testing.T, method, url string, body any, cookieValue
 func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
 	ts := newTestServer(t)
 	ts.fake.def = &domain.FlowDefinition{ProjectID: "proj_1", ID: "def_1", Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"}}
-	ts.fake.startResult = domain.FlowStepResult{
+	ts.fake.startResult = flowengine.FlowStepResult{
 		State: &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()},
-		Step:  &domain.FlowStep{Name: "identify"},
+		Step:  &flowengine.FlowStep{Name: "identify"},
 	}
 
 	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows", map[string]any{
@@ -346,7 +347,7 @@ func TestSubmitFlowStep_HappyPath_RotatesCookie(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 
 	advanced := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
-	ts.fake.submitResult = domain.FlowStepResult{State: advanced, Step: &domain.FlowStep{Name: "password"}}
+	ts.fake.submitResult = flowengine.FlowStepResult{State: advanced, Step: &flowengine.FlowStep{Name: "password"}}
 
 	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
@@ -370,7 +371,7 @@ func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
 
 	complete := domain.FlowStepCompleteShow
 	terminal := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
-	ts.fake.submitResult = domain.FlowStepResult{State: terminal, Step: &domain.FlowStep{Name: "done", Complete: &complete}}
+	ts.fake.submitResult = flowengine.FlowStepResult{State: terminal, Step: &flowengine.FlowStep{Name: "done", Complete: &complete}}
 
 	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
@@ -391,9 +392,9 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 
 	complete := domain.FlowStepCompleteShow
 	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
-	ts.fake.submitResult = domain.FlowStepResult{
+	ts.fake.submitResult = flowengine.FlowStepResult{
 		State:                 &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()},
-		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		Step:                  &flowengine.FlowStep{Name: "done", Complete: &complete},
 		HandoffToken:          "ht_abc",
 		HandoffTokenExpiresAt: expiresAt,
 	}
@@ -470,9 +471,9 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 		t.Run(tt.name, func(t *testing.T) {
 			ts := newTestServer(t, tt.middleware...)
 			state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
-			ts.fake.submitResult = domain.FlowStepResult{
+			ts.fake.submitResult = flowengine.FlowStepResult{
 				State:           state,
-				Step:            &domain.FlowStep{Name: "sso-redirect", RedirectURL: new("https://accounts.example.test/authorize?state=s")},
+				Step:            &flowengine.FlowStep{Name: "sso-redirect", RedirectURL: new("https://accounts.example.test/authorize?state=s")},
 				SSOBindingNonce: "nonce-1",
 			}
 
@@ -662,7 +663,7 @@ func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {
 		FlowProgress: domain.FlowProgress{CurrentStep: "identify"},
 	}
 	cookieVal := ts.sealCookie(t, state)
-	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
+	ts.fake.getResult = flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "identify"}}
 
 	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
@@ -683,9 +684,9 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 
 	complete := domain.FlowStepCompleteShow
-	ts.fake.getResult = domain.FlowStepResult{
+	ts.fake.getResult = flowengine.FlowStepResult{
 		State: state,
-		Step:  &domain.FlowStep{Name: "done", Complete: &complete},
+		Step:  &flowengine.FlowStep{Name: "done", Complete: &complete},
 	}
 
 	resp, _ := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
@@ -700,7 +701,7 @@ func TestGetFlowStep_PlainRenderLeavesCookie(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
-	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
+	ts.fake.getResult = flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "identify"}}
 
 	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
@@ -715,7 +716,7 @@ func TestGetFlowStep_SSOResolvedRenderResealsCookie(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
-	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}, Reseal: true}
+	ts.fake.getResult = flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "identify"}, Reseal: true}
 
 	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
@@ -736,9 +737,9 @@ func TestGetFlowStep_ResolvedHandoffReturns200WithTerminalCookie(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 
 	complete := domain.FlowStepCompleteShow
-	ts.fake.getResult = domain.FlowStepResult{
+	ts.fake.getResult = flowengine.FlowStepResult{
 		State:                 state,
-		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		Step:                  &flowengine.FlowStep{Name: "done", Complete: &complete},
 		HandoffToken:          "ht_abc",
 		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
 	}
@@ -771,9 +772,9 @@ func TestGetFlowStep_ResolvedHandoffSurvivesSealFailure(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 
 	complete := domain.FlowStepCompleteShow
-	ts.fake.getResult = domain.FlowStepResult{
+	ts.fake.getResult = flowengine.FlowStepResult{
 		State:                 state,
-		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		Step:                  &flowengine.FlowStep{Name: "done", Complete: &complete},
 		HandoffToken:          "ht_abc",
 		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
 	}
@@ -841,8 +842,8 @@ func TestSubmitFlowStep_StepErrorLogsOnce(t *testing.T) {
 	})
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
-	failure := domain.FlowStepFailed(domain.FlowStepErrorInvalidCredentials, domain.ErrAuthAttemptProofRejected(nil))
-	ts.fake.submitResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "password", Error: &failure.Key, Failure: failure}}
+	failure := domain.FlowStepFailed(flowengine.FlowStepErrorInvalidCredentials, domain.ErrAuthAttemptProofRejected(nil))
+	ts.fake.submitResult = flowengine.FlowStepResult{State: state, Step: &flowengine.FlowStep{Name: "password", Error: &failure.Key, Failure: failure}}
 
 	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
@@ -855,7 +856,7 @@ func TestSubmitFlowStep_StepErrorLogsOnce(t *testing.T) {
 	require.Equal(t, "api error", record["msg"])
 	require.Equal(t, "INFO", record["level"])
 	require.Equal(t, "password", record["step"])
-	require.Equal(t, domain.FlowStepErrorInvalidCredentials, record["step_error"])
+	require.Equal(t, flowengine.FlowStepErrorInvalidCredentials, record["step_error"])
 	require.Equal(t, "proj_1", record["project_id"])
 	require.Equal(t, domain.ErrAuthAttemptProofRejected(nil).Code, record["error"].(map[string]any)["code"])
 }

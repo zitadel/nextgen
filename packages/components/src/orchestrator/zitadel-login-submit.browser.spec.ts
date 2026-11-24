@@ -59,7 +59,7 @@ describe("<zitadel-login> submit failures and latency (chromium)", () => {
 
     await expect.element(page.getByRole("alert")).toBeVisible();
     // The alert's message is slotted from its host, outside the role node's textContent.
-    await expect.element(page.getByText("Wrong email or password.")).toBeVisible();
+    await expect.element(page.getByText("Wrong password.")).toBeVisible();
     await expectPasswordFocus();
     await expect.element(submit()).toBeEnabled();
     expect(completed).not.toHaveBeenCalled();

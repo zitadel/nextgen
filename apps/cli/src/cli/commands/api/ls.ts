@@ -7,6 +7,7 @@ import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 import { Tabulatable } from "@/cli/core/tabulatable";
 import { BaseCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
@@ -17,7 +18,7 @@ const COLUMNS = ["id", "method", "path", "summary"] as const;
  * offline. `--json` carries each one's parameters, body and paging, which is
  * what an agent needs to build the call.
  */
-export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
+export default class ApiLs extends Telemetered(Tabulatable(ServerCommand(BaseCommand))) {
   static override description =
     "List the operations of the Zitadel API that the api command calls.";
   static override group = CommandGroups.apiAndEvents;

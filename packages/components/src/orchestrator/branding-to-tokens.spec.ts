@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBrandingStylesheet, resolveTheme } from "./branding-to-tokens.js";
+import {
+  brandingDeclarations,
+  buildBrandingStylesheet,
+  resolveTheme,
+} from "./branding-to-tokens.js";
 
 const light = (palette: Record<string, string>) => ({ theme: { light: { palette } } });
 const dark = (palette: Record<string, string>) => ({ theme: { dark: { palette } } });
@@ -224,5 +228,36 @@ describe("resolveTheme", () => {
   it("falls back to dark when a revision publishes no side", () => {
     expect(resolveTheme({ typography: { font_family: "Inter, sans-serif" } })).toBe("dark");
     expect(resolveTheme(undefined)).toBe("dark");
+  });
+});
+
+describe("brandingDeclarations", () => {
+  const branding = {
+    typography: { font_family: "Inter, sans-serif" },
+    shape: { radius: "none" },
+    theme: {
+      light: { palette: { primary: "#ff0000" } },
+      dark: { palette: { primary: "#00ff00" } },
+    },
+  } as const;
+
+  it("takes the shared type and shape and the requested side's palette", () => {
+    const light = brandingDeclarations(branding, "light");
+    expect(light["--zl-primary"]).toBe("#ff0000");
+    expect(light["--zl-font-family-sans"]).toBe("Inter, sans-serif");
+    expect(light["--zl-radius-md"]).toBe("0");
+    expect(brandingDeclarations(branding, "dark")["--zl-primary"]).toBe("#00ff00");
+  });
+
+  it("matches what the stylesheet emits for that side", () => {
+    const css = buildBrandingStylesheet(branding);
+    for (const [name, value] of Object.entries(brandingDeclarations(branding, "dark"))) {
+      expect(css).toContain(`${name}: ${value};`);
+    }
+  });
+
+  it("sets nothing without a revision", () => {
+    expect(brandingDeclarations(undefined, "light")).toEqual({});
+    expect(brandingDeclarations({}, "dark")).toEqual({});
   });
 });

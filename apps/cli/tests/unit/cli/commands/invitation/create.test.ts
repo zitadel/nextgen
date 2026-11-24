@@ -5,7 +5,6 @@ import type { SetupServer } from "msw/node";
 import { afterEach, describe, expect, vi } from "vitest";
 
 import InvitationCreate from "@/cli/commands/invitation/create";
-import { BaseCommand } from "@/cli/core/base";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { answering } from "@tests/helpers/keyboard";
@@ -244,7 +243,7 @@ describe("invitation create --dry-run", () => {
 /** Watches the product events the command sends. */
 function trackedEvents() {
   return vi.spyOn(
-    BaseCommand.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
+    InvitationCreate.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
     "trackEvent",
   );
 }

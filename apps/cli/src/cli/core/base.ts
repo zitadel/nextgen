@@ -10,7 +10,6 @@ import { Documented } from "./documented";
 import { Failure } from "./failure";
 import { Interruptible } from "./interruptible";
 import { Loggable } from "./loggable";
-import { RunTelemetry } from "./run-telemetry";
 import { Output, warnings } from "@/lib/ui";
 
 import { toZitadelError, ZitadelError } from "@/lib/errors";
@@ -26,8 +25,6 @@ import {
   type Suggested,
   type SuggestedCommand,
 } from "@/lib/suggestion";
-import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
-import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { Runtime } from "@/lib/runtime";
 import { Skills } from "@/lib/skills";
 import type { Presentation } from "@/lib/ui";
@@ -53,13 +50,15 @@ const SERVER: FlagVariable = {
  * beside the code that reads it. The CLI reference lists them beside the
  * flags (`./reference.ts`).
  */
-export const FLAG_VARIABLES: readonly FlagVariable[] = [
-  SERVER,
-  NO_COLOR,
-  FORCE_COLOR,
-  DO_NOT_TRACK,
-  ZITADEL_TELEMETRY,
-];
+export const FLAG_VARIABLES: readonly FlagVariable[] = [SERVER, NO_COLOR, FORCE_COLOR];
+
+/**
+ * What a command knows about its run, by name: enums, booleans, counts or lists
+ * of enums, never a value the developer typed.
+ */
+export type Facts = Readonly<
+  Record<string, string | number | boolean | readonly string[] | null | undefined>
+>;
 
 /** How a command resolves the context it runs in; see {@link BaseCommand.meta}. */
 export type MetaOptions = {
@@ -157,11 +156,6 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
       description:
         "Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.",
     }),
-    telemetry: Flags.boolean({
-      default: true,
-      allowNo: true,
-      description: "Send anonymous usage analytics. Disable with --no-telemetry.",
-    }),
   };
 
   /** How the run's context is resolved; see {@link toMeta}. */
@@ -228,16 +222,6 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
     return this.meta.cliVersion;
   }
 
-  /**
-   * Anonymous usage analytics for this invocation. Subclasses add
-   * command-specific dimensions (framework, counts, `step`, …) through
-   * {@link recordTelemetry}; the base fires the lifecycle events and flushes in
-   * {@link finally}.
-   */
-  private readonly runTelemetry = new RunTelemetry((deps) => {
-    return this.createTelemetry(deps);
-  });
-
   private reading: ReturnType<BaseCommand["parse"]> | undefined;
 
   /**
@@ -286,7 +270,7 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
    *
    * This runs before the run has a context, so it may only read what is
    * already here — a file, a flag. It is too early to ask a server: the user
-   * agent is installed by `init` and telemetry opens with the context, so a
+   * agent is installed by `init` and the run's context is settled afterwards, so a
    * request from here would go out unidentified and a failure would be
    * reported with no command behind it.
    */
@@ -509,22 +493,20 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
   }
 
   /**
-   * Merge command-specific dimensions into the recorded dimensions immutably: a
-   * new frozen bag replaces the previous one, so no shared object is ever
-   * mutated. `step` advances by re-recording it at each milestone.
+   * What this command knows about its run, as facts, for whoever reports on
+   * it. A command or a layer between adds its own and keeps what the layers
+   * below it say.
+   *
+   * @returns The facts, by name: enums, booleans, counts or lists of enums.
    */
-  protected recordTelemetry(patch: Properties): void {
-    this.runTelemetry.record(patch);
+  protected describe(): Facts {
+    return {};
   }
 
   /**
-   * Send a product event the catalog lists for the CLI, with the header and
-   * context every CLI event carries. Only for an event an ADR names; a
-   * command's own facts are dimensions ({@link recordTelemetry}).
+   * The failure this run ended with, once it has, as it is shown and exits.
    */
-  protected trackEvent(event: string, properties: Properties): void {
-    this.runTelemetry.track(event, properties, this.meta);
-  }
+  protected failed: ZitadelError | undefined;
 
   /**
    * What this command says of itself for {@link RunContext}: its id, the
@@ -589,11 +571,6 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
         ? await new Skills(process.env, !this.meta.nonInteractive).eligible()
         : false;
     this.settled = true;
-    this.runTelemetry.open(
-      this.meta,
-      typeof flags.telemetry === "boolean" ? flags.telemetry : undefined,
-      this.isInteractive(),
-    );
     return this.meta;
   }
 
@@ -611,36 +588,7 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
   }
 
   /**
-   * Telemetry factory seam. Production returns the real {@link Telemetry.create};
-   * tests override it to inject a recording client and assert the lifecycle
-   * ordering and opt-out behaviour that the central Vitest consent guard would
-   * otherwise make untestable.
-   */
-  protected createTelemetry(deps: TelemetryDeps): Telemetry {
-    return Telemetry.create(deps);
-  }
-
-  /**
-   * Whether this invocation is an interactive human session, used to gate the
-   * one-time first-run notice. Derived from argv + `jsonEnabled()` + TTY rather
-   * than `meta.nonInteractive`, so it is correct even on the early-failure path
-   * where {@link catch} opens telemetry against a fallback meta that has not yet
-   * computed `nonInteractive` from the flags.
-   */
-  private isInteractive(): boolean {
-    if (this.nonInteractive || this.jsonEnabled()) {
-      return false;
-    }
-    const argv = this.argv;
-    if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
-      return false;
-    }
-
-    return RunContext.isTerminal();
-  }
-
-  /**
-   * Final step of every command: records the run's telemetry and hands the
+   * Final step of every command: hands the
    * result to a {@link Presenter}, which writes it for the reader the run has
    * and returns the envelope oclif serialises under `--json`.
    *
@@ -649,7 +597,6 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
-    this.runTelemetry.completed(this.meta, result.status);
     return new Presenter({
       meta: this.meta,
       ui: this.ui,
@@ -715,10 +662,8 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
    * Renders any thrown error as the failure envelope and exits with its code.
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
-   * envelope's `command` field accurate. If that early failure left telemetry
-   * unopened, {@link RunTelemetry.open} runs here so the failure is still recorded;
-   * the flag isn't parsed yet on that path, so `--no-telemetry` is honoured from
-   * argv.
+   * envelope's `command` field accurate. The failure the run ends with is kept in
+   * {@link failed}.
    *
    * A command line oclif refused may name no command, and then the CLI's own
    * help is the one to read. A step left running must not keep drawing under
@@ -749,12 +694,7 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
       help,
     );
     this.meta = meta;
-    this.runTelemetry.open(
-      meta,
-      this.argv.includes("--no-telemetry") ? false : undefined,
-      this.isInteractive(),
-    );
-    this.runTelemetry.failed(meta, failure.error);
+    this.failed = failure.error;
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(failure.envelope(), warnings.take()));
     } else if (failure.error.code === "E_CANCELLED") {
@@ -774,23 +714,12 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
   }
 
   /**
-   * oclif runs this after `run`/`catch` on every path. We flush pending
-   * telemetry so a short-lived CLI process does not exit before the lifecycle
-   * event is sent. The await is bounded by the flush budget, so a hung or
-   * firewalled network adds at most ~1s.
-   *
-   * `mixpanel@0.18` always uses keep-alive agents (hardcoded; not configurable)
-   * and exposes no request timeout or handle, so a completed *or* hung request
-   * leaves a socket that keeps Node's event loop open past the await. The
-   * failure path force-exits via oclif's `exit()`, but the success path would
-   * otherwise hang, so we arm an unref'd watchdog: it cannot keep the loop alive
-   * on a clean exit, but if a telemetry socket is still holding it open after
-   * the grace, it force-exits with the resolved code.
+   * oclif runs this after `run`/`catch` on every path, so whatever a run left
+   * open is closed here.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
     this.ui.stopPrintingLogs();
-    await this.runTelemetry.shutdown();
     await super.finally(error);
   }
 }

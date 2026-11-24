@@ -285,9 +285,11 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
    * once, and the schema and flow already carry `sso_providers` as a list.
    * Space ticks a provider and Enter continues, so Enter on an empty list is
    * not a silent skip: it asks whether to go on without SSO, where No goes back
-   * to the list by asking again, and only a Yes returns none.
+   * to the list by asking again, and only a Yes returns none. Yes is
+   * preselected, so a person who presses Enter at every question finishes
+   * setup rather than going round the list forever.
    *
-   * Nothing is preselected, and declining costs nothing: `auth-method sso enable`
+   * No provider is preselected, and declining costs nothing: `auth-method sso enable`
    * performs this journey on an existing Project later.
    *
    * @returns The providers chosen.
@@ -317,7 +319,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
     const continueWithout = await this.deps.ask.yesNo({
       name: "continue without SSO",
       message: "Would you like to continue without setting up SSO?",
-      initialValue: false,
+      initialValue: true,
     });
     return continueWithout ? [] : this.chooseProviders();
   }

@@ -232,11 +232,13 @@ func (r *recordingSignupProtection) Consume(_ context.Context, state *domain.Flo
 // submitRegistration runs the adapter's passkey registration and returns the
 // create-user factory it handed the attempt service, which calls it only for
 // a provisional ceremony.
-func submitRegistration(t *testing.T, protection service.SignupProtection, in domain.FlowSubmitPasskeyRegistrationInput) func(context.Context, string) ([]service.UserAction, error) {
+func submitRegistration(t *testing.T, protection service.SignupProtection, in domain.FlowVerifyChallengeInput) func(context.Context, string) ([]service.UserAction, error) {
 	t.Helper()
 	fake := &fakeAuthAttempts{verifyAttempt: &domain.AuthAttempt{}}
 	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, protection)
-	require.NoError(t, adapter.SubmitPasskeyRegistration(t.Context(), in))
+	userID, err := adapter.VerifyChallenge(t.Context(), in)
+	require.NoError(t, err)
+	require.Empty(t, userID, "a registration's user is the one bound at issue")
 	require.Equal(t, "ch-reg", fake.verifyIn.ChallengeID)
 	proof, ok := fake.verifyIn.Proof.(service.PasskeyRegistrationProof)
 	require.True(t, ok, "expected a PasskeyRegistrationProof")
@@ -244,22 +246,25 @@ func submitRegistration(t *testing.T, protection service.SignupProtection, in do
 	return proof.CreateUser
 }
 
-func registrationInput(state *domain.FlowState) domain.FlowSubmitPasskeyRegistrationInput {
-	return domain.FlowSubmitPasskeyRegistrationInput{
-		ProjectID:      "proj-1",
-		AttemptID:      "att-1",
-		ChallengeID:    "ch-reg",
-		Attestation:    []byte(`{}`),
-		UserSchemaURL:  "sch_human",
-		UserAttributes: map[string]any{"email": "alice@example.com"},
-		State:          state,
-		GateProofs:     map[string]string{domain.SignupGate: "proof-1"},
+func registrationInput(state *domain.FlowState) domain.FlowVerifyChallengeInput {
+	return domain.FlowVerifyChallengeInput{
+		ProjectID:   "proj-1",
+		AttemptID:   "att-1",
+		Check:       domain.AuthCheckTypePasskeyRegistration,
+		ChallengeID: "ch-reg",
+		Proof:       []byte(`{}`),
+		SignUp: &domain.FlowChallengeSignUp{
+			UserSchemaURL:  "sch_human",
+			UserAttributes: map[string]any{"email": "alice@example.com"},
+			State:          state,
+			GateProofs:     map[string]string{domain.SignupGate: "proof-1"},
+		},
 	}
 }
 
 // A passkey registration that creates its user is a sign-up: the user is
 // built only after the flow's proof is spent.
-func TestFlowAuthAttemptAdapter_SubmitPasskeyRegistration_SpendsTheSignupProof(t *testing.T) {
+func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_SpendsTheSignupProof(t *testing.T) {
 	state := &domain.FlowState{ID: "flow-1", ProjectID: "proj-1"}
 	protection := &recordingSignupProtection{}
 	createUser := submitRegistration(t, protection, registrationInput(state))
@@ -272,7 +277,7 @@ func TestFlowAuthAttemptAdapter_SubmitPasskeyRegistration_SpendsTheSignupProof(t
 	assert.Same(t, state, protection.state, "the proof is bound to the flow it was issued for")
 }
 
-func TestFlowAuthAttemptAdapter_SubmitPasskeyRegistration_RefusedProofBuildsNoUser(t *testing.T) {
+func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_RefusedProofBuildsNoUser(t *testing.T) {
 	protection := &recordingSignupProtection{stubSignupProtection: stubSignupProtection{err: domain.ErrFlowProofInvalid()}}
 	createUser := submitRegistration(t, protection, registrationInput(&domain.FlowState{ID: "flow-1", ProjectID: "proj-1"}))
 
@@ -281,7 +286,7 @@ func TestFlowAuthAttemptAdapter_SubmitPasskeyRegistration_RefusedProofBuildsNoUs
 	assert.Empty(t, actions)
 }
 
-func TestFlowAuthAttemptAdapter_SubmitPasskeyRegistration_NeedsItsFlow(t *testing.T) {
+func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_NeedsItsFlow(t *testing.T) {
 	for name, state := range map[string]*domain.FlowState{
 		"no flow":         nil,
 		"another project": {ID: "flow-1", ProjectID: "proj-2"},
@@ -294,6 +299,125 @@ func TestFlowAuthAttemptAdapter_SubmitPasskeyRegistration_NeedsItsFlow(t *testin
 			assert.Empty(t, protection.consumed)
 		})
 	}
+	t.Run("no sign-up", func(t *testing.T) {
+		protection := &recordingSignupProtection{}
+		in := registrationInput(&domain.FlowState{ID: "flow-1", ProjectID: "proj-1"})
+		in.SignUp = nil
+		createUser := submitRegistration(t, protection, in)
+		_, err := createUser(t.Context(), "user_minted")
+		require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+		assert.Empty(t, protection.consumed)
+	})
+}
+
+// A passkey sign-in is issued as a PasskeyChallenge carrying the relying
+// party, and answers with the request options the browser signs.
+func TestFlowAuthAttemptAdapter_IssueChallenge_Passkey(t *testing.T) {
+	attempt := &domain.AuthAttempt{}
+	attempt.SetPasskeyChallenge(&domain.PasskeyChallenge{Challenge: "Y2hhbGxlbmdl"}).SetID("ch-pk")
+	fake := &fakeAuthAttempts{issueAttempt: attempt}
+	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+
+	out, err := adapter.IssueChallenge(t.Context(), domain.FlowIssueChallengeInput{
+		ProjectID: "proj-1",
+		AttemptID: "att-1",
+		Params: domain.FlowPasskeyChallengeParams{
+			RPID:             "example.com",
+			RPOrigins:        []string{"https://example.com"},
+			UserVerification: "preferred",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "ch-pk", out.ChallengeID)
+	assert.Empty(t, out.UserID)
+	assert.JSONEq(t, `{"challenge":"Y2hhbGxlbmdl"}`, string(out.Options), "the options are built from the stored challenge")
+
+	assert.Equal(t, "att-1", fake.issueIn.AttemptID)
+	challenge, ok := fake.issueIn.Challenge.(service.PasskeyChallenge)
+	require.True(t, ok, "expected a PasskeyChallenge")
+	assert.Equal(t, "example.com", challenge.RPID)
+	assert.Equal(t, "preferred", challenge.UserVerification)
+	require.Len(t, challenge.RPOrigins, 1)
+	assert.Equal(t, "https://example.com", challenge.RPOrigins[0].String())
+}
+
+// A passkey registration is issued as a PasskeyRegistrationChallenge, and
+// answers with the user handle the challenge is bound to.
+func TestFlowAuthAttemptAdapter_IssueChallenge_PasskeyRegistration(t *testing.T) {
+	attempt := &domain.AuthAttempt{}
+	attempt.SetPasskeyRegistrationChallenge(&domain.PasskeyRegistrationChallenge{
+		Challenge: "Y2hhbGxlbmdl",
+		RPID:      "example.com",
+		UserID:    "user_minted",
+		Username:  "alice@example.com",
+	}, true).SetID("ch-reg")
+	fake := &fakeAuthAttempts{issueAttempt: attempt}
+	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+
+	out, err := adapter.IssueChallenge(t.Context(), domain.FlowIssueChallengeInput{
+		ProjectID: "proj-1",
+		AttemptID: "att-1",
+		Params: domain.FlowPasskeyRegistrationChallengeParams{
+			Username:    "alice@example.com",
+			DisplayName: "alice@example.com",
+			RPID:        "example.com",
+			RPOrigins:   []string{"https://example.com"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "ch-reg", out.ChallengeID)
+	assert.Equal(t, "user_minted", out.UserID)
+	assert.NotEmpty(t, out.Options)
+
+	challenge, ok := fake.issueIn.Challenge.(service.PasskeyRegistrationChallenge)
+	require.True(t, ok, "expected a PasskeyRegistrationChallenge")
+	assert.Empty(t, challenge.UserID)
+	assert.Equal(t, "alice@example.com", challenge.Username)
+	assert.Equal(t, "example.com", challenge.RPID)
+}
+
+// A passkey sign-in's proof is verified as an assertion, and the user it
+// authenticated comes back.
+func TestFlowAuthAttemptAdapter_VerifyChallenge_Passkey(t *testing.T) {
+	fake := &fakeAuthAttempts{verifyAttempt: attemptWithUserFactor("ch-user", "user-1")}
+	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+
+	userID, err := adapter.VerifyChallenge(t.Context(), domain.FlowVerifyChallengeInput{
+		ProjectID:   "proj-1",
+		AttemptID:   "att-1",
+		Check:       domain.AuthCheckTypePasskey,
+		ChallengeID: "ch-pk",
+		Proof:       []byte(`{"id":"x"}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "user-1", userID)
+	assert.Equal(t, "ch-pk", fake.verifyIn.ChallengeID)
+	assert.Equal(t, service.PasskeyProof{AssertionResponse: []byte(`{"id":"x"}`)}, fake.verifyIn.Proof)
+}
+
+func TestFlowAuthAttemptAdapter_VerifyChallenge_RejectionSurfaces(t *testing.T) {
+	fake := &fakeAuthAttempts{verifyErr: domain.ErrAuthAttemptProofRejected(errors.New("bad signature"))}
+	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+
+	_, err := adapter.VerifyChallenge(t.Context(), domain.FlowVerifyChallengeInput{
+		Check:       domain.AuthCheckTypePasskey,
+		ChallengeID: "ch-pk",
+	})
+	assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+}
+
+// A check without a two-phase ceremony reaches neither leg of the attempt
+// service.
+func TestFlowAuthAttemptAdapter_UnsupportedChallenge(t *testing.T) {
+	fake := &fakeAuthAttempts{}
+	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+
+	_, err := adapter.IssueChallenge(t.Context(), domain.FlowIssueChallengeInput{})
+	require.Error(t, err)
+	_, err = adapter.VerifyChallenge(t.Context(), domain.FlowVerifyChallengeInput{Check: domain.AuthCheckTypePassword})
+	require.Error(t, err)
+	assert.Nil(t, fake.issueIn.Challenge)
+	assert.Nil(t, fake.verifyIn.Proof)
 }
 
 func attemptWithHandoff(t *testing.T, handedOffAt time.Time) *domain.AuthAttempt {

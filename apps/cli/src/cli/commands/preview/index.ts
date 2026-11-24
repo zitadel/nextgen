@@ -18,6 +18,7 @@ import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { PreviewCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 const CREDENTIAL_REQUIRED_REFUSAL = {
   message: "{credential} is not set",
@@ -220,7 +221,7 @@ export async function refusePrimaryOrigins(
  * prints is the release digest as `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build
  * to pin.
  */
-export default class Preview extends Previewable(ServerCommand(PreviewCommand)) {
+export default class Preview extends Telemetered(Previewable(ServerCommand(PreviewCommand))) {
   static override description =
     "Deploy a release from .zitadel/ to a pull-request build's preview URLs.";
   static override group = CommandGroups.releases;

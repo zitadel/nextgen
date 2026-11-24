@@ -49,7 +49,7 @@ import { Output, warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
-import { DEFAULT_RENDERER, type Fact, PORT } from "./shared";
+import { DEFAULT_RENDERER, type Fact, onboardingStep, PORT } from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
 import { CheckPatch } from "./steps/check-patch";
 import { CheckPreconditions } from "./steps/check-preconditions";
@@ -83,6 +83,7 @@ import { Promptable } from "@/cli/core/promptable";
 import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { BaseCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * How `--design`, which setup no longer takes, is refused.
@@ -298,13 +299,16 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
  * `--design` is hidden so scripts and agents passing it get a targeted error
  * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
-export default class Setup extends Destructive(
-  Promptable(Previewable(ServerCommand(BaseCommand))),
-  "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
+export default class Setup extends Telemetered(
+  Destructive(
+    Promptable(Previewable(ServerCommand(BaseCommand))),
+    "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
+  ),
 ) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
   static override group = CommandGroups.gettingStarted;
+  static override readonly headline = "framework";
   static override groupOrder = 1;
 
   static override examples = [
@@ -583,7 +587,7 @@ export default class Setup extends Destructive(
           ui: this.ui,
         }),
         ({ flags, found, scaffoldedFramework }) => {
-          this.recordTelemetry({
+          this.annotate({
             framework: found.app.framework,
             renderer: flags.renderer ?? DEFAULT_RENDERER,
             scaffolded_skeleton: scaffoldedFramework,
@@ -593,7 +597,7 @@ export default class Setup extends Destructive(
             use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
             sso: flags.sso ?? "none",
             password_policy: flags.passwordMinLength === null ? "empty" : "set",
-            step: "framework_resolved",
+            setup_stage: "framework_resolved",
           });
         },
       )
@@ -613,7 +617,7 @@ export default class Setup extends Destructive(
           suggest: this.suggest,
         }),
         ({ answers }) => {
-          this.recordTelemetry({
+          this.annotate({
             preset: answers.preset,
             use_case: answers.useCase,
             sso:
@@ -658,7 +662,7 @@ export default class Setup extends Destructive(
           ui: this.ui,
         }),
         () => {
-          this.recordTelemetry({ step: "project_created" });
+          this.annotate({ setup_stage: "project_created" });
         },
       )
       .step(
@@ -686,12 +690,12 @@ export default class Setup extends Destructive(
           dryRun: this.dryRun,
         }),
         ({ allFilesWritten, scaffolded }) => {
-          this.recordTelemetry({
-            step: "files_patched",
+          this.annotate({
+            setup_stage: "files_patched",
             files_written_count: allFilesWritten.length,
           });
           if (!this.dryRun) {
-            this.recordTelemetry({
+            this.annotate({
               password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
             });
           }
@@ -722,8 +726,8 @@ export default class Setup extends Destructive(
           ui: this.ui,
         }),
         ({ installOutcome }) => {
-          this.recordTelemetry({
-            step: "dependencies_installed",
+          this.annotate({
+            setup_stage: "dependencies_installed",
             package_manager: installOutcome.install.package_manager,
           });
         },
@@ -776,6 +780,11 @@ export default class Setup extends Destructive(
       .run(
         { flags },
         {
+          watch: this.watchWizard({
+            flow: "onboarding",
+            otherwise: "application_setup",
+            step: onboardingStep,
+          }),
           onUndoError: (key, error) => {
             warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
           },
