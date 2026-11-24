@@ -128,6 +128,33 @@ describe("what a flag requires of the others", () => {
   });
 });
 
+describe("what a flag's relations name", () => {
+  it.each(Object.entries(COMMANDS))("%s names only flags it declares", (_id, command) => {
+    const flags = { ...command.baseFlags, ...command.flags } as Record<
+      string,
+      Interfaces.Flag<unknown>
+    >;
+    const named = Object.entries(flags).flatMap(([name, flag]) => {
+      return [
+        ...(flag.exclusive ?? []),
+        ...(flag.dependsOn ?? []),
+        ...(flag.relationships ?? []).flatMap((relationship) => {
+          return relationship.flags.map((other) => {
+            return typeof other === "string" ? other : other.name;
+          });
+        }),
+      ].map((other) => {
+        return { name, other };
+      });
+    });
+    const unknown = named.filter(({ other }) => {
+      return !(other in flags) && other !== "json";
+    });
+
+    expect(unknown).toEqual([]);
+  });
+});
+
 describe("what every command takes by what it does", () => {
   it.each(Object.entries(COMMANDS))(
     "%s takes --dry-run exactly when it says what it would do",
