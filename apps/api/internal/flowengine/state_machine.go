@@ -337,12 +337,13 @@ type Runtime struct {
 	ssoIdentities SSOIdentityService
 	ssoRedirects  SSORedirectIssuer
 	passwords     PasswordPolicy
+	completion    CompletionPolicy
 	now           func() time.Time
 }
 
 // Deps are the services the runtime calls. Now is injectable
 // so tests can produce deterministic [State.IssuedAt] values; nil
-// means [time.Now].
+// means [time.Now]. A nil Completion lets every flow complete.
 type Deps struct {
 	Schemas       domain.SchemaResolver
 	SchemaStore   domain.JSONSchemaStore
@@ -353,6 +354,7 @@ type Deps struct {
 	SSOIdentities SSOIdentityService
 	SSORedirects  SSORedirectIssuer
 	Passwords     PasswordPolicy
+	Completion    CompletionPolicy
 	Now           func() time.Time
 }
 
@@ -372,6 +374,7 @@ func New(deps Deps) *Runtime {
 		ssoIdentities: deps.SSOIdentities,
 		ssoRedirects:  deps.SSORedirects,
 		passwords:     deps.Passwords,
+		completion:    deps.Completion,
 		now:           now,
 	}
 }
