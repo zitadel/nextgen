@@ -1,4 +1,4 @@
-import type { Command, Interfaces } from "@oclif/core";
+import { Flags, type Command, type Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
 import type { BaseCommand } from "@/cli/core/base";
@@ -33,6 +33,8 @@ export type OperationStatics = Readonly<{
   examples: readonly string[];
   flags: Interfaces.FlagInput;
   args: Interfaces.ArgInput;
+  /** What `--force` does for this resource, for an operation that asks consent. */
+  force?: string;
 }>;
 
 /**
@@ -109,7 +111,18 @@ export const bindOperation = <Ctx, Spec>(
   takesServer: ServerMixin,
 ): typeof Command => {
   const statics = operation.describe(definition);
-  abstract class Bound extends takesServer(operation) {
+  const served = takesServer(operation);
+  abstract class Bound extends served {
+    static override baseFlags =
+      statics.force === undefined
+        ? served.baseFlags
+        : {
+            ...served.baseFlags,
+            force: Flags.boolean({
+              char: "f",
+              description: statics.force,
+            }),
+          };
     static override description = statics.description;
     static override examples = [...statics.examples];
     static override flags = statics.flags;

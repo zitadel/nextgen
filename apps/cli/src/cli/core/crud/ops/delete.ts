@@ -41,6 +41,7 @@ export abstract class DeleteOperation<Ctx> extends Destructive(Previewable(Resou
     return {
       description: `${capitalize(verb)} ${article(resource.singular)} ${resource.singular} by id.`,
       examples: [`<%= config.bin %> ${topic} ${verb} <id> --force --json`],
+      force: `${capitalize(verb)} the ${resource.singular} without the confirmation prompt. Required when non-interactive.`,
       flags: {
         ...options.flags,
       },

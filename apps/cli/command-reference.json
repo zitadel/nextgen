@@ -830,7 +830,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Skip the confirmation. Required when non-interactive.",
+          "description": "Delete the user without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -1037,7 +1037,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Skip the confirmation. Required when non-interactive.",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -1159,7 +1159,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Skip the confirmation. Required when non-interactive.",
+          "description": "Deactivate the team without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -1359,7 +1359,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Skip the confirmation. Required when non-interactive.",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -1516,7 +1516,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Skip the confirmation. Required when non-interactive.",
+          "description": "Delete the grant without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -1807,7 +1807,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Skip the confirmation. Required when non-interactive.",
+          "description": "Revoke the session without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -3442,7 +3442,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Skip the confirmation. Required when non-interactive.",
+          "description": "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],

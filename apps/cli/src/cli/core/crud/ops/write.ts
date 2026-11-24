@@ -152,6 +152,12 @@ const describeWrite = <
       `${command} --data '{...}' --json`,
       `${command} --file ${exampleFile(resource.singular)}`,
     ],
+    ...(verb === "update"
+      ? {
+          force:
+            "Remove the fields set to null without the confirmation prompt. Required when non-interactive.",
+        }
+      : {}),
     flags: {
       ...bodyFieldFlags(fields),
       ...rawBodyFlags(document, fields),
