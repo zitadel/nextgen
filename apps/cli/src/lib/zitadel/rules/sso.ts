@@ -18,7 +18,7 @@ import type { Connection } from "@/lib/zitadel/resources/connections/connection"
 import type { ClaimRead } from "@/lib/zitadel/resources/connections/types";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import { PROVIDER_OUTCOMES, type ProviderOutcome } from "@/lib/zitadel/resources/flows/types";
-import { claimName, type PropertyName } from "@/lib/zitadel/names";
+import { claimName, propertyName, type PropertyName } from "@/lib/zitadel/names";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
@@ -1120,6 +1120,56 @@ export const SSO_RULES: readonly Rule[] = [
     },
     says: (fact, where) => {
       return `${where}: ${quote(fact.slug)} offers registration, but provisioning.creation of ${fact.connection.path} is "disabled", so it can sign existing users in and can never register a new one. Set creation to "auto" in ${fact.connection.path}, or offer it on a login step instead.`;
+    },
+  }),
+
+  defineRule({
+    id: "sso/impossible-auto-creation-data",
+    severity: "warning",
+    each: (config) => {
+      return config.flows.pinnedOffers.flatMap((offer) => {
+        const connection = offer.connection;
+        if (connection === undefined || !connection.createsUsers) {
+          return [];
+        }
+        // A mapping that fills nothing the schema defines is already reported
+        // by sso/empty-claim-mapping, or as an unknown target; this rule only
+        // judges a mapping that fills something.
+        const fillsSomething = connection.mappings.some((row) => {
+          return offer.schema.has(row.property);
+        });
+        if (!fillsSomething) {
+          return [];
+        }
+        const missing = [
+          ...new Set(
+            offer.schema.requiredByServer.map((path) => {
+              return path.split(".")[0] ?? path;
+            }),
+          ),
+        ].filter((name) => {
+          return !connection.maps(propertyName(name));
+        });
+        if (missing.length === 0) {
+          return [];
+        }
+        return [{ ...offer, connection, missing }];
+      });
+    },
+    file: (fact) => {
+      return fact.flow.path;
+    },
+    steps: {
+      step: (fact) => {
+        return fact.step.name;
+      },
+      cause: (fact) => {
+        return fact.slug;
+      },
+    },
+    says: (fact, where) => {
+      const names = fact.missing.map(quote).join(", ");
+      return `${where}: ${quote(fact.slug)} creates users automatically, but ${fact.schema.path} requires ${names} and claim_mapping of ${fact.connection.path} maps no claim to it, so automatic creation can never complete and every new user is asked for it instead. Map ${names} in ${fact.connection.path} to create users without asking.`;
     },
   }),
 ];

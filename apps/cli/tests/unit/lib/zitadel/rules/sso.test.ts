@@ -423,6 +423,18 @@ describe("SSO_RULES", () => {
     }
 
     /**
+     * A schema that lists `acme` and requires `email` and `phone`.
+     *
+     * @returns The schema document.
+     */
+    function aRequiringSchema(): JsonObject {
+      return aSchemaListing(["acme"], {
+        required: ["email", "phone"],
+        properties: { email: { "x-unique": "project" }, phone: { "x-unique": "project" } },
+      });
+    }
+
+    /**
      * A flow whose login entry offers nothing and whose register entry offers
      * `acme`; or, when `shared`, one entry that serves both purposes.
      *
@@ -647,6 +659,13 @@ describe("SSO_RULES", () => {
         message: `verified_claims of "acme" (${CONNECTION_PATH}) names nothing ${SCHEMA_PATH} defines`,
       },
       {
+        rule: "sso/impossible-auto-creation-data",
+        severity: "warning",
+        documents: agreeing(ACME, { schemas: { [SCHEMA_FILE]: aRequiringSchema() } }),
+        file: FLOW_PATH,
+        message: `step "identifier": "acme" creates users automatically, but ${SCHEMA_PATH} requires "phone" and claim_mapping of ${CONNECTION_PATH} maps no claim to it`,
+      },
+      {
         rule: "sso/impossible-registration",
         severity: "warning",
         documents: agreeing(anOidcConnection({ provisioning: { creation: "disabled" } }), {
@@ -802,6 +821,26 @@ describe("SSO_RULES", () => {
       {
         rule: "sso/empty-verified-claims",
         documents: agreeing(anOidcConnection({ verified_claims: { emial: true } })),
+      },
+      { rule: "sso/impossible-auto-creation-data", documents: agreeing(ACME) },
+      {
+        rule: "sso/impossible-auto-creation-data",
+        documents: agreeing(
+          anOidcConnection({ claim_mapping: { email: "email", phone: "phone" } }),
+          { schemas: { [SCHEMA_FILE]: aRequiringSchema() } },
+        ),
+      },
+      {
+        rule: "sso/impossible-auto-creation-data",
+        documents: agreeing(anOidcConnection({ provisioning: { creation: "disabled" } }), {
+          schemas: { [SCHEMA_FILE]: aRequiringSchema() },
+        }),
+      },
+      {
+        rule: "sso/impossible-auto-creation-data",
+        documents: agreeing(anOidcConnection({ claim_mapping: {} }), {
+          schemas: { [SCHEMA_FILE]: aRequiringSchema() },
+        }),
       },
       { rule: "sso/impossible-registration", documents: agreeing(ACME) },
       {
