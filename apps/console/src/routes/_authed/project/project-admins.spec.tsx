@@ -149,14 +149,14 @@ function stubDeleteGrant() {
 }
 
 function admins() {
-  return within(screen.getByRole("region", { name: "Admins" }));
+  return within(screen.getByRole("region", { name: "Members" }));
 }
 
 /** Opens the Members page from the project's Settings list, where the list and the Add button live. */
 async function openAdmins() {
   const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
   await userEvent.click(nav.getByRole("link", { name: "Members" }));
-  return within(await screen.findByRole("region", { name: "Admins" }));
+  return within(await screen.findByRole("region", { name: "Members" }));
 }
 
 /** The row labelled by a person or team, found by its name. */
@@ -212,7 +212,7 @@ describe("project admins", () => {
     expect(self.getByText("(you)")).toBeInTheDocument();
     // Not a grant, so nothing to revoke from here.
     expect(self.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
-    expect(admins().queryByText("No admins to show.")).not.toBeInTheDocument();
+    expect(admins().queryByText("No members to show.")).not.toBeInTheDocument();
   });
 
   it("shows a person with both sources once, with each named", async () => {
@@ -424,7 +424,7 @@ describe("project admins", () => {
     await renderProject();
 
     await openAdmins();
-    expect(admins().getByText("No admins to show.")).toBeInTheDocument();
+    expect(admins().getByText("No members to show.")).toBeInTheDocument();
   });
 
   it("removes an admin from the route's project after confirming", async () => {

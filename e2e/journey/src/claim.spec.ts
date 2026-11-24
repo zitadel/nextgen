@@ -107,7 +107,7 @@ test("the setup admin can invite a colleague and remove them, and the colleague 
       .getByRole("navigation", { name: "Project settings" })
       .getByRole("link", { name: "Members" })
       .click();
-    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
 
     // The admin makes a link. It is shown once, in the message to pass on, and
     // names nobody: whoever opens it gets the role (admin by default).
@@ -140,7 +140,7 @@ test("the setup admin can invite a colleague and remove them, and the colleague 
       .getByRole("navigation", { name: "Project settings" })
       .getByRole("link", { name: "Members" })
       .click();
-    await expect(colleaguePage.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(colleaguePage.getByRole("region", { name: "Members" })).toBeVisible();
 
     await row.getByRole("button", { name: `Actions for ${email}` }).click();
     await page.getByRole("menuitem", { name: "Remove grant" }).click();
@@ -153,7 +153,7 @@ test("the setup admin can invite a colleague and remove them, and the colleague 
     // to login too, so only a still-rendered screen makes the empty list mean
     // what it says.
     await expect(page.getByRole("row").filter({ hasText: email })).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
 
     // The colleague loses the project with the grant: the page's loader fails,
     // so the route's error boundary replaces the screen it rendered before.

@@ -202,7 +202,7 @@ test("lists a colleague's admin grant, lets them in, and takes it away", async (
       .getByRole("navigation", { name: "Project settings" })
       .getByRole("link", { name: "Members" })
       .click();
-    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
 
     // The operator's own grant (the one `signIn` wrote) comes back through
     // `GET /projects/{id}/admins` (#1462) as their row, marked as theirs: the

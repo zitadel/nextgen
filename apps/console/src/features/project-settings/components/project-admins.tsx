@@ -29,11 +29,12 @@ type Source = Admin["sources"][number];
 type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 /**
- * A project's admins: who administers it, how each of them holds that access,
- * and how it is taken away (#1025, journey in #769). The Members tab
- * of the project's Settings (D40), because a grant is project-level data
- * (#1238): the project id comes from the route, and every request made from
- * here carries it.
+ * A project's members: who has access to it, how each of them holds that
+ * access, and how it is taken away (#1025, journey in #769). The Members tab of
+ * the project's Settings (D40), because a grant is project-level data (#1238):
+ * the project id comes from the route, and every request made from here
+ * carries it. The component and its file keep the name of the admins list the
+ * rows come from.
  *
  * **People come from `GET /projects/{id}/admins`** (#1462). It lists each person
  * once with every way they hold admin access: membership in the owning team,
@@ -83,7 +84,7 @@ export function ProjectAdmins({
   const scroll = useScrollEdges();
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
-    <section aria-label="Admins" className="flex flex-col gap-4">
+    <section aria-label="Members" className="flex flex-col gap-4">
       {/* The row menu stays at the card's right edge while the rest scrolls
           under it, so it is reachable on a phone. */}
       <div
@@ -106,7 +107,7 @@ export function ProjectAdmins({
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={3}>No admins to show.</ResourceEmptyRow>
+              <ResourceEmptyRow colSpan={3}>No members to show.</ResourceEmptyRow>
             ) : (
               rows.map((row) => (
                 <ResourceRow key={row.key} className="group">
