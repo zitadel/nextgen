@@ -3541,7 +3541,14 @@ export function setupPlatformHandlers() {
         revision_id: record.revisionId,
         slug: record.slug,
         declared: true,
-        definition: record.body,
+        // A response carries each client's first_party in effect; a declared
+        // client is first-party unless its document says otherwise.
+        definition: {
+          ...record.body,
+          clients: asArray(record.body.clients).map((client) =>
+            isObject(client) ? { first_party: true, ...client } : client,
+          ),
+        },
         created_at: record.createdAt,
         updated_at: record.updatedAt,
       });

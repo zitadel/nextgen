@@ -1535,7 +1535,8 @@ type ApplicationClient struct {
 	Secret OptString `json:"secret"`
 	// A first-party client belongs to the project's own product and skips consent unless the request asks
 	// for it. A client declared in a release is first-party, and one registered through the API
-	// third-party, unless this says otherwise.
+	// third-party, unless this says otherwise. The server stores the value in effect, so a response always
+	// carries it.
 	FirstParty OptBool `json:"first_party"`
 }
 

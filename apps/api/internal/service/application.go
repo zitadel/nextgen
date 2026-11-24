@@ -80,7 +80,7 @@ func (s *applicationService) CreateOrReviseRegistered(ctx context.Context, proje
 	ctx, end := startSpan(ctx, "ApplicationService.CreateOrReviseRegistered")
 	defer end(&err)
 
-	next, err := s.validate(document, false)
+	next, document, err := s.validate(document, false)
 	if err != nil {
 		return nil, err
 	}
@@ -118,19 +118,24 @@ func (s *applicationService) GetRevision(ctx context.Context, projectID, revisio
 
 // validate checks document against the application.json schema, then against
 // the rules of the authorization server the schema cannot express, for the
-// writer: declared for a release, registered for the API.
-func (s *applicationService) validate(document []byte, declared bool) (domain.ApplicationDocument, error) {
+// writer: declared for a release, registered for the API. It returns the
+// document with every client's first_party set, the one the writer stores.
+func (s *applicationService) validate(document []byte, declared bool) (domain.ApplicationDocument, []byte, error) {
 	if _, err := validateBuiltinSchema(s.schemas, domain.SchemaKindApplication, document); err != nil {
-		return domain.ApplicationDocument{}, err
+		return domain.ApplicationDocument{}, nil, err
+	}
+	document, err := domain.FillFirstPartyDefaults(document, declared)
+	if err != nil {
+		return domain.ApplicationDocument{}, nil, domain.ErrRequestInvalid().WithParent(err)
 	}
 	doc, err := domain.ParseApplicationDocument(document)
 	if err != nil {
-		return domain.ApplicationDocument{}, domain.ErrRequestInvalid().WithParent(err)
+		return domain.ApplicationDocument{}, nil, domain.ErrRequestInvalid().WithParent(err)
 	}
 	if declared {
-		return doc, domain.ValidateDeclaredApplication(doc)
+		return doc, document, domain.ValidateDeclaredApplication(doc)
 	}
-	return doc, domain.ValidateRegisteredApplication(doc)
+	return doc, document, domain.ValidateRegisteredApplication(doc)
 }
 
 func (s *applicationService) createRegistered(ctx context.Context, projectID string, next domain.ApplicationDocument, document []byte) (*CreateApplicationOutput, error) {

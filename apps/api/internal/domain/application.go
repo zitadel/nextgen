@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,7 +73,7 @@ type ApplicationClientDocument struct {
 	// Secret is the `${{ NAME }}` reference to the variable holding a
 	// declared client's secret; a registered client has none.
 	Secret       *string `json:"secret"`
-	IsFirstParty *bool   `json:"first_party"`
+	IsFirstParty bool    `json:"first_party"`
 }
 
 func (c ApplicationClientDocument) IsConfidential() bool {
@@ -359,6 +360,30 @@ func ErrApplicationPermissionDenied() Error {
 // instant as another revision of the same application, so neither is newest.
 func ErrApplicationRevisionConflict() Error {
 	return newError(PrefixApplication.ErrorCodePrefix("revision_conflict"), "application: another revision of the same application was created at the same instant", nil, nil)
+}
+
+// FillFirstPartyDefaults returns document with first_party set on each client
+// that leaves it out: true when a release declares the application, false
+// when it is registered through the API. The document is patched as a map, so
+// fields ApplicationDocument does not model are kept.
+func FillFirstPartyDefaults(document []byte, declared bool) ([]byte, error) {
+	var doc map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(document))
+	decoder.UseNumber()
+	if err := decoder.Decode(&doc); err != nil {
+		return nil, err
+	}
+	clients, _ := doc["clients"].([]any)
+	for _, client := range clients {
+		fields, ok := client.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, set := fields["first_party"]; !set {
+			fields["first_party"] = declared
+		}
+	}
+	return json.Marshal(doc)
 }
 
 func ParseApplicationDocument(document []byte) (ApplicationDocument, error) {

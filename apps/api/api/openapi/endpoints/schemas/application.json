@@ -130,7 +130,7 @@
         },
         "first_party": {
           "type": "boolean",
-          "description": "A first-party client belongs to the project's own product and skips\nconsent unless the request asks for it. A client declared in a release\nis first-party, and one registered through the API third-party, unless\nthis says otherwise.\n"
+          "description": "A first-party client belongs to the project's own product and skips\nconsent unless the request asks for it. A client declared in a release\nis first-party, and one registered through the API third-party, unless\nthis says otherwise. The server stores the value in effect, so a\nresponse always carries it.\n"
         }
       }
     }

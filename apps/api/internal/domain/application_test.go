@@ -368,3 +368,37 @@ func TestReviseDeclaredApplication(t *testing.T) {
 		})
 	}
 }
+
+// A client that leaves first_party out takes its writer's default; one that
+// sets it keeps it. Fields the server does not model stay as written.
+func TestFillFirstPartyDefaults(t *testing.T) {
+	t.Parallel()
+	document := []byte(`{"slug":"shop","x-note":12345678901234567890,"clients":[` +
+		`{"slug":"web"},{"slug":"api","first_party":true},{"slug":"cli","first_party":false}]}`)
+	tests := []struct {
+		name     string
+		declared bool
+		want     string
+	}{
+		{
+			name:     "declared",
+			declared: true,
+			want: `{"slug":"shop","x-note":12345678901234567890,"clients":[` +
+				`{"slug":"web","first_party":true},{"slug":"api","first_party":true},{"slug":"cli","first_party":false}]}`,
+		},
+		{
+			name: "registered",
+			want: `{"slug":"shop","x-note":12345678901234567890,"clients":[` +
+				`{"slug":"web","first_party":false},{"slug":"api","first_party":true},{"slug":"cli","first_party":false}]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := domain.FillFirstPartyDefaults(document, tt.declared)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, string(got))
+		})
+	}
+}

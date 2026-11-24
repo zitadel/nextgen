@@ -491,6 +491,7 @@ func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *Bu
 // reports its other refusals in the same answer.
 func (s *releaseService) prepareBundleApplications(input BuildReleaseInput, failures *BundleValidationError) ([]preparedApplication, error) {
 	docs := make([]domain.ApplicationDocument, len(input.Applications))
+	documents := make([][]byte, len(input.Applications))
 	valid := make([]bool, len(input.Applications))
 	clientIDs := map[string]int{}
 	variables := map[string]int{}
@@ -498,14 +499,14 @@ func (s *releaseService) prepareBundleApplications(input BuildReleaseInput, fail
 		if shapeFailed(failures, domain.ReleasePointerKindApplication, application.Index) {
 			continue
 		}
-		doc, err := s.applications.validate(application.Document, true)
+		doc, document, err := s.applications.validate(application.Document, true)
 		if err != nil {
 			if !isBundleResourceFailure(err) {
 				return nil, err
 			}
 			failures.add(domain.ReleasePointerKindApplication, application.Index, doc.Slug, err)
 		}
-		docs[i], valid[i] = doc, err == nil
+		docs[i], documents[i], valid[i] = doc, document, err == nil
 		for _, client := range doc.Clients {
 			if client.ClientID != nil {
 				clientIDs[*client.ClientID]++
@@ -533,7 +534,7 @@ func (s *releaseService) prepareBundleApplications(input BuildReleaseInput, fail
 		if len(taken) > 0 {
 			failures.add(domain.ReleasePointerKindApplication, application.Index, docs[i].Slug, domain.ErrApplicationInvalid(taken, nil))
 		}
-		prepared = append(prepared, preparedApplication{index: application.Index, doc: docs[i], document: application.Document})
+		prepared = append(prepared, preparedApplication{index: application.Index, doc: docs[i], document: documents[i]})
 	}
 	return prepared, nil
 }

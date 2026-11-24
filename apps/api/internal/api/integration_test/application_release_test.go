@@ -43,6 +43,7 @@ func TestDeclaredApplication(t *testing.T) {
 		assert.True(t, app.Declared)
 		assert.Equal(t, v1.Pointers[0].RevisionID, app.RevisionID)
 		assert.Equal(t, "shop-web", app.Definition.Clients[0].ClientID.Value)
+		assert.Equal(t, api.NewOptBool(true), app.Definition.Clients[0].FirstParty, "a declared client is first-party by default")
 	})
 
 	t.Run("the revision the release pins reads back by its id", func(t *testing.T) {
