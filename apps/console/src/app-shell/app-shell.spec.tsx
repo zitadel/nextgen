@@ -976,7 +976,7 @@ describe("project settings view", () => {
     await userEvent.click(nav.getByRole("link", { name: "Members" }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/members"));
-    expect(await screen.findByRole("region", { name: "Admins" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Members" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "console-dev" })).toBeInTheDocument();
     expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("data-active", "true");
     expect(screen.queryByLabelText("Project name")).not.toBeInTheDocument();
