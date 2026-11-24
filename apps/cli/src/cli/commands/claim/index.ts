@@ -7,7 +7,7 @@ import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schem
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
 import { ZitadelError } from "@/lib/errors";
-import { section, log, warnings } from "@/lib/ui";
+import { announce, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -322,10 +322,14 @@ export default class Claim extends Telemetered(ServerCommand(EnvironmentCommand)
       // instruction on its own, so a launch that never happens (headless box,
       // no `xdg-open`, `--no-open`, an agent) needs no separate path.
       // The URL prints bare: it must never be split (clickability, the journey e2e scrape).
-      this.ui.note("Finish in your browser", [
+      // What the person must act on while this command waits is written as the
+      // command goes, to a pipe as to a terminal, so a script reading the pipe
+      // can open the link before the claim completes.
+      announce("Finish in your browser");
+      announce(
         "Create an account or sign in to claim your project, make it permanent and start collaborating.",
-      ]);
-      log.plain(escapeControlCharacters(challenge.claim_url));
+      );
+      announce(escapeControlCharacters(challenge.claim_url));
 
       if (flags.noWait) {
         return this.linkIssued(projectId, challenge);
@@ -334,7 +338,7 @@ export default class Claim extends Telemetered(ServerCommand(EnvironmentCommand)
       const skipLaunch = flags.noOpen || this.nonInteractive;
       opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
       if (!opened) {
-        log.info("Open the link above to continue.");
+        this.info("Open the link above to continue.");
       }
       waitFor = {
         challengeId: challenge.challenge_id,
@@ -355,7 +359,7 @@ export default class Claim extends Telemetered(ServerCommand(EnvironmentCommand)
         }),
       };
     }
-    log.start("Waiting for the browser step to finish");
+    this.info("Waiting for the browser step to finish");
 
     const completed = await this.poll(
       claimService,
@@ -377,7 +381,7 @@ export default class Claim extends Telemetered(ServerCommand(EnvironmentCommand)
     }
     // The team id stays out of the human output by design (it lives in the
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
-    log.done("Project claimed");
+    this.info("Project claimed");
 
     this.annotate({
       claim_outcome: "completed",

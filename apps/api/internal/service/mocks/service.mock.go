@@ -1892,44 +1892,6 @@ func (c *MockAllStatementsDeleteAuthzMembershipEdgesForTeamDeactivateCall) DoAnd
 	return c
 }
 
-// DeleteCancellableInvitation mocks base method.
-func (m *MockAllStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteCancellableInvitation", ctx, projectID, id, now)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteCancellableInvitation indicates an expected call of DeleteCancellableInvitation.
-func (mr *MockAllStatementsMockRecorder) DeleteCancellableInvitation(ctx, projectID, id, now any) *MockAllStatementsDeleteCancellableInvitationCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCancellableInvitation", reflect.TypeOf((*MockAllStatements)(nil).DeleteCancellableInvitation), ctx, projectID, id, now)
-	return &MockAllStatementsDeleteCancellableInvitationCall{Call: call}
-}
-
-// MockAllStatementsDeleteCancellableInvitationCall wrap *gomock.Call
-type MockAllStatementsDeleteCancellableInvitationCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteCancellableInvitationCall) Return(arg0 error) *MockAllStatementsDeleteCancellableInvitationCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteCancellableInvitationCall) Do(f func(context.Context, string, string, time.Time) error) *MockAllStatementsDeleteCancellableInvitationCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteCancellableInvitationCall) DoAndReturn(f func(context.Context, string, string, time.Time) error) *MockAllStatementsDeleteCancellableInvitationCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // DeleteEventsOlderThan mocks base method.
 func (m *MockAllStatements) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
 	m.ctrl.T.Helper()

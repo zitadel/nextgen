@@ -24,7 +24,7 @@ class Failing extends LocalServerCommand(BaseCommand, "exact") {
     throw new Error("unused");
   }
 
-  public async fail(error: Error): Promise<void> {
+  public async failWith(error: Error): Promise<void> {
     await this.toMeta({ "no-telemetry": true }, { source: "mock" });
     try {
       await this.catch(error);
@@ -51,7 +51,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it.each(KINDS)("adds the advice for a %s failure of the local server", async (kind) => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(new LocalServerError(kind, "E_VALIDATION", "It failed", { fact: 1 }));
+    await command.failWith(new LocalServerError(kind, "E_VALIDATION", "It failed", { fact: 1 }));
 
     expect(command.json).toEqual([
       expect.objectContaining({
@@ -66,7 +66,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it("leaves a failure that is not the local server's as it was", async () => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(new Error("something else"));
+    await command.failWith(new Error("something else"));
 
     expect(command.json).toEqual([
       expect.objectContaining({ status: "error", message: "something else" }),
@@ -76,7 +76,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it("names the file a failure is about in its hint", async () => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(
+    await command.failWith(
       new LocalServerError("admin-unreadable", "E_VALIDATION", "It failed", {
         path: "/p/admin.json",
       }),
@@ -90,7 +90,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it("aims the recovery of a malformed record at the folder that holds it", async () => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(
+    await command.failWith(
       new LocalServerError("record-malformed", "E_VALIDATION", "It failed", {
         directory: "/parent",
       }),
@@ -102,7 +102,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it("removes a malformed admin file before it resets", async () => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(
+    await command.failWith(
       new LocalServerError("admin-malformed", "E_VALIDATION", "It failed", {
         path: "/p/admin.json",
       }),
@@ -114,7 +114,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it("quotes the admin file it asks to remove when its path has a space", async () => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(
+    await command.failWith(
       new LocalServerError("admin-malformed", "E_VALIDATION", "It failed", {
         path: "/my dir/admin.json",
       }),
@@ -126,7 +126,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it("hands over the retargeted arguments when the record is in another folder", async () => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(
+    await command.failWith(
       new LocalServerError("record-malformed", "E_VALIDATION", "It failed", {
         directory: "/my dir",
       }),
@@ -147,7 +147,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it("keeps a command written as text when the failure names another folder", async () => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.fail(
+    await command.failWith(
       new LocalServerError("package-missing", "E_VALIDATION", "It failed", {
         directory: "/elsewhere",
       }),

@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  expireInvitation,
   rejectInvitation,
   completeClaimChallenge,
   resetPlatformStore,
@@ -250,6 +251,13 @@ export interface PlatformMock {
    * @param invitationId - The invitation to decline.
    */
   declinesInvitation(invitationId: string): void;
+
+  /**
+   * Lets the invitation expire, as 72 hours passing would.
+   *
+   * @param invitationId - The invitation to expire.
+   */
+  expiresInvitation(invitationId: string): void;
 
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
@@ -758,6 +766,10 @@ export function usePlatformMock(): PlatformMock {
 
     declinesInvitation(invitationId) {
       rejectInvitation(invitationId);
+    },
+
+    expiresInvitation(invitationId) {
+      expireInvitation(invitationId);
     },
 
     recovers() {

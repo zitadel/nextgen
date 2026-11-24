@@ -206,27 +206,22 @@ describe("MoveAppPort", () => {
   });
 
   describe("when it moves the files", () => {
-    it("says so before it asks for consent", async ({ dir }) => {
+    it("says so before it asks for consent", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await setUpApp(dir);
-      const events: string[] = [];
-      const restore = log.install((_level, text) => {
-        events.push(text);
-      });
+      const shownWhenAsked: string[] = [];
 
       await movingTo3101(dir, {
         dryRun: false,
         consent: () => {
-          events.push("asked");
+          shownWhenAsked.push(terminal.shown());
           return Promise.resolve(undefined);
         },
       });
-      restore();
 
-      expect(
-        events.filter((event) => {
-          return event === "asked" || event.startsWith("Moved from");
-        }),
-      ).toEqual(["Moved from http://localhost:3000 to http://localhost:3101", "asked"]);
+      expect(shownWhenAsked.join("")).toContain(
+        "Moved from http://localhost:3000 to http://localhost:3101",
+      );
     });
   });
 

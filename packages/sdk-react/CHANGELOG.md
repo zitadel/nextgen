@@ -1,5 +1,18 @@
 # @zitadel/sdk-react
 
+## 0.8.0
+
+### Minor Changes
+
+- [#3264](https://github.com/zitadel/nextgen/pull/3264) [`caf1506`](https://github.com/zitadel/nextgen/commit/caf1506f461ffa52996f3811e4aeb3bf25778afe) - `@zitadel/sdk-react` now tells your own components who is signed in: the `useSession()` hook returns the session's status and the user's identity, shares one server read across the page and offers `refresh()`. Outside components, `sessionStore()` gives route guards and loaders the same read, and `getSession()` makes a single one. `zitadel setup` points React apps' agents at the hook.
+
+### Patch Changes
+
+- Updated dependencies [[`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c), [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d), [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1), [`caf1506`](https://github.com/zitadel/nextgen/commit/caf1506f461ffa52996f3811e4aeb3bf25778afe)]:
+  - @zitadel/api@0.8.0
+  - @zitadel/sdk-core@0.8.0
+  - @zitadel/components@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

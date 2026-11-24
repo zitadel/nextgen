@@ -261,19 +261,18 @@ func (s *InvitationService) List(ctx context.Context, req ListInvitationsRequest
 	}, nil
 }
 
-// Cancel deletes a pending or rejected invitation.
+// Cancel deletes a pending, expired or rejected invitation.
 func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (err error) {
 	ctx, end := startSpan(ctx, "InvitationService.Cancel")
 	defer end(&err)
 
-	now := time.Now().UTC()
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 		entity, err := stmts.GetInvitationByID(ctx, projectID, id)
 		if err != nil {
 			return err
 		}
-		if err := stmts.DeleteCancellableInvitation(ctx, projectID, id, now); err != nil {
+		if err := stmts.DeleteUnacceptedInvitation(ctx, projectID, id); err != nil {
 			return notPendingOnMiss(err)
 		}
 		return emitInvitationCancelled(ctx, stmts, entity, domain.InvitationCancelReasonCancelled, "")

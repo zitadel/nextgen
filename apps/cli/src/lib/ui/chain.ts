@@ -9,7 +9,8 @@ import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
 import { log as logger } from "./log";
 import { GUIDE, MARK } from "./marks";
-import type { Narratable } from "./narration";
+import { Output } from "./output";
+import type { Narratable } from "./log-printer";
 import type { Presentation } from "./presentation";
 import { type Drawing, Progress, type Report, type Step } from "./progress";
 import type { Confirmer, Questions } from "./questions";
@@ -103,15 +104,19 @@ export class Chain implements Drawing, Narratable {
    * A wizard with nobody watching writes the line instead of drawing it: the
    * same mark and the same words, without the gutter, which is the one part
    * of a chain that needs a terminal. A line that carries no mark of its own
-   * is indented to the same column, so the marks still line up.
+   * is indented to the same column, so the marks still line up. Only a warning
+   * or a failure is written when stdout is not a terminal, and nothing under
+   * `--json`.
    */
   narrate(symbol: string, text: string): void {
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
+      const problem = symbol === MARK.warning || symbol === MARK.failed;
+      if (!problem && (Output.json || !Output.screen)) {
+        return;
+      }
       const line = body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`;
-      (symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout).write(
-        line,
-      );
+      (problem ? process.stderr : process.stdout).write(line);
       return;
     }
     this.open();

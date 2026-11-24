@@ -9,7 +9,8 @@ import { nonBlankString } from "./flags";
 import { inputFlag } from "./input";
 import { Documented } from "./documented";
 import { Interruptible } from "./interruptible";
-import { log, Output, warnings } from "@/lib/ui";
+import { Loggable } from "./loggable";
+import { Output, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
@@ -120,7 +121,7 @@ export type Admitted<C extends typeof BaseCommand> = Readonly<{
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Documented(Interruptible(Command)) {
+export abstract class BaseCommand extends Loggable(Documented(Interruptible(Command))) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -539,7 +540,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    */
   protected narrate(notices: readonly string[]): void {
     for (const notice of notices) {
-      log.plain(notice.replace(/\n+$/, ""));
+      this.info(notice.replace(/\n+$/, ""));
     }
   }
 
@@ -629,7 +630,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
       (this.constructor as typeof BaseCommand).heading ??
         `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim(),
     );
-    this.ui.bridgeNarration({
+    this.ui.printLogs({
       debug,
       silent: json,
     });
@@ -922,7 +923,7 @@ export abstract class BaseCommand extends Documented(Interruptible(Command)) {
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
-    this.ui.releaseNarration();
+    this.ui.stopPrintingLogs();
     await super.finally(error);
   }
 

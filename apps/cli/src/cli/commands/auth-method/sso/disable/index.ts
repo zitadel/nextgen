@@ -127,11 +127,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         summary: {
           title: wouldTitle,
           sections: [],
+          lines: this.said(change),
         },
         next: { commands: [real] },
       });
     }
-    await this.write(target, change, confirmed.consent);
+    const written = await this.write(target, change, confirmed.consent);
     this.report(change);
     const followUps = this.followUps(change.changed);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
@@ -151,6 +152,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       summary: {
         title,
         sections: [],
+        lines: this.said(change, written),
       },
       next:
         actions.length > 0

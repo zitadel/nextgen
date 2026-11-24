@@ -2,7 +2,7 @@ import type { Audience } from "./audience";
 import { Asker, type Session } from "./asker";
 import { Box } from "./box";
 import { Chain } from "./chain";
-import { Narration } from "./narration";
+import { LogPrinter } from "./log-printer";
 import type { Presentation } from "./presentation";
 import type { Report, Step } from "./progress";
 import type { Confirmer, Questions } from "./questions";
@@ -42,15 +42,15 @@ import type { Summary } from "./summary";
  * }
  * ```
  *
- * {@link describe}, {@link bridgeNarration} and {@link finish} are the base
- * command's, not a command's: they name the chain, draw narration into it
+ * {@link describe}, {@link printLogs} and {@link finish} are the base
+ * command's, not a command's: they name the chain, draw what `log` says into it
  * and close it on the result the command returned. A command that reaches for
  * them is a command drawing outside its own chain. The chain opens itself at
  * the first thing a person sees, so nothing opens it by hand.
  */
 export class Ui {
   private readonly chain: Chain;
-  private readonly narration: Narration;
+  private readonly printer: LogPrinter;
   /** Whether a command took its own ending away as text ({@link ending}). */
   private handedOver = false;
 
@@ -80,7 +80,7 @@ export class Ui {
 
   constructor(audience: Audience, presentation: Presentation = "wizard") {
     this.chain = new Chain(audience, presentation);
-    this.narration = new Narration(this.chain);
+    this.printer = new LogPrinter(this.chain);
   }
 
   /** Whether anything is drawn: false under `--json`, `--non-interactive` and no terminal. */
@@ -158,7 +158,7 @@ export class Ui {
 
   /**
    * Draws what the command and the library code under it say with `log`, until
-   * {@link releaseNarration}. A wizard draws it in its chain with a mark; a
+   * {@link stopPrintingLogs}. A wizard draws it in its chain with a mark; a
    * normal command says it as plain lines, because a warning must not be what
    * turns a normal command into a wizard.
    *
@@ -170,16 +170,16 @@ export class Ui {
    * @param options - `debug` also draws the detail that only `--debug` asks for;
    *   `silent` draws nothing, for `--json`.
    */
-  bridgeNarration(options: { debug?: boolean; silent?: boolean } = {}): void {
-    this.narration.install(options);
+  printLogs(options: { debug?: boolean; silent?: boolean } = {}): void {
+    this.printer.install(options);
   }
 
   /**
-   * Stops drawing narration. The base command calls it when the command ends,
+   * Stops drawing what `log` says. The base command calls it when the command ends,
    * so the next command in this process starts from a clean slate.
    */
-  releaseNarration(): void {
-    this.narration.restore();
+  stopPrintingLogs(): void {
+    this.printer.restore();
   }
 
   /**

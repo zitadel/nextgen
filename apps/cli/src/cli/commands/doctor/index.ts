@@ -10,7 +10,7 @@ import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { log, Output, warnings as invocationWarnings } from "@/lib/ui";
+import { Output, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
@@ -236,7 +236,7 @@ export default class Doctor extends Telemetered(
             invocationWarnings.report(`${error.message}. ${error.hint ?? ""}`.trim());
             continue;
           }
-          log.debug(`doctor --fix: ${check.name} repair failed`, error);
+          this.debug(`doctor --fix: ${check.name} repair failed`, error);
           invocationWarnings.report(`${check.name} could not be repaired: ${errorMessage(error)}`);
         }
       }
