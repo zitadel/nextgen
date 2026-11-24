@@ -11,14 +11,20 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// ClientResolver finds a client among the project's registered applications
-// only, for now (ADR 082 §3). An unknown client is
-// [domain.ErrApplicationNotFound].
+// ClientResolver finds a client of the project's applications (ADR 082 §3):
+// a registered application at its newest revision, a declared one at the
+// revision the serving release pins. An unknown client is
+// [domain.ErrApplicationClientNotFound], and a client of a revoked release is
+// [domain.ErrReleaseRevoked].
 type ClientResolver interface {
+	// Client finds the client for the release of deploymentID.
 	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
-	// AuthenticateClient finds the client like Client, when secret is one of
-	// its secrets. A wrong or empty secret is
-	// [domain.ErrApplicationClientSecretInvalid].
+	// AuthenticateClient finds the client for the deployment on ctx, when it
+	// is confidential and secret is its secret: one of a registered client's
+	// stored secrets, or the variable a declared client names. A public
+	// client, or a wrong or empty secret, is
+	// [domain.ErrApplicationClientSecretInvalid]. A declared client with no
+	// deployment on ctx is [domain.ErrReleaseNotDeployed].
 	AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error)
 }
 

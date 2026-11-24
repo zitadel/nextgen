@@ -373,6 +373,11 @@ The access token expires after five minutes or when the session expires,
 whichever is earlier, and `expires_in` says when. An authorization request
 that has expired gets no code.
 
+The token endpoint does not serve a declared client yet: a token request
+names no deployment, so the server cannot tell which deployment's variable
+holds the secret. Such a client is refused like an unknown one
+(zitadel/nextgen#2796).
+
 An unknown code, or a code sent to another project's token endpoint, is
 refused without being used up or recorded. The token endpoint does not read
 the project's OAuth settings: a code issued before OAuth was turned off stays

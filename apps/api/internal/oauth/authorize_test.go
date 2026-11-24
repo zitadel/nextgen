@@ -33,7 +33,7 @@ type clients map[string]domain.ApplicationClientDocument
 func (c clients) Client(_ context.Context, _, _, clientID string) (domain.ApplicationClientDocument, error) {
 	doc, ok := c[clientID]
 	if !ok {
-		return domain.ApplicationClientDocument{}, domain.ErrApplicationNotFound()
+		return domain.ApplicationClientDocument{}, domain.ErrApplicationClientNotFound()
 	}
 	return doc, nil
 }

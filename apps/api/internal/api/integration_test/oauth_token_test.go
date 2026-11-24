@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"cmp"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -81,19 +82,22 @@ func TestOAuthToken(t *testing.T) {
 		return code, userID
 	}
 	// exchange posts form to the token endpoint, as the client's backend
-	// does, with HTTP Basic authentication when basic is set.
+	// does, with HTTP Basic authentication when basic is set. The client is
+	// the form's client_id, or web's when the form has none.
 	exchange := func(t *testing.T, form url.Values, basic bool, secret string) (*http.Response, map[string]any) {
 		t.Helper()
+		clientID := cmp.Or(form.Get("client_id"), web.ClientID)
 		form.Set("grant_type", "authorization_code")
+		form.Del("client_id")
 		if !basic {
-			form.Set("client_id", web.ClientID)
+			form.Set("client_id", clientID)
 			form.Set("client_secret", secret)
 		}
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.EnsureTestServer(t).URL+"/oauth/"+project.ID+"/token", strings.NewReader(form.Encode()))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		if basic {
-			req.SetBasicAuth(url.QueryEscape(web.ClientID), url.QueryEscape(secret))
+			req.SetBasicAuth(url.QueryEscape(clientID), url.QueryEscape(secret))
 		}
 		//egress:allow integration-test harness talking to the server under test
 		resp, err := http.DefaultClient.Do(req)
@@ -156,6 +160,20 @@ func TestOAuthToken(t *testing.T) {
 
 		resp, body = exchange(t, url.Values{"code": {code}, "redirect_uri": {redirectURI}}, true, web.Secret)
 		assert.Equal(t, http.StatusOK, resp.StatusCode, body)
+	})
+
+	// The endpoint does not tell which client IDs exist.
+	t.Run("an unknown client gets the answer of a wrong secret", func(t *testing.T) {
+		code, _ := issue(t, false)
+
+		wrongResp, wrong := exchange(t, url.Values{"code": {code}, "redirect_uri": {redirectURI}}, true, "wrong")
+		resp, body := exchange(t, url.Values{"code": {code}, "redirect_uri": {redirectURI}, "client_id": {"nobody"}}, true, web.Secret)
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.Equal(t, "invalid_client", body["error"])
+		assert.Equal(t, wrongResp.StatusCode, resp.StatusCode)
+		assert.Equal(t, wrong, body)
+		assert.Equal(t, `Basic realm="oauth"`, resp.Header.Get("WWW-Authenticate"))
 	})
 
 	for _, tc := range []struct {

@@ -342,12 +342,22 @@ func TestApplicationService_AuthenticateRegisteredClient(t *testing.T) {
 		secret     string
 		rowErr     error
 		secretsErr error
-		wantErr    error
+		// document replaces the stored one when set.
+		document []byte
+		wantErr  error
 	}{
 		{name: "newest_secret", secret: "newer"},
 		{name: "older_secret", secret: "older"},
 		{name: "wrong_secret", secret: "wrong", wantErr: domain.ErrApplicationClientSecretInvalid()},
 		{name: "empty_secret", wantErr: domain.ErrApplicationClientSecretInvalid()},
+		{
+			// application.json allows no public client yet; one holds no secret
+			// to check.
+			name:     "public_client",
+			secret:   "newer",
+			document: shopDocument(`{"slug":"web","client_id":"shop-web","type":"public","grant_types":["authorization_code"],"redirect_uris":["https://shop.example.com/callback"]}`),
+			wantErr:  domain.ErrApplicationClientSecretInvalid(),
+		},
 		{name: "unknown_client", secret: "newer", rowErr: database.NewNoRowFoundError(nil), wantErr: domain.ErrApplicationClientNotFound()},
 		{name: "lookup_unavailable", secret: "newer", rowErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
 		{name: "secrets_unavailable", secret: "newer", secretsErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
@@ -359,9 +369,13 @@ func TestApplicationService_AuthenticateRegisteredClient(t *testing.T) {
 			f := newApplicationFixture(t)
 			f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-web").Return(row, tt.rowErr)
 			if tt.rowErr == nil {
-				f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(storedShop(), nil)
+				app := storedShop()
+				if tt.document != nil {
+					app.Document = tt.document
+				}
+				f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(app, nil)
 			}
-			if tt.secret != "" && tt.rowErr == nil {
+			if tt.secret != "" && tt.rowErr == nil && tt.document == nil {
 				f.pool.EXPECT().ListApplicationClientSecrets(gomock.Any(), appProjectID, "appcl_1").Return(stored, tt.secretsErr)
 			}
 

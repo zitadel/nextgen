@@ -257,6 +257,15 @@ func TestTokenRefusesTheClient(t *testing.T) {
 			wantStatus: http.StatusUnauthorized,
 			want:       refused,
 		},
+		{
+			// A revoked release serves no client.
+			name:       "release_revoked",
+			user:       "shop",
+			password:   clientSecret,
+			clients:    failing{err: domain.ErrReleaseRevoked()},
+			wantStatus: http.StatusUnauthorized,
+			want:       refused,
+		},
 		{name: "project_id_malformed", path: "/oauth/not-a-project/token", user: "shop", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused},
 		{name: "platform_issuer_off", path: "/oauth/token", user: "shop", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused},
 		{

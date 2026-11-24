@@ -63,8 +63,9 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 	}
 	served, err := s.clients.AuthenticateClient(ctx, projectID, r.Data.ClientID, r.Data.ClientSecret)
 	switch {
-	case errors.Is(err, domain.ErrApplicationNotFound()), errors.Is(err, domain.ErrApplicationClientNotFound()),
-		errors.Is(err, domain.ErrApplicationClientSecretInvalid()):
+	// A revoked release serves no client, as at the authorization endpoint.
+	case errors.Is(err, domain.ErrApplicationClientNotFound()), errors.Is(err, domain.ErrApplicationClientSecretInvalid()),
+		errors.Is(err, domain.ErrReleaseRevoked()):
 		return nil, refused(err)
 	// A declared client's secret is a variable of the deployment that serves
 	// it, and a token request names no deployment, so the lookup finds no
