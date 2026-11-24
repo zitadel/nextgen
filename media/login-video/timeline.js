@@ -190,7 +190,7 @@ const WORDS = [
   "passkeys.",
   "audit trail.",
   "rollbacks.",
-  "plumbing.",
+  "rest.",
 ];
 const KIN = { len: 12 * BEAT, k1: 0, k2: BEAT, w0: 2 * BEAT, every: BEAT };
 
@@ -624,7 +624,9 @@ window.seek = function seek(t) {
 
   // captions
   let cap = "";
-  if (t >= S.pre && t < S.buildEnd) {
+  // the last one fades as the user is signed in; the clock says the rest
+  const capOut = S.buildEnd;
+  if (t >= S.pre && t < capOut + 0.3) {
     if (T >= 0.35 && T < M.enter1) cap = "Start Zitadel locally. <em>No account. No Docker.</em>";
     else if (T >= M.enter1 && T < M.enter1 + 9.85)
       cap = "Answer a few questions. The defaults are fine.";
@@ -633,10 +635,8 @@ window.seek = function seek(t) {
     else if (T >= M.paste2 && T < B.registerShown) cap = "Start your app.";
     else if (T >= B.registerShown) cap = "Sign up on your own page.";
   }
-  // the clock already says the time and "signed in"; the caption adds where it started
-  if (t >= S.buildEnd && t < S.turn) cap = "From an empty folder.";
   setText($("caption"), cap);
-  setOpacity($("caption"), cap ? fade(t, S.pre + 0.1, S.pre + 0.35, S.turn - 0.2, S.turn) : 0);
+  setOpacity($("caption"), cap ? fade(t, S.pre + 0.1, S.pre + 0.35, capOut, capOut + 0.3) : 0);
 
   // browser window: the build
   const bw = $("browser");
@@ -663,7 +663,7 @@ window.seek = function seek(t) {
 
   drawLadder(t);
 
-  // the close: you own the whole experience, Zitadel owns the plumbing
+  // the close: you own the whole experience, Zitadel owns the rest
   const ka = t - S.close;
   const inKin = ka >= 0 && t < S.end + 0.1;
   // gone by the last hit, which belongs to the logo

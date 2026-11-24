@@ -16,7 +16,7 @@ It needs `ffmpeg` on PATH and the repo's `node_modules` (Playwright from `e2e`).
 
 ## Story
 
-Four bars of title ("Give us a minute.", the cover's fan, then the minute as a
+Four bars of title ("Give us one minute!", the cover's fan, then the minute as a
 ring of twelve shards that shrinks into the build clock, a quiet timestamp), the
 real build (12 bars), sign-in,
 "Now make it yours.", the brand ladder, the close ("You own the whole experience.
