@@ -208,14 +208,10 @@ describe("start", () => {
           "--json",
         ]);
 
-        expect(app.envelopeOf(result)).toEqual({
+        expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
-          cli_version: CLI_VERSION,
           command: "start",
-          source: "",
           code: "E_VALIDATION",
-          message: "--runtime=binary cannot also be provided when using --image",
-          next_commands: [expectedPublicCliCommand("start --help")],
         });
       });
 

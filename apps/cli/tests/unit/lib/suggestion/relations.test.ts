@@ -1,5 +1,6 @@
 import { Flags, type Interfaces } from "@oclif/core";
 import { describe, expect, it } from "vitest";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 import { relatedFlags, relationsOf } from "@/lib/suggestion/relations";
 
@@ -67,8 +68,12 @@ describe("relatedFlags", () => {
   });
 
   it("refuses a relation that names a flag the command does not declare", () => {
-    expect(() => {
+    const thrown = thrownBy(() => {
       return relatedFlags({ image: Flags.string() }, { runtime: { required: true } } as never);
-    }).toThrow("a relation names --runtime, which is not declared");
+    });
+
+    expect(thrown).toMatchObject({
+      message: "flags(): a relation names --runtime, which is not declared",
+    });
   });
 });

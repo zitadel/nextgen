@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RunContext } from "@/cli/core/run-context";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /**
  * What a command says of itself that takes a server and resolves it to a fixed one.
@@ -19,6 +20,10 @@ function aCommand(takesServer: boolean) {
     },
   };
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("RunContext", () => {
   describe("from", () => {
@@ -74,16 +79,37 @@ describe("RunContext", () => {
       expect(context.meta.source).toBe("https://fixed.example");
     });
 
-    it("cannot ask anyone under --json", async () => {
-      const context = await RunContext.from({}, aCommand(false), true);
+    it("cannot ask anyone under --json, though a terminal could be asked", async () => {
+      const context = await asTerminal(() => {
+        return RunContext.from({}, aCommand(false), true);
+      });
 
       expect(context.meta.nonInteractive).toBe(true);
     });
 
-    it("turns colour off for --no-color", async () => {
-      const context = await RunContext.from({ color: false }, aCommand(false), false);
+    it("can ask someone at a terminal when it is not told otherwise", async () => {
+      const context = await asTerminal(() => {
+        return RunContext.from({}, aCommand(false), false);
+      });
+
+      expect(context.meta.nonInteractive).toBe(false);
+    });
+
+    it("turns colour off for --no-color, on a terminal that would draw it", async () => {
+      const context = await asTerminal(() => {
+        return RunContext.from({ color: false }, aCommand(false), false);
+      });
 
       expect(context.colored).toBe(false);
+    });
+
+    it("draws colour on a terminal when nothing turns it off", async () => {
+      vi.stubEnv("TERM", "xterm");
+      const context = await asTerminal(() => {
+        return RunContext.from({}, aCommand(false), false);
+      });
+
+      expect(context.colored).toBe(true);
     });
   });
 

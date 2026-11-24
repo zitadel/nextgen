@@ -258,6 +258,29 @@ describe("Input", () => {
       });
     });
 
+    it.each(["dry-run", "force"])(
+      "refuses --%s beside the document, though a mixin declares it with the base flags",
+      async (name) => {
+        class Mixed extends Command {
+          static override baseFlags = {
+            cwd: Flags.string({ char: "c" }),
+            [name]: Flags.boolean(),
+          };
+          static override flags = { input: inputFlag, limit: Flags.integer() };
+          async run(): Promise<void> {}
+        }
+
+        const input = new Input(Mixed);
+        const words = await input.rewrite([`--${name}`, "--input", '{"limit":1}']);
+
+        expect(words).toEqual([`--${name}`, '--input={"limit":1}']);
+        await expect(input.verify('{"limit":1}', words)).rejects.toMatchObject({
+          code: "E_VALIDATION",
+          message: expect.stringContaining("the whole invocation"),
+        });
+      },
+    );
+
     it("takes an argument named with an underscore at the top level, in any spelling", async () => {
       class Underscored extends Command {
         static override args = { deployment_id: Args.string() };

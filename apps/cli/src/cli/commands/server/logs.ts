@@ -29,6 +29,17 @@ const TAIL = {
   },
 } as const satisfies Refused<number>;
 
+/**
+ * How following the lines into the envelope is refused when JSON mode came from
+ * the environment, which `--follow` and `--json` as typed are kept apart by the
+ * flags' own relation: following writes lines as the server writes them, which
+ * is a stream and never the one envelope JSON mode promises.
+ */
+const FOLLOW_IS_NOT_JSON_REFUSAL = {
+  message: "Cannot stream logs in JSON mode",
+  hint: "Unset ZITADEL_CONTENT_TYPE, or omit --follow.",
+} as const satisfies Refusal;
+
 /** How a directory where `zitadel start` never ran is refused. */
 const NOT_STARTED_REFUSAL = {
   message: "Local Zitadel runtime has not been started",
@@ -77,6 +88,10 @@ export default class Logs extends LocalServerCommand(BaseCommand, "nearest") {
    * @throws {ZitadelError} When following under `--json`, or when no server was started here.
    */
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<CommandResult> {
+    if (flags.follow && Output.json) {
+      throw refusalError(FOLLOW_IS_NOT_JSON_REFUSAL, {});
+    }
+
     const server = await this.serverInNearestFolder();
     if (server === undefined) {
       throw refusalError(NOT_STARTED_REFUSAL, {});

@@ -497,6 +497,16 @@ describe("claim", () => {
         expect(result).toSayOnce(`Would claim project ${id} (dry run)`);
       });
 
+      it("says what the real claim would do", async () => {
+        const app = await aSetUpApp();
+
+        const result = await shown(() =>
+          app.run(["claim", "--no-open", "--timeout", "5", "--dry-run"]),
+        );
+
+        expect(result).toSayOnce("Open a browser to claim this project");
+      });
+
       it("prints the claim it planned, once", async () => {
         const app = await aSetUpApp();
 

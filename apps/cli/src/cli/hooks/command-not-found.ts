@@ -294,17 +294,12 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
     readonly skipping: boolean;
     readonly finished: boolean;
   };
-  const scanFrom = (index: number, scan: Scan): Scan => {
-    const word = typed[index];
-    if (word === undefined || scan.finished) {
+  const step = (scan: Scan, word: string, index: number): Scan => {
+    if (scan.finished) {
       return scan;
     }
-    const advance = (state: Scan): Scan => {
-      return scanFrom(index + 1, state);
-    };
-
     if (scan.skipping) {
-      return advance({ ...scan, skipping: false });
+      return { ...scan, skipping: false };
     }
     const next = typed[index + 1];
     const takesNext = (always: boolean): Scan => {
@@ -314,37 +309,33 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
       };
     };
     if (word === "--" && !scan.passed) {
-      return advance(
-        scan.words.length > 0 ? { ...scan, finished: true } : { ...scan, passed: true },
-      );
+      return scan.words.length > 0 ? { ...scan, finished: true } : { ...scan, passed: true };
     }
     if (!word.startsWith("-")) {
-      return advance(
-        scan.closed
-          ? scan
-          : {
-              ...scan,
-              words: scan.words.concat(word),
-            },
-      );
+      return scan.closed
+        ? scan
+        : {
+            ...scan,
+            words: [...scan.words, word],
+          };
     }
     if (scan.passed) {
-      return advance({ ...scan, finished: true });
+      return { ...scan, finished: true };
     }
     if (word === "--json") {
-      return advance({ ...scan, json: true });
+      return { ...scan, json: true };
     }
     if (word.startsWith("--")) {
       const typedName = word.slice(2);
       const name =
         switches.has(typedName) || !typedName.startsWith("no-") ? typedName : typedName.slice(3);
       if (greedy.has(name)) {
-        return advance({ ...scan, closed: true });
+        return { ...scan, closed: true };
       }
 
-      return advance(
-        !word.includes("=") && switches.get(name) !== true ? takesNext(valued.has(name)) : scan,
-      );
+      return !word.includes("=") && switches.get(name) !== true
+        ? takesNext(valued.has(name))
+        : scan;
     }
     const letters = [...word.slice(1)].map((letter) => {
       return lettered(letter);
@@ -353,15 +344,15 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
       return flag?.type !== "boolean";
     });
     if (position < 0) {
-      return advance(scan);
+      return scan;
     }
     if (letters[position] === undefined) {
-      return advance(takesNext(false));
+      return takesNext(false);
     }
 
-    return advance(position === word.length - 2 ? takesNext(true) : scan);
+    return position === word.length - 2 ? takesNext(true) : scan;
   };
-  const scanned = scanFrom(0, {
+  const scanned = typed.reduce<Scan>(step, {
     words: [],
     json: false,
     passed: false,

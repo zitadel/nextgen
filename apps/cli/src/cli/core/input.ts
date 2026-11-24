@@ -189,6 +189,13 @@ export class Input {
   ]);
 
   /**
+   * The flags that decide what a run does to the world. Previewable and
+   * Destructive commands declare them with the other base flags, yet they are
+   * the document's to give, so a line may not carry one beside it.
+   */
+  private static readonly deciding: ReadonlySet<string> = new Set(["dry-run", "force"]);
+
+  /**
    * The flags the command declares, by every name they answer to.
    */
   private readonly byName: ReadonlyMap<string, Named>;
@@ -232,6 +239,7 @@ export class Input {
       const one = { name, flag } satisfies Named;
       const isGlobal =
         !Input.names.has(name) &&
+        !Input.deciding.has(name) &&
         (name === "json" ||
           Object.hasOwn(command.baseFlags ?? {}, name) ||
           Object.hasOwn(environmentFlags, name));

@@ -77,8 +77,20 @@ describe("dryRunResult", () => {
 
   it("describes a delete by id without a body", () => {
     expect(
-      dryRunResult({ verb: "revoke", topic: "session", id: "sess_1", next: REAL }).pretty?.text,
+      dryRunResult({ verb: "revoke", topic: "session", id: "sess_1", next: REAL }).summary?.title,
     ).toBe("Would revoke session sess_1 (dry run)");
+  });
+
+  it("leaves the rendering to the summary when there is no body to print", () => {
+    expect(
+      dryRunResult({ verb: "revoke", topic: "session", id: "sess_1", next: REAL }).pretty,
+    ).toBeUndefined();
+  });
+
+  it("prints the body it was given", () => {
+    expect(
+      dryRunResult({ verb: "create", topic: "user", body: { a: 1 }, next: REAL }).pretty?.text,
+    ).toContain('"a": 1');
   });
 
   it("spells the body the way JSON does, so the block a reader copies parses", () => {

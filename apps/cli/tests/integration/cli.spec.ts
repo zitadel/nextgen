@@ -1,8 +1,11 @@
+import { execFile } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import {
@@ -14,6 +17,7 @@ import {
 import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
+const execFileAsync = promisify(execFile);
 
 /** `"auth-method sso enable --flag"` and `"auth-method:sso:enable"` name the same id. */
 function commandIdFromArgs(args: string): string | undefined {
@@ -458,6 +462,23 @@ describe("the cli", () => {
             code: "E_VALIDATION",
             message: "frobnicate is not a zitadel command",
             next_commands: [expectedPublicCliCommand("--help")],
+          });
+        });
+
+        it("names the word that is no command however many words follow it", async () => {
+          const words = Array.from({ length: 6000 }, (_, at) => {
+            return `w${at}`;
+          });
+
+          const result = await execFileAsync(
+            process.execPath,
+            [join(cliPackageRoot, "bin/run.js"), "frobnicate", ...words, "--json"],
+            { env: { ...process.env, DO_NOT_TRACK: "1" }, maxBuffer: 1 << 24 },
+          ).catch((failed: { stdout: string; code: number }) => failed);
+
+          expect(parseJson(result.stdout)).toMatchObject({
+            code: "E_VALIDATION",
+            message: "frobnicate is not a zitadel command",
           });
         });
 

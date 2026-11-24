@@ -244,17 +244,14 @@
   | talks to one through `--server` or its environment | `ServerCommand(Base)` |
   | may have to ask which server | `Promptable(ChoosingServerCommand(Base))` |
   | is about the local server | `LocalServerCommand(Base, folderRule)` |
-  | is destructive | `Destructive(...)`, outermost |
+  | is destructive | `Destructive(Previewable(...))`, or `RemoveCommand` for a project |
 
   A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
   the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
   `Destructive` around it. `LocalServerCommand` names no server itself and ignores
-  `--server`, even around `ServerCommand(Base)`; a command that reads one does not use it.
-  Each local-server command declares its own `group`.
-  `LocalServerCommand` names no server itself. `setup`, `upgrade`, `eject` and a few more
-  still wrap `ServerCommand(...)` only to keep accepting `--server`, which they
-  ignore, each overriding `resolveServer` to name no server: leave them as they
-  are until the flag is removed from them.
+  `--server`, even around `ServerCommand(Base)`, so a command that reads one (`console`,
+  `doctor`) names it in its own `sourceOf`. Each local-server command declares its own `group`.
+  A command that does not use `--server` does not take it: it never wraps `ServerCommand`.
 - "Server" on its own is the Zitadel instance a command talks to by URL. The
   "local server" is the one `zitadel start` runs in a folder. The "server
   binary" is `@zitadel/server`.

@@ -40,7 +40,9 @@ export default class Stop extends LocalServerCommand(Previewable(BaseCommand), "
         verb: "stop",
         topic: "server",
         noun: "host-wide managed local runtime processes",
-        warnings: discovery.supported ? [] : ["managed-runtime-processes: discovery unavailable"],
+        warnings: ["managed-runtime-processes: discovery unavailable"].filter(() => {
+          return !discovery.supported;
+        }),
         next: await this.realRun(),
       });
 
@@ -252,9 +254,7 @@ export default class Stop extends LocalServerCommand(Previewable(BaseCommand), "
         ["Data", record.data_dir],
       ];
       const { stopped, outcome } = await server.stop();
-      const title = stopped
-        ? "Local Zitadel server stopped"
-        : "Local Zitadel server was not running";
+      const title = this.stoppedTitle(stopped);
 
       return {
         status: "ok",
@@ -281,9 +281,7 @@ export default class Stop extends LocalServerCommand(Previewable(BaseCommand), "
         ["Data", record.data_dir],
       ];
       const { stopped } = await server.stop();
-      const title = stopped
-        ? "Local Zitadel server stopped"
-        : "Local Zitadel server was not running";
+      const title = this.stoppedTitle(stopped);
 
       return {
         status: "ok",
@@ -308,9 +306,7 @@ export default class Stop extends LocalServerCommand(Previewable(BaseCommand), "
         ["Container", containerName],
       ];
       const { stopped } = await server.stop();
-      const title = stopped
-        ? "Local Zitadel server stopped"
-        : "Local Zitadel server was not running";
+      const title = this.stoppedTitle(stopped);
 
       return {
         status: "ok",
@@ -329,5 +325,19 @@ export default class Stop extends LocalServerCommand(Previewable(BaseCommand), "
         },
       };
     }
+  }
+
+  /**
+   * What the result calls the outcome.
+   *
+   * @param stopped - Whether there was a running server to stop.
+   * @returns The headline: stopped, or that nothing was running.
+   */
+  private stoppedTitle(stopped: boolean): string {
+    if (stopped) {
+      return "Local Zitadel server stopped";
+    }
+
+    return "Local Zitadel server was not running";
   }
 }

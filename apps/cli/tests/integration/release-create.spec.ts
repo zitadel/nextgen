@@ -407,6 +407,14 @@ describe("release create", () => {
         expect(result).toPrint("Would create release (dry run)");
       });
 
+      it("says how many resources a dry run validated", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["release", "create", "--dry-run", "--non-interactive"]);
+
+        expect(result).toPrint("Validated 4 resources");
+      });
+
       it("suggests the real command after a dry run once", async () => {
         const app = await aSetUpApp();
 

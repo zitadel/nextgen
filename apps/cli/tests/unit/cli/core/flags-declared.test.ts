@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Interfaces } from "@oclif/core";
+import { Config } from "@oclif/core";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
@@ -15,6 +16,7 @@ import {
 } from "@tests/helpers/declarations";
 
 import { COMMANDS, WORKFLOW_COMMANDS } from "@/index";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { relationsOf } from "@/lib/suggestion/relations";
 
 const commands = fileURLToPath(new URL("../../../../src/cli/commands", import.meta.url));
@@ -191,4 +193,19 @@ describe("what every command takes by what it does", () => {
       }
     },
   );
+});
+
+describe("what oclif lists of every command", () => {
+  it("includes --json for every command that takes it", async () => {
+    const config = await Config.load(cliPackageRoot);
+    const without = config.commands
+      .filter((command) => {
+        return command.id in COMMANDS && command.hidden !== true && !("json" in command.flags);
+      })
+      .map((command) => {
+        return command.id;
+      });
+
+    expect(without).toEqual([]);
+  });
 });

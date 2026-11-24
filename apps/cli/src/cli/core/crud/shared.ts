@@ -173,7 +173,9 @@ type DryRun = Readonly<{
  * the two do not fight over it.
  *
  * @param dryRun - What the dry run would do.
- * @returns The `ok` result of the dry run.
+ * @returns The `ok` result of the dry run. It carries its own rendering only when it has a
+ *   body or a verdict to print; without one the summary is what a person reads, so a command
+ *   that adds lines to the summary has them shown wherever the output goes.
  */
 export const dryRunResult = ({
   verb,
@@ -208,7 +210,9 @@ export const dryRunResult = ({
       body: shown,
       ...(result === undefined ? {} : { result }),
     },
-    pretty: prose(`Would ${verb} ${subject} (dry run)${printed}${verdict}`),
+    ...(printed === "" && verdict === ""
+      ? {}
+      : { pretty: prose(`Would ${verb} ${subject} (dry run)${printed}${verdict}`) }),
     ...(next === undefined ? {} : { next: { commands: [next] } }),
     summary: {
       title,

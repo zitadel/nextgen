@@ -2108,6 +2108,15 @@ describe("deploy", () => {
         expect(result).toPrint("Would deploy 4 resources (dry run)");
       });
 
+      it("prints what a dry run compares the release against", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.run(["deploy", "--dry-run", "--non-interactive"]);
+
+        expect(result).toPrint(NO_BASELINE.note);
+      });
+
       it("suggests the real deploy after a dry run once", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

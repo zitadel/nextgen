@@ -33,8 +33,8 @@ in [`apps/cli/AGENTS.md`](../../../../AGENTS.md).
 - It sets no group and takes no `--server`: each command declares its own
   `group`, and one that reads `--server` wraps `ServerCommand` inside it. Each
   names no server before its flags are parsed (`resolveServer` returns none),
-  because its server is the one its folder started, which `sourceOf` reads; for
-  `start`, `stop`, `logs` and `reset` `--server` is accepted and ignored.
+  because its server is the one its folder started, which `sourceOf` reads;
+  `start`, `stop`, `logs` and `reset` do not take `--server`.
 - `status` is the one command about this server that does not extend it: it
   also reads the project's environment, so it extends
   `ServerCommand(EnvironmentCommand)`.

@@ -399,6 +399,14 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
  */
 export abstract class AuthMethodCommand extends Promptable(ChangeCommand) {
   /**
+   * Whether the command takes `--json`, as the class it extends says. oclif
+   * merges a command's statics up its chain only while each class declares one
+   * of its own, so a class that declares statics under a mixin that declares
+   * none, as this one does, says it itself.
+   */
+  static override enableJsonFlag = ChangeCommand.enableJsonFlag;
+
+  /**
    * The flags every `auth-method` command takes. The environment flags are
    * hidden here: most `auth-method` commands only edit files and resolve no
    * environment, and the one that publishes credentials to the project lists

@@ -170,8 +170,9 @@ export function ChoosingServerCommand<
  * ```
  *
  * It does not take `--server`: a command that also reads one is
- * `LocalServerCommand(ServerCommand(Base))`. It sets no group: each command
- * declares its own.
+ * `LocalServerCommand(ServerCommand(Base))` and names it in its own `sourceOf`,
+ * since the server this class names before the flags are parsed is none. It
+ * sets no group: each command declares its own.
  *
  * @param Base - The command class to extend.
  * @param folderRule - Which folder the command acts on, if one rule decides it.

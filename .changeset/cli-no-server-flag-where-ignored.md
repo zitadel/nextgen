@@ -2,4 +2,6 @@
 "@zitadel/cli": minor
 ---
 
-`--server` is no longer taken by `tests add`, `skills add`, `upgrade`, `eject`, `branding eject`, `start`, `stop`, `reset` and `logs`, which never used it: a script that passes it to them now gets an unknown-flag error, and the commands they suggest next no longer carry it.
+`--server` is taken only by a command that reads a server, and the commands those suggest next no longer carry it.
+
+**Breaking:** `start`, `stop`, `reset`, `logs`, `tests add`, `skills add`, `upgrade`, `eject` and `branding eject` never used `--server` and now refuse it as an unknown flag. Remove it from scripts that pass it to them.

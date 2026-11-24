@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 import { ZitadelError } from "@/lib/errors";
 import { Failure } from "@/cli/core/failure";
@@ -50,7 +51,9 @@ describe("Failure", () => {
       HELP,
     );
 
-    expect(() => failure.envelope()).toThrow("doctor was reported without being rendered");
+    expect(thrownBy(() => failure.envelope())).toMatchObject({
+      message: "doctor was reported without being rendered",
+    });
   });
 
   describe("advised", () => {
