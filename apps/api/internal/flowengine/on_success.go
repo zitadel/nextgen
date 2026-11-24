@@ -9,7 +9,7 @@ import (
 type onSuccessHandler interface {
 	// run performs the mutation on a submit of the step whose inputs
 	// validated, and routes the result.
-	run(r *FlowStateMachineRuntime, pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error)
+	run(r *Runtime, pc *processCtx, resolved domain.FlowResolvedFields) (StepResult, error)
 }
 
 // onSuccessHandlers holds one handler per [domain.FlowOnSuccess] value.
@@ -22,13 +22,13 @@ var onSuccessHandlers = map[domain.FlowOnSuccess]onSuccessHandler{
 // the values collected across the flow.
 type createUserHandler struct{}
 
-func (createUserHandler) run(r *FlowStateMachineRuntime, pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error) {
+func (createUserHandler) run(r *Runtime, pc *processCtx, resolved domain.FlowResolvedFields) (StepResult, error) {
 	// on_success reads across every visited step, not just the current one.
 	visitedResolved, err := r.resolveVisitedFields(pc)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
-	result, err := r.userCreater.Handle(pc.ctx, FlowOnSuccessInput{
+	result, err := r.userCreater.Handle(pc.ctx, OnSuccessInput{
 		GateProofs:    pc.in.GateProofs,
 		ProjectID:     pc.state.ProjectID,
 		UserSchemaURL: pc.state.UserSchemaURL,
@@ -38,7 +38,7 @@ func (createUserHandler) run(r *FlowStateMachineRuntime, pc *processCtx, resolve
 		ResolvedFlow:  pc.def,
 	})
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	if result.StepError != nil {
 		return r.renderStepError(pc, resolved, result.StepError)

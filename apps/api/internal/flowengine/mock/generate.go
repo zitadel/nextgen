@@ -12,4 +12,4 @@ package flowenginemock
 // `internal/domain` is fully generated before this one is reached. That is
 // what lets generation bootstrap from a tree with no generated files in it.
 
-//go:generate go tool mockgen -typed -package flowenginemock -destination ./flowengine.mock.go github.com/zitadel/nextgen/internal/flowengine FlowOnSuccessHandler,FlowAuthAttemptService,FlowSSOProviderResolver,FlowSSOIdentityService,FlowSSORedirectIssuer
+//go:generate go tool mockgen -typed -package flowenginemock -destination ./flowengine.mock.go github.com/zitadel/nextgen/internal/flowengine OnSuccessHandler,AuthAttemptService,SSOProviderResolver,SSOIdentityService,SSORedirectIssuer

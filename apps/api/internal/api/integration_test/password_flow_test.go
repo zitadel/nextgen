@@ -415,7 +415,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	require.Equal(t, "signup", badStep.Step.Name, "duplicate email must keep flow on signup step")
 	errVal, errSet := badStep.Step.Error.Get()
 	require.True(t, errSet, "expected an error on the step")
-	require.Equal(t, flowengine.FlowStepErrorUserAlreadyExists, errVal)
+	require.Equal(t, flowengine.StepErrorUserAlreadyExists, errVal)
 	require.False(t, badStep.Step.Complete.Set, "expected non-terminal step")
 	_, hasToken := badStep.HandoffToken.Get()
 	require.False(t, hasToken, "no handoff token on rejected registration")

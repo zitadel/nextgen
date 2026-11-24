@@ -55,7 +55,7 @@ func TestSignupProtection(t *testing.T) {
 		project := ensureProject(t, d.stmts)
 		flow, err := d.stmts.NewManagedID(string(domain.PrefixFlow))
 		require.NoError(t, err)
-		state := &flowengine.FlowState{ProjectID: project, ID: flow}
+		state := &flowengine.State{ProjectID: project, ID: flow}
 		svc := signupService(t, d)
 		challenge, err := svc.Challenge(t.Context(), state)
 		require.NoError(t, err)
@@ -216,7 +216,7 @@ func TestSignupIssuanceBudgetConcurrent(t *testing.T) {
 		for range 8 {
 			flow := "shared_flow"
 			wg.Go(func() {
-				_, err := svc.Challenge(t.Context(), &flowengine.FlowState{ProjectID: project, ID: flow})
+				_, err := svc.Challenge(t.Context(), &flowengine.State{ProjectID: project, ID: flow})
 				if err == nil {
 					issued.Add(1)
 				} else {
@@ -249,14 +249,14 @@ func TestSignupProofSpentOnMutationFailure(t *testing.T) {
 		project := ensureProject(t, d.stmts)
 		flow, err := d.stmts.NewManagedID(string(domain.PrefixFlow))
 		require.NoError(t, err)
-		state := &flowengine.FlowState{ProjectID: project, ID: flow, FlowProgress: flowengine.FlowProgress{CollectedData: flowengine.CollectedFlowData{AuthMethods: map[string]string{domain.AuthMethodPassword: "a password"}}}}
+		state := &flowengine.State{ProjectID: project, ID: flow, Progress: flowengine.Progress{CollectedData: flowengine.CollectedData{AuthMethods: map[string]string{domain.AuthMethodPassword: "a password"}}}}
 		protection := signupService(t, d)
 		challenge, err := protection.Challenge(t.Context(), state)
 		require.NoError(t, err)
 		proof := powtest.Solve(t, challenge)
 		failed := errors.New("mutation failed")
 		handler := service.NewFlowCreateUserHandler(nil, signupPasswordGate{}, failedSignupMutation{err: failed}, nil, service.NewPool(d.pool), protection)
-		_, err = handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{ProjectID: project, State: state, GateProofs: map[string]string{domain.SignupGate: proof}})
+		_, err = handler.Handle(t.Context(), flowengine.OnSuccessInput{ProjectID: project, State: state, GateProofs: map[string]string{domain.SignupGate: proof}})
 		require.ErrorIs(t, err, failed)
 		require.ErrorIs(t, protection.Consume(t.Context(), state, proof), domain.ErrFlowProofInvalid())
 		next, err := protection.Challenge(t.Context(), state)
@@ -274,7 +274,7 @@ func (signupPasswordGate) CheckPassword(context.Context, service.SetPasswordInpu
 func TestSignupRefreshesNearExpiry(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		project := ensureProject(t, d.stmts)
-		state := &flowengine.FlowState{ProjectID: project, ID: "near_expiry_flow"}
+		state := &flowengine.State{ProjectID: project, ID: "near_expiry_flow"}
 		svc := signupService(t, d)
 		first, err := svc.Challenge(t.Context(), state)
 		require.NoError(t, err)

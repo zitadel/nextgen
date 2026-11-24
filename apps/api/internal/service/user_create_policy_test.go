@@ -116,13 +116,13 @@ func TestSignupChallengeTheServerCannotIssue(t *testing.T) {
 	// Any read, lock or budget write fails the test.
 	gate := newUserCreateGate(t, twoChallenges(t), userCreatePolicy{config: map[string]any{"challenge": "turnstile"}})
 	svc := service.NewSignupProtection(servicemocks.NewMockPool(ctrl), nil, gate)
-	_, err := svc.Challenge(t.Context(), &flowengine.FlowState{ProjectID: "project", ID: "flow"})
+	_, err := svc.Challenge(t.Context(), &flowengine.State{ProjectID: "project", ID: "flow"})
 	require.ErrorIs(t, err, domain.ErrInternal(nil))
 }
 
 func TestSignupChallengeFailsClosedOnAnUnreadablePolicy(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	svc := service.NewSignupProtection(servicemocks.NewMockPool(ctrl), nil, newUserCreateGate(t, mustPolicyEngine(t), failingPolicy{}))
-	_, err := svc.Challenge(t.Context(), &flowengine.FlowState{ProjectID: "project", ID: "flow"})
+	_, err := svc.Challenge(t.Context(), &flowengine.State{ProjectID: "project", ID: "flow"})
 	require.ErrorIs(t, err, domain.ErrInternal(nil))
 }

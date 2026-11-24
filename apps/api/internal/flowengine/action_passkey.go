@@ -7,10 +7,10 @@ package flowengine
 // identified. The verify leg validates the assertion.
 type passkeyHandler struct{}
 
-func (passkeyHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
-	resolved, halt, err := r.takeInputs(pc, stepInputs{identifierOnly: true, challengeMethod: FlowChallengeMethodPasskey})
+func (passkeyHandler) process(r *Runtime, pc *processCtx) (StepResult, error) {
+	resolved, halt, err := r.takeInputs(pc, stepInputs{identifierOnly: true, challengeMethod: ChallengeMethodPasskey})
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	if halt != nil {
 		return *halt, nil
@@ -20,7 +20,7 @@ func (passkeyHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowS
 	}
 	dispatch, err := r.dispatchChallenges(pc, resolved)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	if dispatch.StepError != nil {
 		return r.renderStepError(pc, resolved, dispatch.StepError)
@@ -32,5 +32,5 @@ func (passkeyHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowS
 	if pc.state.PendingChallenge != nil {
 		return r.renderPendingChallenge(pc, resolved)
 	}
-	return r.issueChallenge(pc, FlowChallengeMethodPasskey, resolved, resolved)
+	return r.issueChallenge(pc, ChallengeMethodPasskey, resolved, resolved)
 }

@@ -73,7 +73,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	flipOK := flipResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	require.Equal(t, api.NewOptFlowStepPurpose(api.FlowStepPurposeRegister), flipOK.Response.Step.Purpose)
-	require.Equal(t, api.NewOptNilString(flowengine.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
+	require.Equal(t, api.NewOptNilString(flowengine.StepNoticeUserNotFound), flipOK.Response.Step.Notice,
 		"the user asked to sign in, so the sign-up says why")
 	zflow = mustExtractZflow(t, flipOK.SetCookie)
 

@@ -569,7 +569,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 	}{
 		{
 			name:      "a failed result emits the given event",
-			result:    &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled},
+			result:    &domain.SSOCallbackResult{ErrorKey: flowengine.StepErrorSSOCancelled},
 			eventType: domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
@@ -579,7 +579,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 		},
 		{
 			name:      "a refused write emits nothing",
-			result:    &domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed},
+			result:    &domain.SSOCallbackResult{ErrorKey: flowengine.StepErrorSSOFailed},
 			writeErr:  domain.ErrSSOStateInvalid(),
 			wantErr:   domain.ErrSSOStateInvalid(),
 			eventType: domain.EventTypeAuthSSOExchangeFailed,

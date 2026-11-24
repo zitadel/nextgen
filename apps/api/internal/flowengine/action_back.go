@@ -19,14 +19,14 @@ import (
 // leaves all of it in place.
 type backHandler struct{}
 
-func (backHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
+func (backHandler) process(r *Runtime, pc *processCtx) (StepResult, error) {
 	prev, ok := pc.state.PeekBackStack()
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", domain.ErrFlowInvalidAction(), pc.state.CurrentStep)
+		return StepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", domain.ErrFlowInvalidAction(), pc.state.CurrentStep)
 	}
 	prevStep, ok := pc.def.FindStep(prev.StepName)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", domain.ErrFlowIntegrity(), prev.StepName)
+		return StepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", domain.ErrFlowIntegrity(), prev.StepName)
 	}
 	pc.state.PopBackStack()
 	pc.state.CurrentStep = prev.StepName
@@ -38,7 +38,7 @@ func (backHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStep
 	// schema load and the chance of a transient failure on one back click.
 	resolved, err := r.resolveStepFields(pc.ctx, pc.state, prevStep)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 
 	// The identifier is re-offered, so the user may submit a different one —
@@ -51,7 +51,7 @@ func (backHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStep
 	})
 	if collectsIdentifier {
 		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
-			return FlowStepResult{}, err
+			return StepResult{}, err
 		}
 		// The password belongs to the identity being dropped, and
 		// [mergeCollected] banks it before the proof is ever checked, so a
@@ -64,12 +64,12 @@ func (backHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStep
 	// Prefill and build after the drop, so the step reflects the state the
 	// user is actually returning to.
 	if err := r.prefillStep(pc.ctx, pc.state, prevStep, &resolved); err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	step, err := r.buildStep(pc.ctx, pc.state, prevStep, resolved, nil, nil, nil)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	pc.state.IssuedAt = r.now()
-	return FlowStepResult{State: pc.state, Step: step}, nil
+	return StepResult{State: pc.state, Step: step}, nil
 }

@@ -446,7 +446,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		schemaStore,
 		serviceDBPool,
 		signupProtection)
-	stateMachine := flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
+	stateMachine := flowengine.New(flowengine.Deps{
 		Schemas: storageSchemaResolver,
 		// The raw statements: the state machine only hands this store to the
 		// resolver, which follows the namespace itself, so the aliasing wrapper

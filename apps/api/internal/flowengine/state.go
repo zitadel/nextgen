@@ -6,15 +6,15 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// FlowState is the runtime state of a single in-flight flow. The handler
+// State is the runtime state of a single in-flight flow. The handler
 // JSON-encodes it as the payload of the sealed `_zflow` cookie on every
 // response and decodes it back on every incoming request.
 //
-// FlowState embeds FlowProgress: the active progress (definition, step,
+// State embeds Progress: the active progress (definition, step,
 // history, collected data) sits at the root, and any paused parents
 // live on PivotStack. The remaining fields are session/OIDC context
 // that only makes sense at the top level.
-type FlowState struct {
+type State struct {
 	// ID is the flow handle minted at Start. The handler verifies it
 	// matches the path (`/flows/{flow_id}/...`) to reject path/cookie mismatches.
 	ID string
@@ -34,11 +34,11 @@ type FlowState struct {
 	DeploymentID string
 	ReleaseID    string
 
-	// FlowProgress is the user's current progress: which definition is
+	// Progress is the user's current progress: which definition is
 	// running, which step is being shown, and what's been collected so
 	// far. Promoted to the top level so callers read e.g.
 	// state.CurrentStep directly.
-	FlowProgress
+	Progress
 
 	// IssuedAt is when this state was last sealed into the cookie. The
 	// handler refuses to open a state older than the configured max-age,
@@ -62,10 +62,10 @@ type FlowState struct {
 	StepVersion int64
 
 	// PivotStack records parent-flow resume points. When a flow pivots
-	// into another flow, the parent's FlowProgress is pushed; on the
+	// into another flow, the parent's Progress is pushed; on the
 	// child's completion the state machine pops and re-renders the
 	// parent's next step. Empty for non-stacked flows.
-	PivotStack []FlowProgress
+	PivotStack []Progress
 
 	// AuthRequestID, when set, identifies the OIDC authorization request
 	// this flow is fulfilling. Nil for flows started outside an OIDC
@@ -88,7 +88,7 @@ type FlowState struct {
 	// machine when entering a step that declares a challenge; cleared
 	// once the matching ChallengeResponse verifies. Nil when no
 	// ceremony is in flight.
-	PendingChallenge *FlowPendingChallenge
+	PendingChallenge *PendingChallenge
 
 	// AuthAttemptID names the auth_attempts row this flow is collecting
 	// factors against. Created at Start; completed intrinsically by the
@@ -103,12 +103,12 @@ type FlowState struct {
 	SSOResolvedCheckID string `json:",omitempty"`
 }
 
-// FlowPendingChallenge records the server-issued challenge the next
+// PendingChallenge records the server-issued challenge the next
 // submit must satisfy. The binding (id + method) is threaded through the
 // cookie so the verify step can locate it; Options carries the
 // client-facing ceremony options so a GET /flows re-render can re-emit
 // them without re-issuing.
-type FlowPendingChallenge struct {
+type PendingChallenge struct {
 	// ID is the challenge identifier returned by the auth-attempt
 	// service at issue time. The client echoes it back in
 	// ChallengeResponse.
@@ -131,12 +131,12 @@ type FlowPendingChallenge struct {
 	IssuedAt time.Time
 }
 
-// FlowProgress captures the user's position within a single flow
+// Progress captures the user's position within a single flow
 // definition: which definition is running, the current step, the
 // history of steps visited so far, and the data submitted along the
-// way. It is embedded in FlowState for the active flow and pushed onto
-// FlowState.PivotStack for paused parents.
-type FlowProgress struct {
+// way. It is embedded in State for the active flow and pushed onto
+// State.PivotStack for paused parents.
+type Progress struct {
 	// DefinitionID is the flow definition currently being executed. On
 	// pivot it changes to the child definition; on pop it is restored
 	// from the parent entry on PivotStack.
@@ -163,16 +163,16 @@ type FlowProgress struct {
 	// cleared after an irreversible action.
 	// The engine also uses it to decide when an action.back should
 	// be injected into the response.
-	BackStack []FlowBackEntry
+	BackStack []BackEntry
 
 	// CollectedData accumulates submitted field values for this
 	// progress entry, keyed by schema property name. A child flow's
 	// CollectedData is discarded when its progress is popped.
-	CollectedData CollectedFlowData
+	CollectedData CollectedData
 }
 
-// FlowBackEntry holds an entry to be pushed into BackStack.
-type FlowBackEntry struct {
+// BackEntry holds an entry to be pushed into BackStack.
+type BackEntry struct {
 	StepName string
 	// Purpose is kept in the history so the flow returns with the current purpose.
 	Purpose domain.FlowDefinitionPurpose
@@ -180,26 +180,26 @@ type FlowBackEntry struct {
 
 // ClearBackStack drops any accumulated back-navigation entries. Called
 // past irreversible mutations and at flow termination.
-func (s *FlowState) ClearBackStack() {
+func (s *State) ClearBackStack() {
 	s.BackStack = nil
 }
 
 // PeekBackStack returns the top BackStack entry without mutating the
 // state. Returns false when the stack is empty.
-func (s *FlowState) PeekBackStack() (FlowBackEntry, bool) {
+func (s *State) PeekBackStack() (BackEntry, bool) {
 	n := len(s.BackStack) - 1
 	if n < 0 {
-		return FlowBackEntry{}, false
+		return BackEntry{}, false
 	}
 	return s.BackStack[n], true
 }
 
 // PopBackStack removes and returns the top BackStack entry. Returns
 // false when the stack is empty, leaving the state untouched.
-func (s *FlowState) PopBackStack() (FlowBackEntry, bool) {
+func (s *State) PopBackStack() (BackEntry, bool) {
 	prev, ok := s.PeekBackStack()
 	if !ok {
-		return FlowBackEntry{}, false
+		return BackEntry{}, false
 	}
 	s.BackStack = s.BackStack[:len(s.BackStack)-1]
 	return prev, true
@@ -208,11 +208,11 @@ func (s *FlowState) PopBackStack() (FlowBackEntry, bool) {
 // ClearPendingChallenge drops any outstanding ceremony binding on the
 // state. Called when the challenge is superseded (verify succeeded, or
 // the user navigated away).
-func (s *FlowState) ClearPendingChallenge() {
+func (s *State) ClearPendingChallenge() {
 	s.PendingChallenge = nil
 }
 
-type CollectedFlowData struct {
+type CollectedData struct {
 	UserData map[string]any
 	UserID   string
 	// AuthMethods holds the credentials submitted for `x-auth-methods`

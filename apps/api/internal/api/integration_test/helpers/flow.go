@@ -44,7 +44,7 @@ func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 	return h.flowService.value
 }
 
-func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.FlowStateMachineRuntime {
+func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.Runtime {
 	t.Helper()
 	h.flowStateMachine.mutex.Lock()
 	defer h.flowStateMachine.mutex.Unlock()
@@ -52,7 +52,7 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.FlowStateMach
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
-		h.flowStateMachine.value = flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
+		h.flowStateMachine.value = flowengine.New(flowengine.Deps{
 			Schemas:       h.EnsureSchemaResolver(t),
 			SchemaStore:   h.EnsureSchemaStore(t),
 			Fields:        fields,

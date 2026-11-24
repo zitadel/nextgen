@@ -10,10 +10,10 @@ import (
 // challenges, run on_success (if declared), and route the resulting outcome.
 type submitHandler struct{}
 
-func (submitHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
+func (submitHandler) process(r *Runtime, pc *processCtx) (StepResult, error) {
 	resolved, halt, err := r.takeInputs(pc, stepInputs{collectsStepFields: true})
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	if halt != nil {
 		return *halt, nil
@@ -23,7 +23,7 @@ func (submitHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowSt
 	if !pc.currentStep.OnSuccessSpec().ProviderIdentity {
 		dispatch, err := r.dispatchChallenges(pc, resolved)
 		if err != nil {
-			return FlowStepResult{}, err
+			return StepResult{}, err
 		}
 		if dispatch.StepError != nil {
 			return r.renderStepError(pc, resolved, dispatch.StepError)
@@ -37,7 +37,7 @@ func (submitHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowSt
 	}
 	handler, ok := onSuccessHandlers[*pc.currentStep.OnSuccess]
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: on_success %s not wired", domain.ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
+		return StepResult{}, fmt.Errorf("%w: on_success %s not wired", domain.ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
 	}
 	return handler.run(r, pc, resolved)
 }

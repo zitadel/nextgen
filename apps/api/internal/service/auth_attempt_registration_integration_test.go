@@ -247,14 +247,14 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 		attempt, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{ProjectID: projectID})
 		require.NoError(t, err)
 
-		out, err := handler.Handle(t.Context(), flowengine.FlowOnSuccessInput{
+		out, err := handler.Handle(t.Context(), flowengine.OnSuccessInput{
 			ProjectID:     projectID,
 			UserSchemaURL: registrationTestSchemaURL,
-			State: &flowengine.FlowState{
+			State: &flowengine.State{
 				ProjectID:     projectID,
 				AuthAttemptID: attempt.ID,
-				FlowProgress: flowengine.FlowProgress{
-					CollectedData: flowengine.CollectedFlowData{
+				Progress: flowengine.Progress{
+					CollectedData: flowengine.CollectedData{
 						UserData:    map[string]any{"email": "pw-signup@example.com"},
 						AuthMethods: map[string]string{domain.AuthMethodPassword: "s3cret"},
 					},

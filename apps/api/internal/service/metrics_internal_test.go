@@ -106,15 +106,15 @@ func TestFlowResult(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
 		name string
-		res  flowengine.FlowStepResult
+		res  flowengine.StepResult
 		err  error
 		want metrics.FlowResult
 	}{
-		{"error", flowengine.FlowStepResult{}, errors.New("x"), metrics.FlowFailed},
-		{"error with a step", flowengine.FlowStepResult{Step: &flowengine.FlowStep{Complete: new(domain.FlowStepCompleteRedirect)}}, errors.New("x"), metrics.FlowFailed},
-		{"no step", flowengine.FlowStepResult{}, nil, metrics.FlowStep},
-		{"step", flowengine.FlowStepResult{Step: &flowengine.FlowStep{Name: "password"}}, nil, metrics.FlowStep},
-		{"complete", flowengine.FlowStepResult{Step: &flowengine.FlowStep{Complete: new(domain.FlowStepCompleteRedirect)}}, nil, metrics.FlowComplete},
+		{"error", flowengine.StepResult{}, errors.New("x"), metrics.FlowFailed},
+		{"error with a step", flowengine.StepResult{Step: &flowengine.Step{Complete: new(domain.FlowStepCompleteRedirect)}}, errors.New("x"), metrics.FlowFailed},
+		{"no step", flowengine.StepResult{}, nil, metrics.FlowStep},
+		{"step", flowengine.StepResult{Step: &flowengine.Step{Name: "password"}}, nil, metrics.FlowStep},
+		{"complete", flowengine.StepResult{Step: &flowengine.Step{Complete: new(domain.FlowStepCompleteRedirect)}}, nil, metrics.FlowComplete},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

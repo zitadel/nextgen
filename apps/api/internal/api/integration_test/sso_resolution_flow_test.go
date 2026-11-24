@@ -203,19 +203,19 @@ func parkSSOResult(t *testing.T, projectID, attemptID, revisionID, subject strin
 }
 
 // openFlowState decrypts a _zflow cookie the way the handler does.
-func openFlowState(t *testing.T, projectID, zflow string) flowengine.FlowState {
+func openFlowState(t *testing.T, projectID, zflow string) flowengine.State {
 	t.Helper()
 	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), projectID, domain.EncryptionKeyPurposeCookie)
 	require.NoError(t, err)
 	payload, err := crypter.Decrypt(zflow)
 	require.NoError(t, err)
-	var state flowengine.FlowState
+	var state flowengine.State
 	require.NoError(t, json.Unmarshal([]byte(payload), &state))
 	return state
 }
 
 // sealFlowState encrypts state into a _zflow cookie the way the handler does.
-func sealFlowState(t *testing.T, state flowengine.FlowState) string {
+func sealFlowState(t *testing.T, state flowengine.State) string {
 	t.Helper()
 	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), state.ProjectID, domain.EncryptionKeyPurposeCookie)
 	require.NoError(t, err)
@@ -338,7 +338,7 @@ func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
 	assert.False(t, got.HandoffToken.Set)
 	// The unverified email cannot create a user, so the identity is collected;
 	// this definition does not route that outcome.
-	assert.Equal(t, flowengine.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, flowengine.StepErrorSSOUserNotFound, got.Step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "a collected identity stays parked for the prefill")
 }
@@ -439,7 +439,7 @@ func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	step := resp.(*api.FlowResponseHeaders).Response.Step
 	assert.Equal(t, "identifier", step.Name)
-	assert.Equal(t, flowengine.FlowStepErrorSSOCreationDisabled, step.Error.Value)
+	assert.Equal(t, flowengine.StepErrorSSOCreationDisabled, step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "the parked result stays, so a lost response can show the error again")
 
@@ -498,7 +498,7 @@ func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	got := resp.(*api.FlowResponseHeaders).Response
 	assert.Equal(t, "identifier", got.Step.Name)
-	assert.Equal(t, flowengine.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, flowengine.StepErrorSSOUserNotFound, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)
 	attempt := f.attempt(t, flow)
 	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
@@ -625,7 +625,7 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 	parked, ok := f.attempt(t, flow).SSOCallback()
 	require.True(t, ok)
 
-	_, err := resolver.CreateLinked(t.Context(), flowengine.FlowSSOCreateInput{
+	_, err := resolver.CreateLinked(t.Context(), flowengine.SSOCreateInput{
 		ProjectID:     f.project.ID,
 		AttemptID:     flow.attemptID,
 		CheckID:       parked.ID,
