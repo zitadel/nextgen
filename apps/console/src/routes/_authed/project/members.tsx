@@ -8,10 +8,7 @@ import {
   ProjectInvitations,
 } from "@/features/invitations/components/project-invitations";
 import { readProjectMembers } from "@/features/project-settings/api";
-import {
-  AddAdminButton,
-  ProjectMembers,
-} from "@/features/project-settings/components/project-members";
+import { ProjectMembers } from "@/features/project-settings/components/project-members";
 import {
   projectScopeDeps,
   requireProjectScope,
@@ -26,9 +23,8 @@ type MembersTab = "members" | "invitations";
  * Project Settings → Members: every person and team with a role on the
  * project (#1238, #2857), and the links made to bring colleagues into it (root
  * ADR 086 §6, #2855), as two tabs of one page with Invite member on the tabs'
- * row. The
- * header is the Settings layout's (`route.tsx`), which also reads the project
- * this page names in the message an administrator copies.
+ * row. The header is the Settings layout's (`route.tsx`), which also reads the
+ * project this page names in the message an administrator copies.
  *
  * The tab is in the URL (`?tab=invitations`), so a link lands on the table it
  * means and Back returns to the one left. Both tables are read up front:
@@ -37,11 +33,6 @@ type MembersTab = "members" | "invitations";
  * The members and the grants are the same viewer check on the same project and
  * succeed or fail as one. A failed invitations read is shown in its tab rather
  * than thrown, so the members stay readable and the API's own message says why.
- *
- * Add admin stays beside Invite member on the Members tab, though the design
- * draws one button: it gives access to someone who already has an account,
- * which an invitation link does not, and it is the only way in on an instance
- * without a platform project, where invitations are refused.
  */
 export const Route = createFileRoute("/_authed/project/members")({
   staticData: {
@@ -89,18 +80,15 @@ function ProjectMembersPage() {
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
         </TabsList>
-        <div className="flex items-center gap-2">
-          {tab === "members" && <AddAdminButton projectId={projectId} onAdded={reload} />}
-          <InviteMemberButton
-            projectId={projectId}
-            projectName={project.name}
-            onInvited={() => {
-              // Closing the dialog lands on the table the new row is in.
-              open("invitations");
-              reload();
-            }}
-          />
-        </div>
+        <InviteMemberButton
+          projectId={projectId}
+          projectName={project.name}
+          onInvited={() => {
+            // Closing the dialog lands on the table the new row is in.
+            open("invitations");
+            reload();
+          }}
+        />
       </div>
 
       <TabsContent value="members">

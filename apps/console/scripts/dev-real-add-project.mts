@@ -6,8 +6,8 @@
  *
  * `dev-real` boots one project and signs the console into it. A second project
  * is one `POST /projects` away (unauthenticated; the server answers with the
- * new project's secret exactly once), and access is the same grant a
- * project's Members page creates: `POST /grants?project_id=<new>` with the
+ * new project's secret exactly once), and access is a grant its Members
+ * page then lists: `POST /grants?project_id=<new>` with the
  * new project's secret, binding the dev user by id. The server allows a user homed in the
  * seeded project to be bound on another one because dev-real pins no platform
  * project (`internal/service/grant.go`, `resolvePrincipalHome`).
@@ -37,10 +37,7 @@
  *   --relation <r>          viewer | editor | admin (default: admin)
  *   --project-id <proj_…>   grant on an existing project instead of creating
  *   --secret <secret>       that project's secret (printed when this script
- *                           created it); required with --project-id. For the
- *                           seeded project, use the Members page in the
- *                           project's Settings instead: it grants
- *                           with your session.
+ *                           created it); required with --project-id.
  *
  * Environment (all optional, same defaults as dev-real):
  *   CONSOLE_DEV_ORIGIN        console dev server, default http://localhost:5174

@@ -1,9 +1,7 @@
-import { ChevronDown, ChevronRight, EllipsisVertical, Plus, UserCog, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, EllipsisVertical, UserCog, Users } from "lucide-react";
 import { Fragment, useState } from "react";
 
-import { AddAdminDialog } from "./add-admin-dialog";
 import { RemoveMemberDialog } from "./remove-member-dialog";
-import { CARD_ACTION_BUTTON } from "@/components/detail-page";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
@@ -93,6 +91,9 @@ export function ProjectMembers({
     // menu stays at the card's right edge while the rest scrolls under it, so
     // it is reachable on a phone.
     <section
+      // Keyed on which body it holds: the scroll edges are measured on the
+      // table's own container, which exists only while there are rows.
+      key={rows.length === 0 ? "empty" : "rows"}
       aria-label="Members"
       ref={scroll.ref}
       data-scroll-start={scroll.edges.start || undefined}
@@ -287,20 +288,5 @@ function RowActions({
         onRemoved={onRemoved}
       />
     </>
-  );
-}
-
-/**
- * Add admin, drawn on the tabs' row of the Members page rather than in the table:
- * the secondary small button the design placed beside the tabs.
- */
-export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
-  return (
-    <AddAdminDialog projectId={projectId} onAdded={onAdded}>
-      <Button variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
-        <Plus aria-hidden />
-        Add admin
-      </Button>
-    </AddAdminDialog>
   );
 }
