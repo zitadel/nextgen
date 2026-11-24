@@ -19,7 +19,17 @@ vi.mock("@/cli/commands/setup/shared", async (importOriginal) => {
   return { ...(await importOriginal<object>()), askCustomSettings: vi.fn() };
 });
 
-import { confirm, intro, isCancel, log, multiselect, outro, select } from "@clack/prompts";
+import {
+  CANCEL_SYMBOL,
+  confirm,
+  intro,
+  isCancel,
+  log,
+  multiselect,
+  outro,
+  select,
+  text,
+} from "@clack/prompts";
 
 import Setup, {
   refuseUnusableFlags,
@@ -3199,6 +3209,50 @@ describe("Setup.run", () => {
       });
 
       expect(drawnLines()).toContain("Could not record what setup scaffolded");
+    });
+  });
+
+  describe("with Enter pressed at every question", () => {
+    /**
+     * Answers every question the way Enter does: with the choice it starts on, the text it is
+     * filled with, or what is ticked. A question asked a second time is walked away from, since
+     * Enter would answer it the same way again and go round forever.
+     */
+    function pressingEnterAtEveryQuestion(): void {
+      const asked = new Set<string>();
+      const enter = <T>(message: string, answer: T | undefined): T | typeof CANCEL_SYMBOL => {
+        if (answer === undefined || asked.has(message)) {
+          return CANCEL_SYMBOL;
+        }
+        asked.add(message);
+        return answer;
+      };
+      vi.mocked(isCancel).mockImplementation((value) => {
+        return value === CANCEL_SYMBOL;
+      });
+      vi.mocked(confirm).mockImplementation(async ({ message, initialValue }) => {
+        return enter(message, initialValue ?? true);
+      });
+      vi.mocked(select).mockImplementation(async ({ message, initialValue, options }) => {
+        return enter(message, initialValue ?? options[0]?.value);
+      });
+      vi.mocked(multiselect).mockImplementation(async ({ message, initialValues }) => {
+        return enter(message, initialValues ?? []);
+      });
+      vi.mocked(text).mockImplementation(async ({ message, initialValue }) => {
+        return enter(message, initialValue);
+      });
+    }
+
+    it("sets up the app", async ({ dir }) => {
+      await aNextApp(dir);
+      pressingEnterAtEveryQuestion();
+
+      await asTerminal(() => {
+        return Setup.run(["--cwd", dir, "--server", CLOUD, "--skip-install"], config);
+      });
+
+      expect(existsSync(join(dir, "zitadel.json"))).toBe(true);
     });
   });
 
