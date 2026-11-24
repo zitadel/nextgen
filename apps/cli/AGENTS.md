@@ -248,8 +248,8 @@
 
   A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
   the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
-  `Destructive` around it. `LocalServerCommand` does not take `--server`; a
-  command that also reads one is `LocalServerCommand(ServerCommand(Base))`.
+  `Destructive` around it. `LocalServerCommand` names no server itself and ignores
+  `--server`, even around `ServerCommand(Base)`; a command that reads one does not use it.
   Each local-server command declares its own `group`.
   `LocalServerCommand` names no server itself. `setup`, `upgrade`, `eject` and a few more
   still wrap `ServerCommand(...)` only to keep accepting `--server`, which they

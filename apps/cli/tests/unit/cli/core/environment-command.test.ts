@@ -441,7 +441,10 @@ describe("EnvironmentCommand.connect", () => {
       config,
     ).probe();
 
-    expect(telemetry).toMatchObject({ credential: "preview", has_env_file: true });
+    expect({ credential: telemetry?.credential, has_env_file: telemetry?.has_env_file }).toEqual({
+      credential: "preview",
+      has_env_file: true,
+    });
   });
 
   it("records that no file was used when there was none", async ({ dir }) => {
@@ -452,7 +455,10 @@ describe("EnvironmentCommand.connect", () => {
 
     const { telemetry } = await new ProjectProbe(["--cwd", dir], config).probe();
 
-    expect(telemetry).toMatchObject({ credential: "project", has_env_file: false });
+    expect({ credential: telemetry?.credential, has_env_file: telemetry?.has_env_file }).toEqual({
+      credential: "project",
+      has_env_file: false,
+    });
   });
 });
 

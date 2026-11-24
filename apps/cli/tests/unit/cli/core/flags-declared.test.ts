@@ -14,7 +14,7 @@ import {
   sourcesUnder,
 } from "@tests/helpers/declarations";
 
-import { WORKFLOW_COMMANDS } from "@/index";
+import { COMMANDS, WORKFLOW_COMMANDS } from "@/index";
 import { relationsOf } from "@/lib/suggestion/relations";
 
 const commands = fileURLToPath(new URL("../../../../src/cli/commands", import.meta.url));
@@ -126,4 +126,42 @@ describe("what a flag requires of the others", () => {
 
     expect(inline).toEqual([]);
   });
+});
+
+describe("what every command takes by what it does", () => {
+  it.each(Object.entries(COMMANDS))(
+    "%s takes --dry-run exactly when it says what it would do",
+    (_id, command) => {
+      const previews = "preview" in command.prototype && "apply" in command.prototype;
+
+      expect("dry-run" in (command.baseFlags ?? {})).toBe(previews);
+    },
+  );
+
+  it.each(Object.entries(COMMANDS))(
+    "%s declares --dry-run through Previewable alone, never in flags of its own",
+    (_id, command) => {
+      expect("dry-run" in (command.flags ?? {})).toBe(false);
+    },
+  );
+
+  it.each(Object.entries(COMMANDS))(
+    "%s leaves its work to preview and apply, never to an execute of its own",
+    (_id, command) => {
+      if ("preview" in command.prototype) {
+        expect(Object.hasOwn(command.prototype, "execute")).toBe(false);
+      }
+    },
+  );
+
+  it.each(Object.entries(COMMANDS))(
+    "%s takes --force from the mixin that asks consent, or declares a meaning of its own",
+    (_id, command) => {
+      const asks = "confirmed" in command.prototype;
+
+      if (asks) {
+        expect(command.baseFlags).toHaveProperty("force");
+      }
+    },
+  );
 });
