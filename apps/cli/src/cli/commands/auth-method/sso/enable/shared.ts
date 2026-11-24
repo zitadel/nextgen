@@ -12,7 +12,6 @@ import type {
   MappingState,
   PublishedCredentials,
 } from "@/lib/idp";
-import { log } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/lib/oclif";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Again, Suggest, SuggestedCommand } from "@/lib/suggestion";
@@ -324,6 +323,15 @@ export type EnableServices = Readonly<{
   report(change: Change): void;
 
   /**
+   * What a change did, as the lines of a result.
+   *
+   * @param change - The change.
+   * @param written - The files it wrote.
+   * @returns The lines.
+   */
+  said(change: Change, written?: readonly string[]): string[];
+
+  /**
    * Writes the change to the project's files.
    *
    * @param target - What the run read.
@@ -426,17 +434,18 @@ export function payload(
 }
 
 /**
- * Print what the connection maps: which claim fills each user
- * attribute and what verifies it, the scopes it asks for, the attributes no
- * claim fills, the schemas that sign in through it, and where to change it.
+ * Word what the connection maps: which claim fills each user attribute and
+ * what verifies it, the scopes it asks for, the attributes no claim fills, the
+ * schemas that sign in through it, and where to change it.
  *
  * @remarks
  * Every value read from a file is escaped on its own, newlines included, so a
  * name cannot drive the terminal or forge a line of the notice.
  *
  * @param change - The change that adds the connection.
+ * @returns The lines, with a blank line between each part.
  */
-export function drawMapping(change: DocumentChange<Connection>): void {
+export function mappingLines(change: DocumentChange<Connection>): string[] {
   const connection = change.document;
   const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
     change.after.connections.summarize(connection);
@@ -451,72 +460,114 @@ export function drawMapping(change: DocumentChange<Connection>): void {
       return [];
     }),
   );
-  log.info(
-    [
-      mappings.length === 0
-        ? []
-        : [
-            createsUsers
-              ? `When someone signs in with ${plain(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-              : `${plain(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-            ...mappings.map(({ property, claim }) => {
-              const verified = verifiedBy.get(property) ?? "not verified";
-              return `• ${plain(property)} ← ${plain(claim)} (${verified})`;
-            }),
-          ],
-      scopes.length === 0
-        ? []
-        : [
-            `Zitadel asks ${plain(connection.displayName)} for these scopes: ${CONJUNCTION.format(scopes.map(plain))}.`,
-          ],
-      unmapped.length === 0
-        ? []
-        : [
-            ...(unmapped.some(({ required }) => {
-              return !required;
-            })
-              ? [
-                  `Not filled by ${plain(connection.displayName)} (optional): ${CONJUNCTION.format(
-                    unmapped
-                      .filter(({ required }) => {
-                        return !required;
-                      })
-                      .map(({ property }) => {
-                        return plain(property);
-                      }),
-                  )}.`,
-                ]
-              : []),
-            ...(unmapped.some(({ required }) => {
-              return required;
-            })
-              ? [
-                  `No claim fills these required attributes of ${plain(connection.displayName)}:`,
-                  ...unmapped
+  return [
+    mappings.length === 0
+      ? []
+      : [
+          createsUsers
+            ? `When someone signs in with ${plain(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+            : `${plain(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+          ...mappings.map(({ property, claim }) => {
+            const verified = verifiedBy.get(property) ?? "not verified";
+            return `• ${plain(property)} ← ${plain(claim)} (${verified})`;
+          }),
+        ],
+    scopes.length === 0
+      ? []
+      : [
+          `Zitadel asks ${plain(connection.displayName)} for these scopes: ${CONJUNCTION.format(scopes.map(plain))}.`,
+        ],
+    unmapped.length === 0
+      ? []
+      : [
+          ...(unmapped.some(({ required }) => {
+            return !required;
+          })
+            ? [
+                `Not filled by ${plain(connection.displayName)} (optional): ${CONJUNCTION.format(
+                  unmapped
                     .filter(({ required }) => {
-                      return required;
+                      return !required;
                     })
                     .map(({ property }) => {
-                      return createsUsers
-                        ? `• ${plain(property)}, so sign-up will have to ask for it.`
-                        : `• ${plain(property)}, but this connection does not create users.`;
+                      return plain(property);
                     }),
-                ]
-              : []),
-          ],
-      usedBy.length === 0
-        ? []
-        : [
-            `Changes here affect everyone who signs in through ${CONJUNCTION.format(usedBy.map(plain))}.`,
-          ],
-      [`To change a mapping later, edit claim_mapping in ${plain(connection.path)}, then deploy.`],
-    ]
-      .filter((section) => {
-        return section.length > 0;
-      })
-      .flatMap((section, at) => {
-        return at === 0 ? section : ["", ...section];
-      })
-      .join("\n"),
-  );
+                )}.`,
+              ]
+            : []),
+          ...(unmapped.some(({ required }) => {
+            return required;
+          })
+            ? [
+                `No claim fills these required attributes of ${plain(connection.displayName)}:`,
+                ...unmapped
+                  .filter(({ required }) => {
+                    return required;
+                  })
+                  .map(({ property }) => {
+                    return createsUsers
+                      ? `• ${plain(property)}, so sign-up will have to ask for it.`
+                      : `• ${plain(property)}, but this connection does not create users.`;
+                  }),
+              ]
+            : []),
+        ],
+    usedBy.length === 0
+      ? []
+      : [
+          `Changes here affect everyone who signs in through ${CONJUNCTION.format(usedBy.map(plain))}.`,
+        ],
+    [`To change a mapping later, edit claim_mapping in ${plain(connection.path)}, then deploy.`],
+  ]
+    .filter((section) => {
+      return section.length > 0;
+    })
+    .flatMap((section, at) => {
+      return at === 0 ? section : ["", ...section];
+    });
+}
+
+/**
+ * Words what the run addresses and what to register with the provider: the
+ * schema edited, each callback URI, and where to create the application. The
+ * wizard says it as it asks, and the result says it again for whoever reads
+ * only the result.
+ *
+ * @remarks
+ * A custom provider has no console to send the developer to: it is theirs, and
+ * the issuer they gave is the only address known.
+ *
+ * @param needs - What was read and decided.
+ * @returns The lines, one per statement.
+ */
+export function registrationLines(needs: Fact<"target" | "provider" | "summary">): string[] {
+  const { schema } = needs.target;
+  const { summary, provider } = needs;
+
+  return [
+    `Editing ${escapeControlCharacters(schema.path)}${schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(schema.methods.join(", "))}` : ""}`,
+    ...(summary.reused
+      ? []
+      : [
+          `${escapeControlCharacters(provider.displayName, { keepLayout: false })} needs an OAuth application.`,
+        ]),
+    ...[summary.callbackUri, ...summary.deployedCallbackUris].map((uri) => {
+      return `Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`;
+    }),
+    ...(summary.previewCallbackUris.length > 0
+      ? [
+          "Each preview URL needs its own callback URI at the provider, since it takes no wildcards:",
+          ...summary.previewCallbackUris.map((uri) => {
+            return `  ${escapeControlCharacters(uri, { keepLayout: false })}`;
+          }),
+        ]
+      : []),
+    ...(summary.reused
+      ? []
+      : [
+          provider.consoleUrl === undefined
+            ? `Register it as a client at ${escapeControlCharacters(provider.issuer)}, with the callback URI above.`
+            : `Create it at   ${escapeControlCharacters(provider.consoleUrl)}`,
+        ]),
+  ];
 }

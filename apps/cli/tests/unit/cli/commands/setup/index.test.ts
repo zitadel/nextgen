@@ -2098,7 +2098,8 @@ describe("setup", () => {
   });
 
   describe("against a platform that deploys what setup wrote", () => {
-    it("says in the chain that it deployed what it wrote", async ({ dir }) => {
+    it("says in the chain that it deployed what it wrote", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await aNextApp(dir);
 
       const res = await runCliForTest(
@@ -2191,7 +2192,8 @@ describe("setup", () => {
   });
 
   describe("when its first deploy fails", () => {
-    it("names the deploy in the box when its own deploy failed", async ({ dir }) => {
+    it("names the deploy in the box when its own deploy failed", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await aNextApp(dir);
       server.use(
         http.post("*/releases/build", () => {

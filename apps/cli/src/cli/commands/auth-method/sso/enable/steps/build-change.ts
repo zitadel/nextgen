@@ -60,7 +60,7 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
             },
           );
     if (needs.summary.reused) {
-      log.done(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);
+      log.debug(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);
     }
     await change.check(needs.target.store);
     return {

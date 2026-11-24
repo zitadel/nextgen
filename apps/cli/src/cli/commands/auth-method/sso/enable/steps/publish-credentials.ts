@@ -172,7 +172,7 @@ export class PublishCredentials extends WizardStep<"publish", Fact<"published">,
   ): void {
     switch (state) {
       case "stored": {
-        log.done(`Saved ${escapeControlCharacters(name)} in your project`);
+        log.debug(`Saved ${escapeControlCharacters(name)} in your project`);
         return;
       }
       case "deferred": {

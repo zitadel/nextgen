@@ -11,7 +11,6 @@ import {
   ZitadelRuntime,
 } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { log } from "@/lib/ui";
 
 /**
  * `--server`: the one flag every {@link ServerCommand} takes, declared once so
@@ -206,7 +205,7 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
       return LocalRuntime.forFolder(cwd, {
         cliVersion: this.config.version,
         progress: (message) => {
-          log.info(message);
+          this.info(message);
         },
       });
     }
@@ -222,7 +221,7 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
       return LocalRuntime.findStartedFrom(cwd, {
         cliVersion: this.config.version,
         progress: (message) => {
-          log.info(message);
+          this.info(message);
         },
       });
     }

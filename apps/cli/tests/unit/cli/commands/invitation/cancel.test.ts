@@ -32,7 +32,7 @@ describe("invitation cancel", () => {
         parseArg(InvitationCancel.args.invitation_id, value, "invitation_id"),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
-        hint: "Find one with `zitadel invitation list --status pending --status rejected`.",
+        hint: "Find one with `zitadel invitation list`.",
       });
     });
   });
@@ -153,6 +153,7 @@ function serving(server: SetupServer, invitation: ReturnType<typeof pending>, st
 describe("invitation cancel, run by a person with an id", () => {
   it.for([
     ["pending", "so its link stops working?"],
+    ["expired", "and remove its record?"],
     ["rejected", "and remove its record?"],
   ] as const)(
     "names who a %s invitation is for, its role and what the cancel does",
@@ -180,31 +181,28 @@ describe("invitation cancel, run by a person with an id", () => {
     },
   );
 
-  it.for(["accepted", "expired"])(
-    "refuses an %s invitation before asking",
-    async (status, { server }) => {
-      serving(server, { ...pending("inv_1", "John Doe"), status });
-      const cwd = await anApp();
-      const talk = answering(true);
+  it("refuses an accepted invitation before asking", async ({ server }) => {
+    serving(server, { ...pending("inv_1", "John Doe"), status: "accepted" });
+    const cwd = await anApp();
+    const talk = answering(true);
 
-      const refused = await rejectionOf(() => {
-        return asTerminal(() => {
-          return runCommand(InvitationCancel, "invitation:cancel", [
-            "inv_1",
-            "--cwd",
-            cwd,
-            "--server",
-            SERVER,
-          ]);
-        });
+    const refused = await rejectionOf(() => {
+      return asTerminal(() => {
+        return runCommand(InvitationCancel, "invitation:cancel", [
+          "inv_1",
+          "--cwd",
+          cwd,
+          "--server",
+          SERVER,
+        ]);
       });
+    });
 
-      // E_VALIDATION exits with 3.
-      expect(refused).toMatchObject({ oclif: { exit: 3 } });
-      expect(talk.asked()).toEqual([]);
-      expect(cancelled).toEqual([]);
-    },
-  );
+    // E_VALIDATION exits with 3.
+    expect(refused).toMatchObject({ oclif: { exit: 3 } });
+    expect(talk.asked()).toEqual([]);
+    expect(cancelled).toEqual([]);
+  });
 });
 
 /** Watches the product events the command sends. */
@@ -244,24 +242,30 @@ describe("invitation cancel's invitation_cancelled event", () => {
     });
   });
 
-  it("is not sent for a declined invitation, whose journey already ended", async ({ server }) => {
-    serving(server, { ...pending("inv_1", "John Doe"), status: "rejected" });
-    const cwd = await anApp();
-    const sent = trackedEvents();
+  it.for([
+    ["declined", "rejected"],
+    ["expired", "expired"],
+  ] as const)(
+    "is not sent for an invitation that %s, whose journey already ended",
+    async ([, status], { server }) => {
+      serving(server, { ...pending("inv_1", "John Doe"), status });
+      const cwd = await anApp();
+      const sent = trackedEvents();
 
-    await runCommand(InvitationCancel, "invitation:cancel", [
-      "inv_1",
-      "--force",
-      "--json",
-      "--cwd",
-      cwd,
-      "--server",
-      SERVER,
-    ]);
+      await runCommand(InvitationCancel, "invitation:cancel", [
+        "inv_1",
+        "--force",
+        "--json",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
 
-    expect(cancelled).toEqual(["inv_1"]);
-    expect(sent).not.toHaveBeenCalled();
-  });
+      expect(cancelled).toEqual(["inv_1"]);
+      expect(sent).not.toHaveBeenCalled();
+    },
+  );
 
   it("is not sent when the cancel fails", async ({ server }) => {
     serving(server, pending("inv_1", "John Doe"), 500);

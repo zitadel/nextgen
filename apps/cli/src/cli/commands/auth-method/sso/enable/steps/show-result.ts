@@ -1,5 +1,6 @@
 import {
-  drawMapping,
+  mappingLines,
+  registrationLines,
   type EnableServices,
   type Fact,
   payload,
@@ -11,12 +12,14 @@ import { WizardStep } from "@/lib/wizard";
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"summary" | "change" | "written" | "published" | "names" | "answered">;
+type Needs = Fact<
+  "summary" | "change" | "written" | "published" | "names" | "answered" | "target" | "provider"
+>;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "followUps" | "suggest">;
+type Deps = Pick<EnableServices, "followUps" | "said" | "suggest">;
 
 /**
  * Words what the run did as the command's result.
@@ -76,7 +79,6 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
         });
       }),
     );
-    drawMapping(needs.change);
     const title = unpublished
       ? `${name} sign-in is configured locally`
       : `${name} sign-in is already configured locally`;
@@ -97,13 +99,31 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
         summary: {
           title: escapeControlCharacters(title),
           sections: [],
-          lines:
-            unpublished &&
+          lines: [
+            ...registrationLines(needs),
+            ...(needs.summary.reused
+              ? [`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`]
+              : []),
+            ...(needs.published.clientId === "stored" && needs.names.clientId !== undefined
+              ? [`Published ${escapeControlCharacters(needs.names.clientId)} to the project`]
+              : []),
+            ...(needs.published.secret?.published === "stored"
+              ? [`Published ${escapeControlCharacters(needs.published.secret.name)} to the project`]
+              : []),
+            ...this.deps.said(needs.change, needs.written),
+            ...(needs.written.length === 0 && needs.change.notices.length === 0
+              ? [
+                  `${escapeControlCharacters(needs.target.schema.name)} and its login flow already offer ${escapeControlCharacters(needs.provider.displayName, { keepLayout: false })}`,
+                ]
+              : []),
+            ...mappingLines(needs.change),
+            ...(unpublished &&
             needs.published.secret?.published === "stored" &&
             needs.published.clientId !== "deferred" &&
             needs.published.clientId !== "failed"
-              ? ["Its credentials are stored in your project."]
-              : [],
+              ? ["", "Its credentials are stored in your project."]
+              : []),
+          ],
         },
         next: unpublished
           ? {
