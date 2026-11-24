@@ -403,6 +403,36 @@ func (s *ApplicationClient) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Secret.Get(); ok {
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     0,
+					MinLengthSet:  false,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^\\$\\{\\{ *[A-Za-z0-9_]{1,255} *\\}\\}$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(value)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "secret",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -585,6 +615,26 @@ func (s *ApplicationResponse) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ApplicationRevisionID) Validate() error {
+	alias := (string)(s)
+	if err := (validate.String{
+		MinLength:     0,
+		MinLengthSet:  false,
+		MaxLength:     0,
+		MaxLengthSet:  false,
+		Email:         false,
+		Hostname:      false,
+		Regex:         regexMap["^apprev_[a-zA-Z0-9_-]+$"],
+		MinNumeric:    0,
+		MinNumericSet: false,
+		MaxNumeric:    0,
+		MaxNumericSet: false,
+	}).Validate(string(alias)); err != nil {
+		return errors.Wrap(err, "string")
 	}
 	return nil
 }
@@ -4426,6 +4476,42 @@ func (s *ConfigurationBundle) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Applications == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Applications)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Applications {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "applications",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Policies == nil {
 			return nil // optional
 		}
@@ -4592,6 +4678,11 @@ func (s CreateDeploymentBadRequest) Validate() error {
 		return nil // no validation needed
 	case DeploymentVariablesMissingCreateDeploymentBadRequest:
 		if err := s.DeploymentVariablesMissing.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case DeploymentVariablesNotSecretCreateDeploymentBadRequest:
+		if err := s.DeploymentVariablesNotSecret.Validate(); err != nil {
 			return err
 		}
 		return nil
@@ -6510,6 +6601,71 @@ func (s *DeploymentVariablesMissing) Validate() error {
 }
 
 func (s *DeploymentVariablesMissingDetails) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Kind.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "kind",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.Names == nil {
+			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    1,
+			MinLengthSet: true,
+			MaxLength:    0,
+			MaxLengthSet: false,
+		}).ValidateLength(len(s.Names)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "names",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeploymentVariablesNotSecret) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Details.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "details",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeploymentVariablesNotSecretDetails) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -9558,7 +9714,7 @@ func (s *IdpConnectionOidc) Validate() error {
 			MaxLengthSet:  false,
 			Email:         false,
 			Hostname:      false,
-			Regex:         regexMap["^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$"],
+			Regex:         regexMap["^\\$\\{\\{ *[A-Za-z0-9_]{1,255} *\\}\\}$"],
 			MinNumeric:    0,
 			MinNumericSet: false,
 			MaxNumeric:    0,
@@ -17407,6 +17563,8 @@ func (s ReleasePointerKind) Validate() error {
 	case "policy":
 		return nil
 	case "oauth":
+		return nil
+	case "application":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

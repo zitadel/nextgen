@@ -82,6 +82,22 @@ describe("deployment list", () => {
     });
 
     describe("--json", () => {
+      it("takes a field the records carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["deployment", "list", "--fields", "id", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a field the records cannot carry, whatever the page holds", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["deployment", "list", "--fields", "no_such_field", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("is empty before anything is deployed", async () => {
         const app = await anUndeployedEnvironment();
 
@@ -97,6 +113,7 @@ describe("deployment list", () => {
             title: "No deployments found",
             items: [],
             count: 0,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -153,6 +170,7 @@ describe("deployment list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -185,6 +203,7 @@ describe("deployment list", () => {
               },
             ],
             count: 1,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -224,6 +243,7 @@ describe("deployment list", () => {
               },
             ],
             count: 1,
+            truncated: true,
             next_page_token: "1",
             next_commands: [
               expectedPublicCliCommand(
@@ -325,6 +345,7 @@ describe("deployment list", () => {
               },
             ],
             count: 2,
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],

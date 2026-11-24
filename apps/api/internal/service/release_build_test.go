@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ import (
 func newMockedReleaseServiceWithBranding(t *testing.T) (service.ReleaseService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
-	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, nil, nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, nil, nil, nil, testBuiltinBases), statements
 }
 
 // newMockedReleaseServiceWithSchemas builds with the schema writer. Its
@@ -27,7 +28,7 @@ func newMockedReleaseServiceWithSchemas(t *testing.T) (service.ReleaseService, *
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
 	schemas := service.NewSchemaService(pool, nil, nil, testBuiltinBases)
-	return service.NewReleaseService(pool, schemas, nil, nil, nil, nil, nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, schemas, nil, nil, nil, nil, nil, nil, testBuiltinBases), statements
 }
 
 // mockedBuildPool runs every transaction inline on statements and accepts
@@ -307,7 +308,7 @@ func TestBuildRelease_NeverFetchesTheBuiltinNamespace(t *testing.T) {
 func TestBuildRelease_PolicyForAMissingProjectIsProjectNotFound(t *testing.T) {
 	t.Parallel()
 	pool, statements := mockedBuildPool(t)
-	svc := service.NewReleaseService(pool, nil, nil, nil, nil, service.NewPolicyService(pool, mustPolicyEngine(t)), nil, testBuiltinBases)
+	svc := service.NewReleaseService(pool, nil, nil, nil, nil, nil, service.NewPolicyService(pool, mustPolicyEngine(t)), nil, testBuiltinBases)
 
 	statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
 	statements.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
@@ -317,4 +318,61 @@ func TestBuildRelease_PolicyForAMissingProjectIsProjectNotFound(t *testing.T) {
 		Policies:  []service.BuildPolicy{{Operation: service.OperationPasswordSet, Config: map[string]any{}}},
 	})
 	assert.ErrorIs(t, err, domain.ErrReleaseProjectNotFound())
+}
+
+// Spanner replays an aborted transaction's callback. Each attempt starts from
+// the failures found before the transaction, so an in-tx refusal is reported
+// once.
+func TestBuildRelease_ReplayedTransactionReportsARefusalOnce(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			_ = fn(ctx, statementer) // the attempt Spanner aborts
+			return fn(ctx, statementer)
+		})
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	// The slug is held by an application registered through the API.
+	statements.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(&domain.Application{ID: "app_1", Slug: "shop"}, nil).Times(2)
+
+	validator, err := domain.NewSchemaValidator("https://example.com/api/schemas")
+	require.NoError(t, err)
+	db := service.NewPool(pool)
+	svc := service.NewReleaseService(db, nil, nil, nil, nil, service.NewApplicationService(db, validator, nil, nil, nil), nil, nil, testBuiltinBases)
+	_, err = svc.Build(t.Context(), service.BuildReleaseInput{
+		ProjectID: "proj_1",
+		Applications: []service.BuildApplication{{Index: 0, Document: []byte(`{"slug":"shop","name":"Shop","clients":[` +
+			`{"slug":"web","client_id":"shop-web","type":"confidential","secret":"${{ SHOP_WEB_SECRET }}",` +
+			`"grant_types":["authorization_code"],"redirect_uris":["https://shop.example.com/callback"]}]}`)}},
+	})
+	var bundleErr *service.BundleValidationError
+	require.ErrorAs(t, err, &bundleErr)
+	require.Len(t, bundleErr.Resources, 1)
+	assert.ErrorIs(t, bundleErr.Resources[0].Err, domain.ErrApplicationRegistered())
+}
+
+// A secret may only name a variable a variable can be: a longer name would
+// pin a release no deploy can satisfy.
+func TestBuildRelease_SecretNamingAnImpossibleVariable(t *testing.T) {
+	t.Parallel()
+	pool, _ := mockedBuildPool(t)
+	validator, err := domain.NewSchemaValidator("https://example.com/api/schemas")
+	require.NoError(t, err)
+	svc := service.NewReleaseService(pool, nil, nil, nil, nil, service.NewApplicationService(pool, validator, nil, nil, nil), nil, nil, testBuiltinBases)
+	name := strings.Repeat("A", domain.MaxVariableNameLength+1)
+	_, err = svc.Build(t.Context(), service.BuildReleaseInput{
+		ProjectID: "proj_1",
+		Applications: []service.BuildApplication{{Index: 0, Document: []byte(`{"slug":"shop","name":"Shop","clients":[` +
+			`{"slug":"web","client_id":"shop-web","type":"confidential","secret":"${{ ` + name + ` }}",` +
+			`"grant_types":["authorization_code"],"redirect_uris":["https://shop.example.com/callback"]}]}`)}},
+	})
+	var bundleErr *service.BundleValidationError
+	require.ErrorAs(t, err, &bundleErr)
+	require.Len(t, bundleErr.Resources, 1)
+	assert.Equal(t, domain.ReleasePointerKindApplication, bundleErr.Resources[0].Kind)
 }

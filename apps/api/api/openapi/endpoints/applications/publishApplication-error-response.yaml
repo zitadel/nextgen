@@ -5,6 +5,7 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/app-client_id_taken.yaml'
+        - $ref: '../../components/schemas/errors/app-declared.yaml'
         - $ref: '../../components/schemas/errors/app-field_immutable.yaml'
         - $ref: '../../components/schemas/errors/app-invalid.yaml'
         - $ref: '../../components/schemas/errors/app-not_found.yaml'
@@ -20,6 +21,7 @@ content:
         propertyName: code
         mapping:
           app.client_id_taken: '../../components/schemas/errors/app-client_id_taken.yaml'
+          app.declared: '../../components/schemas/errors/app-declared.yaml'
           app.field_immutable: '../../components/schemas/errors/app-field_immutable.yaml'
           app.invalid: '../../components/schemas/errors/app-invalid.yaml'
           app.not_found: '../../components/schemas/errors/app-not_found.yaml'
@@ -34,6 +36,8 @@ content:
     examples:
       app.client_id_taken:
         $ref: '../../components/examples/errors/app-client_id_taken.yaml'
+      app.declared:
+        $ref: '../../components/examples/errors/app-declared.yaml'
       app.field_immutable:
         $ref: '../../components/examples/errors/app-field_immutable.yaml'
       app.invalid:

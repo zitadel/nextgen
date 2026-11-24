@@ -186,6 +186,8 @@ describe("console", () => {
           data: {
             title: "Would mint a console sign-in link (dry run)",
             dry_run: true,
+            verb: "mint",
+            topic: "console",
             signed_in_as: "admin@zitadel.localhost",
             next_commands: [expectedPublicCliCommand(app.againAsRun("console"))],
           },
@@ -219,6 +221,8 @@ describe("console", () => {
           data: {
             title: "Would mint a console sign-in link (dry run)",
             dry_run: true,
+            verb: "mint",
+            topic: "console",
             signed_in_as: "admin@zitadel.localhost",
             next_commands: [expectedPublicCliCommand(app.againAsRun("console"))],
           },

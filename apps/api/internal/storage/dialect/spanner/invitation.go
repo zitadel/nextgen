@@ -28,8 +28,6 @@ const (
 		` THEN RETURN ` + invitationColumnList
 	deleteUnacceptedInvitationStmt = `DELETE FROM invitations` +
 		` WHERE project_id = @p1 AND id = @p2 AND status <> 'accepted'`
-	deleteCancellableInvitationStmt = `DELETE FROM invitations` +
-		` WHERE project_id = @p1 AND id = @p2 AND (status = 'rejected' OR (status = 'pending' AND expires_at > @p3))`
 	countPendingInvitationsStmt = `SELECT COUNT(*) FROM invitations` +
 		` WHERE project_id = @p1 AND status = 'pending' AND expires_at > @p2`
 )
@@ -143,11 +141,6 @@ func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projec
 // DeleteUnacceptedInvitation implements [service.InvitationStatements].
 func (s invitationStatements) DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error {
 	return s.updateOne(ctx, buildStatement(deleteUnacceptedInvitationStmt, projectID, id).statement())
-}
-
-// DeleteCancellableInvitation implements [service.InvitationStatements].
-func (s invitationStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	return s.updateOne(ctx, buildStatement(deleteCancellableInvitationStmt, projectID, id, now).statement())
 }
 
 // CountPendingInvitations implements [service.InvitationStatements].

@@ -804,7 +804,8 @@ export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
 
 /**
  * Union of all possible client-safe auth states. Returned by the client
- * session reads (`useAuth()` in sdk-nuxt, `getSession()` in sdk-next).
+ * session reads (`getSession()` in `./session`, which sdk-next and the SPA
+ * SDKs re-export, and `useAuth()` in sdk-nuxt).
  * Token is intentionally absent — use the server-side helpers when the raw
  * token is needed.
  */

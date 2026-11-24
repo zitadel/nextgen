@@ -130,7 +130,7 @@ export const sessions: Session[] = [
       commands: [
         {
           command: dryRunCommand,
-          output: "Validated 3 resources and deployed nothing (dry run)",
+          output: "Would deploy 3 resources (dry run)",
         },
         {
           command: deployCommand,
@@ -177,7 +177,7 @@ export const sessions: Session[] = [
       commands: [
         {
           command: dryRunCommand,
-          output: "Validated 3 resources and deployed nothing (dry run)",
+          output: "Would deploy 3 resources (dry run)",
         },
         {
           command: deployCommand,

@@ -439,10 +439,10 @@ func TestInvitationService_Cancel(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "deletes a pending invitation",
+			name: "deletes an unaccepted invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
-				s.EXPECT().DeleteCancellableInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(nil)
+				s.EXPECT().DeleteUnacceptedInvitation(gomock.Any(), invitationProjectID, "inv_1").Return(nil)
 			},
 		},
 		{
@@ -453,10 +453,10 @@ func TestInvitationService_Cancel(t *testing.T) {
 			wantErr: domain.ErrInvitationNotFound(),
 		},
 		{
-			name: "finished or expired invitation",
+			name: "accepted invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
-				s.EXPECT().DeleteCancellableInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(database.NewNoRowFoundError(nil))
+				s.EXPECT().DeleteUnacceptedInvitation(gomock.Any(), invitationProjectID, "inv_1").Return(database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrInvitationNotPending(),
 		},
