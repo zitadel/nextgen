@@ -254,8 +254,9 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
   seed,
 }) => {
   // A grant to a team is a row of its own, the team's (#2857). Asserted
-  // against a real instance because which read carries the team, and that `DELETE /grants/{grant_id}` takes the
-  // team's grant without touching the operator's own, are server behaviour.
+  // against a real instance because which read carries the team, and that
+  // `DELETE /grants/{grant_id}` takes the team's grant without touching the
+  // operator's own, are server behaviour.
   const operator = await seed.user();
   const projectId = zitadel.handle.projectId;
   const team = await withErrorBody(

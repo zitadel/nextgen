@@ -21,8 +21,8 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * The project's Members page (#2857). The rows come from the members list and
  * the grants of the route's project, never the console's own (platform)
  * project; the grouping rules themselves are `members.spec.ts`'s. This spec
- * covers what the page does with them: the cells, a team's disclosure, the
- * row menus and their confirmations, and adding an admin.
+ * covers what the page does with them: the cells, a team's disclosure, and
+ * the row menus and their confirmations.
  */
 const PROJECT_ID = "proj_1";
 const PROJECTS_URL = "http://localhost/api/v1/projects";
@@ -128,7 +128,7 @@ function membersTable() {
   return within(screen.getByRole("region", { name: "Members" }));
 }
 
-/** Opens Members from the project's Settings list, where the table and the Add button live. */
+/** Opens Members from the project's Settings list, where the table lives. */
 async function openMembers() {
   const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
   await userEvent.click(nav.getByRole("link", { name: "Members" }));
