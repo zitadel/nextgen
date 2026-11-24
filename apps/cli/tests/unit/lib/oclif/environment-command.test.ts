@@ -11,6 +11,7 @@ import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import { CREDENTIALS } from "@/lib/oclif/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/lib/oclif/environment-command";
 import type { ConnectOptions } from "@/lib/oclif/types";
+import { projectHash } from "@/lib/telemetry/dimensions/project-hash";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { asTerminal } from "@tests/fixtures/terminal";
 import { ServerCommand } from "@/cli/commands/server-command";
@@ -263,7 +264,11 @@ describe("EnvironmentCommand.connect", () => {
       config,
     ).probe();
 
-    expect(telemetry).toEqual({ credential: "preview", has_env_file: true });
+    expect(telemetry).toEqual({
+      credential: "preview",
+      has_env_file: true,
+      project_hash: projectHash.value("proj_staging"),
+    });
   });
 
   it("records that no file was used when there was none", async ({ dir }) => {
@@ -274,7 +279,11 @@ describe("EnvironmentCommand.connect", () => {
 
     const { telemetry } = await new ProjectProbe(["--cwd", dir], config).probe();
 
-    expect(telemetry).toEqual({ credential: "project", has_env_file: false });
+    expect(telemetry).toEqual({
+      credential: "project",
+      has_env_file: false,
+      project_hash: projectHash.value("proj_staging"),
+    });
   });
 });
 
