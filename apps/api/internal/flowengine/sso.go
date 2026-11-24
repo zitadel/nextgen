@@ -33,16 +33,16 @@ var errSSOClaimRejected = errors.New("flow state machine: the user schema reject
 //
 // The outcome is raised with an empty action, so an unwired transition
 // degrades to the step-error re-render, as a handler diversion does.
-func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *domain.FlowDefinition, state *FlowState) (FlowStepResult, bool, error) {
+func (r *Runtime) resolveSSOIdentity(ctx context.Context, def *domain.FlowDefinition, state *State) (StepResult, bool, error) {
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
-		return FlowStepResult{}, false, fmt.Errorf("%w: current step %q missing from definition", domain.ErrFlowIntegrity(), state.CurrentStep)
+		return StepResult{}, false, fmt.Errorf("%w: current step %q missing from definition", domain.ErrFlowIntegrity(), state.CurrentStep)
 	}
 	// A completed flow handed its attempt off; there is nothing to resolve.
 	if currentStep.Complete != nil {
-		return FlowStepResult{}, false, nil
+		return StepResult{}, false, nil
 	}
-	loadInput := FlowSSOLoadInput{
+	loadInput := SSOLoadInput{
 		ProjectID:       state.ProjectID,
 		AttemptID:       state.AuthAttemptID,
 		UserSchemaURL:   state.UserSchemaURL,
@@ -50,24 +50,24 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 	}
 	parked, err := r.ssoIdentities.LoadParked(ctx, loadInput)
 	if err != nil {
-		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
+		return StepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
 	}
 	// An earlier request bound the attempt but its handoff failed, and the
 	// parked row is gone: raise the success outcome again, which mints the
 	// handoff. A state that already carries a user has nothing to retry.
 	if parked != nil && parked.BoundUserID != "" {
 		if state.CollectedData.UserID != "" {
-			return FlowStepResult{}, false, nil
+			return StepResult{}, false, nil
 		}
 		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
 		resolvedFields, err := r.resolveInputs(pc)
 		if err != nil {
-			return FlowStepResult{}, false, err
+			return StepResult{}, false, err
 		}
 		// Checked here as well, so the error render leaves the cookie alone:
 		// the state does not change, and a reload shows the error again.
 		if _, _, ok := ssoRetryRoute(currentStep); !ok {
-			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, nil))
+			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(StepErrorSSOUnavailable, nil))
 			return result, false, err
 		}
 		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID, false)
@@ -78,27 +78,27 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 		// The marker counts only while the attempt still carries that user: a
 		// stale submission may have overwritten the user factor since.
 		if parked.AttemptUserID != parked.CollisionUserID {
-			return FlowStepResult{}, false, domain.ErrFlowRestartRequired()
+			return StepResult{}, false, domain.ErrFlowRestartRequired()
 		}
 		switch state.CollectedData.UserID {
 		case parked.CollisionUserID:
 			// The user alone is no proof that this cookie recorded the
 			// collision: the flow may have identified that user before SSO.
 			if state.SSOResolvedCheckID == parked.CheckID {
-				return FlowStepResult{}, false, nil
+				return StepResult{}, false, nil
 			}
 		case "":
 		default:
-			return FlowStepResult{}, false, domain.ErrFlowRestartRequired()
+			return StepResult{}, false, domain.ErrFlowRestartRequired()
 		}
 		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
 		resolvedFields, err := r.resolveInputs(pc)
 		if err != nil {
-			return FlowStepResult{}, false, err
+			return StepResult{}, false, err
 		}
 		// The bind may have run on another step, or under an older definition.
 		if !userAlreadyExistsRoutes(currentStep) {
-			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, nil))
+			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(StepErrorSSOUnavailable, nil))
 			return result, false, err
 		}
 		state.SSOResolvedCheckID = parked.CheckID
@@ -110,13 +110,13 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 		return result, true, err
 	}
 	if parked == nil {
-		return FlowStepResult{}, false, nil
+		return StepResult{}, false, nil
 	}
 
 	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
 	resolvedFields, err := r.resolveInputs(pc)
 	if err != nil {
-		return FlowStepResult{}, false, err
+		return StepResult{}, false, err
 	}
 	// Recorded before the branch work, so a failed branch is not retried on
 	// every reload, and a row left parked for collection is not resolved twice.
@@ -134,7 +134,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 		// error again; the replay guard in the sealed cookie keeps later
 		// reloads from repeating it. The row expires with the attempt or is
 		// replaced by the next ceremony.
-		result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(FlowStepErrorSSOCreationDisabled, nil))
+		result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(StepErrorSSOCreationDisabled, nil))
 		return result, true, err
 	}
 	if parked.Link == nil {
@@ -143,19 +143,19 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 			return r.resolveStaleSSOBind(pc, resolvedFields, loadInput)
 		}
 		if errors.Is(err, errSSOUnroutable) {
-			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, err))
+			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(StepErrorSSOUnavailable, err))
 			return result, true, err
 		}
 		if errors.Is(err, domain.ErrSSOOwnerOtherSchema) {
-			return FlowStepResult{}, false, domain.ErrFlowRestartRequired().WithParent(err)
+			return StepResult{}, false, domain.ErrFlowRestartRequired().WithParent(err)
 		}
 		if errors.Is(err, errSSOClaimRejected) {
 			// The row stays parked, as under creation disabled.
-			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, err))
+			result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(StepErrorSSOUserCannotBeCreated, err))
 			return result, true, err
 		}
 		if err != nil {
-			return FlowStepResult{}, false, err
+			return StepResult{}, false, err
 		}
 		// Creation bound the attempt, so a concurrent render can win the
 		// handoff first, as after the linked bind. As after create_user, the
@@ -171,10 +171,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 	// a stored definition is validated only on write. Otherwise the step
 	// shows the provider as unavailable, and the row stays parked.
 	if !ssoAuthenticatedRoutes(currentStep) {
-		result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, nil))
+		result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(StepErrorSSOUnavailable, nil))
 		return result, true, err
 	}
-	err = r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
+	err = r.ssoIdentities.BindLinked(ctx, SSOBindInput{
 		ProjectID:    state.ProjectID,
 		AttemptID:    state.AuthAttemptID,
 		CheckID:      parked.CheckID,
@@ -186,7 +186,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 		return r.resolveStaleSSOBind(pc, resolvedFields, loadInput)
 	}
 	if err != nil {
-		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
+		return StepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
 	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID, false)
 }
@@ -197,7 +197,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *d
 // otherwise complete, trusted claims create a linked user
 // (sso_authenticated); anything else is collected (sso_user_not_found), with
 // the row left parked for the prefill.
-func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep, parked *FlowSSOParkedIdentity) (string, error) {
+func (r *Runtime) provisionSSOIdentity(ctx context.Context, state *State, step *domain.FlowDefinitionStep, parked *SSOParkedIdentity) (string, error) {
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
@@ -235,7 +235,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 			return "", fmt.Errorf("flow state machine: sso claim %q: %w", name, err)
 		}
 	}
-	userID, err := r.ssoIdentities.CreateLinked(ctx, FlowSSOCreateInput{
+	userID, err := r.ssoIdentities.CreateLinked(ctx, SSOCreateInput{
 		ProjectID:     state.ProjectID,
 		AttemptID:     state.AuthAttemptID,
 		CheckID:       parked.CheckID,
@@ -268,7 +268,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 // ssoBoundUser is the user the flow already carries: the one its state
 // recorded, or else the one its attempt carries, which a flow started on a
 // signed-in session gets from that session without the state recording it.
-func ssoBoundUser(state *FlowState, parked *FlowSSOParkedIdentity) string {
+func ssoBoundUser(state *State, parked *SSOParkedIdentity) string {
 	if state.CollectedData.UserID != "" {
 		return state.CollectedData.UserID
 	}
@@ -429,7 +429,7 @@ var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route 
 // marker. It returns errSSOUnroutable, before binding, when step cannot route
 // user_already_exists. identifier is the property the schema designates as
 // the identifier, for [recordSSOConflict].
-func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any, identifier string) (bool, error) {
+func (r *Runtime) bindSSOCollision(ctx context.Context, state *State, step *domain.FlowDefinitionStep, parked *SSOParkedIdentity, probeClaims []string, values map[string]any, identifier string) (bool, error) {
 	for _, name := range probeClaims {
 		value, ok := maputil.GetNested[any](values, domain.AttributeKey(name).Nodes())
 		if !ok || value == nil || value == "" {
@@ -456,7 +456,7 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		if !userAlreadyExistsRoutes(step) {
 			return false, errSSOUnroutable
 		}
-		if err := r.ssoIdentities.BindCollision(ctx, FlowSSOBindInput{
+		if err := r.ssoIdentities.BindCollision(ctx, SSOBindInput{
 			ProjectID: state.ProjectID,
 			AttemptID: state.AuthAttemptID,
 			CheckID:   parked.CheckID,
@@ -483,7 +483,7 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 // claim the provider did not verify names nothing unless the visitor submitted
 // that same value on this flow, and a value typed earlier that is not the
 // colliding one is dropped, so the step never names another account.
-func recordSSOConflict(state *FlowState, parked *FlowSSOParkedIdentity, values map[string]any, identifier string) {
+func recordSSOConflict(state *State, parked *SSOParkedIdentity, values map[string]any, identifier string) {
 	state.CollectedData.SSOConflictConnectionID = parked.ConnectionID
 	if identifier == "" {
 		return
@@ -513,7 +513,7 @@ func recordSSOConflict(state *FlowState, parked *FlowSSOParkedIdentity, values m
 // every required property has a claim, and every required unique one arrived
 // verified, so an unverified address cannot claim an account. Claims are
 // top-level, so a required nested object never completes.
-func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity, claims map[string]any, uniqueClaims []string) bool {
+func ssoClaimsComplete(schema *jsonschema.Schema, parked *SSOParkedIdentity, claims map[string]any, uniqueClaims []string) bool {
 	// RequiredPaths reads `required` and `properties` only. Requiredness a
 	// composition or a reference adds, at any depth, is not evaluated, so such
 	// a schema never creates a user unattended: the verified-unique rule must
@@ -546,17 +546,17 @@ func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity,
 // resolveStaleSSOBind handles a bind that found its parked row gone: a
 // concurrent request settled it, or a new ceremony replaced it. One more read
 // tells which.
-func (r *FlowStateMachineRuntime) resolveStaleSSOBind(pc *processCtx, resolvedFields domain.FlowResolvedFields, loadInput FlowSSOLoadInput) (FlowStepResult, bool, error) {
+func (r *Runtime) resolveStaleSSOBind(pc *processCtx, resolvedFields domain.FlowResolvedFields, loadInput SSOLoadInput) (StepResult, bool, error) {
 	reread, err := r.ssoIdentities.LoadParked(pc.ctx, loadInput)
 	if err != nil {
 		// Handed off or expired: restart, so this response cannot reseal a
 		// cookie over the winner's. Any other read failure is returned as is.
-		return FlowStepResult{}, false, fmt.Errorf("flow state machine: reload parked sso identity: %w", err)
+		return StepResult{}, false, fmt.Errorf("flow state machine: reload parked sso identity: %w", err)
 	}
 	if reread == nil || reread.BoundUserID == "" {
 		// Replaced, or settled by a collision whose marker the next render
 		// reconciles: render the step.
-		return FlowStepResult{}, false, nil
+		return StepResult{}, false, nil
 	}
 	return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID, false)
 }
@@ -567,13 +567,13 @@ func (r *FlowStateMachineRuntime) resolveStaleSSOBind(pc *processCtx, resolvedFi
 // the handoff first. irreversible clears the back stack. A retry cannot tell
 // a created user from a linked one, so it passes false; the route can still
 // make it irreversible.
-func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields domain.FlowResolvedFields, userID string, irreversible bool) (FlowStepResult, bool, error) {
+func (r *Runtime) retrySSOHandoff(pc *processCtx, resolvedFields domain.FlowResolvedFields, userID string, irreversible bool) (StepResult, bool, error) {
 	// An earlier bind may have run on another step, or under an older
 	// definition. Checked before the user is recorded: a purpose would drop
 	// that user and move the flow to a fresh attempt.
 	outcome, routeIrreversible, ok := ssoRetryRoute(pc.currentStep)
 	if !ok {
-		result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, nil))
+		result, err := r.renderStepError(pc, resolvedFields, domain.FlowStepFailed(StepErrorSSOUnavailable, nil))
 		return result, true, err
 	}
 	recordResolvedUser(pc.state, userID)
@@ -581,7 +581,7 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 	if errors.Is(err, domain.ErrAuthAttemptAlreadyHandedOff()) {
 		// A concurrent retry won the handoff. A handed-off attempt restarts
 		// the flow on every later render too, so this one does the same.
-		return FlowStepResult{}, false, domain.ErrFlowRestartRequired().WithParent(err)
+		return StepResult{}, false, domain.ErrFlowRestartRequired().WithParent(err)
 	}
 	return result, true, err
 }
@@ -634,22 +634,22 @@ func userAlreadyExistsRoutes(step *domain.FlowDefinitionStep) bool {
 // is still on this step until the resolution after the callback routes it.
 // IssuedAt is refreshed like on every submit, so the flow cookie's
 // window restarts at this submission.
-func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, error) {
+func (r *Runtime) processSSO(pc *processCtx) (StepResult, error) {
 	in := pc.in
 	if in.Action != domain.FlowActionSSO || in.SSOProvider == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: %q with sso provider on step %q", domain.ErrFlowInvalidAction(), in.Action, pc.currentStep.Name)
+		return StepResult{}, fmt.Errorf("%w: %q with sso provider on step %q", domain.ErrFlowInvalidAction(), in.Action, pc.currentStep.Name)
 	}
 	if !slices.Contains(pc.currentStep.SSOProviders, in.SSOProvider.ID) {
-		return FlowStepResult{}, fmt.Errorf("%w: sso provider %q is not offered on step %q", domain.ErrFlowInvalidAction(), in.SSOProvider.ID, pc.currentStep.Name)
+		return StepResult{}, fmt.Errorf("%w: sso provider %q is not offered on step %q", domain.ErrFlowInvalidAction(), in.SSOProvider.ID, pc.currentStep.Name)
 	}
 	if in.SSOReturn == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: sso return params missing", domain.ErrFlowIntegrity())
+		return StepResult{}, fmt.Errorf("%w: sso return params missing", domain.ErrFlowIntegrity())
 	}
 	// Leaving for the provider abandons any pending ceremony; without this
 	// the stale challenge re-attaches on the next render (the mismatch
 	// cleanup in [takeInputs] never runs on this path).
 	pc.state.ClearPendingChallenge()
-	out, err := r.ssoRedirects.Issue(pc.ctx, FlowIssueSSORedirectInput{
+	out, err := r.ssoRedirects.Issue(pc.ctx, IssueSSORedirectInput{
 		ProjectID:     pc.state.ProjectID,
 		AttemptID:     pc.state.AuthAttemptID,
 		ProviderSlug:  in.SSOProvider.ID,
@@ -658,22 +658,22 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 	switch {
 	case errors.Is(err, domain.ErrIDPConnectionNotFound()):
 		// The render dropped the slug, so the client never offered it.
-		return FlowStepResult{}, fmt.Errorf("%w: sso provider %q on step %q has no connection", domain.ErrFlowInvalidAction(), in.SSOProvider.ID, pc.currentStep.Name)
+		return StepResult{}, fmt.Errorf("%w: sso provider %q on step %q has no connection", domain.ErrFlowInvalidAction(), in.SSOProvider.ID, pc.currentStep.Name)
 	case errors.Is(err, domain.ErrFlowSSOUnavailable(nil)):
 		resolved, resolveErr := r.resolveInputs(pc)
 		if resolveErr != nil {
-			return FlowStepResult{}, resolveErr
+			return StepResult{}, resolveErr
 		}
-		return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, err))
+		return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOUnavailable, err))
 	case err != nil:
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	pc.state.IssuedAt = r.now()
-	return FlowStepResult{
+	return StepResult{
 		State: pc.state,
-		Step: &FlowStep{
-			Name:        FlowStepNameSSORedirect,
-			Texts:       FlowStepTexts{TitleKey: flowSSORedirectTitleKey},
+		Step: &Step{
+			Name:        StepNameSSORedirect,
+			Texts:       StepTexts{TitleKey: ssoRedirectTitleKey},
 			Purpose:     pc.state.CurrentPurpose,
 			RedirectURL: &out.RedirectURL,
 		},
@@ -687,26 +687,26 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 // as on the render.
 type createUserWithSSOHandler struct{}
 
-func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error) {
+func (createUserWithSSOHandler) run(r *Runtime, pc *processCtx, resolved domain.FlowResolvedFields) (StepResult, error) {
 	step, state := pc.currentStep, pc.state
 	// The user and the link cannot be undone, so the submitted action must
 	// route before anything is written, and keep the user it creates.
 	transition, ok := step.Transitions[pc.in.Action]
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), pc.in.Action, step.Name)
+		return StepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), pc.in.Action, step.Name)
 	}
 	if transition.Action != nil || transition.Purpose != nil {
-		return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, nil))
+		return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOUnavailable, nil))
 	}
 	if state.SSOResolvedCheckID == "" {
-		return FlowStepResult{}, fmt.Errorf("%w: step %q creates a user from sso, but the flow resolved no sso identity", domain.ErrFlowIntegrity(), step.Name)
+		return StepResult{}, fmt.Errorf("%w: step %q creates a user from sso, but the flow resolved no sso identity", domain.ErrFlowIntegrity(), step.Name)
 	}
 	// The service refuses a bind or a creation on an attempt carrying another
 	// user too; this makes the invariant explicit in the engine.
 	if state.CollectedData.UserID != "" {
-		return FlowStepResult{}, domain.ErrFlowRestartRequired()
+		return StepResult{}, domain.ErrFlowRestartRequired()
 	}
-	loadInput := FlowSSOLoadInput{
+	loadInput := SSOLoadInput{
 		ProjectID:       state.ProjectID,
 		AttemptID:       state.AuthAttemptID,
 		UserSchemaURL:   state.UserSchemaURL,
@@ -714,14 +714,14 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 	}
 	collected, err := r.ssoIdentities.LoadCollected(pc.ctx, loadInput)
 	if err != nil {
-		return FlowStepResult{}, fmt.Errorf("flow state machine: load collected sso identity: %w", err)
+		return StepResult{}, fmt.Errorf("flow state machine: load collected sso identity: %w", err)
 	}
 	if collected == nil {
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
 	}
 	schema, err := r.schemas.Resolve(pc.ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
-		return FlowStepResult{}, fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
+		return StepResult{}, fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
 	}
 	claims := ssoSchemaClaims(schema, collected.Claims)
 	// What the steps collected, this submit's values merged in, and the claims
@@ -742,7 +742,7 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 	// The callback refuses such a claim before the step; the schema may have
 	// changed since.
 	if ssoVerifiedClaimRejected(schema, collected.Verified, claims) {
-		return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, nil))
+		return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOUserCannotBeCreated, nil))
 	}
 	// A shown unique leaf of a verified claim must keep the claimed value. The
 	// step prefills only strings, so any value typed for a number claim is
@@ -763,7 +763,7 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 			continue
 		}
 		if value, ok := maputil.GetNested[any](attributes, path); ok && !reflect.DeepEqual(value, claim) {
-			return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOVerifiedUniqueValueChanged, nil))
+			return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOVerifiedUniqueValueChanged, nil))
 		}
 	}
 	probe, _ := ssoUniqueClaims(schema, attributes)
@@ -790,10 +790,10 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 	walk("", attributes)
 	for path := range domain.NewSchemaReader(schema).RequiredPaths(present) {
 		if _, ok := present[path]; !ok {
-			return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, nil))
+			return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOUserCannotBeCreated, nil))
 		}
 	}
-	userID, err := r.ssoIdentities.CreateLinked(pc.ctx, FlowSSOCreateInput{
+	userID, err := r.ssoIdentities.CreateLinked(pc.ctx, SSOCreateInput{
 		ProjectID:     state.ProjectID,
 		AttemptID:     state.AuthAttemptID,
 		CheckID:       collected.CheckID,
@@ -811,7 +811,7 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 		if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
 			return result, err
 		}
-		return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorUserAlreadyExists, err))
+		return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorUserAlreadyExists, err))
 	case errors.Is(err, domain.ErrSSOStateInvalid()):
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
 	case errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)):
@@ -822,7 +822,7 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 				return r.renderStepError(pc, resolved, domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err))
 			}
 		}
-		return FlowStepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
+		return StepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
 	case domain.IsUserInvalid(err):
 		// RequiredPaths does not see a property that allOf or a reference
 		// requires. The schema library locates it by keyword, as in
@@ -839,19 +839,19 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 				continue
 			}
 			if !slices.ContainsFunc(resolved.Fields, func(f domain.FlowField) bool { return f.Name == string(path) }) {
-				return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, err))
+				return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOUserCannotBeCreated, err))
 			}
 		}
 		// Each field passed on its own, so the values fail only together.
-		return r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOUserInvalid, err))
+		return r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOUserInvalid, err))
 	case err != nil:
-		return FlowStepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
+		return StepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
 	}
 	recordResolvedUser(state, userID)
 	result, err := r.routeOutcome(pc, resolved, pc.in.Action, true)
 	if errors.Is(err, domain.ErrAuthAttemptAlreadyHandedOff()) {
 		// A render that retried the handoff from the bind won it.
-		return FlowStepResult{}, domain.ErrFlowRestartRequired().WithParent(err)
+		return StepResult{}, domain.ErrFlowRestartRequired().WithParent(err)
 	}
 	return result, err
 }
@@ -859,34 +859,34 @@ func (createUserWithSSOHandler) run(r *FlowStateMachineRuntime, pc *processCtx, 
 // ssoCollectionBindResult turns the collision probe on the collection step
 // into a result. handled is false when no user holds a probed value, and the
 // caller goes on.
-func (r *FlowStateMachineRuntime) ssoCollectionBindResult(pc *processCtx, resolved domain.FlowResolvedFields, loadInput FlowSSOLoadInput, bound bool, err error) (FlowStepResult, bool, error) {
+func (r *Runtime) ssoCollectionBindResult(pc *processCtx, resolved domain.FlowResolvedFields, loadInput SSOLoadInput, bound bool, err error) (StepResult, bool, error) {
 	switch {
 	case errors.Is(err, domain.ErrSSOStateInvalid()):
 		result, err := r.resolveStaleSSOSubmit(pc, resolved, loadInput)
 		return result, true, err
 	case errors.Is(err, errSSOUnroutable):
-		result, err := r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorSSOUnavailable, err))
+		result, err := r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorSSOUnavailable, err))
 		return result, true, err
 	case errors.Is(err, domain.ErrSSOOwnerOtherSchema):
 		// The user typed the value and can change it, so it shows taken, as
 		// for any other taken value. Only the log names the other schema.
-		result, err := r.renderStepError(pc, resolved, domain.FlowStepFailed(FlowStepErrorUserAlreadyExists, err))
+		result, err := r.renderStepError(pc, resolved, domain.FlowStepFailed(StepErrorUserAlreadyExists, err))
 		return result, true, err
 	case err != nil:
-		return FlowStepResult{}, true, err
+		return StepResult{}, true, err
 	case bound:
 		// The bind replaced the row this step creates from, so back to it
 		// could not create a user.
 		result, err := r.routeOutcome(pc, resolved, domain.FlowImplicitOutcomeUserAlreadyExists, true)
 		return result, true, err
 	}
-	return FlowStepResult{}, false, nil
+	return StepResult{}, false, nil
 }
 
 // resolveStaleSSOSubmit handles a collection submit whose row is gone or was
 // claimed: a bound user signs in through the retry, and anything else shows
 // the step again with the typed values.
-func (r *FlowStateMachineRuntime) resolveStaleSSOSubmit(pc *processCtx, resolved domain.FlowResolvedFields, loadInput FlowSSOLoadInput) (FlowStepResult, error) {
+func (r *Runtime) resolveStaleSSOSubmit(pc *processCtx, resolved domain.FlowResolvedFields, loadInput SSOLoadInput) (StepResult, error) {
 	result, _, err := r.resolveStaleSSOBind(pc, resolved, loadInput)
 	if err != nil || result.Step != nil {
 		return result, err
@@ -896,7 +896,7 @@ func (r *FlowStateMachineRuntime) resolveStaleSSOSubmit(pc *processCtx, resolved
 
 // resolveSSOProviders renders the step's connection slugs through the
 // resolver.
-func (r *FlowStateMachineRuntime) resolveSSOProviders(ctx context.Context, state *FlowState, step *domain.FlowDefinitionStep) ([]domain.FlowSSOProvider, error) {
+func (r *Runtime) resolveSSOProviders(ctx context.Context, state *State, step *domain.FlowDefinitionStep) ([]domain.FlowSSOProvider, error) {
 	if len(step.SSOProviders) == 0 {
 		return nil, nil
 	}

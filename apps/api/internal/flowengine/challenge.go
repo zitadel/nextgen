@@ -28,22 +28,22 @@ type challengeMethod struct {
 	irreversible bool
 	// params builds what the challenge is issued with from the fields the
 	// ceremony reads.
-	params func(pc *processCtx, fields domain.FlowResolvedFields) (FlowChallengeParams, error)
+	params func(pc *processCtx, fields domain.FlowResolvedFields) (ChallengeParams, error)
 }
 
-// challengeMethods holds one declaration per [FlowPendingChallenge]
+// challengeMethods holds one declaration per [PendingChallenge]
 // method.
 var challengeMethods = map[string]challengeMethod{
-	FlowChallengeMethodPasskey: {
+	ChallengeMethodPasskey: {
 		check:        domain.AuthCheckTypePasskey,
 		label:        "passkey",
-		invalidError: FlowStepErrorPasskeyInvalid,
+		invalidError: StepErrorPasskeyInvalid,
 		params:       passkeyChallengeParams,
 	},
-	FlowChallengeMethodPasskeyRegister: {
+	ChallengeMethodPasskeyRegister: {
 		check:            domain.AuthCheckTypePasskeyRegistration,
 		label:            "passkey registration",
-		invalidError:     FlowStepErrorPasskeyRegistrationInvalid,
+		invalidError:     StepErrorPasskeyRegistrationInvalid,
 		bindsUserAtIssue: true,
 		createsUser:      true,
 		irreversible:     true,
@@ -57,25 +57,25 @@ func challengeMethodFor(method string) challengeMethod {
 	if declared, ok := challengeMethods[method]; ok {
 		return declared
 	}
-	return challengeMethods[FlowChallengeMethodPasskey]
+	return challengeMethods[ChallengeMethodPasskey]
 }
 
 // issueChallenge mints a challenge of method and renders the step carrying
 // it. fields are what the ceremony reads, resolved the step's.
-func (r *FlowStateMachineRuntime) issueChallenge(pc *processCtx, method string, resolved, fields domain.FlowResolvedFields) (FlowStepResult, error) {
+func (r *Runtime) issueChallenge(pc *processCtx, method string, resolved, fields domain.FlowResolvedFields) (StepResult, error) {
 	state := pc.state
 	declared := challengeMethods[method]
 	params, err := declared.params(pc, fields)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
-	out, err := r.authAttempts.IssueChallenge(pc.ctx, FlowIssueChallengeInput{
+	out, err := r.authAttempts.IssueChallenge(pc.ctx, IssueChallengeInput{
 		ProjectID: state.ProjectID,
 		AttemptID: state.AuthAttemptID,
 		Params:    params,
 	})
 	if err != nil {
-		return FlowStepResult{}, fmt.Errorf("flow state machine: issue %s: %w", declared.label, err)
+		return StepResult{}, fmt.Errorf("flow state machine: issue %s: %w", declared.label, err)
 	}
 	// Checked before the browser prompts, so a taken value leaves no passkey
 	// in the password manager that the verify step would refuse. Only a
@@ -84,7 +84,7 @@ func (r *FlowStateMachineRuntime) issueChallenge(pc *processCtx, method string, 
 	if declared.createsUser && out.Provisional {
 		taken, err := r.resolveTakenUniqueValue(pc, fields)
 		if err != nil {
-			return FlowStepResult{}, err
+			return StepResult{}, err
 		}
 		if taken {
 			return r.routeOutcome(pc, resolved, domain.FlowImplicitOutcomeUserAlreadyExists, false)
@@ -95,7 +95,7 @@ func (r *FlowStateMachineRuntime) issueChallenge(pc *processCtx, method string, 
 		// stays stable and the verify leg knows which user it targets.
 		state.CollectedData.UserID = out.UserID
 	}
-	state.PendingChallenge = &FlowPendingChallenge{
+	state.PendingChallenge = &PendingChallenge{
 		ID:       out.ChallengeID,
 		Method:   method,
 		Options:  out.Options,
@@ -108,7 +108,7 @@ func (r *FlowStateMachineRuntime) issueChallenge(pc *processCtx, method string, 
 // pending ceremony's method, and routes the submitted action. The pending
 // ceremony may be missing if the cookie was lost mid-ceremony; the DB
 // rejects unknown challenge ids. fields are what the ceremony reads.
-func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fields domain.FlowResolvedFields) (FlowStepResult, error) {
+func (r *Runtime) verifyChallenge(pc *processCtx, resolved, fields domain.FlowResolvedFields) (StepResult, error) {
 	ctx, state, in := pc.ctx, pc.state, pc.in
 	// The server-issued id is authoritative; never trust a client-supplied
 	// one to rebind the proof to a different challenge.
@@ -120,7 +120,7 @@ func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fiel
 	}
 	declared := challengeMethodFor(method)
 
-	verifyInput := FlowVerifyChallengeInput{
+	verifyInput := VerifyChallengeInput{
 		ProjectID:   state.ProjectID,
 		AttemptID:   state.AuthAttemptID,
 		Check:       declared.check,
@@ -131,7 +131,7 @@ func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fiel
 		// The attempt service decides from the stored challenge whether the
 		// ceremony is provisional; a provisional one spends the sign-up
 		// proof and creates the user in the verify transaction.
-		verifyInput.SignUp = &FlowChallengeSignUp{
+		verifyInput.SignUp = &ChallengeSignUp{
 			UserSchemaURL:  state.UserSchemaURL,
 			UserAttributes: state.CollectedData.UserData,
 			State:          state,
@@ -151,7 +151,7 @@ func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fiel
 		return r.routeCreatedUserConflict(pc, resolved, fields)
 	}
 	if err != nil {
-		return FlowStepResult{}, fmt.Errorf("flow state machine: submit %s: %w", declared.label, err)
+		return StepResult{}, fmt.Errorf("flow state machine: submit %s: %w", declared.label, err)
 	}
 	if declared.bindsUserAtIssue {
 		userID = state.CollectedData.UserID
@@ -168,11 +168,11 @@ func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fiel
 // is re-resolved here to land in the same state. Trying every collected
 // uniquely-keyed field finds the owner even when the race was lost on an
 // undesignated unique attribute (e.g. a fresh email but a taken phone).
-func (r *FlowStateMachineRuntime) routeCreatedUserConflict(pc *processCtx, resolved, fields domain.FlowResolvedFields) (FlowStepResult, error) {
+func (r *Runtime) routeCreatedUserConflict(pc *processCtx, resolved, fields domain.FlowResolvedFields) (StepResult, error) {
 	clearUserBoundState(pc.state)
 	// No owner found routes anyway and the next step re-collects.
 	if _, err := r.resolveTakenUniqueValue(pc, fields); err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	return r.routeOutcome(pc, resolved, domain.FlowImplicitOutcomeUserAlreadyExists, false)
 }
@@ -180,7 +180,7 @@ func (r *FlowStateMachineRuntime) routeCreatedUserConflict(pc *processCtx, resol
 // resolveTakenUniqueValue looks up the owner of each collected unique value
 // and pins the first one found on the attempt and the state. It reports
 // whether a value is taken, which holds even when no owner can be pinned.
-func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, fields domain.FlowResolvedFields) (bool, error) {
+func (r *Runtime) resolveTakenUniqueValue(pc *processCtx, fields domain.FlowResolvedFields) (bool, error) {
 	state := pc.state
 	candidates := uniqueFieldValues(state.CollectedData.UserData, fields)
 	if visited, err := r.resolveVisitedFields(pc); err == nil {
@@ -206,7 +206,7 @@ func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, fields
 		}
 		// Only a sign-up looks here, so a miss is not a failed sign-in:
 		// Register keeps it from writing one.
-		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
+		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, SubmitIdentifierInput{
 			ProjectID:     state.ProjectID,
 			AttemptID:     state.AuthAttemptID,
 			AttributeName: candidate[0],
@@ -230,23 +230,23 @@ func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, fields
 
 // renderPendingChallenge renders the step carrying the pending ceremony: one
 // just issued, or one a submission of the same kind resumes without a proof.
-func (r *FlowStateMachineRuntime) renderPendingChallenge(pc *processCtx, resolved domain.FlowResolvedFields) (FlowStepResult, error) {
+func (r *Runtime) renderPendingChallenge(pc *processCtx, resolved domain.FlowResolvedFields) (StepResult, error) {
 	rendered, err := r.buildStep(pc.ctx, pc.state, pc.currentStep, resolved, nil, nil, nil)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	attachPendingChallenge(rendered, pc.state.PendingChallenge)
 	pc.state.IssuedAt = r.now()
-	return FlowStepResult{State: pc.state, Step: rendered}, nil
+	return StepResult{State: pc.state, Step: rendered}, nil
 }
 
 // attachPendingChallenge surfaces a pending ceremony on a rendered step so the
 // client can run it (and re-run it on a plain GET re-render).
-func attachPendingChallenge(step *FlowStep, pc *FlowPendingChallenge) {
+func attachPendingChallenge(step *Step, pc *PendingChallenge) {
 	if step == nil || pc == nil {
 		return
 	}
-	step.Challenge = &FlowStepChallenge{
+	step.Challenge = &StepChallenge{
 		Method:      pc.Method,
 		ChallengeID: pc.ID,
 		Options:     pc.Options,

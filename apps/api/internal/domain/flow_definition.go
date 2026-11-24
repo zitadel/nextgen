@@ -108,7 +108,7 @@ const (
 )
 
 // FlowActionSSO is the action the client submits with
-// [FlowSubmitInput.SSOProvider] to start an external sign-in. It is not
+// [flowengine.SubmitInput.SSOProvider] to start an external sign-in. It is not
 // declared on the step: offering sso_providers is what enables it.
 const FlowActionSSO = "sso"
 

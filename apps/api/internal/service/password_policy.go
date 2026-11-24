@@ -81,9 +81,9 @@ func NewPasswordPolicy(engine *policy.Engine, resolver PolicyResolver, verifier 
 
 var _ PasswordGate = (*PasswordPolicy)(nil)
 
-var _ flowengine.FlowPasswordPolicy = (*PasswordPolicy)(nil)
+var _ flowengine.PasswordPolicy = (*PasswordPolicy)(nil)
 
-// PasswordLengthBounds implements [flowengine.FlowPasswordPolicy]: the length
+// PasswordLengthBounds implements [flowengine.PasswordPolicy]: the length
 // bounds of the project's policy, which a flow step that asks for a new
 // password shows and checks before the gate does. Without a policy, or for a
 // bound it leaves unset, the minimum is 0 and the maximum is the domain cap.

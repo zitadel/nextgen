@@ -38,15 +38,15 @@ func NewFlowCreateUserHandler(
 	}
 }
 
-var _ flowengine.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
+var _ flowengine.OnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
 
-func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in flowengine.FlowOnSuccessInput) (flowengine.FlowOnSuccessResult, error) {
+func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in flowengine.OnSuccessInput) (flowengine.OnSuccessResult, error) {
 	if in.State == nil || in.ProjectID == "" || in.State.ProjectID != in.ProjectID {
-		return flowengine.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
+		return flowengine.OnSuccessResult{}, domain.ErrFlowIntegrity()
 	}
 	password := in.State.CollectedData.AuthMethods[domain.AuthMethodPassword]
 	if password == "" {
-		return flowengine.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
+		return flowengine.OnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
 	// Signup has no password history. Check its cheap policy before spending
@@ -54,23 +54,23 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in flowe
 	if _, err := h.passwords.CheckPassword(ctx, SetPasswordInput{ProjectID: in.ProjectID, Password: password}); err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
 			if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
-				return flowengine.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
+				return flowengine.OnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
 			}
 		}
-		return flowengine.FlowOnSuccessResult{}, err
+		return flowengine.OnSuccessResult{}, err
 	}
 
 	// Spend once, before password hashing or any user mutation. A failed
 	// signup still costs the proof; the next GET issues a new challenge.
 	if h.protection == nil {
-		return flowengine.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
+		return flowengine.OnSuccessResult{}, domain.ErrFlowIntegrity()
 	}
 	if err := h.protection.Consume(ctx, in.State, in.GateProofs[domain.SignupGate]); err != nil {
-		return flowengine.FlowOnSuccessResult{}, err
+		return flowengine.OnSuccessResult{}, err
 	}
 	userID, err := h.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
-		return flowengine.FlowOnSuccessResult{}, fmt.Errorf("create_user: mint user id: %w", err)
+		return flowengine.OnSuccessResult{}, fmt.Errorf("create_user: mint user id: %w", err)
 	}
 
 	createUserAction := NewCreateUserAction(
@@ -106,21 +106,21 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in flowe
 	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction, recordFactorsAction)
 	if err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
-			return flowengine.FlowOnSuccessResult{StepError: domain.FlowStepFailed(flowengine.FlowStepErrorUserAlreadyExists, err)}, nil
+			return flowengine.OnSuccessResult{StepError: domain.FlowStepFailed(flowengine.StepErrorUserAlreadyExists, err)}, nil
 		}
 		// A password the policy rejects stays on the step, next to the field,
 		// so the user can pick another one instead of seeing a failed request.
 		if errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
 			if derr, ok := errors.AsType[domain.Error](err); ok {
 				if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
-					return flowengine.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
+					return flowengine.OnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
 				}
 			}
 		}
-		return flowengine.FlowOnSuccessResult{}, err
+		return flowengine.OnSuccessResult{}, err
 	}
 
-	return flowengine.FlowOnSuccessResult{
+	return flowengine.OnSuccessResult{
 		UserID:       userID,
 		Irreversible: true,
 	}, nil

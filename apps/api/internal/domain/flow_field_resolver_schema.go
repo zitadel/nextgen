@@ -10,7 +10,7 @@ import (
 )
 
 // SchemaResolver loads a compiled JSON schema by URL. It is the
-// loader [FlowStateMachineRuntime] depends on for runtime schema
+// loader [flowengine.Runtime] depends on for runtime schema
 // access; [SchemaFieldResolver] is the translator that runs on top of
 // the loaded schema.
 type SchemaResolver interface {
@@ -161,7 +161,7 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		// No length rule here: whether the user chooses the password depends
 		// on the purpose on the flow state, which the step's fields are
 		// resolved against at render and at submit alike (see
-		// FlowStateMachineRuntime.applyPasswordPolicy).
+		// flowengine.Runtime.applyPasswordPolicy).
 	}, nil
 }
 

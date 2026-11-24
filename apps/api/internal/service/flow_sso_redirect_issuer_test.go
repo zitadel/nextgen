@@ -58,7 +58,7 @@ const ssoDiscoveryDocument = `{
 	"oidc": {"issuer": "https://accounts.example.test", "client_id": "client-1", "client_secret": "s", "scopes": ["openid"]}
 }`
 
-var ssoIssueInput = flowengine.FlowIssueSSORedirectInput{
+var ssoIssueInput = flowengine.IssueSSORedirectInput{
 	ProjectID:    "proj-1",
 	AttemptID:    "attempt-1",
 	ProviderSlug: "google",

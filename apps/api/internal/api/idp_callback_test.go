@@ -323,7 +323,7 @@ func TestIDPCallbackHandler_LogsTheFailureBeforeRefusingTheTarget(t *testing.T) 
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
 	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{
 		ReturnTarget: "https://app.example.com//evil.example/login",
-		Failure:      domain.FlowStepFailed(flowengine.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+		Failure:      domain.FlowStepFailed(flowengine.StepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
 		ProjectID:    "proj-1",
 		Slug:         "google",
 	}}
@@ -338,7 +338,7 @@ func TestIDPCallbackHandler_LogsTheFailureBeforeRefusingTheTarget(t *testing.T) 
 	require.NoError(t, json.Unmarshal(lines[0], &failure))
 	require.NoError(t, json.Unmarshal(lines[1], &refusal))
 	assert.Equal(t, "WARN", failure["level"])
-	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, failure["step_error"])
+	assert.Equal(t, flowengine.StepErrorSSOFailed, failure["step_error"])
 	assert.Equal(t, "google", failure["slug"])
 	assert.Contains(t, fmt.Sprint(failure["error"]), "server_error")
 	assert.Equal(t, "ERROR", refusal["level"])
@@ -353,7 +353,7 @@ func TestIDPCallbackHandler_LogsTheFailureWhenStoringItFailed(t *testing.T) {
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
 	stub := &stubSSOCallback{
 		out: service.FlowSSOCallbackOutput{
-			Failure:   domain.FlowStepFailed(flowengine.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+			Failure:   domain.FlowStepFailed(flowengine.StepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
 			ProjectID: "proj-1",
 			Slug:      "google",
 		},

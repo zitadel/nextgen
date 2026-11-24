@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/idp"
 )
 
-// FlowSSORedirectIssuer implements [flowengine.FlowSSORedirectIssuer] over the
+// FlowSSORedirectIssuer implements [flowengine.SSORedirectIssuer] over the
 // connection service, the IdP engine and the auth-attempt service. The
 // client is built before the state record is issued, so a provider that
 // cannot be reached leaves no record behind.
@@ -30,34 +30,34 @@ func NewFlowSSORedirectIssuer(connections IDPConnectionService, attempts AuthAtt
 	return &FlowSSORedirectIssuer{connections: connections, attempts: attempts, keys: keys, variables: variables, httpClient: httpClient}
 }
 
-var _ flowengine.FlowSSORedirectIssuer = (*FlowSSORedirectIssuer)(nil)
+var _ flowengine.SSORedirectIssuer = (*FlowSSORedirectIssuer)(nil)
 
-func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in flowengine.FlowIssueSSORedirectInput) (flowengine.FlowSSORedirectOutput, error) {
+func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in flowengine.IssueSSORedirectInput) (flowengine.SSORedirectOutput, error) {
 	connection, err := pinnedIDPConnection(ctx, i.connections, in.ProjectID, in.ProviderSlug)
 	if err != nil {
-		return flowengine.FlowSSORedirectOutput{}, err
+		return flowengine.SSORedirectOutput{}, err
 	}
 	// The engine's rejections stay out of err: the error analysis unions
 	// every assignment to a variable, so a later `return err` would put the
 	// engine's codes on the submit endpoint, where unavailable hides them.
 	conn, parseErr := idp.ParseConnection(connection.RevisionID, connection.Document)
 	if parseErr != nil {
-		return flowengine.FlowSSORedirectOutput{}, i.unavailable(parseErr)
+		return flowengine.SSORedirectOutput{}, i.unavailable(parseErr)
 	}
 	// The client secret is not read here: the authorize request does not
 	// use it.
 	if resolveErr := resolveSSOClientID(ctx, i.variables, in.ProjectID, sealedDeploymentID(ctx), &conn); resolveErr != nil {
-		return flowengine.FlowSSORedirectOutput{}, i.unavailable(resolveErr)
+		return flowengine.SSORedirectOutput{}, i.unavailable(resolveErr)
 	}
 	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
 	if clientErr != nil {
-		return flowengine.FlowSSORedirectOutput{}, i.unavailable(clientErr)
+		return flowengine.SSORedirectOutput{}, i.unavailable(clientErr)
 	}
 	var encrypter crypto.Encrypter
 	if conn.OIDC.PKCEEnabled {
 		crypter, err := i.keys.GetProjectCrypter(ctx, in.ProjectID, domain.EncryptionKeyPurposeSecret)
 		if err != nil {
-			return flowengine.FlowSSORedirectOutput{}, err
+			return flowengine.SSORedirectOutput{}, err
 		}
 		encrypter = crypter
 	}
@@ -71,7 +71,7 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in flowengine.FlowIss
 		PKCEEncrypter:        encrypter,
 	})
 	if err != nil {
-		return flowengine.FlowSSORedirectOutput{}, err
+		return flowengine.SSORedirectOutput{}, err
 	}
 	redirect, err := idp.NewAuthorizeRedirect(client, idp.AuthorizeRequest{
 		State:        state.State,
@@ -79,9 +79,9 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in flowengine.FlowIss
 		PKCEVerifier: state.PKCEVerifier,
 	})
 	if err != nil {
-		return flowengine.FlowSSORedirectOutput{}, err
+		return flowengine.SSORedirectOutput{}, err
 	}
-	return flowengine.FlowSSORedirectOutput{RedirectURL: redirect.URL, BindingNonce: state.BindingNonce}, nil
+	return flowengine.SSORedirectOutput{RedirectURL: redirect.URL, BindingNonce: state.BindingNonce}, nil
 }
 
 // resolveSSOClientID fills a `${{ NAME }}` client_id on conn. A literal

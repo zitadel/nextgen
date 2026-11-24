@@ -22,8 +22,8 @@ import (
 // factor. It is the guard, and the project's user.create policy chooses its
 // challenge.
 type SignupProtection interface {
-	Challenge(context.Context, *flowengine.FlowState) (*pow.PublicChallenge, error)
-	Consume(context.Context, *flowengine.FlowState, string) error
+	Challenge(context.Context, *flowengine.State) (*pow.PublicChallenge, error)
+	Consume(context.Context, *flowengine.State, string) error
 }
 
 const (
@@ -78,7 +78,7 @@ type signupPayload struct {
 	SolutionKey [32]byte
 }
 
-func signupBinding(state *flowengine.FlowState, id string, expires int64) pow.Binding {
+func signupBinding(state *flowengine.State, id string, expires int64) pow.Binding {
 	return pow.Binding{ProfileID: pow.DefaultProfile().ID(), ProjectID: state.ProjectID,
 		Operation: "create_user", OperationInstanceID: state.ID, ChallengeID: id, ExpiresAt: expires}
 }
@@ -87,7 +87,7 @@ func signupBinding(state *flowengine.FlowState, id string, expires int64) pow.Bi
 // insert leaves an existing row alone and takes no lock on it, so a sweep can
 // delete an hour-old row before the lock reads it; the row is then started
 // again, in this transaction, where no sweep sees it.
-func lockSignupLimits(ctx context.Context, st AllStatements, state *flowengine.FlowState) (*domain.SignupLimits, error) {
+func lockSignupLimits(ctx context.Context, st AllStatements, state *flowengine.State) (*domain.SignupLimits, error) {
 	for range 2 {
 		if err := st.InsertSignupLimits(ctx, &domain.SignupLimits{ProjectID: state.ProjectID, FlowID: state.ID}); err != nil {
 			return nil, err
@@ -102,7 +102,7 @@ func lockSignupLimits(ctx context.Context, st AllStatements, state *flowengine.F
 
 // Limits belong to the server-issued flow, never to the entire project. New
 // flows still need ingress rate limits; forwarded IP headers are not trusted.
-func (s *signupProtection) charge(ctx context.Context, state *flowengine.FlowState, issue bool) error {
+func (s *signupProtection) charge(ctx context.Context, state *flowengine.State, issue bool) error {
 	return s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		st := tx.Statements()
 		limits, err := lockSignupLimits(ctx, st, state)
@@ -158,7 +158,7 @@ func (s *signupProtection) open(ctx context.Context, record *domain.SignupChalle
 	return &payload, nil
 }
 
-func (s *signupProtection) Challenge(ctx context.Context, state *flowengine.FlowState) (*pow.PublicChallenge, error) {
+func (s *signupProtection) Challenge(ctx context.Context, state *flowengine.State) (*pow.PublicChallenge, error) {
 	if state == nil || state.ID == "" || state.ProjectID == "" {
 		return nil, domain.ErrFlowIntegrity()
 	}
@@ -249,7 +249,7 @@ func (s *signupProtection) Challenge(ctx context.Context, state *flowengine.Flow
 	return signupPublic(record)
 }
 
-func (s *signupProtection) Consume(ctx context.Context, state *flowengine.FlowState, proof string) error {
+func (s *signupProtection) Consume(ctx context.Context, state *flowengine.State, proof string) error {
 	if state == nil || state.ID == "" || state.ProjectID == "" {
 		return domain.ErrFlowProofInvalid()
 	}

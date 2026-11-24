@@ -10,7 +10,7 @@ It does not own:
 - flow definitions and their validation, which live in `domain`;
 - persistence, policy and side effects, which it calls through the ports it
   declares (`port_<subject>.go`) and `service` implements;
-- keeping flow state: it takes and returns the `FlowState` it declares
+- keeping flow state: it takes and returns the `State` it declares
   (`state.go`), which lives in the browser cookie, sealed by the API layer.
 
 `flowengine` imports `domain`; `domain` never imports `flowengine`. Mocks of

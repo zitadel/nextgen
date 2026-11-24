@@ -31,7 +31,7 @@ to be a fast answer to "can I build flow X right now?"
 ### Definitions
 
 - `FlowDefinitionStatements` over Postgres, Spanner, and SQLite (the storage layer).
-- Per-definition `user_schema` URL, captured into `FlowState` at `Start`.
+- Per-definition `user_schema` URL, captured into `flowengine.State` at `Start`.
 
 ### Steps & state machine
 
@@ -43,7 +43,7 @@ to be a fast answer to "can I build flow X right now?"
 - Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` (login flows) or `user_already_exists` (register flows) when wired, errors otherwise. The engine flips `CurrentPurpose` on the matching outcome to switch sub-flows. On an unwired `user_already_exists` the engine also drops the found user and starts a new auth attempt. The collected password stays, since it belongs to the account being created.
 - Implicit password verification when a password-shaped field is present and `on_success` is not `create_user`.
 - Step error path: validation failures and password rejection re-render the current step with `Error` set; the state machine does **not** advance.
-- Terminal-step handoff: when a user has been resolved, calls `auth-attempt.Handoff` and returns the token + expiry on `FlowStepResult`.
+- Terminal-step handoff: when a user has been resolved, calls `auth-attempt.Handoff` and returns the token + expiry on `flowengine.StepResult`.
 - Field pre-fill: `CollectedData` is propagated into resolved fields before every step render so re-renders carry the user's previous input.
 
 ### SSO redirect
@@ -72,7 +72,7 @@ to be a fast answer to "can I build flow X right now?"
 
 These contracts exist on the wire and in the state machine but reject at runtime:
 
-- **Cross-flow transitions.** `transitions.target` with `action: "pivot"` or `action: "switch"` is rejected. `PivotStack` is defined on `FlowState` but never pushed.
+- **Cross-flow transitions.** `transitions.target` with `action: "pivot"` or `action: "switch"` is rejected. `PivotStack` is defined on `flowengine.State` but never pushed.
 - **Gate proofs.** Submitting a `gate_proofs` map is rejected.
 
 `ErrFlowUnsupported` maps to HTTP 400 with `code: "flow.unsupported"`.
@@ -114,7 +114,7 @@ Not implemented at any layer:
 
 - Branding / template selection beyond `defaultBranding()` — the handler always returns the built-in default.
 - Session integration: the engine mints `sess_*` ids but does not yet read or write durable session rows.
-- `auth_request_id` and `redirect_uri` are stored on `FlowState` but the OIDC handshake that consumes them is out of scope.
+- `auth_request_id` and `redirect_uri` are stored on `flowengine.State` but the OIDC handshake that consumes them is out of scope.
 - `redirect_uri` allowlist validation at `Start` — accepted as-supplied today.
 
 ## What you can build today

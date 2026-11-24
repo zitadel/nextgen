@@ -8,7 +8,7 @@ import (
 // without taking the step's inputs.
 type navigateHandler struct{}
 
-func (navigateHandler) process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error) {
+func (navigateHandler) process(r *Runtime, pc *processCtx) (StepResult, error) {
 	// Navigating abandons any pending ceremony; without this the stale
 	// challenge re-attaches on the next render.
 	pc.state.ClearPendingChallenge()

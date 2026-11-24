@@ -9,9 +9,9 @@ import (
 
 type stubSignupProtection struct{ err error }
 
-func (s stubSignupProtection) Challenge(context.Context, *flowengine.FlowState) (*pow.PublicChallenge, error) {
+func (s stubSignupProtection) Challenge(context.Context, *flowengine.State) (*pow.PublicChallenge, error) {
 	return nil, s.err
 }
-func (s stubSignupProtection) Consume(context.Context, *flowengine.FlowState, string) error {
+func (s stubSignupProtection) Consume(context.Context, *flowengine.State, string) error {
 	return s.err
 }

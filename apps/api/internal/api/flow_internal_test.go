@@ -142,7 +142,7 @@ func TestToFlowField_ReadOnly(t *testing.T) {
 func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
 	t.Parallel()
 
-	got := toFlowStep(&flowengine.FlowStep{
+	got := toFlowStep(&flowengine.Step{
 		Name: "identifier",
 		SSOProviders: []domain.FlowSSOProvider{
 			{ID: "google", Name: "Google", Template: "google"},
@@ -159,7 +159,7 @@ func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
 func TestToFlowStep_NoSSOProvidersLeavesListEmpty(t *testing.T) {
 	t.Parallel()
 
-	got := toFlowStep(&flowengine.FlowStep{Name: "identifier"})
+	got := toFlowStep(&flowengine.Step{Name: "identifier"})
 
 	require.Empty(t, got.SSOProviders)
 }
@@ -167,9 +167,9 @@ func TestToFlowStep_NoSSOProvidersLeavesListEmpty(t *testing.T) {
 func TestToFlowStep_CarriesThePairedIdentifier(t *testing.T) {
 	t.Parallel()
 
-	got := toFlowStep(&flowengine.FlowStep{
+	got := toFlowStep(&flowengine.Step{
 		Name: "password",
-		Identifier: &flowengine.FlowStepIdentifier{
+		Identifier: &flowengine.StepIdentifier{
 			Value:        "alice@example.com",
 			Autocomplete: domain.AutocompleteUsername,
 		},
@@ -183,7 +183,7 @@ func TestToFlowStep_CarriesThePairedIdentifier(t *testing.T) {
 func TestToFlowStep_OmitsThePairedIdentifierWhenAbsent(t *testing.T) {
 	t.Parallel()
 
-	got := toFlowStep(&flowengine.FlowStep{Name: "identifier"})
+	got := toFlowStep(&flowengine.Step{Name: "identifier"})
 
 	require.False(t, got.Identifier.Set)
 }
@@ -191,21 +191,21 @@ func TestToFlowStep_OmitsThePairedIdentifierWhenAbsent(t *testing.T) {
 func TestToFlowStep_CarriesPurposeAndNotice(t *testing.T) {
 	t.Parallel()
 
-	notice := flowengine.FlowStepNoticeUserNotFound
-	got := toFlowStep(&flowengine.FlowStep{
+	notice := flowengine.StepNoticeUserNotFound
+	got := toFlowStep(&flowengine.Step{
 		Name:    "register",
 		Purpose: domain.FlowDefinitionPurposeRegister,
 		Notice:  &notice,
 	})
 
 	require.Equal(t, apigen.NewOptFlowStepPurpose(apigen.FlowStepPurposeRegister), got.Purpose)
-	require.Equal(t, apigen.NewOptNilString(flowengine.FlowStepNoticeUserNotFound), got.Notice)
+	require.Equal(t, apigen.NewOptNilString(flowengine.StepNoticeUserNotFound), got.Notice)
 }
 
 func TestToFlowStep_OmitsTheNoticeWhenAbsent(t *testing.T) {
 	t.Parallel()
 
-	got := toFlowStep(&flowengine.FlowStep{Name: "identifier"})
+	got := toFlowStep(&flowengine.Step{Name: "identifier"})
 
 	require.Equal(t, apigen.NewOptFlowStepPurpose(apigen.FlowStepPurposeLogin), got.Purpose)
 	require.False(t, got.Notice.Set)
@@ -217,7 +217,7 @@ func TestToFlowStep_EveryPurposeIsAWirePurpose(t *testing.T) {
 	t.Parallel()
 
 	for _, purpose := range domain.FlowDefinitionPurposeValues() {
-		got := toFlowStep(&flowengine.FlowStep{Name: "step", Purpose: purpose})
+		got := toFlowStep(&flowengine.Step{Name: "step", Purpose: purpose})
 		require.NoError(t, got.Purpose.Value.Validate(), purpose.String())
 	}
 }
