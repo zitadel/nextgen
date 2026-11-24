@@ -4,7 +4,7 @@ import { describe, expect, onTestFinished } from "vitest";
 import { it } from "@tests/fixtures";
 import { log } from "@/lib/ui";
 import { GUIDE, MARK } from "@/lib/ui/marks";
-import { Narration } from "@/lib/ui/narration";
+import { LogPrinter } from "@/lib/ui/log-printer";
 
 /** A chain that collects what was narrated into it, as `mark text`. */
 class Collected {
@@ -22,7 +22,7 @@ class Collected {
 
 /** A narration installed as the sink, torn down however the test ends. */
 const drawn = (chain = new Collected(), options: { debug?: boolean; silent?: boolean } = {}) => {
-  const narration = new Narration(chain);
+  const narration = new LogPrinter(chain);
   narration.install(options);
   onTestFinished(() => {
     narration.restore();
@@ -30,7 +30,7 @@ const drawn = (chain = new Collected(), options: { debug?: boolean; silent?: boo
   return { chain, narration };
 };
 
-describe("Narration", () => {
+describe("LogPrinter", () => {
   it("draws what a command says into the chain", ({ terminal }) => {
     terminal.tty(true);
     const { chain } = drawn();
@@ -103,7 +103,7 @@ describe("Narration", () => {
 
   it("restores nothing when it was never installed", () => {
     expect(() => {
-      new Narration(new Collected()).restore();
+      new LogPrinter(new Collected()).restore();
     }).not.toThrow();
   });
   describe("off a terminal", () => {

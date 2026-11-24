@@ -8,7 +8,7 @@ import { z } from "zod";
 import { createZitadelClient, ProjectService } from "@/lib/backend";
 import { Environment, type InitialDeployment } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
-import { log, warnings } from "@/lib/ui";
+import { warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
@@ -223,7 +223,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
       });
     }
 
-    log.info(`Adding the ${args.name} environment`);
+    this.info(`Adding the ${args.name} environment`);
     const project =
       flags.project === undefined
         ? await new ProjectService(
@@ -252,7 +252,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
     if (flags.project === undefined) {
-      log.debug(`Created project ${escapeControlCharacters(project.id)}`);
+      this.debug(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     this.ui.ranAgainst(projectId, server);
@@ -268,7 +268,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await Project.envFile(environment.path).write(values);
-    log.debug(`Wrote ${escapeControlCharacters(environment.file)}`);
+    this.debug(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
       {
@@ -388,7 +388,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
     // permits overwriting the env file, never answers a `yes-no`.
     const offerDeployment = hasSomewhereToLand && !nonInteractive && projectSecret !== undefined;
     if (offerDeployment) {
-      log.info(
+      this.info(
         "Nothing is deployed to this environment yet, so sign-in is refused until your .zitadel/ files are deployed.",
       );
     }
@@ -559,7 +559,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
     projectSecret: string;
     suggest: Suggest;
   }): Promise<InitialDeployment | undefined> {
-    log.info("Deploying .zitadel/ to the new environment");
+    this.info("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await Environment.deployInitialRelease({
         client: createZitadelClient({
@@ -576,7 +576,7 @@ export default class EnvAdd extends Promptable(ChoosingServerCommand(BaseCommand
           this.narrate(notices);
         },
       });
-      log.debug(
+      this.debug(
         `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;

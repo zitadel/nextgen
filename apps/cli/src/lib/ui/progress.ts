@@ -3,7 +3,7 @@ import { log } from "@clack/prompts";
 import { Once } from "@/lib/once";
 
 import { stripColumnMarks } from "./layout";
-import { log as narration } from "./log";
+import { log as cliLog } from "./log";
 import { GUIDE, MARK } from "./marks";
 import { Output } from "./output";
 import { DrawnSpinner } from "./spinner";
@@ -91,7 +91,7 @@ export class Progress {
     if (!this.drawing.interactive) {
       this.narrate(MARK.started, label);
       const result = await work(report).catch((error: unknown) => {
-        narration.fail(`${label} failed`);
+        cliLog.fail(`${label} failed`);
         throw error;
       });
       for (const { verb, subject } of lines) {
@@ -139,7 +139,7 @@ export class Progress {
         },
         fail: (text) => {
           return narrated.run(() => {
-            return narration.fail(text ?? `${label} failed`);
+            return cliLog.fail(text ?? `${label} failed`);
           });
         },
       };
@@ -223,7 +223,7 @@ export class Progress {
       this.drawing.narrate(symbol, text);
       return;
     }
-    narration.info(text);
+    cliLog.info(text);
   }
 
   /**
@@ -234,7 +234,7 @@ export class Progress {
    */
   private detail(text: string): void {
     if (!this.drawing.chained) {
-      narration.info(stripColumnMarks(`  ${text}`));
+      cliLog.info(stripColumnMarks(`  ${text}`));
       return;
     }
     this.line(GUIDE, text);
@@ -250,7 +250,7 @@ export class Progress {
    */
   private line(symbol: string, text: string): void {
     if (!this.drawing.chained) {
-      narration.info(stripColumnMarks(text));
+      cliLog.info(stripColumnMarks(text));
       return;
     }
     log.message(stripColumnMarks(text), {

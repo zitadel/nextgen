@@ -178,10 +178,10 @@ describe("Ui", () => {
     it("draws what a command says inside the chain", ({ terminal }) => {
       const ui = watched();
       ui.describe("Listing origins");
-      ui.bridgeNarration();
+      ui.printLogs();
 
       log.info("Looking for a project");
-      ui.releaseNarration();
+      ui.stopPrintingLogs();
 
       expect(printed(terminal)).toContain("┌  Listing origins");
     });
@@ -192,9 +192,9 @@ describe("Ui", () => {
     it("takes a wizard's lines even when nobody is watching", ({ terminal }) => {
       const ui = scripted();
 
-      ui.bridgeNarration();
+      ui.printLogs();
       log.info("the flow was edited by hand");
-      ui.releaseNarration();
+      ui.stopPrintingLogs();
 
       expect(printed(terminal)).toContain("the flow was edited by hand");
     });
@@ -202,10 +202,10 @@ describe("Ui", () => {
     it("says a normal command's lines plainly, with no mark and no chain", ({ terminal }) => {
       const ui = normally();
 
-      ui.bridgeNarration();
+      ui.printLogs();
       log.info("Wrote .zitadel/idps/google.json");
       log.info("Callback URI   https://example.com/callback");
-      ui.releaseNarration();
+      ui.stopPrintingLogs();
 
       expect(printed(terminal)).toBe(
         "Wrote .zitadel/idps/google.json\nCallback URI   https://example.com/callback\n",
@@ -218,9 +218,9 @@ describe("Ui", () => {
     }) => {
       const ui = normally();
 
-      ui.bridgeNarration();
+      ui.printLogs();
       log.warn("the flow was edited by hand");
-      ui.releaseNarration();
+      ui.stopPrintingLogs();
 
       expect([errors(terminal), printed(terminal)]).toEqual([
         "Warning: the flow was edited by hand\n",
@@ -231,9 +231,9 @@ describe("Ui", () => {
     it("keeps debug detail back unless it was asked for", ({ terminal }) => {
       const ui = normally();
 
-      ui.bridgeNarration();
+      ui.printLogs();
       log.debug("an internal detail");
-      ui.releaseNarration();
+      ui.stopPrintingLogs();
 
       expect(printed(terminal)).toBe("");
     });
@@ -243,8 +243,8 @@ describe("Ui", () => {
     }) => {
       const ui = watched();
 
-      ui.bridgeNarration();
-      ui.releaseNarration();
+      ui.printLogs();
+      ui.stopPrintingLogs();
       log.info("after the command ended");
 
       expect(printed(terminal)).toBe("after the command ended\n");

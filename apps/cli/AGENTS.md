@@ -182,8 +182,9 @@
   utilities `tests/unit/lib/upgrade/layering.test.ts` lists.
 - `src/lib/upgrade` takes each of Zitadel's defaults (`defaults.ts`, `config.ts`) as an option, so a
   test or another product can swap it; the `upgrade` command does the CLI's part, `doctor --fix` too.
-- Say what a command is doing with `log` (`src/lib/ui/log.ts`) from a command or a
-  library alike, never a logger or stream of your own: the running command's
+- Say what a command is doing with `this.info`, `this.warn`, `this.fail` and `this.debug`
+  (`src/lib/oclif/loggable.ts`), and from a wizard step or a library with `log`
+  (`src/lib/ui/log.ts`), never a logger or stream of your own: the running command's
   sink decides the look, and `--json` installs one that draws nothing; with no
   sink installed, a line is written plainly. A unit test fails on a
   `consola` import.

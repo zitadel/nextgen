@@ -9,7 +9,7 @@ import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
 import { log as logger } from "./log";
 import { GUIDE, MARK } from "./marks";
-import type { Narratable } from "./narration";
+import type { Narratable } from "./log-printer";
 import type { Presentation } from "./presentation";
 import { type Drawing, Progress, type Report, type Step } from "./progress";
 import type { Confirmer, Questions } from "./questions";

@@ -7,7 +7,7 @@ import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schem
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
 import { ZitadelError } from "@/lib/errors";
-import { announce, log, section, warnings } from "@/lib/ui";
+import { announce, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -336,7 +336,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
       const skipLaunch = flags.noOpen || this.nonInteractive;
       opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
       if (!opened) {
-        log.info("Open the link above to continue.");
+        this.info("Open the link above to continue.");
       }
       waitFor = {
         challengeId: challenge.challenge_id,
@@ -357,7 +357,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
         }),
       };
     }
-    log.info("Waiting for the browser step to finish");
+    this.info("Waiting for the browser step to finish");
 
     const completed = await this.poll(
       claimService,
@@ -379,7 +379,7 @@ export default class Claim extends ServerCommand(EnvironmentCommand) {
     }
     // The team id stays out of the human output by design (it lives in the
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
-    log.info("Project claimed");
+    this.info("Project claimed");
 
     this.recordTelemetry({
       claim_outcome: "completed",

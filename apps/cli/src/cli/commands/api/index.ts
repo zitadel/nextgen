@@ -14,7 +14,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log, Output } from "@/lib/ui";
+import { Output } from "@/lib/ui";
 import { ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
@@ -382,7 +382,7 @@ export default class Api extends Destructive(Promptable(ServerCommand(Environmen
       });
     }
 
-    log.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
+    this.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
     const destructive = request.operation.destructive;
     const consent = destructive
       ? await this.consent({
