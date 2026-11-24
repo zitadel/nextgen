@@ -90,3 +90,9 @@ So your English is the fallback for every language. A step you labelled only in 
 A step that shows sign-in provider buttons asks for `<step>.description.sso` instead of `<step>.description`. Its text must also suit users who have no password. Only the password step has one built in: "Enter your password or continue with your sign-in provider". Every other step shows its plain description.
 
 If you change a step's `.description` but not its `.description.sso`, your text shows whether or not the step offers providers.
+
+## Identifiers other than email
+
+If your user schema's `x-identifier` is not an email address, such as `employee_number`, a step that asks for it reads `<step>.description.custom_identifier` instead of `<step>.description`, or of `<step>.description.sso`: the built-in descriptions name the email. Only the sign-in screen has one built in: "Enter your details to continue". The field's label says what to enter. It reads `<step>.field.<field>`, or the field's name made readable, "Employee number".
+
+If you change a step's `.description` but not its `.description.custom_identifier`, your text shows whatever the identifier is.
