@@ -1389,25 +1389,27 @@ function materializeBundle(
   for (const item of asArray(bundle.applications)) {
     const resource = isObject(item) ? item : {};
     const handle = bundleResourceHandle("application", resource);
-    const newest = [...store.applicationRevisions.values()]
+    const revisions = [...store.applicationRevisions.values()]
       .filter((record) => record.projectId === projectId && record.slug === handle)
-      .sort((a, b) => b.seq - a.seq)[0];
-    const unchanged =
-      newest !== undefined && JSON.stringify(newest.body) === JSON.stringify(resource);
+      .sort((a, b) => b.seq - a.seq);
+    const newest = revisions[0];
+    // Any revision with the same document is reused, the newest match first, as
+    // the service does: rebuilding an older bundle keeps its release id.
+    const match = revisions.find(
+      (record) => JSON.stringify(record.body) === JSON.stringify(resource),
+    );
     const now = nowIso();
-    const record: ApplicationRevisionRecord = unchanged
-      ? (newest as ApplicationRevisionRecord)
-      : {
-          applicationId: newest?.applicationId ?? `app_${shortId()}`,
-          revisionId: `apprev_${shortId()}`,
-          projectId,
-          slug: handle,
-          createdAt: newest?.createdAt ?? now,
-          updatedAt: now,
-          seq: ++store.lastSeq,
-          body: resource,
-        };
-    if (!unchanged) {
+    const record: ApplicationRevisionRecord = match ?? {
+      applicationId: newest?.applicationId ?? `app_${shortId()}`,
+      revisionId: `apprev_${shortId()}`,
+      projectId,
+      slug: handle,
+      createdAt: newest?.createdAt ?? now,
+      updatedAt: now,
+      seq: ++store.lastSeq,
+      body: resource,
+    };
+    if (!match) {
       store.applicationRevisions.set(record.revisionId, record);
     }
     pointers.push({ kind: "application", handle, revision_id: record.revisionId });
@@ -3519,8 +3521,6 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
-    // as a policy id.
     http.get("*/applications/revisions/:revision_id", ({ params, request }) => {
       const path = parse(GetApplicationRevisionParams, params);
       if (!path.ok) {
@@ -3548,6 +3548,8 @@ export function setupPlatformHandlers() {
       return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
+    // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
+    // as a policy id.
     http.get("*/policies/revisions/:revision_id", ({ params, request }) => {
       const path = parse(GetPolicyRevisionParams, params);
       if (!path.ok) {

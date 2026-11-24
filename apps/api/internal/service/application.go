@@ -560,10 +560,7 @@ func (s *applicationService) ServedClient(ctx context.Context, projectID, client
 	return s.servedClient(ctx, projectID, "", clientID)
 }
 
-func (s *applicationService) servedClient(ctx context.Context, projectID, deploymentID, clientID string) (_ *ServedApplicationClient, err error) {
-	ctx, end := startSpan(ctx, "ApplicationService.ServedClient")
-	defer end(&err)
-
+func (s *applicationService) servedClient(ctx context.Context, projectID, deploymentID, clientID string) (*ServedApplicationClient, error) {
 	stmts := s.v2Pool.Statements()
 	stored, err := stmts.GetApplicationClientByClientID(ctx, projectID, clientID)
 	if err != nil {

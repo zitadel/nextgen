@@ -454,7 +454,7 @@ func changedClientIDIndexes(oldClients, newClients []ApplicationClientDocument) 
 func validateNoReservedClientIDs(doc ApplicationDocument, added []ApplicationClientDocument) error {
 	failures := map[string]string{}
 	for i, client := range doc.Clients {
-		if client.ClientID == nil || !HasReservedClientIDPRefix(*client.ClientID) {
+		if client.ClientID == nil || !hasReservedClientIDPrefix(*client.ClientID) {
 			continue
 		}
 		if slices.ContainsFunc(added, func(c ApplicationClientDocument) bool { return c.Slug == client.Slug }) {
@@ -467,7 +467,7 @@ func validateNoReservedClientIDs(doc ApplicationDocument, added []ApplicationCli
 	return nil
 }
 
-func HasReservedClientIDPRefix(clientID string) bool {
+func hasReservedClientIDPrefix(clientID string) bool {
 	return slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
 		return strings.HasPrefix(clientID, prefix)
 	})

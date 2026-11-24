@@ -44,8 +44,8 @@ const POINTER_KIND_LABELS: Record<ReleasePointerKind, { label: string; noun: str
   branding: { label: "Branding", noun: "branding" },
   idp: { label: "Identity providers", noun: "connection" },
   application: { label: "Applications", noun: "application" },
-  oauth: { label: "OAuth settings", noun: "settings" },
   policy: { label: "Policies", noun: "policy" },
+  oauth: { label: "OAuth settings", noun: "settings" },
 };
 
 /** The pointer kinds in the order the detail lists them. */
