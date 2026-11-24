@@ -46,7 +46,7 @@ as `ZitadelSession`).
 
 ## Reading the session in your own UI
 
-`useSession()` tells your own components (header navigation, account menus, route guards) whether a user is signed in, and who. It asks the server once per page, with the same `GET /sessions/me` read the `ZitadelSession` card performs, and every component using the same project shares that read.
+`useSession()` tells your own components (header navigation, account menus, route guards) whether a user is signed in, and who. When the first component using it mounts, it asks the server with the same `GET /sessions/me` read the `ZitadelSession` card performs; every mounted component using the same project shares that read, and once the last one unmounts, the next mount reads again.
 
 ```tsx
 import { useSession } from '@zitadel/sdk-react';
@@ -61,9 +61,11 @@ export function AccountMenu() {
 }
 ```
 
-`status` is `loading`, `authenticated`, `unauthenticated` or `error`. `error` means the read failed (often a misrouted proxy), so treat it as unknown, not signed out. `session` holds `userId`, `identifier`, `identifierProperty` and `display`, never a token. The hook takes the widgets' `project`, `projectId` and `proxyPath`, and falls back to `configureZitadel(...)`.
+`status` is `loading`, then the server's answer, `authenticated` or `unauthenticated`. `error` means there is no answer yet: `error.code` is `session.no_project` when no project id is known (a misconfiguration, not a signed-out visitor) or `session.read_failed` when the read failed, often a misrouted proxy. `session` holds `userId`, `identifier`, `identifierProperty` and `display`, never a token. The hook takes the widgets' `project`, `projectId` and `proxyPath`, and falls back to `configureZitadel(...)`.
 
-Sign-in and sign-out navigate, so the next page reads the session again. To update in place, call the hook's `refresh()` from `onFlowComplete` or `onSignout`. Outside React, `getSession({ projectId, proxyPath })` returns the same answer as a promise of `{ isAuthenticated, session }`.
+Sign-in and sign-out navigate, so the next page reads the session again. To update in place, call the hook's `refresh()` from `onFlowComplete` or `onSignout`: it resolves with the new snapshot and never rejects. While it runs, `isRefreshing` is `true` and the last answer stays; a refresh that fails keeps it too and sets `error` beside it.
+
+Outside components, `sessionStore({ project })` returns the same shared read: `settled()` resolves with the first answer, for a route guard or loader, and `refresh()` reads again. `getSession({ projectId, proxyPath })` makes a single read that resolves to `{ isAuthenticated, session }`.
 
 ## Widget props and events
 
