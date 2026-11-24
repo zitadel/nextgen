@@ -1,5 +1,12 @@
 # @zitadel/client-sdk-contract
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/sdk-core@0.9.0
+
 ## 0.0.2
 
 ### Patch Changes

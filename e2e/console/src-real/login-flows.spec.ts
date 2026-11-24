@@ -55,3 +55,35 @@ test("opens a flow and shows its steps and definition", async ({ page, zitadel, 
 
   await expectNoErrorBoundary(page);
 });
+
+test("draws the flow as a canvas and opens it full screen", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel, await seed.user());
+
+  await page.goto("/flow-definitions");
+  await page.getByRole("link", { name: "Default login" }).click();
+
+  // What a laid-out browser shows and the unit spec's DOM cannot: every step of
+  // the stored definition is a measured card, and the canvas opens fitted, so
+  // all of them are inside the viewport with nothing to pan.
+  const canvas = page.getByRole("region", { name: "Flow canvas" });
+  await canvas.scrollIntoViewIfNeeded();
+  for (const step of ["identifier", "password", "register", "register-password", "done"]) {
+    await expect(
+      canvas.getByRole("article", { name: `Step ${step}`, exact: true }),
+    ).toBeInViewport();
+  }
+  await expect(canvas).not.toHaveCSS("cursor", "grab");
+
+  // Full screen is a modal at 100%: the page behind it is out of reach, and
+  // Escape hands focus back to the button that opened it.
+  const open = page.getByRole("button", { name: "Full screen" });
+  await open.click();
+  const dialog = page.getByRole("dialog", { name: "Default login" });
+  await expect(dialog.getByRole("status", { name: "Zoom" })).toHaveText("100%");
+  await expect(page.getByRole("link", { name: "Login flows" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(open).toBeFocused();
+
+  await expectNoErrorBoundary(page);
+});

@@ -152,21 +152,18 @@ describe("project members tabs", () => {
     const router = openMembers();
 
     // A bare URL is the people; the invitations are read but not drawn.
-    expect(await screen.findByRole("region", { name: "Admins" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Members" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("region", { name: "Invitations" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add admin" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: "Invitations" }));
     expect(await screen.findByRole("region", { name: "Invitations" })).toBeInTheDocument();
     expect(router.state.location.search).toMatchObject({ tab: "invitations", project: PROJECT_ID });
-    expect(screen.queryByRole("region", { name: "Admins" })).not.toBeInTheDocument();
-    // Add admin is the Members tab's; Invite member is on both.
-    expect(screen.queryByRole("button", { name: "Add admin" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Members" })).not.toBeInTheDocument();
     expect(inviteButton()).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: "Members" }));
-    await screen.findByRole("region", { name: "Admins" });
+    await screen.findByRole("region", { name: "Members" });
     expect(router.state.location.search).toEqual({ project: PROJECT_ID });
   });
 
@@ -174,7 +171,7 @@ describe("project members tabs", () => {
     stubPage();
     stubCreate();
     const router = openMembers();
-    await screen.findByRole("region", { name: "Admins" });
+    await screen.findByRole("region", { name: "Members" });
 
     await userEvent.click(inviteButton());
     const dialog = within(await screen.findByRole("dialog", { name: "Invite member" }));

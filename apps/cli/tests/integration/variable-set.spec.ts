@@ -758,6 +758,23 @@ describe("variable set", () => {
         });
       });
 
+      it("accepts a secret stored as the string it already is", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "variable",
+          "set",
+          "TOKEN",
+          "--secret",
+          "--as",
+          "string",
+          "--dry-run",
+          "--json",
+        ]);
+
+        expect(JSON.parse(result.stdout)).toMatchObject({ status: "ok", data: { secret: true } });
+      });
+
       it("refuses a value that is not the type asked for", async () => {
         const app = await aSetUpApp();
 

@@ -12,6 +12,7 @@ import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { COMMANDS } from "@/index";
 import { EXIT_CODES } from "@/lib/errors";
 import { parseJsonOrUndefined } from "@/lib/json";
 import type { JsonObject } from "@/lib/zitadel/types";
@@ -38,6 +39,7 @@ import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
 import { assertRunnableSuggestions, assertSuggestionsCarryTheRun } from "./suggestions";
+import { holdingADryRunToNothing } from "@tests/helpers/dry-run";
 
 const execFileAsync = promisify(execFile);
 
@@ -1048,7 +1050,7 @@ export class ScaffoldedApp {
               process.execPath,
               [
                 join(cliPackageRoot, "bin/run.js"),
-                ...["start", "--cwd", this.path, "--server", MOCK_SERVER_URL],
+                ...["start", "--cwd", this.path],
                 ...["--port", port, "--json"],
               ],
               { env },
@@ -1492,7 +1494,7 @@ export class ScaffoldedApp {
    * `--cwd` every run is given, so a spec states the whole suggestion.
    */
   againAsRun(command: string): string {
-    return `${command} --server ${MOCK_SERVER_URL} --cwd ${this.path}`;
+    return `${command}${takesServer(command.split(" ")) ? ` --server ${MOCK_SERVER_URL}` : ""} --cwd ${this.path}`;
   }
 
   /** For output oclif owns rather than our envelope: `--help`, `--version`. */
@@ -1503,7 +1505,12 @@ export class ScaffoldedApp {
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const ran = [...args, "--cwd", this.path];
-    const result = await runCliForTest(ran, env);
+    const run = (): Promise<CliResult> => {
+      return runCliForTest(ran, env);
+    };
+    const result = args.includes("--dry-run")
+      ? await holdingADryRunToNothing(args.join(" "), this.path, run)
+      : await run();
     assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
@@ -2343,8 +2350,18 @@ export class ScaffoldedApp {
     env: NodeJS.ProcessEnv = {},
     { envelope = true }: { envelope?: boolean } = {},
   ): Promise<CliResult> {
-    const ran = [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL];
-    const result = await runCliForTest(ran, env);
+    const ran = [
+      ...args,
+      "--cwd",
+      this.path,
+      ...(takesServer(args) ? ["--server", MOCK_SERVER_URL] : []),
+    ];
+    const run = (): Promise<CliResult> => {
+      return runCliForTest(ran, env);
+    };
+    const result = args.includes("--dry-run")
+      ? await holdingADryRunToNothing(args.join(" "), this.path, run)
+      : await run();
     assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
@@ -3141,3 +3158,25 @@ if (args[0] === "version") process.stdout.write("27.0.0\\n");
 
 /** The one terminal harness, re-exported for the specs that reached for it here. */
 export { asTerminal };
+
+/**
+ * Whether the command a run names takes `--server`, so a run is given one only
+ * where it means something.
+ *
+ * @param args - The words of the run, the command first.
+ * @returns True when the command declares `--server`, or when no command is named.
+ */
+function takesServer(args: readonly string[]): boolean {
+  const words = args.filter((arg) => {
+    return !arg.startsWith("-");
+  });
+  const id = words
+    .map((_, dropped) => {
+      return words.slice(0, words.length - dropped).join(":");
+    })
+    .find((candidate) => {
+      return candidate in COMMANDS;
+    });
+
+  return id === undefined || "server" in (COMMANDS[id]?.baseFlags ?? {});
+}

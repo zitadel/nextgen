@@ -53,7 +53,7 @@ manages the wrong server: see [`local/AGENTS.md`](local/AGENTS.md).
 - **A bare URL is a `CloudRuntime`.** Giving a `LocalRuntime` no folder made
   `stop()` fail at run time, not compile time. A loopback URL with no record
   was never manageable, so nothing is lost.
-- **`--server`'s variable lives in `lib/oclif/base.ts`.** Flag metadata is CLI
+- **`--server`'s variable lives in `cli/core/base.ts`.** Flag metadata is CLI
   logic and does not belong in a package that must not know the CLI.
 - **`StartedServer` keeps a per-run memo.** It is the one sanctioned mutable
   cache here: it keeps a record from being read twice before the run has a

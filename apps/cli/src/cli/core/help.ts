@@ -1,0 +1,222 @@
+import { type Command, Help, type Interfaces, toConfiguredId, ux } from "@oclif/core";
+
+import { Skills } from "@/lib/skills";
+import { Spelling, suggesterFor } from "@/lib/suggestion";
+
+import { compareInGroup } from "@/lib/oclif/groups";
+import { aliasedCommands, aliasedNouns } from "@/lib/oclif/plural-aliases";
+
+/** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */
+type GroupedCommand = Command.Loadable & { group?: string; groupOrder?: number };
+
+/** One line of the root screen: a command, or a family of commands under one name. */
+type Row = { name: string; summary: string; order: number };
+
+/**
+ * Summaries for oclif plugin commands that ship without one. `version` prints
+ * a blank line otherwise.
+ */
+const PLUGIN_SUMMARIES: Readonly<Record<string, string>> = {
+  version: "Show the CLI version",
+};
+
+/**
+ * The order of oclif's own utilities in the CLI group, which declare no
+ * `groupOrder` of their own to read it from.
+ */
+const UTILITY_ORDER: readonly string[] = ["commands", "search", "autocomplete", "version", "which"];
+
+/**
+ * Root help in the style of `gh --help`: a tagline, usage, the commands under
+ * headed groups, then flags and examples. A family of commands (`user`,
+ * `release`) is one row, and its own help lists the operations. Only
+ * {@link showRootHelp} is replaced; per-command and per-topic help
+ * (`start --help`, `schema --help`) stay oclif's own, with a pointer back to
+ * the root screen added. Help asked for under a plural the commands answer to
+ * (`users --help`, `users list --help`) is the help of the noun and of its
+ * command, spelled as they are declared. Wired in via `oclif.helpClass` in
+ * `package.json`.
+ */
+export abstract class GroupedHelp extends Help {
+  /** The groups the root screen lists, in print order; commands with no group are listed with the last. */
+  protected abstract readonly groups: readonly string[];
+
+  /**
+   * Shows help for `argv`. With `--json` among them the wrapped `help` command
+   * answers, which prints the text this class makes and wraps it in the
+   * envelope.
+   *
+   * @param argv - The words typed.
+   */
+  override async showHelp(argv: string[]): Promise<void> {
+    if (argv.includes("--json")) {
+      await this.config.runCommand("help", [
+        ...argv.filter((word) => {
+          return word !== "--help" && word !== "-h" && word !== "--json";
+        }),
+        "--json",
+      ]);
+
+      return;
+    }
+    const nouns = aliasedNouns(this.config.commands);
+    const subject = argv.findIndex((word) => {
+      return !word.startsWith("-");
+    });
+    await super.showHelp(
+      argv.map((word, at) => {
+        return at === subject ? (nouns.get(word) ?? word) : word;
+      }),
+    );
+  }
+
+  protected override async showRootHelp(): Promise<void> {
+    const { bin } = this.config;
+    const commands = this.rootCommands();
+    const groups = this.groups
+      .map((group) => {
+        return [group, this.rowsOf(this.commandsOf(commands, group))] as const;
+      })
+      .filter(([, rows]) => {
+        return rows.length > 0;
+      });
+    const width = Math.max(
+      0,
+      ...groups.flatMap(([, rows]) => {
+        return rows.map((row) => {
+          return row.name.length;
+        });
+      }),
+    );
+    const list = (rows: readonly Row[]): string => {
+      return rows
+        .map((row) => {
+          return `${row.name.padEnd(width)}  ${row.summary}`;
+        })
+        .join("\n");
+    };
+
+    const sections = [
+      this.render(this.config.pjson.oclif.description ?? this.config.pjson.description ?? ""),
+      this.section("Usage", `${bin} <command> [flags]`),
+      `Run a command below. Use \`${bin} <command> --help\` to see its options.`,
+      ...groups.map(([group, rows]) => {
+        return this.section(group, list(rows));
+      }),
+      this.section(
+        "Flags",
+        ["-h, --help  Show help for command", `--version   Show ${bin} version`].join("\n"),
+      ),
+      this.section(
+        "Examples",
+        [`$ ${bin} setup --framework next`, `$ ${bin} start`, `$ ${bin} doctor`].join("\n"),
+      ),
+    ];
+    const isBareInvocation = process.argv.length <= 2;
+    if (isBareInvocation) {
+      await new Skills(process.env, Boolean(process.stdout.isTTY && process.stdin.isTTY)).showHint(
+        suggesterFor(this.config, {}, this.config.version)({ id: "skills:add" }),
+      );
+    }
+    this.log(sections.join("\n\n"));
+  }
+
+  override async showCommandHelp(command: Command.Loadable): Promise<void> {
+    const id = aliasedCommands(this.config.commands).get(command.id);
+    const declared = id === undefined ? undefined : this.config.findCommand(id);
+    await super.showCommandHelp(declared ?? command);
+    this.log(Spelling.at(this.config.version).exploreAllCommands());
+  }
+
+  override async showTopicHelp(topic: Interfaces.Topic): Promise<void> {
+    await super.showTopicHelp(topic);
+    this.log(Spelling.at(this.config.version).exploreAllCommands());
+  }
+
+  /**
+   * The commands the root screen lists: every visible command, grouped or
+   * not, whatever its depth. Alias entries and `help` itself are left out.
+   */
+  private rootCommands(): GroupedCommand[] {
+    return (this.sortedCommands as GroupedCommand[]).filter((command) => {
+      return command.id !== "help" && !command.aliases?.includes(command.id);
+    });
+  }
+
+  /**
+   * The commands a group lists. oclif's own utilities declare no group and are
+   * listed with the last one.
+   */
+  private commandsOf(commands: readonly GroupedCommand[], group: string): GroupedCommand[] {
+    return commands.filter((command) => {
+      return (
+        command.group === group || (command.group === undefined && group === this.groups.at(-1))
+      );
+    });
+  }
+
+  /**
+   * The rows of one group. Commands sharing a first word (`user create`,
+   * `user get`) are one row named for it, described by the topic when it has
+   * a description and otherwise by the command of that name; a command on its
+   * own keeps its name. Rows follow `groupOrder` (the lowest of a family's
+   * commands), then the name.
+   */
+  private rowsOf(commands: readonly GroupedCommand[]): Row[] {
+    const families = new Map<string, GroupedCommand[]>();
+    for (const command of commands) {
+      const [family = command.id] = command.id.split(":");
+      families.set(family, [...(families.get(family) ?? []), command]);
+    }
+    const rows = [...families].map(([family, members]): Row => {
+      const order = Math.min(
+        ...members.map((member) => {
+          const utility = UTILITY_ORDER.indexOf(member.id);
+
+          return member.groupOrder ?? (utility === -1 ? Number.MAX_SAFE_INTEGER : utility + 1);
+        }),
+      );
+      const isFamily = members.some((member) => {
+        return member.id.includes(":");
+      });
+      if (!isFamily) {
+        const [only] = members;
+        return {
+          name: toConfiguredId(family, this.config),
+          summary: this.oneLineSummary(only?.summary ?? only?.description, only?.id),
+          order,
+        };
+      }
+      const topic = this.config.topics.find((candidate) => {
+        return candidate.name === family;
+      });
+      const root =
+        members.find((member) => {
+          return member.id === family;
+        }) ?? members[0];
+      return {
+        name: toConfiguredId(family, this.config),
+        summary: this.oneLineSummary(topic?.description ?? root?.summary ?? root?.description),
+        order,
+      };
+    });
+    return rows.sort((a, b) => {
+      return compareInGroup(
+        { id: a.name, groupOrder: a.order },
+        { id: b.name, groupOrder: b.order },
+      );
+    });
+  }
+
+  /**
+   * The summary as `gh` prints it: the first clause of the summary or
+   * description, with no trailing full stop. Built from the raw statics rather
+   * than {@link summary} so a user theme's colour codes cannot end up inside
+   * the clause; the theme is applied once the text is final.
+   */
+  private oneLineSummary(text: string | undefined, id?: string): string {
+    const source = (id === undefined ? undefined : PLUGIN_SUMMARIES[id]) ?? text ?? "";
+    const [clause = ""] = this.render(source).split(/[.:]\s|\n/, 1);
+    return ux.colorize(this.config.theme?.commandSummary, clause.trim().replace(/\.$/, ""));
+  }
+}

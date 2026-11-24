@@ -561,7 +561,9 @@ describe("env add", () => {
           command: "env:add",
           source: "",
           data: {
-            title: "Would add the production environment, bound to a new project (dry run)",
+            title: "Would add the production environment bound to a new project (dry run)",
+            verb: "add",
+            topic: "environment",
             dry_run: true,
             environment: "production",
             file: ".env.production.local",
@@ -595,7 +597,9 @@ describe("env add", () => {
           command: "env:add",
           source: "",
           data: {
-            title: "Would add the production environment, bound to proj_x (dry run)",
+            title: "Would add the production environment bound to proj_x (dry run)",
+            verb: "add",
+            topic: "environment",
             dry_run: true,
             environment: "production",
             file: ".env.production.local",
@@ -638,7 +642,7 @@ describe("env add", () => {
         );
 
         expect(result).toPrint(
-          "Would add the production environment, bound to a new project (dry run)",
+          "Would add the production environment bound to a new project (dry run)",
         );
       });
 
@@ -783,7 +787,7 @@ describe("env add", () => {
           "--dry-run",
         ]);
 
-        expect(result).toPrint("Would add the production environment, bound to a new project");
+        expect(result).toPrint("Would add the production environment bound to a new project");
       });
     });
 
