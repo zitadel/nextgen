@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
-import { CONNECTION_FILE, CONNECTION_PATH, ACME } from "@tests/helpers/sso-rules";
+import { aSchemaListing } from "@tests/helpers/schemas";
+import { CONNECTION_FILE, CONNECTION_PATH, SCHEMA_FILE, ACME } from "@tests/helpers/sso-rules";
 
 /**
  * The file name of a second connection claiming the same slug.
@@ -18,7 +19,10 @@ const ACME_COPY = anOidcConnection({
 
 describe("sso/duplicate-slug", () => {
   it("refuse a second connection file that claims a slug, naming the first", () => {
-    const config = aConfig({ connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY } });
+    const config = aConfig({
+      connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY },
+      schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) },
+    });
 
     const issues = SSO_RULES.flatMap((rule) => {
       return rule.check(config, {});

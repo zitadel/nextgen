@@ -44,6 +44,15 @@ export const ACME = anOidcConnection({
 });
 
 /**
+ * A second schema that lists `acme` but defines no `email`, as one of two
+ * schemas the connection `acme.json` maps into.
+ */
+export const NO_EMAIL_SCHEMA = aSchemaListing(["acme"], {
+  objectType: "contractor",
+  properties: { phone: { "x-unique": "project" } },
+});
+
+/**
  * Every project below lists `acme` in its schema, offers it in its flow
  * and keeps the connection `acme.json`: the documents of a project whose
  * files agree, but for what a row changes.
@@ -72,6 +81,31 @@ export function aFlowStepping(step: JsonObject, extra: readonly JsonObject[] = [
   const offering = aFlowOffering(["acme"]);
   const entry = listAt(offering, "steps")[0];
   return { ...offering, steps: [{ ...(isJsonObject(entry) ? entry : {}), ...step }, ...extra] };
+}
+
+/**
+ * Two schemas that both list `acme`: `staff.json`, which defines `email`, and
+ * `field.json`, which does not.
+ *
+ * @returns The schema documents, by file name.
+ */
+export function twoSchemas(): Readonly<Record<string, JsonObject>> {
+  return {
+    [SCHEMA_FILE]: aSchemaListing(["acme"]),
+    "field.json": NO_EMAIL_SCHEMA,
+  };
+}
+
+/**
+ * A schema that lists `acme` and requires `email` and `phone`.
+ *
+ * @returns The schema document.
+ */
+export function aRequiringSchema(): JsonObject {
+  return aSchemaListing(["acme"], {
+    required: ["email", "phone"],
+    properties: { email: { "x-unique": "project" }, phone: { "x-unique": "project" } },
+  });
 }
 
 /**

@@ -59,6 +59,14 @@ import { SUBJECT_CLAIM_UNSTABLE } from "@/lib/zitadel/rules/sso/subject-claim-un
 import { CLAIM_TYPE_MISMATCH } from "@/lib/zitadel/rules/sso/claim-type-mismatch";
 import { ORPHANED_MAPPING_TARGET } from "@/lib/zitadel/rules/sso/orphaned-mapping-target";
 import { ORPHANED_VERIFICATION_KEY } from "@/lib/zitadel/rules/sso/orphaned-verification-key";
+import { INERT_CONNECTION } from "@/lib/zitadel/rules/sso/inert-connection";
+import { DEAD_CAPABILITY } from "@/lib/zitadel/rules/sso/dead-capability";
+import { UNREFERENCED_TYPO_GUARD } from "@/lib/zitadel/rules/sso/unreferenced-typo-guard";
+import { MISSING_MAPPING_TARGET } from "@/lib/zitadel/rules/sso/missing-mapping-target";
+import { EMPTY_VERIFIED_CLAIMS } from "@/lib/zitadel/rules/sso/empty-verified-claims";
+import { IMPOSSIBLE_REGISTRATION } from "@/lib/zitadel/rules/sso/impossible-registration";
+import { IMPOSSIBLE_AUTO_CREATION_DATA } from "@/lib/zitadel/rules/sso/impossible-auto-creation-data";
+import { IMPOSSIBLE_AUTO_CREATION_VERIFICATION } from "@/lib/zitadel/rules/sso/impossible-auto-creation-verification";
 
 /**
  * Every SSO rule, in the order they report.
@@ -81,4 +89,12 @@ export const SSO_RULES: readonly Rule[] = [
   CLAIM_TYPE_MISMATCH,
   ORPHANED_MAPPING_TARGET,
   ORPHANED_VERIFICATION_KEY,
+  INERT_CONNECTION,
+  DEAD_CAPABILITY,
+  UNREFERENCED_TYPO_GUARD,
+  MISSING_MAPPING_TARGET,
+  EMPTY_VERIFIED_CLAIMS,
+  IMPOSSIBLE_REGISTRATION,
+  IMPOSSIBLE_AUTO_CREATION_DATA,
+  IMPOSSIBLE_AUTO_CREATION_VERIFICATION,
 ];
