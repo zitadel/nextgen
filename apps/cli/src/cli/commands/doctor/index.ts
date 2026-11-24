@@ -10,7 +10,7 @@ import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { log, warnings as invocationWarnings } from "@/lib/ui";
+import { Output, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
 import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
@@ -232,7 +232,7 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
             invocationWarnings.report(`${error.message}. ${error.hint ?? ""}`.trim());
             continue;
           }
-          log.debug(`doctor --fix: ${check.name} repair failed`, error);
+          this.debug(`doctor --fix: ${check.name} repair failed`, error);
           invocationWarnings.report(`${check.name} could not be repaired: ${errorMessage(error)}`);
         }
       }
@@ -406,7 +406,7 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
       next,
       fixes: warningAdvice?.fixes ?? [],
       verbose: this.meta.verbose,
-      columns: this.isOnScreen ? process.stdout.columns : undefined,
+      columns: process.stdout.columns,
     };
 
     if (failed.length > 0) {
@@ -455,7 +455,7 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
 
     const report = doctorReport(reportInput);
     // Only the terminal ending draws a summary's steps, so a pipe is given them as lines.
-    const piped = this.isOnScreen ? "" : renderNextSteps(report.next);
+    const piped = Output.screen ? "" : renderNextSteps(report.next);
 
     return this.emit({
       status: "ok",
@@ -464,7 +464,7 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
         title,
         sections: [],
         lines: [...report.lines, ...(piped === "" ? [] : ["", ...piped.split("\n")])],
-        ...(this.isOnScreen ? { next: stepsOf(report.next) } : {}),
+        ...(Output.screen ? { next: stepsOf(report.next) } : {}),
       },
       next,
       warnings: warnings.map((warning) => {

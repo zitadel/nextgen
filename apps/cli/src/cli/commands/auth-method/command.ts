@@ -2,13 +2,14 @@ import type { Interfaces } from "@oclif/core";
 
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log, warnings } from "@/lib/ui";
+import { Output, warnings } from "@/lib/ui";
 import { Destructive } from "@/lib/oclif/destructive";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { JsonEnvelope } from "@/lib/oclif/types";
+import { Promptable } from "@/lib/oclif/promptable";
 import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -334,7 +335,9 @@ const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"
  * credentials. Every other edit is local, and `deploy` publishes it like any
  * configuration change.
  */
-export abstract class AuthMethodCommand extends Destructive(ServerCommand(EnvironmentCommand)) {
+export abstract class AuthMethodCommand extends Destructive(
+  Promptable(ServerCommand(EnvironmentCommand)),
+) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.
@@ -463,7 +466,6 @@ export abstract class AuthMethodCommand extends Destructive(ServerCommand(Enviro
             return this.argsOf(command);
           }),
         },
-        json: this.isJson,
       };
       if (this.dryRun && this.nonInteractive && !this.force) {
         refuseNoSignInLeft(refusal);
@@ -532,16 +534,19 @@ export abstract class AuthMethodCommand extends Destructive(ServerCommand(Enviro
     ) {
       Consent.assert(consent);
     }
+    if (change.changed) {
+      this.info("Updating the project's files");
+    }
     const written = await change.save(target.store);
     for (const path of written) {
       if (change.createdPaths.includes(path)) {
-        log.done(`Wrote ${escapeControlCharacters(path)}`);
+        this.debug(`Wrote ${escapeControlCharacters(path)}`);
       } else {
-        log.done(`Updated ${escapeControlCharacters(path)}`);
+        this.debug(`Updated ${escapeControlCharacters(path)}`);
       }
     }
     for (const path of change.removedPaths) {
-      log.done(`Removed ${escapeControlCharacters(path)}`);
+      this.debug(`Removed ${escapeControlCharacters(path)}`);
     }
     return written;
   }
@@ -560,9 +565,38 @@ export abstract class AuthMethodCommand extends Destructive(ServerCommand(Enviro
       if (notice.severity === "warning") {
         warnings.report(notice.message);
       } else {
-        log.info(escapeControlCharacters(notice.message));
+        this.debug(escapeControlCharacters(notice.message));
       }
     }
+  }
+
+  /**
+   * What a change did, as the lines of a result: each file written, updated or
+   * removed, and each notice the configuration gave that is not a warning.
+   *
+   * @param change - The change.
+   * @param written - The files it wrote; leave it out for a dry run, which says
+   *   what it would remove and writes nothing.
+   * @returns The lines, in the order a person reads them.
+   */
+  protected said(change: Change, written?: readonly string[]): string[] {
+    return [
+      ...(written ?? []).map((path) => {
+        return change.createdPaths.includes(path)
+          ? `Wrote ${escapeControlCharacters(path)}`
+          : `Updated ${escapeControlCharacters(path)}`;
+      }),
+      ...change.removedPaths.map((path) => {
+        return `${written === undefined ? "Would remove" : "Removed"} ${escapeControlCharacters(path)}`;
+      }),
+      ...change.notices
+        .filter((notice) => {
+          return notice.severity !== "warning";
+        })
+        .map((notice) => {
+          return escapeControlCharacters(notice.message);
+        }),
+    ];
   }
 
   /**
@@ -681,11 +715,12 @@ export abstract class AuthMethodCommand extends Destructive(ServerCommand(Enviro
         summary: {
           title: wouldTitle,
           sections: [],
+          lines: this.said(change),
         },
         next: { commands: [real] },
       });
     }
-    await this.write(target, change, confirmed.consent);
+    const written = await this.write(target, change, confirmed.consent);
     this.report(change);
     const followUps = this.followUps(change.changed);
     const title = escapeControlCharacters(
@@ -702,6 +737,7 @@ export abstract class AuthMethodCommand extends Destructive(ServerCommand(Enviro
       summary: {
         title,
         sections: [],
+        lines: this.said(change, written),
       },
       next: { commands: followUps.commands },
     });
@@ -716,7 +752,6 @@ type NoSignInLeftRefusal = {
   readonly question: string;
   /** The exact re-run first, then enabling each method the schema could take instead, then a provider. */
   readonly suggested: FollowUps;
-  readonly json: boolean;
 };
 
 /**
@@ -733,7 +768,7 @@ type NoSignInLeftRefusal = {
  */
 function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
   const error = input.error;
-  const where = input.json
+  const where = Output.json
     ? " (the first of details.suggested_args holds the exact arguments)."
     : ".";
   // Its --force retry is a consent only a person may give, as every gate's is.

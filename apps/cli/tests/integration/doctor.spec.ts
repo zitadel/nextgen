@@ -858,13 +858,6 @@ describe("doctor", () => {
           code: "E_VALIDATION",
           message: "All of the following must be provided when using --force: --fix",
           next_commands: [expectedPublicCliCommand("doctor --help")],
-          details: {
-            original: {
-              name: "Error",
-              message:
-                "The following error occurred:\n  All of the following must be provided when using --force: --fix\nSee more help with --help",
-            },
-          },
         });
       });
     });

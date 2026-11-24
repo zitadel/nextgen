@@ -1,10 +1,8 @@
-import { Flags } from "@oclif/core";
-
-import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
-import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import { fieldPaths } from "@/lib/oclif/crud/paths";
 import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
 import type { GetSpec } from "@/lib/oclif/crud/types";
-import { json, painted } from "@/lib/oclif/rendering";
+import { painted } from "@/lib/oclif/rendering";
+import { fieldsFlag } from "@/lib/oclif/tabulatable";
 import type { CommandResult } from "@/lib/oclif/types";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -42,16 +40,7 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
         `<%= config.bin %> ${topic} get <${idName(resource)}> --json`,
       ],
       flags: {
-        fields: Flags.custom<
-          readonly string[],
-          Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
-        >({
-          parse: async (input, _command, flag) => {
-            return readColumns(input, flag.fallback, flag.shape);
-          },
-        })({
-          description:
-            "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+        fields: fieldsFlag({
           fallback: resource.detail ?? resource.columns,
           shape: fieldPaths(spec.response),
         }),
@@ -63,43 +52,31 @@ export abstract class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx
 
   protected override async operate({ flags, args }: ReadInput): Promise<CommandResult> {
     const { resource, spec } = this.definition;
-    const shape = fieldPaths(spec.response);
     const item = await spec.call(await this.context(), idValue(resource, args));
-    const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
     const heading = headingOf(resource.heading ?? resource.idField, item);
     const title = `Read ${escapeControlCharacters(heading ?? resource.singular, { keepLayout: false })}`;
 
-    if (!this.isOnScreen) {
-      return {
-        status: "ok",
-        data: item,
-        pretty: json(item),
-        summary: {
-          title,
-          sections: [],
-        },
-      };
-    }
+    const view = this.viewRecord(item, flags.fields, resource.detail ?? resource.columns);
     const sections =
-      flags.fields === undefined && !this.isJson
+      flags.fields === undefined
         ? ((await spec.sections?.(item, (columns, rows) => {
             return this.tabulate(columns, rows);
           })) ?? [])
         : [];
-    const record = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
+    const rendered = [this.tabulateDetail(undefined, view.columns, item), ...sections].join("\n\n");
 
     return {
       status: "ok",
-      data: item,
+      data: view.data,
       pretty: painted(
-        [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), record].join(
+        [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), rendered].join(
           "\n",
         ),
       ),
       summary: {
         title,
         sections: [],
-        lines: record.split("\n"),
+        lines: rendered.split("\n"),
       },
     };
   }

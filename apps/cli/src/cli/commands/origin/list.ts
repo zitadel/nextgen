@@ -1,7 +1,7 @@
 import { OriginService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The columns `list` renders, in order. */
@@ -24,6 +24,13 @@ export default class OriginList extends Tabulatable(ServerCommand(EnvironmentCom
     "<%= config.bin %> origin list --plain",
   ];
   static override flags = {
+    fields: fieldsFlag({
+      fallback: ["pattern"],
+      shape: {
+        known: new Set(["pattern", "kind"]),
+        open: [],
+      },
+    }),
     plain: plainFlag,
   };
 

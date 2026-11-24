@@ -3,7 +3,7 @@ import { Args } from "@oclif/core";
 import { Operation } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { fieldsFlag, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The columns `ls` renders, in order. */
@@ -53,6 +53,24 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
     tag: nonBlankString({
       description: "Only the operations of this part of the API (Users, Teams, …).",
     }),
+    fields: fieldsFlag({
+      shape: {
+        known: new Set([
+          "id",
+          "method",
+          "path",
+          "summary",
+          "tag",
+          "auth",
+          "callable",
+          "parameters",
+          "body",
+          "paging",
+          "command",
+        ]),
+        open: ["body", "paging"],
+      },
+    }),
     plain: plainFlag,
   };
 
@@ -73,26 +91,32 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
       return entryOf(operation);
     });
 
-    const rows = items;
-    const columns = COLUMNS;
-    const empty = "No operations found";
-    const footer: string[] = [];
-    const page = null;
-    const extra = {};
-
-    const listed = await this.listResult(flags, {
-      columns,
-      rows,
+    const view = {
+      columns: COLUMNS,
+      rows: items,
       singular: "operation",
-      empty,
-      footer,
-      page,
-      extra,
-      data: {
-        operations: items,
-        count: items.length,
-      },
-    });
+      empty: "No operations found",
+      footer: [] as string[],
+      page: null,
+    };
+
+    const listed = await this.listResult(
+      flags,
+      flags.fields === undefined
+        ? {
+            ...view,
+            extra: {},
+            data: {
+              operations: items,
+              count: items.length,
+            },
+          }
+        : {
+            ...view,
+            items,
+            extra: {},
+          },
+    );
 
     return this.emit({
       ...listed,

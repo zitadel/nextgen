@@ -9,6 +9,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted, prose } from "@/lib/oclif/rendering";
 import { BaseCommand } from "@/lib/oclif";
 import { CommandGroups } from "@/cli/commands/groups";
+import { Output } from "@/lib/ui";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -84,7 +85,7 @@ export default class Logs extends LocalServerCommand(ServerCommand(BaseCommand),
   }
 
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
-    if (flags.follow && this.isJson) {
+    if (flags.follow && Output.json) {
       throw refusalError(FOLLOW_IS_NOT_JSON_REFUSAL, {});
     }
 
@@ -99,14 +100,14 @@ export default class Logs extends LocalServerCommand(ServerCommand(BaseCommand),
         level: flags.level,
         print: (lines) => {
           if (!lines.isEmpty) {
-            process.stdout.write(`${lines.drawn(this.isColored).join("\n")}\n`);
+            process.stdout.write(`${lines.drawn(Output.color).join("\n")}\n`);
           }
         },
         signal: this.signal,
       });
 
       const title = "Stopped following local Zitadel logs";
-      if (this.isOnScreen) {
+      if (Output.screen) {
         return this.emit({
           status: "ok",
           data: { title },
@@ -122,7 +123,7 @@ export default class Logs extends LocalServerCommand(ServerCommand(BaseCommand),
       }
     } else {
       const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
-      const shown = lines.drawn(this.isColored);
+      const shown = lines.drawn(Output.color);
       const title = "Local Zitadel server logs";
 
       if (runtime.backend === "binary") {

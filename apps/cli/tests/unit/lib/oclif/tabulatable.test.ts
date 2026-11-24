@@ -11,9 +11,22 @@ vi.mock("@oclif/table", async (importOriginal) => {
 
 import { makeTable } from "@oclif/table";
 
+import ApiLs from "@/cli/commands/api/ls";
+import DeploymentGet from "@/cli/commands/deployment/get";
+import DeploymentList from "@/cli/commands/deployment/list";
+import EnvList from "@/cli/commands/env/list";
+import InvitationGet from "@/cli/commands/invitation/get";
+import InvitationList from "@/cli/commands/invitation/list";
+import OriginList from "@/cli/commands/origin/list";
+import PreviewList from "@/cli/commands/preview/list";
+import VariableGet from "@/cli/commands/variable/get";
+import VariableList from "@/cli/commands/variable/list";
+import VariableResolve from "@/cli/commands/variable/resolve";
 import { it } from "@tests/fixtures";
+import { parseFlag } from "@tests/helpers/inputs";
 import { asTerminal, offTerminal, type TerminalFixture } from "@tests/fixtures/terminal";
 import { aTableDrawnByARun, aTabulatingCommand } from "@tests/helpers/tabulate";
+import type { ListFlags } from "@/lib/oclif/tabulatable";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);
 
@@ -23,7 +36,7 @@ beforeEach(() => {
 
 /** What a list prints for a person or a pipe, for the given flags and view. */
 const printed = async (
-  flags: { plain: boolean | undefined },
+  flags: ListFlags,
   view: Parameters<ReturnType<typeof draw>["drawList"]>[1],
   argv: string[] = [],
 ): Promise<string> => {
@@ -42,7 +55,7 @@ const printed = async (
  * the count.
  */
 const summarised = async (
-  flags: { plain: boolean | undefined },
+  flags: ListFlags,
   view: Parameters<ReturnType<typeof draw>["drawList"]>[1],
   argv: string[] = [],
 ) => {
@@ -181,7 +194,7 @@ describe("a list for a person", () => {
 
   it("states the count as its headline, the table under it and the footer beside it", async () => {
     const summary = await asTerminal(() =>
-      summarised({ plain: false }, { ...view, footer: ["More."] }),
+      summarised({ plain: false, fields: undefined }, { ...view, footer: ["More."] }),
     );
 
     expect(summary).toEqual({
@@ -192,15 +205,40 @@ describe("a list for a person", () => {
     });
   });
 
+  it("refuses --fields for a list that carries no records to choose from", async () => {
+    await expect(
+      draw().drawList(
+        {
+          plain: false,
+          fields: ["id"],
+        },
+        {
+          ...view,
+          items: undefined,
+          data: {},
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "This list has no fields to choose from",
+    });
+  });
+
   it("builds the table once, and prints no second rendering of it", async () => {
-    const result = await asTerminal(() => draw().drawList({ plain: false }, view));
+    const result = await asTerminal(() =>
+      draw().drawList({ plain: false, fields: undefined }, view),
+    );
 
     expect(makeTable).toHaveBeenCalledTimes(1);
     expect(result).not.toHaveProperty("pretty");
   });
 
   it("says so when the list is empty", async () => {
-    expect(await asTerminal(() => summarised({ plain: false }, { ...view, rows: [] }))).toEqual({
+    expect(
+      await asTerminal(() =>
+        summarised({ plain: false, fields: undefined }, { ...view, rows: [] }),
+      ),
+    ).toEqual({
       title: "No things",
       sections: [],
     });
@@ -209,7 +247,9 @@ describe("a list for a person", () => {
   it("escapes a footer line, which names what the server answered", async () => {
     const footer = ["Frozen by dep_1\u001b[2J for https://a.example"];
 
-    const summary = await asTerminal(() => summarised({ plain: false }, { ...view, footer }));
+    const summary = await asTerminal(() =>
+      summarised({ plain: false, fields: undefined }, { ...view, footer }),
+    );
 
     expect(JSON.stringify(summary)).not.toContain("\\u001b");
     expect(summary?.extras).toEqual(["Frozen by dep_1\\x1b[2J for https://a.example"]);
@@ -219,7 +259,7 @@ describe("a list for a person", () => {
     const empty = "dep_1\u001b[2J froze no variables";
 
     const summary = await asTerminal(() =>
-      summarised({ plain: false }, { ...view, rows: [], empty }),
+      summarised({ plain: false, fields: undefined }, { ...view, rows: [], empty }),
     );
 
     expect(summary?.title).toBe("dep_1\\x1b[2J froze no variables");
@@ -228,17 +268,23 @@ describe("a list for a person", () => {
   it("pluralises the count, with the plural when one is given", async () => {
     const rows = [{ id: "a" }, { id: "b" }];
 
-    expect((await asTerminal(() => summarised({ plain: false }, { ...view, rows })))?.title).toBe(
-      "Found 2 things",
-    );
     expect(
-      (await asTerminal(() => summarised({ plain: false }, { ...view, rows, plural: "people" })))
+      (await asTerminal(() => summarised({ plain: false, fields: undefined }, { ...view, rows })))
         ?.title,
+    ).toBe("Found 2 things");
+    expect(
+      (
+        await asTerminal(() =>
+          summarised({ plain: false, fields: undefined }, { ...view, rows, plural: "people" }),
+        )
+      )?.title,
     ).toBe("Found 2 people");
   });
 
   it("draws nothing under --json", async () => {
-    const list = await asTerminal(() => printed({ plain: false }, view, ["--json"]));
+    const list = await asTerminal(() =>
+      printed({ plain: false, fields: undefined }, view, ["--json"]),
+    );
 
     expect(list).toBe("");
     expect(makeTable).not.toHaveBeenCalled();
@@ -259,31 +305,35 @@ describe("a list for a script", () => {
   };
 
   it("is plain for the --plain flag, and when there is no terminal", async () => {
-    expect(await asTerminal(() => printed({ plain: true }, view))).toBe("a");
-    expect(await offTerminal(() => printed({ plain: false }, view))).toBe("a");
-    expect(await offTerminal(() => printed({ plain: undefined }, view))).toBe("a");
+    expect(await asTerminal(() => printed({ plain: true, fields: undefined }, view))).toBe("a");
+    expect(await offTerminal(() => printed({ plain: false, fields: undefined }, view))).toBe("a");
+    expect(await offTerminal(() => printed({ plain: undefined, fields: undefined }, view))).toBe(
+      "a",
+    );
   });
 
   it("builds no table for a plain run, which draws none", async () => {
-    await asTerminal(() => draw().drawList({ plain: true }, view));
-    await offTerminal(() => draw().drawList({ plain: false }, view));
+    await asTerminal(() => draw().drawList({ plain: true, fields: undefined }, view));
+    await offTerminal(() => draw().drawList({ plain: false, fields: undefined }, view));
 
     expect(makeTable).not.toHaveBeenCalled();
   });
 
   it("is a table for a terminal that did not ask for plain", async () => {
-    const summary = await asTerminal(() => summarised({ plain: undefined }, view));
+    const summary = await asTerminal(() =>
+      summarised({ plain: undefined, fields: undefined }, view),
+    );
 
     expect(summary?.lines?.join("\n")).toContain("──");
   });
 
   it("prints nothing for an empty list", async () => {
-    expect(await printed({ plain: true }, { ...view, rows: [] })).toBe("");
+    expect(await printed({ plain: true, fields: undefined }, { ...view, rows: [] })).toBe("");
   });
 
   it("says what the footer says beside the rows, not in them", async () => {
     const result = await draw().drawList(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, footer: ["Deployment dep_1", "Origins: https://a.example"] },
     );
 
@@ -295,7 +345,7 @@ describe("a list for a script", () => {
 
   it("says the list is empty beside the rows, so a pipe still hears it", async () => {
     const result = await draw().drawList(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, rows: [], items: [], empty: "No things" },
     );
 
@@ -303,20 +353,23 @@ describe("a list for a script", () => {
   });
 
   it("names the next page beside the rows", async () => {
-    const result = await draw().drawList({ plain: true }, { ...view, page: { token: "p2" } });
+    const result = await draw().drawList(
+      { plain: true, fields: undefined },
+      { ...view, page: { token: "p2" } },
+    );
 
     expect(result).toMatchObject({ footer: "More available: --page-token p2 (or --all)" });
   });
 
   it("says nothing beside the rows when there is nothing to add", async () => {
-    const result = await draw().drawList({ plain: true }, view);
+    const result = await draw().drawList({ plain: true, fields: undefined }, view);
 
     expect(result).not.toHaveProperty("footer");
   });
 
   it("adds no footer under --json, which has an envelope for it", async () => {
     const result = await draw(["--json"]).drawList(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, footer: ["Deployment dep_1"] },
     );
 
@@ -325,7 +378,7 @@ describe("a list for a script", () => {
 
   it("emits one tab-separated record per line, with no header", async () => {
     const rows = await printed(
-      { plain: true },
+      { plain: true, fields: undefined },
       {
         ...view,
         columns: ["id", "metadata.status"],
@@ -341,7 +394,7 @@ describe("a list for a script", () => {
 
   it("keeps empty cells as empty fields so column positions hold", async () => {
     const rows = await printed(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, columns: ["id", "gone", "n"], rows: [{ id: "a", n: 3 }] },
     );
 
@@ -350,7 +403,7 @@ describe("a list for a script", () => {
 
   it("escapes tabs and newlines inside a value", async () => {
     const rows = await printed(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, columns: ["note"], rows: [{ note: "a\tb\nc" }] },
     );
 
@@ -359,7 +412,7 @@ describe("a list for a script", () => {
 
   it("escapes control characters so a value cannot drive the terminal", async () => {
     const rows = await printed(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, columns: ["id"], rows: [{ id: "a\u001b[2Jb" }] },
     );
 
@@ -382,7 +435,7 @@ describe("emitList", () => {
   };
 
   it("builds the canonical list data from the rows", async () => {
-    const result = await draw().drawList({ plain: true }, view);
+    const result = await draw().drawList({ plain: true, fields: undefined }, view);
 
     expect(result).toMatchObject({
       data: { items: [{ id: "a" }], count: 1, next_page_token: null },
@@ -391,7 +444,7 @@ describe("emitList", () => {
 
   it("carries other items in the data when the drawn rows are a view of them", async () => {
     const result = await draw().drawList(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, items: [{ id: "a", more: 1 }] },
     );
 
@@ -399,14 +452,17 @@ describe("emitList", () => {
   });
 
   it("adds extra fields beside items, count and next_page_token", async () => {
-    const result = await draw().drawList({ plain: true }, { ...view, extra: { resolved: "x" } });
+    const result = await draw().drawList(
+      { plain: true, fields: undefined },
+      { ...view, extra: { resolved: "x" } },
+    );
 
     expect(result).toMatchObject({ data: { count: 1, resolved: "x" } });
   });
 
   it("lets a list with a fixed shape supply its own data", async () => {
     const result = await draw().drawList(
-      { plain: true },
+      { plain: true, fields: undefined },
       {
         columns: view.columns,
         rows: view.rows,
@@ -424,7 +480,7 @@ describe("emitList", () => {
 
   it("reports the cursor under the property the platform spells it as", async () => {
     const result = await draw().drawList(
-      { plain: true },
+      { plain: true, fields: undefined },
       { ...view, page: { token: "p2", cursorKey: "nextCursor" } },
     );
 
@@ -434,7 +490,7 @@ describe("emitList", () => {
 
   it("does not let an extra field replace a canonical one", async () => {
     const replacing = draw().drawList(
-      { plain: true },
+      { plain: true, fields: undefined },
       // @ts-expect-error `count` belongs to the list itself
       { ...view, extra: { count: 99 } },
     );
@@ -443,20 +499,22 @@ describe("emitList", () => {
   });
 
   it("gives a pipe tab-separated rows, and sends the next steps beside them", async () => {
-    const result = await draw().drawList({ plain: true }, view);
+    const result = await draw().drawList({ plain: true, fields: undefined }, view);
 
     expect(result).toMatchObject({ pretty: { kind: "piped", text: "a" } });
   });
 
   it("keeps the next steps with the table for a person", async () => {
-    const result = await asTerminal(() => draw().drawList({ plain: false }, view));
+    const result = await asTerminal(() =>
+      draw().drawList({ plain: false, fields: undefined }, view),
+    );
 
     expect(result).toMatchObject({ summary: { title: "Found 1 thing" } });
   });
 
   it("reports the next page's cursor, its command and a footer that names it", async () => {
     const result = await draw(["--limit", "1"]).drawList(
-      { plain: false },
+      { plain: false, fields: undefined },
       { ...view, page: { token: "p2" } },
     );
 
@@ -468,7 +526,7 @@ describe("emitList", () => {
 
   it("asks for the next page with its token in place of the one the run was given", async () => {
     const result = await draw(["--page-token", "p1", "--all"]).drawList(
-      { plain: false },
+      { plain: false, fields: undefined },
       { ...view, page: { token: "p2" } },
     );
 
@@ -479,7 +537,7 @@ describe("emitList", () => {
 
   it("asks for the next page as JSON when the run was JSON", async () => {
     const result = await draw(["--json"]).drawList(
-      { plain: false },
+      { plain: false, fields: undefined },
       { ...view, page: { token: "p2" } },
     );
 
@@ -490,7 +548,7 @@ describe("emitList", () => {
 
   it("names the next page in the footer of a person's list", async () => {
     const result = await asTerminal(() =>
-      draw().drawList({ plain: false }, { ...view, page: { token: "p2" } }),
+      draw().drawList({ plain: false, fields: undefined }, { ...view, page: { token: "p2" } }),
     );
 
     expect(result).toMatchObject({
@@ -501,7 +559,7 @@ describe("emitList", () => {
   it("names the next page under an empty page too, since more may follow it", async () => {
     const result = await asTerminal(() =>
       draw().drawList(
-        { plain: false },
+        { plain: false, fields: undefined },
         {
           ...view,
           rows: [],
@@ -523,7 +581,10 @@ describe("emitList", () => {
 
   it("quotes a cursor holding a control character so a shell reads it back as it is", async () => {
     const result = await asTerminal(() =>
-      draw().drawList({ plain: false }, { ...view, page: { token: "a\u001bb" } }),
+      draw().drawList(
+        { plain: false, fields: undefined },
+        { ...view, page: { token: "a\u001bb" } },
+      ),
     );
 
     expect(result).toMatchObject({
@@ -533,7 +594,7 @@ describe("emitList", () => {
 
   it("joins a cursor that starts with a dash to its option, so it stays one option", async () => {
     const result = await asTerminal(() =>
-      draw().drawList({ plain: false }, { ...view, page: { token: "-p2" } }),
+      draw().drawList({ plain: false, fields: undefined }, { ...view, page: { token: "-p2" } }),
     );
 
     expect(result).toMatchObject({
@@ -591,7 +652,9 @@ describe("Tabulatable", () => {
     const defining: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) continue;
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
+        continue;
+      }
       if (/\bplain: Flags\./.test(await readFile(join(root, file), "utf8"))) {
         defining.push(file);
       }
@@ -605,7 +668,9 @@ describe("Tabulatable", () => {
     const importing: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) continue;
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) {
+        continue;
+      }
       if (/["']@oclif\/table["']/.test(await readFile(join(root, file), "utf8"))) {
         importing.push(file);
       }
@@ -619,7 +684,9 @@ describe("Tabulatable", () => {
     const without: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts")) continue;
+      if (!file.endsWith(".ts")) {
+        continue;
+      }
       const source = await readFile(join(root, file), "utf8");
       if (source.includes("emitList(") && !source.includes("const COLUMNS")) {
         without.push(file);
@@ -627,5 +694,220 @@ describe("Tabulatable", () => {
     }
 
     expect(without).toEqual([]);
+  });
+});
+
+describe("--fields", () => {
+  const items = [
+    {
+      id: "a",
+      name: "Ann",
+      attributes: {
+        email: "ann@example.com",
+        age: 3,
+      },
+    },
+    {
+      id: "b",
+      name: "Bob",
+      attributes: {
+        email: "bob@example.com",
+        age: 4,
+      },
+    },
+  ];
+  const view = {
+    columns: ["id", "name"],
+    rows: items.map(({ id, name }) => ({ id, name })),
+    items,
+    singular: "user",
+    empty: "No users found",
+    footer: [],
+    page: null,
+    extra: {},
+  };
+
+  const dataOf = async (fields: readonly string[] | undefined) => {
+    const result = await draw(["--json"]).drawList(
+      {
+        plain: false,
+        fields,
+      },
+      view,
+    );
+    return result.status === "ok" ? result.data : undefined;
+  };
+
+  it("cuts each record under --json to the paths named, nested as they were", async () => {
+    expect(await dataOf(["id", "attributes.email"])).toMatchObject({
+      items: [
+        {
+          id: "a",
+          attributes: { email: "ann@example.com" },
+        },
+        {
+          id: "b",
+          attributes: { email: "bob@example.com" },
+        },
+      ],
+      count: 2,
+    });
+  });
+
+  it("returns the whole record under --json without it", async () => {
+    expect(await dataOf(undefined)).toMatchObject({ items });
+  });
+
+  it("draws the rows of a script from the paths named, read from the records", async () => {
+    const result = await offTerminal(() => {
+      return draw().drawList(
+        {
+          plain: true,
+          fields: ["name", "attributes.age"],
+        },
+        view,
+      );
+    });
+
+    expect(result.status === "ok" ? result.pretty?.text : undefined).toBe("Ann\t3\nBob\t4");
+  });
+
+  it("refuses a path the records do not carry, and names the ones they do", async () => {
+    await expect(dataOf(["nope"])).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("refuses a list whose whole data is fixed, which has no records to cut", async () => {
+    await expect(
+      draw(["--json"]).drawList(
+        {
+          plain: false,
+          fields: ["id"],
+        },
+        {
+          ...view,
+          items: undefined,
+          data: { operations: [] },
+          page: null,
+          extra: {},
+        },
+      ),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+});
+
+describe("--fields cutting a record", () => {
+  it("keeps the paths named, nested, and leaves out what the record lacks", async () => {
+    expect(
+      draw().cut(
+        {
+          a: 1,
+          b: {
+            c: 2,
+            d: 3,
+          },
+        },
+        ["a", "b.c", "x.y"],
+      ),
+    ).toEqual({
+      a: 1,
+      b: { c: 2 },
+    });
+  });
+
+  it("reads a record as --json prints it, through its toJSON", async () => {
+    class Held {
+      readonly id = "dep_1";
+      private readonly record = {
+        project_id: "proj_1",
+        status: "live",
+      };
+
+      toJSON(): Record<string, unknown> {
+        return {
+          id: this.id,
+          ...this.record,
+        };
+      }
+    }
+
+    expect(draw().cut(new Held(), ["id", "project_id", "status"])).toEqual({
+      id: "dep_1",
+      project_id: "proj_1",
+      status: "live",
+    });
+  });
+
+  it("leaves out what a record only inherits", async () => {
+    expect(
+      draw().cut(
+        {
+          id: "a",
+          attributes: { x: 1 },
+        },
+        ["attributes.constructor", "id"],
+      ),
+    ).toEqual({
+      id: "a",
+    });
+  });
+
+  it("ignores a path that names a prototype", async () => {
+    expect(Object.keys(draw().cut({ a: 1 }, ["__proto__.polluted", "a"]) as object)).toEqual(["a"]);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
+describe("--fields on one record", () => {
+  const record = {
+    id: "a",
+    name: "Ann",
+    attributes: {
+      email: "ann@example.com",
+      age: 3,
+    },
+  };
+
+  it("carries the whole record and the default columns when no field was chosen", async () => {
+    const view = draw().view(record, undefined, ["id", "name"]);
+
+    expect(view.data).toBe(record);
+    expect(view.columns).toEqual(["id", "name"]);
+  });
+
+  it("cuts the data to the fields chosen and shows them as the columns", async () => {
+    const view = draw().view(record, ["id", "attributes.email"], ["name"]);
+
+    expect(view.data).toEqual({
+      id: "a",
+      attributes: { email: "ann@example.com" },
+    });
+    expect(view.columns).toEqual(["id", "attributes.email"]);
+  });
+
+  it("leaves a field the record lacks out of the data and does not refuse it", async () => {
+    const view = draw().view(record, ["id", "responded_by"], ["name"]);
+
+    expect(view.data).toEqual({ id: "a" });
+    expect(view.columns).toEqual(["id", "responded_by"]);
+  });
+});
+
+describe("every command taking --fields", () => {
+  it.each([
+    ["variable list", VariableList.flags.fields],
+    ["variable resolve", VariableResolve.flags.fields],
+    ["variable get", VariableGet.flags.fields],
+    ["deployment list", DeploymentList.flags.fields],
+    ["deployment get", DeploymentGet.flags.fields],
+    ["invitation list", InvitationList.flags.fields],
+    ["invitation get", InvitationGet.flags.fields],
+    ["preview list", PreviewList.flags.fields],
+    ["origin list", OriginList.flags.fields],
+    ["env list", EnvList.flags.fields],
+    ["api ls", ApiLs.flags.fields],
+  ])("judges a field by its shape before any request, in %s", async (_name, flag) => {
+    await expect(parseFlag(flag, "no_such_field", "fields")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 });
