@@ -753,9 +753,26 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
-          message: "--as=number cannot also be provided when using --secret",
-          next_commands: [expectedPublicCliCommand("variable set --help")],
+          message: "A secret is stored as a string.",
+          hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
         });
+      });
+
+      it("accepts a secret stored as the string it already is", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "variable",
+          "set",
+          "TOKEN",
+          "--secret",
+          "--as",
+          "string",
+          "--dry-run",
+          "--json",
+        ]);
+
+        expect(JSON.parse(result.stdout)).toMatchObject({ status: "ok", data: { secret: true } });
       });
 
       it("refuses a value that is not the type asked for", async () => {

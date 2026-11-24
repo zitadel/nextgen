@@ -12,11 +12,16 @@ import { readingFrom, type SuggestInput, WHAT_CHANGED } from "@/lib/suggestion";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView, type VariableType } from "@/lib/variable";
-import { relatedFlags } from "@/lib/suggestion/relations";
 import { warnings } from "@/lib/ui";
 import { variableNameArg } from "./name";
 import { Promptable } from "@/cli/core/promptable";
 import { ChangeCommand } from "@/cli/commands/bases";
+
+/** How a secret asked to be stored as another type is refused. */
+const SECRET_AS_STRING_REFUSAL = {
+  message: "A secret is stored as a string.",
+  hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
+} as const satisfies Refusal;
 
 /** How a secret given on the command line, where it would reach shell history, is refused. */
 const SECRET_VALUE_REFUSAL = {
@@ -173,24 +178,21 @@ export default class VariableSet extends Tabulatable(Promptable(ChangeCommand)) 
       description: "The value, for a plain (non-secret) variable.",
     }),
   };
-  static override flags = relatedFlags(
-    {
-      secret: Flags.boolean({
-        default: false,
-        description: "Store the value encrypted. It can be replaced later but never read back.",
-      }),
-      as: Flags.option({
-        options: VariableView.TYPES,
-        default: "string",
-        description: "Store the value as this JSON type.",
-      })(),
-      preview: Flags.boolean({
-        default: false,
-        description: "Write the preview value alone, leaving the primary one as it is.",
-      }),
-    },
-    { secret: { exclusive: ["as"] } },
-  );
+  static override flags = {
+    secret: Flags.boolean({
+      default: false,
+      description: "Store the value encrypted. It can be replaced later but never read back.",
+    }),
+    as: Flags.option({
+      options: VariableView.TYPES,
+      default: "string",
+      description: "Store the value as this JSON type.",
+    })(),
+    preview: Flags.boolean({
+      default: false,
+      description: "Write the preview value alone, leaving the primary one as it is.",
+    }),
+  };
 
   /**
    * Says what the write would store, before the connection and without the
@@ -404,6 +406,9 @@ export default class VariableSet extends Tabulatable(Promptable(ChangeCommand)) 
       preview: flags.preview,
     });
 
+    if (write.secret && flags.as !== "string") {
+      throw refusalError(SECRET_AS_STRING_REFUSAL, {});
+    }
     if (write.secret && args.value !== undefined) {
       throw refusalError(SECRET_VALUE_REFUSAL, {});
     }
