@@ -1,7 +1,8 @@
 # Agent Instructions — `apps/teaser-video`
 
 The login teaser video, rendered with [Remotion](https://remotion.dev) from the
-real atoms of `@zitadel/components`. Not deployed and not published.
+real atoms of `@zitadel/components`. Not deployed and not published. How it is
+built and how to edit it: [README.md](README.md).
 
 ```sh
 moon run teaser-video:dev      # Remotion Studio, to scrub and preview
@@ -21,8 +22,8 @@ moon run teaser-video:render   # dist/teaser.mp4
   animations; import it before the atoms, and animate by the frame instead.
 - A frame that depends on a Lit update waits for `updateComplete` behind
   `delayRender`; Lit renders a property change a microtask later.
-- The music is licensed and git-ignored: put `mörket.mp3` in `public/music/`
-  before a render. Its cut points are track beats in `src/soundtrack.tsx`.
+- Never commit music or name a licensed track in the code: tracks live in the
+  git-ignored `public/music/`, wired through `MUSIC` in `src/soundtrack.tsx`.
 - Check a cut by ear in the `TeaserWithMetronome` composition, which plays the
   beat grid over the music.
 - `src/fonts/APK-Futural-Regular.woff2` is the website's licensed heading
