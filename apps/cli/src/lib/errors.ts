@@ -208,7 +208,7 @@ export class ZitadelError extends Error {
  * own codes, with exit codes that no longer collide, is a separate decision;
  * this table is the one place it lands.
  */
-const CATEGORY_CODES: Record<ErrorCategory, ZitadelErrorCode> = {
+const CATEGORY_CODES: Readonly<Record<ErrorCategory, ZitadelErrorCode>> = {
   invalid: "E_VALIDATION",
   missing: "E_NOT_FOUND",
   conflict: "E_CONFLICT",
@@ -217,6 +217,16 @@ const CATEGORY_CODES: Record<ErrorCategory, ZitadelErrorCode> = {
   fault: "E_VALIDATION",
   unknown: "E_VALIDATION",
 };
+
+/**
+ * The code a category is reported with, which a class's `code` starts from.
+ *
+ * @param category - The kind of failure.
+ * @returns Its stable product code.
+ */
+export function categoryCode(category: ErrorCategory): ZitadelErrorCode {
+  return CATEGORY_CODES[category];
+}
 
 /**
  * Where a failure is reported with a code other than the one its category has,

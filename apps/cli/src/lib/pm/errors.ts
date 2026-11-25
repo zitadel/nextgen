@@ -1,4 +1,9 @@
-import type { Categorized, ErrorCategory } from "@/lib/errors";
+import {
+  categoryCode,
+  type Categorized,
+  type ErrorCategory,
+  type ZitadelErrorCode,
+} from "@/lib/errors";
 
 /**
  * What a package manager failure carries beyond its message.
@@ -41,6 +46,14 @@ export class PmError extends Error implements Categorized {
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
+
+  /**
+   * The stable product code the failure is reported with, which is the one
+   * its category has unless a class's condition has a code of its own.
+   */
+  get code(): ZitadelErrorCode {
+    return categoryCode(this.category);
+  }
 
   /**
    * What to do about it.
@@ -107,7 +120,7 @@ export type PmCommandFailedOptions = PmErrorOptions & {
    * The errno string of a command that could not start, or the exit code of
    * one that ran and failed.
    */
-  readonly code?: string | number | undefined;
+  readonly exit?: string | number | undefined;
 
   /**
    * The signal that ended the command, when one did.
@@ -136,7 +149,7 @@ export class PmCommandFailedError extends PmError {
   /**
    * The errno string or the exit code.
    */
-  readonly code: string | number | undefined;
+  readonly exit: string | number | undefined;
 
   /**
    * The signal that ended the command, when one did.
@@ -152,11 +165,11 @@ export class PmCommandFailedError extends PmError {
    * Make the failure.
    *
    * @param message - What went wrong.
-   * @param options - The code, signal, captured output and cause.
+   * @param options - The exit, signal, captured output and cause.
    */
   constructor(message: string, options: PmCommandFailedOptions = {}) {
     super(message, options);
-    this.code = options.code;
+    this.exit = options.exit;
     this.signal = options.signal;
     this.output = options.output;
   }

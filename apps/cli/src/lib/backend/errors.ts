@@ -1,6 +1,11 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import type { Categorized, ErrorCategory } from "@/lib/errors";
+import {
+  categoryCode,
+  type Categorized,
+  type ErrorCategory,
+  type ZitadelErrorCode,
+} from "@/lib/errors";
 
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{
@@ -35,6 +40,14 @@ export class BackendError extends Error implements Categorized {
   readonly category: ErrorCategory;
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
+
+  /**
+   * The stable product code the failure is reported with, which is the one
+   * its category has unless a class's condition has a code of its own.
+   */
+  get code(): ZitadelErrorCode {
+    return categoryCode(this.category);
+  }
   readonly status: number | undefined;
   readonly url: string | undefined;
   readonly body: unknown;
@@ -128,6 +141,11 @@ export class BackendOperationAmbiguousError extends BackendError {
 /** The server does not implement what was asked: a `501`. Retrying cannot help. */
 export class BackendUnsupportedError extends BackendError {
   override readonly retryable: boolean = false;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_UNSUPPORTED_PROJECT_SHAPE";
+  }
   override readonly name: string = "BackendUnsupportedError";
 
   constructor(message: string, options: BackendErrorOptions = {}) {

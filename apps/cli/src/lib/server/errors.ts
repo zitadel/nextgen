@@ -1,4 +1,10 @@
-import { errorMessage, type Categorized, type ErrorCategory } from "@/lib/errors";
+import {
+  categoryCode,
+  errorMessage,
+  type Categorized,
+  type ErrorCategory,
+  type ZitadelErrorCode,
+} from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import type { ServerRecord, StopOutcome } from "@/lib/server/local/internal/lifecycle";
 
@@ -29,6 +35,14 @@ export class LocalServerError extends Error implements Categorized {
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
+
+  /**
+   * The stable product code the failure is reported with, which is the one
+   * its category has unless a class's condition has a code of its own.
+   */
+  get code(): ZitadelErrorCode {
+    return categoryCode(this.category);
+  }
 
   /** What to do about it, when the package can say. */
   readonly hint: string | undefined;
@@ -61,6 +75,11 @@ export type LocalServerDownReason = "not-running" | "not-responding";
  */
 export class LocalServerDownError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_LOCAL_SERVER_NOT_RUNNING";
+  }
   /** Whether there is no record at all, or a record whose server does not answer. */
   readonly reason: LocalServerDownReason;
 
@@ -110,6 +129,11 @@ export class LocalServerMalformedError extends LocalServerError {
 /** Another start is running in the folder, and still holds its lock. */
 export class LocalServerBusyError extends LocalServerError {
   override readonly retryable: boolean = true;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_CONFLICT";
+  }
   /**
    * Creates the error.
    *
@@ -130,6 +154,11 @@ export type LocalServerStopReason = "server" | "processes" | "unlistable";
  */
 export class LocalServerStopError<R = unknown> extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The stable product code: a machine that cannot list its processes is an unsupported shape. */
+  override get code(): ZitadelErrorCode {
+    return this.reason === "unlistable" ? "E_UNSUPPORTED_PROJECT_SHAPE" : super.code;
+  }
   /** A recorded server, the processes found on the data, or processes that cannot be listed. */
   readonly reason: LocalServerStopReason;
 
@@ -298,6 +327,11 @@ export class LocalServerInternalError extends LocalServerError {
 /** A port that was explicitly asked for is held, so the start is refused rather than moved. */
 export class LocalServerPortBusyError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_PORT_IN_USE";
+  }
   /** The port that is held. */
   readonly port: number;
 
@@ -316,6 +350,11 @@ export class LocalServerPortBusyError extends LocalServerError {
 /** Every port in the search range was taken. */
 export class LocalServerPortFullError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_PORT_IN_USE";
+  }
   /** The first port that was tried. */
   readonly firstPort: number;
 

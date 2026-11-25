@@ -1,4 +1,9 @@
-import type { Categorized, ErrorCategory } from "@/lib/errors";
+import {
+  categoryCode,
+  type Categorized,
+  type ErrorCategory,
+  type ZitadelErrorCode,
+} from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
@@ -41,6 +46,14 @@ export class ConsentError extends Error implements Categorized {
   readonly retryable: boolean = false;
 
   /**
+   * The stable product code the failure is reported with, which is the one
+   * its category has unless a class's condition has a code of its own.
+   */
+  get code(): ZitadelErrorCode {
+    return categoryCode(this.category);
+  }
+
+  /**
    * What to do about it.
    */
   readonly hint: string | undefined;
@@ -74,6 +87,11 @@ export class ConsentRequiredError extends ConsentError {
   override readonly name: string = "ConsentRequiredError";
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_CONFIRMATION_REQUIRED";
+  }
 
   /**
    * The question a person would have been asked.

@@ -1,4 +1,9 @@
-import type { Categorized, ErrorCategory } from "@/lib/errors";
+import {
+  categoryCode,
+  type Categorized,
+  type ErrorCategory,
+  type ZitadelErrorCode,
+} from "@/lib/errors";
 
 /**
  * What an identity-provider failure carries beyond its message.
@@ -38,6 +43,14 @@ export class IdpError extends Error implements Categorized {
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
+
+  /**
+   * The stable product code the failure is reported with, which is the one
+   * its category has unless a class's condition has a code of its own.
+   */
+  get code(): ZitadelErrorCode {
+    return categoryCode(this.category);
+  }
 
   /**
    * What to do about it.
@@ -150,6 +163,11 @@ export class IdpProviderUnknownError extends IdpError {
   override readonly name: string = "IdpProviderUnknownError";
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_VALIDATION";
+  }
 
   /**
    * The name that was given.

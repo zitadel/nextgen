@@ -24,7 +24,7 @@ describe("the package manager errors", () => {
     const cause = new Error("spawn");
     const error = new PmCommandFailedError("npm install failed with exit 1", {
       cause,
-      code: 1,
+      exit: 1,
       signal: null,
       output: "boom",
     });
@@ -33,7 +33,7 @@ describe("the package manager errors", () => {
     expect(error.category).toBe("unknown");
     expect(error.retryable).toBe(false);
     expect(error.cause).toBe(cause);
-    expect(error).toMatchObject({ code: 1, signal: null, output: "boom" });
+    expect(error).toMatchObject({ exit: 1, signal: null, output: "boom" });
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
       message: "npm install failed with exit 1",

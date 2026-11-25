@@ -1,4 +1,9 @@
-import type { Categorized, ErrorCategory } from "@/lib/errors";
+import {
+  categoryCode,
+  type Categorized,
+  type ErrorCategory,
+  type ZitadelErrorCode,
+} from "@/lib/errors";
 
 /**
  * What an orca failure carries beyond its message.
@@ -39,6 +44,14 @@ export class OrcaError extends Error implements Categorized {
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
+
+  /**
+   * The stable product code the failure is reported with, which is the one
+   * its category has unless a class's condition has a code of its own.
+   */
+  get code(): ZitadelErrorCode {
+    return categoryCode(this.category);
+  }
 
   /**
    * What to do about it.
@@ -83,6 +96,11 @@ export class OrcaFrameworkError extends OrcaError {
   override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
 
+  /** The stable product code, which each reason of the framework failing has its own of. */
+  override get code(): ZitadelErrorCode {
+    return FRAMEWORK_CODES[this.reason];
+  }
+
   /**
    * Why the framework cannot be used.
    */
@@ -108,6 +126,15 @@ export class OrcaFrameworkError extends OrcaError {
     this.category = FRAMEWORK_CATEGORIES[reason];
   }
 }
+
+/** The code each {@link OrcaFrameworkReason} is reported with. */
+const FRAMEWORK_CODES: Record<OrcaFrameworkReason, ZitadelErrorCode> = {
+  none: "E_FRAMEWORK_NOT_DETECTED",
+  unknown: "E_FRAMEWORK_NOT_DETECTED",
+  layout: "E_UNSUPPORTED_PROJECT_SHAPE",
+  outdated: "E_UNSUPPORTED_PROJECT_SHAPE",
+  mismatch: "E_CONFLICT",
+};
 
 /** The kind of failure each {@link OrcaFrameworkReason} is. */
 const FRAMEWORK_CATEGORIES: Record<OrcaFrameworkReason, ErrorCategory> = {
@@ -242,6 +269,11 @@ export class OrcaRendererError extends OrcaError {
   override readonly name: string = "OrcaRendererError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
+
+  /** The stable product code: a renderer not published yet is not implemented. */
+  override get code(): ZitadelErrorCode {
+    return this.reason === "pending" ? "E_NOT_IMPLEMENTED" : super.code;
+  }
 
   /**
    * Why the renderer cannot be used.

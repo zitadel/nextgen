@@ -154,7 +154,7 @@ export class PackageCommand {
       throw new PmCommandFailedError(
         result.originalMessage ?? result.message ?? `${this.display} did not start`,
         {
-          code: result.code,
+          exit: result.code,
         },
       );
     }
@@ -163,7 +163,7 @@ export class PackageCommand {
         ? `signal ${result.signal}`
         : `exit ${String(result.exitCode ?? 1)}`;
       throw new PmCommandFailedError(`${this.display} failed with ${detail}`, {
-        code: result.exitCode ?? 1,
+        exit: result.exitCode ?? 1,
         signal: result.signal ?? null,
         ...(capture ? { output: String(result.all ?? "") } : {}),
       });
