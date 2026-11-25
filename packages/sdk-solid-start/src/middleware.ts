@@ -14,6 +14,7 @@ import {
   matchesRoutes,
   proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -357,7 +358,7 @@ export function createNextgenMiddleware(
     // An OAuth issuer that is not this app's project: the app answers, so its
     // origin never serves another project's issuer.
     if (route?.refused) {
-      return new Response("Not Found", { status: 404 });
+      return refusedProxyResponse();
     }
     if (route) {
       return proxyRequest(event, url2, url, route, projectId, projectSecret, proxyTimeoutMs);

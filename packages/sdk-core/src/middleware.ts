@@ -173,6 +173,20 @@ const AUTHORIZATION_SERVER_METADATA = "/.well-known/oauth-authorization-server";
 /** The path every OAuth issuer of the server lives under, before its project id. */
 const OAUTH_PREFIX = "/oauth";
 
+/** The only proxy path the server builds an issuer from. */
+const DEFAULT_PROXY_PATH = "/__nextgen";
+
+const warned = new Set<string>();
+
+/** Says `message` once per process on the app's server log. */
+function warnOnce(message: string): void {
+  if (warned.has(message)) {
+    return;
+  }
+  warned.add(message);
+  console.error(`[nextgen] ${message}`);
+}
+
 /** What decides where the proxy sends a request. */
 export interface ProxyRouteOptions {
   /** The path prefix the app proxies, e.g. `"/__nextgen"`. */
@@ -238,16 +252,15 @@ function isUnder(path: string, prefix: string): boolean {
  * @param options  - The app's proxy path, project and login page.
  */
 export function proxyRoute(pathname: string, options: ProxyRouteOptions): ProxyRoute | undefined {
-  const { proxyPath, projectId, loginPath } = options;
+  const { proxyPath, loginPath } = options;
   const headers = {
     "x-forwarded-prefix": proxyPath,
     "x-zitadel-login-path": loginPath.split(/[?#]/, 1)[0] ?? loginPath,
   };
-  const ownIssuer = projectId ? `${OAUTH_PREFIX}/${projectId}` : undefined;
   if (isUnder(pathname, proxyPath)) {
     const path = pathname.slice(proxyPath.length);
     const refused =
-      isUnder(path, OAUTH_PREFIX) && (ownIssuer === undefined || !isUnder(path, ownIssuer));
+      isUnder(path, OAUTH_PREFIX) && !servesIssuer(options, (own) => isUnder(path, own));
     return { path, refused, headers };
   }
   const issuers = `${AUTHORIZATION_SERVER_METADATA}${proxyPath}${OAUTH_PREFIX}`;
@@ -255,11 +268,58 @@ export function proxyRoute(pathname: string, options: ProxyRouteOptions): ProxyR
     const issuer = `${OAUTH_PREFIX}${pathname.slice(issuers.length)}`;
     return {
       path: `${AUTHORIZATION_SERVER_METADATA}${issuer}`,
-      refused: issuer !== ownIssuer,
+      refused: !servesIssuer(options, (own) => issuer === own),
       headers,
     };
   }
   return undefined;
+}
+
+/**
+ * Whether an OAuth path is one of this app's issuer, by `isOwn`, which gets
+ * the issuer's path on the server. On the app's server log it says once why
+ * the app is no issuer when its own setup is the reason: no project is
+ * configured, or the proxy path is not the one the server knows.
+ */
+function servesIssuer(options: ProxyRouteOptions, isOwn: (ownIssuer: string) => boolean): boolean {
+  const { proxyPath, projectId } = options;
+  if (!projectId) {
+    warnOnce(
+      "No project id is configured, so this app's OAuth issuer answers 404. " +
+        "Set ZITADEL_PROJECT_ID (or the `projectId` option) to the project this app signs its users in to.",
+    );
+    return false;
+  }
+  if (!isOwn(`${OAUTH_PREFIX}/${projectId}`)) {
+    return false;
+  }
+  if (proxyPath !== DEFAULT_PROXY_PATH) {
+    warnOnce(
+      `The proxy path is "${proxyPath}", but the server serves a project's OAuth issuer only ` +
+        `under "${DEFAULT_PROXY_PATH}", so this app's issuer answers 404. ` +
+        "Leave `proxyPath` at its default to make this app an issuer.",
+    );
+  }
+  return true;
+}
+
+/**
+ * The answer to a request {@link proxyRoute} refuses: the `404` the server
+ * gives for an issuer it does not serve, so a client reads the same answer
+ * whether the app or the server refused. It never says why: the caller is
+ * anonymous, and the app's server log names a cause in the app's own setup.
+ */
+export function refusedProxyResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      error: "invalid_request",
+      error_description: "no authorization server at this issuer",
+    }),
+    {
+      status: 404,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+    },
+  );
 }
 
 // ─── Response header filtering ───────────────────────────────────────────────
@@ -1425,16 +1485,10 @@ function signedOut(): UnauthState {
   return { isAuthenticated: false, session: null };
 }
 
-let warnedMissingProject = false;
-
 /** Says once per process why no session counts: no project is configured. */
 function warnMissingProject(): void {
-  if (warnedMissingProject) {
-    return;
-  }
-  warnedMissingProject = true;
-  console.error(
-    "[nextgen] No project id is configured, so no session counts as signed in. " +
+  warnOnce(
+    "No project id is configured, so no session counts as signed in. " +
       "Set ZITADEL_PROJECT_ID (or the `projectId` option) to the project this app signs its users in to.",
   );
 }

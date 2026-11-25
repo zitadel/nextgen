@@ -1499,8 +1499,16 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
         APP_PROXY,
       );
 
+      // The server's own answer for an issuer it does not serve.
+      const refusal = {
+        error: "invalid_request",
+        error_description: "no authorization server at this issuer",
+      };
       expect(metadata.status).toBe(404);
+      expect(JSON.parse(metadata.body)).toEqual(refusal);
+      expect(metadata.headers.get("content-type")).toContain("application/json");
       expect(endpoint.status).toBe(404);
+      expect(JSON.parse(endpoint.body)).toEqual(refusal);
       expect(calls).toHaveLength(0);
     });
 

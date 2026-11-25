@@ -16,6 +16,7 @@ import {
   jwtNamesProject,
   proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   requiresProjectSecret,
   resolveSession,
   serializeSessionCookie,
@@ -344,6 +345,70 @@ describe("proxyRoute", () => {
       proxyRoute("/__nextgen/api/v1/flows", { ...options, loginPath: "/signin?from=app#top" })
         ?.headers,
     ).toEqual({ "x-forwarded-prefix": "/__nextgen", "x-zitadel-login-path": "/signin" });
+  });
+
+  describe("the app's server log", () => {
+    /** A fresh copy of the module, which has warned about nothing yet. */
+    async function fresh() {
+      vi.resetModules();
+      return (await import("./middleware.js")).proxyRoute;
+    }
+    let logged: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      logged.mockRestore();
+    });
+
+    it("says once that no project is configured when an OAuth path is asked for", async () => {
+      const route = await fresh();
+      const anonymous = { ...options, projectId: undefined };
+
+      route("/__nextgen/api/v1/flows", anonymous);
+      expect(logged).not.toHaveBeenCalled();
+
+      route("/__nextgen/oauth/proj_app/authorize", anonymous);
+      route(`${METADATA}/__nextgen/oauth/proj_app`, anonymous);
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.mock.calls[0]?.[0]).toContain("ZITADEL_PROJECT_ID");
+    });
+
+    it("says once that a proxy path of the app's own makes it no issuer", async () => {
+      const route = await fresh();
+      const custom = { ...options, proxyPath: "/auth" };
+
+      route("/auth/api/v1/flows", custom);
+      route("/auth/oauth/proj_other/authorize", custom);
+      expect(logged).not.toHaveBeenCalled();
+
+      route("/auth/oauth/proj_app/authorize", custom);
+      route(`${METADATA}/auth/oauth/proj_app`, custom);
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.mock.calls[0]?.[0]).toContain('"/auth"');
+    });
+
+    it("says nothing about another project's issuer", async () => {
+      const route = await fresh();
+
+      route("/__nextgen/oauth/proj_other/authorize", options);
+      route("/__nextgen/oauth/proj_app/authorize", options);
+      expect(logged).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("refusedProxyResponse", () => {
+  it("answers as the server does for an issuer it does not serve", async () => {
+    const response = refusedProxyResponse();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toBe("application/json");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      error: "invalid_request",
+      error_description: "no authorization server at this issuer",
+    });
   });
 });
 

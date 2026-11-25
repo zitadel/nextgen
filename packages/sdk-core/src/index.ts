@@ -12,6 +12,7 @@ export {
   filterResponseHeaders,
   requiresProjectSecret,
   proxyRoute,
+  refusedProxyResponse,
   checkOpaqueSessionToken,
   validateOpaqueSessionToken,
   jwtNamesProject,

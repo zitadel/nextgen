@@ -14,6 +14,7 @@ import {
   matchesRoutes,
   proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -376,7 +377,7 @@ export function createNextgenOnRequest(
     // An OAuth issuer that is not this app's project: the app answers, so its
     // origin never serves another project's issuer.
     if (route?.refused) {
-      ev.send(new Response("Not Found", { status: 404 }));
+      ev.send(refusedProxyResponse());
       return;
     }
     if (route) {
