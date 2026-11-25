@@ -71,9 +71,8 @@ describe("selectionFromFlags for a custom connection", () => {
     const error = refusal(() => selectionFromFlags("custom", {}, flag, "--provider custom ..."));
 
     expect(error.code).toBe("E_VALIDATION");
-    expect(error.message).toBe("A custom connection needs --slug, --display-name, --issuer");
-    expect(error.hint).toBe(
-      "A custom connection is described by its slug, display name and issuer.",
+    expect(error.message).toBe(
+      "A custom connection needs --slug, --display-name, --issuer; describe it, e.g. --provider custom ...",
     );
   });
 
@@ -131,13 +130,14 @@ describe("selectionFromFlags for a catalog provider", () => {
       selectionFromFlags("google", { issuer: "https://x.example", scopes: "openid" }, flag, "e.g."),
     );
 
-    expect(error.message).toBe("--issuer, --scopes only applies to a custom connection");
-    expect(error.hint).toBe("A catalog provider knows its own name, issuer and scopes.");
+    expect(error.message).toBe(
+      "--issuer, --scopes only applies to a custom connection; add --provider custom, or remove them",
+    );
   });
 
   it("refuses a name nothing answers to", () => {
-    expect(refusal(() => selectionFromFlags("okta", {}, flag, "e.g.")).message).toBe(
-      "Unknown provider okta",
+    expect(refusal(() => selectionFromFlags("okta", {}, flag, "e.g.")).message).toContain(
+      "Unknown provider okta; use one of ",
     );
   });
 });

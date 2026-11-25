@@ -39,7 +39,10 @@ describe("ProviderChoice.fromFlags", () => {
     });
 
     expect(error).toBeInstanceOf(IdpError);
-    expect(error).toMatchObject({ code: "E_VALIDATION", message: "Unknown provider nope" });
+    expect(error).toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining("Unknown provider nope; use one of "),
+    });
   });
 
   it("refuses a custom setting beside a catalog provider", () => {
@@ -59,7 +62,7 @@ describe("ProviderChoice.fromFlags", () => {
     expect(error).toBeInstanceOf(IdpError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      details: { missing: ["--display-name", "--issuer"] },
+      message: expect.stringContaining("--display-name, --issuer"),
     });
   });
 

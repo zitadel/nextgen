@@ -2697,7 +2697,7 @@ describe("setup", () => {
 
       expect(res).toFail();
       expect(parseJson(res.stdout)).toMatchObject({
-        message: "--sso-issuer only applies to a custom connection",
+        message: expect.stringContaining("--sso-issuer only applies to a custom connection"),
       });
     });
 
@@ -3617,25 +3617,24 @@ describe("refuseUnusableFlags", () => {
       flags: { sso: "google", ssoIssuer: "https://x", ssoSlug: "x" },
       scripted: false,
       refusal: {
-        message: "--sso-slug, --sso-issuer only applies to a custom connection",
-        hint: expect.stringContaining("remove them"),
-        details: { flags: ["--sso-slug", "--sso-issuer"] },
+        message:
+          "--sso-slug, --sso-issuer only applies to a custom connection; add --sso custom, or remove them",
       },
     },
     {
       situation: "one custom connection setting beside a catalog provider, saying it, not them",
       flags: { sso: "google", ssoIssuer: "https://x" },
       scripted: false,
-      refusal: { hint: expect.stringContaining("remove it") },
+      refusal: { message: expect.stringContaining("remove it") },
     },
     {
       situation: "a custom connection a scripted run did not describe, naming what was left out",
       flags: { sso: "custom", ssoSlug: "x", ssoClientId: "abc" },
       scripted: true,
       refusal: {
-        message: "A custom connection needs --sso-display-name, --sso-issuer",
-        hint: expect.stringContaining("--sso custom --sso-slug"),
-        details: { missing: ["--sso-display-name", "--sso-issuer"] },
+        message: expect.stringMatching(
+          /^A custom connection needs --sso-display-name, --sso-issuer; describe it, e\.g\. .*--sso custom --sso-slug/,
+        ),
       },
     },
     {
@@ -4008,7 +4007,7 @@ describe("ReadSsoFlags", () => {
         expect(error).toBeInstanceOf(ZitadelError);
         expect(error).toMatchObject({
           code: "E_VALIDATION",
-          hint: expect.stringContaining("Describe the connection, e.g."),
+          message: expect.stringContaining("describe it, e.g."),
         });
       });
 

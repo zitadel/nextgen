@@ -1,49 +1,6 @@
-import { CUSTOM_PROVIDER } from "@zitadel/config/idp";
-
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
-import {
-  ENABLE_FLAG_NAMES,
-  IdpProviderUnknownError,
-  IdpSettingRefusedError,
-  IdpSettingsConflictError,
-  IdpSettingsMissingError,
-  ProviderChoice,
-} from "@/lib/idp";
+import { ProviderChoice } from "@/lib/idp";
 import { WizardStep } from "@/lib/wizard";
-
-/** How a setting the platform refuses is refused. */
-const SETTING_REFUSED_REFUSAL = {
-  message: "{message}",
-  hint: "Fix {flag} and run the command again.",
-  details: {
-    flag: "{flag}",
-  },
-} as const satisfies Refusal;
-
-/** How settings of a custom connection given with a catalog provider are refused. */
-const SETTINGS_CONFLICT_REFUSAL = {
-  message: "{message}",
-  hint: "Add {provider} {custom}, or remove {them}.",
-  details: {
-    flags: "{flags}",
-  },
-} as const satisfies Refusal;
-
-/** How a custom connection that lacks settings is refused. */
-const SETTINGS_MISSING_REFUSAL = {
-  message: "{message}",
-  hint: "Describe the connection, e.g. {example}",
-  details: {
-    missing: "{missing}",
-  },
-} as const satisfies Refusal;
-
-/** How a provider that is neither in the catalog nor custom is refused. */
-const PROVIDER_UNKNOWN_REFUSAL = {
-  message: "{message}",
-  hint: "Use one of {known}.",
-} as const satisfies Refusal;
 
 /**
  * What the step is given by the command.
@@ -79,42 +36,10 @@ export class ChooseProvider extends WizardStep<"choice", Fact<"choice">, Fact<"f
    * @returns How the flags choose a provider.
    */
   async run(needs: Fact<"flags">): Promise<Fact<"choice">> {
-    try {
-      return {
-        choice: ProviderChoice.fromFlags(needs.flags, {
-          interactive: !this.deps.nonInteractive && !this.deps.dryRun,
-        }),
-      };
-    } catch (error) {
-      if (error instanceof IdpSettingRefusedError) {
-        throw refusalError(SETTING_REFUSED_REFUSAL, {
-          message: error.message,
-          flag: error.flag,
-        });
-      }
-      if (error instanceof IdpSettingsConflictError) {
-        throw refusalError(SETTINGS_CONFLICT_REFUSAL, {
-          message: error.message,
-          provider: ENABLE_FLAG_NAMES.provider,
-          custom: CUSTOM_PROVIDER,
-          them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
-          flags: error.given,
-        });
-      }
-      if (error instanceof IdpSettingsMissingError) {
-        throw refusalError(SETTINGS_MISSING_REFUSAL, {
-          message: error.message,
-          example: error.example,
-          missing: error.missing,
-        });
-      }
-      if (error instanceof IdpProviderUnknownError) {
-        throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
-          message: error.message,
-          known: error.known.join(", "),
-        });
-      }
-      throw error;
-    }
+    return {
+      choice: ProviderChoice.fromFlags(needs.flags, {
+        interactive: !this.deps.nonInteractive && !this.deps.dryRun,
+      }),
+    };
   }
 }

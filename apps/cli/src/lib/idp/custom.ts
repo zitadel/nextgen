@@ -261,7 +261,7 @@ export function givenCustomFlags(
  */
 function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
   if (!parsed.ok) {
-    throw new IdpSettingRefusedError(`${name}: ${parsed.problem}`, name);
+    throw new IdpSettingRefusedError(`${name}: ${parsed.problem}`);
   }
 
   return parsed.value;
@@ -332,14 +332,15 @@ export function selectionFromFlags(
     // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
       throw new IdpSettingsConflictError(
-        `${given.join(", ")} only applies to a custom connection`,
-        given,
+        `${given.join(", ")} only applies to a custom connection; add ${flag.provider} ${CUSTOM_PROVIDER}, or remove ${new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them"}`,
       );
     }
     const selection = parseProviderSelection(provider);
     if (selection === undefined) {
       const known = [...IDP_PROVIDERS, CUSTOM_PROVIDER];
-      throw new IdpProviderUnknownError(provider, known);
+      throw new IdpProviderUnknownError(
+        `Unknown provider ${provider}; use one of ${known.join(", ")}`,
+      );
     }
 
     return selection;
@@ -351,9 +352,7 @@ export function selectionFromFlags(
       return !given.includes(name);
     });
     throw new IdpSettingsMissingError(
-      `A custom connection needs ${missing.join(", ")}`,
-      missing,
-      example,
+      `A custom connection needs ${missing.join(", ")}; describe it, e.g. ${example}`,
     );
   }
 
