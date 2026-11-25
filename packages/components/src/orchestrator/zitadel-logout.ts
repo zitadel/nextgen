@@ -36,7 +36,7 @@ import "../atoms/zl-icon.js";
  * and `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy
  * aliases of the first two). Any element with `data-action="logout"` inside
  * the cloned template triggers the sign-out flow. This mirrors the
- * placeholder `<nextgen-logout>`'s contract so existing markup keeps working.
+ * placeholder element's contract so existing markup keeps working.
  *
  * Default styles consume the `--zl-*` design tokens so tenant branding
  * applies automatically.
