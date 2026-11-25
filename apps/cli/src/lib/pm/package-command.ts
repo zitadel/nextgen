@@ -3,6 +3,7 @@ import { execa } from "execa";
 import { Cmd } from "@/lib/cmd";
 import { Output } from "@/lib/ui/output";
 
+import { PmCommandFailedError } from "./errors";
 import type { PMName } from "./pm";
 
 /**
@@ -127,7 +128,7 @@ export class PackageCommand {
    * off the terminal altogether.
    *
    * @param options - Where and how it runs.
-   * @throws When the command cannot start or exits non-zero.
+   * @throws {@link PmCommandFailedError} When the command cannot start or exits non-zero.
    */
   async run(options: RunOptions): Promise<void> {
     const capture = options.captureOutput === true;
@@ -150,21 +151,22 @@ export class PackageCommand {
     }
     const result = await subprocess;
     if (result.code !== undefined && result.exitCode === undefined) {
-      throw Object.assign(new Error(result.originalMessage ?? result.message), {
-        code: result.code,
-      });
+      throw new PmCommandFailedError(
+        result.originalMessage ?? result.message ?? `${this.display} did not start`,
+        {
+          code: result.code,
+        },
+      );
     }
     if (result.failed) {
       const detail = result.signal
         ? `signal ${result.signal}`
         : `exit ${String(result.exitCode ?? 1)}`;
-      const error = new Error(`${this.display} failed with ${detail}`);
-      Object.assign(error, {
+      throw new PmCommandFailedError(`${this.display} failed with ${detail}`, {
         code: result.exitCode ?? 1,
         signal: result.signal ?? null,
         ...(capture ? { output: String(result.all ?? "") } : {}),
       });
-      throw error;
     }
   }
 }

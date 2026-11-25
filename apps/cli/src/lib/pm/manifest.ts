@@ -5,6 +5,8 @@ import type { PackageJson } from "type-fest";
 import { readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 
+import { PmManifestInvalidError } from "./errors";
+
 /**
  * The shape of an npm `package.json`, as published by `type-fest`: `name`,
  * `version`, `scripts`, `dependencies`, `devDependencies`, `workspaces`,
@@ -41,10 +43,9 @@ export class Manifest {
    *
    * @param dir - The project directory that holds the `package.json`.
    * @returns The manifest.
-   * @throws An `ENOENT` error when there is no `package.json` in `dir`, a
-   *   `SyntaxError` when the file is not valid JSON, and an `Error` naming the
-   *   file ("... must contain a JSON object") when its root is an array or a
-   *   scalar.
+   * @throws An `ENOENT` error when there is no `package.json` in `dir`, and a
+   *   {@link PmManifestInvalidError} when the file is not valid JSON or its
+   *   root is an array or a scalar.
    *
    * @example
    * const { json } = await Manifest.read(cwd);
@@ -54,7 +55,7 @@ export class Manifest {
    */
   static async read(dir: string): Promise<Manifest> {
     const path = join(dir, "package.json");
-    return new Manifest(parseJsonObject(await readFile(path, "utf8"), path) as PackageJson);
+    return Manifest.parse(await readFile(path, "utf8"), path);
   }
 
   /**
@@ -70,15 +71,30 @@ export class Manifest {
    *
    * @param dir - The project directory that would hold the `package.json`.
    * @returns The manifest, or `undefined` when `dir` has no `package.json`.
-   * @throws A `SyntaxError` when the file is not valid JSON, an `Error` naming
-   *   the file when its root is not a JSON object, and any read error other
-   *   than the file being absent (for example `EACCES` or `EISDIR`).
+   * @throws A {@link PmManifestInvalidError} when the file is not valid JSON or
+   *   its root is not a JSON object, and any read error other than the file
+   *   being absent (for example `EACCES` or `EISDIR`).
    */
   static async readIfExists(dir: string): Promise<Manifest | undefined> {
     const path = join(dir, "package.json");
     const text = await readIfExists(path);
-    return text === undefined
-      ? undefined
-      : new Manifest(parseJsonObject(text, path) as PackageJson);
+    return text === undefined ? undefined : Manifest.parse(text, path);
+  }
+
+  /**
+   * Parses the text of a `package.json`.
+   *
+   * @param text - The file's contents.
+   * @param path - The file's path, for the error.
+   * @returns The manifest.
+   * @throws {@link PmManifestInvalidError} When the text is not JSON or its
+   *   root is not an object; the parse error is its cause.
+   */
+  private static parse(text: string, path: string): Manifest {
+    try {
+      return new Manifest(parseJsonObject(text, path) as PackageJson);
+    } catch (error) {
+      throw new PmManifestInvalidError(path, { cause: error });
+    }
   }
 }

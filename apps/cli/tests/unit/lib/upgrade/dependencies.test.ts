@@ -1,5 +1,6 @@
 import { describe, expect, it as plain } from "vitest";
 
+import { PmManifestInvalidError } from "@/lib/pm";
 import { Dependencies, Dependency } from "@/lib/upgrade/dependencies";
 import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
@@ -31,7 +32,7 @@ describe("Dependencies.read", () => {
       return Dependencies.read(dir, "@zitadel/");
     });
 
-    expect(error).toBeInstanceOf(SyntaxError);
+    expect(error).toBeInstanceOf(PmManifestInvalidError);
   });
 
   it("ignores a dependency whose value is not a string", async ({ dir }) => {

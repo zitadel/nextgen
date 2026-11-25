@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { PM } from "@/lib/pm";
+import { PM, PmManifestInvalidError } from "@/lib/pm";
 import { it } from "@tests/fixtures";
 
 describe("PM.manifest", () => {
@@ -22,7 +22,10 @@ describe("PM.manifest", () => {
   it("throws on invalid JSON", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), "{ nope");
 
-    await expect(PM.manifest(dir)).rejects.toThrow(SyntaxError);
+    await expect(PM.manifest(dir)).rejects.toMatchObject({
+      name: "PmManifestInvalidError",
+      cause: expect.any(SyntaxError),
+    });
   });
 
   it("throws when the root is not an object, naming the file", async ({ dir }) => {
@@ -46,6 +49,6 @@ describe("PM.manifestIfExists", () => {
   it("still throws on a corrupt package.json", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), "{ nope");
 
-    await expect(PM.manifestIfExists(dir)).rejects.toThrow(SyntaxError);
+    await expect(PM.manifestIfExists(dir)).rejects.toBeInstanceOf(PmManifestInvalidError);
   });
 });

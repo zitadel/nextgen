@@ -40,9 +40,9 @@ describe("lib/upgrade", () => {
  * the CLI.
  */
 const TRANSITIVE: Readonly<Record<string, readonly string[]>> = {
-  "pm/manifest.ts": ["@/lib/fs", "@/lib/json"],
-  "pm/pm.ts": ["@/lib/fs", "@/lib/ui/output", "./manifest", "./package-command"],
-  "pm/package-command.ts": ["@/lib/cmd", "@/lib/ui/output", "./pm"],
+  "pm/manifest.ts": ["@/lib/fs", "@/lib/json", "./errors"],
+  "pm/pm.ts": ["@/lib/fs", "@/lib/ui/output", "./errors", "./manifest", "./package-command"],
+  "pm/package-command.ts": ["@/lib/cmd", "@/lib/ui/output", "./errors", "./pm"],
 };
 
 describe("what lib/upgrade reaches through lib/pm", () => {

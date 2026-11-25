@@ -90,7 +90,7 @@ export class Dependencies {
    * @param cwd - The project directory.
    * @param scope - The package name prefix to keep, such as `@acme/`.
    * @returns The dependencies, or `undefined` without a `package.json`.
-   * @throws A `SyntaxError` when the `package.json` is not valid JSON.
+   * @throws A `PmManifestInvalidError` when the `package.json` is not valid JSON.
    */
   static async read(cwd: string, scope: string): Promise<Dependencies | undefined> {
     const pkg = await PM.manifestIfExists(cwd);

@@ -1,7 +1,13 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
-import { type DependencyInstall, type InstallContext, PM, type Runner } from "@/lib/pm";
+import {
+  type DependencyInstall,
+  type InstallContext,
+  PM,
+  PmCommandFailedError,
+  type Runner,
+} from "@/lib/pm";
 import { Guidance, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { WizardStep } from "@/lib/wizard";
 
@@ -134,8 +140,25 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         return this.deps.ui.task(label, work, done);
       },
       log,
-      failed: (error, installCommand) => {
-        return new ZitadelError(
+      ...(this.deps.run === undefined ? {} : { run: this.deps.run }),
+    };
+    const { install } = await packageManager
+      .installDependencies(
+        {
+          needed: scaffoldedFramework || patched.depsAdded.length > 0,
+          dryRun: this.deps.dryRun,
+          skipInstall: Boolean(flags.skipInstall),
+        },
+        context,
+      )
+      .catch((error: unknown) => {
+        if (!(error instanceof PmCommandFailedError)) {
+          throw error;
+        }
+        const installCommand = packageManager.install();
+        const original = error.cause ?? error;
+
+        throw new ZitadelError(
           "E_VALIDATION",
           `Dependency install failed: ${installCommand.display}`,
           {
@@ -145,29 +168,19 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
               command: installCommand.display,
               cwd: this.deps.cwd,
               original:
-                error instanceof Error
+                original instanceof Error
                   ? {
-                      name: error.name,
-                      message: error.message,
-                      code: "code" in error ? error.code : undefined,
+                      name: original.name,
+                      message: original.message,
+                      code: "code" in original ? original.code : undefined,
                     }
                   : {
-                      message: String(error),
+                      message: String(original),
                     },
             },
           },
         );
-      },
-      ...(this.deps.run === undefined ? {} : { run: this.deps.run }),
-    };
-    const { install } = await packageManager.installDependencies(
-      {
-        needed: scaffoldedFramework || patched.depsAdded.length > 0,
-        dryRun: this.deps.dryRun,
-        skipInstall: Boolean(flags.skipInstall),
-      },
-      context,
-    );
+      });
     if (install.status === "completed" && afterInstallScript !== undefined) {
       const command = packageManager.script(afterInstallScript);
       try {

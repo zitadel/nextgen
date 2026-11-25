@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PM, type PMName } from "@/lib/pm";
+import { PM, PmCommandFailedError, type PMName } from "@/lib/pm";
 import { Output } from "@/lib/ui";
 import { test } from "@tests/fixtures";
 import { scratchDir } from "@tests/fixtures/scratch";
@@ -82,6 +82,7 @@ describe("PackageCommand.run with its output captured", () => {
       });
     });
 
+    expect(error).toBeInstanceOf(PmCommandFailedError);
     expect(error).toMatchObject({ output: expect.stringContaining("to stdout") });
     expect(error).toMatchObject({ output: expect.stringContaining("to stderr") });
   });

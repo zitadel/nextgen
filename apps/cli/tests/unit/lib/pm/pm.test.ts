@@ -3,9 +3,10 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect } from "vitest";
 
-import { PM, type PMName, type Runner } from "@/lib/pm";
+import { PM, PmCommandFailedError, type PMName, type Runner } from "@/lib/pm";
 import { log, Output } from "@/lib/ui";
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
  * Makes a directory a project: it gets a `package.json` that names no package manager.
@@ -195,9 +196,6 @@ describe("PM.installDependencies with the json option left out", () => {
           return work();
         },
         log,
-        failed: (error) => {
-          return error instanceof Error ? error : new Error(String(error));
-        },
         run: async (_command, options) => {
           received.push(options);
         },
@@ -225,5 +223,31 @@ describe("PM.installDependencies with the json option left out", () => {
     const received = await installed(dir);
 
     expect(received[0]?.redirectStdoutToStderr).toBe(false);
+  });
+});
+
+describe("PM.installDependencies when the run fails", () => {
+  it("wraps the failure, keeping it as the cause", async ({ dir }) => {
+    const cause = new Error("no such file");
+
+    const error = await rejectionOf(() => {
+      return PM.named("npm").installDependencies(
+        { needed: true, dryRun: false, skipInstall: false },
+        {
+          cwd: dir,
+          env: {},
+          task: async (_label, work) => {
+            return work();
+          },
+          log,
+          run: async () => {
+            throw cause;
+          },
+        },
+      );
+    });
+
+    expect(error).toBeInstanceOf(PmCommandFailedError);
+    expect(error).toMatchObject({ message: "npm install failed", cause });
   });
 });

@@ -1,3 +1,10 @@
+export {
+  PmCommandFailedError,
+  type PmCommandFailedOptions,
+  PmError,
+  type PmErrorOptions,
+  PmManifestInvalidError,
+} from "./errors";
 export type { PackageJson } from "./manifest";
 export type { PackageCommand, Runner } from "./package-command";
 export type {
