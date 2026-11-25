@@ -2,7 +2,14 @@ import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
-import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
+import {
+  AdminSession,
+  LocalRuntime,
+  LocalServerAdminFileMalformedError,
+  LocalServerFileBlockedError,
+  LocalServerFileUnreadableError,
+  ZitadelRuntime,
+} from "@/lib/server";
 import { section } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -20,6 +27,41 @@ const NO_LOCAL_ADMIN_REFUSAL = {
   message: "No local admin in this directory or its parents",
   hint: "Run this from the directory the local server was started in, or one inside it. If it was never started, start it first; that is what creates the local admin the console signs in as.",
   next: [{ id: "start" }],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerAdminFileMalformedError. */
+const ADMIN_FILE_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerFileUnreadableError. */
+const FILE_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerFileBlockedError. */
+const FILE_BLOCKED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
+  details: "{details}",
 } as const satisfies Refusal;
 
 /**
@@ -210,7 +252,38 @@ export default class Console extends Telemetered(
 
     const found = await LocalRuntime.findAdminDir(this.cwd);
     const localDir = found ?? this.cwd;
-    const admin = await this.serverInThisFolder(localDir).admin();
+    const admin = await this.serverInThisFolder(localDir)
+      .admin()
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerAdminFileMalformedError) {
+          throw refusalError(ADMIN_FILE_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerFileUnreadableError) {
+          throw refusalError(FILE_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerFileBlockedError) {
+          throw refusalError(FILE_BLOCKED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      });
     if (admin === undefined) {
       throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
     }

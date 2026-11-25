@@ -146,39 +146,62 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    const retry = retryOptionsFromFlags(flags);
-    const recovery = ssoRecovery(retry, suggest);
-    const scripting =
-      retry.sso && retry.sso.length > 0
-        ? "The rerun asks for the client id and secret, because a command carries neither. " +
-          "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-        : "";
-    const recovered =
-      recovery.commands.length > 0
-        ? `${recovery.hint}${recovery.commands.join(" ")} `
-        : recovery.hint;
     const server = await ZitadelRuntime.resolve({
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
     })
       .catch((error: unknown) => {
         if (error instanceof LocalServerNotStartedError) {
+          const retry = retryOptionsFromFlags(flags);
+          const recovery = ssoRecovery(retry, suggest);
+          const scripting =
+            retry.sso && retry.sso.length > 0
+              ? "The rerun asks for the client id and secret, because a command carries neither. " +
+                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+              : "";
+          const recovered =
+            recovery.commands.length > 0
+              ? `${recovery.hint}${recovery.commands.join(" ")} `
+              : recovery.hint;
           throw Object.assign(
             refusalError(
               NO_LOCAL_SERVER_REFUSAL,
-              { reason: error.hint ?? "", scripting, recovery: recovered },
               {
-                start: { id: "start", flags: {} },
-                setup: { id: "setup", flags: setupRetryFlags(retry) },
+                reason: error.hint ?? "",
+                scripting,
+                recovery: recovered,
+              },
+              {
+                start: {
+                  id: "start",
+                  flags: {},
+                },
+                setup: {
+                  id: "setup",
+                  flags: setupRetryFlags(retry),
+                },
               },
             ),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;
       })
       .catch((error: unknown) => {
         if (error instanceof LocalServerNotRespondingError) {
+          const retry = retryOptionsFromFlags(flags);
+          const recovery = ssoRecovery(retry, suggest);
+          const scripting =
+            retry.sso && retry.sso.length > 0
+              ? "The rerun asks for the client id and secret, because a command carries neither. " +
+                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+              : "";
+          const recovered =
+            recovery.commands.length > 0
+              ? `${recovery.hint}${recovery.commands.join(" ")} `
+              : recovery.hint;
           const { directory } = isObject(error.details) ? error.details : {};
           const elsewhere =
             typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
@@ -193,19 +216,39 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
                     recovery: recovered,
                   },
                   {
-                    start: { id: "start", flags: { cwd: directory } },
-                    setup: { id: "setup", flags: setupRetryFlags(retry) },
+                    start: {
+                      id: "start",
+                      flags: {
+                        cwd: directory,
+                      },
+                    },
+                    setup: {
+                      id: "setup",
+                      flags: setupRetryFlags(retry),
+                    },
                   },
                 )
               : refusalError(
                   LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
-                  { reason: error.hint ?? "", scripting, recovery: recovered },
                   {
-                    start: { id: "start", flags: {} },
-                    setup: { id: "setup", flags: setupRetryFlags(retry) },
+                    reason: error.hint ?? "",
+                    scripting,
+                    recovery: recovered,
+                  },
+                  {
+                    start: {
+                      id: "start",
+                      flags: {},
+                    },
+                    setup: {
+                      id: "setup",
+                      flags: setupRetryFlags(retry),
+                    },
                   },
                 ),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;

@@ -222,7 +222,7 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
           {
             command: packageManager.install().display,
             cwd: this.cwd,
-            message: error.message,
+            message: String(error.cause ?? error),
           },
           { install: this.shown(packageManager.install(), flags.cwd) },
         );

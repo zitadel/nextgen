@@ -139,7 +139,6 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
                   server: answers.server,
                   original: normalized.details,
                 },
-                cause: error,
               });
             });
       creating.done(

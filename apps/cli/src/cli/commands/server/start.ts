@@ -3,9 +3,17 @@ import { z } from "zod";
 
 import {
   LocalRuntime,
+  LocalServerAdminFileMalformedError,
+  LocalServerAdminPlatformMissingError,
+  LocalServerBinaryBlockedError,
+  LocalServerBinaryMissingError,
+  LocalServerBusyError,
   LocalServerDockerMissingError,
+  LocalServerFileBlockedError,
+  LocalServerFileUnreadableError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerRecordMalformedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
@@ -14,7 +22,14 @@ import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
 import type { NextSteps } from "@/cli/core/next-steps";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import { Guidance, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { PM } from "@/lib/pm";
+import { CliPackage } from "@/lib/upgrade";
+import {
+  Guidance,
+  shellCommand,
+  type SuggestedCommand,
+  suggestedCommandOf,
+} from "@/lib/suggestion";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -136,6 +151,102 @@ const SERVER_WOULD_NOT_STOP_REFUSAL = {
   message: "Existing local Zitadel server did not stop",
   hint: "Stop the existing local runtime manually, then rerun start.",
   details: { runtime: "{runtime}", stop_result: "{stop}" },
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerBinaryMissingError. */
+const BINARY_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
+  details: "{details}",
+  next: ["{reinstall}"],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerBinaryBlockedError. */
+const BINARY_BLOCKED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
+  details: "{details}",
+  next: ["{reinstall}"],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerBusyError. */
+const START_IN_PROGRESS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Wait for it to finish, or delete {lock_file} if no start is running.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerRecordMalformedError. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerAdminFileMalformedError. */
+const ADMIN_FILE_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerFileUnreadableError. */
+const FILE_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerFileBlockedError. */
+const FILE_BLOCKED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerAdminPlatformMissingError. */
+const PLATFORM_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
+  details: "{details}",
+  next: [
+    {
+      id: "stop",
+    },
+    {
+      id: "start",
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -380,6 +491,94 @@ export default class Start extends Telemetered(
           throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
             runtime: error.record ?? null,
             stop: error.outcome ?? null,
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerBinaryMissingError) {
+          throw refusalError(
+            BINARY_MISSING_REFUSAL,
+            {
+              message: error.message,
+              details: error.details ?? null,
+            },
+            {
+              reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
+            },
+          );
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerBinaryBlockedError) {
+          throw refusalError(
+            BINARY_BLOCKED_REFUSAL,
+            {
+              message: error.message,
+              details: error.details ?? null,
+            },
+            {
+              reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
+            },
+          );
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerBusyError) {
+          throw refusalError(START_IN_PROGRESS_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            lock_file: String(error.details?.lock_file ?? ""),
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerRecordMalformedError) {
+          throw refusalError(RECORD_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerAdminFileMalformedError) {
+          throw refusalError(ADMIN_FILE_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerFileUnreadableError) {
+          throw refusalError(FILE_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerFileBlockedError) {
+          throw refusalError(FILE_BLOCKED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerAdminPlatformMissingError) {
+          throw refusalError(PLATFORM_MISSING_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
           });
         }
         throw error;

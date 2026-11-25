@@ -1,5 +1,11 @@
-import { DestroyPermit } from "@/lib/server";
+import {
+  DestroyPermit,
+  LocalServerProcessesStopError,
+  LocalServerProcessesUnlistableError,
+  LocalServerStopError,
+} from "@/lib/server";
 import type { CommandResult } from "@/cli/core";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { Previewable } from "@/cli/core/previewable";
@@ -16,6 +22,30 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 type ResetTarget =
   | Readonly<{ backend: "binary"; pid: number; log_path: string }>
   | Readonly<{ backend: "docker" | "missing"; container_name: string }>;
+
+/** How a start of the local server is refused: LocalServerProcessesStopError. */
+const PROCESSES_DID_NOT_STOP_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerProcessesUnlistableError. */
+const PROCESSES_UNLISTABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerStopError. */
+const SERVER_DID_NOT_STOP_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+  details: "{details}",
+} as const satisfies Refusal;
 
 /**
  * `zitadel reset`: stops and removes this folder's server and deletes its data.
@@ -83,7 +113,35 @@ export default class Reset extends Telemetered(
         `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
       ].join("\n"),
       apply: async () => {
-        await this.serverInThisFolder().reset(DestroyPermit.forFolder(this.cwd));
+        await this.serverInThisFolder()
+          .reset(DestroyPermit.forFolder(this.cwd))
+          .catch((error: unknown) => {
+            if (error instanceof LocalServerProcessesStopError) {
+              throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+                message: error.message,
+                details: error.details ?? null,
+              });
+            }
+            throw error;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof LocalServerProcessesUnlistableError) {
+              throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+                message: error.message,
+                details: error.details ?? null,
+              });
+            }
+            throw error;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof LocalServerStopError) {
+              throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+                message: error.message,
+                details: error.details ?? null,
+              });
+            }
+            throw error;
+          });
         const title = "Local Zitadel server runtime reset";
 
         return {

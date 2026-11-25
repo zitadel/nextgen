@@ -272,10 +272,6 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
         throw error;
       }
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
-        details: {
-          reason: error.message,
-          ...(error.cause === undefined ? {} : { cause: errorMessage(error.cause) }),
-        },
         hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
         nextCommands: [await this.again("upgrade", {})],
       });

@@ -60,16 +60,6 @@ export function Interruptible<TBase extends CommandClass>(Base: TBase) {
       return this.interruption ?? toZitadelError(reason);
     }
 
-    /**
-     * Aborts the run's signal, for a prompt the person walked away from. The
-     * first reason stays: a signal already aborted is left as it is.
-     *
-     * @param reason - The `AbortError` the prompt threw.
-     */
-    protected abortRun(reason: DOMException): void {
-      this.controller.abort(reason);
-    }
-
     /** Starts listening as the command begins. Calling it again does not add a second listener. */
     protected listenForInterrupt(): void {
       this.stopListeningForInterrupt();

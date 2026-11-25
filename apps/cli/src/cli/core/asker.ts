@@ -69,7 +69,7 @@ export type Session = Prompting & {
  *   question in `details.question`, for an agent to put to a person.
  *   Only `Consent.request` asks it.
  *
- * Cancelling a prompt (Ctrl-C) aborts the run's signal and throws an
+ * Cancelling a prompt (Ctrl-C) throws an
  * `AbortError` instead of returning a sentinel, so a command never carries on
  * with a missing answer, and the run ends as `E_CANCELLED`, exiting 130 like
  * Ctrl-C anywhere else. A drawn prompt closes its chain with

@@ -3,7 +3,13 @@ import pTimeout from "p-timeout";
 import { UserService } from "@/lib/backend";
 import { Claim, type ClaimState } from "@/lib/claim";
 import { isCancellation } from "@/lib/errors";
-import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerFileUnreadableError,
+  LocalServerRecordMalformedError,
+  ZitadelRuntime,
+} from "@/lib/server";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { CommandResult, Connection, MetaOptions } from "@/cli/core";
 import type { GlobalOptions } from "@/cli/core/types";
@@ -339,6 +345,33 @@ function nextCommandsFor(
   return commands;
 }
 
+/** How a start of the local server is refused: LocalServerRecordMalformedError. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerFileUnreadableError. */
+const FILE_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
+  details: "{details}",
+} as const satisfies Refusal;
+
 /**
  * `zitadel status` — summarize the local server and project state.
  *
@@ -384,7 +417,27 @@ export default class Status extends Telemetered(ProjectCommand) {
   protected async execute(): Promise<CommandResult> {
     const server = await LocalRuntime.forFolder(this.cwd, {
       cliVersion: this.cliVersion,
-    }).status();
+    })
+      .status()
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerRecordMalformedError) {
+          throw refusalError(RECORD_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerFileUnreadableError) {
+          throw refusalError(FILE_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      });
     const serverLifecycle = server.lifecycle;
 
     const project = await projectStatus(

@@ -189,7 +189,6 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
           throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {
             hint: `${normalized.message}. Nothing was changed; start the server this app uses (${source}) and retry.`,
             details: { original: normalized.details },
-            cause: error,
           });
         }
       }

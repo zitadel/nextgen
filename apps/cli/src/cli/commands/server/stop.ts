@@ -1,7 +1,13 @@
 import { Flags } from "@oclif/core";
 
-import { LocalRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerProcessesStopError,
+  LocalServerProcessesUnlistableError,
+  LocalServerStopError,
+} from "@/lib/server";
 import type { Admitted, CommandResult } from "@/cli/core";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { Previewable } from "@/cli/core/previewable";
@@ -9,6 +15,30 @@ import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { Telemetered } from "@/cli/telemetry/telemetered";
+
+/** How a start of the local server is refused: LocalServerProcessesStopError. */
+const PROCESSES_DID_NOT_STOP_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerProcessesUnlistableError. */
+const PROCESSES_UNLISTABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerStopError. */
+const SERVER_DID_NOT_STOP_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+  details: "{details}",
+} as const satisfies Refusal;
 
 /**
  * `zitadel stop`: stops this folder's server and keeps its data, or, with
@@ -184,7 +214,34 @@ export default class Stop extends Telemetered(
    */
   protected async apply({ flags }: Admitted<typeof Stop>): Promise<CommandResult> {
     if (flags.all) {
-      const sweep = await LocalRuntime.stopAll(this.localServers());
+      const sweep = await LocalRuntime.stopAll(this.localServers())
+        .catch((error: unknown) => {
+          if (error instanceof LocalServerProcessesStopError) {
+            throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          throw error;
+        })
+        .catch((error: unknown) => {
+          if (error instanceof LocalServerProcessesUnlistableError) {
+            throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          throw error;
+        })
+        .catch((error: unknown) => {
+          if (error instanceof LocalServerStopError) {
+            throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          throw error;
+        });
       if (!sweep.supported) {
         const title = "Managed local runtime process discovery is unavailable";
 

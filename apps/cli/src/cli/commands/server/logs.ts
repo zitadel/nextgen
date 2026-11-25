@@ -1,7 +1,11 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerFileUnreadableError,
+  LocalServerRecordMalformedError,
+} from "@/lib/server";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
@@ -46,6 +50,33 @@ const NOT_STARTED_REFUSAL = {
   message: "Local Zitadel runtime has not been started",
   hint: "Start the local server first.",
   next: [{ id: "start" }],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerRecordMalformedError. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerFileUnreadableError. */
+const FILE_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
+  details: "{details}",
 } as const satisfies Refusal;
 
 /**
@@ -93,7 +124,26 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
       throw refusalError(FOLLOW_IS_NOT_JSON_REFUSAL, {});
     }
 
-    const server = await this.serverInNearestFolder();
+    const server = await this.serverInNearestFolder()
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerRecordMalformedError) {
+          throw refusalError(RECORD_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerFileUnreadableError) {
+          throw refusalError(FILE_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: String(error.details?.path ?? ""),
+          });
+        }
+        throw error;
+      });
     if (server === undefined) {
       throw refusalError(NOT_STARTED_REFUSAL, {});
     }

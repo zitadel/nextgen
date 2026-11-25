@@ -231,7 +231,6 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
               ]
             : []),
         details: cause.details,
-        cause: error,
       });
     }
   }
