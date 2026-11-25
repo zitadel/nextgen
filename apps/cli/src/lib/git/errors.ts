@@ -1,3 +1,4 @@
+import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -10,38 +11,7 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
  * nothing useful. The temporary staging area's file-system calls can still
  * fail with Node's own errors. Whether a failure is fatal is the caller's choice.
  */
-export abstract class GitError extends Error {
-  /** The kind of failure, which the boundary reports it as. */
-  abstract readonly category: ErrorCategory;
-
-  /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  abstract readonly retryable: boolean;
-
-  /** The stable product code the failure is reported with. */
-  abstract readonly code: ZitadelErrorCode;
-
-  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
-  readonly hint?: string | undefined;
-
-  /** Structured facts about the failure, for a `--json` reader. */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * Creates the error.
-   *
-   * @param message - What went wrong.
-   * @param options - The error that caused this one, if any.
-   */
-  constructor(
-    message: string,
-    options: {
-      readonly cause?: unknown;
-    } = {},
-  ) {
-    super(message, options);
-    this.name = new.target.name;
-  }
-
+export abstract class GitError extends ZitadelLibError {
   /**
    * The one line of the message that says why git failed, for a one-line warning; never empty.
    *

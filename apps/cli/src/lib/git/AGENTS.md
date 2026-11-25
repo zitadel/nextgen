@@ -20,9 +20,8 @@ Zitadel: callers say what to leave out and whom to name as author.
   import from the rest of the CLI.
 - Assume a modern git (2.25 or later); add no fallbacks or workarounds for
   older versions.
-- Throw a `GitError` subclass with git's own message (`GitCommandFailedError` when
-  git ran and failed); the caller decides whether a failure is fatal, and uses
-  `Repository.answer` when it should mean no answer.
+- Throw a `GitError` subclass with git's own message; the caller decides whether a
+  failure is fatal, and uses `Repository.answer` when it should mean no answer.
 
 ## Gotchas
 

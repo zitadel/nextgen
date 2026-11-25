@@ -31,11 +31,7 @@ describe("a git error's cause", () => {
   it("is kept", () => {
     const cause = new Error("underneath");
 
-    expect(
-      new GitCommandFailedError("why", {
-        cause,
-      }).cause,
-    ).toBe(cause);
+    expect(new GitCommandFailedError("why", cause).cause).toBe(cause);
   });
 });
 
