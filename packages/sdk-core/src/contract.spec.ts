@@ -758,7 +758,7 @@ describe("SDK specs ↔ the contract packages", () => {
         "sdk-react/src/index.spec.tsx",
         "sdk-vue/src/components.spec.ts",
         "sdk-angular/src/lib/components.spec.ts",
-        "sdk-svelte/src/index.spec.ts",
+        "sdk-svelte/src/index.ssr.spec.ts",
         "sdk-solid/src/index.ssr.spec.tsx",
         "sdk-qwik/src/index.ssr.spec.tsx",
       ],
@@ -1072,6 +1072,12 @@ describe("server SDK middleware tests ↔ the blocks they share", () => {
     "protected routes and encoded paths",
     "an empty backend URL",
     "an empty project secret",
+    "proxied OAuth paths of another project",
+    "an unsafe login path",
+    "a cleared session cookie",
+    "a request with the internal auth header",
+    "proxied request headers",
+    "proxied requests without a body",
   ];
 
   /**

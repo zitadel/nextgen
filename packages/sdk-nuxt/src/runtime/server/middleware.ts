@@ -40,6 +40,15 @@ import {
 
 import { resolveProjectSecret, resolveUrl } from "../lib/settings";
 
+/**
+ * The process environment, or an empty map when there is none.
+ *
+ * `process` is undefined in some edge and serverless runtimes, so the environment is read
+ * defensively and the fallback never throws a `ReferenceError`.
+ */
+const PROCESS_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" && process.env ? process.env : {};
+
 declare module "h3" {
   interface H3EventContext {
     /**
@@ -73,7 +82,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
   const headers = new Headers();
   for (const [key, value] of Object.entries(getRequestHeaders(event))) {
     const lower = key.toLowerCase();
-    if (!value || HOP_BY_HOP.has(lower) || INTERNAL_HEADERS.has(lower)) {
+    if (value === undefined || HOP_BY_HOP.has(lower) || INTERNAL_HEADERS.has(lower)) {
       continue;
     }
     headers.set(key, value);
@@ -140,12 +149,20 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * an h3 event handler. This factory returns that handler. It is a factory, called once, so it
  * starts with create.
  *
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
  * @param options - The middleware options, described by {@link ZitadelMiddlewareOptions}. Every
  *   field is optional. An empty `url` counts as unset and falls back to `ZITADEL_URL`, then
  *   `http://localhost:8080`. The `projectSecret` wins over `NUXT_ZITADEL_PROJECT_SECRET` and
  *   `ZITADEL_PROJECT_SECRET`, and an empty value counts as unset.
  * @returns An H3 event handler suitable as a global server middleware.
- * @throws When `loginPath` is not a relative path starting with a single `/`. An absolute or
+ * @throws When `loginPath` is not a relative path starting with a single `/` with no backslash. An absolute or
  *   protocol-relative URL would allow an open redirect.
  *
  * @example
@@ -162,7 +179,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  */
 export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}): EventHandler {
   const {
-    projectId = process.env.ZITADEL_PROJECT_ID || process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID,
+    projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.NUXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -183,7 +200,7 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
   // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
       `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
@@ -195,8 +212,7 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
     // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
     // request that carries it, on every route, before anything else runs.
     if (getRequestHeader(event, "x-zitadel-auth-token") !== undefined) {
-      setResponseStatus(event, 400);
-      return "Bad Request";
+      return sendWebResponse(event, new Response("Bad Request", { status: 400 }));
     }
 
     const urlObj = getRequestURL(event);

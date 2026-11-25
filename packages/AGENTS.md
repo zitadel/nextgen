@@ -13,7 +13,7 @@ change needs a changeset, and the whole train versions together.
 
 - **`sdk-core` is the shared contract**: JWT verification (`verifyJwt`),
   middleware primitives, runtime resolution, and the `ZitadelAuthSession` /
-  `AuthResult` types the SDKs re-export through `@zitadel/sdk-core/types`.
+  `AuthResult` types the SDKs re-export from `@zitadel/sdk-core/middleware`.
   Change a shared type there; never fork it into a framework package.
 - **Exports are consumer contract**: removing or renaming an `exports` entry
   (`/server`, `/client`, `/types`, …) is a breaking change, and an addition
@@ -22,9 +22,8 @@ change needs a changeset, and the whole train versions together.
 - **Framework runtimes are `peerDependencies`**, never `dependencies`: an SDK
   never pins its host framework. `src/contract.spec.ts` in `sdk-core` checks
   each README lists its peers.
-- **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
-  points use `export type *`. This is the one statement of it; READMEs link
-  here.
+- **TypeScript floor**: consumers need TypeScript 5.0 or newer.
+  This is the one statement of it; READMEs link here.
 - **Name a server entry after its framework.** A meta-framework SDK exposes the
   entry its framework asks for under the framework's own term, and a `create…`
   name is a factory that returns the handler ([ADR 090](../docs/adrs/090-sdk-public-api-standard.md)).
@@ -120,7 +119,7 @@ shared cases once" above).
 - **List every name an app can set,** not only exports: config keys, `NUXT_*` and
   `NUXT_PUBLIC_*` variables, runtime-config keys, `locals` keys, `useState` keys.
 - **Refuse the old name or call it out under `**Breaking:**`.** `sdk-nuxt` throws in
-  `legacyConfigProblems` because an ignored `protectedRoutes` leaves pages open.
+  `refuseLegacyConfig` because an ignored `protectedRoutes` leaves pages open.
 - **A fork with a shared name passes name and type checks.** Assert the SDK exports
   the shared function itself (`describeSharedConfigHelpers`, `describeClientEntry`).
 - **An exported `*Props` type must be what the component accepts,** in that

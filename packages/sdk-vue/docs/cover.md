@@ -12,7 +12,7 @@
 
 Each component is a runtime wrapper built with `defineComponent` and a render function that creates the element by its string tag (`zitadel-login`, `zitadel-logout`, `zitadel-session`). Vue never tries to resolve the tag as a Vue component, so no `compilerOptions.isCustomElement` setting is needed. The element definitions come from `@zitadel/components`, which this package imports at load; they only exist in the browser, and the widget starts after the element is upgraded.
 
-The wrappers write `project-id` and `proxy-path` (and `url`, from a `project` handle) as kebab-case attributes, so server-rendered markup carries them. The `project` handle itself is bound as a DOM property, raw rather than as Vue's reactive proxy, because the widget does identity checks on it. A string prop you leave unset is bound as an attribute on the client and removed, so the element keeps its own default. Event details are re-emitted from the widget's `zitadel-*` events as Vue emits.
+The wrappers write `project-id` and `proxy-path` (and `url` and `publishable-key`, from a `project` handle) as kebab-case attributes, so server-rendered markup carries them. The `project` handle itself is bound as a DOM property, raw rather than as Vue's reactive proxy, because the widget does identity checks on it. A string prop you leave unset is bound as an attribute on the client and removed, so the element keeps its own default. Event details are re-emitted from the widget's `zitadel-*` events as Vue emits.
 
 The widgets call the Zitadel API through a same-origin proxy path, `/__nextgen` unless you set `proxyPath`. Your app's host or dev server must provide that path.
 

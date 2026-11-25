@@ -117,5 +117,4 @@ documented in each framework SDK's README on top of this pipeline.
 
 ## Requirements
 
-TypeScript ≥ 5.0 — the published type definitions re-export with
-`export type *`.
+TypeScript 5.0 or newer.

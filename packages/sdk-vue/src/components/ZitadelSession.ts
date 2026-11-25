@@ -7,7 +7,7 @@ import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
 import type { WithZitadelWidgetAttributes } from "../types.js";
-import { forceAttr } from "./forceAttr";
+import { forceAttr, proxyPathAttr } from "./forceAttr";
 
 /**
  * The component that {@link ZitadelSession} is typed from, before the standard HTML attributes are added to
@@ -26,8 +26,9 @@ export const Base = defineComponent({
      *
      * Pass the value that {@link configureZitadel} returns. The component binds it as a DOM
      * property, raw and not as Vue's reactive proxy, because the widget compares it by identity.
-     * It also writes the handle's fields as the `project-id`, `proxy-path` and `url` attributes, so
-     * server-rendered markup carries them before hydration. It wins over
+     * It also writes the handle's fields as the `project-id`, `proxy-path`, `url` and
+     * `publishable-key` attributes, so server-rendered markup carries them before hydration. The
+     * publishable key is browser-safe by design. It wins over
      * {@link ZitadelSessionProps.projectId} and {@link ZitadelSessionProps.proxyPath}.
      *
      * @example
@@ -61,9 +62,7 @@ export const Base = defineComponent({
     /**
      * The address to navigate to after a completed sign-out.
      *
-     * Unset, the widget uses its own default navigation. The widget navigates right after it emits
-     * `signout`, so a handler must run synchronously or register its work with the `waitUntil` hook
-     * of the event detail, which delays the navigation for at most two seconds.
+     * Unset, the widget uses its own default navigation.
      *
      * @example
      * ```html
@@ -108,8 +107,9 @@ export const Base = defineComponent({
      * Whether to hide the heading block of the widget visually while keeping it in the accessibility
      * tree.
      *
-     * Set it on a page that already carries its own heading. The component binds it as a property.
-     * Vue turns an unset boolean into `false`, which is the default, so an unset prop is safe.
+     * Set it on a page that already carries its own heading. The component writes it as the
+     * `suppress-header` attribute, present when `true` and absent otherwise, so server-rendered
+     * markup carries it and an unset prop is the same as `false`.
      *
      * @defaultValue false
      */
@@ -119,6 +119,11 @@ export const Base = defineComponent({
    * The events that the component re-emits from the widget.
    *
    * The `signout` event carries a {@link ZitadelSignoutDetail} when the sign-out completes.
+   *
+   * A handler may return a promise, but the component emits an event and cannot capture a return
+   * value, so nothing waits for it. To delay the navigation, call `waitUntil(promise)` on the
+   * event detail inside the handler: the widget then waits for it, for at most two seconds, before
+   * it navigates. Only the `signout` detail carries `waitUntil`.
    */
   emits: ["signout"],
   setup(props, { attrs, emit, expose }) {
@@ -141,11 +146,12 @@ export const Base = defineComponent({
         // do in the widget's `resolveApi`, so a page that passes only `project`
         // is configured before hydration and both channels agree.
         "project-id": props.project?.projectId ?? props.projectId,
-        "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+        "proxy-path": proxyPathAttr(props.project?.proxyPath ?? props.proxyPath),
         url: props.project?.url,
+        "publishable-key": props.project?.publishableKey,
         projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        "post-sign-out-url": props.postSignOutUrl,
+        proxyPath: proxyPathAttr(props.proxyPath),
+        "post-sign-out-url": props.postSignOutUrl || undefined,
         // A string prop with a default is bound as an attribute (the "^" prefix on
         // the client, see `forceAttr`): Vue assigns an unset property as "", which
         // the element cannot tell from an intended empty string, while an unset
@@ -154,7 +160,7 @@ export const Base = defineComponent({
         [`${attr}logout-label`]: props.logoutLabel,
         [`${attr}variant`]: props.variant,
         [`${attr}theme`]: props.theme,
-        suppressHeader: props.suppressHeader,
+        "suppress-header": props.suppressHeader ? "" : undefined,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },

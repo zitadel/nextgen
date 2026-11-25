@@ -194,6 +194,8 @@ An empty `url` or `projectSecret`, whether in the options or in the environment,
 | `proxyTimeoutMs`    | `number`             | `5000`               | Timeout in ms for upstream proxy requests                                                       |
 | `audience`          | `string \| string[]` | not validated        | Expected `aud` claim value(s). When omitted, audience is not checked                           |
 
+A signed-out request for a protected route is redirected with an absolute URL on the origin of the request, such as `https://app.example.com/login?next=%2Fadmin`. The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them from the request only when the client sent none. It cannot tell a trusted CDN or load balancer from a client, and the server builds the OAuth issuer and the `Secure` decision for session cookies from those headers, so strip them at the edge when clients can reach the app directly.
+
 ## How JWT verification works
 
 1. Bearer token from `Authorization` header is checked first; the app's session cookie, `__Host-zitadel_session_<projectId>` (`zitadel_session_<projectId>` over plain http to a loopback host), is the fallback

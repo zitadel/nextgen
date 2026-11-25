@@ -9,7 +9,14 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
-import { Component, CUSTOM_ELEMENTS_SCHEMA, input, output, viewChild } from "@angular/core";
+import {
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  input,
+  output,
+  viewChild,
+} from "@angular/core";
 
 import type { ZitadelProject } from "@zitadel/sdk-core/config";
 
@@ -29,11 +36,23 @@ import "@zitadel/components";
  * discrete project id and same-origin proxy path are bound as properties too, and again as the
  * `project-id` and `proxy-path` attributes, so a server-rendered page carries them before
  * hydration. The handle wins over the discrete inputs, as it does inside the widget. Callbacks,
- * `locales` and the boolean options are properties and are not part of server markup. The widget
+ * `locales` are properties and are not part of server markup. The boolean options are boolean
+ * attributes, present when `true` and absent otherwise, so server markup carries them. The
+ * `variant`, `theme` and `lang` inputs and the publishable key of the handle are attributes too. The
+ * widget
  * fires `zitadel-*` events, and the component re-emits each detail on the outputs {@link
  * ZitadelLogin.flowStep}, {@link ZitadelLogin.flowInput}, {@link
  * ZitadelLogin.flowComplete}, {@link ZitadelLogin.flowRedirect} and {@link
  * ZitadelLogin.flowError}.
+ *
+ * A handler may return a promise, but the component emits an output and cannot capture a return
+ * value, so nothing waits for it. To delay the navigation, call `waitUntil(promise)` on the
+ * event detail inside the handler: the widget then waits for it, for at most two seconds, before
+ * it navigates. Only the `flowComplete` and `flowRedirect` details carry `waitUntil`.
+ *
+ * The standard HTML attributes (`class`, `style`, `id`, `data-*` and `aria-*`) belong to the
+ * `zitadel-auth-login` host element, not to the widget inside it, so a host `id` or `class` lands on the host and
+ * not on the `zitadel-login` element.
  *
  * The widget is defined only in a browser. On the server the tag renders as an unknown element
  * until the browser upgrades it, so mount the component on the client after hydration. A widget
@@ -66,21 +85,22 @@ import "@zitadel/components";
     #el
     [project]="project()"
     [projectId]="projectId()"
-    [proxyPath]="proxyPath()"
+    [proxyPath]="proxyPath() === '' ? '/' : proxyPath()"
     [attr.project-id]="project()?.projectId ?? projectId() ?? null"
-    [attr.proxy-path]="project()?.proxyPath ?? proxyPath() ?? null"
+    [attr.proxy-path]="proxyPathAttr()"
     [attr.url]="project()?.url ?? null"
+    [attr.publishable-key]="project()?.publishableKey ?? null"
     [locales]="locales()"
     [attr.lang]="lang() ?? null"
     [attr.purpose]="purpose()"
     [attr.flow-name]="flowName()"
-    [attr.post-sign-in-url]="postSignInUrl()"
-    [forcePostSignInUrl]="forcePostSignInUrl()"
-    [attr.resume-flow-id]="resumeFlowId()"
+    [attr.post-sign-in-url]="postSignInUrl() || null"
+    [attr.force-post-sign-in-url]="forcePostSignInUrl() ? '' : null"
+    [attr.resume-flow-id]="resumeFlowId() || null"
     [attr.variant]="variant() ?? null"
     [attr.theme]="theme() ?? null"
-    [suppressHeader]="suppressHeader()"
-    [suppressPasswordToggle]="suppressPasswordToggle()"
+    [attr.suppress-header]="suppressHeader() ? '' : null"
+    [attr.suppress-password-toggle]="suppressPasswordToggle() ? '' : null"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
@@ -184,8 +204,9 @@ export class ZitadelLogin {
    * Whether the widget always navigates to {@link ZitadelLogin.postSignInUrl}, even when
    * the page's `next` query parameter names a path.
    *
-   * Set it on a page that uses `next` for something of its own. It is bound as a DOM property, so
-   * it is not part of server markup.
+   * Set it on a page that uses `next` for something of its own. It is written as the
+   * `force-post-sign-in-url` attribute, present when `true` and absent otherwise, so server-rendered
+   * markup carries it.
    *
    * @defaultValue false
    *
@@ -268,7 +289,8 @@ export class ZitadelLogin {
    * Whether the widget hides its own heading block.
    *
    * The heading stays in the accessibility tree and is only hidden visually, so use it on a page
-   * that already carries its own heading. Unset is the same as `false` and keeps the heading
+   * that already carries its own heading. It is written as the `suppress-header` attribute,
+   * present when `true` and absent otherwise. Unset is the same as `false` and keeps the heading
    * visible.
    *
    * @defaultValue false
@@ -283,7 +305,8 @@ export class ZitadelLogin {
    * Whether the widget hides the show and hide button on password fields.
    *
    * The widget shows the button by default, and it sits in the tab order right after the field. The
-   * option is named negatively because a boolean attribute can only switch something on. The
+   * option is named negatively because a boolean attribute can only switch something on. It is
+   * written as the `suppress-password-toggle` attribute, present when `true` and absent otherwise. The
    * setting belongs to the embedding page and is not stored with the tenant's branding. Unset keeps
    * the button.
    *
@@ -358,6 +381,18 @@ export class ZitadelLogin {
    * ```
    */
   readonly flowError = output<ZitadelFlowErrorDetail>();
+
+  /**
+   * The value of the `proxy-path` attribute: the handle's path, else the discrete input.
+   *
+   * An empty path means the origin root, because the API client strips trailing slashes, but the
+   * widget treats an empty `proxy-path` attribute as unset and falls back to `/__nextgen`. The
+   * value `/` survives that and normalizes to the root. The template reads it, so you do not.
+   */
+  protected readonly proxyPathAttr = computed(() => {
+    const path = this.project()?.proxyPath ?? this.proxyPath();
+    return path === "" ? "/" : (path ?? null);
+  });
 
   private readonly elementRef = viewChild<ElementRef<ZitadelLoginElement>>("el");
 

@@ -221,6 +221,10 @@ export interface ZitadelNavigationDetail {
  * navigates afterwards, so register any work that must finish first with
  * {@link ZitadelFlowCompleteDetail.waitUntil}.
  *
+ * The event bubbles and is composed, so any script on the page can listen for it and read the
+ * single-use `handoff_token` in its detail. The host should exchange that token itself, or set
+ * `postSignInUrl` so the widget exchanges it and navigates.
+ *
  * Whether the widget navigates by itself depends on the `postSignInUrl` prop of the login widget:
  * when that prop is unset, the widget leaves the handoff to the host page, so the listener is the
  * only place that learns the sign-in finished.

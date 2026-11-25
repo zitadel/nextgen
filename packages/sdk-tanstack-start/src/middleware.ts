@@ -207,7 +207,8 @@ async function proxyRequest(
 
   const method = request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
-  const body = hasBody ? await request.arrayBuffer() : undefined;
+  const buffered = hasBody ? await request.arrayBuffer() : undefined;
+  const body = buffered && buffered.byteLength > 0 ? buffered : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(request, url, clientAddress);
   for (const [name, value] of Object.entries(route.headers)) {
@@ -332,6 +333,14 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  * `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` when `process` exists. On an edge runtime without
  * `process` they fall back to the defaults instead of throwing.
  *
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
  * @param request - The incoming Web `Request`.
  * @param options - The configuration, defaulting to an empty object.
  * @returns A {@link ZitadelRequestDecision} that tells the caller what to send or do next.
@@ -374,7 +383,7 @@ export async function handleZitadelRequest(
   const projectSecret = options.projectSecret || PROCESS_ENV.ZITADEL_PROJECT_SECRET;
 
   // Guard against open-redirect: loginPath must be a relative path.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
       `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
@@ -537,6 +546,8 @@ const CONTEXT_KEY = "zitadelAuth";
  * Naming: TanStack Start has request middleware and function middleware, both registered in
  * start.ts, so the name says RequestMiddleware to tell the two apart. It is a factory, called
  * once to return the middleware, so it starts with create.
+ *
+ * It redirects and forwards as {@link handleZitadelRequest} does.
  *
  * @param options - The middleware configuration, see {@link ZitadelRequestOptions}.
  * @returns A request-middleware server handler that resolves to the response to send.

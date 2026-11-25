@@ -19,8 +19,9 @@ function nonEmptyString(value: unknown): string | undefined {
 /**
  * Reads a list of strings from a runtime-config value.
  *
- * A single non-empty string counts as a one-entry list, because an environment variable that is
- * not valid JSON arrives as a plain string.
+ * A list stays as it is. A plain string, which is how an environment variable that is not valid
+ * JSON arrives, is split on commas, and each entry is trimmed and dropped when it is empty, so
+ * `/a,/b` is the two routes `/a` and `/b`.
  *
  * @param value - The value to read.
  * @returns The list, or `undefined` when the value is empty or of another type.
@@ -29,8 +30,15 @@ function stringList(value: unknown): string[] | undefined {
   if (Array.isArray(value)) {
     return value.map(String);
   }
-  const single = nonEmptyString(value);
-  return single === undefined ? undefined : [single];
+  const text = nonEmptyString(value);
+  if (text === undefined) {
+    return undefined;
+  }
+  const entries = text
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+  return entries.length > 0 ? entries : undefined;
 }
 
 /**
@@ -87,6 +95,15 @@ export function middlewareOptions(
   };
 }
 
+/**
+ * The process environment, or an empty map when there is none.
+ *
+ * `process` is undefined in some edge and serverless runtimes, so the environment is read
+ * defensively and the fallback never throws a `ReferenceError`.
+ */
+const PROCESS_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" && process.env ? process.env : {};
+
 const config = useRuntimeConfig() as {
   nextgen?: unknown;
   zitadel?: Record<string, unknown>;
@@ -94,7 +111,7 @@ const config = useRuntimeConfig() as {
 };
 
 // Refuses to start on an old name that only the running server's environment carries.
-refuseLegacyConfig({ env: process.env, runtimeConfig: config, publicConfig: config.public });
+refuseLegacyConfig({ env: PROCESS_ENV, runtimeConfig: config, publicConfig: config.public });
 
 /**
  * The global Nitro event handler that the module registers as server middleware.

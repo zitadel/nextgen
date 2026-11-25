@@ -8,6 +8,15 @@
 export const DEFAULT_URL = "http://localhost:8080";
 
 /**
+ * The process environment, or an empty map when there is none.
+ *
+ * `process` is undefined in some edge and serverless runtimes, so the environment is read
+ * defensively and the fallback never throws a `ReferenceError`.
+ */
+const PROCESS_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" && process.env ? process.env : {};
+
+/**
  * Narrows a value to a string, because Nitro hands runtime-config values over as `unknown`.
  *
  * @param value - The value to narrow.
@@ -30,7 +39,7 @@ function text(value: unknown): string {
  * @returns The backend URL, never empty.
  */
 export function resolveUrl(zitadel: Record<string, unknown> | undefined): string {
-  return text(zitadel?.url) || text(zitadel?.issuerUrl) || process.env.ZITADEL_URL || DEFAULT_URL;
+  return text(zitadel?.url) || text(zitadel?.issuerUrl) || PROCESS_ENV.ZITADEL_URL || DEFAULT_URL;
 }
 
 /**
@@ -51,5 +60,5 @@ export function resolveProjectSecret(
   zitadel: Record<string, unknown> | undefined,
   option?: string,
 ): string | undefined {
-  return option || text(zitadel?.projectSecret) || process.env.ZITADEL_PROJECT_SECRET || undefined;
+  return option || text(zitadel?.projectSecret) || PROCESS_ENV.ZITADEL_PROJECT_SECRET || undefined;
 }

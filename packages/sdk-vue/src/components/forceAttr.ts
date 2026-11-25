@@ -15,3 +15,17 @@
 export function forceAttr(): "" | "^" {
   return typeof document === "undefined" ? "" : "^";
 }
+
+/**
+ * Maps a proxy path to the value its attribute and property must carry.
+ *
+ * An explicit empty proxy path means the origin root, because the API client strips trailing
+ * slashes. The element, however, treats an empty `proxy-path` as unset and falls back to
+ * `/__nextgen`. The value `/` survives that and normalizes to the root.
+ *
+ * @param path - The proxy path, or `undefined` when unset.
+ * @returns `/` for an empty path, otherwise the path unchanged.
+ */
+export function proxyPathAttr(path: string | undefined): string | undefined {
+  return path === "" ? "/" : path;
+}

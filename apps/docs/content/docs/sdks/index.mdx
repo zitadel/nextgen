@@ -49,7 +49,7 @@ Lower-level packages the framework SDKs are built on. Use them to embed the comp
 
 ## Choosing an SDK
 
-All packages ship on npm's `latest` tag in one release. Install the same version of all of them, for example `pnpm add @zitadel/sdk-next@latest`. A framework SDK (the first six rows) re-exports the widgets of its UI SDK from a `/components` entry, so one package is enough for an app. Until 1.0.0, a minor version can break, and its release note marks it **Breaking:**.
+All packages ship on npm's `latest` tag in one release. Install the same version of all of them, for example `pnpm add @zitadel/sdk-next@latest`. A framework SDK (the first six rows) re-exports the widgets of its UI SDK from a `/components` entry, so one package is enough to import from. The SvelteKit, SolidStart and Qwik Router SDKs also need their UI SDK installed, because the framework's compiler plugin looks for it in the app's own `package.json`; the CLI adds both. Until 1.0.0, a minor version can break, and its release note marks it **Breaking:**.
 
 | Framework | Package | Rendering | Same-origin `/__nextgen/*` proxy | CLI scaffolds |
 | --------- | ------- | --------- | -------------------------------- | ------------- |

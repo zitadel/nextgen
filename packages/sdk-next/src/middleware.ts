@@ -112,11 +112,20 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
  * itself and returns the response. It is not a factory, so it has no create prefix.
  * createProxy(project, options) is the factory that returns a handler.
  *
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`, because
+ * `NextResponse.redirect` needs an absolute URL.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
  * @param req - The incoming Next.js edge request.
  * @param options - The middleware configuration; see {@link ZitadelMiddlewareOptions}.
  * @returns A response that continues the request, redirects it, answers `503` or `400`, or is the
  *   proxied backend response.
- * @throws When `options.loginPath` is not a relative path that starts with a single `/`.
+ * @throws When `options.loginPath` is not a relative path that starts with a single `/` and has no backslash.
  *
  * @example
  * ```ts
@@ -162,7 +171,7 @@ export async function zitadelMiddleware(
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
   // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
       `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
@@ -315,7 +324,8 @@ async function proxyRequest(
   // Read body eagerly so undici receives a concrete buffer rather than a
   // WinterCG ReadableStream, which is incompatible with Node.js fetch body
   // extraction.
-  const bodyBuffer = hasBody ? await req.arrayBuffer() : undefined;
+  const buffered = hasBody ? await req.arrayBuffer() : undefined;
+  const bodyBuffer = buffered && buffered.byteLength > 0 ? buffered : undefined;
 
   const upstream = await fetch(target, {
     method: req.method,
@@ -392,7 +402,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     // The backend could not say whether the session is live. The user may well
     // be signed in, so a protected route answers 503 rather than send them to
     // the login page.
-    response = new NextResponse("Service Unavailable", { status: 503 });
+    return new NextResponse("Service Unavailable", { status: 503 });
   } else if (isProtected) {
     response = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
   } else {

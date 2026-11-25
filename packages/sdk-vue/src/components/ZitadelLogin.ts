@@ -18,7 +18,7 @@ import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
 import type { WithZitadelWidgetAttributes } from "../types.js";
-import { forceAttr } from "./forceAttr";
+import { forceAttr, proxyPathAttr } from "./forceAttr";
 
 /**
  * The component that {@link ZitadelLogin} is typed from, before the standard HTML attributes are added to
@@ -37,8 +37,9 @@ export const Base = defineComponent({
      *
      * Pass the value that {@link configureZitadel} returns. The component binds it as a DOM
      * property, raw and not as Vue's reactive proxy, because the widget compares it by identity.
-     * It also writes the handle's fields as the `project-id`, `proxy-path` and `url` attributes, so
-     * server-rendered markup carries them before hydration. It wins over
+     * It also writes the handle's fields as the `project-id`, `proxy-path`, `url` and
+     * `publishable-key` attributes, so server-rendered markup carries them before hydration. The
+     * publishable key is browser-safe by design. It wins over
      * {@link ZitadelLoginProps.projectId} and {@link ZitadelLoginProps.proxyPath}.
      *
      * @example
@@ -174,8 +175,9 @@ export const Base = defineComponent({
      * Whether to hide the heading block of the widget visually while keeping it in the accessibility
      * tree.
      *
-     * Set it on a page that already carries its own heading. The component binds it as a property.
-     * Vue turns an unset boolean into `false`, which is the default, so an unset prop is safe.
+     * Set it on a page that already carries its own heading. The component writes it as the
+     * `suppress-header` attribute, present when `true` and absent otherwise, so server-rendered
+     * markup carries it and an unset prop is the same as `false`.
      *
      * @defaultValue false
      */
@@ -183,8 +185,9 @@ export const Base = defineComponent({
     /**
      * Whether to hide the show and hide button on password fields.
      *
-     * The component binds it as a property. Vue turns an unset boolean into `false`, which is the
-     * default, so an unset prop is safe.
+     * The component writes it as the `suppress-password-toggle` attribute, present when `true` and
+     * absent otherwise, so server-rendered markup carries it and an unset prop is the same as
+     * `false`.
      *
      * @defaultValue false
      */
@@ -199,10 +202,12 @@ export const Base = defineComponent({
    * The `flowComplete` event carries a {@link ZitadelFlowCompleteDetail} when the flow succeeds.
    * The `flowRedirect` event carries a {@link ZitadelFlowRedirectDetail} when the widget is about
    * to navigate away. The `flowError` event carries a {@link ZitadelFlowErrorDetail} when the flow
-   * fails. The `flowRedirect` and `flowComplete` events are emitted just before the widget
-   * navigates, so the handler must run synchronously. The `waitUntil` hook that the event detail
-   * offers lets a handler delay the navigation for at most two seconds, which matters only for
-   * asynchronous work. Vue emits are synchronous, so a plain handler needs no hook.
+   * fails.
+   *
+   * A handler may return a promise, but the component emits an event and cannot capture a return
+   * value, so nothing waits for it. To delay the navigation, call `waitUntil(promise)` on the
+   * event detail inside the handler: the widget then waits for it, for at most two seconds, before
+   * it navigates. Only the `flowComplete` and `flowRedirect` details carry `waitUntil`.
    */
   emits: ["flowStep", "flowInput", "flowComplete", "flowRedirect", "flowError"],
   setup(props, { attrs, emit, expose }) {
@@ -229,14 +234,15 @@ export const Base = defineComponent({
         // do in the widget's `resolveApi`, so a page that passes only `project`
         // is configured before hydration and both channels agree.
         "project-id": props.project?.projectId ?? props.projectId,
-        "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+        "proxy-path": proxyPathAttr(props.project?.proxyPath ?? props.proxyPath),
         url: props.project?.url,
+        "publishable-key": props.project?.publishableKey,
         projectId: props.projectId,
-        proxyPath: props.proxyPath,
+        proxyPath: proxyPathAttr(props.proxyPath),
         purpose: props.purpose,
-        "post-sign-in-url": props.postSignInUrl,
-        forcePostSignInUrl: props.forcePostSignInUrl,
-        "resume-flow-id": props.resumeFlowId,
+        "post-sign-in-url": props.postSignInUrl || undefined,
+        "force-post-sign-in-url": props.forcePostSignInUrl ? "" : undefined,
+        "resume-flow-id": props.resumeFlowId || undefined,
         // Same raw-unwrap rationale as `project`: hand the widget the plain
         // dictionaries, not Vue's reactive proxy.
         locales: props.locales === undefined ? undefined : toRaw(props.locales),
@@ -248,8 +254,8 @@ export const Base = defineComponent({
         [`${attr}lang`]: props.lang,
         [`${attr}variant`]: props.variant,
         [`${attr}theme`]: props.theme,
-        suppressHeader: props.suppressHeader,
-        suppressPasswordToggle: props.suppressPasswordToggle,
+        "suppress-header": props.suppressHeader ? "" : undefined,
+        "suppress-password-toggle": props.suppressPasswordToggle ? "" : undefined,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

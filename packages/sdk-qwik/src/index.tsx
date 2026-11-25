@@ -175,10 +175,10 @@ function loginAttrs(props: ZitadelLoginProps): Attrs {
     ...projectAttrs(props),
     purpose: props.purpose ?? "login",
     "flow-name": props.flowName,
-    "post-sign-in-url": props.postSignInUrl,
+    "post-sign-in-url": props.postSignInUrl || undefined,
     "force-post-sign-in-url": flag(props.forcePostSignInUrl),
     // Without it a resumed widget would boot with no handle and start a new flow.
-    "resume-flow-id": props.resumeFlowId ?? undefined,
+    "resume-flow-id": props.resumeFlowId || undefined,
     variant: props.variant,
     theme: props.theme,
     "suppress-header": flag(props.suppressHeader),
@@ -196,7 +196,7 @@ function loginAttrs(props: ZitadelLoginProps): Attrs {
 function logoutAttrs(props: ZitadelLogoutProps): Attrs {
   return {
     ...projectAttrs(props),
-    "post-sign-out-url": props.postSignOutUrl,
+    "post-sign-out-url": props.postSignOutUrl || undefined,
     theme: props.theme,
   };
 }
@@ -210,7 +210,7 @@ function logoutAttrs(props: ZitadelLogoutProps): Attrs {
 function sessionAttrs(props: ZitadelSessionProps): Attrs {
   return {
     ...projectAttrs(props),
-    "post-sign-out-url": props.postSignOutUrl,
+    "post-sign-out-url": props.postSignOutUrl || undefined,
     heading: props.heading,
     "logout-label": props.logoutLabel,
     variant: props.variant,
@@ -246,7 +246,7 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "resumeFlowId", props.resumeFlowId ?? "");
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
-  setProp(el, "suppressHeader", props.suppressHeader);
+  setProp(el, "suppressHeader", props.suppressHeader === true);
   // A concrete boolean, not the raw prop: `setProp` skips `undefined`, so
   // going from `true` back to unset would otherwise leave the toggle hidden.
   setProp(el, "suppressPasswordToggle", props.suppressPasswordToggle === true);
@@ -287,7 +287,7 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "logoutLabel", props.logoutLabel);
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
-  setProp(el, "suppressHeader", props.suppressHeader);
+  setProp(el, "suppressHeader", props.suppressHeader === true);
 }
 
 /**
@@ -398,9 +398,12 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  * whenever a prop changes and wires the native listeners that forward the widget's `zitadel-*`
  * events to the `on...$` callbacks.
  *
- * Callbacks are QRLs, which load lazily. For `onFlowComplete$` and `onFlowRedirect$` the wrapper
- * hands the callback's promise to the event's `waitUntil`, so the widget waits for it before it
- * navigates. Terminal events that fire before the listeners attach, which happens when the widget
+ * Callbacks are QRLs, which load lazily. A callback may return a promise. The component registers
+ * it on the `waitUntil` of the event detail, so the widget waits for it, for at most two seconds,
+ * before it navigates. Only `zitadel-flow-complete`, `zitadel-flow-redirect` and
+ * `zitadel-signout` navigate; the other events carry no `waitUntil`, so nothing waits for them.
+ * An unset or empty `resumeFlowId` and `postSignInUrl` write no attribute, a `false` flag writes
+ * none, and an empty `proxyPath` is written as `/`. Terminal events that fire before the listeners attach, which happens when the widget
  * boots from a resume flow handle under server rendering, are buffered and replayed in order, so a
  * callback such as a handoff-token exchange is not missed. Input events are never buffered because
  * they can carry passwords.
@@ -505,9 +508,11 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  *
  * Like {@link ZitadelLogin}, the element is static in the JSX, its attribute-backed config rides in
  * the server-rendered markup, and the property-only config and the `zitadel-signout` listener are
- * applied in the browser. `onSignout$` may be async: the widget navigates only after the callback
- * has settled, or after a two-second timeout, so a lazily loaded QRL is not cut off by the page
- * unloading. A signout event that fires before the listener attaches is buffered and replayed.
+ * applied in the browser. `onSignout$` may return a promise. The component registers it on the
+ * `waitUntil` of the event detail, so the widget waits for it, for at most two seconds, before it
+ * navigates, and a lazily loaded QRL is not cut off by the page unloading. Only
+ * `zitadel-signout` carries `waitUntil`. An empty `postSignOutUrl` writes no attribute. A signout
+ * event that fires before the listener attaches is buffered and replayed.
  *
  * @example
  * ```tsx
@@ -592,9 +597,10 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  *
  * Like {@link ZitadelLogin}, the element is static in the JSX, its attribute-backed config rides in
  * the server-rendered markup, and the property-only config and the `zitadel-signout` listener are
- * applied in the browser. `onSignout$` may be async: the widget navigates only after the callback
- * has settled, or after a two-second timeout. A signout event that fires before the listener
- * attaches is buffered and replayed.
+ * applied in the browser. `onSignout$` may return a promise. The component registers it on the
+ * `waitUntil` of the event detail, so the widget waits for it, for at most two seconds, before it
+ * navigates. Only `zitadel-signout` carries `waitUntil`. An empty `postSignOutUrl` writes no
+ * attribute. A signout event that fires before the listener attaches is buffered and replayed.
  *
  * @example
  * ```tsx

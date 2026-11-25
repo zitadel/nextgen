@@ -22,7 +22,6 @@ import {
   type WidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import type { Component } from "svelte";
 import { hydrate, unmount } from "svelte";
 import { createServer } from "vite";
 import { afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -33,7 +32,6 @@ import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 
-import { describeServerRenderCases } from "@zitadel/client-sdk-contract/server-render";
 import {
   type Attributes,
   cssProperties,
@@ -570,24 +568,6 @@ describe("hydrating a server-rendered login", () => {
     host.remove();
   });
 });
-
-const SDK = "svelte";
-
-/** The attributes on the widget's element once the component has rendered. */
-async function renderAttributes(
-  widget: "login" | "session" | "logout",
-  props: Readonly<Record<string, unknown>>,
-): Promise<Record<string, string>> {
-  const component = { login: ZitadelLogin, session: ZitadelSession, logout: ZitadelLogout }[
-    widget
-  ] as Component<Record<string, unknown>>;
-  const { container } = render(component, { props: { ...props } });
-  const el = container.querySelector(`zitadel-${widget}`);
-  expect(el, `<zitadel-${widget}> missing from the markup`).not.toBeNull();
-  return Object.fromEntries(el!.getAttributeNames().map((n) => [n, el!.getAttribute(n) ?? ""]));
-}
-
-describeServerRenderCases(SDK, renderAttributes);
 
 type ForwardedAttributes = {
   class: string;

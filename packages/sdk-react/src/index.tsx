@@ -195,37 +195,66 @@ function asAttributes<Tag extends WidgetTag>(
 /**
  * Returns the project coordinates as attributes, so they are in the server markup.
  *
- * The `project` handle stays a property too: it carries the publishable key and is what the
- * element prefers once React hands it over. The attributes are `project-id`, `proxy-path` and
- * `url`; each is `undefined`, and so omitted, when its source is unset.
- *
- * A handle with a publishable key writes none, because attributes cannot carry the key. A widget
- * that started from them would send its first request without the bearer the project needs, and
- * never retry. {@link ZitadelLogin} renders nothing for such a handle until it has mounted, so its
- * element is created with the handle already bound.
+ * The `project` handle stays a property too: it is what the element prefers once React hands it
+ * over. The attributes are `project-id`, `proxy-path`, `url` and `publishable-key`; each is
+ * `undefined`, and so omitted, when its source is unset. The publishable key is browser-safe by
+ * design, so it rides in the markup and the element's first request carries the bearer. An empty
+ * proxy path is written as `/`, because the element treats an empty `proxy-path` attribute as
+ * unset and falls back to its default path, while `/` normalizes to the site root.
  *
  * @param props - The wrapper props that name the project.
- * @returns The attribute map to spread onto the element, empty for a handle with a key.
+ * @returns The attribute map to spread onto the element.
  */
 function projectAttributes(props: {
   readonly project?: ZitadelProject;
   readonly projectId?: string;
   readonly proxyPath?: string;
 }) {
-  if (props.project?.publishableKey) {
-    return {};
-  }
   return {
     "project-id": props.project?.projectId ?? props.projectId,
-    "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+    "proxy-path": proxyPathAttr(props.project?.proxyPath ?? props.proxyPath),
     url: props.project?.url,
+    "publishable-key": props.project?.publishableKey,
   };
+}
+
+/**
+ * Maps a proxy path to the value its attribute and property must carry.
+ *
+ * An explicit empty proxy path means the origin root, because the API client strips trailing
+ * slashes. The element, however, treats an empty `proxy-path` as unset and falls back to
+ * `/__nextgen`. The value `/` survives that and normalizes to the root.
+ *
+ * @param path - The proxy path, or `undefined` when unset.
+ * @returns `/` for an empty path, otherwise the path unchanged.
+ */
+function proxyPathAttr(path: string | undefined): string | undefined {
+  return path === "" ? "/" : path;
+}
+
+/**
+ * Maps a boolean prop to the value of a boolean attribute.
+ *
+ * @param value - The prop value.
+ * @returns An empty string (attribute present) when `true`, otherwise `undefined` (omitted).
+ */
+function flag(value: boolean | undefined): string | undefined {
+  return value ? "" : undefined;
 }
 
 const ZitadelLoginElementReact = createComponent({
   react: React,
   tagName: widgetTags.login,
-  elementClass: asAttributes(widgetTags.login, "purpose", "resumeFlowId", "postSignInUrl", "url"),
+  elementClass: asAttributes(
+    widgetTags.login,
+    "purpose",
+    "resumeFlowId",
+    "postSignInUrl",
+    "url",
+    "variant",
+    "theme",
+    "lang",
+  ),
   events: {
     onZitadelFlowStep: eventName("zitadel-flow-step"),
     onZitadelFlowInput: eventName("zitadel-flow-input"),
@@ -238,7 +267,7 @@ const ZitadelLoginElementReact = createComponent({
 const ZitadelLogoutElementReact = createComponent({
   react: React,
   tagName: widgetTags.logout,
-  elementClass: asAttributes(widgetTags.logout, "url"),
+  elementClass: asAttributes(widgetTags.logout, "url", "theme"),
   events: {
     onZitadelSignout: eventName("zitadel-signout"),
   },
@@ -247,7 +276,7 @@ const ZitadelLogoutElementReact = createComponent({
 const ZitadelSessionElementReact = createComponent({
   react: React,
   tagName: widgetTags.session,
-  elementClass: asAttributes(widgetTags.session, "url"),
+  elementClass: asAttributes(widgetTags.session, "url", "heading", "variant", "theme"),
   events: {
     onZitadelSignout: eventName("zitadel-signout"),
   },
@@ -322,23 +351,32 @@ export type ZitadelLoginProps = ZitadelLoginWidgetProps &
  * Renders the sign-in or sign-up flow as a React component that wraps the `<zitadel-login>`
  * widget.
  *
- * The component binds the project handle as a DOM property, or the discrete `projectId` and
- * `proxyPath` props as attributes, which is what puts them into server-rendered markup. It
- * forwards the widget's `zitadel-*` events as optional callbacks that receive the event's
- * `detail`. A callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout`
- * may return a promise; the widget waits for it, up to two seconds, before it navigates.
+ * The component binds the project handle as a DOM property and writes its fields, or the discrete
+ * `projectId` and `proxyPath` props, as attributes, which is what puts them into server-rendered
+ * markup. It forwards the widget's `zitadel-*` events as optional callbacks that receive the
+ * event's `detail`.
+ *
+ * A callback may return a promise. The component registers it on the `waitUntil` of the event
+ * detail, so the widget waits for it, for at most two seconds, before it navigates. Only
+ * `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` navigate; the other
+ * events carry no `waitUntil`, so nothing waits for them.
  *
  * The attributes `purpose`, `flow-name`, `resume-flow-id`, `post-sign-in-url`, `project-id`,
- * `proxy-path` and `url` are written into server markup, because the widget starts its first flow
- * when it upgrades, before React hydrates. Passing them only as properties would start a default
- * flow first and then restart it. Because React 19 does not apply an object property while it
+ * `proxy-path`, `url`, `publishable-key`, `variant`, `theme`, `lang`, `suppress-header`,
+ * `suppress-password-toggle` and `force-post-sign-in-url` are written into server markup, because
+ * the widget starts its first flow when it upgrades, before React hydrates. Passing them only as
+ * properties would start a default flow first and then restart it. An unset or empty
+ * `resumeFlowId` and `postSignInUrl` write no attribute, a `false` flag writes none, and an empty
+ * `proxyPath` is written as `/`. Because React 19 does not apply an object property while it
  * hydrates a server-rendered custom element, pass `projectId` and `proxyPath` as strings on a
  * server-rendered page and keep the handle for a client-side app.
  *
- * A project handle with a publishable key cannot travel as attributes, because the first request
- * would then lack the bearer key and never retry. For such a handle the component renders nothing
- * on the server and until it has mounted in the browser, so the element is created with the
- * handle already bound. Do not rely on its markup being present in the server render in that case.
+ * The publishable key of a project handle is browser-safe, so it is written as the
+ * `publishable-key` attribute and the element's first request carries it.
+ *
+ * Only this SDK exports session helpers (`useSession`, `getSession` and `sessionStore`). Other
+ * SDKs read the session through the helpers of `@zitadel/sdk-core/session`.
+ *
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-login>` element, so the upgraded web
  * component can be reached imperatively. The definition of the element registers only in the
@@ -383,32 +421,23 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginPr
   ) {
     // The standard HTML attributes are the only extra props the element takes.
     const attributes = standardAttributes(props);
-    const keyed = Boolean(props.project?.publishableKey);
-    const [mounted, setMounted] = React.useState(false);
-    React.useEffect(() => setMounted(true), []);
-    // A keyed handle cannot reach the element as attributes, and the element
-    // starts its first flow when it first updates. Create it only once the
-    // handle can be bound at the same time, never during server rendering.
-    if (keyed && !mounted) {
-      return null;
-    }
     return (
       <ZitadelLoginElementReact
         {...attributes}
         ref={ref}
         project={props.project}
         projectId={props.projectId}
-        proxyPath={props.proxyPath}
-        variant={props.variant}
-        theme={props.theme}
-        suppressHeader={props.suppressHeader}
-        suppressPasswordToggle={props.suppressPasswordToggle}
-        forcePostSignInUrl={props.forcePostSignInUrl}
+        proxyPath={proxyPathAttr(props.proxyPath)}
         locales={props.locales}
-        lang={props.lang}
         previewState={props.previewState}
         previewSuccessStep={props.previewSuccessStep}
         purpose={purpose ?? "login"}
+        variant={props.variant}
+        theme={props.theme}
+        lang={props.lang}
+        suppress-header={flag(props.suppressHeader)}
+        suppress-password-toggle={flag(props.suppressPasswordToggle)}
+        force-post-sign-in-url={flag(props.forcePostSignInUrl)}
         flow-name={props.flowName}
         {...projectAttributes(props)}
         resume-flow-id={resumeFlowId || undefined}
@@ -441,12 +470,13 @@ export type ZitadelLogoutProps = ZitadelLogoutWidgetProps & ZitadelWidgetAttribu
  *
  * The component binds the project handle as a DOM property, or the discrete `projectId` and
  * `proxyPath` props as attributes, and forwards the widget's `zitadel-signout` event as the
- * optional `onSignout` callback. Use it in an account menu or a profile page. A callback that
- * returns a promise delays the post-sign-out navigation until it settles, up to two seconds.
+ * optional `onSignout` callback. Use it in an account menu or a profile page. A callback may
+ * return a promise: the component registers it on the `waitUntil` of the event detail, so the
+ * widget waits for it, for at most two seconds, before it navigates.
  *
- * With a project handle that carries a publishable key the component still renders its tag, but
- * without the project attributes, because attributes cannot carry the key. A forwarded `ref`
- * resolves to the underlying `<zitadel-logout>` element.
+ * The project attributes, including `publishable-key` and `theme`, are written into server
+ * markup, and an empty `postSignOutUrl` writes no attribute. A forwarded `ref` resolves to the
+ * underlying `<zitadel-logout>` element.
  *
  * @example
  * ```tsx
@@ -468,10 +498,10 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
         {...attributes}
         project={props.project}
         projectId={props.projectId}
-        proxyPath={props.proxyPath}
+        proxyPath={proxyPathAttr(props.proxyPath)}
         theme={props.theme}
         {...projectAttributes(props)}
-        post-sign-out-url={props.postSignOutUrl}
+        post-sign-out-url={props.postSignOutUrl || undefined}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => withDetail(event, onSignout))}
       />
@@ -501,9 +531,11 @@ export type ZitadelSessionProps = ZitadelSessionWidgetProps & ZitadelWidgetAttri
  *
  * The component binds the project handle as a DOM property, or the discrete `projectId` and
  * `proxyPath` props as attributes, and forwards the widget's `zitadel-signout` event as the
- * optional `onSignout` callback. With a project handle that carries a publishable key the
- * component still renders its tag, without the project attributes. A forwarded `ref` resolves to
- * the underlying `<zitadel-session>` element.
+ * optional `onSignout` callback. A callback may return a promise: the component registers it on
+ * the `waitUntil` of the event detail, so the widget waits for it, for at most two seconds,
+ * before it navigates. The project attributes, including `publishable-key`, `heading`,
+ * `logout-label`, `variant`, `theme` and `suppress-header`, are written into server markup. A
+ * forwarded `ref` resolves to the underlying `<zitadel-session>` element.
  *
  * @example
  * ```tsx
@@ -525,14 +557,14 @@ export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSes
         {...attributes}
         project={props.project}
         projectId={props.projectId}
-        proxyPath={props.proxyPath}
+        proxyPath={proxyPathAttr(props.proxyPath)}
         heading={props.heading}
-        logoutLabel={props.logoutLabel}
+        logout-label={props.logoutLabel}
         variant={props.variant}
         theme={props.theme}
-        suppressHeader={props.suppressHeader}
+        suppress-header={flag(props.suppressHeader)}
         {...projectAttributes(props)}
-        post-sign-out-url={props.postSignOutUrl}
+        post-sign-out-url={props.postSignOutUrl || undefined}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => withDetail(event, onSignout))}
       />

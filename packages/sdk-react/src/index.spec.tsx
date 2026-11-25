@@ -376,24 +376,16 @@ describe("a login with a keyed project handle", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders no element on the server", () => {
-    expect(renderToString(<ZitadelLogin project={keyed} />)).toBe("");
-  });
-
-  it("starts its first flow once, with the bearer, after mounting", async () => {
+  it("starts its first flow once, with the bearer", async () => {
     const fetched = vi.spyOn(globalThis, "fetch");
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    hydrateRoot(host, <ZitadelLogin project={keyed} />);
+    const { container: host } = render(<ZitadelLogin project={keyed} />);
 
-    await waitFor(() => expect(host.querySelector(widgetTags.login)).not.toBeNull());
     expect(widgetIn(host, widgetTags.login).project).toBe(keyed);
     await waitFor(() => expect(fetched).toHaveBeenCalled());
     expect(fetched).toHaveBeenCalledTimes(1);
     const [input, init] = fetched.mock.calls[0]!;
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
     expect(headers.get("authorization")).toBe("Bearer pk_test_123");
-    host.remove();
   });
 });
 
@@ -614,11 +606,10 @@ describe("server-rendered properties", () => {
   it("leaves the properties and the callbacks out of the server markup", async () => {
     const attributes = await renderAttributes("login", {
       project: { projectId: "p1", proxyPath: "/px" },
-      variant: "page",
       locales: { en: {} },
       onFlowStep: () => undefined,
     });
-    for (const name of ["variant", "locales", "onflowstep"]) {
+    for (const name of ["locales", "onflowstep"]) {
       expect(attributes).not.toHaveProperty(name);
     }
     expect(Object.values(attributes).join(" ")).not.toContain("object Object");

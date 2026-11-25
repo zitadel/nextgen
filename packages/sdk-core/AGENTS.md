@@ -31,3 +31,9 @@ project configuration from `@zitadel/sdk-core/config`.
   entry source does not move the hash of `@zitadel/sdk-core#test`.
 - Locate packages from `import.meta.dirname`, never `process.cwd()`: a wrong
   directory makes the tables empty and the guards silently vanish.
+
+## Session cookies
+
+- **A session token needs no escaping in a cookie.** The server issues a JWE in compact form, and a
+  JWT has the same shape: base64url segments joined by `.`, so it holds no `%`, `+` or `=`, and
+  `serializeSessionCookie` writes the value raw in every SDK.

@@ -14,15 +14,12 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-qwik-router";
 /**
- * The idiomatic Qwik component library that ships the `<ZitadelLogin>` /
- * `<ZitadelSession>` Qwik components the routes render. The server SDK above is
- * plumbing only; the widget comes from here, so a Qwik Router app gets the native
- * Qwik component (typed props, callback events) rather than the bare element.
+ * The Qwik UI SDK behind the widgets. The routes import the widgets from
+ * `@zitadel/sdk-qwik-router/components`, which re-exports this package, yet the
+ * app still declares it as a direct dependency: Qwik's optimizer finds the
+ * Qwik libraries to bundle in the app's own `package.json`.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
-// The routes import the widgets from `@zitadel/sdk-qwik-router/components`, which re-exports
-// this package. The app still declares it: Qwik's optimizer bundles the Qwik libraries it
-// finds in the app's own dependencies.
 
 /**
  * Rule-based patcher for a Qwik Router app. Like Next.js and SvelteKit, Qwik Router
@@ -30,8 +27,8 @@ const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
  * here the `@zitadel/sdk-qwik-router` `onRequest` plugin in
  * `src/routes/plugin@zitadel.ts`. Contributes the landing/login/register/profile
  * file-based routes (the idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Qwik
- * components from `@zitadel/sdk-qwik`), the public project-id env var, and both
- * deps. No config edit is needed — the plugin is a plain route file, so (like
+ * components from `@zitadel/sdk-qwik-router/components`), the public
+ * project-id env var, and both deps. No config edit is needed — the plugin is a plain route file, so (like
  * Next) every managed file carries the marker.
  */
 export class QwikRouterPatcher extends AbstractRulePatcher {

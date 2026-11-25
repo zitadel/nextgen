@@ -6,7 +6,10 @@ import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
-import { describeServerStandardAttributes } from "@zitadel/client-sdk-contract/server-render";
+import {
+  describeServerRenderCases,
+  describeServerStandardAttributes,
+} from "@zitadel/client-sdk-contract/server-render";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(
@@ -138,6 +141,7 @@ async function renderAttributes(
   );
 }
 
+describeServerRenderCases("svelte", renderAttributes);
 describeServerStandardAttributes(renderAttributes);
 
 describe("the package entry on a Node server", () => {

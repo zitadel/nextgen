@@ -33,7 +33,7 @@ Do not replace `Dynamic` with a literal widget tag in the components.
 
 Server-rendered markup contains the tag and its attributes only. The project
 coordinates are written as the `project-id` and `proxy-path` attributes (and
-`url` when the handle has one), so they are present before any script runs;
+`url` and `publishable-key` when the handle has them), so they are present before any script runs;
 an empty proxy path is written as `/`, because the widget treats an empty
 attribute as unset. The `project` handle is also bound as a DOM property,
 which carries the publishable key and is what the element prefers once Solid

@@ -90,11 +90,26 @@ Each widget event is an Angular output (`output()`) named in the last column, wh
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
 
-The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates, for at most two seconds. A component output cannot capture a handler's return value, so unlike the React, Solid, Svelte and Qwik SDKs a promise your handler returns is not awaited; `waitUntil` is the supported way.
+
+## Reading the session in your own UI
+
+Only `@zitadel/sdk-react` exports session helpers (`useSession`, `getSession` and `sessionStore`); this SDK does not re-export them. Import the same helpers from `@zitadel/sdk-core/session`, which this package depends on, and bind the shared store with a signal and `DestroyRef`. On a server the store reads nothing and stays `loading`, so read the session there through the server SDK of your meta-framework. `snapshot` holds `status` (`loading`, `authenticated`, `unauthenticated` or `error`) and `session` (`userId`, `identifier`, `identifierProperty` and `display`, never a token); `store.refresh()` reads again, for example from a flow-complete or sign-out handler. For a single read, `getSession({ projectId, proxyPath })` resolves to `{ isAuthenticated, session }`.
+
+```ts
+import { DestroyRef, inject, signal } from "@angular/core";
+import { sessionStore } from "@zitadel/sdk-core/session";
+
+const store = sessionStore({ project });
+const snapshot = signal(store.getServerSnapshot());
+inject(DestroyRef).onDestroy(
+  store.subscribe(() => snapshot.set(store.getSnapshot())),
+);
+```
 
 ## Standard HTML attributes
 
-The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, not to the widget inside it.
+The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, the host element, not to the widget inside it. A host `id` or `class` therefore never reaches the `<zitadel-login>`, `<zitadel-logout>` or `<zitadel-session>` element.
 
 ```html
 <zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
@@ -102,7 +117,7 @@ The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and
 
 ## Server rendering
 
-If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `zitadel-auth-login` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.
+If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `zitadel-auth-login` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. The server markup also carries the `url` and `publishable-key` of a `project` handle (the key is browser-safe), the `variant`, `theme`, `lang`, `heading` and `logoutLabel` props and the `suppressHeader`, `suppressPasswordToggle` and `forcePostSignInUrl` flags as attributes, in every SDK alike. An unset, empty or `null` `resumeFlowId`, `postSignInUrl` and `postSignOutUrl` write no attribute, a `false` flag writes none, and an empty `proxyPath` is written as `/`.
 
 ## Proxying to the backend (deployment)
 

@@ -686,6 +686,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
     }
   });
 
+  it.each([
+    ["javascript:alert(1)", false],
+    ["data:text/html,x", false],
+    ["//evil.example/home", true],
+    ["/home", true],
+    ["https://app.example.invalid/home", true],
+  ])("checks the scheme of post-sign-in-url %s before navigating", async (url, allowed) => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = url;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const errors: string[] = [];
+      element.addEventListener("zitadel-flow-error", (e) =>
+        errors.push((e as CustomEvent).detail.message),
+      );
+
+      await advanceMockLoginFlow(element);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      expect(assign.mock.calls.map((call) => call[0])).toEqual(allowed ? [url] : []);
+      expect(errors).toEqual(
+        allowed ? [] : ["Refused to navigate: the target URL must use http or https."],
+      );
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
+  });
+
   it("still shows the terminal step when the host handles the handoff itself", async () => {
     // No post-sign-in-url: nothing navigates, so the terminal screen is the
     // flow's last word and must render.

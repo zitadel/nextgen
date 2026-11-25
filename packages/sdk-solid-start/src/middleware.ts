@@ -241,7 +241,8 @@ async function proxyRequest(
 
   const method = event.request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
-  const body = hasBody ? await event.request.arrayBuffer() : undefined;
+  const buffered = hasBody ? await event.request.arrayBuffer() : undefined;
+  const body = buffered && buffered.byteLength > 0 ? buffered : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event, url);
   for (const [name, value] of Object.entries(route.headers)) {
@@ -455,11 +456,19 @@ async function handleAuth(
  * });
  * ```
  *
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
  * @param options - The middleware configuration, see {@link ZitadelMiddlewareOptions}. The `url`
  *   defaults to `ZITADEL_URL`, else `http://localhost:8080`, and the `projectSecret` to
  *   `ZITADEL_PROJECT_SECRET`. An empty value counts as unset.
  * @returns The SolidStart middleware config.
- * @throws Error when `loginPath` is not a relative path starting with a single `/`. An absolute
+ * @throws Error when `loginPath` is not a relative path starting with a single `/` with no backslash. An absolute
  *   or protocol-relative URL would turn the login redirect into an open redirect, so it is
  *   refused when the middleware is created.
  */
@@ -484,7 +493,7 @@ export function createZitadelMiddleware(
   const projectSecret = options.projectSecret || PROCESS_ENV.ZITADEL_PROJECT_SECRET;
 
   // Guard against open-redirect: loginPath must be a relative path.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
       `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +

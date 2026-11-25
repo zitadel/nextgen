@@ -26,7 +26,9 @@ There are two families.
    matching UI SDK (see "Widgets come through the framework SDK"). The widget
    entry has the same name, `./components`, in all six: an SDK never names it
    after its renderer (`./react`). Any other entry has kind `other` and states
-   every name it exports.
+   every name it exports. The handler sits on `./server` in five of them;
+   `sdk-next` declares `zitadelMiddleware` and `createProxy` on a separate
+   `./middleware` entry (kind `other`) and keeps its auth reader on `./server`.
 
 ## The names
 
@@ -68,6 +70,10 @@ The auth reader is `getAuth(event)` in every SDK that is handed the
 framework's event or context, which is synchronous. `sdk-next` is the
 exception: `auth()` reads the request from Next.js's async context, takes no
 request and is `async`, so it keeps the name it has always had.
+
+In five SDKs the handler is exported from `./server`. `sdk-next` exports
+`zitadelMiddleware` and `createProxy` from `./middleware`, as its
+`public-api.json` declares.
 
 A new SDK picks the name its framework uses, decides whether it is a factory
 by what it returns, and writes the reason in the three places above.
@@ -161,8 +167,8 @@ Rules that follow:
   `standardAttributes`, the `ZITADEL_*` constants, the `*EventMap` types) are
   `@internal` and never leave an SDK.
 - **The API package is reached only through `sdk-core`.** The API package is
-  generated from the OpenAPI document and changes with it, so no SDK imports
-  it. `sdk-core/src/config.ts` is the one seam: it declares `ZitadelProject`
+  generated from the OpenAPI document and changes with it, so only `sdk-core`
+  sources import it. `sdk-core/src/config.ts` is the one seam: it declares `ZitadelProject`
   and `ZitadelConfig` itself and wraps `configureZitadel`, `getZitadelConfig`
   and `getApi`, and every SDK imports them from `@zitadel/sdk-core/config`.
 - **No generated name or shape is public.** What an app can see is declared by

@@ -69,9 +69,9 @@ declare module "solid-js" {
          */
         "prop:locales"?: Record<string, Partial<Record<string, string>>>;
         /**
-         * The language tag, assigned as a DOM property.
+         * The BCP-47 language tag attribute.
          */
-        "prop:lang"?: string;
+        lang?: string;
         /**
          * The project id attribute, present in server markup.
          */
@@ -85,6 +85,10 @@ declare module "solid-js" {
          */
         url?: string;
         /**
+         * The publishable key attribute, which is browser-safe.
+         */
+        "publishable-key"?: string;
+        /**
          * The flow purpose attribute.
          */
         purpose?: string;
@@ -97,9 +101,9 @@ declare module "solid-js" {
          */
         "post-sign-in-url"?: string;
         /**
-         * Whether the post sign-in URL wins over a return target, assigned as a DOM property.
+         * Whether the post sign-in URL wins over a return target, as a boolean attribute.
          */
-        "prop:forcePostSignInUrl"?: boolean;
+        "attr:force-post-sign-in-url"?: string;
         /**
          * The layout attribute: a framed widget or a full page.
          */
@@ -109,13 +113,13 @@ declare module "solid-js" {
          */
         theme?: "light" | "dark" | "auto";
         /**
-         * Whether to hide the widget header, assigned as a DOM property.
+         * Whether to hide the widget header, as a boolean attribute.
          */
-        "prop:suppressHeader"?: boolean;
+        "attr:suppress-header"?: string;
         /**
-         * Whether to hide the password visibility toggle, assigned as a DOM property.
+         * Whether to hide the password visibility toggle, as a boolean attribute.
          */
-        "prop:suppressPasswordToggle"?: boolean;
+        "attr:suppress-password-toggle"?: string;
         /**
          * Called when the flow shows a new step.
          */
@@ -163,6 +167,10 @@ declare module "solid-js" {
          */
         url?: string;
         /**
+         * The publishable key attribute, which is browser-safe.
+         */
+        "publishable-key"?: string;
+        /**
          * The attribute that names where to go after sign-out.
          */
         "post-sign-out-url"?: string;
@@ -201,6 +209,10 @@ declare module "solid-js" {
          */
         url?: string;
         /**
+         * The publishable key attribute, which is browser-safe.
+         */
+        "publishable-key"?: string;
+        /**
          * The attribute that names where to go after sign-out.
          */
         "post-sign-out-url"?: string;
@@ -221,9 +233,9 @@ declare module "solid-js" {
          */
         theme?: "light" | "dark" | "auto";
         /**
-         * Whether to hide the card header, assigned as a DOM property.
+         * Whether to hide the card header, as a boolean attribute.
          */
-        "prop:suppressHeader"?: boolean;
+        "attr:suppress-header"?: string;
         /**
          * Called when the session ends.
          */
@@ -246,7 +258,7 @@ declare module "solid-js" {
  * default, while `/` normalizes to the site root.
  *
  * @param props - The component props that carry the project coordinates.
- * @returns The `project-id`, `proxy-path` and `url` attributes. A value is `undefined`, and so
+ * @returns The `project-id`, `proxy-path`, `url` and `publishable-key` attributes. A value is `undefined`, and so
  * omitted from the markup, when neither the handle nor the discrete prop sets it.
  */
 function projectAttributes(props: {
@@ -259,7 +271,18 @@ function projectAttributes(props: {
     "project-id": props.project?.projectId ?? props.projectId,
     "proxy-path": proxyPath === "" ? "/" : proxyPath,
     url: props.project?.url,
+    "publishable-key": props.project?.publishableKey,
   };
+}
+
+/**
+ * Maps a boolean prop to the value of a boolean attribute.
+ *
+ * @param value - The prop value.
+ * @returns An empty string (attribute present) when `true`, otherwise `undefined` (omitted).
+ */
+function flag(value: boolean | undefined): string | undefined {
+  return value ? "" : undefined;
 }
 
 /**
@@ -431,9 +454,18 @@ export { businessLocales } from "@zitadel/components";
  * its attributes. Do not replace `Dynamic` with a literal `<zitadel-login>` tag in this package.
  *
  * On the server only the tag and its attributes are written; the widget upgrades and starts its
- * flow in the browser after hydration. When a callback for `zitadel-flow-complete` or
- * `zitadel-flow-redirect` returns a promise, the widget waits for it, for at most two seconds,
- * before it navigates. The standard HTML attributes are passed to the element with Solid's
+ * flow in the browser after hydration. The attributes `project-id`, `proxy-path`, `url`,
+ * `publishable-key`, `variant`, `theme`, `lang`, `suppress-header`, `suppress-password-toggle`
+ * and `force-post-sign-in-url` are written into server markup. An unset or empty `resumeFlowId`
+ * and `postSignInUrl` write no attribute, a `false` flag writes none, and an empty `proxyPath` is
+ * written as `/`.
+ *
+ * A callback may return a promise. The component registers it on the `waitUntil` of the event
+ * detail, so the widget waits for it, for at most two seconds, before it navigates. Only
+ * `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` navigate; the other
+ * events carry no `waitUntil`, so nothing waits for them.
+ *
+ * The standard HTML attributes are passed to the element with Solid's
  * `attr:` prefix, because Solid would otherwise assign them to a custom element as properties.
  * The `purpose` defaults to `login`.
  *
@@ -462,17 +494,17 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
       ref={props.ref}
       prop:project={props.project}
       prop:locales={props.locales}
-      prop:lang={props.lang}
+      lang={props.lang}
       {...projectAttributes(props)}
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
-      post-sign-in-url={props.postSignInUrl}
-      prop:forcePostSignInUrl={props.forcePostSignInUrl}
-      resume-flow-id={props.resumeFlowId}
+      post-sign-in-url={props.postSignInUrl || undefined}
+      attr:force-post-sign-in-url={flag(props.forcePostSignInUrl)}
+      resume-flow-id={props.resumeFlowId || undefined}
       variant={props.variant}
       theme={props.theme}
-      prop:suppressHeader={props.suppressHeader}
-      prop:suppressPasswordToggle={props.suppressPasswordToggle}
+      attr:suppress-header={flag(props.suppressHeader)}
+      attr:suppress-password-toggle={flag(props.suppressPasswordToggle)}
       on:zitadel-flow-step={(event) => withDetail(event, props.onFlowStep)}
       on:zitadel-flow-input={(event) => withDetail(event, props.onFlowInput)}
       on:zitadel-flow-complete={(event) => withDetail(event, props.onFlowComplete)}
@@ -494,8 +526,10 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
  * not load or server-render on edge runtimes. With `Dynamic` the dist loads anywhere. Do not
  * replace it with a literal `<zitadel-logout>` tag.
  *
- * When the callback returns a promise, the widget waits for it, for at most two seconds, before
- * it navigates. The standard HTML attributes are passed with Solid's `attr:` prefix.
+ * The callback may return a promise. The component registers it on the `waitUntil` of the event
+ * detail, so the widget waits for it, for at most two seconds, before it navigates. Only
+ * `zitadel-signout` carries `waitUntil`. An empty `postSignOutUrl` writes no attribute. The
+ * standard HTML attributes are passed with Solid's `attr:` prefix.
  *
  * @param props - The widget props, the standard HTML attributes and an optional `ref`.
  * @returns The JSX element of the widget.
@@ -518,7 +552,7 @@ export function ZitadelLogout(props: ZitadelLogoutProps): JSX.Element {
       ref={props.ref}
       prop:project={props.project}
       {...projectAttributes(props)}
-      post-sign-out-url={props.postSignOutUrl}
+      post-sign-out-url={props.postSignOutUrl || undefined}
       theme={props.theme}
       on:zitadel-signout={(event) => withDetail(event, props.onSignout)}
     />
@@ -538,8 +572,10 @@ export function ZitadelLogout(props: ZitadelLogoutProps): JSX.Element {
  * not load or server-render on edge runtimes. With `Dynamic` the dist loads anywhere. Do not
  * replace it with a literal `<zitadel-session>` tag.
  *
- * When the callback returns a promise, the widget waits for it, for at most two seconds, before
- * it navigates. The standard HTML attributes are passed with Solid's `attr:` prefix.
+ * The callback may return a promise. The component registers it on the `waitUntil` of the event
+ * detail, so the widget waits for it, for at most two seconds, before it navigates. Only
+ * `zitadel-signout` carries `waitUntil`. An empty `postSignOutUrl` writes no attribute. The
+ * standard HTML attributes are passed with Solid's `attr:` prefix.
  *
  * @param props - The widget props, the standard HTML attributes and an optional `ref`.
  * @returns The JSX element of the widget.
@@ -562,12 +598,12 @@ export function ZitadelSession(props: ZitadelSessionProps): JSX.Element {
       ref={props.ref}
       prop:project={props.project}
       {...projectAttributes(props)}
-      post-sign-out-url={props.postSignOutUrl}
+      post-sign-out-url={props.postSignOutUrl || undefined}
       heading={props.heading}
       logout-label={props.logoutLabel}
       variant={props.variant}
       theme={props.theme}
-      prop:suppressHeader={props.suppressHeader}
+      attr:suppress-header={flag(props.suppressHeader)}
       on:zitadel-signout={(event) => withDetail(event, props.onSignout)}
     />
   );

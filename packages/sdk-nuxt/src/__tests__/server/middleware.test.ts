@@ -168,3 +168,161 @@ describe("an empty project secret", () => {
     expect(authorization).toBe(expected);
   });
 });
+
+describe("proxied OAuth paths of another project", () => {
+  it.each([
+    "/__nextgen/.well-known/oauth-authorization-server/oauth/other",
+    "/__nextgen/.well-known/openid-configuration/oauth/other",
+    "/__nextgen/%6Fauth/other/authorize",
+    "/__nextgen/oauth%2Fother",
+  ])("answers 404 for %s", async (path) => {
+    const served = await serve(
+      `http://localhost:3000${path}`,
+      {},
+      { url: "http://localhost:4000", projectId: "project" },
+    );
+
+    expect(served.status).toBe(404);
+  });
+
+  it("forwards the issuer of its own project to the backend", async () => {
+    const requested: string[] = [];
+    const backend = createServer((request, response) => {
+      requested.push(request.url ?? "");
+      response.end("{}");
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+
+    try {
+      await serve(
+        "http://localhost:3000/__nextgen/oauth/project/x",
+        {},
+        { url: `http://127.0.0.1:${port}`, projectId: "project" },
+      );
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
+
+    expect(requested).toEqual(["/oauth/project/x"]);
+  });
+});
+
+describe("an unsafe login path", () => {
+  it.each(["//evil.com", "https://evil.com", "/\\evil.com"])("throws for %s", async (loginPath) => {
+    await expect(
+      serve("http://localhost:3000/admin", {}, { projectId: "project", loginPath }),
+    ).rejects.toThrow(/loginPath must be a relative path/);
+  });
+
+  it("accepts /login", async () => {
+    const served = await serve(
+      "http://localhost:3000/admin",
+      {},
+      { projectId: "project", protectedRoutes: ["/admin"], loginPath: "/login" },
+    );
+
+    expect(served.status).toBe(302);
+  });
+});
+
+describe("a cleared session cookie", () => {
+  it("carries Max-Age=0 and Secure over https", async () => {
+    const backend = createServer((_request, response) => {
+      response.statusCode = 401;
+      response.end();
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+    let cleared: string | undefined;
+
+    try {
+      const served = await serve(
+        "https://localhost:3000/admin",
+        {
+          headers: {
+            cookie: "__Host-zitadel_session_project=dead",
+            "x-forwarded-proto": "https",
+          },
+        },
+        { url: `http://127.0.0.1:${port}`, projectId: "project", protectedRoutes: ["/admin"] },
+      );
+      cleared = served.headers.getSetCookie()[0];
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
+
+    expect(cleared).toMatch(/^__Host-zitadel_session_project=;/);
+    expect(cleared).toMatch(/; Max-Age=0(;|$)/i);
+    expect(cleared).toMatch(/; Secure(;|$)/i);
+  });
+});
+
+describe("a request with the internal auth header", () => {
+  it("is refused with a plain text 400", async () => {
+    const served = await serve("http://localhost:3000/", {
+      headers: { "x-zitadel-auth-token": "forged" },
+    });
+
+    expect(served.status).toBe(400);
+    expect(served.headers.get("content-type")).toMatch(/^text\/plain/);
+    expect(served.body).toBe("Bad Request");
+  });
+});
+
+describe("proxied request headers", () => {
+  it("reach the backend with the empty ones, without the hop-by-hop ones", async () => {
+    let received: Record<string, string | string[] | undefined> = {};
+    const backend = createServer((request, response) => {
+      received = request.headers;
+      response.end("{}");
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+
+    try {
+      await serve(
+        "http://localhost:3000/__nextgen/ping",
+        { headers: { "x-custom": "kept", "x-empty": "", "keep-alive": "timeout=5" } },
+        { url: `http://127.0.0.1:${port}` },
+      );
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
+
+    expect(received["x-custom"]).toBe("kept");
+    expect(received["x-empty"]).toBe("");
+    expect(received["keep-alive"]).toBeUndefined();
+  });
+});
+
+describe("proxied requests without a body", () => {
+  it("reach the backend as a POST with no body", async () => {
+    const received: { method?: string; body: string }[] = [];
+    const backend = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        received.push({ method: request.method, body: Buffer.concat(chunks).toString() });
+        response.end("{}");
+      });
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+    let status = 0;
+
+    try {
+      const served = await serve(
+        "http://localhost:3000/__nextgen/ping",
+        { method: "POST" },
+        { url: `http://127.0.0.1:${port}` },
+      );
+      status = served.status;
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
+
+    expect(status).toBe(200);
+    expect(received).toEqual([{ method: "POST", body: "" }]);
+  });
+});

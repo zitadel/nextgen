@@ -312,6 +312,18 @@ describe("proxyRoute", () => {
     ]) {
       expect(proxyRoute(`/__nextgen${path}`, options)).toMatchObject({ path, refused: false });
     }
+    for (const path of [
+      `${METADATA}/oauth/proj_app`,
+      "/.well-known/openid-configuration/oauth/proj_app",
+      "/oauth/proj_app/a%20b",
+    ]) {
+      expect(proxyRoute(`/__nextgen${path}`, options)).toMatchObject({ path, refused: false });
+    }
+  });
+
+  it("forwards a path with a malformed escape that names no OAuth issuer", () => {
+    expect(proxyRoute("/__nextgen/api/v1/%E0%A4%A", options)).toMatchObject({ refused: false });
+    expect(proxyRoute("/__nextgen/oauth/proj_other/%E0%A4%A", options)?.refused).toBe(true);
   });
 
   it.each([
@@ -322,6 +334,20 @@ describe("proxyRoute", () => {
     ["another project's metadata", `${METADATA}/__nextgen/oauth/proj_other`],
     ["the platform project's metadata", `${METADATA}/__nextgen/oauth`],
     ["a path under this project's metadata", `${METADATA}/__nextgen/oauth/proj_app/more`],
+    ["another project's metadata under the proxy path", `/__nextgen${METADATA}/oauth/proj_other`],
+    [
+      "another project's discovery document under the proxy path",
+      "/__nextgen/.well-known/openid-configuration/oauth/proj_other",
+    ],
+    ["the platform project's metadata under the proxy path", `/__nextgen${METADATA}/oauth`],
+    ["an escaped oauth segment", "/__nextgen/%6Fauth/proj_other/authorize"],
+    ["an escaped slash after oauth", "/__nextgen/oauth%2Fproj_other"],
+    ["an escaped well-known segment", `/__nextgen/%2Ewell-known/x/oauth/proj_other`],
+    ["an escaped form of this project's issuer", "/__nextgen/%6Fauth/proj_app/authorize"],
+    [
+      "a dot segment that leaves this project's issuer",
+      "/__nextgen/oauth/proj_app/%2e%2e/proj_other",
+    ],
   ])("refuses %s", (_name, pathname) => {
     expect(proxyRoute(pathname, options)?.refused).toBe(true);
   });

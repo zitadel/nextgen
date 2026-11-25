@@ -329,7 +329,8 @@ function isUnder(path: string, prefix: string): boolean {
  *   `/.well-known/oauth-authorization-server{proxyPath}/oauth/{projectId}`, which goes to the
  *   `/.well-known/oauth-authorization-server/oauth/{projectId}` of the server. OpenID Connect
  *   Discovery needs no mapping: it sits under the issuer, and so under `proxyPath`.
- * - An OAuth path of another project, or of any project when the app has none, is refused. The
+ * - An OAuth path of another project, or of any project when the app has none, is refused, also
+ *   when it is written as `/.well-known/{name}/oauth/{project}` or with percent escapes. The
  *   server takes the origin of the issuer from the forwarded headers, so an app that forwarded the
  *   issuer of another project would lend that project its origin. The issuer of the platform
  *   project, `/oauth` itself, is never reached through an app either.
@@ -346,9 +347,7 @@ export function proxyRoute(pathname: string, options: ProxyRouteOptions): ProxyR
   };
   if (isUnder(pathname, proxyPath)) {
     const path = pathname.slice(proxyPath.length);
-    const refused =
-      isUnder(path, OAUTH_PREFIX) && !servesIssuer(options, (own) => isUnder(path, own));
-    return { path, refused, headers };
+    return { path, refused: refusesOAuthPath(path, options), headers };
   }
   const issuers = `${AUTHORIZATION_SERVER_METADATA}${proxyPath}${OAUTH_PREFIX}`;
   if (isUnder(pathname, issuers)) {
@@ -360,6 +359,59 @@ export function proxyRoute(pathname: string, options: ProxyRouteOptions): ProxyR
     };
   }
   return undefined;
+}
+
+/**
+ * Decodes the percent escapes of a path once.
+ *
+ * @param path - The path to decode.
+ * @returns The decoded path, or the path as it is when it holds a malformed escape.
+ */
+function decodePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
+/**
+ * Cuts the `/.well-known/{name}` that RFC 8414 puts before an issuer path off a path.
+ *
+ * @param path - The path under the proxy path.
+ * @returns The path without that prefix, or the path itself when it has none.
+ */
+function issuerPart(path: string): string {
+  return path.replace(/^\/\.well-known\/[^/]+(?=\/oauth(?:\/|$))/, "");
+}
+
+/**
+ * Whether a path under the proxy path asks for an OAuth issuer that is not the project of this app.
+ *
+ * The server decodes a path before it routes it, so the raw and the decoded form are both tested:
+ * a path that names an OAuth issuer in either form is refused unless the raw path itself names the
+ * issuer of this project and the decoded path does too, without a dot segment that leaves it. A
+ * path whose first segment is an escaped form of `oauth` or `.well-known` is refused, because an
+ * escaped path cannot be shown to be the issuer of the project.
+ *
+ * @param path - The path under the proxy path, for example `/oauth/proj_app/authorize`.
+ * @param options - The proxy path, the project and the login page of the app.
+ * @returns `true` when the proxy answers `404` itself.
+ */
+function refusesOAuthPath(path: string, options: ProxyRouteOptions): boolean {
+  const decoded = decodePath(path);
+  const head = decodePath(path.split("/")[1] ?? "");
+  const escaped = /^(?:oauth|\.well-known)(?:\/|$)/i.test(head) && head !== path.split("/")[1];
+  const named =
+    isUnder(issuerPart(path), OAUTH_PREFIX) || isUnder(issuerPart(decoded), OAUTH_PREFIX);
+  if (!named && !escaped) {
+    return false;
+  }
+  const own = !escaped && !/(?:^|\/)\.\.?(?:\/|$)/.test(decoded);
+  return !servesIssuer(
+    options,
+    (issuer) => own && isUnder(issuerPart(path), issuer) && isUnder(issuerPart(decoded), issuer),
+  );
 }
 
 /**

@@ -179,7 +179,8 @@ async function proxyRequest(
   // Read the body eagerly so the upstream fetch receives a concrete buffer
   // rather than a streaming body (which would require the `duplex` option and
   // is not supported uniformly across platform adapters).
-  const body = hasBody ? await event.request.arrayBuffer() : undefined;
+  const buffered = hasBody ? await event.request.arrayBuffer() : undefined;
+  const body = buffered && buffered.byteLength > 0 ? buffered : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
   for (const [name, value] of Object.entries(route.headers)) {
@@ -427,6 +428,14 @@ function withNoStore(response: Response): Response {
  * createZitadelHandle(...). It is a factory, called once to return the hook, so it starts with
  * create.
  *
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
  * @param options - The middleware settings, which are all optional. `projectSecret` is the
  *   project service key, sent as the bearer on the `POST /sessions/exchange` handoff only.
  * @returns A SvelteKit `handle` hook of type {@link ZitadelHandle}.
@@ -476,7 +485,7 @@ export function createZitadelHandle(options: ZitadelMiddlewareOptions = {}): Zit
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
   // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
       `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +

@@ -343,7 +343,8 @@ async function proxyResponse(
 
   const method = ev.request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
-  const body = hasBody ? await ev.request.arrayBuffer() : undefined;
+  const buffered = hasBody ? await ev.request.arrayBuffer() : undefined;
+  const body = buffered && buffered.byteLength > 0 ? buffered : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(ev);
   for (const [name, value] of Object.entries(route.headers)) {
@@ -489,17 +490,13 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   // backend gave no verdict on. Qwik applies the changes to whichever response
   // goes out.
   for (const cookie of sessionCookies) {
-    if (cookie.maxAge === 0) {
-      ev.cookie.delete(cookie.name, { path: "/" });
-    } else {
-      ev.cookie.set(cookie.name, cookie.value, {
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-        secure: cookie.secure,
-        ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
-      });
-    }
+    ev.cookie.set(cookie.name, cookie.value, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: cookie.secure,
+      ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
+    });
   }
   if (sessionCookies.length > 0) {
     ev.headers?.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
@@ -547,10 +544,18 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  * OnRequest and the call reads export const onRequest = createZitadelOnRequest(...). It is a
  * factory, called once to return the handler, so it starts with create.
  *
+ * A signed-out request for a protected route is redirected with a relative URL, such as
+ * `/login?next=%2Fadmin`, which the browser resolves against the origin it used.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
  * @param options - See {@link ZitadelMiddlewareOptions}. The `projectSecret` takes precedence over
  *   `ZITADEL_PROJECT_SECRET`, and an empty `url` or `projectSecret` counts as unset.
  * @returns The `onRequest` handler to export from a root plugin or layout.
- * @throws An `Error` when `loginPath` is not a relative path that starts with a single `/`. An
+ * @throws An `Error` when `loginPath` is not a relative path that starts with a single `/` and has no backslash. An
  *   absolute or protocol-relative URL would allow an open redirect, so it is refused when the
  *   handler is built rather than at the first redirect.
  * @defaultValue `{}`, which uses the defaults of {@link ZitadelMiddlewareOptions} and the
@@ -587,7 +592,7 @@ export function createZitadelOnRequest(
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
       `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +

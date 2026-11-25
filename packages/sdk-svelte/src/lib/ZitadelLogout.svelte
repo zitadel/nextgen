@@ -6,7 +6,7 @@
   import type { ZitadelLogoutProps } from './types';
   import { assignGiven } from './given';
   import { withDetail } from './events';
-  import { onClient, proxyPathAttr } from './attributes';
+  import { onClient, proxyPathAttr, serverOnly } from './attributes';
 
   let {
     project,
@@ -62,7 +62,9 @@
   project-id={project?.projectId ?? projectId}
   proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
   url={project?.url}
-  post-sign-out-url={postSignOutUrl}
+  publishable-key={project?.publishableKey}
+  post-sign-out-url={postSignOutUrl || undefined}
+  {...serverOnly({ theme })}
 ></zitadel-logout>
 
 <!--
@@ -72,9 +74,12 @@
   Like the other wrappers, it writes `projectId` and `proxyPath` as the `project-id` and
   `proxy-path` attributes so server-rendered markup carries them, assigns the project handle as a
   property in the browser (the handle wins over the plain values when both are given), and
-  forwards the element's `zitadel-signout` event to `onSignout`. A promise the callback returns
-  delays the post-sign-out navigation for up to two seconds. `theme` is assigned only when set, so
-  an unset prop keeps the element's own default.
+  forwards the element's `zitadel-signout` event to `onSignout`. A callback may return a promise.
+  The component registers it on the `waitUntil` of the event detail, so the widget waits for it,
+  for at most two seconds, before it navigates. Only `zitadel-signout` carries `waitUntil`.
+  `theme` is assigned only when set, so an unset prop keeps the element's own default, and it is
+  written as an attribute on the server together with `publishable-key`. An empty
+  `postSignOutUrl` writes no attribute.
 
   Use it where the application offers a stand-alone sign-out button. Use the session card instead
   when the signed-in identity should be shown as well. Props are typed by

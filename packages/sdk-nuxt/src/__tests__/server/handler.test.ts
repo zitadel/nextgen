@@ -194,6 +194,22 @@ describe("middlewareOptions", () => {
     expect(options.clockSkewMs).toBeUndefined();
   });
 
+  it.each([
+    ["/a,/b", ["/a", "/b"]],
+    [" /a , /b ,, ", ["/a", "/b"]],
+    ["/admin*", ["/admin*"]],
+    [",", undefined],
+  ])("splits the plain string %j on commas into %j", (value, expected) => {
+    expect(middlewareOptions({ protectedRoutes: value }).protectedRoutes).toEqual(expected ?? []);
+    expect(middlewareOptions({ ignoredRoutes: value }).ignoredRoutes).toEqual(expected);
+  });
+
+  it("keeps a list of routes as it is", () => {
+    const routes = ["/a,b", "/c"];
+
+    expect(middlewareOptions({ protectedRoutes: routes }).protectedRoutes).toEqual(routes);
+  });
+
   it("refuses to start when only the running server's environment has an old name", async () => {
     vi.stubEnv("NUXT_NEXTGEN_PROTECTED_ROUTES", '["/admin*"]');
 

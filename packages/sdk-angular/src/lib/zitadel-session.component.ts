@@ -2,7 +2,14 @@ import type { ElementRef } from "@angular/core";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
-import { Component, CUSTOM_ELEMENTS_SCHEMA, input, output, viewChild } from "@angular/core";
+import {
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  input,
+  output,
+  viewChild,
+} from "@angular/core";
 
 import type { ZitadelProject } from "@zitadel/sdk-core/config";
 
@@ -16,6 +23,15 @@ import "@zitadel/components";
  * behavior are the same as for {@link ZitadelLogin}. The widget fires `zitadel-signout`,
  * and the component re-emits its detail on {@link ZitadelSession.signout}. The underlying
  * element is reachable through {@link ZitadelSession.element}.
+ *
+ * A handler may return a promise, but the component emits an output and cannot capture a return
+ * value, so nothing waits for it. To delay the navigation, call `waitUntil(promise)` on the
+ * event detail inside the handler: the widget then waits for it, for at most two seconds, before
+ * it navigates. Only the `signout` detail carries `waitUntil`.
+ *
+ * The standard HTML attributes (`class`, `style`, `id`, `data-*` and `aria-*`) belong to the
+ * `zitadel-auth-session` host element, not to the widget inside it, so a host `id` or `class` lands on the host and
+ * not on the `zitadel-session` element.
  *
  * Every input is a signal input declared with `input()`, and the event is an output declared with
  * `output()`, so the component needs Angular 19 or later. The inputs are exactly the keys of
@@ -35,16 +51,17 @@ import "@zitadel/components";
     #el
     [project]="project()"
     [projectId]="projectId()"
-    [proxyPath]="proxyPath()"
+    [proxyPath]="proxyPath() === '' ? '/' : proxyPath()"
     [attr.project-id]="project()?.projectId ?? projectId() ?? null"
-    [attr.proxy-path]="project()?.proxyPath ?? proxyPath() ?? null"
+    [attr.proxy-path]="proxyPathAttr()"
     [attr.url]="project()?.url ?? null"
-    [attr.post-sign-out-url]="postSignOutUrl()"
+    [attr.publishable-key]="project()?.publishableKey ?? null"
+    [attr.post-sign-out-url]="postSignOutUrl() || null"
     [attr.heading]="heading()"
     [attr.logout-label]="logoutLabel()"
     [attr.variant]="variant() ?? null"
     [attr.theme]="theme() ?? null"
-    [suppressHeader]="suppressHeader()"
+    [attr.suppress-header]="suppressHeader() ? '' : null"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-session>`,
 })
@@ -164,7 +181,8 @@ export class ZitadelSession {
    * Whether the widget hides its own heading block.
    *
    * The heading stays in the accessibility tree and is only hidden visually, so use it on a page
-   * that already carries its own heading. Unset keeps the heading visible.
+   * that already carries its own heading. It is written as the `suppress-header` attribute, present
+   * when `true` and absent otherwise. Unset keeps the heading visible.
    *
    * @defaultValue false
    *
@@ -186,6 +204,18 @@ export class ZitadelSession {
    * ```
    */
   readonly signout = output<ZitadelSignoutDetail>();
+
+  /**
+   * The value of the `proxy-path` attribute: the handle's path, else the discrete input.
+   *
+   * An empty path means the origin root, because the API client strips trailing slashes, but the
+   * widget treats an empty `proxy-path` attribute as unset and falls back to `/__nextgen`. The
+   * value `/` survives that and normalizes to the root. The template reads it, so you do not.
+   */
+  protected readonly proxyPathAttr = computed(() => {
+    const path = this.project()?.proxyPath ?? this.proxyPath();
+    return path === "" ? "/" : (path ?? null);
+  });
 
   private readonly elementRef = viewChild<ElementRef<ZitadelSessionElement>>("el");
 

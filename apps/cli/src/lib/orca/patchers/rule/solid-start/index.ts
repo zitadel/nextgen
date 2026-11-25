@@ -16,15 +16,12 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-solid-start";
 /**
- * The idiomatic Solid component library that ships the `<ZitadelLogin>` /
- * `<ZitadelSession>` Solid components the routes render. The server SDK above is
- * plumbing only; the widget comes from here, so a SolidStart app gets the native
- * Solid component (typed props, callback events) rather than the bare element.
+ * The Solid UI SDK behind the widgets. The routes import the widgets from
+ * `@zitadel/sdk-solid-start/components`, which re-exports this package, yet the
+ * app still declares it as a direct dependency: Solid's Vite plugin finds the
+ * Solid libraries to compile in the app's own `package.json`.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-solid";
-// The routes import the widgets from `@zitadel/sdk-solid-start/components`, which re-exports
-// this package. The app still declares it: Solid's Vite plugin finds the Solid libraries to
-// compile from the app's own dependencies.
 
 const VITE_CONFIG_PATHS = configCandidates("vite.config");
 
@@ -36,8 +33,9 @@ const VITE_CONFIG_PATHS = configCandidates("vite.config");
  * non-destructive `vite.config.*` edit (SolidStart 2 reads middleware from the
  * Vite plugin, not a top-level `app.config.ts` field). Contributes the
  * landing/login/register/profile file-based routes (the idiomatic
- * `<ZitadelLogin>`/`<ZitadelSession>` Solid components from `@zitadel/sdk-solid`),
- * the public project-id env var, and both deps.
+ * `<ZitadelLogin>`/`<ZitadelSession>` Solid components from
+ * `@zitadel/sdk-solid-start/components`), the public project-id env var, and
+ * both deps.
  */
 export class SolidStartPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {

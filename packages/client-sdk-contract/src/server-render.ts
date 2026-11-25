@@ -44,8 +44,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
       "proxy-path": "/__handle",
       url: "https://auth.example.com",
     },
-    absent: [],
-    gaps: ["svelte"],
+    absent: ["publishable-key"],
   },
   {
     title: "lets the project handle win over conflicting discrete props in the login markup",
@@ -53,7 +52,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
     present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
     absent: [],
-    gaps: ["svelte"],
   },
   {
     title: "writes nothing for no config in the login markup",
@@ -68,7 +66,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", purpose: "register" },
     present: { purpose: "register" },
     absent: [],
-    gaps: ["svelte"],
   },
   {
     title: "puts the default purpose into the login markup",
@@ -76,7 +73,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1" },
     present: { purpose: "login" },
     absent: [],
-    gaps: ["svelte"],
   },
   {
     title: "puts the flow name into the login markup",
@@ -105,7 +101,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", resumeFlowId: "" },
     present: {},
     absent: ["resume-flow-id"],
-    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
   },
   {
     title: "puts the post-sign-in URL into the login markup",
@@ -122,12 +117,25 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     absent: ["post-sign-in-url"],
   },
   {
-    title: "puts the display options into the login markup",
+    title: "puts the variant into the login markup",
     widget: "login",
-    props: { projectId: "p1", variant: "page", theme: "dark" },
-    present: { variant: "page", theme: "dark" },
+    props: { projectId: "p1", variant: "page" },
+    present: { variant: "page" },
     absent: [],
-    gaps: ["react", "svelte"],
+  },
+  {
+    title: "puts the theme into the login markup",
+    widget: "login",
+    props: { projectId: "p1", theme: "dark" },
+    present: { theme: "dark" },
+    absent: [],
+  },
+  {
+    title: "puts the language into the login markup",
+    widget: "login",
+    props: { projectId: "p1", lang: "de" },
+    present: { lang: "de" },
+    absent: [],
   },
   {
     title: "leaves unset display options out of the login markup",
@@ -170,8 +178,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
       "proxy-path": "/__handle",
       url: "https://auth.example.com",
     },
-    absent: [],
-    gaps: ["svelte"],
+    absent: ["publishable-key"],
   },
   {
     title: "lets the project handle win over conflicting discrete props in the session markup",
@@ -179,7 +186,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
     present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
     absent: [],
-    gaps: ["svelte"],
   },
   {
     title: "writes nothing for no config in the session markup",
@@ -196,26 +202,49 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     absent: [],
   },
   {
-    title: "leaves a keyed project handle out of the session markup",
+    title: "puts a keyed project handle into the login markup",
+    widget: "login",
+    props: {
+      project: { ...SERVER_RENDER_HANDLE, publishableKey: "pk_test_123" },
+      projectId: "proj-other",
+    },
+    present: {
+      "project-id": "proj-handle",
+      "proxy-path": "/__handle",
+      url: "https://auth.example.com",
+      "publishable-key": "pk_test_123",
+    },
+    absent: [],
+  },
+  {
+    title: "puts a keyed project handle into the session markup",
     widget: "session",
     props: {
       project: { ...SERVER_RENDER_HANDLE, publishableKey: "pk_test_123" },
       projectId: "proj-other",
     },
-    present: {},
-    absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
+    present: {
+      "project-id": "proj-handle",
+      "proxy-path": "/__handle",
+      url: "https://auth.example.com",
+      "publishable-key": "pk_test_123",
+    },
+    absent: [],
   },
   {
-    title: "leaves a keyed project handle out of the logout markup",
+    title: "puts a keyed project handle into the logout markup",
     widget: "logout",
     props: {
       project: { ...SERVER_RENDER_HANDLE, publishableKey: "pk_test_123" },
       projectId: "proj-other",
     },
-    present: {},
-    absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
+    present: {
+      "project-id": "proj-handle",
+      "proxy-path": "/__handle",
+      url: "https://auth.example.com",
+      "publishable-key": "pk_test_123",
+    },
+    absent: [],
   },
   {
     title: "puts the discrete project props into the logout markup",
@@ -233,8 +262,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
       "proxy-path": "/__handle",
       url: "https://auth.example.com",
     },
-    absent: [],
-    gaps: ["svelte"],
+    absent: ["publishable-key"],
   },
   {
     title: "lets the project handle win over conflicting discrete props in the logout markup",
@@ -242,7 +270,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
     present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
     absent: [],
-    gaps: ["svelte"],
   },
   {
     title: "writes nothing for no config in the logout markup",
@@ -264,7 +291,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", proxyPath: "" },
     present: { "proxy-path": "/" },
     absent: [],
-    gaps: ["react", "vue", "angular"],
   },
   {
     title: "normalizes an empty proxy path to the site root in the session markup",
@@ -272,7 +298,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", proxyPath: "" },
     present: { "proxy-path": "/" },
     absent: [],
-    gaps: ["react", "vue", "angular"],
   },
   {
     title: "normalizes an empty proxy path to the site root in the logout markup",
@@ -280,7 +305,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", proxyPath: "" },
     present: { "proxy-path": "/" },
     absent: [],
-    gaps: ["react", "vue", "angular"],
   },
   {
     title: "puts the heading into the session markup",
@@ -288,7 +312,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", heading: "Welcome" },
     present: { heading: "Welcome" },
     absent: [],
-    gaps: ["react", "svelte"],
   },
   {
     title: "puts the logout label into the session markup",
@@ -296,7 +319,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", logoutLabel: "Leave" },
     present: { "logout-label": "Leave" },
     absent: [],
-    gaps: ["react", "svelte"],
   },
   {
     title: "leaves an unset heading and logout label out of the session markup",
@@ -304,6 +326,99 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1" },
     present: {},
     absent: ["heading", "logout-label"],
+  },
+  {
+    title: "puts the theme into the logout markup",
+    widget: "logout",
+    props: { projectId: "p1", theme: "dark" },
+    present: { theme: "dark" },
+    absent: [],
+  },
+  {
+    title: "puts the theme into the session markup",
+    widget: "session",
+    props: { projectId: "p1", theme: "dark" },
+    present: { theme: "dark" },
+    absent: [],
+  },
+  {
+    title: "puts the variant into the session markup",
+    widget: "session",
+    props: { projectId: "p1", variant: "page" },
+    present: { variant: "page" },
+    absent: [],
+  },
+  {
+    title: "leaves an unset theme out of the logout markup",
+    widget: "logout",
+    props: { projectId: "p1" },
+    present: {},
+    absent: ["theme"],
+  },
+  {
+    title: "leaves an unset theme and variant out of the session markup",
+    widget: "session",
+    props: { projectId: "p1" },
+    present: {},
+    absent: ["theme", "variant", "suppress-header"],
+  },
+  {
+    title: "puts a true boolean option into the login markup",
+    widget: "login",
+    props: {
+      projectId: "p1",
+      suppressHeader: true,
+      suppressPasswordToggle: true,
+      forcePostSignInUrl: true,
+    },
+    present: {
+      "suppress-header": "",
+      "suppress-password-toggle": "",
+      "force-post-sign-in-url": "",
+    },
+    absent: [],
+  },
+  {
+    title: "puts a true suppress-header option into the session markup",
+    widget: "session",
+    props: { projectId: "p1", suppressHeader: true },
+    present: { "suppress-header": "" },
+    absent: [],
+  },
+  {
+    title: "leaves a false suppress-header option out of the session markup",
+    widget: "session",
+    props: { projectId: "p1", suppressHeader: false },
+    present: {},
+    absent: ["suppress-header"],
+  },
+  {
+    title: "leaves a null resume flow id out of the login markup",
+    widget: "login",
+    props: { projectId: "p1", resumeFlowId: null },
+    present: {},
+    absent: ["resume-flow-id"],
+  },
+  {
+    title: "leaves an empty post-sign-in URL out of the login markup",
+    widget: "login",
+    props: { projectId: "p1", postSignInUrl: "" },
+    present: {},
+    absent: ["post-sign-in-url"],
+  },
+  {
+    title: "leaves an empty post-sign-out URL out of the session markup",
+    widget: "session",
+    props: { projectId: "p1", postSignOutUrl: "" },
+    present: {},
+    absent: ["post-sign-out-url"],
+  },
+  {
+    title: "leaves an empty post-sign-out URL out of the logout markup",
+    widget: "logout",
+    props: { projectId: "p1", postSignOutUrl: "" },
+    present: {},
+    absent: ["post-sign-out-url"],
   },
 ];
 
