@@ -3,7 +3,7 @@ import { HeadIsOnABranch } from "@/lib/git/checks/head-is-on-a-branch";
 import { NoOperationUnderWay } from "@/lib/git/checks/no-operation-under-way";
 import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
 import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
-import { RepositoryError } from "@/lib/git/errors";
+import { GitInternalError } from "@/lib/git/errors";
 import type { Git } from "@/lib/git/git";
 import type { Check, Operation } from "@/lib/git/operation";
 import { StagingArea } from "@/lib/git/staging-area";
@@ -93,7 +93,7 @@ export class CommitAll implements Operation<CommitOutcome> {
       }
       const sha = await new CurrentCommit().run(git);
       if (sha === null) {
-        throw new RepositoryError("the commit left no HEAD to record");
+        throw new GitInternalError("the commit left no HEAD to record");
       }
       await git.run(["reset", "--quiet", "--", "."]).catch(() => {
         return undefined;

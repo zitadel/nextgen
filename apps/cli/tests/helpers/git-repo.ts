@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { vi } from "vitest";
 
-import { RepositoryError } from "@/lib/git/errors";
+import { GitCommandFailedError } from "@/lib/git/errors";
 import { Git, GitResult } from "@/lib/git/git";
 import { scratchDir } from "@tests/fixtures/scratch";
 
@@ -227,7 +227,7 @@ class FakeGit extends Git {
     const { exitCode = 0, stdout = "", stderr = "" } = this.answer(args, this.added);
     const result = new GitResult(exitCode, stdout, stderr);
     if (exitCode !== 0 && !allow.includes(exitCode)) {
-      throw new RepositoryError(result.reason());
+      throw new GitCommandFailedError(result.reason());
     }
     return result;
   }

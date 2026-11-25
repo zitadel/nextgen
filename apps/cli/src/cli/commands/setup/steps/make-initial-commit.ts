@@ -1,6 +1,6 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { errorMessage } from "@/lib/errors";
-import { Repository, RepositoryError } from "@/lib/git";
+import { GitError, Repository } from "@/lib/git";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Project } from "@/lib/project";
@@ -180,7 +180,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
               return {
                 kind: "unavailable",
                 reason:
-                  error instanceof RepositoryError
+                  error instanceof GitError
                     ? error.headline()
                     : (errorMessage(error).split("\n")[0] ?? ""),
                 createdRepository: existing === null,
@@ -192,7 +192,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
         return {
           kind: "unavailable",
           reason:
-            error instanceof RepositoryError
+            error instanceof GitError
               ? error.headline()
               : (errorMessage(error).split("\n")[0] ?? ""),
           createdRepository: false,

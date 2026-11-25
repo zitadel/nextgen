@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { lstat, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { GitDidNotStartError, RepositoryError } from "./errors";
+import { GitBinaryMissingError, GitCommandFailedError } from "./errors";
 import { Git } from "./git";
 import type { Operation } from "./operation";
 import { CommitAll } from "./operations/commit-all";
@@ -27,7 +27,7 @@ import type {
  * In a monorepo the repository may start several levels up; everything here
  * is limited to the directory and names paths relative to it, except
  * {@link isDirty}, which looks at the whole repository. When git fails, a
- * method throws a `RepositoryError` carrying git's own message.
+ * method throws a `GitError` carrying git's own message.
  *
  * Each method is one {@link Operation}: its checks run first, and the first
  * one that fails decides the answer through the operation's `refused`.
@@ -65,7 +65,7 @@ export class Repository {
       .with({ LC_ALL: "C" })
       .run(["rev-parse", "--show-prefix"], [128])
       .catch((error: unknown) => {
-        if (error instanceof GitDidNotStartError) {
+        if (error instanceof GitBinaryMissingError) {
           return null;
         }
         throw error;
@@ -77,7 +77,7 @@ export class Repository {
       return null;
     }
     if (!result.succeeded()) {
-      throw new RepositoryError(result.reason());
+      throw new GitCommandFailedError(result.reason());
     }
     return new Repository(real, result.text());
   }

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { execa } from "execa";
 
-import { GitDidNotStartError, RepositoryError } from "./errors";
+import { GitBinaryMissingError, GitCommandFailedError } from "./errors";
 
 /**
  * What one git call returned, and ways to read it.
@@ -79,7 +79,7 @@ export class Git {
   }
 
   /**
-   * Runs git with `args`; throws a {@link RepositoryError} for an exit code other than 0 or `allow`.
+   * Runs git with `args`; throws a {@link GitCommandFailedError} for an exit code other than 0 or `allow`.
    *
    * Every call is made safe the same way:
    * - `GIT_LITERAL_PATHSPECS`, `GIT_GLOB_PATHSPECS`, `GIT_NOGLOB_PATHSPECS`
@@ -103,7 +103,7 @@ export class Git {
    *
    * An allowed exit code is an answer, not a failure. Only a git that ran and
    * exited has one, so no allow list can mistake a missing git for an answer;
-   * that throws {@link GitDidNotStartError}. Every other failure carries git's
+   * that throws {@link GitBinaryMissingError}. Every other failure carries git's
    * own message, or Node's when git wrote nothing.
    */
   async run(
@@ -137,24 +137,24 @@ export class Git {
       return new GitResult(0, stdout, stderr);
     }
     if (result.code === "ENOENT") {
-      throw new GitDidNotStartError(
+      throw new GitBinaryMissingError(
         result.originalMessage ?? result.message ?? "git did not start",
       );
     }
     if (result.isMaxBuffer) {
-      throw new RepositoryError("git printed more than 16 MB");
+      throw new GitCommandFailedError("git printed more than 16 MB");
     }
     if (result.timedOut) {
-      throw new RepositoryError("git did not finish in time");
+      throw new GitCommandFailedError("git did not finish in time");
     }
     if (result.exitCode === undefined) {
-      throw new RepositoryError(stderr.trim() || result.message || "git failed");
+      throw new GitCommandFailedError(stderr.trim() || result.message || "git failed");
     }
     const failed = new GitResult(result.exitCode, stdout, stderr);
     if (allow.includes(result.exitCode)) {
       return failed;
     }
-    throw new RepositoryError(failed.reason() || result.message || "git failed");
+    throw new GitCommandFailedError(failed.reason() || result.message || "git failed");
   }
 
   /**

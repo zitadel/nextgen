@@ -9,6 +9,7 @@ import {
   UnavailableError,
   type UnavailableReason,
 } from "./backend";
+import { type ErrorCategory, isCategorized } from "./error-category";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
 import {
@@ -152,6 +153,27 @@ export class PromptCancelled extends ZitadelError {
   }
 }
 
+/**
+ * The code each {@link ErrorCategory} is reported with.
+ *
+ * @remarks
+ * `precondition`, `internal` and `unexpected` have no code of their own yet, so
+ * they are reported as `E_VALIDATION`, as every unrecognised error always was.
+ * Giving them their own codes, with exit codes that no longer collide, is a
+ * separate decision; this table is the one place it lands.
+ */
+const CATEGORY_CODES: Record<ErrorCategory, ZitadelErrorCode> = {
+  validation: "E_VALIDATION",
+  not_found: "E_NOT_FOUND",
+  conflict: "E_CONFLICT",
+  auth: "E_AUTH",
+  unavailable: "E_NETWORK",
+  unsupported: "E_UNSUPPORTED_PROJECT_SHAPE",
+  precondition: "E_VALIDATION",
+  internal: "E_VALIDATION",
+  unexpected: "E_VALIDATION",
+};
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<UnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -286,6 +308,14 @@ export function toZitadelError(error: unknown): ZitadelError {
       ...(error instanceof BrokenFlowsError && error.hint?.includes("deploy --dry-run")
         ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
         : {}),
+    });
+  }
+
+  // An error a package raised on purpose says what kind of failure it is.
+  if (isCategorized(error)) {
+    return new ZitadelError(CATEGORY_CODES[error.category], error.message, {
+      ...(error.hint === undefined ? {} : { hint: error.hint }),
+      details: error.details ?? { original: pickErrorShape(error) },
     });
   }
 

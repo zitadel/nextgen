@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GitDidNotStartError, RepositoryError } from "@/lib/git/errors";
+import { GitBinaryMissingError, GitCommandFailedError } from "@/lib/git/errors";
 import { Git, GitResult } from "@/lib/git/git";
 import { GitScratch, isolateGit, write } from "@tests/helpers/git-repo";
 
@@ -25,11 +25,11 @@ describe("Git", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  it("throws a RepositoryError for any other exit code", async () => {
+  it("throws a GitCommandFailedError for any other exit code", async () => {
     const cwd = await scratch.repository();
 
     await expect(git(cwd, ["rev-parse", "--verify", "--quiet", "HEAD"])).rejects.toBeInstanceOf(
-      RepositoryError,
+      GitCommandFailedError,
     );
   });
 
@@ -153,11 +153,11 @@ describe("Git", () => {
     await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(/de_DE\.UTF-8$/);
   });
 
-  it("throws a GitDidNotStartError when there is no git on PATH", async () => {
+  it("throws a GitBinaryMissingError when there is no git on PATH", async () => {
     const cwd = await scratch.directory();
     vi.stubEnv("PATH", await scratch.directory());
 
-    await expect(git(cwd, ["status"])).rejects.toBeInstanceOf(GitDidNotStartError);
+    await expect(git(cwd, ["status"])).rejects.toBeInstanceOf(GitBinaryMissingError);
   });
 
   it("throws when git is stopped by a signal, even where exit 0 is allowed", async () => {
@@ -167,15 +167,15 @@ describe("Git", () => {
     vi.stubEnv("PATH", bin);
 
     await expect(new Git(await scratch.directory()).run(["status"], [0])).rejects.toBeInstanceOf(
-      RepositoryError,
+      GitCommandFailedError,
     );
   });
 
-  it("throws a GitDidNotStartError even where exit 1 is allowed", async () => {
+  it("throws a GitBinaryMissingError even where exit 1 is allowed", async () => {
     const cwd = await scratch.directory();
     vi.stubEnv("PATH", await scratch.directory());
 
-    await expect(new Git(cwd).run(["status"], [1])).rejects.toBeInstanceOf(GitDidNotStartError);
+    await expect(new Git(cwd).run(["status"], [1])).rejects.toBeInstanceOf(GitBinaryMissingError);
   });
 
   it("names all of git's message, how to fix it included", async () => {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { responseFailure } from "@/lib/backend";
+import { ERROR_CATEGORIES } from "@/lib/error-category";
+import { GitError } from "@/lib/git/errors";
 import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
 import {
   EXIT_CODES,
@@ -673,5 +675,25 @@ describe("a failure as a person is shown it", () => {
         misuse: false,
       });
     });
+  });
+});
+
+describe("toZitadelError for an error that says its category", () => {
+  it.each([
+    ["validation", "E_VALIDATION"],
+    ["not_found", "E_NOT_FOUND"],
+    ["conflict", "E_CONFLICT"],
+    ["auth", "E_AUTH"],
+    ["unavailable", "E_NETWORK"],
+    ["unsupported", "E_UNSUPPORTED_PROJECT_SHAPE"],
+    ["precondition", "E_VALIDATION"],
+    ["internal", "E_VALIDATION"],
+    ["unexpected", "E_VALIDATION"],
+  ] as const)("reports %s as %s", (category, code) => {
+    expect(toZitadelError(new GitError(category, "why"))).toMatchObject({ code, message: "why" });
+  });
+
+  it("names a code for every category", () => {
+    expect(ERROR_CATEGORIES).toHaveLength(9);
   });
 });

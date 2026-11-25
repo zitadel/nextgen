@@ -1,45 +1,89 @@
 import { describe, expect, it } from "vitest";
 
-import { GitDidNotStartError, RepositoryError } from "@/lib/git/errors";
+import {
+  GitBinaryMissingError,
+  GitCommandFailedError,
+  GitError,
+  GitInternalError,
+} from "@/lib/git/errors";
 
-describe("RepositoryError", () => {
-  it("carries its message and name", () => {
-    expect(new RepositoryError("why")).toMatchObject({ message: "why", name: "RepositoryError" });
+describe("GitError", () => {
+  it("carries its message, name and category", () => {
+    expect(new GitError("validation", "why")).toMatchObject({
+      message: "why",
+      name: "GitError",
+      category: "validation",
+    });
+  });
+
+  it("keeps the error that caused it", () => {
+    const cause = new Error("underneath");
+
+    expect(new GitError("unexpected", "why", { cause }).cause).toBe(cause);
   });
 });
 
-describe("GitDidNotStartError", () => {
-  it("is a RepositoryError", () => {
-    expect(new GitDidNotStartError("why")).toBeInstanceOf(RepositoryError);
+describe("GitBinaryMissingError", () => {
+  it("is a GitError", () => {
+    expect(new GitBinaryMissingError("why")).toBeInstanceOf(GitError);
   });
 
-  it("carries its own name", () => {
-    expect(new GitDidNotStartError("why").name).toBe("GitDidNotStartError");
+  it("is a precondition under its own name", () => {
+    expect(new GitBinaryMissingError("why")).toMatchObject({
+      name: "GitBinaryMissingError",
+      category: "precondition",
+    });
   });
 });
 
-describe("RepositoryError.headline", () => {
+describe("GitCommandFailedError", () => {
+  it("is a GitError", () => {
+    expect(new GitCommandFailedError("why")).toBeInstanceOf(GitError);
+  });
+
+  it("is unexpected, because nothing knows why git failed", () => {
+    expect(new GitCommandFailedError("why")).toMatchObject({
+      name: "GitCommandFailedError",
+      category: "unexpected",
+    });
+  });
+});
+
+describe("GitInternalError", () => {
+  it("is a GitError", () => {
+    expect(new GitInternalError("why")).toBeInstanceOf(GitError);
+  });
+
+  it("is internal under its own name", () => {
+    expect(new GitInternalError("why")).toMatchObject({
+      name: "GitInternalError",
+      category: "internal",
+    });
+  });
+});
+
+describe("GitError.headline", () => {
   it("takes the line that says why git failed, past the warnings before it", () => {
     expect(
-      new RepositoryError(
+      new GitCommandFailedError(
         "warning: in the working copy of 'a.txt', LF will be replaced by CRLF\nerror: open(\"c.txt\"): Permission denied\nfatal: adding files failed",
       ).headline(),
     ).toBe('error: open("c.txt"): Permission denied');
   });
 
   it("takes a fatal line", () => {
-    expect(new RepositoryError("hint: try this\nfatal: refused\nhint: or that").headline()).toBe(
-      "fatal: refused",
-    );
+    expect(
+      new GitCommandFailedError("hint: try this\nfatal: refused\nhint: or that").headline(),
+    ).toBe("fatal: refused");
   });
 
   it("takes the first line when git names no fatal or error line", () => {
-    expect(new RepositoryError("git did not finish in time").headline()).toBe(
+    expect(new GitCommandFailedError("git did not finish in time").headline()).toBe(
       "git did not finish in time",
     );
   });
 
   it("says git gave no reason rather than nothing", () => {
-    expect(new RepositoryError("").headline()).toBe("git gave no reason");
+    expect(new GitCommandFailedError("").headline()).toBe("git gave no reason");
   });
 });

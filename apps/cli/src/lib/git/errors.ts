@@ -1,17 +1,34 @@
+import type { Categorized, ErrorCategory } from "@/lib/error-category";
+
 /**
- * A git operation that failed, with a message ready to show the developer.
+ * Every error the git package throws.
  *
- * What the module throws when git fails. The message is git's own (all of
- * its stderr, which often says how to fix the failure), or one of the
- * module's when git said nothing useful: output over 16 MB, a call that timed
- * out. The temporary staging area's file-system calls can still fail with
- * Node's own errors. Whether a failure is fatal is the caller's choice.
+ * @remarks
+ * A caller catches this to handle anything from git, or one of its subclasses
+ * to handle one condition. The message is git's own (all of its stderr, which
+ * often says how to fix the failure), or one of the package's when git said
+ * nothing useful. The temporary staging area's file-system calls can still
+ * fail with Node's own errors. Whether a failure is fatal is the caller's choice.
  */
-export class RepositoryError extends Error {
-  /** Creates the error from its message. */
-  constructor(message: string) {
-    super(message);
-    this.name = "RepositoryError";
+export class GitError extends Error implements Categorized {
+  /** The kind of failure, which the boundary reports it as. */
+  readonly category: ErrorCategory;
+
+  /**
+   * Creates the error.
+   *
+   * @param category - What kind of failure it is.
+   * @param message - What went wrong.
+   * @param options - The error that caused this one, if any.
+   */
+  constructor(
+    category: ErrorCategory,
+    message: string,
+    options: { readonly cause?: unknown } = {},
+  ) {
+    super(message, options);
+    this.name = "GitError";
+    this.category = category;
   }
 
   /**
@@ -20,6 +37,8 @@ export class RepositoryError extends Error {
    * git writes `warning:` and `hint:` lines before and after the line that
    * gives the reason, so the first `fatal:` or `error:` line is taken, then
    * the first line, then a fixed phrase when git said nothing.
+   *
+   * @returns The line that says why.
    */
   headline(): string {
     const lines = this.message
@@ -36,6 +55,7 @@ export class RepositoryError extends Error {
     if (reason !== undefined) {
       return reason;
     }
+
     return lines[0] ?? "git gave no reason";
   }
 }
@@ -47,10 +67,45 @@ export class RepositoryError extends Error {
  * {@link Repository.open} answers "no repository" for it, where any other
  * failure is thrown.
  */
-export class GitDidNotStartError extends RepositoryError {
-  /** Creates the error from the message Node gave. */
+export class GitBinaryMissingError extends GitError {
+  /**
+   * Creates the error.
+   *
+   * @param message - The message Node gave.
+   */
   constructor(message: string) {
-    super(message);
-    this.name = "GitDidNotStartError";
+    super("precondition", message);
+    this.name = "GitBinaryMissingError";
+  }
+}
+
+/**
+ * git ran and failed for a reason nothing here handles: it exited non-zero, was
+ * killed, timed out, or printed more than the buffer holds.
+ *
+ * Carries git's own words and no advice, because nothing knows why.
+ */
+export class GitCommandFailedError extends GitError {
+  /**
+   * Creates the error.
+   *
+   * @param message - What git said, or what this package says when git said nothing.
+   */
+  constructor(message: string) {
+    super("unexpected", message);
+    this.name = "GitCommandFailedError";
+  }
+}
+
+/** A bug in this package: something that cannot happen unless the code is wrong. */
+export class GitInternalError extends GitError {
+  /**
+   * Creates the error.
+   *
+   * @param message - What the code found impossible.
+   */
+  constructor(message: string) {
+    super("internal", message);
+    this.name = "GitInternalError";
   }
 }
