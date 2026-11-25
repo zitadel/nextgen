@@ -2,6 +2,7 @@ import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cdp } from "vitest/browser";
 
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
@@ -892,5 +893,162 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     const body = JSON.parse(String(submit.init?.body)) as { fields: Record<string, unknown> };
     expect(body.fields).toHaveProperty("x-auth-methods#password", "hunter2");
     expect(Object.keys(body.fields)).toEqual(["x-auth-methods#password"]);
+  });
+});
+
+const passkeyRegisterStep: CreateFlow201 = {
+  id: "flow_1",
+  session_id: "sess_1",
+  session_token: "tok_1",
+  step: {
+    name: "passkey-register",
+    texts: { title_key: "passkey-register.title" },
+    fields: [],
+    actions: [],
+    gates: {},
+    challenge: {
+      method: "passkey_register",
+      challenge_id: "chal-1",
+      options: {
+        challenge: "AAAA",
+        rp: { name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: { residentKey: "required", userVerification: "required" },
+      },
+    },
+  },
+};
+
+const passkeyLoginStep: CreateFlow201 = {
+  id: "flow_1",
+  session_id: "sess_1",
+  session_token: "tok_2",
+  step: {
+    name: "passkey-login",
+    texts: { title_key: "passkey-login.title" },
+    fields: [],
+    actions: [],
+    gates: {},
+    challenge: {
+      method: "passkey",
+      challenge_id: "chal-2",
+      options: { challenge: "AAAA" },
+    },
+  },
+};
+
+describe("<zitadel-login> passkey ceremony (chromium)", () => {
+  let host: HTMLDivElement;
+  let stub: ReturnType<typeof installFlowFetchStub>;
+  let testProject: ZitadelProject;
+  let authenticatorId: string;
+
+  beforeEach(async () => {
+    await cdp().send("WebAuthn.enable");
+    ({ authenticatorId } = await cdp().send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "ctap2",
+        transport: "internal",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    }));
+  });
+
+  function setup(responses: readonly CreateFlow201[]): void {
+    _resetConfigForTesting();
+    testProject = configureZitadel({
+      proxyPath: "/__nextgen",
+      projectId: "test-project",
+      url: "http://localhost:4000",
+    });
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    stub = installFlowFetchStub(responses);
+  }
+
+  afterEach(async () => {
+    host.remove();
+    stub.restore();
+    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    await cdp().send("WebAuthn.disable");
+  });
+
+  function mount(): ZitadelLogin {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    host.appendChild(element);
+    return element;
+  }
+
+  it("registers a passkey, then signs in with it, submitting each real proof", async () => {
+    setup([passkeyRegisterStep, passkeyLoginStep, identifierStep]);
+    mount();
+
+    const submits = await waitFor(() => {
+      const calls = stub.calls.filter(
+        (call) => call.init?.method === "POST" && call.url.includes("/submit"),
+      );
+      return calls.length === 2 ? calls : null;
+    });
+    const [register, login] = submits.map(
+      (call) =>
+        JSON.parse(String(call.init?.body)) as {
+          action: string;
+          challenge_response: {
+            challenge_id: string;
+            method: string;
+            proof: { id: string; response: { attestationObject?: string; signature?: string } };
+          };
+        },
+    );
+    expect(register?.action).toBe("passkey_register");
+    expect(register?.challenge_response.challenge_id).toBe("chal-1");
+    expect(register?.challenge_response.proof.response.attestationObject).toBeTypeOf("string");
+    expect(login?.action).toBe("passkey");
+    expect(login?.challenge_response.challenge_id).toBe("chal-2");
+    expect(login?.challenge_response.proof.id).toBe(register?.challenge_response.proof.id);
+    expect(login?.challenge_response.proof.response.signature).toBeTypeOf("string");
+  });
+
+  it("shows the step error and submits nothing when user verification fails", async () => {
+    setup([passkeyRegisterStep]);
+    await cdp().send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
+    const element = mount();
+    const root = element.shadowRoot!;
+
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"));
+    expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
+    expect(root.querySelector("zl-passkey")).toBeNull();
+    expect(
+      stub.calls.filter((call) => call.init?.method === "POST" && call.url.includes("/submit")),
+    ).toHaveLength(0);
+  });
+
+  it("shows the step error and submits nothing when the user cancels the prompt", async () => {
+    setup([passkeyRegisterStep]);
+    await cdp().send("WebAuthn.setAutomaticPresenceSimulation", {
+      authenticatorId,
+      enabled: false,
+    });
+    const element = mount();
+    const root = element.shadowRoot!;
+
+    const cancel = await waitFor(() =>
+      root.querySelector('zl-button[data-testid="zitadel-passkey-cancel"]'),
+    );
+    const inner = await waitFor(() => (cancel as HTMLElement).shadowRoot?.querySelector("button"));
+    (inner as HTMLButtonElement).click();
+
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"));
+    expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
+    expect(root.querySelector("zl-passkey")).toBeNull();
+    expect(
+      stub.calls.filter((call) => call.init?.method === "POST" && call.url.includes("/submit")),
+    ).toHaveLength(0);
   });
 });
