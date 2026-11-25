@@ -379,8 +379,8 @@ func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_
 		}
 		found.Inviter = new(refs[*entity.CreatedBy])
 	}
-	if found.Membership, err = heldAccess(ctx, stmts, entity, userID); err != nil {
-		return nil, err
+	if found.Membership, err = s.heldAccess(ctx, stmts, entity, userID); err != nil {
+		return nil, mapInvitationError(err, "failed to look up invitation")
 	}
 	return found, nil
 }
@@ -412,7 +412,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
 			return err
 		}
-		if err := refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
+		if err := s.refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
 			return err
 		}
 		// The lock can wait; the guarded change rechecks expiry at this time.
@@ -480,24 +480,20 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 
 // heldAccess is the type's adapter for what userID already holds of what the
 // invitation grants: for project_member, any role on the project, from any
-// source. Nil when they hold none.
-func heldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (*domain.ProjectMemberRecord, error) {
+// source. Nil when they hold none, and for a type with no check yet.
+func (s *InvitationService) heldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (*domain.ProjectMemberRecord, error) {
 	switch entity.Type {
 	case domain.InvitationTypeProjectMember:
-		member, err := stmts.GetProjectMember(ctx, entity.ProjectID, userID)
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, nil
-		}
-		return member, err
+		return s.grants.ProjectMembership(ctx, stmts, entity.ProjectID, userID)
 	default:
-		return nil, domain.ErrNotImplemented()
+		return nil, nil
 	}
 }
 
 // refuseHeldAccess refuses redeeming for a user who already holds access, so
 // no redundant grant is written and the invitation stays pending.
-func refuseHeldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
-	held, err := heldAccess(ctx, stmts, entity, userID)
+func (s *InvitationService) refuseHeldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
+	held, err := s.heldAccess(ctx, stmts, entity, userID)
 	if err != nil {
 		return err
 	}
@@ -524,8 +520,12 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfReject()
 		}
-		// A member's decline would spend the link meant for someone else.
-		if err := refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
+		// A member's decline would spend the link meant for someone else. The
+		// lock, as in accept, waits out a grant a racing accept is writing.
+		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+			return err
+		}
+		if err := s.refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
 			return err
 		}
 		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, userID, now)

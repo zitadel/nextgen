@@ -569,7 +569,8 @@ holds, and the same-relation rule of the first 2026-11-12 amendment (#3330).
   that a racing accept or administrator wrote.
 - **Lookup returns the same answer** as `membership` on the `project_member`
   variant: `{ relation, sources }`, shaped as the members list shapes a
-  member, or null. The accept page shows it in place of Accept and Decline.
+  member, or null, so the accept page can show it in place of Accept and
+  Decline.
   Each type's variant carries its own, so a project role never blocks a team
   invitation.
 - §4's "a different relation already held: a second grant is created" no

@@ -2,11 +2,26 @@ package service
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+// ProjectMembership is userID's strongest role on the project and every way
+// they hold it, read through the caller's stmts as ListProjectMembers counts a
+// member. Nil when they hold none.
+func (s *GrantService) ProjectMembership(ctx context.Context, stmts AllStatements, projectID, userID string) (_ *domain.ProjectMemberRecord, err error) {
+	ctx, end := startSpan(ctx, "GrantService.ProjectMembership")
+	defer end(&err)
+
+	member, err := stmts.GetProjectMember(ctx, projectID, userID)
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return nil, nil
+	}
+	return member, err
+}
 
 type ProjectMember struct {
 	User domain.UserRef

@@ -347,14 +347,9 @@ func (s authzAssignmentStatements) ListProjectMembers(ctx context.Context, proje
 
 // GetProjectMember implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) GetProjectMember(ctx context.Context, projectID, userID string) (*domain.ProjectMemberRecord, error) {
-	members, err := s.projectMembers(ctx, projectID, domain.ProjectRoles, userID, "", false, 1)
-	if err != nil {
-		return nil, err
-	}
-	if len(members) == 0 {
-		return nil, database.NewNoRowFoundError(nil)
-	}
-	return members[0], nil
+	return authz.OneProjectMember(userID, func() ([]*domain.ProjectMemberRecord, error) {
+		return s.projectMembers(ctx, projectID, domain.ProjectRoles, userID, "", false, 1)
+	})
 }
 
 func (s authzAssignmentStatements) projectMembers(ctx context.Context, projectID string, relations []string, userID, afterUserID string, desc bool, limit uint32) ([]*domain.ProjectMemberRecord, error) {

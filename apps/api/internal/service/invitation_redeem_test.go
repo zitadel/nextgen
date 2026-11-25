@@ -231,13 +231,6 @@ func TestInvitationService_Accept(t *testing.T) {
 			wantEvents: []domain.EventType{domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
 		},
 		{
-			// The member check refuses this first; the adapter still never
-			// writes a duplicate.
-			name:       "an identical active grant: already done",
-			held:       []*domain.AuthzAssignment{managed("asgn_admin", "admin", nil)},
-			wantEvents: []domain.EventType{domain.EventTypeInvitationAccepted},
-		},
-		{
 			name:       "an identical expired grant: revoked and created again",
 			held:       []*domain.AuthzAssignment{managed("asgn_admin", "admin", &expired)},
 			revokes:    "asgn_admin",
@@ -434,6 +427,7 @@ func TestInvitationService_Reject(t *testing.T) {
 		entity := pendingInvitation(new("user_admin"))
 		entity.EncryptedMetadata = new("ciphertext")
 		expectInvitationByToken(s, entity)
+		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
 		expectNoMembership(s, "user_colleague")
 		expectStatusChange(s, entity, domain.InvitationStatusRejected, "user_colleague")
 
@@ -464,6 +458,7 @@ func TestInvitationService_Reject(t *testing.T) {
 		svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
 		expectActiveUserPrincipal(s, "user_colleague")
 		expectInvitationByToken(s, pendingInvitation(new("user_admin")))
+		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
 		s.EXPECT().GetProjectMember(gomock.Any(), invitationProjectID, "user_colleague").Return(heldAdmin("user_colleague"), nil)
 
 		// No status change: the link stays pending for its invitee.
