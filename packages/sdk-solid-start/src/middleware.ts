@@ -11,10 +11,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  nonEmpty,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
+  resolveZitadelUrl,
   serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
@@ -449,19 +451,18 @@ async function handleAuth(
  * });
  * ```
  *
- * @param options - The middleware configuration, which is {@link ZitadelMiddlewareOptions} plus
- *   `projectSecret`. The `url` defaults to `ZITADEL_URL`, else `http://localhost:8080`, and the
- *   `projectSecret` to `ZITADEL_PROJECT_SECRET`. The secret is the project service key.
+ * @param options - The middleware configuration, see {@link ZitadelMiddlewareOptions}. The `url`
+ *   defaults to `ZITADEL_URL`, else `http://localhost:8080`, and the `projectSecret` to
+ *   `ZITADEL_PROJECT_SECRET`. An empty value counts as unset.
  * @returns The SolidStart middleware config.
  * @throws Error when `loginPath` is not a relative path starting with a single `/`. An absolute
  *   or protocol-relative URL would turn the login redirect into an open redirect, so it is
  *   refused when the middleware is created.
  */
 export function createZitadelMiddleware(
-  options: ZitadelMiddlewareOptions & { projectSecret?: string } = {},
+  options: ZitadelMiddlewareOptions = {},
 ): SolidMiddlewareConfig {
   const {
-    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -474,8 +475,10 @@ export function createZitadelMiddleware(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
+  const url = resolveZitadelUrl(options.url, PROCESS_ENV.ZITADEL_URL);
+  const projectSecret =
+    nonEmpty(options.projectSecret) ?? nonEmpty(PROCESS_ENV.ZITADEL_PROJECT_SECRET);
 
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {

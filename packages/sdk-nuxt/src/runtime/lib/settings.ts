@@ -1,23 +1,13 @@
+import { DEFAULT_ZITADEL_URL, nonEmpty, resolveZitadelUrl } from "@zitadel/sdk-core/middleware";
+
 /**
  * The backend URL used when no other source names one.
  *
  * It is where `zitadel start` runs the local server, so a fresh app works against a local server
- * with no configuration.
+ * with no configuration. Nitro stores a runtime-config key the app left unset as an empty string,
+ * so an empty value counts as unset, as it does in every server SDK.
  */
-export const DEFAULT_URL = "http://localhost:8080";
-
-/**
- * Narrows a value to a non-empty string.
- *
- * Nitro stores a runtime-config key the app left unset as an empty string, so an empty string
- * has to count as unset.
- *
- * @param value - The value to check.
- * @returns The value when it is a non-empty string, otherwise `undefined`.
- */
-function nonEmpty(value: unknown): string | undefined {
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
+export const DEFAULT_URL = DEFAULT_ZITADEL_URL;
 
 /**
  * Resolves the Zitadel backend URL when the server runs.
@@ -32,12 +22,7 @@ function nonEmpty(value: unknown): string | undefined {
  * @returns The backend URL, never empty.
  */
 export function resolveUrl(zitadel: Record<string, unknown> | undefined): string {
-  return (
-    nonEmpty(zitadel?.url) ??
-    nonEmpty(zitadel?.issuerUrl) ??
-    nonEmpty(process.env.ZITADEL_URL) ??
-    DEFAULT_URL
-  );
+  return resolveZitadelUrl(zitadel?.url, zitadel?.issuerUrl, process.env.ZITADEL_URL);
 }
 
 /**
@@ -45,14 +30,22 @@ export function resolveUrl(zitadel: Record<string, unknown> | undefined): string
  *
  * `NUXT_ZITADEL_PROJECT_SECRET` (the runtime config) wins, then `ZITADEL_PROJECT_SECRET` from the
  * server's environment. The module never writes the secret into the build, so it exists only in
- * the running server's environment and never reaches the build output or the browser.
+ * the running server's environment and never reaches the build output or the browser. A
+ * `projectSecret` passed to {@link createZitadelMiddleware} by hand is the explicit choice of the
+ * app and comes first.
  *
  * @param zitadel - The private `runtimeConfig.zitadel` object, or `undefined` where it is not
  *   available.
+ * @param option - The `projectSecret` option of the middleware, or `undefined` when none is set.
  * @returns The secret, or `undefined` when none is set. The proxy then sends no bearer.
  */
 export function resolveProjectSecret(
   zitadel: Record<string, unknown> | undefined,
+  option?: string,
 ): string | undefined {
-  return nonEmpty(zitadel?.projectSecret) ?? nonEmpty(process.env.ZITADEL_PROJECT_SECRET);
+  return (
+    nonEmpty(option) ??
+    nonEmpty(zitadel?.projectSecret) ??
+    nonEmpty(process.env.ZITADEL_PROJECT_SECRET)
+  );
 }

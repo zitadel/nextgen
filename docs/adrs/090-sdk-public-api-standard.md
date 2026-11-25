@@ -205,6 +205,9 @@ Rules that follow:
 | Was | Is |
 | --- | --- |
 | `ZitadelLoginSolidProps`, `…ReactProps`, `…SvelteProps` (and Logout, Session) | `ZitadelLoginProps` (and Logout, Session) |
+| `ZitadelLoginConfig`, `ZitadelLogoutConfig`, `ZitadelSessionConfig`, the `*Handlers` types, `ZitadelNavigationDetail`, `ZitadelWidgetAttributes` and `WithZitadelWidgetAttributes` as exports of a UI SDK | not exported; the config, handler and navigation types are in `@zitadel/sdk-core/types` |
+| `WidgetName`, `WidgetTag`, `StandardAttributeName`, `StandardAttributes`, `StandardAttributeProps` and the `Zitadel*EventMap` interfaces as exports of an SDK | not exported |
+| the session, event and widget-name types in the `./components` entry of `sdk-tanstack-start` | not exported |
 | `ZitadelLoginComponent`, `ZitadelLogoutComponent`, `ZitadelSessionComponent` (`sdk-angular`) | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` |
 | `CreateFlowBodyPurpose` (the type the API client is generated with) | `ZitadelFlowPurpose`, declared in `sdk-core` |
 | `CreateFlow201Step` and `CreateFlow201StepComplete` as the types of an event's `step` and `behavior` | `ZitadelFlowStep` and `ZitadelFlowBehavior`, declared in `sdk-core` |

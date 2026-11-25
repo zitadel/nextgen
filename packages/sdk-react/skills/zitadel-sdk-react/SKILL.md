@@ -132,12 +132,12 @@ independently and a hardcoded API list here would drift.
 
 ## Gotchas
 
-- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow. React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `projectId` and `proxyPath` as strings instead of a `project` handle.
 - **TypeScript ≥ 5.0 required** — the published types use `export type *`, which
   older TypeScript cannot parse.
 - **Browser web components.** These wrap browser web components that only start
   in the browser. A server render emits a bare element, so follow the
-  server-rendering gotcha above: string `project-id` and `proxy-path` may be
+  server-rendering gotcha above: string `projectId` and `proxyPath` may be
   server-rendered, while an object such as `project` is client-only because
   React 19 does not apply object properties while hydrating.
 - **Same-origin proxy.** The widgets call `${proxyPath}/…` same-origin (default

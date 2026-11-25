@@ -55,8 +55,12 @@ export type UseSessionResult = SessionSnapshot & {
  *
  * export function AccountMenu() {
  *   const { status, session } = useSession({ projectId: "296547382910273" });
- *   if (status === "loading") return null;
- *   if (status === "error") return <span role="alert">Session unavailable</span>;
+ *   if (status === "loading") {
+ *     return null;
+ *   }
+ *   if (status === "error") {
+ *     return <span role="alert">Session unavailable</span>;
+ *   }
  *   return status === "authenticated"
  *     ? <a href="/profile">{session?.display ?? session?.identifier ?? "Account"}</a>
  *     : <a href="/login">Sign in</a>;

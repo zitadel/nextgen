@@ -128,12 +128,8 @@ client-side navigation, where the hook's `locals` are not available.
 
 ### 4. Render the login widget
 
-Install the Svelte component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-sveltekit/components` re-exports the widgets of `@zitadel/sdk-svelte`, which the app declares as well:
-
-```bash
-pnpm add @zitadel/sdk-svelte@latest
-```
+Render `ZitadelLogin` from `@zitadel/sdk-sveltekit/components`. It re-exports the widgets of
+`@zitadel/sdk-svelte`, so this one package is all the app installs.
 
 ```svelte
 <script lang="ts">

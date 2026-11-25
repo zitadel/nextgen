@@ -9,6 +9,8 @@
  * @module
  */
 import { getZitadelConfig } from "@zitadel/sdk-core/config";
+import type { GetSessionOptions as CoreGetSessionOptions } from "@zitadel/sdk-core/session";
+
 import { getSession as readSession } from "@zitadel/sdk-core/session";
 
 import type { ClientAuthResult } from "./types.js";
@@ -16,36 +18,21 @@ import type { ClientAuthResult } from "./types.js";
 /**
  * Options for {@link getSession}.
  *
- * Both fields fall back to the configuration of the page, so an app that calls
+ * It is the type of `@zitadel/sdk-core`, so the shape lives in one place: `proxyPath` and
+ * `projectId`. Both fall back to the configuration of the page, so an app that calls
  * `configureZitadel()` before the read can pass nothing.
+ *
+ * Next.js adds one fallback of its own. With no `projectId` option and no project from
+ * `configureZitadel()`, {@link getSession} reads `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, which Next.js
+ * inlines into the bundle at build time. With no project id from any source, nobody reads as
+ * signed in, the same as on the server, and the first call logs a warning.
+ *
+ * @example
+ * ```ts
+ * const options: GetSessionOptions = { projectId: "296547382910273", proxyPath: "/auth-proxy" };
+ * ```
  */
-export type GetSessionOptions = {
-  /**
-   * The same-origin proxy path that the request boundary forwards to the Zitadel backend.
-   *
-   * The browser never calls Zitadel directly, so the read goes to this path on the app's own
-   * origin. The middleware must be mounted for it, which the scaffolded `proxy.ts` always does.
-   * Set it only when the proxy lives somewhere other than the default, for example `"/auth-proxy"`
-   * together with a matching `proxyPath` on the middleware.
-   *
-   * @defaultValue The path from `configureZitadel()` when it has run on this page, else
-   * `"/__nextgen"`.
-   */
-  proxyPath?: string;
-
-  /**
-   * The project id this app signs its users in to.
-   *
-   * A session of another project reads as signed out, because a browser shares one host's cookies
-   * across every app on it. Set it when `configureZitadel()` has not run on the page. With no
-   * project id from any source, nobody reads as signed in, the same as on the server, and the
-   * first call logs a warning.
-   *
-   * @defaultValue The project from `configureZitadel()` when it has run on this page, else
-   * `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, which Next.js inlines into the bundle at build time.
-   */
-  projectId?: string;
-};
+export type GetSessionOptions = CoreGetSessionOptions;
 
 /**
  * Reads `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, which Next.js inlines into client bundles at build time.

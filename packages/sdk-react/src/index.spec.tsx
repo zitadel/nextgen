@@ -650,6 +650,7 @@ const staleOnRemoval: readonly string[] = [];
 // again with other attributes.
 async function mountWidget(widget: WidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  configureZitadel(project);
   let element: HTMLElement | null = null;
   const elementFor = ({ class: className, style, hidden, tabindex, ...rest }: Attributes) => (
     <Widget
@@ -672,6 +673,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

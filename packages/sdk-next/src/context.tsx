@@ -23,10 +23,12 @@ const ZitadelAuthContext = createContext<ClientAuthResult>(defaultValue);
  *
  * Render this component directly only from client code that already holds a client-safe value,
  * for example a state seeded from a {@link session!getSession | getSession} read in an effect.
- * The `value` prop is typed as {@link ClientAuthResult} on purpose: passing the token-bearing
- * result of {@link server!auth | auth} is a type error, so the raw session token cannot
- * enter client-side state by accident. Without any provider above, {@link useAuth} reads as
- * signed out.
+ * The `value` prop is typed as {@link ClientAuthResult}, which has no `token` field. The type
+ * does not stop the token: the token-bearing result of {@link server!auth | auth} still compiles,
+ * because TypeScript allows an extra property on a value that is not an object literal, and the
+ * provider does not copy or strip the value. Strip it first with
+ * {@link server!ZitadelProvider | ZitadelProvider}. Without any provider above,
+ * {@link useAuth} reads as signed out.
  *
  * The file starts with `"use client"`. Keep that directive on the first line of the file.
  *
@@ -51,9 +53,9 @@ export function AuthContextProvider({
   /**
    * The client-safe auth state that every {@link useAuth} call below this provider reads.
    *
-   * It is typed as {@link ClientAuthResult} so that a token-bearing result of
-   * {@link server!auth | auth} is a type error here. The provider does not copy or
-   * validate the value, so pass an object that is already token-less.
+   * It is typed as {@link ClientAuthResult}, which has no `token` field. A token-bearing result of
+   * {@link server!auth | auth} still compiles here, and the provider does not copy or validate
+   * the value, so pass an object that is already token-less.
    */
   value: ClientAuthResult;
   /**

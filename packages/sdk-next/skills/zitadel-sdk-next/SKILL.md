@@ -152,7 +152,7 @@ Confirm names against those before writing code.
 - **`ZitadelProvider` is server-only** and must not be re-exported through a
   `"use client"` `providers.tsx` wrapper — that would leak the unstripped token
   into the RSC flight payload. To seed from client state, use
-  `AuthContextProvider` from `/react` (it only takes the token-less shape).
+  `AuthContextProvider` from `/react` (typed as the token-less shape; it strips nothing).
 - **Same-origin proxy is required.** The widgets and `getSession()` hit
   `{proxyPath}/api/v1/sessions/me` on the same origin; the middleware `matcher` must
   cover `{proxyPath}/:path*` or the proxy breaks.

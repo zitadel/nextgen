@@ -15,8 +15,8 @@ SolidStart middleware and helpers that add Zitadel auth to a
 SolidStart app. The middleware proxies auth traffic same-origin under
 `/__nextgen`, verifies the session JWT via JWKS on the server, writes the result
 to `event.locals.zitadelAuth`, and redirects unauthenticated requests on
-protected routes. The package is server-only; the widgets come from
-`@zitadel/sdk-solid`.
+protected routes. It also re-exports the widgets from `/components`, so one
+package is enough.
 
 ## When to use
 
@@ -31,8 +31,6 @@ adjusting a scaffolded wiring.
 
 ```bash
 pnpm add @zitadel/sdk-solid-start@latest
-# the login/logout/session widgets are a separate package:
-pnpm add @zitadel/sdk-solid@latest
 ```
 
 Peer deps: `@solidjs/start ^2.0.0`, `solid-js ^1.8.0`.
@@ -92,7 +90,7 @@ all without a session, check the session in a `query` that `throw redirect('/log
 and call it from the route's `preload` — it runs on the server for client-side
 navigation too.
 
-**3. Render the widgets** from `@zitadel/sdk-solid`, loaded with SolidStart's
+**3. Render the widgets** from `@zitadel/sdk-solid-start/components`, loaded with SolidStart's
 `clientOnly` so they are created in the browser and the package stays out of the
 server render:
 
@@ -120,7 +118,7 @@ same way.
 
 ## Widget props and events
 
-This SDK is server-only. The widgets come from `@zitadel/sdk-solid`, so read its skill for the widget props and events.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` from `@zitadel/sdk-solid-start/components` are the `@zitadel/sdk-solid` widgets, so read its skill for the widget props and events.
 
 ## Read these, don't guess
 
@@ -140,10 +138,9 @@ names and defaults against the installed version rather than assuming.
   `createZitadelMiddleware(...)` object registers nothing and `/__nextgen/*`
   404s.
 - **Pass `projectId` / `proxyPath` as props, not a `configureZitadel` handle.**
-  Building the handle imports `@zitadel/sdk-solid` at module scope, outside the
-  `clientOnly` boundary.
-- **`@zitadel/sdk-solid-start` renders no widgets.** They come from
-  `@zitadel/sdk-solid`, which registers custom elements on import — never import
-  it at module scope in a server-rendered file.
+  Building the handle imports the `/components` entry at module scope, outside
+  the `clientOnly` boundary.
+- **Import `/components` only through `clientOnly`.** The entry registers custom
+  elements on import, so never import it at module scope in a server-rendered file.
 - **Client-side navigation skips the middleware.** Without a preloaded server
   query, only the `ZitadelSession` card sends a signed-out visitor away.

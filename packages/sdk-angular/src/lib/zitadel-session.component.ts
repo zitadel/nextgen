@@ -190,7 +190,7 @@ export class ZitadelSession {
   private readonly elementRef = viewChild<ElementRef<ZitadelSessionElement>>("el");
 
   /**
-   * The underlying `<zitadel-auth-session>` custom element, or `null` before the view is
+   * The underlying `<zitadel-session>` custom element, or `null` before the view is
    * initialized.
    *
    * Use it for what the inputs do not cover, such as calling a method on the element or attaching

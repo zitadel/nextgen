@@ -26,10 +26,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  nonEmpty,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
+  resolveZitadelUrl,
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
@@ -138,7 +140,6 @@ export async function zitadelMiddleware(
   options: ZitadelMiddlewareOptions = {},
 ): Promise<NextResponse | Response> {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
     projectId = process.env.ZITADEL_PROJECT_ID || process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -152,6 +153,7 @@ export async function zitadelMiddleware(
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+  const url = resolveZitadelUrl(options.url, process.env.ZITADEL_URL);
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
@@ -177,7 +179,7 @@ export async function zitadelMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, url, proxyPath, projectId, proxyTimeoutMs);
+    return proxyRequest(req, url, proxyPath, projectId, proxyTimeoutMs, options.projectSecret);
   }
 
   return handleAuth(req, {
@@ -220,6 +222,8 @@ export async function zitadelMiddleware(
  * @param proxyPath - The path prefix being proxied, for example `"/__nextgen"`.
  * @param projectId - The project this app signs its users in to.
  * @param proxyTimeoutMs - The time in milliseconds to wait for the backend.
+ * @param projectSecretOption - The `projectSecret` option, which wins over the
+ *   `ZITADEL_PROJECT_SECRET` environment variable, or `undefined` when none is set.
  * @returns The proxied upstream response.
  */
 async function proxyRequest(
@@ -228,6 +232,7 @@ async function proxyRequest(
   proxyPath: string,
   projectId: string | undefined,
   proxyTimeoutMs: number,
+  projectSecretOption: string | undefined,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
@@ -286,7 +291,7 @@ async function proxyRequest(
   // Preserve an explicit caller credential so the exchange can use the future
   // publishable-key plane without being overwritten.
   if (requiresProjectSecret(req.method, suffix) && !upstreamHeaders.has("authorization")) {
-    const secret = process.env.ZITADEL_PROJECT_SECRET;
+    const secret = nonEmpty(projectSecretOption) ?? nonEmpty(process.env.ZITADEL_PROJECT_SECRET);
     if (secret) {
       upstreamHeaders.set("authorization", `Bearer ${secret}`);
     }

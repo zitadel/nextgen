@@ -138,7 +138,8 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  *
  * @param options - The middleware options, described by {@link ZitadelMiddlewareOptions}. Every
  *   field is optional. An empty `url` counts as unset and falls back to `ZITADEL_URL`, then
- *   `http://localhost:8080`.
+ *   `http://localhost:8080`. The `projectSecret` wins over `NUXT_ZITADEL_PROJECT_SECRET` and
+ *   `ZITADEL_PROJECT_SECRET`, and an empty value counts as unset.
  * @returns An H3 event handler suitable as a global server middleware.
  * @throws When `loginPath` is not a relative path starting with a single `/`. An absolute or
  *   protocol-relative URL would allow an open redirect.
@@ -202,7 +203,15 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, urlObj, projectId, proxyTimeoutMs);
+      return proxyRequest(
+        event,
+        url,
+        proxyPath,
+        urlObj,
+        projectId,
+        proxyTimeoutMs,
+        options.projectSecret,
+      );
     }
 
     return handleAuth(event, {
@@ -241,6 +250,8 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
  * @param projectId - The project this app signs its users in to.
  * @param proxyTimeoutMs - How long the upstream request may take, in milliseconds, before it is
  *   aborted.
+ * @param projectSecretOption - The `projectSecret` option, which wins over the runtime config and
+ *   the environment, or `undefined` when none is set.
  * @returns The upstream response body stream.
  */
 async function proxyRequest(
@@ -250,6 +261,7 @@ async function proxyRequest(
   url: URL,
   projectId: string | undefined,
   proxyTimeoutMs: number,
+  projectSecretOption: string | undefined,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
@@ -287,7 +299,7 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = resolveProjectSecret(config.zitadel);
+    const projectSecret = resolveProjectSecret(config.zitadel, projectSecretOption);
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }

@@ -41,7 +41,7 @@ An option left unset, or set to an empty value, takes its default. The project s
 
 ## How it works
 
-The wrappers here are not components. The widgets are the `<zitadel-login>`, `<zitadel-logout>` and `<zitadel-session>` custom elements, written in your templates like any HTML element, so nothing builds an element at render time.
+The widgets are the `<zitadel-login>`, `<zitadel-logout>` and `<zitadel-session>` custom elements, written in your templates like any HTML element, so nothing builds an element at render time. The typed Vue wrappers in `@zitadel/sdk-nuxt/components` are an option on top of the elements, and one package covers both.
 
 On the server, the Nitro middleware runs before your routes. It answers `proxyPath` requests by forwarding them to the backend with the real client address in `X-Forwarded-*`, and for every other request it judges the session cookie (or a `Bearer` token) and stores the result on the event for {@link server!getAuth}. The session cookie travels under the project's own name in the browser, so two apps on one host do not share a session. Because the browser only ever calls the app's own origin, the widgets need no CORS setup and the backend is not exposed to the page.
 

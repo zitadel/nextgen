@@ -17,6 +17,7 @@ import {
   proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
+  resolveZitadelUrl,
   serializeSessionCookie,
   serverSessionCookieName,
   sessionCookieName,
@@ -138,6 +139,12 @@ describe("matchesRoutes", () => {
     ["/", ["/"]],
     ["/admin/users", ["/admin*"]],
     ["/admin", ["/admin*"]],
+    ["/%61dmin", ["/admin*"]],
+    ["/%61dmin", ["/admin"]],
+    ["/%61dmin/", ["/admin"]],
+    ["/ad%6Din/x", ["/admin*"]],
+    ["/admin%2Fx", ["/admin*"]],
+    ["/%E0%A4%A", ["/%E0%A4%A"]],
   ])("matches %s against %j", (pathname, routes) => {
     expect(matchesRoutes(pathname, routes)).toBe(true);
   });
@@ -149,6 +156,10 @@ describe("matchesRoutes", () => {
     ["/profile", ["/"]],
     ["/other", ["/admin*"]],
     ["/profile", []],
+    ["/%2561dmin", ["/admin*"]],
+    ["/%2561dmin", ["/admin"]],
+    ["/admin%2Fx", ["/admin"]],
+    ["/%E0%A4%A", ["/admin*"]],
   ])("does not match %s against %j", (pathname, routes) => {
     expect(matchesRoutes(pathname, routes)).toBe(false);
   });
@@ -165,6 +176,20 @@ describe("matchesRoutes", () => {
 
     expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
     expect(performance.now() - started).toBeLessThan(250);
+  });
+});
+
+describe("resolveZitadelUrl", () => {
+  it.each([
+    [[], "http://localhost:8080"],
+    [[undefined, null], "http://localhost:8080"],
+    [[""], "http://localhost:8080"],
+    [["", undefined, ""], "http://localhost:8080"],
+    [["https://a.example.com"], "https://a.example.com"],
+    [["", "https://b.example.com"], "https://b.example.com"],
+    [["https://a.example.com", "https://b.example.com"], "https://a.example.com"],
+  ])("resolves %j to %s", (sources, expected) => {
+    expect(resolveZitadelUrl(...sources)).toBe(expected);
   });
 });
 

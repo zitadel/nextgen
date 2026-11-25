@@ -15,8 +15,8 @@ TanStack Start request middleware and helpers that add Zitadel auth to
 a TanStack Start app. The middleware proxies auth traffic same-origin under
 `/__nextgen`, verifies the session JWT via JWKS on the server, places the result
 on the request context as `zitadelAuth`, and redirects unauthenticated requests
-on protected routes. Unlike the other meta-framework SDKs it also ships the
-widgets (a `/react` entry), so no other Zitadel package is needed.
+on protected routes. It also ships the widgets (a `/components` entry), so one
+package is enough.
 
 ## When to use
 
@@ -97,7 +97,7 @@ export const Route = createFileRoute('/admin')({
 });
 ```
 
-**3. Render the widgets** from the `/react` entry, with `configureZitadel` from
+**3. Render the widgets** from the `/components` entry, with `configureZitadel` from
 `/client`:
 
 ```tsx
@@ -119,13 +119,13 @@ signed-in card with sign-out, and `<ZitadelLogout>` a sign-out control on its ow
 
 ## Widget props and events
 
-This SDK is not server-only: its `/react` entry wraps the widgets from `@zitadel/sdk-react`, so no other package is needed. Read the `@zitadel/sdk-react` skill for the widget props and events.
+Its `/components` entry wraps the widgets from `@zitadel/sdk-react`, so one package is enough and nothing else is installed. Read the `@zitadel/sdk-react` skill for the widget props and events.
 
 ## Read these, don't guess
 
 The package README at `node_modules/@zitadel/sdk-tanstack-start/README.md` and
 the bundled `.d.ts` types (`dist/server.d.ts`, `dist/client.d.ts`,
-`dist/react.d.ts`) are authoritative and versioned with the installed package —
+`dist/components.d.ts`) are authoritative and versioned with the installed package —
 read them before wiring anything, and let them override anything remembered.
 This skill teaches the pattern, not a full catalog of options, widget props, or
 the shared JWT-verification pipeline (that lives in `@zitadel/sdk-core`). Check
@@ -134,7 +134,7 @@ than assuming.
 
 ## Gotchas
 
-- **Import widgets from `/react`, not `/client`.** `/client` only configures the
+- **Import widgets from `/components`, not `/client`.** `/client` only configures the
   SDK and exports no components.
 - **The widgets render nothing on the server and during hydration.** They mount
   right after, with every prop in place; do not expect them in the SSR markup.

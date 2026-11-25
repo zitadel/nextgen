@@ -110,6 +110,8 @@ The module loads the widget elements in the browser for you, through a
 client-only plugin, and provides the business copy overlay as
 `useNuxtApp().$zitadelBusinessLocales`. There is nothing to install or register
 beyond `@zitadel/sdk-nuxt`; do not import `@zitadel/components` yourself.
+The typed Vue wrappers `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` come from
+`@zitadel/sdk-nuxt/components`, so the same one package covers them too.
 
 Render `<zitadel-login>` inside `<ClientOnly>`, binding the project
 handle from the auto-imported `useZitadelProject()` composable — there is no

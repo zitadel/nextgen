@@ -44,9 +44,9 @@ describe("package manifest", () => {
 });
 
 /**
- * `@zitadel/sdk-solid-start` is server-only: the `<zitadel-*>` widgets come from
- * `@zitadel/sdk-solid`, whose specs check every config key against the element.
- * If an entry here ever exports a widget wrapper, it needs the same
+ * The root, `/client` and `/server` entries export no widget: the `<zitadel-*>` widgets come
+ * from `@zitadel/sdk-solid` through `/components`, and its specs check every config key against
+ * the element. If an entry here ever exports a widget wrapper, it needs the same
  * "wrapper config parity" checks, so this fails until they are added.
  */
 describe("wrapper config parity", () => {

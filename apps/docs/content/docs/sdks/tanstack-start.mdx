@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The TanStack Start SDK (`@zitadel/sdk-tanstack-start`) is a global request middleware that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/react` entry adds typed React wrappers for the login and logout components.
+The TanStack Start SDK (`@zitadel/sdk-tanstack-start`) is a global request middleware that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/components` entry exports the login, logout and session components for React, so this one package is enough.
 
 <Callout title="Generated setup" type="info">
   The CLI writes `src/start.ts`, the server entry TanStack Start loads on its own, and writes the backend URL, the project secret, and the project ID to `.env.local`.
@@ -113,7 +113,7 @@ Setup installs the SDK. To add it yourself, run:
 
     Never return `getAuth(context)` itself from a server function: its `session` carries the raw session token, and a server function's result reaches browser scripts. Return only `userId` and other client-safe fields.
 
-    Render the components from `@zitadel/sdk-tanstack-start/components`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/react` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
+    Render the components from `@zitadel/sdk-tanstack-start/components`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/components` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
 
     ```tsx
     import { createFileRoute } from "@tanstack/react-router";

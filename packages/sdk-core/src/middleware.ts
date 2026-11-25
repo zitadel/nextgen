@@ -83,8 +83,13 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-zitadel-auth-to
  * pathname is attacker-controlled, so the function trims slashes with a linear scan and not with a
  * regular expression that backtracks on a long run of slashes.
  *
- * The match is on the pathname only: it does not decode percent escapes or collapse dot segments,
- * so pass the pathname that the framework routes on.
+ * A route matches when the raw pathname or the percent-decoded pathname matches. Frameworks route
+ * on the decoded path, so `/%61dmin` reaches the page that `/admin` names, and a match on the raw
+ * text alone would serve that page to a signed-out visitor. The path is decoded once, with
+ * `decodeURI`, and never again: `/%2561dmin` decodes to `/%61dmin`, which names no route, and
+ * `decodeURI` leaves reserved escapes such as `%2F` as they are. A malformed escape makes the
+ * decoding throw, and the raw pathname alone is then matched. Dot segments are not collapsed, so
+ * pass the pathname that the framework routes on.
  *
  * @param pathname - The URL pathname to test.
  * @param routes - The route patterns to match against.
@@ -94,6 +99,7 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-zitadel-auth-to
  * ```ts
  * matchesRoutes("/profile/", ["/profile"]); // true
  * matchesRoutes("/admin/users", ["/admin*"]); // true
+ * matchesRoutes("/%61dmin", ["/admin*"]); // true
  * matchesRoutes("/public", ["/admin*"]); // false
  * ```
  */
@@ -107,14 +113,82 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
     }
     return path.slice(0, end);
   };
-  const path = withoutTrailingSlash(pathname);
+  const decoded = ((): string => {
+    try {
+      return decodeURI(pathname);
+    } catch {
+      return pathname;
+    }
+  })();
+  const candidates = decoded === pathname ? [pathname] : [pathname, decoded];
 
   return routes.some((route) => {
     if (route.endsWith("*")) {
-      return pathname.startsWith(route.slice(0, -1));
+      const prefix = route.slice(0, -1);
+      return candidates.some((candidate) => {
+        return candidate.startsWith(prefix);
+      });
     }
-    return path === withoutTrailingSlash(route);
+    const expected = withoutTrailingSlash(route);
+    return candidates.some((candidate) => {
+      return withoutTrailingSlash(candidate) === expected;
+    });
   });
+}
+
+/**
+ * The backend URL that applies when no source names one.
+ *
+ * It is where `zitadel start` runs the local server, so a fresh app works against a local server
+ * with no configuration.
+ */
+export const DEFAULT_ZITADEL_URL = "http://localhost:8080";
+
+/**
+ * Narrows a configuration value to a non-empty string.
+ *
+ * An empty string counts as unset: an environment variable that is declared but left empty, and a
+ * runtime-config key that a framework fills with `""`, both mean "not configured".
+ *
+ * @param value - The value to check.
+ * @returns The value when it is a non-empty string, otherwise `undefined`.
+ *
+ * @example
+ * ```ts
+ * nonEmpty(""); // undefined
+ * nonEmpty("https://auth.example.com"); // "https://auth.example.com"
+ * ```
+ */
+export function nonEmpty(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+/**
+ * Resolves the backend URL from its sources, first to last.
+ *
+ * Every server SDK uses this one rule: the first source that is a non-empty string wins, and an
+ * empty string, `null` or `undefined` falls through to the next. With no source left, the result
+ * is {@link DEFAULT_ZITADEL_URL}. The result is never empty, so no backend call starts from an
+ * empty base.
+ *
+ * @param sources - The candidate values in order of precedence, typically the `url` option, the
+ *   framework's own configuration and the `ZITADEL_URL` environment variable.
+ * @returns The first non-empty source, else {@link DEFAULT_ZITADEL_URL}.
+ *
+ * @example
+ * ```ts
+ * resolveZitadelUrl("", process.env.ZITADEL_URL); // the environment variable, or the default
+ * resolveZitadelUrl("https://auth.example.com"); // "https://auth.example.com"
+ * ```
+ */
+export function resolveZitadelUrl(...sources: ReadonlyArray<unknown>): string {
+  for (const source of sources) {
+    const value = nonEmpty(source);
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return DEFAULT_ZITADEL_URL;
 }
 
 /**
@@ -1201,7 +1275,8 @@ export type ZitadelMiddlewareOptions = {
    * It is the issuer that JWTs are checked against, the host of the JWKS, and the target of the
    * same-origin proxy. A trailing slash is ignored.
    *
-   * @defaultValue process.env.ZITADEL_URL ?? "http://localhost:8080"
+   * @defaultValue process.env.ZITADEL_URL, else "http://localhost:8080". An empty string counts
+   * as unset.
    * @example "https://auth.example.com"
    */
   url?: string;
@@ -1231,6 +1306,21 @@ export type ZitadelMiddlewareOptions = {
    * @example "296547382910273"
    */
   projectId?: string;
+
+  /**
+   * The project secret, the service key of the project.
+   *
+   * The proxy sends it as the `Authorization: Bearer` header of the `POST /sessions/exchange`
+   * call, the handoff that turns a sign-in into a session, and of no other request. A bearer that
+   * the browser itself sends is kept and never replaced. The secret is for the server only: keep
+   * it out of the build output and of any client bundle, so pass it from the environment of the
+   * running server and never from a file that the build copies. An empty string counts as unset.
+   * With no secret, the proxy sends no bearer and the handoff cannot be exchanged.
+   *
+   * @defaultValue process.env.ZITADEL_PROJECT_SECRET
+   * @example process.env.ZITADEL_PROJECT_SECRET
+   */
+  projectSecret?: string;
 
   /**
    * The URL path prefix that is reverse-proxied to the auth backend.

@@ -156,8 +156,9 @@ token included — would serialise into the flight payload before the provider
 ever ran. The `server-only` guard turns that wrapper into a build error
 instead of a silent leak. To seed the context from client-side state (e.g. a
 `getSession()` read), render `AuthContextProvider` from
-`@zitadel/sdk-next/react` — it only accepts the token-less
-`ClientAuthResult`.
+`@zitadel/sdk-next/react` — it is typed as the token-less
+`ClientAuthResult`, and it does not strip anything, so pass it a value that
+already has no token.
 
 Then in any client component:
 

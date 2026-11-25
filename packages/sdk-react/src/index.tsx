@@ -256,7 +256,7 @@ const ZitadelSessionElementReact = createComponent({
 /**
  * Forwards a widget event's detail to an app callback.
  *
- * The callback's return value, from an async handler or a Qwik QRL, is registered on the detail's
+ * The callback's return value, from an async handler, is registered on the detail's
  * `waitUntil`. The three navigating events (flow-complete, flow-redirect and signout) then wait
  * for it before the widget navigates, up to two seconds. Other events carry no `waitUntil`, so the
  * registration is a no-op for them. Nothing happens when the event is not a custom event or the

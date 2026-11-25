@@ -11,10 +11,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  nonEmpty,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
+  resolveZitadelUrl,
 } from "@zitadel/sdk-core/middleware";
 
 /**
@@ -541,9 +543,8 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  * OnRequest and the call reads export const onRequest = createZitadelOnRequest(...). It is a
  * factory, called once to return the handler, so it starts with create.
  *
- * @param options - See {@link ZitadelMiddlewareOptions}. The extra `projectSecret` is the project
- *   service key, sent as the bearer on the `POST /sessions/exchange` handoff only. It takes
- *   precedence over `ZITADEL_PROJECT_SECRET`.
+ * @param options - See {@link ZitadelMiddlewareOptions}. The `projectSecret` takes precedence over
+ *   `ZITADEL_PROJECT_SECRET`, and an empty `url` or `projectSecret` counts as unset.
  * @returns The `onRequest` handler to export from a root plugin or layout.
  * @throws An `Error` when `loginPath` is not a relative path that starts with a single `/`. An
  *   absolute or protocol-relative URL would allow an open redirect, so it is refused when the
@@ -562,7 +563,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  * ```
  */
 export function createZitadelOnRequest(
-  options: ZitadelMiddlewareOptions & { projectSecret?: string } = {},
+  options: ZitadelMiddlewareOptions = {},
 ): (ev: QwikRequestEvent) => Promise<void> {
   const {
     url: urlOption,
@@ -605,12 +606,11 @@ export function createZitadelOnRequest(
     // `process.env` (set in production adapters) > localhost default. Qwik does
     // not surface `.env` files on `process.env`, so a factory-time read would
     // miss them and the proxy would fall back to :8080 ("fetch failed").
-    const url =
-      urlOption ?? ev.env?.get("ZITADEL_URL") ?? PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080";
+    const url = resolveZitadelUrl(urlOption, ev.env?.get("ZITADEL_URL"), PROCESS_ENV.ZITADEL_URL);
     const projectSecret =
-      projectSecretOption ??
-      ev.env?.get("ZITADEL_PROJECT_SECRET") ??
-      PROCESS_ENV.ZITADEL_PROJECT_SECRET;
+      nonEmpty(projectSecretOption) ??
+      nonEmpty(ev.env?.get("ZITADEL_PROJECT_SECRET")) ??
+      nonEmpty(PROCESS_ENV.ZITADEL_PROJECT_SECRET);
     const projectId =
       projectIdOption ??
       (ev.env?.get("ZITADEL_PROJECT_ID") ||

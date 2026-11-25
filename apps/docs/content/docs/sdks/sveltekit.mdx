@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The SvelteKit SDK (`@zitadel/sdk-sveltekit`) is a `handle` hook, the SvelteKit function that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. The login and logout components come from the [Svelte SDK](/docs/sdks/svelte).
+The SvelteKit SDK (`@zitadel/sdk-sveltekit`) is a `handle` hook, the SvelteKit function that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/components` entry also exports the login, logout and session components of the [Svelte SDK](/docs/sdks/svelte), so the app imports everything from this one package.
 
 <Callout title="Generated setup" type="info">
   The CLI writes `src/hooks.server.ts` and the auth pages, declares the hook's settings in `src/env.ts` (adding them to the app's own file when it has one), and writes the backend URL, the project secret, and the project ID to `.env.local`. It needs SvelteKit 3.
@@ -21,9 +21,9 @@ The SvelteKit SDK (`@zitadel/sdk-sveltekit`) is a `handle` hook, the SvelteKit f
 - A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
 - The URL, project ID and project secret. Setup writes them to `.env.local` as `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, and the project ID again as `VITE_ZITADEL_PROJECT_ID`, the name a Vite app exposes to the browser.
 
-## Install the SDKs
+## Install the SDK
 
-Setup installs both packages. To add them yourself, run:
+Install `@zitadel/sdk-sveltekit`. It re-exports the Svelte widgets, so the app needs no other import. Setup also adds `@zitadel/sdk-svelte` as a direct dependency, because the Svelte compiler looks for libraries to compile in the app's `package.json`. To add both yourself, run:
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>

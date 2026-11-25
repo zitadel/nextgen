@@ -55,7 +55,7 @@ function toClientSession(session: ClientSession | ZitadelAuthSession): ClientSes
  * prop, token included, would serialize into the payload before this code ran. The `server-only`
  * import turns that wrapper into a build error instead of a silent leak. To seed a client-side
  * tree, for example from {@link session!getSession | getSession}, use {@link AuthContextProvider}
- * from `@zitadel/sdk-next/react`, which accepts only the token-less {@link ClientAuthResult}.
+ * from `@zitadel/sdk-next/react`, which is typed as the token-less {@link ClientAuthResult} and strips nothing.
  *
  * Client components therefore see only `userId`, `identifier`, `identifierProperty` and `display`.
  * The seeded state is the state at render time and does not update afterwards. On a route the

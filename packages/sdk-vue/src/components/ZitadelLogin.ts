@@ -123,7 +123,7 @@ export const Base = defineComponent({
      *
      * @example
      * ```html
-     * <ZitadelLogin :project="project" :locales="{ en: { 'login.title': 'Welcome back' } }" />
+     * <ZitadelLogin :project="project" :locales="{ en: { 'identifier.title': 'Welcome back' } }" />
      * ```
      */
     locales: {

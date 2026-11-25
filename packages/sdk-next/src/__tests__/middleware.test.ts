@@ -5,7 +5,7 @@
 
 import { NextRequest } from "next/server";
 
-import { expectTypeOf, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import type { AuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
@@ -54,12 +54,9 @@ async function serve(
   };
 }
 
-// Next reads the project secret from one source, `ZITADEL_PROJECT_SECRET`, and
-// takes no option for it, so the contract's "configuration" row repeats its
-// "environment" row here.
 function configureSecret(configured?: string, environment?: string): ServeOptions {
-  vi.stubEnv("ZITADEL_PROJECT_SECRET", configured ?? environment);
-  return {};
+  vi.stubEnv("ZITADEL_PROJECT_SECRET", environment);
+  return { projectSecret: configured };
 }
 
 function configureProject(configured?: string, environment?: string): ServeOptions {
@@ -88,4 +85,43 @@ describeServerMiddleware({
   readAuth,
   expectHandlerType,
   checksSessionsOnPublicRoutes: false,
+});
+
+describe("protected routes and encoded paths", () => {
+  const options = {
+    url: "http://localhost:4000",
+    projectId: "project",
+    protectedRoutes: ["/admin*"],
+    loginPath: "/login",
+  };
+
+  it.each(["/admin", "/%61dmin", "/ad%6Din/x"])(
+    "sends a signed-out visitor of %s to the login page",
+    async (path) => {
+      const served = await serve(`http://localhost:3000${path}`, {}, options);
+
+      expect(served.status).toBe(302);
+      expect(served.headers.get("location")).toContain("/login");
+    },
+  );
+});
+
+describe("an empty backend URL", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("counts as unset, so the proxy calls the default backend", async () => {
+    const requested: string[] = [];
+    vi.stubEnv("ZITADEL_URL", "");
+    vi.stubGlobal("fetch", async (input: string | URL | Request): Promise<Response> => {
+      requested.push(String(input));
+      return new Response("{}", { status: 200 });
+    });
+
+    await serve("http://localhost:3000/__nextgen/ping");
+
+    expect(requested[0]).toMatch(/^http:\/\/localhost:8080/);
+  });
 });

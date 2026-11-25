@@ -153,8 +153,8 @@ export class ZitadelLogin {
    * The name of the flow definition to run.
    *
    * Unset runs the project's default flow for {@link ZitadelLogin.purpose}. Set it to run
-   * a named flow that you configured for a product line or a tenant. It is written as the `flow-
-   * name` attribute.
+   * a named flow that you configured for a product line or a tenant. It is written as the
+   * `flow-name` attribute.
    *
    * @example
    * ```html
@@ -362,7 +362,7 @@ export class ZitadelLogin {
   private readonly elementRef = viewChild<ElementRef<ZitadelLoginElement>>("el");
 
   /**
-   * The underlying `<zitadel-auth-login>` custom element, or `null` before the view is initialized.
+   * The underlying `<zitadel-login>` custom element, or `null` before the view is initialized.
    *
    * Use it for what the inputs do not cover, such as calling a method on the element or attaching
    * an extra listener. It is `null` until Angular has rendered the template.

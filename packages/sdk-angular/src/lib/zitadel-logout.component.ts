@@ -130,7 +130,7 @@ export class ZitadelLogout {
   private readonly elementRef = viewChild<ElementRef<ZitadelLogoutElement>>("el");
 
   /**
-   * The underlying `<zitadel-auth-logout>` custom element, or `null` before the view is
+   * The underlying `<zitadel-logout>` custom element, or `null` before the view is
    * initialized.
    *
    * Use it for what the inputs do not cover, such as calling a method on the element or attaching

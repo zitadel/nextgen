@@ -103,7 +103,7 @@ at `/login`. The `beforeLoad` guard above keeps the route from rendering at all.
 
 ### 3. Render the login widget
 
-Use the typed React wrappers from the `/react` entry. They are
+Use the typed React wrappers from the `/components` entry. They are
 `@zitadel/sdk-react`'s components, rendered on the client only: on the server and
 during hydration they render nothing, and right after hydration they mount the
 widget with every prop in place, so it never starts a flow with its defaults.
@@ -134,10 +134,10 @@ export function ProfilePage() {
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
 `onSignout` on `ZitadelLogout` and `ZitadelSession`. Pass
-`locales={businessLocales}` (also exported from `/react`) to show work-email copy
+`locales={businessLocales}` (also exported from `/components`) to show work-email copy
 for a business audience.
 
-`/react` also exports every type `@zitadel/sdk-react` does, so a callback can be
+`/components` also exports every type `@zitadel/sdk-react` does, so a callback can be
 typed without installing `@zitadel/sdk-react`:
 
 ```tsx

@@ -614,6 +614,7 @@ const staleOnRemoval: readonly string[] = ["title"];
 // reaches its element through the component's `getElement()`, the way a consumer
 // does after `bind:this`. `update` renders it again with other attributes.
 async function mountWidget(widget: WidgetName, attributes: Attributes) {
+  configureZitadel(project);
   const propsOf = ({ style, hidden, ...rest }: Attributes) => {
     // Svelte takes the style as a string.
     const declarations = typeof style === "string" ? Object.entries(cssProperties(style)) : [];
@@ -641,6 +642,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

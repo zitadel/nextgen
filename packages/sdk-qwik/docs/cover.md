@@ -48,7 +48,7 @@ component's JSX, not built at render time from a tag name. What happens where:
   `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout`, so a
   QRL that had not yet run could be cut off by the page unloading. The wrapper
   therefore passes the promise the callback returns to the event's `waitUntil`
-  (see `ZitadelNavigationDetail`), and the widget waits for it, for at most two
+  (the detail's `waitUntil` hook), and the widget waits for it, for at most two
   seconds, before it navigates. A callback that returns nothing delays nothing.
 - **Early events.** Under SSR a widget that boots from `resume-flow-id` can reach
   a terminal step before the wrapper's listeners are attached. A small buffer
@@ -74,4 +74,5 @@ that each component renders its attributes.
   has installation, setup and the proxy configuration.
 - Start with [[ZitadelLogin]] and [[ZitadelLoginProps]], then
   [[ZitadelSession]] and [[ZitadelLogout]].
-- For server-side session handling in Qwik Router, see `@zitadel/sdk-qwik-router`.
+- In Qwik Router, `@zitadel/sdk-qwik-router` handles the server-side session and also
+  re-exports these widgets from `@zitadel/sdk-qwik-router/components`, so that one package is enough.

@@ -32,7 +32,7 @@ The widgets talk to your auth backend through the same-origin `/__nextgen` proxy
 
 The server entries run on Cloudflare Workers and Vercel Edge. The middleware needs no Node built-ins: it verifies the JWT with the Web Crypto API, reaches the backend with `fetch`, and reads `process.env` only when `process` exists, so omitting `url` or `projectSecret` falls back to defaults instead of throwing. It is exercised in the package's edge test with the client address supplied through `clientAddress`, since an edge runtime hands the address over rather than the middleware reading a header.
 
-The `/react` entry loads without a DOM: `@zitadel/components` has an edge build with no element definitions, importing it does nothing there, and the components render nothing on the server in any runtime. So on the edge the server response contains the page without the widgets, and the widgets appear once the browser has hydrated.
+The `/components` entry loads without a DOM: `@zitadel/components` has an edge build with no element definitions, importing it does nothing there, and the components render nothing on the server in any runtime. So on the edge the server response contains the page without the widgets, and the widgets appear once the browser has hydrated.
 
 ## Where to go next
 

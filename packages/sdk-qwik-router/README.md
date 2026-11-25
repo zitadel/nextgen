@@ -5,7 +5,7 @@ Qwik Router request handler and helpers for Zitadel.
 > **Qwik 2 required.** This SDK peers Qwik 2 — `@qwik.dev/core` and
 > `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City,
 > `@builder.io/qwik-city`), which run on Vite 8. A Qwik 1 app (`@builder.io/qwik`) is not
-> supported: the login widget comes from `@zitadel/sdk-qwik`, which requires
+> supported: the login widget is built on `@zitadel/sdk-qwik`, which requires
 > Qwik 2. Migrate the app to `@qwik.dev/*` first.
 
 ## Installation
@@ -105,13 +105,8 @@ export default component$(() => {
 
 ### 3. Render the login widget
 
-Install the Qwik component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-qwik-router/components` re-exports the widgets of `@zitadel/sdk-qwik`, which the app declares as well.
-Qwik bundles ecosystem packages, so install it as a dev dependency:
-
-```bash
-pnpm add -D @zitadel/sdk-qwik@latest
-```
+Render `ZitadelLogin` from `@zitadel/sdk-qwik-router/components`. It re-exports the widgets of
+`@zitadel/sdk-qwik`, so this one dev dependency is all the app installs.
 
 ```tsx
 import { component$ } from '@qwik.dev/core';

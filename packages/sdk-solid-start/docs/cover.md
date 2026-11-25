@@ -4,8 +4,8 @@ The server half of Zitadel for SolidStart apps. It is a request middleware, not
 a component library: it proxies the browser's calls to your Zitadel server,
 checks the session on every request, and lets your server functions and routes
 ask who is signed in. It is for developers building a SolidStart app that signs
-its users in through Zitadel. The login and sign-out widgets live in
-`@zitadel/sdk-solid`, which this package re-exports from
+its users in through Zitadel. The login and sign-out widgets are built in
+`@zitadel/sdk-solid`, and this package re-exports them from
 `@zitadel/sdk-solid-start/components`, so an app imports everything for
 SolidStart from one package; the middleware supplies what the widgets talk to.
 
@@ -55,7 +55,7 @@ read `process.env` defensively, so they load and run without a DOM or Node
 built-ins on Cloudflare Workers and Vercel Edge. The middleware is exercised
 inside the edge runtime against the built package. Because the entries load no
 custom elements, nothing here needs a browser to import. Anything that does
-need a DOM, such as the widgets, belongs in `@zitadel/sdk-solid`.
+need a DOM, such as the widgets, belongs in the `/components` entry.
 
 ## Where to go next
 

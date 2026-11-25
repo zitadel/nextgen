@@ -177,7 +177,7 @@ function signOutBackend(check: () => Response): { method: string; cookie: string
   return calls;
 }
 
-export type ServeOptions = ZitadelMiddlewareOptions & { projectSecret?: string };
+export type ServeOptions = ZitadelMiddlewareOptions;
 
 export interface ServeInit {
   readonly method?: string;

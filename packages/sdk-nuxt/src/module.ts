@@ -91,6 +91,17 @@ function settingsLookup(rootDir: string): (name: string) => string | undefined {
 }
 
 /**
+ * The options of the Nuxt module: every {@link ZitadelMiddlewareOptions} option except
+ * `projectSecret`.
+ *
+ * Whatever `nuxt.config.ts` holds is written into the build output, so a secret set there would
+ * leak. The module has no `projectSecret` option: the running server reads the secret from
+ * `NUXT_ZITADEL_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. An app that registers the middleware
+ * by hand can still pass `projectSecret` to `createZitadelMiddleware`.
+ */
+type ModuleOptions = Omit<ZitadelMiddlewareOptions, "projectSecret">;
+
+/**
  * The Nuxt module that wires Zitadel sign-in into an app.
  *
  * Add `"@zitadel/sdk-nuxt/module"` to `modules` in `nuxt.config.ts` and configure it under the
@@ -153,106 +164,105 @@ function settingsLookup(rootDir: string): (name: string) => string | undefined {
  *
  * @see {@link ZitadelMiddlewareOptions} for every option and its default.
  */
-const zitadelModule: NuxtModule<ZitadelMiddlewareOptions> =
-  defineNuxtModule<ZitadelMiddlewareOptions>({
-    meta: {
-      name: "@zitadel/sdk-nuxt",
-      configKey: "zitadel",
-    },
-    defaults: {
-      proxyPath: DEFAULT_PROXY_PATH,
-      protectedRoutes: [],
-      loginPath: "/login",
-    },
-    async setup(options, nuxt) {
-      refuseLegacyConfig({
-        env: process.env,
-        nextgen: (nuxt.options as unknown as Record<string, unknown>).nextgen,
-        runtimeConfig: nuxt.options.runtimeConfig as unknown as Record<string, unknown>,
-        publicConfig: nuxt.options.runtimeConfig.public as Record<string, unknown>,
-      });
-      const { resolve, resolvePath: resolveFile } = createResolver(import.meta.url);
-      const setting = settingsLookup(nuxt.options.rootDir);
-      const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;
+const zitadelModule: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
+  meta: {
+    name: "@zitadel/sdk-nuxt",
+    configKey: "zitadel",
+  },
+  defaults: {
+    proxyPath: DEFAULT_PROXY_PATH,
+    protectedRoutes: [],
+    loginPath: "/login",
+  },
+  async setup(options, nuxt) {
+    refuseLegacyConfig({
+      env: process.env,
+      nextgen: (nuxt.options as unknown as Record<string, unknown>).nextgen,
+      runtimeConfig: nuxt.options.runtimeConfig as unknown as Record<string, unknown>,
+      publicConfig: nuxt.options.runtimeConfig.public as Record<string, unknown>,
+    });
+    const { resolve, resolvePath: resolveFile } = createResolver(import.meta.url);
+    const setting = settingsLookup(nuxt.options.rootDir);
+    const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;
 
-      nuxt.options.runtimeConfig.zitadel = {
-        // Only a URL the app set in nuxt.config is kept. The key exists (empty)
-        // so `NUXT_ZITADEL_URL` can set it at runtime; `ZITADEL_URL` is read by
-        // the running server and never baked into the build.
-        url: options.url || (nuxt.options.dev ? setting("ZITADEL_URL") : undefined) || "",
-        // The project a session must belong to for its user to count as signed
-        // in, when set here or through NUXT_ZITADEL_PROJECT_ID. Unset, the
-        // handler takes the public project id the widgets sign users in to,
-        // which NUXT_PUBLIC_ZITADEL_PROJECT_ID sets at runtime, then
-        // ZITADEL_PROJECT_ID at runtime. Nothing is read from the build's
-        // environment here, so a built server is not pinned to it.
-        projectId: options.projectId,
-        // The server middleware proxies this prefix; the plugin hands the same
-        // one to the widgets, so the browser calls the path the server serves.
-        proxyPath,
-        loginPath: options.loginPath ?? "/login",
-        protectedRoutes: options.protectedRoutes ?? [],
-        // Left unset, these take the middleware's defaults; the handler reads
-        // the "" Nitro stores for them as unset.
-        ignoredRoutes: options.ignoredRoutes,
-        allowedAlgorithms: options.allowedAlgorithms,
-        allowedTokenTypes: options.allowedTokenTypes,
-        audience: options.audience,
-        clockSkewMs: options.clockSkewMs,
-        jwksTimeoutMs: options.jwksTimeoutMs,
-        proxyTimeoutMs: options.proxyTimeoutMs,
-        opaqueTokenTimeoutMs: options.opaqueTokenTimeoutMs,
-        jwtKey: options.jwtKey,
-        // Server-only. Never filled from the build environment, which would
-        // copy it into `.output/`: the running server reads it from
-        // `NUXT_ZITADEL_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. Only
-        // `nuxt dev`, which writes no build output, fills it from `.env.local`
-        // that the dev server would not otherwise see.
-        projectSecret: (nuxt.options.dev ? setting("ZITADEL_PROJECT_SECRET") : undefined) ?? "",
-      };
+    nuxt.options.runtimeConfig.zitadel = {
+      // Only a URL the app set in nuxt.config is kept. The key exists (empty)
+      // so `NUXT_ZITADEL_URL` can set it at runtime; `ZITADEL_URL` is read by
+      // the running server and never baked into the build.
+      url: options.url || (nuxt.options.dev ? setting("ZITADEL_URL") : undefined) || "",
+      // The project a session must belong to for its user to count as signed
+      // in, when set here or through NUXT_ZITADEL_PROJECT_ID. Unset, the
+      // handler takes the public project id the widgets sign users in to,
+      // which NUXT_PUBLIC_ZITADEL_PROJECT_ID sets at runtime, then
+      // ZITADEL_PROJECT_ID at runtime. Nothing is read from the build's
+      // environment here, so a built server is not pinned to it.
+      projectId: options.projectId,
+      // The server middleware proxies this prefix; the plugin hands the same
+      // one to the widgets, so the browser calls the path the server serves.
+      proxyPath,
+      loginPath: options.loginPath ?? "/login",
+      protectedRoutes: options.protectedRoutes ?? [],
+      // Left unset, these take the middleware's defaults; the handler reads
+      // the "" Nitro stores for them as unset.
+      ignoredRoutes: options.ignoredRoutes,
+      allowedAlgorithms: options.allowedAlgorithms,
+      allowedTokenTypes: options.allowedTokenTypes,
+      audience: options.audience,
+      clockSkewMs: options.clockSkewMs,
+      jwksTimeoutMs: options.jwksTimeoutMs,
+      proxyTimeoutMs: options.proxyTimeoutMs,
+      opaqueTokenTimeoutMs: options.opaqueTokenTimeoutMs,
+      jwtKey: options.jwtKey,
+      // Server-only. Never filled from the build environment, which would
+      // copy it into `.output/`: the running server reads it from
+      // `NUXT_ZITADEL_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. Only
+      // `nuxt dev`, which writes no build output, fills it from `.env.local`
+      // that the dev server would not otherwise see.
+      projectSecret: (nuxt.options.dev ? setting("ZITADEL_PROJECT_SECRET") : undefined) ?? "",
+    };
 
-      // Expose SDK-initializer values to the client-side plugin so it can
-      // call `configureZitadel()` without hardcoding paths.
-      const publicConfig = nuxt.options.runtimeConfig.public;
-      publicConfig.zitadelProxyPath = proxyPath;
-      // A project id set in `runtimeConfig.public` wins. The key is set even
-      // when empty, so `NUXT_PUBLIC_ZITADEL_PROJECT_ID` can still fill it at
-      // runtime.
-      publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
+    // Expose SDK-initializer values to the client-side plugin so it can
+    // call `configureZitadel()` without hardcoding paths.
+    const publicConfig = nuxt.options.runtimeConfig.public;
+    publicConfig.zitadelProxyPath = proxyPath;
+    // A project id set in `runtimeConfig.public` wins. The key is set even
+    // when empty, so `NUXT_PUBLIC_ZITADEL_PROJECT_ID` can still fill it at
+    // runtime.
+    publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
 
-      addPlugin(resolve("./runtime/plugin"));
-      // Loads the widget elements in the browser, so the app does not depend on
-      // `@zitadel/components` itself. Client-only: registering custom elements
-      // during SSR would break.
-      addPlugin({ src: resolve("./runtime/components.client"), mode: "client" });
-      if (nuxt.options.dev) {
-        // `nuxt dev` pre-bundles the dependencies its startup scan finds from
-        // Nuxt's entry, but the scan stops at the virtual module that lists the
-        // plugins and never reaches the widgets' (lit, lucide and the rest).
-        // Vite then bundles those once a page asks for them, and never when
-        // this package is installed in node_modules: the browser fetches them
-        // file by file. Scanning the plugin too bundles them at startup. Vite
-        // drops an entry that names no file, so the path carries its extension.
-        const componentsPlugin = await resolveFile("./runtime/components.client");
-        extendViteConfig((config) => {
-          config.optimizeDeps ??= {};
-          const { entries = [] } = config.optimizeDeps;
-          config.optimizeDeps.entries = [entries, componentsPlugin].flat();
-        });
-      }
-      // Types the value the plugin above provides. Written into the app's own
-      // `.nuxt/types`, with the locale map spelled out, because the app does not
-      // install `@zitadel/components`, so a type import from it would not resolve.
-      addTypeTemplate({
-        filename: "types/zitadel-business-locales.d.ts",
-        getContents: () => BUSINESS_LOCALES_TYPES,
+    addPlugin(resolve("./runtime/plugin"));
+    // Loads the widget elements in the browser, so the app does not depend on
+    // `@zitadel/components` itself. Client-only: registering custom elements
+    // during SSR would break.
+    addPlugin({ src: resolve("./runtime/components.client"), mode: "client" });
+    if (nuxt.options.dev) {
+      // `nuxt dev` pre-bundles the dependencies its startup scan finds from
+      // Nuxt's entry, but the scan stops at the virtual module that lists the
+      // plugins and never reaches the widgets' (lit, lucide and the rest).
+      // Vite then bundles those once a page asks for them, and never when
+      // this package is installed in node_modules: the browser fetches them
+      // file by file. Scanning the plugin too bundles them at startup. Vite
+      // drops an entry that names no file, so the path carries its extension.
+      const componentsPlugin = await resolveFile("./runtime/components.client");
+      extendViteConfig((config) => {
+        config.optimizeDeps ??= {};
+        const { entries = [] } = config.optimizeDeps;
+        config.optimizeDeps.entries = [entries, componentsPlugin].flat();
       });
-      addServerHandler({
-        middleware: true,
-        handler: resolve("./runtime/server/handler"),
-      });
-      addImportsDir(resolve("./runtime/composables"));
-    },
-  });
+    }
+    // Types the value the plugin above provides. Written into the app's own
+    // `.nuxt/types`, with the locale map spelled out, because the app does not
+    // install `@zitadel/components`, so a type import from it would not resolve.
+    addTypeTemplate({
+      filename: "types/zitadel-business-locales.d.ts",
+      getContents: () => BUSINESS_LOCALES_TYPES,
+    });
+    addServerHandler({
+      middleware: true,
+      handler: resolve("./runtime/server/handler"),
+    });
+    addImportsDir(resolve("./runtime/composables"));
+  },
+});
 
 export default zitadelModule;

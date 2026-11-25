@@ -64,6 +64,7 @@ The module also loads the web components in the browser through a client-only
 plugin and provides the business copy overlay as
 `useNuxtApp().$zitadelBusinessLocales`. Do not install or import
 `@zitadel/components` in the app.
+The typed Vue wrappers come from `@zitadel/sdk-nuxt/components`, so one package is enough.
 
 Login and logout pages bind the project handle from `useZitadelProject()` inside
 `<ClientOnly>`; navigation after each flow is driven by the URL props (there is

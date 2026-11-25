@@ -1,5 +1,9 @@
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GetSessionOptions as CoreGetSessionOptions } from "@zitadel/sdk-core/session";
+
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+
+import type { GetSessionOptions } from "../session";
 
 import { getSession } from "../session";
 
@@ -85,5 +89,11 @@ describe("getSession()", () => {
 
     await expect(getSession()).rejects.toThrow(/auth\(\)/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("GetSessionOptions", () => {
+  it("is the type of @zitadel/sdk-core", () => {
+    expectTypeOf<GetSessionOptions>().toEqualTypeOf<CoreGetSessionOptions>();
   });
 });

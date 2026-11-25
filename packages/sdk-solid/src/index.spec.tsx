@@ -21,7 +21,8 @@ import {
   type WidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 
 import {
   businessLocales,
@@ -497,6 +498,7 @@ const staleOnRemoval: readonly string[] = [];
 // again with other attributes.
 async function mountWidget(widget: WidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  configureZitadel(project);
   const [current, setCurrent] = createSignal(attributes);
   const propsOf = ({ style, hidden, ...rest }: Attributes) => ({
     ...rest,
@@ -520,6 +522,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

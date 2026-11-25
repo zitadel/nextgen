@@ -725,6 +725,14 @@ describe("SDK specs ↔ the contract packages", () => {
         "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
         "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
       ],
+      "describeClientEntry(": [
+        "sdk-next/src/__tests__/client.test.ts",
+        "sdk-nuxt/src/__tests__/client.test.ts",
+        "sdk-sveltekit/src/__tests__/client.test.ts",
+        "sdk-qwik-router/src/__tests__/client.test.ts",
+        "sdk-solid-start/src/__tests__/client.test.ts",
+        "sdk-tanstack-start/src/__tests__/client.test.ts",
+      ],
     },
     "@zitadel/client-sdk-contract": {
       "describeEdgeEntry(": [
@@ -755,13 +763,22 @@ describe("SDK specs ↔ the contract packages", () => {
         "sdk-qwik/src/index.ssr.spec.tsx",
       ],
       // Angular's component tag already is the element that carries the standard
-      // attributes, so its wrapper forwards none and runs neither of these.
+      // attributes, so its wrapper forwards none and runs neither of the two
+      // standard-attribute cases; it runs every other shared case.
       "describeServerStandardAttributes(": [
         "sdk-react/src/index.spec.tsx",
         "sdk-vue/src/components.spec.ts",
         "sdk-svelte/src/index.ssr.spec.ts",
         "sdk-solid/src/index.ssr.spec.tsx",
         "sdk-qwik/src/index.ssr.spec.tsx",
+      ],
+      "describeSharedConfigHelpers(": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-angular/src/lib/components.spec.ts",
+        "sdk-svelte/src/index.spec.ts",
+        "sdk-solid/src/index.spec.tsx",
+        "sdk-qwik/src/index.spec.tsx",
       ],
       "describeStandardAttributes<": [
         "sdk-react/src/index.spec.tsx",
@@ -1033,5 +1050,45 @@ describe("published SDK packages ↔ their contents", () => {
     // A negation only removes what an earlier pattern added, so it must come after `dist`.
     expect(files).toContain("dist");
     expect(files.indexOf("!dist/api-docs")).toBeGreaterThan(files.indexOf("dist"));
+  });
+});
+
+/**
+ * The cases every server SDK writes out in its own middleware test.
+ *
+ * Each block below sits in the middleware test of all six server SDKs, and the text must be the
+ * same in every one. A copy that drifts means one SDK checks something its siblings do not.
+ */
+describe("server SDK middleware tests ↔ the blocks they share", () => {
+  const files = [
+    "sdk-next/src/__tests__/middleware.test.ts",
+    "sdk-nuxt/src/__tests__/server/middleware.test.ts",
+    "sdk-sveltekit/src/__tests__/handle.test.ts",
+    "sdk-qwik-router/src/__tests__/request-handler.test.ts",
+    "sdk-solid-start/src/__tests__/middleware.test.ts",
+    "sdk-tanstack-start/src/__tests__/middleware.test.ts",
+  ];
+  const titles = ["protected routes and encoded paths", "an empty backend URL"];
+
+  /**
+   * Cuts a top-level `describe` block out of a test file.
+   *
+   * @param path - The path of the file below `packages/`.
+   * @param title - The title of the block.
+   * @returns The text of the block, from `describe(` to its closing line.
+   */
+  const blockOf = (path: string, title: string): string => {
+    const source = readFileSync(`${PACKAGES_ROOT}/${path}`, "utf8");
+    const start = source.indexOf(`describe("${title}"`);
+    const end = source.indexOf("\n});\n", start);
+    return start === -1 || end === -1 ? "" : source.slice(start, end + 5);
+  };
+
+  it.each(titles)("%s is in every SDK, word for word", (title) => {
+    const blocks = files.map((path) => blockOf(path, title));
+    expect(blocks[0]).not.toBe("");
+    for (const block of blocks) {
+      expect(block).toBe(blocks[0]);
+    }
   });
 });

@@ -27,6 +27,8 @@ import { ZitadelLogout } from "./zitadel-logout.component";
 import { ZitadelSession } from "./zitadel-session.component";
 
 import { describeServerRenderCases } from "@zitadel/client-sdk-contract/server-render";
+import { describeSharedConfigHelpers } from "@zitadel/client-sdk-contract/config-helpers";
+import * as sdk from "../public-api";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -50,6 +52,8 @@ const outputOf = (instance: object, event: string): SubscribableOutput => {
   }
   return output;
 };
+
+describeSharedConfigHelpers(sdk);
 
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -1,7 +1,11 @@
 import "server-only";
 
 import { getZitadelConfig } from "@zitadel/sdk-core/config";
-import { checkOpaqueSessionToken, jwtNamesProject } from "@zitadel/sdk-core/middleware";
+import {
+  checkOpaqueSessionToken,
+  jwtNamesProject,
+  resolveZitadelUrl,
+} from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import { headers } from "next/headers";
 import { cache } from "react";
@@ -28,7 +32,7 @@ import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
  *   projectId: process.env.ZITADEL_PROJECT_ID,
  *   audience: "https://api.example.com",
  * };
- * const auth = await auth(options);
+ * const session = await auth(options);
  * ```
  */
 export type AuthOptions = Pick<
@@ -102,7 +106,7 @@ const checkOpaqueSession = cache(
  * `@zitadel/sdk-next/session` instead, which works on any page.
  *
  * The backend URL comes from `options.url`, else the `ZITADEL_URL` environment variable the
- * middleware reads, else `http://localhost:8080`. Reading `headers()` makes the route dynamic,
+ * middleware reads, else `http://localhost:8080`. An empty value counts as unset. Reading `headers()` makes the route dynamic,
  * so a page that calls this function is rendered per request and cannot be statically generated.
  *
  * This module is server-only. Importing it, or the package root, from a client component fails
@@ -124,11 +128,11 @@ const checkOpaqueSession = cache(
  * import { auth } from "@zitadel/sdk-next/server";
  *
  * export default async function Page() {
- *   const auth = await auth();
- *   if (!auth.isAuthenticated) {
+ *   const session = await auth();
+ *   if (!session.isAuthenticated) {
  *     return <p>Not signed in</p>;
  *   }
- *   return <p>Hello {auth.session.userId}</p>;
+ *   return <p>Hello {session.session.userId}</p>;
  * }
  * ```
  */
@@ -141,7 +145,6 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   }
 
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
     projectId = process.env.ZITADEL_PROJECT_ID ||
       process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ||
       getZitadelConfig()?.projectId,
@@ -152,6 +155,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     jwksTimeoutMs,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+  const url = resolveZitadelUrl(options.url, process.env.ZITADEL_URL);
 
   if (!projectId) {
     warnMissingProject();

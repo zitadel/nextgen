@@ -54,7 +54,7 @@ function mountWithInstanceRef(
 } {
   const captured = shallowRef<{ element: HTMLElement | null } | null>(null);
   const parent = defineComponent({
-    setup: () => () => h(child, { ref: captured }),
+    setup: () => () => h(child, { ref: captured, project }),
   });
   const { container } = render(parent);
   return { captured, container };
@@ -627,6 +627,7 @@ const staleOnRemoval: readonly string[] = [];
 // `update` renders it again with other attributes.
 async function mountWidget(widget: WidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  configureZitadel(project);
   const current = shallowRef(attributes);
   const captured = shallowRef<{ element: HTMLElement | null } | null>(null);
   const parent = defineComponent({
@@ -649,6 +650,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

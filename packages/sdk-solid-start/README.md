@@ -125,12 +125,8 @@ export default function Profile() {
 
 ### 3. Render the login widget
 
-Install the Solid component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-solid-start/components` re-exports the widgets of `@zitadel/sdk-solid`, which the app declares as well:
-
-```bash
-pnpm add @zitadel/sdk-solid@latest
-```
+Render `ZitadelLogin` from `@zitadel/sdk-solid-start/components`. It re-exports the widgets of
+`@zitadel/sdk-solid`, so this one package is all the app installs.
 
 Load it with SolidStart's `clientOnly`, so the widget is created in the browser
 with its config in place: its config is set as element properties, which
@@ -158,8 +154,8 @@ export default function Login() {
 ```
 
 Pass `projectId` / `proxyPath` as props rather than a `configureZitadel`
-handle: building the handle means importing `@zitadel/sdk-solid` at module
-scope, outside the client-only boundary.
+handle: building the handle means importing `@zitadel/sdk-solid-start/components` at
+module scope, outside the client-only boundary.
 
 `ZitadelSession` renders the signed-in "signed in as" card with a sign-out
 button, and `ZitadelLogout` a sign-out control on its own. Load them the same

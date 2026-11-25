@@ -27,9 +27,8 @@ from one package.
 
 ## How it works
 
-The hook renders no markup. The widgets, which the components entry re-exports,
-are separate from it. The hook sits in
-front of every request:
+The hook renders no markup. The widgets come from the components entry, which
+re-exports them. The hook sits in front of every request:
 
 - `/__nextgen/*` is forwarded to your Zitadel server, so the browser only ever
   talks to your own origin. The project secret is attached as the bearer on
@@ -55,7 +54,7 @@ imports no Node module and needs no DOM, and it reads `process.env` only if
 `process` exists. It therefore loads and runs on Cloudflare Workers and other
 edge adapters, and the package's edge spec runs it against the built output.
 The client entry only re-exports the API configuration helpers and renders
-nothing.
+nothing, and so does the server entry. Only the components entry holds widgets.
 
 ## Where to go next
 

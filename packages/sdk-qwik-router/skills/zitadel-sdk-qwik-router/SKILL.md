@@ -15,7 +15,7 @@ A Qwik Router request handler and helpers that add Zitadel auth to a
 Qwik 2 app. The handler proxies auth traffic same-origin under `/__nextgen`,
 verifies the session JWT via JWKS on the server, stores the result on
 `requestEvent.sharedMap`, and redirects unauthenticated requests on protected
-routes. The package is server-only; the widgets come from `@zitadel/sdk-qwik`.
+routes. It also re-exports the widgets from `/components`, so one package is enough.
 
 ## When to use
 
@@ -29,8 +29,6 @@ adjusting a scaffolded wiring.
 
 ```bash
 pnpm add -D @zitadel/sdk-qwik-router@latest
-# the login/logout/session widgets are a separate package:
-pnpm add -D @zitadel/sdk-qwik@latest
 ```
 
 Install both as **dev dependencies**: Qwik bundles `devDependencies` into the
@@ -77,7 +75,7 @@ export const useUser = routeLoader$((ev) => {
 all without a session, export a loader like this one from the route itself —
 Qwik Router runs it on the server for `<Link>` navigation too.
 
-**3. Render the widgets** from `@zitadel/sdk-qwik`:
+**3. Render the widgets** from `@zitadel/sdk-qwik-router/components`:
 
 ```tsx
 import { component$ } from '@qwik.dev/core';
@@ -98,7 +96,7 @@ signed-in card with sign-out, and `<ZitadelLogout>` a sign-out control on its ow
 
 ## Widget props and events
 
-This SDK is server-only. The widgets come from `@zitadel/sdk-qwik`, so read its skill for the widget props and events.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` from `@zitadel/sdk-qwik-router/components` are the `@zitadel/sdk-qwik` widgets, so read its skill for the widget props and events.
 
 ## Read these, don't guess
 
@@ -118,8 +116,8 @@ names and defaults against the installed version rather than assuming.
 - **Dev dependency, not dependency.** Qwik's starter `vite.config.ts` throws if a
   package is listed in both sections, and a regular dependency stays external to
   the server bundle.
-- **`@zitadel/sdk-qwik-router` renders no widgets.** They come from
-  `@zitadel/sdk-qwik`.
+- **Import widgets from `/components`, not `/server` or `/client`.** Those two
+  entries load on edge runtimes and export no widgets.
 - **Env comes from `requestEvent.env`.** Vite loads `.env.local` there, not onto
   `process.env`, so the handler reads it per request.
 - **Client-side `<Link>` navigation skips the handler.** Without a route

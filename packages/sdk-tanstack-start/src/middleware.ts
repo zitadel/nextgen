@@ -7,10 +7,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  nonEmpty,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
+  resolveZitadelUrl,
   serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
@@ -103,23 +105,10 @@ export type ZitadelRequestDecision =
 /**
  * The options accepted by {@link handleZitadelRequest} and {@link createZitadelRequestMiddleware}.
  *
- * It is the shared {@link ZitadelMiddlewareOptions} plus two members that only this adapter
- * needs.
+ * It is the shared {@link ZitadelMiddlewareOptions}, including its `projectSecret`, plus one
+ * member that only this adapter needs.
  */
-export type ZitadelRequestOptions = ZitadelMiddlewareOptions & {
-  /**
-   * The project secret, sent as the bearer on the session handoff only.
-   *
-   * Attaching it to every operation would make the public proxy an open relay with project
-   * authority, so it goes only to the handoff.
-   *
-   * It is attached to the `POST /sessions/exchange` call and to no other proxied operation,
-   * and it is never sent to the browser. A credential the caller supplied is kept instead.
-   * Read it from a server-only environment variable.
-   *
-   * @defaultValue The `ZITADEL_PROJECT_SECRET` environment variable, or none when it is unset.
-   */
-  readonly projectSecret?: string;
+export interface ZitadelRequestOptions extends ZitadelMiddlewareOptions {
   /**
    * The direct client address, appended to the `X-Forwarded-For` chain.
    *
@@ -133,7 +122,7 @@ export type ZitadelRequestOptions = ZitadelMiddlewareOptions & {
    * @defaultValue None, so the chain is forwarded unchanged.
    */
   readonly clientAddress?: string;
-};
+}
 
 /**
  * Builds the headers sent upstream: the request's own, minus hop-by-hop and internal ones.
@@ -360,7 +349,6 @@ export async function handleZitadelRequest(
   options: ZitadelRequestOptions = {},
 ): Promise<ZitadelRequestDecision> {
   const {
-    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -373,9 +361,11 @@ export async function handleZitadelRequest(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
     clientAddress,
   } = options;
+  const url = resolveZitadelUrl(options.url, PROCESS_ENV.ZITADEL_URL);
+  const projectSecret =
+    nonEmpty(options.projectSecret) ?? nonEmpty(PROCESS_ENV.ZITADEL_PROJECT_SECRET);
 
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {

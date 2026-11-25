@@ -341,7 +341,8 @@ type Qrlify<H> = {
  * The props of {@link ZitadelLogin}.
  *
  * It combines the shared sign-in configuration from `@zitadel/sdk-core`, the standard HTML
- * attributes, the `on...$` QRL callbacks derived from the sign-in handlers, and {@link ZitadelLoginProps | ref}.
+ * attributes, the `on...$` QRL callbacks derived from the sign-in handlers, and
+ * `ref`.
  *
  * Supply the project through `project` (the project handle that {@link configureZitadel}
  * returns), or through the discrete `projectId` and `proxyPath` props. The widget uses whichever
@@ -373,7 +374,7 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
      *
      * @example
      * ```tsx
-     * const login = useSignal<HTMLElement>();
+     * const login = useSignal<ZitadelLoginElement>();
      * <ZitadelLogin project={project} ref={login} />;
      * ```
      */
@@ -409,7 +410,6 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  *
  * @example
  * ```tsx
- * import { $ } from "@qwik.dev/core";
  * import { ZitadelLogin } from "@zitadel/sdk-qwik";
  *
  * export default () => (
@@ -475,7 +475,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
  * The props of {@link ZitadelLogout}.
  *
  * It combines the shared sign-out configuration from `@zitadel/sdk-core`, the standard HTML
- * attributes, the `onSignout$` QRL callback, and {@link ZitadelLogoutProps | ref}.
+ * attributes, the `onSignout$` QRL callback, and `ref`.
  *
  * Supply the project through `project` (the project handle that {@link configureZitadel}
  * returns), or through the discrete `projectId` and `proxyPath` props. The widget uses whichever
@@ -514,7 +514,13 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * import { ZitadelLogout } from "@zitadel/sdk-qwik";
  *
  * export default () => (
- *   <ZitadelLogout project={project} postSignOutUrl="/login" onSignout$={async () => clearCache()} />
+ *   <ZitadelLogout
+ *     project={project}
+ *     postSignOutUrl="/login"
+ *     onSignout$={async () => {
+ *       await clearCache();
+ *     }}
+ *   />
  * );
  * ```
  *
@@ -558,7 +564,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
  * The props of {@link ZitadelSession}.
  *
  * It combines the shared session configuration from `@zitadel/sdk-core`, the standard HTML
- * attributes, the `onSignout$` QRL callback, and {@link ZitadelSessionProps | ref}.
+ * attributes, the `onSignout$` QRL callback, and `ref`.
  *
  * Supply the project through `project` (the project handle that {@link configureZitadel}
  * returns), or through the discrete `projectId` and `proxyPath` props. The widget uses whichever

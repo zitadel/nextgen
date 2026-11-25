@@ -12,10 +12,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  nonEmpty,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
+  resolveZitadelUrl,
   serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
@@ -406,7 +408,8 @@ function withNoStore(response: Response): Response {
  *
  * Settings that are left out fall back to the environment. SvelteKit never fills `process.env`
  * from `.env` files, so read the values from `$app/env/private` and pass them in, as in the
- * example. The fallbacks are `ZITADEL_URL` for `url` (then `http://localhost:8080`),
+ * example. An empty value counts as unset. The fallbacks are `ZITADEL_URL` for `url` (then
+ * `http://localhost:8080`),
  * `ZITADEL_PROJECT_SECRET` for `projectSecret`, and `ZITADEL_PROJECT_ID` and then
  * `VITE_ZITADEL_PROJECT_ID` for `projectId`. Without a `projectSecret` the session handoff cannot
  * be exchanged. The values are read once, when the hook is created, so they do not change
@@ -449,11 +452,8 @@ function withNoStore(response: Response): Response {
  * ```
  * @see {@link getAuth}
  */
-export function createZitadelHandle(
-  options: ZitadelMiddlewareOptions & { projectSecret?: string } = {},
-): ZitadelHandle {
+export function createZitadelHandle(options: ZitadelMiddlewareOptions = {}): ZitadelHandle {
   const {
-    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -466,8 +466,10 @@ export function createZitadelHandle(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
+  const url = resolveZitadelUrl(options.url, PROCESS_ENV.ZITADEL_URL);
+  const projectSecret =
+    nonEmpty(options.projectSecret) ?? nonEmpty(PROCESS_ENV.ZITADEL_PROJECT_SECRET);
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL

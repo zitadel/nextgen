@@ -13,7 +13,8 @@
  * from the flight payload. Import it from `@zitadel/sdk-next/server` instead, where the
  * `server-only` guard turns a client-side import into a build error. To seed the context from
  * client-side state, such as a {@link session!getSession | getSession} read, render
- * {@link AuthContextProvider}, which accepts only the token-less {@link ClientAuthResult}.
+ * {@link AuthContextProvider}, which is typed as the token-less {@link ClientAuthResult} and
+ * strips nothing.
  *
  * @example
  * ```tsx

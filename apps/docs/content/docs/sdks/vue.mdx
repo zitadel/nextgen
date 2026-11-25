@@ -139,7 +139,7 @@ Each component event reaches the callback in the last column. The callback recei
 
 ## Render on the server
 
-If your app renders on the server, mount the component on the client only, after hydration. The `ZitadelLogin` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup. Alternatively, use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes. A component that starts before its configuration arrives shows an error instead of the flow.
+If your app renders on the server, mount the component on the client only, after hydration. Or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings: it writes them as the `project-id` and `proxy-path` attributes. Use those hyphenated names only on a raw `<zitadel-login>` element. A component that starts before its configuration arrives shows an error instead of the flow.
 
 ## Check that sign-in works
 
