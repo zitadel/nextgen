@@ -19,22 +19,7 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
     host = document.createElement("div");
     document.body.appendChild(host);
     await cdp().send("WebAuthn.enable");
-    authenticatorId = await addAuthenticator();
-  });
-
-  afterEach(async () => {
-    try {
-      await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
-      await cdp().send("WebAuthn.disable");
-    } finally {
-      host.remove();
-    }
-  });
-
-  async function addAuthenticator(
-    overrides: Record<string, boolean | string> = {},
-  ): Promise<string> {
-    const added = await cdp().send("WebAuthn.addVirtualAuthenticator", {
+    ({ authenticatorId } = await cdp().send("WebAuthn.addVirtualAuthenticator", {
       options: {
         protocol: "ctap2",
         transport: "internal",
@@ -42,11 +27,15 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
         hasUserVerification: true,
         isUserVerified: true,
         automaticPresenceSimulation: true,
-        ...overrides,
       },
-    });
-    return added.authenticatorId;
-  }
+    }));
+  });
+
+  afterEach(async () => {
+    host.remove();
+    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    await cdp().send("WebAuthn.disable");
+  });
 
   function create(props: Partial<ZlPasskey> = {}): ZlPasskey {
     const el = document.createElement("zl-passkey") as ZlPasskey;
@@ -64,9 +53,7 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
     });
   }
 
-  async function register(
-    residentKey: "required" | "discouraged" = "required",
-  ): Promise<{ proof: { id: string; rawId: string; response: { attestationObject?: string } } }> {
+  it("registers a passkey and serialises the attestation into base64url proof", async () => {
     const el = create({
       ceremony: "register",
       method: "passkey_register",
@@ -75,18 +62,14 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
         rp: { name: "example.com" },
         user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
         pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-        authenticatorSelection: { residentKey },
+        authenticatorSelection: { residentKey: "required" },
       },
     });
     const detail = nextEvent<{
       proof: { id: string; rawId: string; response: { attestationObject?: string } };
     }>(el, "zl-passkey-result");
     host.appendChild(el);
-    return await detail;
-  }
-
-  it("registers a passkey and serialises the attestation into base64url proof", async () => {
-    const result = await register();
+    const result = await detail;
 
     const stored = await cdp().send("WebAuthn.getCredentials", { authenticatorId });
     expect(stored.credentials).toHaveLength(1);
@@ -98,7 +81,20 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
   });
 
   it("signs in with the registered discoverable credential", async () => {
-    const registered = await register();
+    const registerEl = create({
+      ceremony: "register",
+      method: "passkey_register",
+      options: {
+        challenge: "AAAA",
+        rp: { name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: { residentKey: "required" },
+      },
+    });
+    const registration = nextEvent<{ proof: { id: string } }>(registerEl, "zl-passkey-result");
+    host.appendChild(registerEl);
+    const registered = await registration;
     const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
     const detail = nextEvent<{
       proof: {
@@ -118,7 +114,23 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
   });
 
   it("signs in with the non-discoverable credential named in allowCredentials", async () => {
-    const registered = await register("discouraged");
+    const registerEl = create({
+      ceremony: "register",
+      method: "passkey_register",
+      options: {
+        challenge: "AAAA",
+        rp: { name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: { residentKey: "discouraged" },
+      },
+    });
+    const registration = nextEvent<{ proof: { id: string; rawId: string } }>(
+      registerEl,
+      "zl-passkey-result",
+    );
+    host.appendChild(registerEl);
+    const registered = await registration;
     const el = create({
       ceremony: "authenticate",
       options: {
@@ -167,7 +179,20 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
   });
 
   it("cancel click aborts a ceremony that is waiting on the authenticator", async () => {
-    await register();
+    const registerEl = create({
+      ceremony: "register",
+      method: "passkey_register",
+      options: {
+        challenge: "AAAA",
+        rp: { name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: { residentKey: "required" },
+      },
+    });
+    const registration = nextEvent(registerEl, "zl-passkey-result");
+    host.appendChild(registerEl);
+    await registration;
     await cdp().send("WebAuthn.setAutomaticPresenceSimulation", {
       authenticatorId,
       enabled: false,
@@ -187,17 +212,31 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
   });
 
   it("signs in with a u2f security key over usb", async () => {
-    const platformAuthenticatorId = authenticatorId;
-    authenticatorId = await addAuthenticator({
-      protocol: "u2f",
-      transport: "usb",
-      hasResidentKey: false,
-      hasUserVerification: false,
+    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    ({ authenticatorId } = await cdp().send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "u2f",
+        transport: "usb",
+        automaticPresenceSimulation: true,
+      },
+    }));
+    const registerEl = create({
+      ceremony: "register",
+      method: "passkey_register",
+      options: {
+        challenge: "AAAA",
+        rp: { name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: { residentKey: "discouraged" },
+      },
     });
-    await cdp().send("WebAuthn.removeVirtualAuthenticator", {
-      authenticatorId: platformAuthenticatorId,
-    });
-    const registered = await register("discouraged");
+    const registration = nextEvent<{ proof: { id: string; rawId: string } }>(
+      registerEl,
+      "zl-passkey-result",
+    );
+    host.appendChild(registerEl);
+    const registered = await registration;
     const el = create({
       ceremony: "authenticate",
       options: {

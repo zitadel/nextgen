@@ -971,19 +971,15 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
   }
 
   afterEach(async () => {
-    try {
-      await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
-      await cdp().send("WebAuthn.disable");
-    } finally {
-      host.remove();
-      stub.restore();
-    }
+    host.remove();
+    stub.restore();
+    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    await cdp().send("WebAuthn.disable");
   });
 
   function mount(): ZitadelLogin {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
-    element.lang = "en";
     element.project = testProject;
     host.appendChild(element);
     return element;
@@ -998,7 +994,7 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
         (call) => call.init?.method === "POST" && call.url.includes("/submit"),
       );
       return calls.length === 2 ? calls : null;
-    }, 5000);
+    });
     const [register, login] = submits.map(
       (call) =>
         JSON.parse(String(call.init?.body)) as {
@@ -1020,12 +1016,12 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
   });
 
   it("shows the step error and submits nothing when user verification fails", async () => {
-    await cdp().send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
     setup([passkeyRegisterStep]);
+    await cdp().send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
     const element = mount();
     const root = element.shadowRoot!;
 
-    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"), 5000);
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"));
     expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
     expect(root.querySelector("zl-passkey")).toBeNull();
     expect(
@@ -1034,22 +1030,21 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
   });
 
   it("shows the step error and submits nothing when the user cancels the prompt", async () => {
+    setup([passkeyRegisterStep]);
     await cdp().send("WebAuthn.setAutomaticPresenceSimulation", {
       authenticatorId,
       enabled: false,
     });
-    setup([passkeyRegisterStep]);
     const element = mount();
     const root = element.shadowRoot!;
 
-    const cancel = await waitFor(
-      () => root.querySelector('zl-button[data-testid="zitadel-passkey-cancel"]'),
-      5000,
+    const cancel = await waitFor(() =>
+      root.querySelector('zl-button[data-testid="zitadel-passkey-cancel"]'),
     );
     const inner = await waitFor(() => (cancel as HTMLElement).shadowRoot?.querySelector("button"));
     (inner as HTMLButtonElement).click();
 
-    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"), 5000);
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"));
     expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
     expect(root.querySelector("zl-passkey")).toBeNull();
     expect(
