@@ -22,6 +22,6 @@ properties:
     minItems: 1
     description: |
       How the user holds `relation`: owning-team access first, then grants to
-      teams, then grants to the user.
+      teams, then grants to the user. Grants of a weaker role are left out.
     items:
       $ref: ../../projects/by_id/members/project-member-source.yaml

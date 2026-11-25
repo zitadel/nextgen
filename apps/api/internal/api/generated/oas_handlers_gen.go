@@ -16952,8 +16952,10 @@ func (s *Server) handleListVariablesRequest(args [0]string, argsEscaped bool, w 
 // handleLookupInvitationRequest handles lookupInvitation operation.
 //
 // Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
-// expiry, and the role the signed-in user already holds on the project as `membership`. A user with a
-// role can neither accept nor decline the invitation.
+// expiry.
+//
+// It also returns the role the signed-in user already holds on the project as `membership`; a user
+// with a role can neither accept nor decline the invitation.
 //
 // Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 // the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).

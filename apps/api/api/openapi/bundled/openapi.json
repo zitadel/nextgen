@@ -9481,7 +9481,7 @@
       "post": {
         "operationId": "lookupInvitation",
         "summary": "Look up an invitation by token",
-        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry, and the role the signed-in user already\nholds on the project as `membership`. A user with a role can neither\naccept nor decline the invitation.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do).\n",
+        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nIt also returns the role the signed-in user already holds on the project\nas `membership`; a user with a role can neither accept nor decline the\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do).\n",
         "tags": [
           "Invitations"
         ],
@@ -23281,7 +23281,7 @@
           "sources": {
             "type": "array",
             "minItems": 1,
-            "description": "How the user holds `relation`: owning-team access first, then grants to\nteams, then grants to the user.\n",
+            "description": "How the user holds `relation`: owning-team access first, then grants to\nteams, then grants to the user. Grants of a weaker role are left out.\n",
             "items": {
               "$ref": "#/components/schemas/project-member-source"
             }

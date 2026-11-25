@@ -51193,7 +51193,7 @@ type InvitationLookupMembership struct {
 	// The user's strongest role on the project. A stronger role includes the weaker ones.
 	Relation InvitationLookupMembershipRelation `json:"relation"`
 	// How the user holds `relation`: owning-team access first, then grants to teams, then grants to the
-	// user.
+	// user. Grants of a weaker role are left out.
 	Sources []ProjectMemberSource `json:"sources"`
 }
 
