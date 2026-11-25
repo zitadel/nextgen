@@ -28,16 +28,16 @@ export interface SourceImport {
 }
 
 /**
- * Whether `found` is the one import a package may take from outside itself: a
- * type-only import of the shared error types, `@/lib/errors`, from the
+ * Whether `found` is the one import a package may take from outside itself: the
+ * shared error vocabulary, `@/lib/errors` (its types and `codeOf`), from the
  * package's own `errors.ts`.
  *
  * @param found - An import of a file under `layer`.
  * @param layer - The package's directory, relative to `src` (for example `lib/backend`).
  * @returns True for that import and nothing else.
  */
-export function isOwnErrorsTypeImport(found: SourceImport, layer: string): boolean {
-  return found.file === `${layer}/errors.ts` && found.target === "lib/errors" && found.typeOnly;
+export function isOwnErrorsImport(found: SourceImport, layer: string): boolean {
+  return found.file === `${layer}/errors.ts` && found.target === "lib/errors";
 }
 
 /**

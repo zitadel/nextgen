@@ -1,4 +1,5 @@
 import {
+  codeOf,
   errorMessage,
   type Categorized,
   type ErrorCategory,
@@ -6,17 +7,6 @@ import {
 } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import type { ServerRecord, StopOutcome } from "@/lib/server/local/internal/lifecycle";
-
-/** The code each kind of failure is reported with, unless a class's condition has one of its own. */
-const CATEGORY_CODES = {
-  invalid: "E_VALIDATION",
-  missing: "E_NOT_FOUND",
-  conflict: "E_CONFLICT",
-  denied: "E_AUTH",
-  unavailable: "E_NETWORK",
-  fault: "E_VALIDATION",
-  unknown: "E_VALIDATION",
-} as const satisfies Record<ErrorCategory, ZitadelErrorCode>;
 
 /**
  * Which piece of advice goes with a failure of the local server: the CLI words
@@ -76,7 +66,7 @@ export class LocalServerError extends Error implements Categorized {
    * its category has unless a class's condition has a code of its own.
    */
   get code(): ZitadelErrorCode {
-    return CATEGORY_CODES[this.category];
+    return codeOf(this.category);
   }
 
   /** The advice that goes with this failure, when the CLI has any. */

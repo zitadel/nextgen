@@ -102,6 +102,29 @@ export type ZitadelErrorCode =
   | "E_NOT_IMPLEMENTED"
   | "E_CANCELLED";
 
+/** The code each kind of failure is reported with, unless a class's condition has one of its own. */
+const CATEGORY_CODES = {
+  invalid: "E_VALIDATION",
+  missing: "E_NOT_FOUND",
+  conflict: "E_CONFLICT",
+  denied: "E_AUTH",
+  unavailable: "E_NETWORK",
+  fault: "E_VALIDATION",
+  unknown: "E_VALIDATION",
+} as const satisfies Record<ErrorCategory, ZitadelErrorCode>;
+
+/**
+ * The code a failure of `category` is reported with, which every package's
+ * base error answers its `code` with unless a class's condition has a code of
+ * its own.
+ *
+ * @param category - What kind of failure it is.
+ * @returns The stable product code of that kind.
+ */
+export function codeOf(category: ErrorCategory): ZitadelErrorCode {
+  return CATEGORY_CODES[category];
+}
+
 /**
  * Maps each {@link ZitadelErrorCode} to the process exit code the CLI
  * returns. The table is the single source of truth for exit semantics so
