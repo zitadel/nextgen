@@ -2,8 +2,7 @@ import type { GetVariable200, ListVariables200 } from "@zitadel/api/generated/mo
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
-import type { ErrorCategory } from "@/lib/errors";
-import { BackendError, BackendNotFoundError } from "@/lib/backend/errors";
+import { BackendForbiddenError, BackendNotFoundError } from "@/lib/backend/errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -85,9 +84,6 @@ export type VariableWritten = Readonly<
  * which is exactly what the `${{ NAME }}` reference syntax can address
  * (ADR 062 §2).
  */
-/** The kinds of failure that mean a value is not there for this caller to read: absent, or not theirs to see. */
-const UNREADABLE_BY_US: ReadonlySet<ErrorCategory> = new Set(["missing", "denied"]);
-
 const NAME_PATTERN = /^\w+$/;
 
 /** Longest name the same schema accepts. */
@@ -588,7 +584,7 @@ export class VariableService extends ApiService {
         kind: "primary",
       })
       .catch((error: unknown): GetVariable200 => {
-        if (error instanceof BackendError && UNREADABLE_BY_US.has(error.category)) {
+        if (error instanceof BackendNotFoundError || error instanceof BackendForbiddenError) {
           return {};
         }
         throw error;
