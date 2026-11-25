@@ -1,53 +1,58 @@
 # ZITADEL NextGen: Writing for marketing
 
-**Status:** Draft for the messaging workshop · 25 November 2026  
-**Scope:** Website, landing pages, launch posts, blog, social copy, video scripts and on-screen text in videos. Read [`README.md`](README.md) first: the voice defined there applies here in full. For text inside the product, use [`product.md`](product.md).
+**Status:** Draft for review · 25 November 2026  
+**Scope:** Website, landing pages, launch posts, blog, social copy, campaigns, video scripts and on-screen video text.
 
-## 1. What marketing writing adds to the voice
+Read the [Company OS brand voice](https://github.com/zitadel/company-os/blob/main/skills/zitadel-brand-voice/SKILL.md) and [NextGen product context](https://github.com/zitadel/company-os/blob/main/strategy/context/nextgen.md) first, then [README.md](README.md). This guide applies those sources; it does not redefine the brand.
 
-| Principle | What it means on the page | Source |
+## 1. Apply the existing brand voice
+
+Use the five Company OS voice attributes as defined in the skill. Expressive and rebellious does not mean hostile; friendly authority does not mean generic corporate reassurance. Use wit, warmth and fresh language when they serve the message. Start with the reader's problem or the command, rather than the company, in line with the skill.
+
+The documented promise, **"You own the experience. Zitadel guards the state."**, remains valid marketing positioning. Do not confuse it with the wording of a project-claim action in the interface.
+
+## 2. Claims and evidence
+
+- Support factual capability, performance, security and comparative claims with evidence appropriate to the claim.
+- On the product front page, follow [website instructions](../../../apps/website/AGENTS.md): state the benefit, then prove it with the product.
+- A demo can show a command, output or real screen. A campaign or video may instead tell a story; it need not put a product proof beside every expressive line.
+- Distinguish current capabilities from direction. Follow the [GTM strategy](https://github.com/zitadel/company-os/blob/main/strategy/gtm-strategy.md) and verify shipped behaviour against the repository. Do not imply planned features are live.
+- Use the prohibited wording and naming guidance from Company OS. Do not create a separate blanket ban on adjectives or expressive punctuation; use them deliberately and avoid unsupported superlatives.
+
+## 3. Examples
+
+| Write | Avoid | Why |
 | --- | --- | --- |
-| **Take a position** | Say what ZITADEL is an alternative to: the complexity of legacy identity tools and vendor lock-in. Name the problem the reader has. | `skills/zitadel-brand-voice` (expressive, rebellious); `company.md` |
-| **Wit that explains** | One sharp image is welcome when it makes a capability clear in a few words. | `positioning.md` |
-| **Start with the problem or the command** | Never start with the company. | `skills/zitadel-brand-voice` |
-| **Claim, then proof, on the same screen** | A headline is followed by the command, the output, or a real screen. | `company.md`; `content-channel-strategy.md` |
-| **Label what is not there yet** | Planned capabilities may appear, marked "Coming soon" at the feature, not as a banner over the whole page. | `marketing/website-launch-strategy.md` |
+| Stop juggling auth providers. | The seamless, robust identity platform. | Names a problem; avoids the skill's banned words. |
+| Give your AI a passport and a leash. | Next-generation AI agent security. | A metaphor can explain identity and limits; do not imply unshipped governance capabilities are available. |
+| You own the experience. Zitadel guards the state. | Generic ownership claims without context | The documented promise has a concrete product meaning. |
+| Agent governance. Coming soon. | Describing a planned capability as available | Distinguishes direction from shipped behaviour; verify timing and approved launch wording. |
 
-## 2. Examples
+The first two examples are drawn from Company OS positioning. The promise is from the NextGen product context.
 
-| Write | Not | Why |
-| --- | --- | --- |
-| "Stop juggling auth providers." | "The seamless, robust identity platform." | Names the reader's problem. No judgment words. |
-| "Give your AI a passport and a leash." | "Next-generation AI agent security." | The image explains identity plus limits. |
-| `npx @zitadel/cli@latest start` with "No account needed" | "Get started in minutes." | The command is the proof. The flag is a checkable fact. |
-| "Agent governance. Coming soon." | Describing a planned capability as available | Honest about the current state. |
+## 4. Format and audience
 
-The first two lines are taken from `strategy/positioning.md`.
+| Medium | Application |
+| --- | --- |
+| Product landing page | Lead with the benefit or problem; demonstrate the product. Follow the website's established narrative. |
+| Product demo | Let real behaviour carry the story. Keep on-screen text readable; preserve actual commands and output. |
+| Launch video or brand campaign | Use narrative, metaphor, pacing and emotional resonance when appropriate. Keep product claims accurate. |
+| Social and blog | Adapt the length and emphasis to the audience and channel; use concrete examples when useful. |
 
-## 3. Images and metaphors
+There is no universal limit on metaphors or sentence count. Choose a form that serves comprehension and the brand. For audience emphasis, consult the [messaging matrix](https://github.com/zitadel/company-os/blob/main/strategy/messaging-matrix.md).
 
-- Allowed: an image that explains what a capability does ("a passport and a leash" for agent identity with limits).
-- Not allowed: an image that only makes something sound better, or one that needs explaining itself.
-- One image per section at most. The line after it is plain.
+## 5. Calls to action
 
-## 4. Calls to action
+Follow the Company OS skill's CTA order and the product context's command guidance. For the NextGen front page, use the verified current command as the primary CTA. Do not copy an outdated command from another product or release. Other formats can use an appropriate CTA from the existing strategy.
 
-In priority order (`skills/zitadel-brand-voice`): the command, "Sign up", "Book a call" for enterprise, "Join our community", "Read the docs". The primary call to action is a command, not a button.
+## 6. Review checklist
 
-## 5. Tone by reader
-
-The voice stays the same. On pages written for one audience, the emphasis shifts (`strategy/messaging-matrix.md`): practical for Davide, blunt for John, technical and specific for Amir, risk-aware for Sarah.
-
-## 6. Checklist
-
-- [ ] The page starts with the reader's problem or the command, not with ZITADEL.
-- [ ] Every claim is followed by a command, an output, or a real screen.
-- [ ] No judgment words (fast, easy, powerful) and none of the banned words in `README.md`.
-- [ ] Any image explains a capability.
-- [ ] Capabilities that are not available are labelled "Coming soon".
-- [ ] Product terms match the [glossary](../glossary.md).
+- [ ] The copy reflects the Company OS brand voice and current product positioning.
+- [ ] Factual claims are supported and planned capabilities are identified honestly.
+- [ ] The creative treatment serves the message and audience.
+- [ ] Commands, product names and domain terms are accurate.
+- [ ] The CTA is appropriate to the channel and current product context.
 
 ## 7. Open decisions
 
-1. The hero line for the launch. `positioning.md` sets "Authenticate Humans. Govern Agents. Secure Everything." Only the first part is available today.
-2. Whether the product promise "You own the experience. Zitadel guards the state." is used in marketing copy. See open decision 3 in `README.md`.
+Confirm the launch hero, naming, canonical commands and planned-capability wording with the relevant owners. No change to Company OS positioning or its brand attributes is proposed.

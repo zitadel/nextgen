@@ -1,7 +1,7 @@
 # ZITADEL NextGen: Writing for the product
 
-**Status:** Working FE handoff · 4 November 2026 · restructured 25 November 2026  
-**Scope:** Shared UX writing for the NextGen Console, hosted login, CLI output, error messages, and docs. This document defines wording principles, not page layouts or application behavior. Read [`README.md`](README.md) first: the voice defined there applies here in full. For website and launch copy, use [`marketing.md`](marketing.md).  
+**Status:** Working FE handoff · 4 November 2026 · revised 25 November 2026  
+**Scope:** Shared UX writing for the NextGen console, login component, CLI prompts and output, and interface error messages. Technical documentation follows [the existing writing rules](../../../apps/docs/AGENTS.md#writing). This document defines wording principles, not page layouts or application behavior. Read [`README.md`](README.md) first: it routes to the existing Company OS brand voice and relevant surface guidance. For website and launch copy, use [`marketing.md`](marketing.md).  
 **Basis:** The voice principles, metaphor decision, and locked glossary supplied by Design. Exact new product-copy choices identified as **Proposed** require design/product approval before becoming implementation requirements.
 
 ## 1. What product writing adds to the voice
@@ -11,10 +11,10 @@
 | Principle | What it means on screen | Source |
 | --- | --- | --- |
 | **Functional, not poetic** | Name actions plainly: *claim*, *join*, *create*. No “make it yours” or “graduation”. | Metaphor decision; manifest: “no marketing language” |
-| **Brief** | Use the fewest words that communicate the meaning. Many screens need only a label and one line. | Manifest: “brief” |
+| **Brief** | Use the fewest words that communicate the meaning. Many screens need only a label and one line; add context where it helps the reader act or understand consequences. | Manifest: “brief” |
 | **Transparent, not explanatory** | Say what an action does and what matters to the user. Do not narrate internal mechanics or approval processes unless relevant to the decision or its consequences. | Manifest: transparency over surprise |
 | **Honest on failure** | Explain what happened and, where possible, what the user can do next. Never alarm or blame. | Manifest: “honest” |
-| **Neutral** | No position, no wit, no images. The reader is in the middle of a task. | Follows from the job of the text, see `README.md` |
+| **Neutral** | Prioritize the task over brand expression. Avoid decorative metaphors or wit that obscures the action. | Follows from the job of the text, see `README.md` |
 
 ## 2. The metaphor decision and what it rules out
 
@@ -24,7 +24,7 @@
 
 **Do not use:**
 
-- Ownership or possession framing such as “make it yours”, “belongs to you”, or “your very own”.
+- Decorative ownership or possession framing such as “make it yours”, “belongs to you”, or “your very own” when it obscures an interface action. Describe actual ownership or permission semantics accurately. The Company OS marketing promise is not affected.
 - “Graduation, not migration” as interface copy. It may remain a design intention, but not user-facing wording.
 - Reassurance paragraphs such as “everything is preserved” or “nothing breaks” when the user does not need that explanation. **Exception:** An actual destructive or consequential action must state its consequences truthfully.
 - Marketing language, congratulatory tone, filler explanations, or exclamation marks.
@@ -36,7 +36,7 @@
 - **Body text:** Usually one short line is enough; often no body text is necessary.
 - **Technical formatting:** Use monospace for commands and identifiers such as `project-river-8421` and `npx zitadel claim`. Preserve the actual identifier; visual truncation must not change its copied value.
 - **Errors:** State the problem and a useful next action, without “Oops”, apologies, blame, or alarm. See the API-error constraint in §6.
-- **Punctuation:** Never use exclamation marks.
+- **Punctuation:** Avoid exclamation marks in routine interface copy; preserve required verbatim output.
 - **One concept, one term:** Align button labels, status text, tooltips, empty states, and documentation with the glossary.
 - **Truth first:** Do not describe a user, connection, policy, release, or deployment as active, linked, available, or configured without evidence.
 
@@ -44,7 +44,7 @@
 
 ### Locked product vocabulary
 
-Use the existing canonical glossary for **project**, **team**, **user**, **claim**, **issuer**, **dashboard**, and **personal team**. These terms are **locked**; this document does not redefine their meanings. **Canonical glossary:** [`docs/design/glossary.md`](../glossary.md). It defines project, team, user, claim, and issuer. It does not yet contain entries for **dashboard** or **personal team**. See open decision 3.
+Use the existing [canonical glossary](../glossary.md) for domain terms, including **project**, **team**, **user**, **claim**, and **issuer**, respecting the status of each entry. **Dashboard** and **personal team** require terminology confirmation; this guide does not establish new glossary entries. See open decision 3.
 
 ### Describe the actual state, not just the absence of a value
 
@@ -63,9 +63,11 @@ Different states are **not** interchangeable:
 
 ## 5. Action labels, navigation & supporting copy
 
+Apply the relevant lessons from [Technical Writing](../../../apps/docs/AGENTS.md#writing): use plain language, short sentences, sentence case for headings, outcome-led task wording, precise terms and concrete recovery steps. Explain unfamiliar concepts when the task requires it, without repeating documentation in the UI. These are proposed UX-writing applications of the existing docs standard; do not apply its procedural imperative to interactive CLI questions or override established component conventions.
+
 - Prefer **verb + object** for actions when the object is not otherwise clear: `Add user`, `Create project`, `View user`, `Replace invitation`.
 - Match labels to actual behavior. A link that opens a User detail should not imply editing; a destructive action must name the action and explain meaningful consequences.
-- Keep a single term for the same action across menus and screens. A **Row Actions Menu** is the vertical ellipsis menu belonging to one row; a **Columns** control configures visible table columns. These are distinct controls.
+- Keep a single term for the same action across equivalent actions in menus and screens. Refer to UI-02 for interaction-pattern naming.
 - Avoid redundant headings, subtitles, and helper paragraphs. Keep helper text when it materially helps users complete the field or understand a limitation.
 - Copy controls should have accessible labels that identify the copied content; use the existing shared feedback pattern for success.
 
@@ -98,7 +100,7 @@ This guide does **not** replace valid technical requirements from `apps/console/
 ## 8. FE acceptance checklist & open decisions
 
 - [ ] The action label matches the actual action and uses the locked vocabulary.
-- [ ] Copy is brief, neutral, and free of marketing metaphors or exclamation marks.
+- [ ] Copy is brief, neutral, task-focused and free of distracting marketing metaphors.
 - [ ] Command and identifier formatting follows shared typography rules.
 - [ ] Empty, not-configured, not-linked, unavailable, and failed-to-load states are not conflated.
 - [ ] API error handling preserves the verbatim returned message required by ADR 030.
@@ -109,6 +111,6 @@ This guide does **not** replace valid technical requirements from `apps/console/
 
 1. Approve or revise exact Authentication-state copy: `Not configured` (password/passkey) versus `None linked` (identity providers).
 2. Confirm the shared naming convention for resource menu actions such as `View user` versus `View details`.
-3. Add **dashboard** and **personal team** to `docs/design/glossary.md`, or remove them from the locked list in §4.
+3. Confirm **dashboard** and **personal team** with the glossary owners; add entries only if approved.
 
 **Workflow:** Draft → Design Review → Approved Specification → Documentation PR → Claude Audit → Implementation.
