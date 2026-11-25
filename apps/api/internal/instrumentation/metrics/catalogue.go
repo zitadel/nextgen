@@ -49,6 +49,14 @@ const (
 
 	AuditInsertDuration = "zitadel.audit.insert.duration"
 	AuditEventsWritten  = "zitadel.audit.events.written"
+
+	JobsTaken           = "zitadel.jobs.taken"
+	JobsCompleted       = "zitadel.jobs.completed"
+	JobsFailed          = "zitadel.jobs.failed"
+	JobsDead            = "zitadel.jobs.dead"
+	JobsExpired         = "zitadel.jobs.expired"
+	JobsPerformDuration = "zitadel.jobs.perform.duration"
+	JobsTakeLag         = "zitadel.jobs.take.lag"
 )
 
 // Attribute keys. The database keys are the semantic convention's; CacheNameKey
@@ -66,6 +74,7 @@ const (
 	OperationKey = attribute.Key("operation")
 	SourceKey    = attribute.Key("source")
 	EventTypeKey = attribute.Key("type")
+	JobNameKey   = attribute.Key("name")
 )
 
 // Kind is the OpenTelemetry instrument type of an instrument.
@@ -369,6 +378,55 @@ func Catalogue() []Instrument {
 			Description: "Audit events handed to storage successfully, by event type. An event written inside a transaction that later rolls back is still counted.",
 			Attributes: []Attribute{
 				{Key: EventTypeKey, Description: "Event type, such as `auth.token.revoked`. Fixed in code."},
+			},
+		},
+		{
+			Name: JobsTaken, Kind: KindCounter, Unit: "{job}",
+			Description: "Jobs leased for Perform by the Engine, by handler name. DeadOnTake expiries are not counted here.",
+			Attributes: []Attribute{
+				{Key: JobNameKey, Description: "Registered handler name, such as `sessions.gc`. Fixed in code."},
+			},
+		},
+		{
+			Name: JobsCompleted, Kind: KindCounter, Unit: "{job}",
+			Description: "Jobs whose Perform succeeded and Complete matched the lease token, by handler name.",
+			Attributes: []Attribute{
+				{Key: JobNameKey, Description: "Registered handler name, such as `sessions.gc`. Fixed in code."},
+			},
+		},
+		{
+			Name: JobsFailed, Kind: KindCounter, Unit: "{job}",
+			Description: "Jobs whose Perform returned an error and Fail was applied, by handler name.",
+			Attributes: []Attribute{
+				{Key: JobNameKey, Description: "Registered handler name, such as `sessions.gc`. Fixed in code."},
+			},
+		},
+		{
+			Name: JobsDead, Kind: KindCounter, Unit: "{job}",
+			Description: "Queued jobs that Fail moved to dead (max_attempts reached), by handler name.",
+			Attributes: []Attribute{
+				{Key: JobNameKey, Description: "Registered handler name, such as `sessions.gc`. Fixed in code."},
+			},
+		},
+		{
+			Name: JobsExpired, Kind: KindCounter, Unit: "{job}",
+			Description: "Queued jobs Take marked dead for past not_after without Perform (DeadOnTake), by handler name.",
+			Attributes: []Attribute{
+				{Key: JobNameKey, Description: "Registered handler name, such as `sessions.gc`. Fixed in code."},
+			},
+		},
+		{
+			Name: JobsPerformDuration, Kind: KindHistogram, Unit: "s",
+			Description: "Duration of one handler Perform, by handler name.",
+			Attributes: []Attribute{
+				{Key: JobNameKey, Description: "Registered handler name, such as `sessions.gc`. Fixed in code."},
+			},
+		},
+		{
+			Name: JobsTakeLag, Kind: KindHistogram, Unit: "s",
+			Description: "Wall time from the job's run_at until Take leased it for Perform, by handler name.",
+			Attributes: []Attribute{
+				{Key: JobNameKey, Description: "Registered handler name, such as `sessions.gc`. Fixed in code."},
 			},
 		},
 		{
