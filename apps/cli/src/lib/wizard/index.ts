@@ -10,6 +10,6 @@
  * its own constructor was given. Nothing here imports the CLI, so the engine can
  * be lifted out unchanged.
  */
-export { WizardError, WizardInternalError } from "./errors";
+export { WizardDefinitionError, WizardError } from "./errors";
 export { EndStep, WizardStep } from "./step";
 export { type RunWatcher, Wizard } from "./wizard";

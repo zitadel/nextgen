@@ -1,3 +1,4 @@
+import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -7,45 +8,12 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
  * What a step throws is not one of these: it passes through as it was thrown,
  * after what had finished is undone.
  */
-export abstract class WizardError extends Error {
-  /** The kind of failure, which the boundary reports it as. */
-  abstract readonly category: ErrorCategory;
-
-  /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  abstract readonly retryable: boolean;
-
-  /** The stable product code the failure is reported with. */
-  abstract readonly code: ZitadelErrorCode;
-
-  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
-  readonly hint?: string | undefined;
-
-  /** Structured facts about the failure, for a `--json` reader. */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * Make a wizard failure.
-   *
-   * @param message - What went wrong.
-   * @param options - The error that caused this one, if any.
-   */
-  constructor(
-    message: string,
-    options: {
-      readonly cause?: unknown;
-    } = {},
-  ) {
-    super(message, options);
-    this.name = new.target.name;
-  }
-}
+export abstract class WizardError extends ZitadelLibError {}
 
 /**
- * The engine's own guard tripped: a wizard that is put together wrongly, such
- * as two steps of one name. It is a defect in the code that built the wizard,
- * not something a person can fix.
+ * Refuses a wizard that is put together wrongly, such as two steps of one name.
  */
-export class WizardInternalError extends WizardError {
+export class WizardDefinitionError extends WizardError {
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";

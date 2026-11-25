@@ -1,4 +1,4 @@
-import { WizardInternalError } from "./errors";
+import { WizardDefinitionError } from "./errors";
 import type { EndStep, WizardStep } from "./step";
 
 /**
@@ -204,7 +204,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
    * @param rest - The observer, if any; or, only when the step needs what is
    *   not known, the argument that names what is missing.
    * @returns The wizard with the step added, knowing what it adds.
-   * @throws {@link WizardInternalError} When a step already has its name.
+   * @throws {@link WizardDefinitionError} When a step already has its name.
    */
   step<Out extends object, Needs extends object>(
     step: WizardStep<string, Out, Needs>,
@@ -268,7 +268,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
    * @param step - The step.
    * @param _unmet - Present only when the step needs what is not known.
    * @returns The wizard with the step added.
-   * @throws {@link WizardInternalError} When a step already has its name.
+   * @throws {@link WizardDefinitionError} When a step already has its name.
    */
   endWhen<Needs extends object>(
     step: EndStep<string, Result, Needs>,
@@ -359,11 +359,11 @@ export class Wizard<Initial extends object, State extends object, Result> {
    *
    * @param key - The name.
    * @returns The names taken, with this one.
-   * @throws {@link WizardInternalError} When the name is taken.
+   * @throws {@link WizardDefinitionError} When the name is taken.
    */
   private claim(key: string): ReadonlySet<string> {
     if (this.keys.has(key)) {
-      throw new WizardInternalError(`The wizard "${this.name}" already has a step "${key}"`);
+      throw new WizardDefinitionError(`The wizard "${this.name}" already has a step "${key}"`);
     }
     return new Set([...this.keys, key]);
   }

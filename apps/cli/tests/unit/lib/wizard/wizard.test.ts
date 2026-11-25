@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EndStep, Wizard, WizardInternalError, WizardStep } from "@/lib/wizard";
+import { EndStep, Wizard, WizardDefinitionError, WizardStep } from "@/lib/wizard";
 
 /**
  * What every run starts from.
@@ -177,7 +177,7 @@ describe("Wizard", () => {
           .step(new Adds([], "first", 2));
       };
 
-      expect(build).toThrow(WizardInternalError);
+      expect(build).toThrow(WizardDefinitionError);
     });
 
     it("names the wizard and the step in the refusal", () => {
