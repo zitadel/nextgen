@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   ZitadelConfigFileBrokenError,
-  ZitadelConfigDeployBlockedError,
+  ZitadelConfigDeployEmptyError,
+  ZitadelConfigDeployTooLargeError,
+  ZitadelConfigFileWrongKindError,
   ZitadelConfigEditBreaksFlowsError,
   CONFIG_DIRECTORIES,
   ZitadelConfigConnectionExistsError,
@@ -130,22 +132,6 @@ describe("ZitadelConfigEditBreaksFlowsError", () => {
         `  - ${FLOW_PATH}: step "password": no such field`,
       ].join("\n"),
     );
-  });
-
-  it("says whether a dry-run deploy would report the same issues", () => {
-    const issues = [issueOn("password", "x")];
-
-    expect(refusalOf(issues).dryRun).toBe(false);
-    expect(
-      new ZitadelConfigEditBreaksFlowsError({
-        file: SCHEMA_PATH,
-        heading: "h",
-        hint: HINT,
-        dryRun: true,
-        issues,
-        kind: "broken",
-      }).dryRun,
-    ).toBe(true);
   });
 
   it("carries the hint it was given", () => {
@@ -382,32 +368,37 @@ describe("ZitadelConfigFileExistsError", () => {
 });
 
 describe("ZitadelConfigFileUnreadableError", () => {
-  it("is an auth failure when the permission is refused", () => {
-    expect(new ZitadelConfigFileUnreadableError("denied", "x.json cannot be read")).toMatchObject({
+  it("is a denied failure when the permission is refused", () => {
+    expect(new ZitadelConfigFileUnreadableError("x.json cannot be read")).toMatchObject({
       category: "denied",
-      reason: "denied",
+      code: "E_AUTH",
     });
-  });
-
-  it("is a conflict when a file stands where a directory is expected", () => {
-    expect(
-      new ZitadelConfigFileUnreadableError("wrong-kind", "x cannot be read (ENOTDIR)"),
-    ).toMatchObject({ category: "conflict", reason: "wrong-kind", code: "E_VALIDATION" });
   });
 });
 
-describe("ZitadelConfigDeployBlockedError", () => {
-  it("is a precondition when there is nothing to deploy", () => {
-    expect(new ZitadelConfigDeployBlockedError("empty", "nothing here")).toMatchObject({
-      category: "invalid",
-      reason: "empty",
+describe("ZitadelConfigFileWrongKindError", () => {
+  it("is a conflict when a file stands where a directory is expected", () => {
+    expect(new ZitadelConfigFileWrongKindError("x cannot be read (ENOTDIR)")).toMatchObject({
+      category: "conflict",
+      code: "E_VALIDATION",
     });
   });
+});
 
-  it("is a validation failure when there is too much to deploy", () => {
-    expect(new ZitadelConfigDeployBlockedError("too-large", "too many")).toMatchObject({
+describe("ZitadelConfigDeployEmptyError", () => {
+  it("is a validation failure when there is nothing to deploy", () => {
+    expect(new ZitadelConfigDeployEmptyError("nothing here")).toMatchObject({
       category: "invalid",
-      reason: "too-large",
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("ZitadelConfigDeployTooLargeError", () => {
+  it("is a validation failure when there is too much to deploy", () => {
+    expect(new ZitadelConfigDeployTooLargeError("too many")).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
     });
   });
 });

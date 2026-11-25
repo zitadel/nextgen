@@ -169,7 +169,6 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
     file: edit.edited.path,
     heading: `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
     hint: disableHint(method, uses),
-    dryRun: true,
     issues: introduced,
     uses,
   });
@@ -210,7 +209,6 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
       file: edit.edited.path,
       heading: "A login flow has errors, so it cannot be checked against the changed schema:",
       hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
-      dryRun: true,
       issues: unchecked,
     });
   }

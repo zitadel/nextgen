@@ -14,7 +14,8 @@ import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
   ZitadelConfigFileBrokenError,
-  ZitadelConfigDeployBlockedError,
+  ZitadelConfigDeployEmptyError,
+  ZitadelConfigDeployTooLargeError,
   ZitadelConfigError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -456,21 +457,13 @@ export class ZitadelConfig {
         return file.kind !== "policy-test";
       }).length;
     if (fileCount === 0) {
-      throw new ZitadelConfigDeployBlockedError(
-        "empty",
-        "There is nothing in .zitadel/ to deploy",
-        {
-          hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
-        },
-      );
+      throw new ZitadelConfigDeployEmptyError("There is nothing in .zitadel/ to deploy", {
+        hint: "Add a schema, flow, policy or branding under .zitadel/.",
+      });
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
-      throw new ZitadelConfigDeployBlockedError(
-        "too-large",
+      throw new ZitadelConfigDeployTooLargeError(
         `A release pins at most ${ZitadelConfig.MAX_BUNDLE_RESOURCES} resources, but .zitadel/ holds ${fileCount}`,
-        {
-          hint: "Remove or merge resources until .zitadel/ holds no more than that, then run the command again.",
-        },
       );
     }
     return { bundle, resourceCount };

@@ -23,6 +23,7 @@ import {
   type ConfigStore,
   DiskStore,
   type ForceOptions,
+  ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigSchemaMissingError,
   type Schemas,
@@ -74,6 +75,34 @@ type SchemaFlags = {
    */
   readonly schema?: string | undefined;
 };
+
+/**
+ * What a change that would break a login flow is refused for, without a
+ * dry run to point at.
+ */
+const EDIT_BREAKS_FLOWS_REFUSAL = {
+  message: "{message}",
+  hint: "{hint}",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/**
+ * What a change that would break a login flow is refused for, when a dry-run
+ * deploy reports the same issues.
+ */
+const EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL = {
+  message: "{message}",
+  hint: "{hint}",
+  details: "{details}",
+  next: [
+    {
+      id: "deploy",
+      flags: {
+        dryRun: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
 
 /**
  * What a schema pointing at an external URL is refused for.
@@ -799,6 +828,18 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         dryRun: true,
       });
     } catch (error) {
+      if (error instanceof ZitadelConfigEditBreaksFlowsError) {
+        throw refusalError(
+          error.hint?.includes("deploy --dry-run")
+            ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
+            : EDIT_BREAKS_FLOWS_REFUSAL,
+          {
+            message: error.message,
+            hint: error.hint ?? "",
+            details: error.details ?? null,
+          },
+        );
+      }
       if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
       }
@@ -847,6 +888,18 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         consent: undefined,
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigEditBreaksFlowsError) {
+        throw refusalError(
+          error.hint?.includes("deploy --dry-run")
+            ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
+            : EDIT_BREAKS_FLOWS_REFUSAL,
+          {
+            message: error.message,
+            hint: error.hint ?? "",
+            details: error.details ?? null,
+          },
+        );
+      }
       if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
       }
@@ -960,12 +1013,28 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async preview({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    return this.previewToggle(
-      target,
-      target.config.schemas.enable(target.schema, this.method),
-      this.method,
-      true,
-    );
+    try {
+      return await this.previewToggle(
+        target,
+        target.config.schemas.enable(target.schema, this.method),
+        this.method,
+        true,
+      );
+    } catch (error) {
+      if (!(error instanceof ZitadelConfigEditBreaksFlowsError)) {
+        throw error;
+      }
+      throw refusalError(
+        error.hint?.includes("deploy --dry-run")
+          ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
+          : EDIT_BREAKS_FLOWS_REFUSAL,
+        {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        },
+      );
+    }
   }
 
   /**
@@ -977,12 +1046,28 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async apply({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    return this.applyToggle(
-      target,
-      target.config.schemas.enable(target.schema, this.method),
-      this.method,
-      true,
-    );
+    try {
+      return await this.applyToggle(
+        target,
+        target.config.schemas.enable(target.schema, this.method),
+        this.method,
+        true,
+      );
+    } catch (error) {
+      if (!(error instanceof ZitadelConfigEditBreaksFlowsError)) {
+        throw error;
+      }
+      throw refusalError(
+        error.hint?.includes("deploy --dry-run")
+          ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
+          : EDIT_BREAKS_FLOWS_REFUSAL,
+        {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        },
+      );
+    }
   }
 }
 

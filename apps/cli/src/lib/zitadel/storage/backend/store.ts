@@ -4,6 +4,7 @@ import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
   ZitadelConfigFileUnreadableError,
+  ZitadelConfigFileWrongKindError,
 } from "@/lib/zitadel/errors";
 import {
   CONFIG_DIRECTORIES,
@@ -36,14 +37,6 @@ const WRITE_FLAG = {
   create: "wx",
   replace: "w",
 } as const satisfies Record<WriteMode, string>;
-
-/** Why a read fails with advice, by the errno that says it. */
-const UNREADABLE_REASONS: Readonly<Record<string, "denied" | "wrong-kind">> = {
-  EACCES: "denied",
-  EPERM: "denied",
-  ENOTDIR: "wrong-kind",
-  EISDIR: "wrong-kind",
-};
 
 /**
  * The configuration as files under a project's `.zitadel/`, kept in whatever
@@ -271,10 +264,9 @@ export abstract class Store implements ConfigStore {
             throw error;
           }
           throw new ZitadelConfigFileUnreadableError(
-            "denied",
             `$file ${JSON.stringify(ref)} cannot be read`,
             {
-              hint: "Check that the referenced file is readable, then run the command again.",
+              hint: "Create the referenced file or fix the path.",
               details: {
                 file: file.path,
                 ref,
@@ -441,17 +433,25 @@ export abstract class Store implements ConfigStore {
    * @returns The error to throw.
    */
   private static unreadable(path: string, code: string | undefined, error: unknown): unknown {
-    const reason = UNREADABLE_REASONS[code ?? ""];
-    if (reason === undefined) {
-      return error;
+    if (code === "EACCES" || code === "EPERM") {
+      return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`, {
+        hint: "Check that the file is readable, then run the command again.",
+        details: {
+          file: path,
+          code,
+        },
+      });
     }
-    return new ZitadelConfigFileUnreadableError(reason, `${path} cannot be read (${code})`, {
-      hint: "Check that the file is readable, then run the command again.",
-      details: {
-        file: path,
-        code,
-      },
-    });
+    if (code === "ENOTDIR" || code === "EISDIR") {
+      return new ZitadelConfigFileWrongKindError(`${path} cannot be read (${code})`, {
+        hint: "Check that the file is readable, then run the command again.",
+        details: {
+          file: path,
+          code,
+        },
+      });
+    }
+    return error;
   }
 
   /**
