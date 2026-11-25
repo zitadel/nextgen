@@ -1098,21 +1098,45 @@ describe("server SDK middleware tests ↔ the blocks they share", () => {
 });
 
 describe("server SDK sources ↔ the default backend URL", () => {
-  const sources = [
-    "sdk-next/src/middleware.ts",
-    "sdk-next/src/auth.ts",
-    "sdk-nuxt/src/runtime/lib/settings.ts",
-    "sdk-sveltekit/src/handle.ts",
-    "sdk-qwik-router/src/request-handler.ts",
-    "sdk-solid-start/src/middleware.ts",
-    "sdk-tanstack-start/src/middleware.ts",
-  ];
+  const serverSdks = readdirSync(PACKAGES_ROOT).filter(
+    (dir) =>
+      dir.startsWith("sdk-") &&
+      existsSync(`${PACKAGES_ROOT}/${dir}/package.json`) &&
+      JSON.parse(readFileSync(`${PACKAGES_ROOT}/${dir}/package.json`, "utf8")).devDependencies?.[
+        "@zitadel/server-sdk-contract"
+      ] !== undefined,
+  );
 
-  it.each(sources)("%s falls back to http://localhost:8080 and no other address", (path) => {
-    const source = readFileSync(`${PACKAGES_ROOT}/${path}`, "utf8");
-    const defaults = [...source.matchAll(/"(http:\/\/localhost:\d+)"/g)].map((match) => match[1]);
-    expect(defaults).not.toEqual([]);
-    for (const address of defaults) {
+  /**
+   * Lists the source files of a package that hold code, without its tests and generated output.
+   *
+   * @param directory - The directory to read.
+   * @returns The paths of the TypeScript files below it.
+   */
+  const sourcesOf = (directory: string): string[] => {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) {
+        return entry.name === "__tests__" ? [] : sourcesOf(path);
+      }
+      return /\.tsx?$/.test(entry.name) && !/\.(spec|test)\./.test(entry.name) ? [path] : [];
+    });
+  };
+
+  it("finds the six server SDKs", () => {
+    expect(serverSdks).toHaveLength(6);
+  });
+
+  it.each(serverSdks)("%s falls back to http://localhost:8080 and no other address", (dir) => {
+    const addresses = sourcesOf(`${PACKAGES_ROOT}/${dir}/src`).flatMap((path) => {
+      const code = readFileSync(path, "utf8")
+        .split("\n")
+        .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
+        .join("\n");
+      return [...code.matchAll(/["'`](http:\/\/localhost:\d+)["'`]/g)].map((match) => match[1]);
+    });
+    expect(addresses).not.toEqual([]);
+    for (const address of addresses) {
       expect(address).toBe("http://localhost:8080");
     }
   });

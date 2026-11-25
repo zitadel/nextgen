@@ -124,7 +124,7 @@ describe("an empty backend URL", () => {
       await new Promise((resolve) => backend.close(resolve));
     }
 
-    expect(requested).not.toEqual([]);
+    expect(requested).toEqual(["/ping"]);
   });
 });
 

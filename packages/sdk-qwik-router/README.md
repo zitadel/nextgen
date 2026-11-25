@@ -141,6 +141,8 @@ work-email copy for a business audience.
 
 ## Handler options
 
+An empty `url` or `projectSecret`, whether in the options or in the environment, counts as unset and falls back to the next source and then to the default (`http://localhost:8080` for `url`). `projectSecret` is a plain option of every server SDK. A route in `protectedRoutes` matches the raw path and the percent-decoded path, so `/%61dmin` is protected like `/admin`.
+
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
 | `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend. A trailing slash is ignored.   |

@@ -158,6 +158,8 @@ The widgets are plain custom elements, so each event is a DOM `CustomEvent` that
 
 ## Surface 2 — direct middleware (hand-rolled)
 
+An empty `url` or `projectSecret`, whether in the options or in the environment, counts as unset and falls back to the next source and then to the default (`http://localhost:8080` for `url`). The Nuxt module takes no `projectSecret`; set `NUXT_ZITADEL_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`, or pass `projectSecret` here. A route in `protectedRoutes` matches the raw path and the percent-decoded path, so `/%61dmin` is protected like `/admin`.
+
 Without the module, create `server/middleware/auth.ts` yourself:
 
 ```ts
