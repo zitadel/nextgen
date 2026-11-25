@@ -32,9 +32,12 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
   });
 
   afterEach(async () => {
-    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
-    await cdp().send("WebAuthn.disable");
-    host.remove();
+    try {
+      await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+      await cdp().send("WebAuthn.disable");
+    } finally {
+      host.remove();
+    }
   });
 
   function create(props: Partial<ZlPasskey> = {}): ZlPasskey {

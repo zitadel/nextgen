@@ -341,8 +341,11 @@ export async function holdPasskeyCeremony(): Promise<() => void | Promise<void>>
     },
   });
   return async () => {
-    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
-    await cdp().send("WebAuthn.disable");
+    try {
+      await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    } finally {
+      await cdp().send("WebAuthn.disable");
+    }
   };
 }
 

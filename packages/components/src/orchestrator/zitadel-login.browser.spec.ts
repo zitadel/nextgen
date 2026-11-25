@@ -971,15 +971,19 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
   }
 
   afterEach(async () => {
-    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
-    await cdp().send("WebAuthn.disable");
-    host.remove();
-    stub.restore();
+    try {
+      await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+      await cdp().send("WebAuthn.disable");
+    } finally {
+      host.remove();
+      stub.restore();
+    }
   });
 
-  async function mount(): Promise<ZitadelLogin> {
+  function mount(): ZitadelLogin {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
+    element.lang = "en";
     element.project = testProject;
     host.appendChild(element);
     return element;
@@ -987,7 +991,7 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
 
   it("registers a passkey, then signs in with it, submitting each real proof", async () => {
     setup([passkeyRegisterStep, passkeyLoginStep, identifierStep]);
-    await mount();
+    mount();
 
     const submits = await waitFor(() => {
       const calls = stub.calls.filter(
@@ -1018,7 +1022,7 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
   it("shows the step error and submits nothing when user verification fails", async () => {
     await cdp().send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
     setup([passkeyRegisterStep]);
-    const element = await mount();
+    const element = mount();
 
     const alert = await waitFor(
       () => element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"),
@@ -1037,7 +1041,7 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
       enabled: false,
     });
     setup([passkeyRegisterStep]);
-    const element = await mount();
+    const element = mount();
 
     const cancel = await waitFor(
       () => element.shadowRoot?.querySelector('zl-button[data-testid="zitadel-passkey-cancel"]'),
