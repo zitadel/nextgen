@@ -1002,7 +1002,7 @@ describe("readSchemaTarget", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
       expect(error).toMatchObject({
-        problems: [expect.objectContaining({ path: ".zitadel/schemas/customers.json" })],
+        message: expect.stringContaining(".zitadel/schemas/customers.json:"),
       });
     });
 
@@ -1017,7 +1017,7 @@ describe("readSchemaTarget", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
       expect(error).toMatchObject({
-        problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
+        message: expect.stringContaining(".zitadel/schemas/employees.json:"),
       });
     });
   });
@@ -1103,9 +1103,7 @@ describe("readSchemaTarget", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
       expect(error).toMatchObject({
-        problems: expect.arrayContaining([
-          expect.objectContaining({ path: ".zitadel/idps/broken.json" }),
-        ]),
+        message: expect.stringContaining(".zitadel/idps/broken.json:"),
       });
     });
   });

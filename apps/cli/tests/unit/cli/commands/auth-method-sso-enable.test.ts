@@ -1350,7 +1350,7 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_NOT_FOUND",
-        hint: expect.stringContaining(".zitadel/flows/"),
+        message: expect.stringContaining(".zitadel/flows/"),
       });
     });
 
@@ -1579,7 +1579,7 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        details: { problems: [expect.objectContaining({ path: LOGIN_FLOW_FILE })] },
+        message: expect.stringContaining(`${LOGIN_FLOW_FILE}:`),
       });
     });
 
