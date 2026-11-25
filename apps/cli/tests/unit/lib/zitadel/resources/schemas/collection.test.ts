@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ZitadelConfigSchemaAmbiguousError,
   ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigEditRefusedError,
+  ZitadelConfigSchemaMissingError,
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
@@ -730,7 +732,7 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve("customer");
       });
 
-      expect(error).toMatchObject({ reason: "ambiguous" });
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaAmbiguousError);
       expect(error).toMatchObject({
         requested: "customer",
         details: { requested: "customer", candidates: ["customer", "customers"] },
@@ -744,10 +746,10 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve();
       });
 
-      expect(error).toMatchObject({ reason: "ambiguous" });
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaAmbiguousError);
       expect(error).toMatchObject({
         requested: undefined,
-        schemas: config.schemas.all,
+        candidates: config.schemas.all,
         details: { requested: null },
       });
     });
@@ -759,7 +761,7 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve("staff.json");
       });
 
-      expect(error).toMatchObject({ reason: "missing" });
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaMissingError);
       expect(error).toMatchObject({
         message: "No user schema is named staff",
         requested: "staff",
@@ -776,10 +778,10 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve("customers");
       });
 
-      expect(error).toMatchObject({ reason: "missing" });
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaMissingError);
       expect(error).toMatchObject({
         message: "There is no user schema under .zitadel/schemas",
-        schemas: [],
+        known: [],
       });
     });
   });

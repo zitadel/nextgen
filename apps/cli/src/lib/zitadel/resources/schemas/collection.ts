@@ -3,8 +3,9 @@ import { basename } from "node:path";
 import { Change, type Notice } from "@/lib/zitadel/change";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
 import {
-  ZitadelConfigSchemaChoiceError,
+  ZitadelConfigSchemaAmbiguousError,
   ZitadelConfigEditLockoutError,
+  ZitadelConfigSchemaMissingError,
 } from "@/lib/zitadel/errors";
 import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/rules/flows";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
@@ -145,19 +146,19 @@ export class Schemas extends PinnedCollection<UserSchema> {
    *
    * @param requested - The name, if any.
    * @returns The schema.
-   * @throws {@link ZitadelConfigSchemaChoiceError} When there is no schema at all, or
+   * @throws {@link ZitadelConfigSchemaMissingError} When there is no schema at all, or
    *   none has the name.
-   * @throws {@link ZitadelConfigSchemaChoiceError} When more than one schema fits, or
+   * @throws {@link ZitadelConfigSchemaAmbiguousError} When more than one schema fits, or
    *   there are several and no name is given.
    */
   resolve(requested?: string): UserSchema {
     const only = this.all[0];
     if (only === undefined) {
-      throw new ZitadelConfigSchemaChoiceError("missing", requested, this.all);
+      throw new ZitadelConfigSchemaMissingError(requested, this.all);
     }
     if (requested === undefined) {
       if (this.all.length > 1) {
-        throw new ZitadelConfigSchemaChoiceError("ambiguous", undefined, this.all);
+        throw new ZitadelConfigSchemaAmbiguousError(undefined, this.all);
       }
       return only;
     }
@@ -168,10 +169,10 @@ export class Schemas extends PinnedCollection<UserSchema> {
     });
     const match = matches[0];
     if (match === undefined) {
-      throw new ZitadelConfigSchemaChoiceError("missing", wanted, this.all);
+      throw new ZitadelConfigSchemaMissingError(wanted, this.all);
     }
     if (matches.length > 1) {
-      throw new ZitadelConfigSchemaChoiceError("ambiguous", wanted, matches);
+      throw new ZitadelConfigSchemaAmbiguousError(wanted, matches);
     }
     return match;
   }

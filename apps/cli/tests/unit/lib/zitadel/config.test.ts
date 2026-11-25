@@ -7,6 +7,7 @@ import {
   Branding,
   CONFIG_DIRECTORIES,
   ZitadelConfigError,
+  ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
   Flow,
   PasswordPolicy,
@@ -798,7 +799,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }], force });
       });
 
-      expect(error).toMatchObject({ selection: expect.anything() });
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
       expect(error).toMatchObject({ path: GOOGLE, selection: googleSelection });
     });
 
@@ -809,7 +810,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toMatchObject({ selection: expect.anything() });
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
       expect(error).toMatchObject({ path: `${CONFIG_DIRECTORIES.connections}/elsewhere.json` });
     });
 
@@ -820,7 +821,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toMatchObject({ selection: expect.anything() });
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
       expect(error).toMatchObject({ path: GOOGLE, selection: googleSelection });
     });
 

@@ -65,6 +65,7 @@ import { tryCatch } from "@/lib/try-catch";
 import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
+  ZitadelConfigConnectionExistsError,
   DiskStore,
   ZitadelConfigFileExistsError,
   PasswordPolicy,
@@ -892,35 +893,35 @@ export function setupRefusal(
   error: unknown,
   connections: readonly ScaffoldedConnection[],
 ): unknown {
+  if (error instanceof ZitadelConfigConnectionExistsError) {
+    return connectionRefusal(error.path, error.selection);
+  }
   if (!(error instanceof ZitadelConfigFileExistsError)) {
     return error;
   }
-  const selection =
-    error.selection ??
-    connections.find((scaffolded) => {
-      return scaffolded.connection.path === error.path;
-    })?.chosen.selection;
-  if (selection !== undefined) {
-    return connectionRefusal(error.path, selection);
+  const planned = connections.find((scaffolded) => {
+    return scaffolded.connection.path === error.path;
+  });
+  if (planned !== undefined) {
+    return connectionRefusal(error.path, planned.chosen.selection);
   }
-
+  if (error.path === PasswordPolicy.PATH) {
+    return new ZitadelError("E_CONFLICT", error.message, {
+      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+      details: error.details,
+    });
+  }
+  if (error.path === SignupPolicy.PATH) {
+    return new ZitadelError("E_CONFLICT", error.message, {
+      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
+      details: error.details,
+    });
+  }
   return new ZitadelError("E_CONFLICT", error.message, {
-    hint: TAKEN_FILE_HINTS[error.path] ?? TAKEN_FILE_HINT,
+    hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
     details: error.details,
   });
 }
-
-/** What to do about a file setup will not write, for the paths that have words of their own. */
-const TAKEN_FILE_HINTS: Readonly<Record<string, string>> = {
-  [PasswordPolicy.PATH]:
-    "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
-  [SignupPolicy.PATH]:
-    "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
-};
-
-/** What to do about any other file setup will not write. */
-const TAKEN_FILE_HINT =
-  "Move the file aside or rerun setup with --force if you want setup to replace it.";
 
 /**
  * The refusal for a provider whose connection file is already there.
