@@ -244,12 +244,12 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
 
     const args = ["manifest", "inspect", image];
     const result = await runDocker(args).catch((error: unknown) => {
-      throw dockerError(`Inspect Docker image ${image}`, args, error);
+      throw dockerError(`Inspect Docker image ${image}`, error);
     });
     if (result.status === 0) {
       return "remote";
     }
-    throw dockerError(`Inspect Docker image ${image}`, args, result);
+    throw dockerError(`Inspect Docker image ${image}`, result);
   }
 
   /**
@@ -430,10 +430,10 @@ async function requireDocker(
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
   const result = await runDocker(args, env).catch((error: unknown) => {
-    throw dockerError(action, args, error);
+    throw dockerError(action, error);
   });
   if (result.status !== 0) {
-    throw dockerError(action, args, result);
+    throw dockerError(action, result);
   }
   return result;
 }
@@ -444,7 +444,7 @@ async function requireDocker(
 async function imageExists(image: string): Promise<boolean> {
   const args = ["image", "inspect", image];
   const result = await runDocker(args).catch((error: unknown) => {
-    throw dockerError(`Inspect Docker image ${image}`, args, error);
+    throw dockerError(`Inspect Docker image ${image}`, error);
   });
   return result.status === 0;
 }
@@ -461,22 +461,15 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
 }
 
 /**
- * Wraps a failed `docker` call, keeping its command and stderr for whoever is debugging.
+ * Wraps a failed `docker` call, keeping what it printed for whoever is debugging.
  */
-function dockerError(action: string, args: string[], cause: unknown): LocalServerDockerFailedError {
+function dockerError(action: string, cause: unknown): LocalServerDockerFailedError {
   if (cause && typeof cause === "object" && "stderr" in cause) {
-    return new LocalServerDockerFailedError(`${action} failed`, {
-      details: {
-        command: ["docker", ...args],
-        stderr: String((cause as { stderr?: unknown }).stderr),
-      },
-    });
+    return new LocalServerDockerFailedError(
+      `${action} failed: ${String((cause as { stderr?: unknown }).stderr)}`,
+      cause,
+    );
   } else {
-    return new LocalServerDockerFailedError(`${action} failed`, {
-      details: {
-        command: ["docker", ...args],
-        cause,
-      },
-    });
+    return new LocalServerDockerFailedError(`${action} failed`, cause);
   }
 }

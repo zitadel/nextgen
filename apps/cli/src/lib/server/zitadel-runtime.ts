@@ -206,15 +206,11 @@ export abstract class ZitadelRuntime {
    */
   static origin(value: string): string {
     if (!URL.canParse(value)) {
-      throw new LocalServerUrlInvalidError(`Invalid server "${value}"`, {
-        hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
-      });
+      throw new LocalServerUrlInvalidError(`Invalid server "${value}"`);
     }
     const url = new URL(value);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new LocalServerUrlInvalidError(`Server URL must use http(s): ${value}`, {
-        hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
-      });
+      throw new LocalServerUrlInvalidError(`Server URL must use http(s): ${value}`);
     }
     return url.origin;
   }
@@ -801,12 +797,9 @@ export class LocalRuntime extends ZitadelRuntime {
       }
     }
     if (resolve(nearest.dir) !== resolve(cwd)) {
-      throw new LocalServerNotRespondingElsewhereError({
-        server_url: runtime.server_url,
-        directory: nearest.dir,
-      });
+      throw new LocalServerNotRespondingElsewhereError(runtime.server_url, nearest.dir);
     }
-    throw localServerNotRunning(runtime.server_url, nearest.dir);
+    throw localServerNotRunning(runtime.server_url);
   }
 
   /**
@@ -854,12 +847,7 @@ export class LocalRuntime extends ZitadelRuntime {
         return result.stop_result.status === "failed";
       })
     ) {
-      throw new LocalServerProcessesStopError("Some managed local runtime processes did not stop", {
-        details: {
-          supported: true,
-          results,
-        },
-      });
+      throw new LocalServerProcessesStopError("Some managed local runtime processes did not stop");
     }
     return { supported: true, results };
   }
@@ -1299,11 +1287,6 @@ export class LocalRuntime extends ZitadelRuntime {
         if (recordExists) {
           throw new LocalServerProcessesUnlistableError(
             "The local runtime record cannot be read and the machine's processes cannot be listed",
-            {
-              details: {
-                error: discovery.error,
-              },
-            },
           );
         }
       }
@@ -1340,11 +1323,7 @@ export class LocalRuntime extends ZitadelRuntime {
           return orphan.stop_result.status === "failed";
         })
       ) {
-        throw new LocalServerOrphansStopError("Local Zitadel server did not stop", {
-          details: {
-            stop_results: orphans,
-          },
-        });
+        throw new LocalServerOrphansStopError("Local Zitadel server did not stop");
       }
     }
     await removeLocalData(this.cwd);
@@ -1441,7 +1420,7 @@ export class LocalRuntime extends ZitadelRuntime {
     if (runtime?.backend === "binary") {
       const outcome = await this.directory.processes.stopRecord(runtime);
       if (outcome.status === "failed") {
-        throw new LocalServerStopError("Local Zitadel server did not stop", runtime, outcome);
+        throw new LocalServerStopError("Local Zitadel server did not stop");
       }
       return { runtime, stopped: outcome.status !== "stale", outcome };
     }

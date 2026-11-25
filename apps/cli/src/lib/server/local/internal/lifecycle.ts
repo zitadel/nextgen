@@ -13,6 +13,7 @@
 import {
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
@@ -303,6 +304,7 @@ export class Lifecycle<R extends ServerRecord> {
           requested === undefined &&
           attempt < PORT_RACE_RETRIES &&
           !(error instanceof LocalServerStopError) &&
+          !(error instanceof LocalServerStartCleanupFailedError) &&
           !(error instanceof LocalServerStartTimeoutError) &&
           !(await this.deps.ports.isFree(claim.port))
         ) {
@@ -341,7 +343,7 @@ export class Lifecycle<R extends ServerRecord> {
     } catch (error) {
       const outcome = await this.terminateQuietly(record);
       if (outcome.status === "failed") {
-        throw new LocalServerStopError("The server did not stop", record, outcome);
+        throw new LocalServerStopError("The server did not stop");
       }
       throw error;
     }
@@ -356,7 +358,7 @@ export class Lifecycle<R extends ServerRecord> {
     }
   }
 
-  /** Launches on the port and waits until it is ready; throws {@link LocalServerStartExitedError} or {@link LocalServerStartTimeoutError} if it does not become so. */
+  /** Launches on the port and waits until it is ready; throws {@link LocalServerStartExitedError}, {@link LocalServerStartTimeoutError} or {@link LocalServerStartCleanupFailedError} if it does not become so. */
   private async launchAndWait(port: number): Promise<Launched<R>> {
     const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
     await this.save(record);
@@ -365,6 +367,7 @@ export class Lifecycle<R extends ServerRecord> {
     } catch (error) {
       if (
         !(error instanceof LocalServerStartExitedError) &&
+        !(error instanceof LocalServerStartCleanupFailedError) &&
         !(error instanceof LocalServerStartTimeoutError)
       ) {
         // Something other than the server failing (a probe that threw): the
@@ -405,7 +408,7 @@ export class Lifecycle<R extends ServerRecord> {
   private async terminate(record: R): Promise<StopOutcome> {
     const outcome = await this.deps.launcher.terminate(record);
     if (outcome.status === "failed") {
-      throw new LocalServerStopError("The server did not stop", record, outcome);
+      throw new LocalServerStopError("The server did not stop");
     }
     return outcome;
   }
@@ -444,27 +447,24 @@ export class Lifecycle<R extends ServerRecord> {
   private async startFailure(
     reason: "exited" | "timeout",
     record: R,
-  ): Promise<LocalServerStartExitedError<R> | LocalServerStartTimeoutError<R>> {
+  ): Promise<
+    LocalServerStartExitedError | LocalServerStartTimeoutError | LocalServerStartCleanupFailedError
+  > {
     // The log goes first: cleaning up may remove it with the server.
     const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => {
       return undefined;
     });
-    const cleanup = await this.terminateQuietly(record);
+    const outcome = await this.terminateQuietly(record);
+    const logged = logTail ? `\nThe server logged:\n${logTail}` : "";
 
-    if (reason === "exited") {
-      return new LocalServerStartExitedError(
-        record,
-        cleanup,
-        this.deps.launcher.describe(record),
-        logTail,
+    if (outcome.status === "failed") {
+      return new LocalServerStartCleanupFailedError(
+        `The server did not become healthy and is still running${logged}`,
       );
+    } else if (reason === "exited") {
+      return new LocalServerStartExitedError(`The server exited before it became healthy${logged}`);
     } else {
-      return new LocalServerStartTimeoutError(
-        record,
-        cleanup,
-        this.deps.launcher.describe(record),
-        logTail,
-      );
+      return new LocalServerStartTimeoutError(`The server did not become healthy in time${logged}`);
     }
   }
 }

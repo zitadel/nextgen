@@ -98,11 +98,6 @@ export async function adminSessionCookie(
   if (!res.ok || !cookie) {
     throw new LocalServerAdminSessionError(
       `Local admin session exchange failed (${String(res.status)})`,
-      {
-        details: {
-          status: res.status,
-        },
-      },
     );
   }
   return cookie;
@@ -121,11 +116,6 @@ async function signIn(
   if (!runtime) {
     throw new LocalServerAdminPlatformMissingError(
       "The local server does not host the platform project, so the local admin cannot sign in",
-      {
-        details: {
-          server_url: serverUrl,
-        },
-      },
     );
   }
   const client = createZitadelClient({

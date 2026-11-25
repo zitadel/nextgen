@@ -4,12 +4,9 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { errorMessage } from "@/lib/errors";
 import {
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
-  LocalServerInternalError,
-  LocalServerRecordMalformedElsewhereError,
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
 } from "@/lib/server/errors";
@@ -283,13 +280,7 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
       return false;
     }
-    throw new LocalServerRecordUnreadableError(`${path} cannot be read`, path, {
-      details: {
-        path,
-        cause: errorMessage(error),
-      },
-      cause: error,
-    });
+    throw new LocalServerRecordUnreadableError(`${path} cannot be read`, error);
   }
 }
 
@@ -347,24 +338,14 @@ export async function readNearestRuntimeMetadata(
   if (!dir) {
     return undefined;
   }
-  try {
-    const runtime = await readRuntimeMetadata(dir);
-    if (runtime) {
-      return {
-        dir,
-        runtime,
-      };
-    } else {
-      return undefined;
-    }
-  } catch (error) {
-    if (error instanceof LocalServerRecordMalformedError && resolve(dir) !== resolve(cwd)) {
-      throw new LocalServerRecordMalformedElsewhereError(error.message, dir, {
-        details: error.details,
-        cause: error,
-      });
-    }
-    throw error;
+  const runtime = await readRuntimeMetadata(dir);
+  if (runtime) {
+    return {
+      dir,
+      runtime,
+    };
+  } else {
+    return undefined;
   }
 }
 
@@ -389,7 +370,7 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
   }
 
   const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
-  return normalizeRuntimeMetadata(parsed, cwd);
+  return normalizeRuntimeMetadata(parsed);
 }
 
 export async function writeRuntimeMetadata(cwd: string, metadata: RuntimeMetadata): Promise<void> {
@@ -433,28 +414,20 @@ export async function checkLocalServerHealth(
 
 /**
  * The error for a directory with no running server of its own. With a
- * `serverUrl` there is a record whose server is not running, and `directory`
- * is the folder that holds the record (a parent, when `start` ran there);
- * without one there is no record in the directory or a parent. Nothing falls
- * back to another directory's server on its own.
+ * `serverUrl` there is a record whose server is not running; without one
+ * there is no record in the directory or a parent. Nothing falls back to
+ * another directory's server on its own.
  *
  * @param serverUrl - The address the record names, when there is a record.
- * @param directory - The folder that holds the record.
  * @returns The error.
  */
 export function localServerNotRunning(
   serverUrl?: string,
-  directory?: string,
 ): LocalServerNotRespondingError | LocalServerNotRunningError {
   if (serverUrl) {
-    return new LocalServerNotRespondingError({
-      server_url: serverUrl,
-      directory,
-    });
+    return new LocalServerNotRespondingError(serverUrl);
   } else {
-    return new LocalServerNotRunningError({
-      server_url: serverUrl,
-    });
+    return new LocalServerNotRunningError();
   }
 }
 
@@ -475,10 +448,7 @@ async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   }
 }
 
-function normalizeRuntimeMetadata(
-  input: Record<string, unknown>,
-  directory: string,
-): RuntimeMetadata {
+function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetadata {
   if (
     input.schema_version !== 1 ||
     typeof input.port !== "number" ||
@@ -489,7 +459,7 @@ function normalizeRuntimeMetadata(
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
   ) {
-    throw malformedRuntime(input, directory);
+    throw malformedRuntime();
   }
 
   const backend = [input.backend, "docker"].find((value) => {
@@ -516,7 +486,7 @@ function normalizeRuntimeMetadata(
       typeof input.server_package !== "string" ||
       typeof input.server_version !== "string"
     ) {
-      throw malformedRuntime(input, directory);
+      throw malformedRuntime();
     }
     return {
       ...base,
@@ -535,7 +505,7 @@ function normalizeRuntimeMetadata(
     typeof input.container_id !== "string" ||
     typeof input.image !== "string"
   ) {
-    throw malformedRuntime(input, directory);
+    throw malformedRuntime();
   }
   return {
     ...base,
@@ -559,11 +529,11 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       continue;
     }
     if (!info.isDirectory()) {
-      throw new LocalServerInternalError(`${current} exists but is not a directory`);
+      throw new Error(`${current} exists but is not a directory`);
     }
     return current;
   }
-  throw new LocalServerInternalError(`${path} has no existing directory above it`);
+  throw new Error(`${path} has no existing directory above it`);
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {
@@ -627,14 +597,6 @@ function explicitUrlPort(value: string): number | undefined {
   }
 }
 
-function malformedRuntime(
-  input: Record<string, unknown>,
-  directory: string,
-): LocalServerRecordMalformedError {
-  return new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`, {
-    details: {
-      ...input,
-      directory,
-    },
-  });
+function malformedRuntime(): LocalServerRecordMalformedError {
+  return new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
 }

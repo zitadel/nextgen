@@ -10,7 +10,6 @@ import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
-import { errorMessage } from "@/lib/errors";
 import { LocalServerBinaryBlockedError, LocalServerBinaryMissingError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
@@ -138,7 +137,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
         },
         stdio: ["ignore", log.fd, log.fd],
       });
-      const pid = await spawned(child, command.command);
+      const pid = await spawned(child);
       return launched<BinaryRuntimeMetadata>({
         schema_version: 1,
         backend: "binary",
@@ -255,13 +254,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return find();
     } catch (error) {
-      throw new LocalServerBinaryMissingError("Zitadel server npm package is not available", {
-        details: {
-          package: SERVER_NPM_PACKAGE,
-          message: errorMessage(error),
-        },
-        cause: error,
-      });
+      throw new LocalServerBinaryMissingError("Zitadel server npm package is not available", error);
     }
   }
 
@@ -509,7 +502,7 @@ async function ps(args: string[]): Promise<string> {
  * unhandled it crashes the CLI with a stack trace, so it is awaited here and
  * turned into an error that says what to do.
  */
-async function spawned(child: ReturnType<typeof spawn>, command: string): Promise<number> {
+async function spawned(child: ReturnType<typeof spawn>): Promise<number> {
   try {
     const pid = await new Promise<number>((resolve, reject) => {
       child.once("error", reject);
@@ -528,13 +521,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
     child.unref();
     return pid;
   } catch (error) {
-    throw new LocalServerBinaryBlockedError("The Zitadel server could not be started", {
-      details: {
-        command,
-        message: errorMessage(error),
-      },
-      cause: error,
-    });
+    throw new LocalServerBinaryBlockedError("The Zitadel server could not be started", error);
   }
 }
 
@@ -542,15 +529,7 @@ function resolveServerPackageManifest(): string {
   try {
     return require.resolve(`${SERVER_NPM_PACKAGE}/package.json`);
   } catch (error) {
-    throw new LocalServerBinaryMissingError(
-      `Missing ${SERVER_NPM_PACKAGE}. Reinstall @zitadel/cli.`,
-      {
-        details: {
-          package: SERVER_NPM_PACKAGE,
-        },
-        cause: error,
-      },
-    );
+    throw new Error(`Missing ${SERVER_NPM_PACKAGE}. Reinstall @zitadel/cli.`, { cause: error });
   }
 }
 
