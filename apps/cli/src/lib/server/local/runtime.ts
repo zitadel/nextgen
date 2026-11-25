@@ -8,7 +8,6 @@ import { errorMessage } from "@/lib/errors";
 import {
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
-  LocalServerFileBlockedError,
   LocalServerInternalError,
   LocalServerRecordMalformedElsewhereError,
   LocalServerRecordMalformedError,
@@ -351,7 +350,10 @@ export async function readNearestRuntimeMetadata(
   try {
     const runtime = await readRuntimeMetadata(dir);
     if (runtime) {
-      return { dir, runtime };
+      return {
+        dir,
+        runtime,
+      };
     } else {
       return undefined;
     }
@@ -557,11 +559,7 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       continue;
     }
     if (!info.isDirectory()) {
-      throw new LocalServerFileBlockedError(`${current} exists but is not a directory`, {
-        details: {
-          path: current,
-        },
-      });
+      throw new LocalServerInternalError(`${current} exists but is not a directory`);
     }
     return current;
   }

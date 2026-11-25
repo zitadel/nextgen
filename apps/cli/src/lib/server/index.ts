@@ -12,7 +12,6 @@ export {
   LocalServerDockerMissingError,
   LocalServerEnvUnreadableError,
   LocalServerError,
-  LocalServerFileBlockedError,
   LocalServerInternalError,
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,

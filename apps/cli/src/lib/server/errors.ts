@@ -591,30 +591,6 @@ export class LocalServerEnvUnreadableError extends LocalServerError {
   }
 }
 
-/** Something that is not a directory is in the way of the local data directory. */
-export class LocalServerFileBlockedError extends LocalServerError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-  override readonly hint: string | undefined = undefined;
-
-  /**
-   * Creates the error.
-   *
-   * @param message - What went wrong.
-   * @param options - The facts behind it (its `path`) and the error that caused it.
-   */
-  constructor(
-    message: string,
-    options: {
-      details?: Readonly<Record<string, unknown>> | undefined;
-      cause?: unknown;
-    } = {},
-  ) {
-    super(message, options);
-  }
-}
-
 /** The server does not know the local admin. */
 export class LocalServerAdminRejectedError extends LocalServerError {
   override readonly category: ErrorCategory = "denied";

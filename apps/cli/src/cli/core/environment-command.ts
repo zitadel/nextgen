@@ -15,6 +15,9 @@ import {
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
+  LocalServerRecordMalformedElsewhereError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
 } from "@/lib/server";
 import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -97,6 +100,42 @@ const LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL = {
     suggested_args: [["start", "--cwd", "{path}"]],
   },
   next: ["{start}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record of this folder is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record of a parent folder is not in the shape it is written in. */
+const RECORD_MALFORMED_ELSEWHERE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
+  details: "{details}",
+  next: ["{reset}", "{start}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record of this folder cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
+  details: "{details}",
 } as const satisfies Refusal;
 
 /**
@@ -225,6 +264,49 @@ export abstract class EnvironmentCommand extends BaseCommand {
             },
           },
         );
+      }
+      if (error instanceof LocalServerRecordMalformedError) {
+        throw refusalError(RECORD_MALFORMED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerRecordMalformedElsewhereError) {
+        throw refusalError(
+          RECORD_MALFORMED_ELSEWHERE_REFUSAL,
+          {
+            message: error.message,
+            details: {
+              ...error.details,
+              suggested_args: [
+                ["reset", "--force", "--cwd", error.directory],
+                ["start", "--cwd", error.directory],
+              ],
+            },
+          },
+          {
+            reset: {
+              id: "reset",
+              flags: {
+                force: true,
+                cwd: error.directory,
+              },
+            },
+            start: {
+              id: "start",
+              flags: {
+                cwd: error.directory,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+          path: Cmd.quote(error.path),
+        });
       }
       throw error;
     }
