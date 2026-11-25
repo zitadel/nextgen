@@ -139,7 +139,9 @@ describe("an empty project secret", () => {
     ["from-option", "from-env", "Bearer from-option"],
   ])("with option %j and environment %j sends %s", async (option, environment, expected) => {
     let authorization: string | undefined;
+    let requested = false;
     const backend = createServer((request, response) => {
+      requested = true;
       authorization = request.headers.authorization;
       response.end("{}");
     });
@@ -157,6 +159,7 @@ describe("an empty project secret", () => {
       await new Promise((resolve) => backend.close(resolve));
     }
 
+    expect(requested).toBe(true);
     expect(authorization).toBe(expected);
   });
 });

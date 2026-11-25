@@ -413,11 +413,10 @@ function withNoStore(response: Response): Response {
  * Settings that are left out fall back to the environment. SvelteKit never fills `process.env`
  * from `.env` files, so read the values from `$app/env/private` and pass them in, as in the
  * example. An empty value counts as unset. The fallbacks are `ZITADEL_URL` for `url` (then
- * `http://localhost:8080`),
- * `ZITADEL_PROJECT_SECRET` for `projectSecret`, and `ZITADEL_PROJECT_ID` and then
- * `VITE_ZITADEL_PROJECT_ID` for `projectId`. Without a `projectSecret` the session handoff cannot
- * be exchanged. The values are read once, when the hook is created, so they do not change
- * afterwards.
+ * `http://localhost:8080`), `ZITADEL_PROJECT_SECRET` for `projectSecret`, and `ZITADEL_PROJECT_ID`
+ * and then `VITE_ZITADEL_PROJECT_ID` for `projectId`. Without a `projectSecret` the session
+ * handoff cannot be exchanged. The values are read once, when the hook is created, so they do not
+ * change afterwards.
  *
  * The hook uses only Web APIs, which are `fetch`, Web Crypto and `AbortSignal.timeout`, and reads
  * `process.env` only when `process` exists. It therefore runs on Cloudflare Workers and other

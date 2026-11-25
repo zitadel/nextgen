@@ -1,14 +1,6 @@
 import { type WidgetName, widgetNames } from "@zitadel/sdk-core/types";
 
-import { configureZitadel } from "@zitadel/sdk-core/config";
-
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-/**
- * The key under which `@zitadel/api/config` keeps the registered project on `globalThis`. The
- * contract restores the slot itself because it does not depend on the API package.
- */
-const PROJECT_SLOT = Symbol.for("@zitadel/api/config:currentProject");
+import { describe, expect, it } from "vitest";
 
 /** The SDKs that write widget attributes into markup, as the table's `gaps` name them. */
 export type Sdk = "react" | "vue" | "angular" | "svelte" | "solid" | "qwik";
@@ -321,23 +313,6 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
  */
 export function describeServerRenderCases(sdk: Sdk, renderAttributes: RenderAttributes): void {
   describe("server-rendered widget config", () => {
-    const slots = globalThis as Record<symbol, unknown>;
-    const before: { had?: boolean; slot?: unknown } = {};
-
-    beforeEach(() => {
-      before.had = PROJECT_SLOT in slots;
-      before.slot = slots[PROJECT_SLOT];
-      configureZitadel({ projectId: "server-render-config", proxyPath: "/__server-render" });
-    });
-
-    afterEach(() => {
-      if (before.had) {
-        slots[PROJECT_SLOT] = before.slot;
-      } else {
-        delete slots[PROJECT_SLOT];
-      }
-    });
-
     const covered = SERVER_RENDER_CASES.filter((c) => !c.gaps?.includes(sdk));
 
     // `%s` with the title as its own argument: Vitest cuts a `$title` to 40

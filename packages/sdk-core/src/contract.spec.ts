@@ -1096,3 +1096,24 @@ describe("server SDK middleware tests ↔ the blocks they share", () => {
     }
   });
 });
+
+describe("server SDK sources ↔ the default backend URL", () => {
+  const sources = [
+    "sdk-next/src/middleware.ts",
+    "sdk-next/src/auth.ts",
+    "sdk-nuxt/src/runtime/lib/settings.ts",
+    "sdk-sveltekit/src/handle.ts",
+    "sdk-qwik-router/src/request-handler.ts",
+    "sdk-solid-start/src/middleware.ts",
+    "sdk-tanstack-start/src/middleware.ts",
+  ];
+
+  it.each(sources)("%s falls back to http://localhost:8080 and no other address", (path) => {
+    const source = readFileSync(`${PACKAGES_ROOT}/${path}`, "utf8");
+    const defaults = [...source.matchAll(/"(http:\/\/localhost:\d+)"/g)].map((match) => match[1]);
+    expect(defaults).not.toEqual([]);
+    for (const address of defaults) {
+      expect(address).toBe("http://localhost:8080");
+    }
+  });
+});
