@@ -585,6 +585,10 @@ type SessionEstablishedRes interface {
 	sessionEstablishedRes()
 }
 
+type SessionExpiredRes interface {
+	sessionExpiredRes()
+}
+
 type SetUserPasswordRes interface {
 	setUserPasswordRes()
 }
