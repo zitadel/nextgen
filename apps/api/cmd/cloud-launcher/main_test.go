@@ -27,6 +27,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/jobs"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 )
 
@@ -307,9 +308,13 @@ func TestPrepareServerLeavesThePurgeToTheCronJob(t *testing.T) {
 				TriggerSecret string `yaml:"trigger_secret"`
 			} `yaml:"retention"`
 		} `yaml:"events"`
+		Jobs struct {
+			TriggerSecret string `yaml:"trigger_secret"`
+		} `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal(raw, &config))
 	assert.Equal(t, secret, config.Events.Retention.TriggerSecret)
+	assert.Equal(t, secret, config.Jobs.TriggerSecret)
 	assert.Empty(t, os.Getenv("CRON_SECRET"), "the secret leaves the environment once it is on disk")
 }
 
@@ -682,28 +687,32 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(raw, &config))
 
-	require.Len(t, config.Crons, 1)
+	require.Len(t, config.Crons, 2)
 	assert.Equal(t, audit.RetentionTriggerPath, config.Crons[0].Path)
 	assert.Equal(t, "17 * * * *", config.Crons[0].Schedule, "hourly, as a self-hosted server purges")
+	assert.Equal(t, jobs.TriggerPath, config.Crons[1].Path)
+	assert.Equal(t, "*/1 * * * *", config.Crons[1].Schedule, "every minute for sessions.gc")
 
-	for _, redirect := range config.Redirects {
-		assert.False(t, routeMatches(redirect.Source, audit.RetentionTriggerPath), "redirected by %s", redirect.Source)
-	}
-	var service string
-	for _, rewrite := range config.Rewrites {
-		// The cron job calls the cloud's own host, so go.zitadel.com's rule
-		// does not apply; every other rule still does.
-		if forGoImportHost(rewrite.Has) {
-			continue
+	for _, path := range []string{audit.RetentionTriggerPath, jobs.TriggerPath} {
+		for _, redirect := range config.Redirects {
+			assert.False(t, routeMatches(redirect.Source, path), "%s redirected by %s", path, redirect.Source)
 		}
-		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
-			var destination struct{ Service string }
-			require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
-			service = destination.Service
-			break
+		var service string
+		for _, rewrite := range config.Rewrites {
+			// The cron job calls the cloud's own host, so go.zitadel.com's rule
+			// does not apply; every other rule still does.
+			if forGoImportHost(rewrite.Has) {
+				continue
+			}
+			if routeMatches(rewrite.Source, path) {
+				var destination struct{ Service string }
+				require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
+				service = destination.Service
+				break
+			}
 		}
+		assert.Equal(t, "server", service, "the first rewrite that matches %s", path)
 	}
-	assert.Equal(t, "server", service, "the first rewrite that matches the trigger's path")
 }
 
 // The cloud gives the server its own paths and nothing else: the API under
@@ -749,6 +758,7 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 		"/readyz",
 		securityheaders.ReportPath,
 		audit.RetentionTriggerPath,
+		jobs.TriggerPath,
 		api.IDPCallbackUpstreamPath("github"),
 		api.IDPCallbackPath("github"),
 	}

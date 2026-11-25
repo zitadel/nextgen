@@ -253,6 +253,12 @@
       }
     },
     {
+      "source": "/cron/jobs",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
       "source": "/idp/:slug/callback",
       "destination": {
         "service": "server"
@@ -281,6 +287,10 @@
     {
       "path": "/cron/events-retention",
       "schedule": "17 * * * *"
+    },
+    {
+      "path": "/cron/jobs",
+      "schedule": "*/1 * * * *"
     }
   ],
   "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],
