@@ -2,7 +2,7 @@ import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { execaSync } from "execa";
 
-import { OrcaScaffoldBlockedError, OrcaScaffoldCommandFailedError } from "@/lib/orca/errors";
+import { OrcaInvalidError, OrcaInternalError } from "@/lib/orca/errors";
 import { warnings } from "@/lib/ui";
 
 import {
@@ -119,7 +119,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       );
     }
     if (support === "refused") {
-      throw new OrcaScaffoldBlockedError(
+      throw new OrcaInvalidError(
         `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}`,
         {
           hint: `Switch to Node ${describeAcceptedNode(range)} and rerun, or create the ${this.displayName} app with that Node and run setup inside it.`,
@@ -141,7 +141,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     const result = execaSync(command, [...args], { cwd, reject: false });
     if (result.code !== undefined) {
       if (result.code === "ENOENT") {
-        throw new OrcaScaffoldBlockedError(`Command not found: ${command}`, {
+        throw new OrcaInvalidError(`Command not found: ${command}`, {
           hint: `Ensure '${command}' is installed and on PATH.`,
           details: {
             command,
@@ -150,7 +150,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
           },
         });
       }
-      throw new OrcaScaffoldCommandFailedError(
+      throw new OrcaInternalError(
         `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
         {
           details: {
@@ -166,7 +166,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       const stdout = String(result.stdout);
       const stderr = String(result.stderr);
       const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
-      throw new OrcaScaffoldCommandFailedError(
+      throw new OrcaInternalError(
         `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
         {
           hint: output ? `Command output:\n${output}` : "Run the command directly for more detail.",

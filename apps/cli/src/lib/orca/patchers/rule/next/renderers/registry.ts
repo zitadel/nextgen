@@ -1,4 +1,4 @@
-import { OrcaRendererPendingError, OrcaRendererUnknownError } from "@/lib/orca/errors";
+import { OrcaRendererPendingError, OrcaInvalidError } from "@/lib/orca/errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
 import type { RendererId, RendererSpec } from "./types";
@@ -42,7 +42,7 @@ export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter((id) => 
 
 /**
  * Resolves a renderer id (an untrusted string from config) to its spec,
- * throwing a typed {@link OrcaRendererUnknownError} or
+ * throwing a typed {@link OrcaInvalidError} or
  * {@link OrcaRendererPendingError} rather than returning `undefined`
  * so callers get an actionable message. Rejects ids that are unknown
  * (`E_VALIDATION`) or declared-but-unpublished (`E_NOT_IMPLEMENTED`),
@@ -50,7 +50,7 @@ export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter((id) => 
  */
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
-    throw new OrcaRendererUnknownError(`Unknown renderer "${id}"`, {
+    throw new OrcaInvalidError(`Unknown renderer "${id}"`, {
       hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}.`,
     });
   }

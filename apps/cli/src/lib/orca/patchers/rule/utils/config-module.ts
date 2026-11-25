@@ -3,7 +3,7 @@ import { getDefaultExportOptions } from "magicast/helpers";
 import type { ProxifiedArray, ProxifiedModule, ProxifiedObject } from "magicast";
 
 import { errorMessage } from "@/lib/errors";
-import { OrcaPatchFileMissingError, OrcaPatchFileUnsupportedError } from "@/lib/orca/errors";
+import { OrcaPatchFileMissingError, OrcaInvalidError } from "@/lib/orca/errors";
 import { tryCatch } from "@/lib/try-catch";
 
 /**
@@ -64,7 +64,7 @@ export class ConfigModule {
     const [error, module] = tryCatch(parseModule, source, options);
 
     if (error) {
-      throw new OrcaPatchFileUnsupportedError(`Could not parse ${filename}`, {
+      throw new OrcaInvalidError(`Could not parse ${filename}`, {
         hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
         details: {
           cause: errorMessage(error),
@@ -86,12 +86,9 @@ export class ConfigModule {
     });
 
     if (isCommonJs) {
-      throw new OrcaPatchFileUnsupportedError(
-        `${filename} is a CommonJS module, which cannot be edited`,
-        {
-          hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
-        },
-      );
+      throw new OrcaInvalidError(`${filename} is a CommonJS module, which cannot be edited`, {
+        hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
+      });
     }
 
     return new ConfigModule(module, source, filename);
@@ -105,12 +102,9 @@ export class ConfigModule {
     const value = this.module.exports.default ? getDefaultExportOptions(this.module) : undefined;
 
     if (value?.$type !== "object") {
-      throw new OrcaPatchFileUnsupportedError(
-        `Could not locate the config object in ${this.filename}`,
-        {
-          hint: `Add the Zitadel configuration to ${this.filename} manually (see the SDK README).`,
-        },
-      );
+      throw new OrcaInvalidError(`Could not locate the config object in ${this.filename}`, {
+        hint: `Add the Zitadel configuration to ${this.filename} manually (see the SDK README).`,
+      });
     }
 
     return value;
@@ -121,7 +115,7 @@ export class ConfigModule {
     const value = parent[key] as EditableObject | undefined;
 
     if (value?.$type !== "object") {
-      throw new OrcaPatchFileUnsupportedError(`Could not edit "${key}" in the config`, {
+      throw new OrcaInvalidError(`Could not edit "${key}" in the config`, {
         hint: `Set "${key}" to an inline object literal, or add the Zitadel settings manually.`,
       });
     }
@@ -134,7 +128,7 @@ export class ConfigModule {
     const value = parent[key] as ProxifiedArray<string[]> | undefined;
 
     if (value?.$type !== "array") {
-      throw new OrcaPatchFileUnsupportedError(`Could not edit "${key}" in the config`, {
+      throw new OrcaInvalidError(`Could not edit "${key}" in the config`, {
         hint: `Set "${key}" to an inline array literal, or add the Zitadel settings manually.`,
       });
     }
@@ -156,7 +150,7 @@ export class ConfigModule {
     const [error] = tryCatch(parseModule, value);
 
     if (error) {
-      throw new OrcaPatchFileUnsupportedError(`Could not write ${this.filename}`, {
+      throw new OrcaInvalidError(`Could not write ${this.filename}`, {
         hint: `The edit left ${this.filename} unparseable, so apply the Zitadel changes manually.`,
         details: {
           cause: errorMessage(error),

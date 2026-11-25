@@ -14,7 +14,7 @@ import { pathExists } from "@/lib/fs";
 import { callbackUriFor } from "@/lib/idp";
 import type { CommandResult } from "@/cli/core";
 import { refusalError, type Refusal } from "@/cli/core/refusal";
-import { Orca, createOrca, issuerFromPort } from "@/lib/orca";
+import { Orca, OrcaPatchFileMissingError, createOrca, issuerFromPort } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
 import { WHAT_CHANGED } from "@/lib/suggestion";
@@ -49,6 +49,13 @@ const SECRET_MISSING_REFUSAL = {
       },
     },
   ],
+} as const satisfies Refusal;
+
+/** What a project with no `zitadel.json` is refused for when the app moves. */
+const CONFIG_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "zitadel.json was not found",
+  hint: "Run `zitadel setup` first.",
 } as const satisfies Refusal;
 
 /**
@@ -409,6 +416,9 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       moving.fail();
       if (error instanceof ProjectSecretMissingError) {
         throw refusalError(SECRET_MISSING_REFUSAL, {});
+      }
+      if (error instanceof OrcaPatchFileMissingError) {
+        throw refusalError(CONFIG_MISSING_REFUSAL, {});
       }
       throw error;
     }

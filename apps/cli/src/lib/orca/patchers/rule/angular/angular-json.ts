@@ -1,4 +1,4 @@
-import { OrcaPatchFileMissingError, OrcaPatchFileUnsupportedError } from "@/lib/orca/errors";
+import { OrcaPatchFileMissingError, OrcaInvalidError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject } from "@/lib/json";
 
 /**
@@ -29,7 +29,7 @@ export function angularProxyEdit(opts: {
       : undefined;
     const projectNames = Object.keys(projects ?? {});
     if (typeof root.defaultProject !== "string" && projectNames.length > 1) {
-      throw new OrcaPatchFileUnsupportedError(
+      throw new OrcaInvalidError(
         "angular.json has multiple projects and no defaultProject to choose from",
         {
           hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: ${projectNames.join(", ")}.`,
@@ -40,7 +40,7 @@ export function angularProxyEdit(opts: {
       typeof root.defaultProject === "string" ? root.defaultProject : projectNames[0];
     const project = projects && projectName ? projects[projectName] : undefined;
     if (!isObject(project)) {
-      throw new OrcaPatchFileUnsupportedError("No project found in angular.json", {
+      throw new OrcaInvalidError("No project found in angular.json", {
         hint: 'Add "proxyConfig" to your serve target manually.',
       });
     }
@@ -53,7 +53,7 @@ export function angularProxyEdit(opts: {
     const serve =
       targets && isObject(targets.serve) ? (targets.serve as Record<string, unknown>) : undefined;
     if (!serve) {
-      throw new OrcaPatchFileUnsupportedError("No serve target in angular.json", {
+      throw new OrcaInvalidError("No serve target in angular.json", {
         hint: 'Add "proxyConfig" to your serve options manually.',
       });
     }

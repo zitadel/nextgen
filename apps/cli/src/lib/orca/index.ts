@@ -30,14 +30,11 @@ export {
   OrcaFrameworkMissingError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
+  OrcaInvalidError,
   OrcaPatchFileMissingError,
   OrcaPatchFileOverwriteError,
-  OrcaPatchFileUnsupportedError,
   OrcaPatchLayoutConflictError,
   OrcaRendererPendingError,
-  OrcaRendererUnknownError,
-  OrcaScaffoldBlockedError,
-  OrcaScaffoldCommandFailedError,
   OrcaScaffoldOccupiedError,
 } from "./errors";
 export type { Detector, FrameworkFacts } from "./detectors/types";

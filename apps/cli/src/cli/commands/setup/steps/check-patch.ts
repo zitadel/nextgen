@@ -1,5 +1,9 @@
 import { WizardStep } from "@/lib/wizard";
-import { OrcaPatchFileOverwriteError, OrcaPatchLayoutConflictError } from "@/lib/orca";
+import {
+  OrcaPatchFileOverwriteError,
+  OrcaPatchLayoutConflictError,
+  OrcaRendererPendingError,
+} from "@/lib/orca";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
@@ -18,6 +22,13 @@ const PATCH_LAYOUT_REFUSAL = {
   message: "{message}",
   hint: "{hint} --force can't fix this: it only replaces files at the paths setup writes.",
   details: "{details}",
+} as const satisfies Refusal;
+
+/** How a renderer that is declared and not published yet is refused. */
+const RENDERER_PENDING_REFUSAL = {
+  code: "E_NOT_IMPLEMENTED",
+  message: "{message}",
+  hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
 } as const satisfies Refusal;
 
 /**
@@ -105,6 +116,11 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
             message: error.message,
             hint: error.hint ?? "",
             details: error.details ?? null,
+          });
+        }
+        if (error instanceof OrcaRendererPendingError) {
+          throw refusalError(RENDERER_PENDING_REFUSAL, {
+            message: error.message,
           });
         }
         throw error;

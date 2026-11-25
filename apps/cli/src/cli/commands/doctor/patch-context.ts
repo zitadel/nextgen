@@ -4,10 +4,18 @@ import { parseEnv } from "node:util";
 
 import { Environment } from "@/lib/environment";
 import { readIfReadable } from "@/lib/fs";
-import { issuerFromPort, Orca } from "@/lib/orca";
+import { refusalError, type Refusal } from "@/cli/core/refusal";
+import { issuerFromPort, Orca, OrcaFrameworkMissingError } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { Project } from "@/lib/project";
 import { CliPackage } from "@/lib/upgrade";
+
+/** What a directory with no app of a framework orca knows is reported as. */
+const FRAMEWORK_NOT_DETECTED_REFUSAL = {
+  code: "E_FRAMEWORK_NOT_DETECTED",
+  message: "Could not detect a supported app framework",
+  hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
+} as const satisfies Refusal;
 
 /**
  * Reconstructs a {@link PatchContext} from the on-disk project (config,
@@ -36,53 +44,60 @@ export async function loadPatchContext(
   orca: Orca,
   cliVersion: string,
 ): Promise<PatchContext> {
-  const config = await Project.at(cwd).config();
-  const secret = await Project.at(cwd).secret();
-  const framework = await orca.detect(cwd);
-  const scaffold = await Orca.readManifest(cwd);
-  const configured = await configuredIssuer(cwd);
-  const issuerScaffold = configured === undefined ? await Orca.readManifest(cwd) : undefined;
-  const issuer =
-    configured ??
-    (typeof issuerScaffold?.dev_port === "number"
-      ? issuerFromPort(issuerScaffold.dev_port)
-      : framework.url);
-  const developmentEnv = await readIfReadable(join(cwd, ".env.development.local"));
-  return {
-    framework,
-    rendererId: config.rendererId,
-    issuer,
-    server: typeof config.data.server === "string" ? config.data.server : "",
-    defaultServer: ZitadelRuntime.DEFAULT,
-    cliVersion,
-    sdkVersion: CliPackage.at(cliVersion).selector(),
-    scaffoldedFramework: scaffold?.scaffolded_framework,
-    posture: scaffold?.posture ?? "page",
-    preset: config.preset,
-    useCase: config.useCase,
-    developmentServerUrl:
-      developmentEnv === undefined ? undefined : parseEnv(developmentEnv).ZITADEL_URL,
-    project: {
-      id: secret.data.project_id,
-      project_secret: secret.data.project_secret,
-      preview_secret: secret.data.preview_secret,
-      origins: [
-        ...(secret.data.primary_origins ?? []).map((pattern) => {
-          return {
-            pattern,
-            kind: "primary" as const,
-          };
-        }),
-        ...secret.data.preview_origins.map((pattern) => {
-          return {
-            pattern,
-            kind: "preview" as const,
-          };
-        }),
-      ],
-      created_at: secret.data.created_at,
-    },
-  };
+  try {
+    const config = await Project.at(cwd).config();
+    const secret = await Project.at(cwd).secret();
+    const framework = await orca.detect(cwd);
+    const scaffold = await Orca.readManifest(cwd);
+    const configured = await configuredIssuer(cwd);
+    const issuerScaffold = configured === undefined ? await Orca.readManifest(cwd) : undefined;
+    const issuer =
+      configured ??
+      (typeof issuerScaffold?.dev_port === "number"
+        ? issuerFromPort(issuerScaffold.dev_port)
+        : framework.url);
+    const developmentEnv = await readIfReadable(join(cwd, ".env.development.local"));
+    return {
+      framework,
+      rendererId: config.rendererId,
+      issuer,
+      server: typeof config.data.server === "string" ? config.data.server : "",
+      defaultServer: ZitadelRuntime.DEFAULT,
+      cliVersion,
+      sdkVersion: CliPackage.at(cliVersion).selector(),
+      scaffoldedFramework: scaffold?.scaffolded_framework,
+      posture: scaffold?.posture ?? "page",
+      preset: config.preset,
+      useCase: config.useCase,
+      developmentServerUrl:
+        developmentEnv === undefined ? undefined : parseEnv(developmentEnv).ZITADEL_URL,
+      project: {
+        id: secret.data.project_id,
+        project_secret: secret.data.project_secret,
+        preview_secret: secret.data.preview_secret,
+        origins: [
+          ...(secret.data.primary_origins ?? []).map((pattern) => {
+            return {
+              pattern,
+              kind: "primary" as const,
+            };
+          }),
+          ...secret.data.preview_origins.map((pattern) => {
+            return {
+              pattern,
+              kind: "preview" as const,
+            };
+          }),
+        ],
+        created_at: secret.data.created_at,
+      },
+    };
+  } catch (error) {
+    if (error instanceof OrcaFrameworkMissingError) {
+      throw refusalError(FRAMEWORK_NOT_DETECTED_REFUSAL, {});
+    }
+    throw error;
+  }
 }
 
 /**

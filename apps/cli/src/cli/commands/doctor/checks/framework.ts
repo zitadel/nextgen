@@ -1,4 +1,5 @@
 import { AbstractSanityCheck, type CheckContext } from "./types";
+import { OrcaFrameworkMissingError } from "@/lib/orca";
 import { Project, ProjectConfigMissingError } from "@/lib/project";
 import { refusalError, type Refusal } from "@/cli/core/refusal";
 
@@ -11,6 +12,13 @@ const CONFIG_MISSING_REFUSAL = {
       id: "setup",
     },
   ],
+} as const satisfies Refusal;
+
+/** What a directory with no app of a framework orca knows is reported as. */
+const FRAMEWORK_NOT_DETECTED_REFUSAL = {
+  code: "E_FRAMEWORK_NOT_DETECTED",
+  message: "Could not detect a supported app framework",
+  hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
 } as const satisfies Refusal;
 
 /** Verifies the framework detected on disk matches the one recorded in config. */
@@ -30,6 +38,9 @@ export class FrameworkCheck extends AbstractSanityCheck {
     } catch (error) {
       if (error instanceof ProjectConfigMissingError) {
         throw refusalError(CONFIG_MISSING_REFUSAL, {});
+      }
+      if (error instanceof OrcaFrameworkMissingError) {
+        throw refusalError(FRAMEWORK_NOT_DETECTED_REFUSAL, {});
       }
       throw error;
     }

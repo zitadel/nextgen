@@ -1,4 +1,4 @@
-import { OrcaPatchFileUnsupportedError } from "@/lib/orca/errors";
+import { OrcaInvalidError } from "@/lib/orca/errors";
 import { withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
 import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
@@ -128,16 +128,13 @@ function variablesObject(text: string): AstNode {
   const variables = (file.module.exports as { variables?: ProxyNode } | undefined)?.variables;
   const object = variables?.$type === "function-call" ? variables.$args?.[0] : variables;
   if (object?.$type !== "object") {
-    throw new OrcaPatchFileUnsupportedError(
-      `Could not find the env variables ${ENV_LABEL} declares`,
-      {
-        hint: `Export them as \`export const variables = defineEnvVars({ ... })\` from @sveltejs/kit/env, or declare ${HOOK_VARIABLES.map(
-          (variable) => {
-            return variable.name;
-          },
-        ).join(", ")} there by hand.`,
-      },
-    );
+    throw new OrcaInvalidError(`Could not find the env variables ${ENV_LABEL} declares`, {
+      hint: `Export them as \`export const variables = defineEnvVars({ ... })\` from @sveltejs/kit/env, or declare ${HOOK_VARIABLES.map(
+        (variable) => {
+          return variable.name;
+        },
+      ).join(", ")} there by hand.`,
+    });
   }
   return object.$ast as AstNode;
 }

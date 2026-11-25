@@ -120,20 +120,14 @@ export class OrcaScaffoldOccupiedError extends OrcaError {
 }
 
 /**
- * A scaffold that cannot start until something in the way is dealt with: a
- * Node the framework's tool refuses, or a tool that is not installed.
+ * A request orca cannot act on as given: a scaffold that cannot start until
+ * something in the way is dealt with (a Node the framework's tool refuses, a
+ * tool that is not installed), a file of the project a patch cannot edit
+ * because its content is not in a shape the patch handles, or a renderer id
+ * that names none.
  */
-export class OrcaScaffoldBlockedError extends OrcaError {
+export class OrcaInvalidError extends OrcaError {
   override readonly category: ErrorCategory = "invalid";
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-  override readonly retryable: boolean = false;
-}
-
-/**
- * An external command a scaffold runs that could not be spawned or exited non-zero.
- */
-export class OrcaScaffoldCommandFailedError extends OrcaError {
-  override readonly category: ErrorCategory = "fault";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }
@@ -168,25 +162,6 @@ export class OrcaPatchLayoutConflictError extends OrcaError {
 }
 
 /**
- * A file of the project that a patch cannot edit: its content is not in a
- * shape the patch handles, or is broken.
- */
-export class OrcaPatchFileUnsupportedError extends OrcaError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-  override readonly retryable: boolean = false;
-}
-
-/**
- * A renderer id that names none.
- */
-export class OrcaRendererUnknownError extends OrcaError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-  override readonly retryable: boolean = false;
-}
-
-/**
  * A renderer that is declared and not published yet.
  */
 export class OrcaRendererPendingError extends OrcaError {
@@ -196,7 +171,9 @@ export class OrcaRendererPendingError extends OrcaError {
 }
 
 /**
- * A bug in this package: something that cannot happen unless the code is wrong.
+ * A failure in this package: a bug, something that cannot happen unless the
+ * code is wrong, or an external command a scaffold runs that could not be
+ * spawned or exited non-zero.
  */
 export class OrcaInternalError extends OrcaError {
   override readonly category: ErrorCategory = "fault";
