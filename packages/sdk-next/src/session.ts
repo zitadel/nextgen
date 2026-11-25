@@ -9,6 +9,7 @@
  * @module
  */
 import { getZitadelConfig } from "@zitadel/sdk-core/config";
+import { ZitadelRuntimeError } from "@zitadel/sdk-core";
 import type { ZitadelGetSessionOptions as CoreGetSessionOptions } from "@zitadel/sdk-core/session";
 
 import { getSession as readSession } from "@zitadel/sdk-core/session";
@@ -107,7 +108,8 @@ function warnMissingProject(): void {
  *
  * @param options - The proxy path and project id; see {@link ZitadelGetSessionOptions}.
  * @returns The current {@link ZitadelClientAuthResult}.
- * @throws When called outside a browser, or when the server answers with an unexpected response.
+ * @throws A `ZitadelRuntimeError` with the code `E_ZITADEL_SESSION_NO_BROWSER` when called outside
+ * a browser, and when the server answers with an unexpected response.
  *
  * @example
  * ```tsx
@@ -142,8 +144,9 @@ export async function getSession(
   options: ZitadelGetSessionOptions = {},
 ): Promise<ZitadelClientAuthResult> {
   if (typeof window === "undefined") {
-    throw new Error(
-      "[zitadel] getSession() reads the session from the browser. " +
+    throw new ZitadelRuntimeError(
+      "E_ZITADEL_SESSION_NO_BROWSER",
+      "getSession() reads the session from the browser. " +
         "In Server Components and Route Handlers use auth() from @zitadel/sdk-next/server " +
         "(requires the route to be covered by the middleware matcher).",
     );

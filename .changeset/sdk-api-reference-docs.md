@@ -23,4 +23,6 @@ Every SDK now has a warning-free API reference that documents each export, prop,
 
 **Behavior:** an empty `url` or `projectSecret` now counts as unset in every server SDK and falls back to the next source, `projectSecret` is an option of every server SDK except the Nuxt module, and `protectedRoutes` also matches the percent-decoded path, so `/%61dmin` is protected like `/admin`.
 
+**Breaking in `@zitadel/sdk-core`:** `validateOpaqueSessionToken` is removed, `checkOpaqueSessionToken`, `serverSessionCookieName` and `sessionCookieName` take one options object, and `getSession` (also the one of `@zitadel/sdk-next`) throws a `ZitadelRuntimeError` with a `code` instead of a plain `Error`.
+
 **Upgrading:** rename these in your app, or scaffold it again; `zitadel upgrade` does not rename them for you. `@zitadel/api` moves from the dependencies of the SDKs to their development dependencies, and no value export changed.

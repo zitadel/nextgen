@@ -88,6 +88,7 @@ describe("getSession()", () => {
     vi.stubGlobal("window", undefined);
 
     await expect(getSession()).rejects.toThrow(/auth\(\)/);
+    await expect(getSession()).rejects.toMatchObject({ code: "E_ZITADEL_SESSION_NO_BROWSER" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
