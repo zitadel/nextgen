@@ -4,7 +4,7 @@ import {
   ZitadelConfigFileBrokenError,
   ZitadelConfigDeployEmptyError,
   ZitadelConfigDeployTooLargeError,
-  ZitadelConfigFileWrongKindError,
+  ZitadelConfigFileReadFailedError,
   ZitadelConfigEditBreaksFlowsError,
   CONFIG_DIRECTORIES,
   ZitadelConfigConnectionExistsError,
@@ -387,10 +387,10 @@ describe("ZitadelConfigFileUnreadableError", () => {
   });
 });
 
-describe("ZitadelConfigFileWrongKindError", () => {
-  it("is a conflict when a file stands where a directory is expected", () => {
-    expect(new ZitadelConfigFileWrongKindError("x cannot be read (ENOTDIR)")).toMatchObject({
-      category: "conflict",
+describe("ZitadelConfigFileReadFailedError", () => {
+  it("is a validation failure when a file cannot be read for another reason", () => {
+    expect(new ZitadelConfigFileReadFailedError("x cannot be read (ENOTDIR)")).toMatchObject({
+      category: "invalid",
       code: "E_VALIDATION",
     });
   });

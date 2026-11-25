@@ -3,8 +3,8 @@ import { stringify } from "safe-stable-stringify";
 import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
+  ZitadelConfigFileReadFailedError,
   ZitadelConfigFileUnreadableError,
-  ZitadelConfigFileWrongKindError,
 } from "@/lib/zitadel/errors";
 import {
   CONFIG_DIRECTORIES,
@@ -102,7 +102,7 @@ export abstract class Store implements ConfigStore {
         if (code === "ENOENT") {
           return [];
         }
-        throw Store.unreadable(directory, code, error);
+        throw Store.unreadable(directory, code);
       });
     // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
@@ -260,17 +260,27 @@ export abstract class Store implements ConfigStore {
           if (code === "ENOENT" || code === "ENOTDIR") {
             return undefined;
           }
-          if (code !== "EACCES" && code !== "EPERM") {
-            throw error;
+          if (code === "EACCES" || code === "EPERM") {
+            throw new ZitadelConfigFileUnreadableError(
+              `$file ${JSON.stringify(ref)} cannot be read`,
+              {
+                hint: "Create the referenced file or fix the path.",
+                details: {
+                  file: file.path,
+                  ref,
+                  ...(code === undefined ? {} : { code }),
+                },
+              },
+            );
           }
-          throw new ZitadelConfigFileUnreadableError(
+          throw new ZitadelConfigFileReadFailedError(
             `$file ${JSON.stringify(ref)} cannot be read`,
             {
               hint: "Create the referenced file or fix the path.",
               details: {
                 file: file.path,
                 ref,
-                code,
+                ...(code === undefined ? {} : { code }),
               },
             },
           );
@@ -400,7 +410,7 @@ export abstract class Store implements ConfigStore {
         if (code === "EISDIR") {
           return undefined;
         }
-        throw Store.unreadable(path, code, error);
+        throw Store.unreadable(path, code);
       });
     if (text === undefined) {
       return UnparsedFile.directory(path);
@@ -424,34 +434,36 @@ export abstract class Store implements ConfigStore {
    * The failure for a file or directory that cannot be read.
    *
    * @remarks
-   * Only a refused permission and a file where a directory is expected carry
-   * advice, so only those become an error of this package; any other failure is
-   * returned as it came, for the caller to throw.
+   * The errno is kept in `details.code`, so the CLI can tell a permission
+   * failure from the rest.
    *
    * @param path - The project-relative path.
    * @param code - The errno of the failed operation, when it had one.
    * @returns The error to throw.
    */
-  private static unreadable(path: string, code: string | undefined, error: unknown): unknown {
+  private static unreadable(path: string, code: string | undefined): ZitadelConfigError {
     if (code === "EACCES" || code === "EPERM") {
-      return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`, {
+      return new ZitadelConfigFileUnreadableError(
+        `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
+        {
+          hint: "Check that the file is readable, then run the command again.",
+          details: {
+            file: path,
+            ...(code === undefined ? {} : { code }),
+          },
+        },
+      );
+    }
+    return new ZitadelConfigFileReadFailedError(
+      `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
+      {
         hint: "Check that the file is readable, then run the command again.",
         details: {
           file: path,
-          code,
+          ...(code === undefined ? {} : { code }),
         },
-      });
-    }
-    if (code === "ENOTDIR" || code === "EISDIR") {
-      return new ZitadelConfigFileWrongKindError(`${path} cannot be read (${code})`, {
-        hint: "Check that the file is readable, then run the command again.",
-        details: {
-          file: path,
-          code,
-        },
-      });
-    }
-    return error;
+      },
+    );
   }
 
   /**

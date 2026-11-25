@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -349,6 +349,22 @@ describe("deploy", () => {
               },
             ],
           },
+        });
+      });
+
+      it("stops before sending a project with nothing in .zitadel/ to deploy", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await rm(join(app.path, ".zitadel"), { recursive: true, force: true });
+
+        const result = await app.deploy();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          command: "deploy",
+          code: "E_VALIDATION",
+          message: "There is nothing in .zitadel/ to deploy",
+          hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
         });
       });
 

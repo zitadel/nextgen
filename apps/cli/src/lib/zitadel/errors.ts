@@ -700,11 +700,6 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
 /**
  * A file or directory that cannot be read because the operating system refused
  * to let this process read it.
- *
- * @remarks
- * Only the refusal and a file where a directory is expected carry advice, so
- * only they become typed errors; any other failure of the file system reaches
- * the caller as it came.
  */
 export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "denied";
@@ -712,11 +707,9 @@ export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
   override readonly code: ZitadelErrorCode = "E_AUTH";
 }
 
-/**
- * A file stands where a directory is expected, or a directory where a file is.
- */
-export class ZitadelConfigFileWrongKindError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "conflict";
+/** A file or directory could not be read for a reason other than a refused permission. */
+export class ZitadelConfigFileReadFailedError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }

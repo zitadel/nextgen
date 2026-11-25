@@ -22,6 +22,7 @@ import {
   PublishConnectionVariableSharedError,
   Publisher,
 } from "@/lib/publish";
+import { ZitadelConfigDeployEmptyError } from "@/lib/zitadel";
 import {
   type NextOf,
   type Suggested,
@@ -126,6 +127,13 @@ export function missingPrimaryOrigin(input: {
  * The action a lockout refusal names: "Cannot … without --force".
  */
 const LOCKOUT_ACTION = "deploy a release that leaves existing users unable to sign in";
+
+/** How a `.zitadel/` that holds nothing to deploy is refused. */
+const DEPLOY_EMPTY_REFUSAL = {
+  message: "{message}",
+  hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+  details: "{details}",
+} as const satisfies Refusal;
 
 /** How a configuration with errors in it is refused. */
 const CONFIG_INVALID_REFUSAL = {
@@ -386,6 +394,12 @@ export default class Deploy extends Telemetered(
             },
           );
         }
+        if (error instanceof ZitadelConfigDeployEmptyError) {
+          throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
         throw error;
       });
     this.annotate({
@@ -582,6 +596,12 @@ export default class Deploy extends Telemetered(
               cause: error,
             },
           );
+        }
+        if (error instanceof ZitadelConfigDeployEmptyError) {
+          throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
         }
         throw error;
       });
