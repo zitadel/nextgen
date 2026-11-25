@@ -68,27 +68,24 @@ async function anAppWithCustomSso(): Promise<ScaffoldedApp> {
 }
 
 /** Mapping mistakes a deploy must refuse, each applied to a Google connection, with what it is refused for. */
-const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>, string, string]> =
+const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>, string]> = [
   [
-    [
-      "a mapping target the schema does not define",
-      (app) =>
-        app.editConnection("google", (c) => {
-          c.claim_mapping = { ...c.claim_mapping, contactEmial: "mail" };
-        }),
-      "contactEmial",
-      "sso/orphaned-mapping-target",
-    ],
-    [
-      "a mapping key that contains a dot",
-      (app) =>
-        app.editConnection("google", (c) => {
-          c.claim_mapping = { ...c.claim_mapping, "profile.email": "mail" };
-        }),
-      "profile.email",
-      "sso/orphaned-mapping-target",
-    ],
-  ];
+    "a mapping target the schema does not define",
+    (app) =>
+      app.editConnection("google", (c) => {
+        c.claim_mapping = { ...c.claim_mapping, contactEmial: "mail" };
+      }),
+    "contactEmial",
+  ],
+  [
+    "a mapping key that contains a dot",
+    (app) =>
+      app.editConnection("google", (c) => {
+        c.claim_mapping = { ...c.claim_mapping, "profile.email": "mail" };
+      }),
+    "profile.email",
+  ],
+];
 
 /**
  * Mapping mistakes that almost certainly do not do what was meant, which a

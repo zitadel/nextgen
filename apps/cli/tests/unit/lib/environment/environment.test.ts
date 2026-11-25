@@ -328,8 +328,9 @@ describe("Environment.resolve", () => {
     it("names the file a malformed server came from", async ({ dir }) => {
       await write(dir, ".env", { ZITADEL_URL: "localhost:8080" });
 
-      await expect(resolve(dir)).rejects.toMatchObject({
-        name: "EnvironmentServerInvalidError",
+      const rejection = expect(resolve(dir)).rejects;
+      await rejection.toBeInstanceOf(EnvironmentServerInvalidError);
+      await rejection.toMatchObject({
         message: expect.stringContaining("ZITADEL_URL from .env"),
       });
     });

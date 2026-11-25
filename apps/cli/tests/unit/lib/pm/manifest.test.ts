@@ -22,8 +22,9 @@ describe("PM.manifest", () => {
   it("throws on invalid JSON", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), "{ nope");
 
-    await expect(PM.manifest(dir)).rejects.toMatchObject({
-      name: "PmManifestInvalidError",
+    const rejection = expect(PM.manifest(dir)).rejects;
+    await rejection.toBeInstanceOf(PmManifestInvalidError);
+    await rejection.toMatchObject({
       cause: expect.any(SyntaxError),
     });
   });

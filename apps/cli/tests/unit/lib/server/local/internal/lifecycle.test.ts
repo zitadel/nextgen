@@ -384,8 +384,9 @@ describe("Lifecycle", () => {
       world.logs = "listen tcp :8080: bind: address already in use";
       world.onLaunch = () => undefined;
 
-      await expect(world.server().start()).rejects.toMatchObject({
-        name: "LocalServerStartExitedError",
+      const rejection = expect(world.server().start()).rejects;
+      await rejection.toBeInstanceOf(LocalServerStartExitedError);
+      await rejection.toMatchObject({
         message: expect.stringContaining("listen tcp :8080: bind: address already in use"),
       });
     });
@@ -395,8 +396,9 @@ describe("Lifecycle", () => {
       world.logsGone = true;
       world.onLaunch = () => undefined;
 
-      await expect(world.server().start()).rejects.toMatchObject({
-        name: "LocalServerStartExitedError",
+      const rejection = expect(world.server().start()).rejects;
+      await rejection.toBeInstanceOf(LocalServerStartExitedError);
+      await rejection.toMatchObject({
         message: "The server exited before it became healthy",
       });
     });

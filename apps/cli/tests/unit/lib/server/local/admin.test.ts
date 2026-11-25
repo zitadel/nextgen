@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
+import { LocalServerInvalidError } from "@/lib/server";
 import {
   LOCAL_ADMIN_EMAIL,
   LOCAL_ADMIN_FILE,
@@ -129,9 +130,9 @@ describe("local admin", () => {
 
     const error = await readLocalAdmin(cwd).catch((caught: unknown) => caught);
 
+    expect(error).toBeInstanceOf(LocalServerInvalidError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      name: "LocalServerInvalidError",
     });
   });
 
@@ -144,9 +145,10 @@ describe("local admin", () => {
       await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
 
       try {
-        await expect(ensureLocalAdmin(cwd)).rejects.toMatchObject({
+        const rejection = expect(ensureLocalAdmin(cwd)).rejects;
+        await rejection.toBeInstanceOf(LocalServerInvalidError);
+        await rejection.toMatchObject({
           code: "E_VALIDATION",
-          name: "LocalServerInvalidError",
           message: expect.stringMatching(/cannot be read/),
         });
       } finally {

@@ -4,6 +4,7 @@ import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
+import { LocalServerDeniedError, LocalServerInvalidError } from "@/lib/server";
 import type { LocalAdmin } from "@/lib/server/local/admin-credential";
 import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
 import { adminSessionCookie, consoleSignInUrl } from "@/lib/server/local/sign-in";
@@ -221,10 +222,10 @@ describe("local admin sign-in", () => {
 
     const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
+    expect(error).toBeInstanceOf(LocalServerInvalidError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("does not host the platform project") as string,
-      name: "LocalServerInvalidError",
     });
     // Nothing is attempted against a server that cannot sign the admin in.
     expect(calls).toEqual([]);
@@ -242,10 +243,10 @@ describe("local admin sign-in", () => {
 
     const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
+    expect(error).toBeInstanceOf(LocalServerDeniedError);
     expect(error).toMatchObject({
       code: "E_AUTH",
       message: "The local server could not find the local admin",
-      name: "LocalServerDeniedError",
     });
   });
 

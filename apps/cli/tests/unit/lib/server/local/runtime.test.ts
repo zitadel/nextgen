@@ -6,6 +6,7 @@ import { describe, expect } from "vitest";
 
 import { it, type Serve } from "@tests/fixtures";
 
+import { LocalServerRecordMalformedError } from "@/lib/server";
 import {
   LOCAL_RUNTIME_FILE,
   checkLocalServerHealth,
@@ -175,17 +176,17 @@ describe("readNearestRuntimeMetadata", () => {
     const app = join(cwd, "my-app");
     await mkdir(app);
 
-    await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
-      name: "LocalServerRecordMalformedError",
-    });
+    const rejection = expect(readNearestRuntimeMetadata(app)).rejects;
+    await rejection.toBeInstanceOf(LocalServerRecordMalformedError);
+    await rejection.toMatchObject({});
   });
 
   it("names a malformed record in the working directory by kind", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
 
-    await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
-      name: "LocalServerRecordMalformedError",
-    });
+    const rejection = expect(readNearestRuntimeMetadata(cwd)).rejects;
+    await rejection.toBeInstanceOf(LocalServerRecordMalformedError);
+    await rejection.toMatchObject({});
   });
 });
 

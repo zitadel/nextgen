@@ -340,8 +340,8 @@
 - State `category`, `retryable` and `code` as literals in each class.
 - Add no type for errors beyond `ErrorCategory`.
 - `toZitadelError` has one branch for `ZitadelLibError`; add no per-package branch.
-- Never put a hint, flag, command or suggestion in a lib error, and never
-  throw `ZitadelError` or a `Refusal` from `src/lib`.
+- Never put a hint, flag, command or suggestion in a lib error.
+- Never throw `ZitadelError` or a `Refusal` from `src/lib`.
 - Catch a lib error where its command words it, in a plain `try`/`catch`.
 - Inside the catch write one flat `if (error instanceof X)` per class that
   throws `refusalError(X_REFUSAL, ...)`, then `throw error;`.
@@ -351,9 +351,9 @@
   `src/lib/backend/client.ts`.
 - Write every hint and next command in the catching command's `*_REFUSAL`.
 - Spread the error into the refusal's values so no property is dropped.
-- Use no `as`, `!`, `any` or lookup table for errors; duplicate instead.
-- Let an error nobody anticipated bubble up unwrapped; utilities throw plain
-  `Error`s.
+- Use no `as`, `!` or `any` on errors.
+- Use no lookup table for errors; duplicate the refusal instead.
+- Let an error nobody anticipated bubble up unwrapped.
 
 ## Telemetry
 

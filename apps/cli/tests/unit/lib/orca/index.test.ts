@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { OrcaConflictError } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { basename, dirname, join } from "node:path";
 
@@ -140,10 +141,11 @@ describe("Orca detection", () => {
   // Not detected would read as a directory to scaffold into, and setup's
   // --force would then scaffold a new app over this one.
   it("refuses a requested framework other than the app's own", async ({ dir }) => {
-    await expect(orca.detect(await nextProject(dir), "react")).rejects.toMatchObject({
+    const rejection = expect(orca.detect(await nextProject(dir), "react")).rejects;
+    await rejection.toBeInstanceOf(OrcaConflictError);
+    await rejection.toMatchObject({
       code: "E_CONFLICT",
       message: "Setup detects Next.js here, not React (Vite)",
-      name: "OrcaConflictError",
     });
   });
 

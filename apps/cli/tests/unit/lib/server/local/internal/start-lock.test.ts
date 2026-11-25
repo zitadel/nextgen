@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { LocalServerBusyError } from "@/lib/server";
 import {
   clearStale,
   tryLock,
@@ -282,14 +283,15 @@ describe("withStartLock", () => {
     const lock = lockPath(dir);
     const release = await tryLock(lock);
 
-    await expect(
+    const rejection = expect(
       withStartLock(lock, async () => undefined, {
         timeoutMs: 100,
         pollMs: 10,
         clock: new ManualClock(),
       }),
-    ).rejects.toMatchObject({
-      name: "LocalServerBusyError",
+    ).rejects;
+    await rejection.toBeInstanceOf(LocalServerBusyError);
+    await rejection.toMatchObject({
       code: "E_CONFLICT",
       retryable: true,
       message: expect.stringContaining(lock),
