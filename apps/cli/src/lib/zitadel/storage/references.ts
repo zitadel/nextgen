@@ -1,4 +1,4 @@
-import { ZitadelConfigError, ZitadelConfigResourceMissingError } from "@/lib/zitadel/errors";
+import { ZitadelConfigError } from "@/lib/zitadel/errors";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import type { MissingReference } from "@/lib/zitadel/storage/types";
 import { isJsonArray, isJsonObject } from "@/lib/zitadel/utils/json";
@@ -129,7 +129,7 @@ export function inlineFileReferences(
       if (missing === "omit") {
         return omitted;
       }
-      throw new ZitadelConfigResourceMissingError(`$file ${JSON.stringify(ref)} cannot be read`, {
+      throw new ZitadelConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
         hint: "Create the referenced file or fix the path.",
       });
     }
