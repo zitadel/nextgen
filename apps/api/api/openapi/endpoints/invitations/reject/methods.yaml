@@ -8,8 +8,9 @@ post:
     Send the plaintext token from the invitation link fragment. The
     invitation keeps its metadata for administrators, but this response
     returns `metadata` as null. The inviter cannot decline their own invitation; an administrator
-    cancels it instead. Every unknown or finished token answers the same
-    opaque `404`.
+    cancels it instead. A user who already holds a role on the project gets
+    `409 inv.already_member`, and the invitation stays pending. Every unknown
+    or finished token answers the same opaque `404`.
     Authenticate with a platform-project user session cookie (`sessionCookie`).
     Cookie requests follow that scheme's CSRF rules.
   tags:
@@ -51,6 +52,12 @@ post:
             $ref: ../../../components/error-details.yaml
     '404':
       description: Unknown or finished invitation token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: The user already holds a role on the project (`inv.already_member`).
       content:
         application/json:
           schema:

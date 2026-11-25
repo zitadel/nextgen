@@ -215,6 +215,14 @@ func (h *Handler) LookupInvitation(ctx context.Context, req *api.InvitationToken
 	} else {
 		view.Inviter.SetToNull()
 	}
+	if found.Membership != nil {
+		view.Membership.SetTo(api.InvitationLookupMembership{
+			Relation: api.InvitationLookupMembershipRelation(found.Membership.Relation),
+			Sources:  projectMemberSources(found.Membership.Sources),
+		})
+	} else {
+		view.Membership.SetToNull()
+	}
 	resp := api.NewInvitationLookupProjectMemberResponseInvitationLookupResponse(view)
 	return &resp, nil
 }
@@ -272,7 +280,8 @@ func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrInvitationSelfReject().Code,
 		domain.ErrInvitationInviterNotAdmin().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrInvitationProjectUnclaimed().Code,
+	case domain.ErrInvitationAlreadyMember("").Code,
+		domain.ErrInvitationProjectUnclaimed().Code,
 		domain.ErrInvitationPendingLimit().Code,
 		domain.ErrInvitationPlatformRequired().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)

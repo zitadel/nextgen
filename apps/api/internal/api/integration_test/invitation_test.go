@@ -640,31 +640,91 @@ func TestInvitationRedeem(t *testing.T) {
 		require.IsType(t, &api.ProjectDetailResponse{}, after, helpers.MustMarshal(t, after))
 	})
 
-	t.Run("accept keeps an identical active grant", func(t *testing.T) {
+	t.Run("a member can't redeem, and the link stays pending", func(t *testing.T) {
 		t.Parallel()
-		colleagueID, colleague := newColleague(t)
-		held := seedGrant(t, colleagueID, "editor", nil)
-		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
+		for _, tc := range []struct {
+			name     string
+			held     string
+			relation api.InvitationProjectMemberPayloadRelation
+		}{
+			{"the same role", "editor", api.InvitationProjectMemberPayloadRelationEditor},
+			{"a weaker role", "viewer", api.InvitationProjectMemberPayloadRelationAdmin},
+			{"a stronger role", "admin", api.InvitationProjectMemberPayloadRelationViewer},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				colleagueID, colleague := newColleague(t)
+				held := seedGrant(t, colleagueID, tc.held, nil)
+				created, token := invite(t, owner, tc.relation)
 
-		accepted(t, accept(t, colleague, token))
+				found, ok := lookup(t, colleague, token).(*api.InvitationLookupResponse)
+				require.True(t, ok)
+				view, ok := found.GetInvitationLookupProjectMemberResponse()
+				require.True(t, ok)
+				membership, ok := view.Membership.Get()
+				require.True(t, ok, "lookup names the role held")
+				assert.Equal(t, tc.held, string(membership.Relation))
+				require.Len(t, membership.Sources, 1)
+				grantSource, ok := membership.Sources[0].GetProjectMemberGrantSource()
+				require.True(t, ok)
+				assert.Equal(t, held, grantSource.GrantID)
 
-		editor := grants(t, colleagueID)["editor"]
-		require.Len(t, editor, 1)
-		assert.Equal(t, held, editor[0].ID)
+				conflict, ok := accept(t, colleague, token).(*api.AcceptInvitationConflict)
+				require.True(t, ok)
+				assert.Equal(t, "inv.already_member", string(conflict.Code))
+				assert.JSONEq(t, `{"relation":"`+tc.held+`"}`, string(conflict.Details.Value["details"]), "the error names the role held")
+				declined, ok := reject(t, colleague, token).(*api.RejectInvitationConflict)
+				require.True(t, ok)
+				assert.Equal(t, "inv.already_member", string(declined.Code))
+
+				after := grants(t, colleagueID)
+				require.Len(t, after, 1, "no grant is written")
+				require.Len(t, after[tc.held], 1)
+				assert.Equal(t, held, after[tc.held][0].ID)
+				require.ElementsMatch(t, []string{"invitation.created"}, eventTypes(invitationEvents(t, owner, projectID, created.ID)))
+
+				// The person it was meant for still can.
+				_, invitee := newColleague(t)
+				accepted(t, accept(t, invitee, token))
+			})
+		}
 	})
 
-	t.Run("accept adds a relation beside another", func(t *testing.T) {
+	t.Run("an owning-team admin can't accept a project secret's link", func(t *testing.T) {
 		t.Parallel()
-		colleagueID, colleague := newColleague(t)
-		viewer := seedGrant(t, colleagueID, "viewer", nil)
-		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationAdmin)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, project)
+		_, token := invite(t, secret, api.InvitationProjectMemberPayloadRelationAdmin)
 
-		accepted(t, accept(t, colleague, token))
+		found, ok := lookup(t, owner, token).(*api.InvitationLookupResponse)
+		require.True(t, ok)
+		view, ok := found.GetInvitationLookupProjectMemberResponse()
+		require.True(t, ok)
+		membership, ok := view.Membership.Get()
+		require.True(t, ok)
+		assert.Equal(t, api.InvitationLookupMembershipRelationAdmin, membership.Relation)
+		require.NotEmpty(t, membership.Sources)
+		owning, ok := membership.Sources[0].GetProjectMemberOwningTeamSource()
+		require.True(t, ok, "owning-team access comes first")
+		assert.Equal(t, owningTeamID, owning.Team.TeamID)
 
-		held := grants(t, colleagueID)
-		require.Len(t, held["viewer"], 1)
-		assert.Equal(t, viewer, held["viewer"][0].ID)
-		require.Len(t, held["admin"], 1)
+		conflict, ok := accept(t, owner, token).(*api.AcceptInvitationConflict)
+		require.True(t, ok)
+		assert.Equal(t, "inv.already_member", string(conflict.Code))
+		assert.Empty(t, grants(t, ownerID), "no grant beside the owning team")
+	})
+
+	t.Run("a colleague without a role is not a member", func(t *testing.T) {
+		t.Parallel()
+		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationViewer)
+		_, colleague := newColleague(t)
+
+		found, ok := lookup(t, colleague, token).(*api.InvitationLookupResponse)
+		require.True(t, ok)
+		view, ok := found.GetInvitationLookupProjectMemberResponse()
+		require.True(t, ok)
+		assert.True(t, view.Membership.IsNull())
 	})
 
 	t.Run("of two concurrent accepts one wins", func(t *testing.T) {
@@ -701,7 +761,7 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.Equal(t, 1, len(grants(t, firstID)["viewer"])+len(grants(t, secondID)["viewer"]))
 	})
 
-	t.Run("one user accepting two links at once gets one grant", func(t *testing.T) {
+	t.Run("one user accepting two links at once uses one", func(t *testing.T) {
 		t.Parallel()
 		_, firstToken := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
 		_, secondToken := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
@@ -718,9 +778,21 @@ func TestInvitationRedeem(t *testing.T) {
 		}
 		wg.Wait()
 
+		// The project lock orders them: the second finds a member.
+		var won, refused int
 		for _, resp := range results {
-			accepted(t, resp)
+			switch resp := resp.(type) {
+			case *api.Invitation:
+				won++
+			case *api.AcceptInvitationConflict:
+				assert.Equal(t, "inv.already_member", string(resp.Code))
+				refused++
+			default:
+				t.Errorf("unexpected answer: %s", helpers.MustMarshal(t, resp))
+			}
 		}
+		assert.Equal(t, 1, won)
+		assert.Equal(t, 1, refused)
 		assert.Len(t, grants(t, colleagueID)["editor"], 1)
 	})
 
@@ -744,8 +816,15 @@ func TestInvitationRedeem(t *testing.T) {
 		})
 		wg.Wait()
 
-		// The accept keeps whichever grant came first; a second create conflicts.
-		accepted(t, acceptResp)
+		// Whichever comes first grants: an accept after the grant finds a
+		// member, a create after the accept conflicts.
+		switch resp := acceptResp.(type) {
+		case *api.Invitation:
+		case *api.AcceptInvitationConflict:
+			assert.Equal(t, "inv.already_member", string(resp.Code))
+		default:
+			t.Errorf("unexpected accept answer: %s", helpers.MustMarshal(t, acceptResp))
+		}
 		switch grantResp.(type) {
 		case *api.Grant, *api.CreateGrantConflict:
 		default:

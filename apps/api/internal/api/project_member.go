@@ -36,22 +36,28 @@ func projectMemberResponse(member *service.ProjectMember) api.ProjectMember {
 	return api.ProjectMember{
 		User:     userRefToAPI(member.User),
 		Relation: api.ProjectMemberRelation(member.Relation),
-		Sources: mapProjectMemberSources(member.Sources,
-			func(team api.TeamRef) api.ProjectMemberSource {
-				return api.NewProjectMemberOwningTeamSourceProjectMemberSource(api.ProjectMemberOwningTeamSource{
-					Type: api.ProjectMemberOwningTeamSourceTypeOwningTeam,
-					Team: team,
-				})
-			},
-			func(grantID string, team api.OptTeamRef) api.ProjectMemberSource {
-				return api.NewProjectMemberGrantSourceProjectMemberSource(api.ProjectMemberGrantSource{
-					Type:    api.ProjectMemberGrantSourceTypeGrant,
-					GrantID: grantID,
-					Team:    team,
-				})
-			},
-		),
+		Sources:  projectMemberSources(member.Sources),
 	}
+}
+
+// projectMemberSources is the members list's wire shape of sources, which
+// invitation lookup's membership shares.
+func projectMemberSources(sources []domain.ProjectMemberSourceRecord) []api.ProjectMemberSource {
+	return mapProjectMemberSources(sources,
+		func(team api.TeamRef) api.ProjectMemberSource {
+			return api.NewProjectMemberOwningTeamSourceProjectMemberSource(api.ProjectMemberOwningTeamSource{
+				Type: api.ProjectMemberOwningTeamSourceTypeOwningTeam,
+				Team: team,
+			})
+		},
+		func(grantID string, team api.OptTeamRef) api.ProjectMemberSource {
+			return api.NewProjectMemberGrantSourceProjectMemberSource(api.ProjectMemberGrantSource{
+				Type:    api.ProjectMemberGrantSourceTypeGrant,
+				GrantID: grantID,
+				Team:    team,
+			})
+		},
+	)
 }
 
 // mapProjectMemberSources walks domain sources once for both the members and

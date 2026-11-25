@@ -355,31 +355,47 @@ func (s authzAssignmentStatements) ListProjectMembers(ctx context.Context, proje
 	}
 	relations := domain.ProjectRolesAtLeast(minRelation)
 	members, next, err := pagination.Page(page, authz.ProjectMemberSchema, func(limit uint32) ([]*domain.ProjectMemberRecord, error) {
-		var c statementCompiler
-		authz.WriteProjectMemberSources(&c, spannerAuthzEnv(), projectID, relations, afterUserID, page.OrderBy.Direction == database.OrderDesc, limit)
-		var sources []authz.ProjectMemberSourceRow
-		err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
-			var qErr error
-			sources, qErr = collectRows(iter, func(row *spanner.Row) (authz.ProjectMemberSourceRow, error) {
-				var (
-					source   authz.ProjectMemberSourceRow
-					teamName spanner.NullString
-				)
-				err := row.Columns(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &source.Relation, &teamName)
-				source.TeamName = teamName.StringVal
-				return source, err
-			})
-			return qErr
-		})
-		if err != nil {
-			return nil, wrapError(err)
-		}
-		return authz.GroupProjectMemberSourcesByUser(sources), nil
+		return s.projectMembers(ctx, projectID, relations, "", afterUserID, page.OrderBy.Direction == database.OrderDesc, limit)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &database.ListResult[*domain.ProjectMemberRecord]{Items: members, NextCursor: next}, nil
+}
+
+// GetProjectMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) GetProjectMember(ctx context.Context, projectID, userID string) (*domain.ProjectMemberRecord, error) {
+	members, err := s.projectMembers(ctx, projectID, domain.ProjectRoles, userID, "", false, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(members) == 0 {
+		return nil, database.NewNoRowFoundError(nil)
+	}
+	return members[0], nil
+}
+
+func (s authzAssignmentStatements) projectMembers(ctx context.Context, projectID string, relations []string, userID, afterUserID string, desc bool, limit uint32) ([]*domain.ProjectMemberRecord, error) {
+	var c statementCompiler
+	authz.WriteProjectMemberSources(&c, spannerAuthzEnv(), projectID, relations, userID, afterUserID, desc, limit)
+	var sources []authz.ProjectMemberSourceRow
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		sources, qErr = collectRows(iter, func(row *spanner.Row) (authz.ProjectMemberSourceRow, error) {
+			var (
+				source   authz.ProjectMemberSourceRow
+				teamName spanner.NullString
+			)
+			err := row.Columns(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &source.Relation, &teamName)
+			source.TeamName = teamName.StringVal
+			return source, err
+		})
+		return qErr
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return authz.GroupProjectMemberSourcesByUser(sources), nil
 }
 
 // ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].

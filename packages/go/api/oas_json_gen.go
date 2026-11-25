@@ -164,6 +164,22 @@ func (s AcceptInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case InvAlreadyMemberAcceptInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("inv.already_member")
+		{
+			s := s.InvAlreadyMember
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InvInviterNotAdminAcceptInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("inv.inviter_not_admin")
@@ -330,6 +346,9 @@ func (s *AcceptInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalAcceptInvitationErrorResponse
 					found = true
+				case "inv.already_member":
+					s.Type = InvAlreadyMemberAcceptInvitationErrorResponse
+					found = true
 				case "inv.inviter_not_admin":
 					s.Type = InvInviterNotAdminAcceptInvitationErrorResponse
 					found = true
@@ -382,6 +401,10 @@ func (s *AcceptInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalAcceptInvitationErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case InvAlreadyMemberAcceptInvitationErrorResponse:
+		if err := s.InvAlreadyMember.Decode(d); err != nil {
 			return err
 		}
 	case InvInviterNotAdminAcceptInvitationErrorResponse:
@@ -80645,6 +80668,194 @@ func (s *InternalDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *InvAlreadyMember) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvAlreadyMember) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("inv.already_member")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfInvAlreadyMember = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes InvAlreadyMember from json.
+func (s *InvAlreadyMember) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvAlreadyMember to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvAlreadyMember")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvAlreadyMember) {
+					name = jsonFieldsNameOfInvAlreadyMember[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvAlreadyMember) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvAlreadyMember) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s InvAlreadyMemberDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s InvAlreadyMemberDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes InvAlreadyMemberDetails from json.
+func (s *InvAlreadyMemberDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvAlreadyMemberDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvAlreadyMemberDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvAlreadyMemberDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvAlreadyMemberDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *InvInvalid) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -85832,6 +86043,169 @@ func (s *InvitationID) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *InvitationLookupMembership) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvitationLookupMembership) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("relation")
+		s.Relation.Encode(e)
+	}
+	{
+		e.FieldStart("sources")
+		e.ArrStart()
+		for _, elem := range s.Sources {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+}
+
+var jsonFieldsNameOfInvitationLookupMembership = [2]string{
+	0: "relation",
+	1: "sources",
+}
+
+// Decode decodes InvitationLookupMembership from json.
+func (s *InvitationLookupMembership) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationLookupMembership to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "relation":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Relation.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"relation\"")
+			}
+		case "sources":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				s.Sources = make([]ProjectMemberSource, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem ProjectMemberSource
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Sources = append(s.Sources, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"sources\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvitationLookupMembership")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvitationLookupMembership) {
+					name = jsonFieldsNameOfInvitationLookupMembership[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvitationLookupMembership) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationLookupMembership) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InvitationLookupMembershipRelation as json.
+func (s InvitationLookupMembershipRelation) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes InvitationLookupMembershipRelation from json.
+func (s *InvitationLookupMembershipRelation) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationLookupMembershipRelation to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch InvitationLookupMembershipRelation(v) {
+	case InvitationLookupMembershipRelationViewer:
+		*s = InvitationLookupMembershipRelationViewer
+	case InvitationLookupMembershipRelationEditor:
+		*s = InvitationLookupMembershipRelationEditor
+	case InvitationLookupMembershipRelationAdmin:
+		*s = InvitationLookupMembershipRelationAdmin
+	default:
+		*s = InvitationLookupMembershipRelation(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvitationLookupMembershipRelation) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationLookupMembershipRelation) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *InvitationLookupProjectMemberResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -85882,9 +86256,15 @@ func (s *InvitationLookupProjectMemberResponse) encodeFields(e *jx.Encoder) {
 		e.FieldStart("project_member")
 		s.ProjectMember.Encode(e)
 	}
+	{
+		if s.Membership.Set {
+			e.FieldStart("membership")
+			s.Membership.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfInvitationLookupProjectMemberResponse = [9]string{
+var jsonFieldsNameOfInvitationLookupProjectMemberResponse = [10]string{
 	0: "project_id",
 	1: "project_name",
 	2: "created_by",
@@ -85894,6 +86274,7 @@ var jsonFieldsNameOfInvitationLookupProjectMemberResponse = [9]string{
 	6: "status",
 	7: "type",
 	8: "project_member",
+	9: "membership",
 }
 
 // Decode decodes InvitationLookupProjectMemberResponse from json.
@@ -85998,6 +86379,16 @@ func (s *InvitationLookupProjectMemberResponse) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"project_member\"")
+			}
+		case "membership":
+			if err := func() error {
+				s.Membership.Reset()
+				if err := s.Membership.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"membership\"")
 			}
 		default:
 			return d.Skip()
@@ -86189,6 +86580,12 @@ func (s InvitationLookupResponse) encodeFields(e *jx.Encoder) {
 			{
 				e.FieldStart("project_member")
 				s.ProjectMember.Encode(e)
+			}
+			{
+				if s.Membership.Set {
+					e.FieldStart("membership")
+					s.Membership.Encode(e)
+				}
 			}
 		}
 	case InvitationLookupTeamMemberResponseInvitationLookupResponse:
@@ -105007,6 +105404,40 @@ func (s *OptInternalDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes InvAlreadyMemberDetails as json.
+func (o OptInvAlreadyMemberDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes InvAlreadyMemberDetails from json.
+func (o *OptInvAlreadyMemberDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptInvAlreadyMemberDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(InvAlreadyMemberDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptInvAlreadyMemberDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptInvAlreadyMemberDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes InvInvalidDetails as json.
 func (o OptInvInvalidDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -107372,6 +107803,55 @@ func (s OptNilInvitationCreatedEventActorType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptNilInvitationCreatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InvitationLookupMembership as json.
+func (o OptNilInvitationLookupMembership) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes InvitationLookupMembership from json.
+func (o *OptNilInvitationLookupMembership) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilInvitationLookupMembership to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v InvitationLookupMembership
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilInvitationLookupMembership) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilInvitationLookupMembership) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -137064,6 +137544,44 @@ func (s *RejectInvitationBadRequest) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes RejectInvitationConflict as json.
+func (s *RejectInvitationConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes RejectInvitationConflict from json.
+func (s *RejectInvitationConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RejectInvitationConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = RejectInvitationConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RejectInvitationConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RejectInvitationConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes RejectInvitationErrorResponse as json.
 func (s RejectInvitationErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -137126,6 +137644,22 @@ func (s RejectInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InvAlreadyMemberRejectInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("inv.already_member")
+		{
+			s := s.InvAlreadyMember
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -137255,6 +137789,9 @@ func (s *RejectInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalRejectInvitationErrorResponse
 					found = true
+				case "inv.already_member":
+					s.Type = InvAlreadyMemberRejectInvitationErrorResponse
+					found = true
 				case "inv.not_found":
 					s.Type = InvNotFoundRejectInvitationErrorResponse
 					found = true
@@ -137298,6 +137835,10 @@ func (s *RejectInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalRejectInvitationErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case InvAlreadyMemberRejectInvitationErrorResponse:
+		if err := s.InvAlreadyMember.Decode(d); err != nil {
 			return err
 		}
 	case InvNotFoundRejectInvitationErrorResponse:

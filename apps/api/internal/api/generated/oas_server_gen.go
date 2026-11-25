@@ -17,6 +17,11 @@ type Handler interface {
 	// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
 	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
+	// A user who already holds a role on the project, from a grant or the owning team, gets
+	// `409 inv.already_member` with that role as `details.details.relation`: no grant is written and the
+	// invitation stays pending. `lookupInvitation` (`POST /invitations/lookup`) returns the same role as
+	// `membership` before accept is called.
+	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 	// that scheme's CSRF rules.
 	//
@@ -1269,7 +1274,8 @@ type Handler interface {
 	// LookupInvitation implements lookupInvitation operation.
 	//
 	// Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
-	// expiry.
+	// expiry, and the role the signed-in user already holds on the project as `membership`. A user with a
+	// role can neither accept nor decline the invitation.
 	//
 	// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
@@ -1493,9 +1499,10 @@ type Handler interface {
 	//
 	// Send the plaintext token from the invitation link fragment. The invitation keeps its metadata for
 	// administrators, but this response returns `metadata` as null. The inviter cannot decline their own
-	// invitation; an administrator cancels it instead. Every unknown or finished token answers the same
-	// opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
-	// requests follow that scheme's CSRF rules.
+	// invitation; an administrator cancels it instead. A user who already holds a role on the project gets
+	// `409 inv.already_member`, and the invitation stays pending. Every unknown or finished token answers
+	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
+	// Cookie requests follow that scheme's CSRF rules.
 	//
 	// POST /invitations/reject
 	RejectInvitation(ctx context.Context, req *InvitationTokenRequest) (RejectInvitationRes, error)

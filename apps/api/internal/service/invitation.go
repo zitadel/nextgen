@@ -290,6 +290,9 @@ type InvitationLookup struct {
 	// Inviter names CreatedBy for a redeemer who cannot read platform users.
 	// Nil when a project secret created the invitation.
 	Inviter *domain.UserRef
+	// Membership is the access the redeemer already holds on the project,
+	// which refuses accept and decline. Nil when they hold none.
+	Membership *domain.ProjectMemberRecord
 }
 
 // resolveInviters sets each invitation's Inviter from its CreatedBy.
@@ -376,6 +379,9 @@ func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_
 		}
 		found.Inviter = new(refs[*entity.CreatedBy])
 	}
+	if found.Membership, err = heldAccess(ctx, stmts, entity, userID); err != nil {
+		return nil, err
+	}
 	return found, nil
 }
 
@@ -404,6 +410,9 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 		// Serializes the grant writes of accepts racing on other links, and
 		// locks the project before the row, as create does.
 		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+			return err
+		}
+		if err := refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
 			return err
 		}
 		// The lock can wait; the guarded change rechecks expiry at this time.
@@ -469,6 +478,35 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 	}
 }
 
+// heldAccess is the type's adapter for what userID already holds of what the
+// invitation grants: for project_member, any role on the project, from any
+// source. Nil when they hold none.
+func heldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (*domain.ProjectMemberRecord, error) {
+	switch entity.Type {
+	case domain.InvitationTypeProjectMember:
+		member, err := stmts.GetProjectMember(ctx, entity.ProjectID, userID)
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, nil
+		}
+		return member, err
+	default:
+		return nil, domain.ErrNotImplemented()
+	}
+}
+
+// refuseHeldAccess refuses redeeming for a user who already holds access, so
+// no redundant grant is written and the invitation stays pending.
+func refuseHeldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
+	held, err := heldAccess(ctx, stmts, entity, userID)
+	if err != nil {
+		return err
+	}
+	if held != nil {
+		return domain.ErrInvitationAlreadyMember(held.Relation)
+	}
+	return nil
+}
+
 // Reject declines a pending invitation for userID.
 func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_ *Invitation, err error) {
 	ctx, end := startSpan(ctx, "InvitationService.Reject")
@@ -485,6 +523,10 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 		// An administrator cancels their own invitation instead.
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfReject()
+		}
+		// A member's decline would spend the link meant for someone else.
+		if err := refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
+			return err
 		}
 		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, userID, now)
 		if err != nil {

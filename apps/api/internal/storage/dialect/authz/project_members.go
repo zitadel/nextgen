@@ -51,10 +51,11 @@ func ProjectMembersCursorUserID(page database.Page[domain.ProjectMemberField]) (
 	return userID, nil
 }
 
-// WriteProjectMemberSources emits the query behind ListProjectMembers: every
-// way the first limit people (0 for no limit) hold one of relations on a
-// project, in user id order (descending when desc) after afterUserID in that
-// order ("" for the first page). It selects user_id, home_project_id,
+// WriteProjectMemberSources emits the query behind ListProjectMembers and
+// GetProjectMember: every way the first limit people (0 for no limit) hold one
+// of relations on a project, in user id order (descending when desc) after
+// afterUserID in that order ("" for the first page), only userID unless it is
+// "". It selects user_id, home_project_id,
 // source_rank (0 owning team, 1 team grant, 2 user grant), grant_id, team_id,
 // relation and team_name. The owning team holds admin, so it is a source only
 // when relations includes admin. An empty relations matches nobody.
@@ -72,15 +73,19 @@ func ProjectMembersCursorUserID(page database.Page[domain.ProjectMemberField]) (
 // directly, and sources are then read only for the page's people.
 // How much of a large team is read for the candidates is up to the dialect's
 // planner.
-func WriteProjectMemberSources(w ArgWriter, env Env, projectID string, relations []string, afterUserID string, desc bool, limit uint32) {
+func WriteProjectMemberSources(w ArgWriter, env Env, projectID string, relations []string, userID, afterUserID string, desc bool, limit uint32) {
 	compare, direction := " > ", " ASC"
 	if desc {
 		compare, direction = " < ", " DESC"
 	}
-	writeAfter := func(column string) {
+	writePeople := func(column string) {
 		if afterUserID != "" {
 			w.WriteString(` AND ` + column + compare)
 			w.WriteArg(afterUserID)
+		}
+		if userID != "" {
+			w.WriteString(` AND ` + column + ` = `)
+			w.WriteArg(userID)
 		}
 	}
 	writeLimit := func() {
@@ -158,7 +163,7 @@ direct_grants AS (
 	w.WriteArg(domain.UserStatusActive.String())
 	w.WriteString(`
   WHERE g.principal_type = 'user'`)
-	writeAfter("g.principal_id")
+	writePeople("g.principal_id")
 	w.WriteString(`
 ),
 direct_people AS (
@@ -181,7 +186,7 @@ people AS (
 	writeMembershipEdgeMatchIn(w, "th.home_project_id", "", "th.team_id", "", "", "")
 	w.WriteString(`
     WHERE TRUE`)
-	writeAfter("e.member_id")
+	writePeople("e.member_id")
 	w.WriteString(`
     UNION ALL
     SELECT dp.user_id
