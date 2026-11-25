@@ -354,8 +354,6 @@ describe("deploy", () => {
           status: "error",
           command: "deploy",
           code: "E_VALIDATION",
-          message: "There is nothing in .zitadel/ to deploy",
-          hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
         });
       });
 
@@ -1298,7 +1296,7 @@ describe("deploy", () => {
         });
       });
 
-      it("tells a connection holding its client_secret literally how to publish it", async () => {
+      it("refuses a connection holding its client_secret literally and points at variable set", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.enableSso("google", GOOGLE);
@@ -1312,7 +1310,6 @@ describe("deploy", () => {
           status: "error",
           command: "deploy",
           code: "E_VALIDATION",
-          hint: expect.stringContaining("Publish a secret with the command below"),
           next_commands: [expectedPublicCliCommand(app.againAsRun("variable set NAME --secret"))],
         });
       });

@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
@@ -160,6 +163,26 @@ describe("start", () => {
             next_commands: [expectedPublicCliCommand(`setup --server local --cwd ${app.path}`)],
           },
           warnings: [],
+        });
+      });
+
+      it("refuses a record of the local server that is malformed with the reset and start that repair it", async () => {
+        const app = await aSetUpApp();
+        await mkdir(join(app.path, ".zitadel/local"), { recursive: true });
+        await writeFile(
+          join(app.path, ".zitadel/local/runtime.json"),
+          JSON.stringify({ backend: "nope" }),
+        );
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          next_commands: [
+            expectedPublicCliCommand(app.againAsRun("reset --force")),
+            expectedPublicCliCommand(app.againAsRun("start")),
+          ],
         });
       });
 
