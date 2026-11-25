@@ -264,14 +264,14 @@ export function appTemplateHtml(ctx: PatchContext): string {
   const localesBinding = ctx.useCase === "business" ? `\n      [locales]="locales"` : "";
   return `<!-- ${ManagedFile.MARKER} -->
 @if (path.startsWith('/profile')) {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-session
       [project]="project"
       [postSignOutUrl]="'/login'"
     ></zitadel-auth-session>
   </div>
 } @else if (path.startsWith('/register')) {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
       [project]="project"${localesBinding}
       purpose="register"
@@ -279,7 +279,7 @@ export function appTemplateHtml(ctx: PatchContext): string {
     ></zitadel-auth-login>
   </div>
 } @else {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
       [project]="project"${localesBinding}
       purpose="login"
