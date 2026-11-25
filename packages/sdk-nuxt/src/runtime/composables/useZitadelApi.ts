@@ -2,7 +2,7 @@ import { getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 
 /**
  * Returns the typed Zitadel API client for the current project, so an app can call the API
- * without depending on `@zitadel/api` itself.
+ * from this one package.
  *
  * The client is built from the project that the module's plugin configured from the project id
  * and the proxy path, so calls go to the app's same-origin proxy path and carry the session

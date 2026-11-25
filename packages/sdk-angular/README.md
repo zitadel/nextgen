@@ -18,7 +18,7 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 
 ## Reading the configuration and the API client
 
-`configureZitadel`, `getApi` and `getZitadelConfig` are the same functions the other SDKs export, from `@zitadel/api/config`: `configureZitadel` registers the project handle, `getZitadelConfig` reads it back, and `getApi(project)` returns a typed API client for it.
+`configureZitadel`, `getApi` and `getZitadelConfig` are the same functions the other SDKs export: `configureZitadel` registers the project handle, `getZitadelConfig` reads it back, and `getApi(project)` returns a typed API client for it.
 
 ## Usage
 

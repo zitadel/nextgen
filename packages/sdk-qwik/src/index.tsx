@@ -39,8 +39,7 @@ import type { ZitadelWidgetAttributes } from "./types.js";
  *
  * {@link configureZitadel} sets the project the SDK talks to and returns the project handle,
  * {@link getApi} returns the configured API client, and {@link getZitadelConfig} reads the
- * configuration back. They exist here so a Qwik app needs no direct dependency on
- * `@zitadel/api`, which strict package managers would otherwise require it to declare.
+ * configuration back. They exist here so a Qwik app configures the SDK from this one package.
  *
  * @example
  * ```ts

@@ -4,9 +4,9 @@
  * This entry carries only the project configuration helpers ({@link configureZitadel},
  * {@link getApi}, {@link getZitadelConfig}). They are re-exported so an app that declares
  * `@zitadel/sdk-qwik-router` as its only direct dependency can configure the SDK without
- * importing `@zitadel/api/config`. It contains no server code and no secrets, so it is safe in a
- * browser bundle. The `<ZitadelLogin>` and `<ZitadelLogout>` Qwik components live in
- * `@zitadel/sdk-qwik`, not here.
+ * a second package. It contains no server code and no secrets, so it is safe in a
+ * browser bundle. The `<ZitadelLogin>` and `<ZitadelLogout>` Qwik components come from
+ * `@zitadel/sdk-qwik-router/components`, which re-exports `@zitadel/sdk-qwik`, not from here.
  *
  * @example
  * ```ts
