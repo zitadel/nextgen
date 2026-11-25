@@ -68,6 +68,7 @@ export function configFiles(documents: ConfigDocuments = {}): {
     connections: filesOf(documents, "connections"),
     policies: filesOf(documents, "policies"),
     branding: filesOf(documents, "branding"),
+    applications: filesOf(documents, "applications"),
   };
 }
 
@@ -302,4 +303,29 @@ export const PASSWORD_POLICY: PolicyOperation = "auth.factor.password.set";
  */
 export function aPasswordPolicy(config: JsonObject = { min_length: 12 }): JsonObject {
   return { operation: PASSWORD_POLICY, config };
+}
+
+/**
+ * An application a release declares, whose one web client sets its
+ * `client_id` and names its secret as a variable.
+ *
+ * @param client - Keys of the client to set in place of the defaults.
+ * @returns The application document.
+ */
+export function anApplication(client: JsonObject = {}): JsonObject {
+  return {
+    slug: "shop",
+    name: "Shop",
+    clients: [
+      {
+        slug: "web",
+        client_id: "shop-web",
+        type: "confidential",
+        grant_types: ["authorization_code"],
+        redirect_uris: ["https://shop.example.com/callback"],
+        secret: "${{ SHOP_WEB_CLIENT_SECRET }}",
+        ...client,
+      },
+    ],
+  };
 }

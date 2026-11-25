@@ -34,6 +34,7 @@ import {
   aStore,
   aStoreHolding,
   aUserSchema,
+  anApplication,
   bodyAt,
   type ConfigDocuments,
   type DocumentsByName,
@@ -967,6 +968,23 @@ describe("ZitadelConfig.bundle", () => {
     const { bundle } = config.bundle(new MemoryStore());
 
     expect(bundle).not.toHaveProperty("policies");
+  });
+
+  it("carries application files under `applications` and counts each", () => {
+    const config = aConfig({ applications: { "shop.json": anApplication() } });
+
+    const { bundle, resourceCount } = config.bundle(new MemoryStore());
+
+    expect(bundle.applications).toEqual([anApplication()]);
+    expect(resourceCount).toBe(1);
+  });
+
+  it("leaves `applications` out when there are none, so a server without the kind takes it", () => {
+    const config = aConfig({ schemas: { "human-user.json": aUserSchema() } });
+
+    const { bundle } = config.bundle(new MemoryStore());
+
+    expect(bundle).not.toHaveProperty("applications");
   });
 
   it("refuses an empty configuration", () => {

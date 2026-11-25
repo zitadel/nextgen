@@ -189,6 +189,17 @@ describe("diffStep", () => {
       expect(shown(result)).toContain("The primary origins serve 2 different releases");
     });
 
+    it("shows an added application, with its redirect URIs", async ({ dir }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, {
+        ".zitadel/applications/shop.json": '{ "redirect_uris": ["https://shop.test/cb"] }\n',
+      });
+
+      const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(shown(result)).toContain('+{ "redirect_uris": ["https://shop.test/cb"] }');
+    });
+
     it("prints the diff against the live commit", async ({ dir }) => {
       const sha = await aLiveCommit(dir);
       await write(dir, { [SCHEMA]: '{ "type": "string" }\n' });
@@ -236,6 +247,16 @@ describe("diffStep", () => {
       const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
 
       expect(result?.learned?.changedConfiguration).toEqual(["user_schema", "branding"]);
+    });
+
+    it("records a changed application, which changes no schema or flow", async ({ dir }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, { ".zitadel/applications/shop.json": "{}\n" });
+
+      const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(result?.learned?.changedConfiguration).toEqual(["application"]);
+      expect(result?.learned?.schemasOrFlowsChanged).toBe(false);
     });
 
     it("does not count a README or a policy's test file as a changed policy", async ({ dir }) => {

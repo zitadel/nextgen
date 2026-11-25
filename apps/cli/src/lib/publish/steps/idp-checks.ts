@@ -1,17 +1,9 @@
-import { ForbiddenError, type VariableService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
+import type { StepContext } from "@/lib/publish/pipeline";
 import type { Suggestion } from "@/lib/suggestion";
 import type { Connection } from "@/lib/zitadel";
 
-/**
- * The kind of variable each publish freezes, with no fallback from one to the
- * other (ADR 069).
- */
-const VARIABLE_KIND = {
-  deploy: "primary",
-  preview: "preview",
-} as const satisfies Record<PipelineMode, Parameters<VariableService["heldByName"]>[0]>;
+import { heldVariables } from "./held-variables";
 
 /**
  * The checks a connection gets against the project before the release is built.
@@ -35,7 +27,7 @@ const VARIABLE_KIND = {
  *   secret name one variable, or a variable is not the kind its field needs.
  * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a connection names a
  *   variable the project does not hold.
- * @throws {@link ForbiddenError} When a deploy's token may not read the
+ * @throws `ForbiddenError` When a deploy's token may not read the
  *   variables.
  */
 export async function validateConnections(ctx: StepContext): Promise<void> {
@@ -49,30 +41,6 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
   }
   for (const connection of connections) {
     checkCredentialVariables(ctx, connection, held);
-  }
-}
-
-/**
- * The variables the deploy would freeze, by name, and whether each is a secret.
- *
- * @remarks
- * The primary kind's for a deploy and the preview kind's for a preview, with
- * no fallback from one to the other (ADR 069). A preview's token may not read
- * them, which leaves the check to the deploy that merges it.
- *
- * @param ctx - The step's context.
- * @returns Each variable's name and whether it is a secret, or `undefined`
- *   when a preview's token may not read them.
- * @throws {@link ForbiddenError} When a deploy's token may not read them.
- */
-async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, boolean> | undefined> {
-  try {
-    return await ctx.variables.heldByName(VARIABLE_KIND[ctx.mode]);
-  } catch (error) {
-    if (ctx.mode === "preview" && error instanceof ForbiddenError) {
-      return undefined;
-    }
-    throw error;
   }
 }
 

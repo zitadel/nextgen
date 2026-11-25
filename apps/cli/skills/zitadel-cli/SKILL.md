@@ -550,7 +550,8 @@ Each invocation prints one JSON object:
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
   diff), including rapid same-size edits and untracked configuration files.
-  It covers `schemas/`, `flows/`, `branding/` and `idps/` under `.zitadel/`,
+  It covers `schemas/`, `flows/`, `branding/`, `idps/` and `applications/`
+  under `.zitadel/`,
   the `*.json` files at the top of `.zitadel/policies/` but not their
   `*.test.json` test files, and any file a branding descriptor's `$file`
   inlines. Review it before you deploy. `files` is `[]` when nothing changed
@@ -1129,6 +1130,19 @@ is in `next_commands`, not in the hint. Warnings in
 `warnings` start with the file's path. The server still applies its own
 release rules when the build is submitted, such as handles being unique, so a
 passing dry run does not promise the release is accepted.
+
+`deploy` sends every `.zitadel/applications/<slug>.json` with the release; a
+release declares those applications, and `POST /applications` may not write
+one (`app.declared`). `.zitadel/meta/application.json` is the file's schema.
+Each client sets its `client_id`, and each confidential client names its
+secret as `"secret": "${{ NAME }}"`, never the value (`contract/application`).
+Two files with one `slug` (`application/duplicate-slug`), two clients with one
+`client_id` (`application/duplicate-client-id`) or one secret variable
+(`application/shared-variable`) are issues of the same `E_VALIDATION`. Before
+the release is built, a secret variable the project lacks fails with
+`E_CREDENTIAL_MISSING`, and one that is not a secret with `E_VALIDATION`; both
+name the file and client, with `variable set NAME --secret` in
+`next_commands`.
 
 A flow is matched to a local schema by the schema's `objectType`, its `$id`, an
 id `.zitadel/state.json` records for it, or, for a schema with no `$id`, the

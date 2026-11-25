@@ -22,6 +22,7 @@ const CONFIG_PATHS = [
   `${CONFIG_DIRECTORIES.flows}/`,
   `${CONFIG_DIRECTORIES.branding}/`,
   `${CONFIG_DIRECTORIES.connections}/`,
+  `${CONFIG_DIRECTORIES.applications}/`,
 ] as const;
 
 /**

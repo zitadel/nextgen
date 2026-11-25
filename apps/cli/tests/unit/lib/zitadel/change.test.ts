@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  Application,
   Change,
   CONFIG_DIRECTORIES,
   ConfigError,
@@ -15,6 +16,7 @@ import {
 import {
   aConfig,
   aFile,
+  anApplication,
   aPasswordPolicy,
   aStore,
   aUserSchema,
@@ -266,6 +268,17 @@ describe("Change.save", () => {
       .save(store);
 
     expect(bodyAt(store, PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+  });
+
+  it("replaces an application file a new application is put over", async () => {
+    const path = `${CONFIG_DIRECTORIES.applications}/shop.json`;
+    const store = aStore({ applications: { "shop.json": anApplication() } });
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const edited = anApplication({ redirect_uris: ["https://shop.example.com/cb"] });
+
+    await config.applications.put(Application.create({ path, body: edited })).save(store);
+
+    expect(bodyAt(store, path)).toEqual(edited);
   });
 
   it("replaces a file whose document was removed earlier in the same edit", async () => {
