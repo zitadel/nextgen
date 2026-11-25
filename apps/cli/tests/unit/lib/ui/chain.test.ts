@@ -181,7 +181,10 @@ describe("Chain", () => {
     const chain = watching();
     chain.describe("Removing an origin");
     const cancelled = await asTerminal(() => {
-      return Asker.for(chain.session()).yesNo({ name: "remove it", message: "Remove it?" });
+      return Asker.for(chain.session()).yesNo({
+        name: "remove it",
+        message: "Remove it?",
+      });
     }).catch((error: unknown) => error);
 
     const asked = printed(person);
@@ -359,7 +362,10 @@ describe("a normal command's chain, which is no chain at all", () => {
     const running = aSpinnerRunning(clock, chain, "Deploying");
 
     await asTerminal(() => {
-      return Asker.for(chain.session()).yesNo({ name: "deploy it", message: "Deploy it now?" });
+      return Asker.for(chain.session()).yesNo({
+        name: "deploy it",
+        message: "Deploy it now?",
+      });
     });
     clock.advance(FRAME);
 
@@ -381,9 +387,14 @@ describe("a normal command's chain, which is no chain at all", () => {
 
       await expect(
         asTerminal(() => {
-          return Asker.for(chain.session()).yesNo({ name: "deploy it", message: "Deploy it now?" });
+          return Asker.for(chain.session()).yesNo({
+            name: "deploy it",
+            message: "Deploy it now?",
+          });
         }),
-      ).rejects.toMatchObject({ name: "AbortError" });
+      ).rejects.toMatchObject({
+        name: "AbortError",
+      });
       clock.advance(FRAME);
 
       const shown = printed(person);
@@ -415,7 +426,10 @@ describe("a normal command's chain, which is no chain at all", () => {
             return { ok: true, value: raw };
           },
         });
-        await Asker.for(chain.session()).yesNo({ name: "deploy it", message: "Deploy it now?" });
+        await Asker.for(chain.session()).yesNo({
+          name: "deploy it",
+          message: "Deploy it now?",
+        });
       });
 
       expect(drawn).toEqual(["prompt"]);

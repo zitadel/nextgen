@@ -208,7 +208,11 @@ describe("EnvironmentCommand.service", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
     const consent = await Consent.request(
       { verb: "remove", name: "remove it", message: "Remove it?" },
-      aConsentSession({ interactive: false, force: true, dryRun: false }),
+      aConsentSession({
+        interactive: false,
+        force: true,
+        dryRun: false,
+      }),
     );
     if (consent === undefined) {
       throw new Error("consent was not given");
@@ -227,7 +231,11 @@ describe("EnvironmentCommand.service", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
     const consent = await Consent.request(
       { verb: "remove", name: "remove it", message: "Remove it?" },
-      aConsentSession({ interactive: false, force: true, dryRun: false }),
+      aConsentSession({
+        interactive: false,
+        force: true,
+        dryRun: false,
+      }),
     );
     if (consent === undefined) {
       throw new Error("consent was not given");
@@ -248,7 +256,11 @@ describe("EnvironmentCommand.projectOnServer", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
     const consent = await Consent.request(
       { verb: "remove", name: "remove it", message: "Remove it?" },
-      aConsentSession({ interactive: false, force: true, dryRun: false }),
+      aConsentSession({
+        interactive: false,
+        force: true,
+        dryRun: false,
+      }),
     );
     if (consent === undefined) {
       throw new Error("consent was not given");

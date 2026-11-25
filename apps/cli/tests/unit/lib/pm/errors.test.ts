@@ -6,7 +6,9 @@ import { PmCommandFailedError, PmError, PmManifestInvalidError } from "@/lib/pm"
 describe("the package manager errors", () => {
   it("reports an unreadable manifest as invalid, keeping the parse error", () => {
     const cause = new SyntaxError("bad");
-    const error = new PmManifestInvalidError("/app/package.json", { cause });
+    const error = new PmManifestInvalidError("/app/package.json", {
+      cause,
+    });
 
     expect(error).toBeInstanceOf(PmError);
     expect(error.category).toBe("invalid");
@@ -16,7 +18,9 @@ describe("the package manager errors", () => {
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
       message: "Cannot read /app/package.json as a package.json: bad",
-      details: { path: "/app/package.json" },
+      details: {
+        path: "/app/package.json",
+      },
     });
   });
 
@@ -33,7 +37,11 @@ describe("the package manager errors", () => {
     expect(error.category).toBe("unknown");
     expect(error.retryable).toBe(false);
     expect(error.cause).toBe(cause);
-    expect(error).toMatchObject({ exit: 1, signal: null, output: "boom" });
+    expect(error).toMatchObject({
+      exit: 1,
+      signal: null,
+      output: "boom",
+    });
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
       message: "npm install failed with exit 1",

@@ -1,6 +1,6 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{
@@ -29,7 +29,7 @@ export type BackendErrorOptions = Readonly<{
  * (it carries the status, the URL and the body), and a request the backend
  * itself would not make (it carries only a message and a hint).
  */
-export class BackendError extends Error implements Categorized {
+export class BackendError extends Error {
   /** The kind of failure; `unknown` for a failure no subclass names. */
   readonly category: ErrorCategory = "unknown";
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
@@ -58,7 +58,13 @@ export class BackendError extends Error implements Categorized {
       (answered && options.status !== 404 ? BackendError.rejectionHint(options.body) : undefined);
     this.details =
       options.details ??
-      (answered ? { status: options.status, url: options.url, body: options.body } : undefined);
+      (answered
+        ? {
+            status: options.status,
+            url: options.url,
+            body: options.body,
+          }
+        : undefined);
   }
 
   /**
@@ -340,7 +346,10 @@ export class BackendUnavailableError extends BackendError {
         : {
             ...options,
             hint: BackendUnavailableError.hintFor(options.reason),
-            details: { url: options.url, reason: options.reason },
+            details: {
+              url: options.url,
+              reason: options.reason,
+            },
           },
     );
   }

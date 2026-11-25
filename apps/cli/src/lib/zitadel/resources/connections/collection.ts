@@ -606,7 +606,10 @@ export class Connections extends Collection<Connection> {
         `${path} already exists and is not the ${slug} connection`,
         {
           hint: this.renameHint(slug),
-          details: { file: path, slug },
+          details: {
+            file: path,
+            slug,
+          },
         },
       );
     }
@@ -728,7 +731,10 @@ export class Connections extends Collection<Connection> {
         `This connection points both credentials at ${doubled}`,
         {
           hint: "Give client_id and client_secret separate ${{ NAME }} references, then run the command again.",
-          details: { slug, variable: doubled },
+          details: {
+            slug,
+            variable: doubled,
+          },
         },
       );
     }
@@ -745,7 +751,12 @@ export class Connections extends Collection<Connection> {
           `${connection.path} and ${slug} both use ${shared}`,
           {
             hint: "Point one of them at a variable of its own, then run the command again.",
-            details: { file: connection.path, slug, other_slug: connection.slug, variable: shared },
+            details: {
+              file: connection.path,
+              slug,
+              other_slug: connection.slug,
+              variable: shared,
+            },
           },
         );
       }

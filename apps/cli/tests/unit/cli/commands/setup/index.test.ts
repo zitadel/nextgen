@@ -252,7 +252,10 @@ const CANCELLED = Symbol("cancelled");
  * @param question - The question.
  * @returns The answer.
  */
-const ask = Asker.for({ interactive: true, force: false });
+const ask = Asker.for({
+  interactive: true,
+  force: false,
+});
 
 /**
  * A Vite React app.

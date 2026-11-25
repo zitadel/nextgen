@@ -30,7 +30,6 @@ export {
   IdpSettingRefusedError,
   IdpSettingsConflictError,
   IdpSettingsMissingError,
-  type IdpErrorOptions,
 } from "./errors";
 export {
   type CredentialNames,

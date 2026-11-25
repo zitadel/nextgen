@@ -34,7 +34,10 @@ const APP_DIR = "/tmp/app";
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = Asker.for({ interactive: true, force: false });
+const ask = Asker.for({
+  interactive: true,
+  force: false,
+});
 
 /**
  * The boxes a prompt drew, as setup's own context would have drawn them.
@@ -168,6 +171,8 @@ describe("ConfirmFramework", () => {
     const error = await rejectionOf(() => {
       return new ConfirmFramework(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
     });
-    expect(error).toMatchObject({ name: "AbortError" });
+    expect(error).toMatchObject({
+      name: "AbortError",
+    });
   });
 });

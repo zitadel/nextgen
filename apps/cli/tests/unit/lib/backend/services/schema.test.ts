@@ -70,7 +70,9 @@ describe("SchemaService.get", () => {
 
     const schema = await service({
       getSchema: async () => {
-        throw new BackendNotFoundError("no such schema", { status: 404 });
+        throw new BackendNotFoundError("no such schema", {
+          status: 404,
+        });
       },
       listSchemas: { pages },
     }).get("human-user");
@@ -88,7 +90,9 @@ describe("SchemaService.get", () => {
     await expect(
       service({
         getSchema: async () => {
-          throw new BackendNotFoundError("no such schema", { status: 404 });
+          throw new BackendNotFoundError("no such schema", {
+            status: 404,
+          });
         },
         listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
       }).get("typo"),

@@ -20,9 +20,6 @@ import { warnings } from "@/lib/ui";
 import { ChangeCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
-/** What a refusal adds when a key may be one a newer server declares. */
-const NEWER_SERVER = " A key a newer Zitadel server added needs a CLI as new as the server.";
-
 /** How a configuration with errors in it is refused. */
 const CONFIG_INVALID_REFUSAL = {
   message: "{message}",
@@ -208,22 +205,40 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
               CONFIG_INVALID_SECRET_REFUSAL,
               {
                 message: error.message,
-                newer: error.refusedKey ? NEWER_SERVER : "",
+                newer: error.refusedKey
+                  ? " A key a newer Zitadel server added needs a CLI as new as the server."
+                  : "",
                 details: error.details ?? null,
               },
-              { next: { id: "variable:set", args: { name: "NAME" }, flags: { secret: true } } },
+              {
+                next: {
+                  id: "variable:set",
+                  args: {
+                    name: "NAME",
+                  },
+                  flags: {
+                    secret: true,
+                  },
+                },
+              },
             ),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof PublishConfigInvalidError) {
           throw Object.assign(
             refusalError(CONFIG_INVALID_REFUSAL, {
               message: error.message,
-              newer: error.refusedKey ? NEWER_SERVER : "",
+              newer: error.refusedKey
+                ? " A key a newer Zitadel server added needs a CLI as new as the server."
+                : "",
               details: error.details ?? null,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof PublishConnectionVariableSharedError) {
@@ -232,7 +247,9 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
               message: error.message,
               details: error.details ?? null,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof PublishConnectionVariableKindError) {
@@ -240,32 +257,52 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
           throw Object.assign(
             refusalError(
               wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
-              { message: error.message, details: error.details ?? null },
+              {
+                message: error.message,
+                details: error.details ?? null,
+              },
               {
                 next: {
                   id: "variable:set",
-                  args: { name: error.variable },
-                  flags: { secret: wantsSecret, preview: false },
+                  args: {
+                    name: error.variable,
+                  },
+                  flags: {
+                    secret: wantsSecret,
+                    preview: false,
+                  },
                 },
               },
             ),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof PublishConnectionVariableMissingError) {
           throw Object.assign(
             refusalError(
               VARIABLE_MISSING_REFUSAL,
-              { message: error.message, details: error.details ?? null },
+              {
+                message: error.message,
+                details: error.details ?? null,
+              },
               {
                 next: {
                   id: "variable:set",
-                  args: { name: error.variable },
-                  flags: { secret: error.field === "client_secret", preview: false },
+                  args: {
+                    name: error.variable,
+                  },
+                  flags: {
+                    secret: error.field === "client_secret",
+                    preview: false,
+                  },
                 },
               },
             ),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;

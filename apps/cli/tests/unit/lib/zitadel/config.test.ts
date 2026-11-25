@@ -834,7 +834,9 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toMatchObject({ category: "conflict" });
+      expect(error).toMatchObject({
+        category: "conflict",
+      });
     });
 
     it("refuses one that connects to another issuer, saying to choose another slug", () => {
@@ -848,7 +850,9 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: acmeSelection }] });
       });
 
-      expect(error).toMatchObject({ category: "conflict" });
+      expect(error).toMatchObject({
+        category: "conflict",
+      });
       expect(error).toMatchObject({
         hint: expect.stringContaining("Choose another slug for this connection"),
       });
@@ -875,7 +879,9 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: acmeSelection }] });
       });
 
-      expect(error).toMatchObject({ category: "conflict" });
+      expect(error).toMatchObject({
+        category: "conflict",
+      });
     });
   });
 

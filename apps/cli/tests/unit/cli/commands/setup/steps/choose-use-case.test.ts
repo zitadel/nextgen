@@ -38,7 +38,10 @@ const CANCEL = Symbol("cancel");
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = Asker.for({ interactive: true, force: false });
+const ask = Asker.for({
+  interactive: true,
+  force: false,
+});
 
 /**
  * The boxes a prompt drew, as setup's own context would have drawn them.
@@ -168,6 +171,8 @@ describe("ChooseUseCase", () => {
         CONTEXT,
       );
     });
-    expect(error).toMatchObject({ name: "AbortError" });
+    expect(error).toMatchObject({
+      name: "AbortError",
+    });
   });
 });

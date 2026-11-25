@@ -19,7 +19,9 @@ describe("the consent errors", () => {
       code: "E_CONFIRMATION_REQUIRED",
       message: "Cannot remove X without --force in non-interactive mode",
       hint: "Remove X?",
-      details: { question: "Remove X?" },
+      details: {
+        question: "Remove X?",
+      },
     });
   });
 

@@ -12,13 +12,19 @@ describe("the sync errors", () => {
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
       message: "Cannot read .zitadel/state.json: it is not valid JSON",
-      details: { file: ".zitadel/state.json" },
+      details: {
+        file: ".zitadel/state.json",
+      },
     });
   });
 
   it("keeps the cause", () => {
     const cause = new SyntaxError("bad");
 
-    expect(new SyncStateMalformedError("f", "p", { cause }).cause).toBe(cause);
+    expect(
+      new SyncStateMalformedError("f", "p", {
+        cause,
+      }).cause,
+    ).toBe(cause);
   });
 });

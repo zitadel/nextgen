@@ -368,6 +368,9 @@ function boundaryConflict(
       `${existing} aside and rerun setup, then merge it into ${target}.`;
   return new OrcaPatchLayoutConflictError(
     `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
-    { hint: remedy, details },
+    {
+      hint: remedy,
+      details,
+    },
   );
 }

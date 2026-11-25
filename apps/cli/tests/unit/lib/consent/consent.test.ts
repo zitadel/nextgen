@@ -29,9 +29,21 @@ const GATE: Gate = {
 };
 /** A client as every command gets one; nothing here sends a request. */
 const aClient = () => createZitadelClient({ signal, baseUrl: "http://localhost:8080" });
-const asked = aConsentSession({ interactive: true, force: false, dryRun: false });
-const forced = aConsentSession({ interactive: false, force: true, dryRun: false });
-const scripted = aConsentSession({ interactive: false, force: false, dryRun: false });
+const asked = aConsentSession({
+  interactive: true,
+  force: false,
+  dryRun: false,
+});
+const forced = aConsentSession({
+  interactive: false,
+  force: true,
+  dryRun: false,
+});
+const scripted = aConsentSession({
+  interactive: false,
+  force: false,
+  dryRun: false,
+});
 
 /** What a refused request threw. */
 const refusalOf = (session: typeof scripted, gate: Gate = GATE) =>
@@ -112,7 +124,9 @@ describe("Consent", () => {
       vi.mocked(confirm).mockResolvedValueOnce(CANCEL_SYMBOL);
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
-      await expect(Consent.request(GATE, asked)).rejects.toMatchObject({ name: "AbortError" });
+      await expect(Consent.request(GATE, asked)).rejects.toMatchObject({
+        name: "AbortError",
+      });
     });
   });
 

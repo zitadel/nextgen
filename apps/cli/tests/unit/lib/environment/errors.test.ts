@@ -67,7 +67,10 @@ describe("the environment errors", () => {
         consulted: ["process environment", ".env"],
       },
     });
-    expect(error).toMatchObject({ unbound: true, boundFile: ".env.staging.local" });
+    expect(error).toMatchObject({
+      unbound: true,
+      boundFile: ".env.staging.local",
+    });
     expect(toZitadelError(error).nextCommands).toBeUndefined();
   });
 });

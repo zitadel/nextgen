@@ -124,8 +124,12 @@ export class PlanChange extends WizardStep<
         republish: (missing) => {
           return this.deps.suggest({
             id: "variable:set",
-            args: { name: missing.name },
-            flags: { secret: missing.secret },
+            args: {
+              name: missing.name,
+            },
+            flags: {
+              secret: missing.secret,
+            },
           });
         },
       });

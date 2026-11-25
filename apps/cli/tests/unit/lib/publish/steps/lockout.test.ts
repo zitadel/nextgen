@@ -149,7 +149,9 @@ function aPlatform(platform: Platform = {}): ClientStubs {
   } = platform;
   const reachable = (userId: string) => {
     if (gone.includes(userId)) {
-      throw new BackendNotFoundError(`${userId} is gone`, { status: 404 });
+      throw new BackendNotFoundError(`${userId} is gone`, {
+        status: 404,
+      });
     }
     if (credentialsUnreadableFor.includes(userId)) {
       throw new Error("forbidden");

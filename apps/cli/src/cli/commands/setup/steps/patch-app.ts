@@ -158,7 +158,9 @@ export class PatchApp extends WizardStep<
               message: error.message,
               details: error.details ?? null,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;
@@ -171,7 +173,9 @@ export class PatchApp extends WizardStep<
               hint: error.hint ?? "",
               details: error.details ?? null,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;

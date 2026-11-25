@@ -54,6 +54,10 @@ describe("the project errors", () => {
   it("keeps the cause of a missing file", () => {
     const cause = new Error("ENOENT");
 
-    expect(new ProjectSecretMissingError({ cause }).cause).toBe(cause);
+    expect(
+      new ProjectSecretMissingError({
+        cause,
+      }).cause,
+    ).toBe(cause);
   });
 });

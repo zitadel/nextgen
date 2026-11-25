@@ -180,7 +180,9 @@ export class PM {
       } catch (error) {
         throw error instanceof PmCommandFailedError
           ? error
-          : new PmCommandFailedError(`${command.display} failed`, { cause: error });
+          : new PmCommandFailedError(`${command.display} failed`, {
+              cause: error,
+            });
       }
     };
 

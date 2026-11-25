@@ -169,7 +169,9 @@ describe("responseFailure", () => {
         { code: "proj.origin_not_allowed" },
         "refused",
       ),
-    ).toMatchObject({ name: "BackendRejectedError" });
+    ).toMatchObject({
+      name: "BackendRejectedError",
+    });
   });
 
   it("carries the status, the URL and the body the server answered with", () => {
@@ -193,7 +195,9 @@ describe("responseFailure", () => {
     const error = responseFailure(
       409,
       "http://localhost:8080/p",
-      { code: "rel.revoked" },
+      {
+        code: "rel.revoked",
+      },
       "refused",
     );
 
@@ -235,7 +239,10 @@ describe("translateFailure", () => {
     (reason) => {
       expect(
         translateFailure(new NetworkError("http://localhost:8080", reason, "no answer")),
-      ).toMatchObject({ name: "BackendUnavailableError", reason });
+      ).toMatchObject({
+        name: "BackendUnavailableError",
+        reason,
+      });
     },
   );
 

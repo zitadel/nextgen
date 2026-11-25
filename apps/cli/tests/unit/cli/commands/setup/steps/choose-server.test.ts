@@ -57,7 +57,10 @@ const APP_DIR = "/tmp/app";
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = Asker.for({ interactive: true, force: false });
+const ask = Asker.for({
+  interactive: true,
+  force: false,
+});
 
 /**
  * The boxes a prompt drew, as setup's own context would have drawn them.

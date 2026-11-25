@@ -52,7 +52,9 @@ describe("ProviderChoice.fromFlags", () => {
     });
 
     expect(error).toBeInstanceOf(IdpError);
-    expect(toZitadelError(error)).toMatchObject({ code: "E_VALIDATION" });
+    expect(toZitadelError(error)).toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 
   it("holds a script to the flags and names the ones a custom connection lacks", () => {
@@ -148,7 +150,9 @@ describe("ProviderChoice.readStoredSettings", () => {
         return choice.readStoredSettings(acme);
       });
 
-      expect(error).toMatchObject({ category: "conflict" });
+      expect(error).toMatchObject({
+        category: "conflict",
+      });
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
         hint: "Fix the file, or choose another slug, then run the command again.",

@@ -14,7 +14,11 @@ describe("the wizard errors", () => {
   it("keeps the cause", () => {
     const cause = new Error("boom");
 
-    expect(new WizardInternalError("undo failed", { cause }).cause).toBe(cause);
+    expect(
+      new WizardInternalError("undo failed", {
+        cause,
+      }).cause,
+    ).toBe(cause);
   });
 
   it("is reported as E_VALIDATION, as every fault is until it has a code of its own", () => {

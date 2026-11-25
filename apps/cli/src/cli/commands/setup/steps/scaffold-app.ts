@@ -91,7 +91,9 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
                   hint: error.hint ?? "",
                   details: error.details ?? null,
                 }),
-                { cause: error },
+                {
+                  cause: error,
+                },
               );
             }
             throw error;

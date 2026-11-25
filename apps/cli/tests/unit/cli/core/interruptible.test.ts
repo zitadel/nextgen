@@ -16,10 +16,6 @@ class Probe extends Interruptible(Command) {
     return this.cancellation;
   }
 
-  public walkAway(reason: DOMException): void {
-    this.abortRun(reason);
-  }
-
   public listen(): void {
     this.listenForInterrupt();
   }
@@ -75,7 +71,10 @@ describe("Interruptible", () => {
     pressCtrlC();
 
     expect(command.cancel.aborted).toBe(true);
-    expect(command.cancel.reason).toMatchObject({ name: "AbortError", message: "Cancelled" });
+    expect(command.cancel.reason).toMatchObject({
+      name: "AbortError",
+      message: "Cancelled",
+    });
   });
 
   it("reports nothing while the run goes on", () => {
@@ -94,15 +93,6 @@ describe("Interruptible", () => {
       hint: "The command was cancelled with Ctrl-C.",
       exitCode: 130,
     });
-  });
-
-  it("reports a prompt walked away from as the person's decision, with no hint", () => {
-    const command = listening();
-
-    command.walkAway(new DOMException("Cancelled by user", "AbortError"));
-
-    expect(command.report).toMatchObject({ code: "E_CANCELLED", message: "Cancelled by user" });
-    expect(command.report?.hint).toBeUndefined();
   });
 
   it("keeps the signal aborted after the first Ctrl-C", () => {

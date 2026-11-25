@@ -178,7 +178,10 @@ export class Orca {
       const supported = this.frameworkIds();
       throw new OrcaFrameworkMissingError(`Unsupported framework "${requested}"`, {
         hint: `Supported frameworks: ${supported.join(", ")}.`,
-        details: { requested, supported },
+        details: {
+          requested,
+          supported,
+        },
       });
     }
     for (const detector of candidates) {
@@ -329,7 +332,10 @@ export class Orca {
       });
       throw new OrcaInternalError(`No scaffolder supports "${framework}"`, {
         hint: `Available frameworks: ${available.join(", ")}.`,
-        details: { framework, available },
+        details: {
+          framework,
+          available,
+        },
       });
     }
     return scaffolder;
@@ -346,7 +352,9 @@ export class Orca {
     if (!patcher) {
       throw new OrcaInternalError(`No patcher supports "${framework}"`, {
         hint: "Zitadel integration currently supports Next.js.",
-        details: { framework },
+        details: {
+          framework,
+        },
       });
     }
     return patcher;
@@ -385,7 +393,11 @@ export class Orca {
     return new OrcaFrameworkMismatchError(
       `Setup detects ${name(detected)} here, not ${name(requested)}`,
       {
-        details: { requested, detected, requestedName: name(requested) },
+        details: {
+          requested,
+          detected,
+          requestedName: name(requested),
+        },
       },
     );
   }

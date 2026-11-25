@@ -34,21 +34,27 @@ const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
 const SETTING_REFUSED_REFUSAL = {
   message: "{message}",
   hint: "Fix {flag} and run the command again.",
-  details: { flag: "{flag}" },
+  details: {
+    flag: "{flag}",
+  },
 } as const satisfies Refusal;
 
 /** How settings of a custom connection given with a catalog provider are refused. */
 const SETTINGS_CONFLICT_REFUSAL = {
   message: "{message}",
   hint: "Add {provider} {custom}, or remove {them}.",
-  details: { flags: "{flags}" },
+  details: {
+    flags: "{flags}",
+  },
 } as const satisfies Refusal;
 
 /** How a custom connection that lacks settings is refused. */
 const SETTINGS_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Describe the connection, e.g. {example}",
-  details: { missing: "{missing}" },
+  details: {
+    missing: "{missing}",
+  },
 } as const satisfies Refusal;
 
 /** How a provider that is neither in the catalog nor custom is refused. */
@@ -151,8 +157,13 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
       .catch((error: unknown) => {
         if (error instanceof IdpSettingRefusedError) {
           throw Object.assign(
-            refusalError(SETTING_REFUSED_REFUSAL, { message: error.message, flag: error.flag }),
-            { cause: error },
+            refusalError(SETTING_REFUSED_REFUSAL, {
+              message: error.message,
+              flag: error.flag,
+            }),
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof IdpSettingsConflictError) {
@@ -164,7 +175,9 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
               them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
               flags: error.given,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof IdpSettingsMissingError) {
@@ -174,7 +187,9 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
               example: SSO_CUSTOM_EXAMPLE,
               missing: error.missing,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof IdpProviderUnknownError) {
@@ -183,7 +198,9 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
               message: error.message,
               known: error.known.join(", "),
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;

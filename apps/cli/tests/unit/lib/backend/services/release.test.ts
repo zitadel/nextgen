@@ -110,7 +110,10 @@ describe("ReleaseService.revoke", () => {
      */
     function refusedWith(body: unknown): ReleaseService {
       const revokeRelease = async () => {
-        throw new BackendConflictError("release: still served by an origin", { status: 409, body });
+        throw new BackendConflictError("release: still served by an origin", {
+          status: 409,
+          body,
+        });
       };
 
       return new ReleaseService(fakeClient({ revokeRelease }), "proj_1");

@@ -131,9 +131,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
     })
       .catch((error: unknown) => {
         if (error instanceof EnvironmentSourcesConflictError) {
-          throw Object.assign(refusalError(SOURCES_CONFLICT_REFUSAL, { message: error.message }), {
-            cause: error,
-          });
+          throw Object.assign(
+            refusalError(SOURCES_CONFLICT_REFUSAL, {
+              message: error.message,
+            }),
+            {
+              cause: error,
+            },
+          );
         }
         throw error;
       })
@@ -144,7 +149,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
               message: error.message,
               hint: error.hint ?? "",
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;
@@ -158,7 +165,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
               example: error.example,
               details: error.details ?? null,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;
@@ -281,7 +290,12 @@ export abstract class EnvironmentCommand extends BaseCommand {
       if (error instanceof EnvironmentValueMissingError && error.unbound) {
         // Run in the directory this run addressed, which need not be the
         // shell's: `setup` and `env add` both write their files there.
-        const elsewhere = error.cwd === process.cwd() ? {} : { cwd: error.cwd };
+        const elsewhere =
+          error.cwd === process.cwd()
+            ? {}
+            : {
+                cwd: error.cwd,
+              };
         throw Object.assign(
           refusalError(
             VALUE_MISSING_UNBOUND_REFUSAL,
@@ -296,11 +310,22 @@ export abstract class EnvironmentCommand extends BaseCommand {
             {
               next:
                 error.environment === "development"
-                  ? { id: "setup", flags: elsewhere }
-                  : { id: "env:add", args: { name: error.environment }, flags: elsewhere },
+                  ? {
+                      id: "setup",
+                      flags: elsewhere,
+                    }
+                  : {
+                      id: "env:add",
+                      args: {
+                        name: error.environment,
+                      },
+                      flags: elsewhere,
+                    },
             },
           ),
-          { cause: error },
+          {
+            cause: error,
+          },
         );
       }
       if (error instanceof EnvironmentValueMissingError) {
@@ -312,7 +337,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
             file: error.file ?? error.boundFile,
             details: error.details ?? null,
           }),
-          { cause: error },
+          {
+            cause: error,
+          },
         );
       }
       throw error;

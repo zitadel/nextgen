@@ -57,7 +57,9 @@ export class ConfigModule {
     if (isMissing) {
       throw new OrcaPatchFileMissingError(`Cannot edit ${filename}: file not found`, {
         hint: `Run setup from a project that has ${filename}.`,
-        details: { path: filename },
+        details: {
+          path: filename,
+        },
       });
     }
 

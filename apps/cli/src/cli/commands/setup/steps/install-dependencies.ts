@@ -21,7 +21,11 @@ const INSTALL_FAILED_REFUSAL = {
   message: "Dependency install failed: {command}",
   hint: "Run {command} in {cwd}, then start the app with {dev}.",
   next: ["{install}"],
-  details: { command: "{command}", cwd: "{cwd}", original: "{original}" },
+  details: {
+    command: "{command}",
+    cwd: "{cwd}",
+    original: "{original}",
+  },
 } as const satisfies Refusal;
 
 /**
@@ -148,7 +152,11 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         return this.deps.ui.task(label, work, done);
       },
       log,
-      ...(this.deps.run === undefined ? {} : { run: this.deps.run }),
+      ...(this.deps.run === undefined
+        ? {}
+        : {
+            run: this.deps.run,
+          }),
     };
     const { install } = await packageManager
       .installDependencies(
@@ -184,9 +192,13 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
                       message: String(original),
                     },
             },
-            { install: shownInstall },
+            {
+              install: shownInstall,
+            },
           ),
-          { cause: error },
+          {
+            cause: error,
+          },
         );
       });
     if (install.status === "completed" && afterInstallScript !== undefined) {

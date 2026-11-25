@@ -36,12 +36,16 @@ const SRC = join(import.meta.dirname, "../../../../src");
 
 /** A stdin that is a pipe carrying `content`. */
 function piped(content: string): NodeJS.ReadableStream & { isTTY?: boolean } {
-  return Object.assign(Readable.from([content]), { isTTY: false });
+  return Object.assign(Readable.from([content]), {
+    isTTY: false,
+  });
 }
 
 /** A stdin that is the keyboard: reading it would block forever. */
 function keyboard(): NodeJS.ReadableStream & { isTTY?: boolean } {
-  const stream = Object.assign(Readable.from([]), { isTTY: true });
+  const stream = Object.assign(Readable.from([]), {
+    isTTY: true,
+  });
   stream.read = () => {
     throw new Error("a terminal on stdin was read");
   };
@@ -50,20 +54,50 @@ function keyboard(): NodeJS.ReadableStream & { isTTY?: boolean } {
 
 const upper = (value: string): Parsed<string> =>
   value.trim() === ""
-    ? { ok: false, problem: "Enter a value." }
-    : { ok: true, value: value.toUpperCase() };
+    ? {
+        ok: false,
+        problem: "Enter a value.",
+      }
+    : {
+        ok: true,
+        value: value.toUpperCase(),
+      };
 
 const refuseBad = (value: string): Parsed<string> =>
-  value === "bad" ? { ok: false, problem: "Not that one." } : { ok: true, value };
+  value === "bad"
+    ? {
+        ok: false,
+        problem: "Not that one.",
+      }
+    : {
+        ok: true,
+        value,
+      };
 
-const ask: Session = { interactive: true, force: false };
-const scripted: Session = { interactive: false, force: false };
+const ask: Session = {
+  interactive: true,
+  force: false,
+};
+const scripted: Session = {
+  interactive: false,
+  force: false,
+};
 
-const typed = (name = "client id") => ({ name, message: "Client ID", parse: parseClientId });
+const typed = (name = "client id") => ({
+  name,
+  message: "Client ID",
+  parse: parseClientId,
+});
 
 const options = [
-  { value: "a", label: "A" },
-  { value: "b", label: "B" },
+  {
+    value: "a",
+    label: "A",
+  },
+  {
+    value: "b",
+    label: "B",
+  },
 ];
 
 beforeEach(() => {
@@ -80,7 +114,10 @@ beforeEach(() => {
 describe("Asker", () => {
   describe("the order of sources", () => {
     it("prefers the given value to piped stdin", async () => {
-      const answer = await Asker.for({ ...scripted, stdin: piped("pipe") }).text({
+      const answer = await Asker.for({
+        ...scripted,
+        stdin: piped("pipe"),
+      }).text({
         name: "value",
         message: "Value",
         parse: upper,
@@ -92,7 +129,10 @@ describe("Asker", () => {
     });
 
     it("prefers piped stdin to a prompt", async () => {
-      const answer = await Asker.for({ ...ask, stdin: piped("pipe\n") }).text({
+      const answer = await Asker.for({
+        ...ask,
+        stdin: piped("pipe\n"),
+      }).text({
         name: "value",
         message: "Value",
         parse: upper,
@@ -104,7 +144,10 @@ describe("Asker", () => {
     });
 
     it("prefers the given value to a prompt", async () => {
-      await Asker.for(ask).text({ ...typed(), given: "abc" });
+      await Asker.for(ask).text({
+        ...typed(),
+        given: "abc",
+      });
 
       expect(text).not.toHaveBeenCalled();
     });
@@ -112,29 +155,55 @@ describe("Asker", () => {
     it("prompts when nothing else answered and a person is there", async () => {
       vi.mocked(text).mockResolvedValueOnce("typed" as never);
 
-      const answer = await Asker.for(ask).text({ ...typed(), parse: upper });
+      const answer = await Asker.for(ask).text({
+        ...typed(),
+        parse: upper,
+      });
 
       expect(answer).toBe("TYPED");
     });
 
     it("does not read stdin when the question does not accept it", async () => {
       await expect(
-        Asker.for({ ...scripted, stdin: piped("pipe") }).text({ ...typed(), parse: upper }),
-      ).rejects.toMatchObject({ code: "E_VALIDATION", message: "No client id supplied" });
+        Asker.for({
+          ...scripted,
+          stdin: piped("pipe"),
+        }).text({
+          ...typed(),
+          parse: upper,
+        }),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "No client id supplied",
+      });
     });
 
     it("does not read a terminal on stdin", async () => {
       await expect(
-        Asker.for({ ...scripted, stdin: keyboard() }).text({ ...typed(), stdin: true }),
-      ).rejects.toMatchObject({ message: "No client id supplied" });
+        Asker.for({
+          ...scripted,
+          stdin: keyboard(),
+        }).text({
+          ...typed(),
+          stdin: true,
+        }),
+      ).rejects.toMatchObject({
+        message: "No client id supplied",
+      });
     });
 
     it("keeps an empty pipe as a value for parse to judge", async () => {
-      const answer = await Asker.for({ ...scripted, stdin: piped("") }).text({
+      const answer = await Asker.for({
+        ...scripted,
+        stdin: piped(""),
+      }).text({
         name: "value",
         message: "Value",
         stdin: true,
-        parse: (value): Parsed<string> => ({ ok: true, value }),
+        parse: (value): Parsed<string> => ({
+          ok: true,
+          value,
+        }),
       });
 
       expect(answer).toBe("");
@@ -143,12 +212,30 @@ describe("Asker", () => {
 
   describe("parse", () => {
     it.each([
-      ["a flag", { given: "  abc  " }, scripted],
-      ["a pipe", { stdin: true }, { ...scripted, stdin: piped("  abc  \n") }],
+      [
+        "a flag",
+        {
+          given: "  abc  ",
+        },
+        scripted,
+      ],
+      [
+        "a pipe",
+        {
+          stdin: true,
+        },
+        {
+          ...scripted,
+          stdin: piped("  abc  \n"),
+        },
+      ],
     ])(
       "runs on the value from %s and returns what it produced",
       async (_source, extra, session) => {
-        const answer = await Asker.for(session).text({ ...typed(), ...extra });
+        const answer = await Asker.for(session).text({
+          ...typed(),
+          ...extra,
+        });
 
         expect(answer).toBe("abc");
       },
@@ -163,21 +250,51 @@ describe("Asker", () => {
     });
 
     it.each([
-      ["a flag", { given: "bad" }, scripted],
-      ["a pipe", { stdin: true }, { ...scripted, stdin: piped("bad\n") }],
+      [
+        "a flag",
+        {
+          given: "bad",
+        },
+        scripted,
+      ],
+      [
+        "a pipe",
+        {
+          stdin: true,
+        },
+        {
+          ...scripted,
+          stdin: piped("bad\n"),
+        },
+      ],
     ])(
       "refuses a value from %s that does not parse, saying why",
       async (_source, extra, session) => {
         await expect(
-          Asker.for(session).text({ ...typed(), parse: refuseBad, ...extra }),
-        ).rejects.toMatchObject({ code: "E_VALIDATION", message: "Not that one." });
+          Asker.for(session).text({
+            ...typed(),
+            parse: refuseBad,
+            ...extra,
+          }),
+        ).rejects.toMatchObject({
+          code: "E_VALIDATION",
+          message: "Not that one.",
+        });
       },
     );
 
     it("treats an empty pipe that does not parse as nothing supplied", async () => {
       await expect(
-        Asker.for({ ...scripted, stdin: piped("\n") }).text({ ...typed(), stdin: true }),
-      ).rejects.toMatchObject({ message: "No client id supplied" });
+        Asker.for({
+          ...scripted,
+          stdin: piped("\n"),
+        }).text({
+          ...typed(),
+          stdin: true,
+        }),
+      ).rejects.toMatchObject({
+        message: "No client id supplied",
+      });
     });
 
     it("is what refuses an answer as it is typed", async () => {
@@ -196,15 +313,23 @@ describe("Asker", () => {
     it("shows the placeholder in the prompt", async () => {
       vi.mocked(text).mockResolvedValueOnce("x" as never);
 
-      await Asker.for(ask).text({ ...typed(), placeholder: "3000" });
+      await Asker.for(ask).text({
+        ...typed(),
+        placeholder: "3000",
+      });
 
-      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ placeholder: "3000" });
+      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
+        placeholder: "3000",
+      });
     });
 
     it("starts the prompt from the initial value", async () => {
       vi.mocked(text).mockResolvedValueOnce("x" as never);
 
-      await Asker.for(ask).text({ ...typed(), initialValue: "https://a.example" });
+      await Asker.for(ask).text({
+        ...typed(),
+        initialValue: "https://a.example",
+      });
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
         initialValue: "https://a.example",
@@ -223,23 +348,44 @@ describe("Asker", () => {
     });
 
     it("is never put in the error for a value that does not parse", async () => {
-      const error = await Asker.for({ ...scripted, stdin: piped("hunter2") })
+      const error = await Asker.for({
+        ...scripted,
+        stdin: piped("hunter2"),
+      })
         .secret({
           name: "client secret",
           message: "Secret",
           stdin: true,
-          retry: suggest({ id: "start" }),
-          parse: (): Parsed<string> => ({ ok: false, problem: "Too short." }),
+          retry: suggest({
+            id: "start",
+          }),
+          parse: (): Parsed<string> => ({
+            ok: false,
+            problem: "Too short.",
+          }),
         })
         .catch((caught: ZitadelError) => caught);
 
       const { message, hint, details, nextCommands } = error as ZitadelError;
-      expect(JSON.stringify({ message, hint, details, nextCommands })).not.toContain("hunter2");
+      expect(
+        JSON.stringify({
+          message,
+          hint,
+          details,
+          nextCommands,
+        }),
+      ).not.toContain("hunter2");
     });
 
     it("is refused with a reminder that it is never a flag", async () => {
-      const error = await Asker.for({ ...scripted, stdin: keyboard() })
-        .secret({ ...typed("client secret"), stdin: true })
+      const error = await Asker.for({
+        ...scripted,
+        stdin: keyboard(),
+      })
+        .secret({
+          ...typed("client secret"),
+          stdin: true,
+        })
         .catch((caught: ZitadelError) => caught);
 
       expect((error as ZitadelError).hint).toContain("It is never a flag");
@@ -249,34 +395,71 @@ describe("Asker", () => {
   describe("with nothing supplied and nobody to ask", () => {
     it.each([
       ["no flag and no stdin", {}, "No client id supplied", undefined],
-      ["a flag", { flag: "--client-id" }, "No client id supplied", "Pass --client-id."],
-      ["stdin", { stdin: true }, "No client id supplied", "Pipe it in on stdin."],
+      [
+        "a flag",
+        {
+          flag: "--client-id",
+        },
+        "No client id supplied",
+        "Pass --client-id.",
+      ],
+      [
+        "stdin",
+        {
+          stdin: true,
+        },
+        "No client id supplied",
+        "Pipe it in on stdin.",
+      ],
       [
         "a flag and stdin",
-        { flag: "--client-id", stdin: true },
+        {
+          flag: "--client-id",
+          stdin: true,
+        },
         "No client id supplied",
         "Pass --client-id, or pipe it in on stdin.",
       ],
     ])("says what to do given %s", async (_case, extra, message, hint) => {
       await expect(
-        Asker.for({ ...scripted, stdin: keyboard() }).text({ ...typed(), ...extra }),
-      ).rejects.toMatchObject({ code: "E_VALIDATION", message, hint });
+        Asker.for({
+          ...scripted,
+          stdin: keyboard(),
+        }).text({
+          ...typed(),
+          ...extra,
+        }),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message,
+        hint,
+      });
     });
 
     it("says a secret is never a flag", async () => {
       await expect(
-        Asker.for({ ...scripted, stdin: keyboard() }).secret({
+        Asker.for({
+          ...scripted,
+          stdin: keyboard(),
+        }).secret({
           ...typed("client secret"),
           stdin: true,
         }),
-      ).rejects.toMatchObject({ hint: expect.stringContaining("It is never a flag") });
+      ).rejects.toMatchObject({
+        hint: expect.stringContaining("It is never a flag"),
+      });
     });
 
     it("offers the command to run again as the next command", async () => {
       await expect(
         Asker.for(scripted).text({
           ...typed(),
-          retry: suggest({ id: "auth-method:sso:enable", flags: { clientId: "<id>" as ClientId } }),
+          retry: suggest({
+            id: "auth-method:sso:enable",
+            flags: {
+              clientId: "<id>" as ClientId,
+            },
+          }),
         }),
       ).rejects.toMatchObject({
         nextCommands: ["npx @zitadel/cli@0.1.0 auth-method sso enable --client-id '<id>'"],
@@ -287,7 +470,12 @@ describe("Asker", () => {
       await expect(
         Asker.for(scripted).text({
           ...typed(),
-          retry: suggest({ id: "auth-method:sso:enable", flags: { clientId: "<id>" as ClientId } }),
+          retry: suggest({
+            id: "auth-method:sso:enable",
+            flags: {
+              clientId: "<id>" as ClientId,
+            },
+          }),
         }),
       ).rejects.toMatchObject({
         hint: "For example: npx @zitadel/cli@0.1.0 auth-method sso enable --client-id '<id>'",
@@ -302,10 +490,17 @@ describe("Asker", () => {
         Asker.for(scripted)[method]({
           name: "x",
           message: "X",
-          retry: suggest({ id: "start", flags: { port: 9081 } }),
+          retry: suggest({
+            id: "start",
+            flags: {
+              port: 9081,
+            },
+          }),
           options,
         }),
-      ).rejects.toMatchObject({ nextCommands: ["npx @zitadel/cli@0.1.0 start --port 9081"] });
+      ).rejects.toMatchObject({
+        nextCommands: ["npx @zitadel/cli@0.1.0 start --port 9081"],
+      });
     });
 
     it.each([
@@ -328,31 +523,62 @@ describe("Asker", () => {
   });
 
   describe("an optional value", () => {
-    const optional = { ...typed("client secret"), stdin: true, optional: true as const };
+    const optional = {
+      ...typed("client secret"),
+      stdin: true,
+      optional: true as const,
+    };
 
     it("is returned when piped in", async () => {
-      expect(await Asker.for({ ...scripted, stdin: piped("abc\n") }).secret(optional)).toBe("abc");
+      expect(
+        await Asker.for({
+          ...scripted,
+          stdin: piped("abc\n"),
+        }).secret(optional),
+      ).toBe("abc");
     });
 
     it("is undefined when nothing was piped in", async () => {
-      expect(await Asker.for({ ...scripted, stdin: keyboard() }).secret(optional)).toBeUndefined();
+      expect(
+        await Asker.for({
+          ...scripted,
+          stdin: keyboard(),
+        }).secret(optional),
+      ).toBeUndefined();
     });
 
     it("is undefined when the pipe was empty", async () => {
-      expect(await Asker.for({ ...scripted, stdin: piped("\n") }).secret(optional)).toBeUndefined();
+      expect(
+        await Asker.for({
+          ...scripted,
+          stdin: piped("\n"),
+        }).secret(optional),
+      ).toBeUndefined();
     });
 
     it("is refused when what was piped in does not parse", async () => {
       await expect(
-        Asker.for({ ...scripted, stdin: piped("abc") }).secret({
+        Asker.for({
+          ...scripted,
+          stdin: piped("abc"),
+        }).secret({
           ...optional,
-          parse: (): Parsed<string> => ({ ok: false, problem: "Not that." }),
+          parse: (): Parsed<string> => ({
+            ok: false,
+            problem: "Not that.",
+          }),
         }),
-      ).rejects.toMatchObject({ code: "E_VALIDATION", message: "Not that." });
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "Not that.",
+      });
     });
 
     it("is never prompted for", async () => {
-      await Asker.for({ ...ask, stdin: keyboard() }).secret(optional);
+      await Asker.for({
+        ...ask,
+        stdin: keyboard(),
+      }).secret(optional);
 
       expect(password).not.toHaveBeenCalled();
     });
@@ -362,13 +588,24 @@ describe("Asker", () => {
     it("returns the value of the chosen option", async () => {
       vi.mocked(select).mockResolvedValueOnce("b" as never);
 
-      expect(await Asker.for(ask).select({ name: "x", message: "X", options })).toBe("b");
+      expect(
+        await Asker.for(ask).select({
+          name: "x",
+          message: "X",
+          options,
+        }),
+      ).toBe("b");
     });
 
     it("starts on the initial value", async () => {
       vi.mocked(select).mockResolvedValueOnce("a" as never);
 
-      await Asker.for(ask).select({ name: "x", message: "X", options, initialValue: "b" });
+      await Asker.for(ask).select({
+        name: "x",
+        message: "X",
+        options,
+        initialValue: "b",
+      });
 
       expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
         message: "X",
@@ -379,8 +616,14 @@ describe("Asker", () => {
 
     it("is never asked when nobody is there", async () => {
       await expect(
-        Asker.for(scripted).select({ name: "x", message: "X", options }),
-      ).rejects.toMatchObject({ message: "No x supplied" });
+        Asker.for(scripted).select({
+          name: "x",
+          message: "X",
+          options,
+        }),
+      ).rejects.toMatchObject({
+        message: "No x supplied",
+      });
       expect(select).not.toHaveBeenCalled();
     });
   });
@@ -389,31 +632,50 @@ describe("Asker", () => {
     it("returns the values of the chosen options", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce(["a", "b"] as never);
 
-      expect(await Asker.for(ask).multiselect({ name: "x", message: "X", options })).toEqual([
-        "a",
-        "b",
-      ]);
+      expect(
+        await Asker.for(ask).multiselect({
+          name: "x",
+          message: "X",
+          options,
+        }),
+      ).toEqual(["a", "b"]);
     });
 
     it("returns nothing chosen as an empty list", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([] as never);
 
       expect(
-        await Asker.for(ask).multiselect({ name: "x", message: "X", options, required: false }),
+        await Asker.for(ask).multiselect({
+          name: "x",
+          message: "X",
+          options,
+          required: false,
+        }),
       ).toEqual([]);
     });
 
     it.each([true, false])("passes required=%s on to the prompt", async (required) => {
       vi.mocked(multiselect).mockResolvedValueOnce([] as never);
 
-      await Asker.for(ask).multiselect({ name: "x", message: "X", options, required });
+      await Asker.for(ask).multiselect({
+        name: "x",
+        message: "X",
+        options,
+        required,
+      });
 
-      expect(vi.mocked(multiselect).mock.calls[0]?.[0]).toMatchObject({ message: "X", required });
+      expect(vi.mocked(multiselect).mock.calls[0]?.[0]).toMatchObject({
+        message: "X",
+        required,
+      });
     });
   });
 
   describe("confirm", () => {
-    const question = { name: "delete the thing", message: "Delete?" };
+    const question = {
+      name: "delete the thing",
+      message: "Delete?",
+    };
 
     it.each([true, false])("returns %s as answered", async (answer) => {
       vi.mocked(confirm).mockResolvedValueOnce(answer as never);
@@ -422,12 +684,22 @@ describe("Asker", () => {
     });
 
     it("is answered by force, without asking", async () => {
-      expect(await Asker.for({ interactive: true, force: true }).confirm(question)).toBe(true);
+      expect(
+        await Asker.for({
+          interactive: true,
+          force: true,
+        }).confirm(question),
+      ).toBe(true);
       expect(confirm).not.toHaveBeenCalled();
     });
 
     it("is answered by force when nobody is there to ask", async () => {
-      expect(await Asker.for({ interactive: false, force: true }).confirm(question)).toBe(true);
+      expect(
+        await Asker.for({
+          interactive: false,
+          force: true,
+        }).confirm(question),
+      ).toBe(true);
     });
 
     it("defaults to no", async () => {
@@ -435,21 +707,30 @@ describe("Asker", () => {
 
       await Asker.for(ask).confirm(question);
 
-      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ initialValue: false });
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+        initialValue: false,
+      });
     });
 
     it("requires --force when nobody is there to ask", async () => {
       await expect(
         Asker.for(scripted).confirm({
           ...question,
-          retry: suggest({ id: "reset", flags: { force: true } }),
+          retry: suggest({
+            id: "reset",
+            flags: {
+              force: true,
+            },
+          }),
         }),
       ).rejects.toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot delete the thing without --force in non-interactive mode",
         hint: "Ask a person first: Delete? Pass --force only once they agree.",
         nextCommands: ["npx @zitadel/cli@0.1.0 reset --force"],
-        details: { question: "Delete?" },
+        details: {
+          question: "Delete?",
+        },
       });
     });
   });
@@ -460,42 +741,75 @@ describe("Asker", () => {
 
     it("keeps it exact in the refusal a script reads", async () => {
       await expect(
-        Asker.for(scripted).confirm({ name: "remove a", message: raw }),
+        Asker.for(scripted).confirm({
+          name: "remove a",
+          message: raw,
+        }),
       ).rejects.toMatchObject({
         hint: `Ask a person first: ${raw} Pass --force only once they agree.`,
-        details: { question: raw },
+        details: {
+          question: raw,
+        },
       });
     });
 
     it.each([
       [
         "confirm",
-        () => Asker.for(ask).confirm({ name: "x", message: raw }),
+        () =>
+          Asker.for(ask).confirm({
+            name: "x",
+            message: raw,
+          }),
         () => vi.mocked(confirm).mock.calls[0]?.[0],
       ],
       [
         "yes-no",
-        () => Asker.for(ask).yesNo({ name: "x", message: raw }),
+        () =>
+          Asker.for(ask).yesNo({
+            name: "x",
+            message: raw,
+          }),
         () => vi.mocked(confirm).mock.calls[0]?.[0],
       ],
       [
         "text",
-        () => Asker.for(ask).text({ name: "x", message: raw, parse: upper }),
+        () =>
+          Asker.for(ask).text({
+            name: "x",
+            message: raw,
+            parse: upper,
+          }),
         () => vi.mocked(text).mock.calls[0]?.[0],
       ],
       [
         "secret",
-        () => Asker.for(ask).secret({ name: "x", message: raw, parse: upper }),
+        () =>
+          Asker.for(ask).secret({
+            name: "x",
+            message: raw,
+            parse: upper,
+          }),
         () => vi.mocked(password).mock.calls[0]?.[0],
       ],
       [
         "select",
-        () => Asker.for(ask).select({ name: "x", message: raw, options }),
+        () =>
+          Asker.for(ask).select({
+            name: "x",
+            message: raw,
+            options,
+          }),
         () => vi.mocked(select).mock.calls[0]?.[0],
       ],
       [
         "multiselect",
-        () => Asker.for(ask).multiselect({ name: "x", message: raw, options }),
+        () =>
+          Asker.for(ask).multiselect({
+            name: "x",
+            message: raw,
+            options,
+          }),
         () => vi.mocked(multiselect).mock.calls[0]?.[0],
       ],
     ])("spells it out when a %s prompt draws it", async (_kind, act, drawn) => {
@@ -507,7 +821,9 @@ describe("Asker", () => {
 
       await act();
 
-      expect(drawn()).toMatchObject({ message: spelled });
+      expect(drawn()).toMatchObject({
+        message: spelled,
+      });
     });
   });
 
@@ -527,7 +843,10 @@ describe("Asker", () => {
           }
         },
       })
-        .confirm({ name: "x", message: "X?" })
+        .confirm({
+          name: "x",
+          message: "X?",
+        })
         .catch(() => undefined);
 
       expect(thrown).toHaveLength(1);
@@ -550,7 +869,12 @@ describe("Asker", () => {
     it("is never answered by force", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-      expect(await Asker.for({ interactive: true, force: true }).yesNo(question)).toBe(false);
+      expect(
+        await Asker.for({
+          interactive: true,
+          force: true,
+        }).yesNo(question),
+      ).toBe(false);
     });
 
     it("offers its initial value", async () => {
@@ -558,12 +882,17 @@ describe("Asker", () => {
 
       await Asker.for(ask).yesNo(question);
 
-      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ initialValue: true });
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+        initialValue: true,
+      });
     });
 
     it("refuses when nobody is there to ask, even with force", async () => {
       await expect(
-        Asker.for({ interactive: false, force: true }).yesNo(question),
+        Asker.for({
+          interactive: false,
+          force: true,
+        }).yesNo(question),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: "No deploy it now supplied",
@@ -578,17 +907,31 @@ describe("Asker", () => {
       [
         "a select",
         () => vi.mocked(select),
-        () => Asker.for(ask).select({ name: "x", message: "X", options }),
+        () =>
+          Asker.for(ask).select({
+            name: "x",
+            message: "X",
+            options,
+          }),
       ],
       [
         "a multiselect",
         () => vi.mocked(multiselect),
-        () => Asker.for(ask).multiselect({ name: "x", message: "X", options }),
+        () =>
+          Asker.for(ask).multiselect({
+            name: "x",
+            message: "X",
+            options,
+          }),
       ],
       [
         "a confirm",
         () => vi.mocked(confirm),
-        () => Asker.for(ask).confirm({ name: "x", message: "X" }),
+        () =>
+          Asker.for(ask).confirm({
+            name: "x",
+            message: "X",
+          }),
       ],
     ];
 
@@ -617,7 +960,11 @@ describe("Asker", () => {
   });
 
   describe("the guide", () => {
-    const question = { name: "x", message: "X", options };
+    const question = {
+      name: "x",
+      message: "X",
+      options,
+    };
     const kinds: Array<
       [string, (guide: boolean) => unknown, (session: Session) => Promise<unknown>]
     > = [
@@ -636,12 +983,20 @@ describe("Asker", () => {
       [
         "a yes or no",
         (guide) => (guide ? vi.mocked(confirm) : vi.mocked(select)),
-        (session) => Asker.for(session).yesNo({ name: "x", message: "X?" }),
+        (session) =>
+          Asker.for(session).yesNo({
+            name: "x",
+            message: "X?",
+          }),
       ],
       [
         "a confirm",
         (guide) => (guide ? vi.mocked(confirm) : vi.mocked(select)),
-        (session) => Asker.for(session).confirm({ name: "x", message: "X?" }),
+        (session) =>
+          Asker.for(session).confirm({
+            name: "x",
+            message: "X?",
+          }),
       ],
     ];
 
@@ -650,7 +1005,10 @@ describe("Asker", () => {
       async (_kind, prompt, act) => {
         (prompt(false) as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
 
-        await act({ ...ask, guide: false });
+        await act({
+          ...ask,
+          guide: false,
+        });
 
         expect((prompt(false) as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
           withGuide: false,
@@ -663,7 +1021,10 @@ describe("Asker", () => {
       async (_kind, prompt, act) => {
         (prompt(true) as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
 
-        await act({ ...ask, guide: true });
+        await act({
+          ...ask,
+          guide: true,
+        });
 
         expect((prompt(true) as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
           withGuide: true,
@@ -686,21 +1047,29 @@ describe("Asker", () => {
       async (_kind, prompt, act) => {
         (prompt(false) as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
 
-        await act({ ...ask, guide: false });
+        await act({
+          ...ask,
+          guide: false,
+        });
 
         const drawn = (prompt(false) as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
           input: unknown;
           output: { isTTY: boolean };
         };
         expect(drawn.input).toBe(process.stdin);
-        expect(drawn.output).toMatchObject({ isTTY: true });
+        expect(drawn.output).toMatchObject({
+          isTTY: true,
+        });
       },
     );
 
     it("draws a wizard's prompts on the terminal itself", async () => {
       vi.mocked(text).mockResolvedValueOnce("x");
 
-      await Asker.for({ ...ask, guide: true }).text(typed());
+      await Asker.for({
+        ...ask,
+        guide: true,
+      }).text(typed());
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).not.toHaveProperty("output");
     });
@@ -709,7 +1078,10 @@ describe("Asker", () => {
       it("is a list of No then Yes, so Enter alone declines", async () => {
         vi.mocked(select).mockResolvedValueOnce(false);
 
-        const agreed = await Asker.for({ ...ask, guide: false }).confirm({
+        const agreed = await Asker.for({
+          ...ask,
+          guide: false,
+        }).confirm({
           name: "x",
           message: "X?",
         });
@@ -718,8 +1090,14 @@ describe("Asker", () => {
         expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
           message: "X?",
           options: [
-            { value: false, label: "No" },
-            { value: true, label: "Yes" },
+            {
+              value: false,
+              label: "No",
+            },
+            {
+              value: true,
+              label: "Yes",
+            },
           ],
           initialValue: false,
         });
@@ -729,20 +1107,31 @@ describe("Asker", () => {
         vi.mocked(select).mockResolvedValueOnce(true);
 
         await expect(
-          Asker.for({ ...ask, guide: false }).confirm({ name: "x", message: "X?" }),
+          Asker.for({
+            ...ask,
+            guide: false,
+          }).confirm({
+            name: "x",
+            message: "X?",
+          }),
         ).resolves.toBe(true);
       });
 
       it("starts on Yes for a question that defaults to yes", async () => {
         vi.mocked(select).mockResolvedValueOnce(true);
 
-        await Asker.for({ ...ask, guide: false }).yesNo({
+        await Asker.for({
+          ...ask,
+          guide: false,
+        }).yesNo({
           name: "x",
           message: "X?",
           initialValue: true,
         });
 
-        expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: true });
+        expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+          initialValue: true,
+        });
       });
     });
 
@@ -760,9 +1149,15 @@ describe("Asker", () => {
       it.each(kinds)(
         "throws an AbortError from %s without the guide",
         async (_kind, prompt, act) => {
-          const error = await cancelled(prompt(false), act, { ...ask, guide: false });
+          const error = await cancelled(prompt(false), act, {
+            ...ask,
+            guide: false,
+          });
 
-          expect(error).toMatchObject({ name: "AbortError", message: "Cancelled by user" });
+          expect(error).toMatchObject({
+            name: "AbortError",
+            message: "Cancelled by user",
+          });
         },
       );
 
@@ -780,22 +1175,33 @@ describe("Asker", () => {
             });
           });
 
-          await act({ ...ask, guide: false }).catch(() => undefined);
+          await act({
+            ...ask,
+            guide: false,
+          }).catch(() => undefined);
 
           expect([await onScreen, screen.showing]).toEqual([2, 0]);
         },
       );
 
       it.each(kinds)("closes no chain from %s without the guide", async (_kind, prompt, act) => {
-        await cancelled(prompt(false), act, { ...ask, guide: false });
+        await cancelled(prompt(false), act, {
+          ...ask,
+          guide: false,
+        });
 
         expect(cancel).not.toHaveBeenCalled();
       });
 
       it.each(kinds)("throws an AbortError from %s with the guide", async (_kind, prompt, act) => {
-        const error = await cancelled(prompt(true), act, { ...ask, guide: true });
+        const error = await cancelled(prompt(true), act, {
+          ...ask,
+          guide: true,
+        });
 
-        expect(error).toMatchObject({ name: "AbortError" });
+        expect(error).toMatchObject({
+          name: "AbortError",
+        });
       });
     });
   });

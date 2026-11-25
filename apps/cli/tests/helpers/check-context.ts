@@ -19,7 +19,14 @@ export const CHECK_CLI_VERSION = "0.1.0-alpha.0";
  */
 export function forced(dryRun = false): CheckContext["consent"] {
   return (gate) => {
-    return Consent.request(gate, aConsentSession({ interactive: false, force: true, dryRun }));
+    return Consent.request(
+      gate,
+      aConsentSession({
+        interactive: false,
+        force: true,
+        dryRun,
+      }),
+    );
   };
 }
 

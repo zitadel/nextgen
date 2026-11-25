@@ -177,7 +177,10 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
       return release;
     }
     if (clock.now() >= deadline) {
-      throw new LocalServerBusyError({ lock_file: lockFile, owner_pid: await readOwner(lockFile) });
+      throw new LocalServerBusyError({
+        lock_file: lockFile,
+        owner_pid: await readOwner(lockFile),
+      });
     }
     await clock.wait(pollMs);
   }

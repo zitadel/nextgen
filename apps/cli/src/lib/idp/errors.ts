@@ -1,24 +1,4 @@
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-
-/**
- * What an identity-provider failure carries beyond its message.
- */
-export type IdpErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Anything choosing or describing an identity provider fails with on purpose.
@@ -27,15 +7,15 @@ export type IdpErrorOptions = {
  * A caller catches this, or one of its subclasses; the CLI turns it into its
  * own error in one place, wording the advice with its flags.
  */
-export class IdpError extends Error implements Categorized {
+export abstract class IdpError extends Error {
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "unknown";
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
   /** The stable product code the failure is reported with. */
-  readonly code: ZitadelErrorCode = "E_VALIDATION";
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * What to do about it.
@@ -53,8 +33,22 @@ export class IdpError extends Error implements Categorized {
    * @param message - What went wrong.
    * @param options - What to do about it, the facts behind it, and its cause.
    */
-  constructor(message: string, options: IdpErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      readonly hint?: string | undefined;
+      readonly details?: Readonly<Record<string, unknown>> | undefined;
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(
+      message,
+      options.cause === undefined
+        ? undefined
+        : {
+            cause: options.cause,
+          },
+    );
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
@@ -81,7 +75,11 @@ export class IdpSettingRefusedError extends IdpError {
    * @param flag - The setting a value was refused for, as the caller names it.
    */
   constructor(message: string, flag: string) {
-    super(message, { details: { flag } });
+    super(message, {
+      details: {
+        flag,
+      },
+    });
     this.flag = flag;
   }
 }
@@ -108,7 +106,9 @@ export class IdpSettingsConflictError extends IdpError {
   constructor(message: string, given: readonly string[]) {
     super(message, {
       hint: "A catalog provider knows its own name, issuer and scopes.",
-      details: { flags: given },
+      details: {
+        flags: given,
+      },
     });
     this.given = given;
   }
@@ -136,7 +136,9 @@ export class IdpSettingsMissingError extends IdpError {
   constructor(message: string, missing: readonly string[]) {
     super(message, {
       hint: "A custom connection is described by its slug, display name and issuer.",
-      details: { missing },
+      details: {
+        missing,
+      },
     });
     this.missing = missing;
   }
@@ -167,7 +169,9 @@ export class IdpProviderUnknownError extends IdpError {
    * @param known - The names that would have been understood.
    */
   constructor(provider: string, known: readonly string[]) {
-    super(`Unknown provider ${provider}`, { hint: `Known providers: ${known.join(", ")}.` });
+    super(`Unknown provider ${provider}`, {
+      hint: `Known providers: ${known.join(", ")}.`,
+    });
     this.provider = provider;
     this.known = known;
   }

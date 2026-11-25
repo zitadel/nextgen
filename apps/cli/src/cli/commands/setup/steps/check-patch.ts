@@ -100,7 +100,9 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
                 message: error.message,
                 details: error.details ?? null,
               }),
-              { cause: error },
+              {
+                cause: error,
+              },
             );
           }
           throw error;
@@ -113,7 +115,9 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
                 hint: error.hint ?? "",
                 details: error.details ?? null,
               }),
-              { cause: error },
+              {
+                cause: error,
+              },
             );
           }
           throw error;

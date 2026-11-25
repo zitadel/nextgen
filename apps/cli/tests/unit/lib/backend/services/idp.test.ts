@@ -55,7 +55,9 @@ describe("IdpService.deployedSlugs", () => {
       fakeClient({
         queryIdps: {
           all: async () => {
-            throw new BackendForbiddenError("not allowed", { status: 403 });
+            throw new BackendForbiddenError("not allowed", {
+              status: 403,
+            });
           },
         },
       }),

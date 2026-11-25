@@ -118,7 +118,14 @@ export class PmCommandFailedError extends PmError {
       readonly cause?: unknown;
     } = {},
   ) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    super(
+      message,
+      options.cause === undefined
+        ? undefined
+        : {
+            cause: options.cause,
+          },
+    );
     this.exit = options.exit;
     this.signal = options.signal;
     this.output = options.output;

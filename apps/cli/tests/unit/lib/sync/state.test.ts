@@ -170,7 +170,9 @@ describe("publishedIds", () => {
       expect(error).toBeInstanceOf(SyncStateMalformedError);
       expect(toZitadelError(error)).toMatchObject({
         code: "E_VALIDATION",
-        details: { file: ".zitadel/state.json" },
+        details: {
+          file: ".zitadel/state.json",
+        },
       });
     },
   );

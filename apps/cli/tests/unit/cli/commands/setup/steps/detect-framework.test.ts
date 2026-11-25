@@ -74,7 +74,9 @@ describe("DetectFramework", () => {
       const error = await rejectionOf(() => {
         return detectIn(dir);
       });
-      expect(error).toMatchObject({ name: "AbortError" });
+      expect(error).toMatchObject({
+        name: "AbortError",
+      });
     });
   });
 });

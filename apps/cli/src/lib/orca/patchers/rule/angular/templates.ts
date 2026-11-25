@@ -188,7 +188,9 @@ function packageJson(source: string | undefined): {
   if (source === undefined) {
     throw new OrcaPatchFileMissingError("package.json is required to add the dev script", {
       hint: "Run setup from a project that has a package.json.",
-      details: { path: "package.json" },
+      details: {
+        path: "package.json",
+      },
     });
   }
   const pkg = parseJsonObject(source, "package.json");

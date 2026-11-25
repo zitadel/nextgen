@@ -51,14 +51,20 @@ export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
     throw new OrcaRendererUnknownError(`Unknown renderer "${id}"`, {
       hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}.`,
-      details: { id, available: AVAILABLE_RENDERER_IDS },
+      details: {
+        id,
+        available: AVAILABLE_RENDERER_IDS,
+      },
     });
   }
   const renderer = RENDERERS[id];
   if (renderer.status === "not-implemented") {
     throw new OrcaRendererPendingError(`Renderer "${id}" is declared but not yet published`, {
       hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}; the <zitadel-flow> web component ships in a later package.`,
-      details: { id, available: AVAILABLE_RENDERER_IDS },
+      details: {
+        id,
+        available: AVAILABLE_RENDERER_IDS,
+      },
     });
   }
   return renderer;

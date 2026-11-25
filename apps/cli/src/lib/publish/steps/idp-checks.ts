@@ -124,7 +124,15 @@ function checkCredentialVariables(
   if (idVariable !== undefined && idVariable === secretVariable) {
     throw new PublishConnectionVariableSharedError(
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
-      { file, variable: idVariable, mode: ctx.mode, details: { variable: idVariable, file } },
+      {
+        file,
+        variable: idVariable,
+        mode: ctx.mode,
+        details: {
+          variable: idVariable,
+          file,
+        },
+      },
     );
   }
   for (const use of uses) {
@@ -135,7 +143,17 @@ function checkCredentialVariables(
     if (isSecret === undefined) {
       throw new PublishConnectionVariableMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
-        { file, field, variable, mode: ctx.mode, details: { variable, field, file } },
+        {
+          file,
+          field,
+          variable,
+          mode: ctx.mode,
+          details: {
+            variable,
+            field,
+            file,
+          },
+        },
       );
     }
     if (isSecret !== wantsSecret) {

@@ -341,7 +341,9 @@ describe("Wizard", () => {
 
       const error = await wizard
         .run(
-          { input: "x" },
+          {
+            input: "x",
+          },
           {
             onUndoError: () => {
               throw new Error("the report failed");
@@ -351,7 +353,11 @@ describe("Wizard", () => {
         .catch((caught: unknown) => caught);
 
       expect(error).toBeInstanceOf(WizardInternalError);
-      expect(error).toMatchObject({ cause: expect.objectContaining({ message: "boom" }) });
+      expect(error).toMatchObject({
+        cause: expect.objectContaining({
+          message: "boom",
+        }),
+      });
     });
 
     it("undoes the steps that finished when the answer cannot be built", async () => {

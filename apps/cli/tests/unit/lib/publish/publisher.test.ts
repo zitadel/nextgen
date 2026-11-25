@@ -121,7 +121,9 @@ function listing(...slugs: readonly string[]): ClientStubs["queryIdps"] {
  */
 const REFUSED_LISTING: ClientStubs["queryIdps"] = {
   all: async () => {
-    throw new BackendForbiddenError("not allowed", { status: 403 });
+    throw new BackendForbiddenError("not allowed", {
+      status: 403,
+    });
   },
 };
 
@@ -229,7 +231,12 @@ describe("Publisher.deploy", () => {
           },
         },
         createDeployment: async () => {
-          throw new BackendConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw new BackendConflictError("raced", {
+            status: 409,
+            body: {
+              code: "dep.conflict",
+            },
+          });
         },
       }),
       PROJECT_ID,
@@ -454,7 +461,9 @@ describe("Publisher.prepare", () => {
       });
 
       expect(error).toBeInstanceOf(PublishConfigInvalidError);
-      expect(toZitadelError(error)).toMatchObject({ code: "E_VALIDATION" });
+      expect(toZitadelError(error)).toMatchObject({
+        code: "E_VALIDATION",
+      });
     });
 
     test("stops when the person cancels while the listing is read", async ({ dir }) => {

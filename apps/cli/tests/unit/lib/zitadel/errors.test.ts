@@ -117,9 +117,16 @@ function refusalOf(
     issues,
   };
   if (uses === undefined) {
-    return new ZitadelConfigEditBreaksFlowsError({ ...refused, kind: "broken" });
+    return new ZitadelConfigEditBreaksFlowsError({
+      ...refused,
+      kind: "broken",
+    });
   }
-  return new ZitadelConfigEditBreaksFlowsError({ ...refused, kind: "method-in-use", uses });
+  return new ZitadelConfigEditBreaksFlowsError({
+    ...refused,
+    kind: "method-in-use",
+    uses,
+  });
 }
 
 describe("ZitadelConfigEditBreaksFlowsError", () => {
@@ -319,7 +326,9 @@ describe("ZitadelConfigConnectionExistsError", () => {
   it("is a conflict", () => {
     const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
 
-    expect(error).toMatchObject({ category: "conflict" });
+    expect(error).toMatchObject({
+      category: "conflict",
+    });
   });
 
   it("says the connection file is already there", () => {
@@ -351,7 +360,9 @@ describe("ZitadelConfigFileExistsError", () => {
   it("is a conflict", () => {
     const error = new ZitadelConfigFileExistsError(GOOGLE_PATH);
 
-    expect(error).toMatchObject({ category: "conflict" });
+    expect(error).toMatchObject({
+      category: "conflict",
+    });
   });
 
   it("names no flag, as not every command that writes a file has one", () => {
@@ -405,6 +416,8 @@ describe("ZitadelConfigDeployTooLargeError", () => {
 
 describe("ZitadelConfigInternalError", () => {
   it("is an internal failure", () => {
-    expect(new ZitadelConfigInternalError("not an object")).toMatchObject({ category: "fault" });
+    expect(new ZitadelConfigInternalError("not an object")).toMatchObject({
+      category: "fault",
+    });
   });
 });

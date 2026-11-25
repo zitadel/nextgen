@@ -9,14 +9,21 @@ import { Consent, type ConsentSession } from "@/lib/consent";
  * @returns The session, with its confirmer.
  */
 export function aConsentSession(session: Omit<ConsentSession, "confirmer">): ConsentSession {
-  return { ...session, confirmer: Asker.for(session) };
+  return {
+    ...session,
+    confirmer: Asker.for(session),
+  };
 }
 
 /** The consent `--force` gives, for a unit test that drives a destructive operation directly. */
 export async function forcedConsent(): Promise<Consent> {
   const consent = await Consent.request(
     { verb: "delete", name: "delete it", message: "Delete it?" },
-    aConsentSession({ interactive: false, force: true, dryRun: false }),
+    aConsentSession({
+      interactive: false,
+      force: true,
+      dryRun: false,
+    }),
   );
   if (consent === undefined) {
     throw new Error("--force gave no consent");

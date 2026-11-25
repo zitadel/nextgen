@@ -24,19 +24,28 @@ describe("the publish errors", () => {
     ],
     [
       "shared variable",
-      new PublishConnectionVariableSharedError("shared", { file: "a.json", variable: "X" }),
+      new PublishConnectionVariableSharedError("shared", {
+        file: "a.json",
+        variable: "X",
+      }),
       "invalid",
       "E_VALIDATION",
     ],
     [
       "wrong kind",
-      new PublishConnectionVariableKindError("kind", { file: "a.json", variable: "X" }),
+      new PublishConnectionVariableKindError("kind", {
+        file: "a.json",
+        variable: "X",
+      }),
       "invalid",
       "E_VALIDATION",
     ],
     [
       "missing variable",
-      new PublishConnectionVariableMissingError("missing", { file: "a.json", variable: "X" }),
+      new PublishConnectionVariableMissingError("missing", {
+        file: "a.json",
+        variable: "X",
+      }),
       "conflict",
       "E_CREDENTIAL_MISSING",
     ],
@@ -48,14 +57,22 @@ describe("the publish errors", () => {
   });
 
   it("keeps its findings as the issues a --json reader sees", () => {
-    const findings = [{ rule: "r", path: "a.json", message: "bad" }];
+    const findings = [
+      {
+        rule: "r",
+        path: "a.json",
+        message: "bad",
+      },
+    ];
     const error = new PublishConfigInvalidError("bad", {
       findings,
       literalSecret: false,
       refusedKey: false,
     });
 
-    expect(toZitadelError(error).details).toEqual({ issues: findings });
+    expect(toZitadelError(error).details).toEqual({
+      issues: findings,
+    });
   });
 
   it("states a literal secret and a refused key as facts, with no command to run", () => {
@@ -65,7 +82,10 @@ describe("the publish errors", () => {
       refusedKey: true,
     });
 
-    expect(error).toMatchObject({ literalSecret: true, refusedKey: true });
+    expect(error).toMatchObject({
+      literalSecret: true,
+      refusedKey: true,
+    });
     expect(toZitadelError(error).nextCommands).toBeUndefined();
   });
 
@@ -100,17 +120,26 @@ describe("the publish errors' codes", () => {
   it.each([
     [
       "a missing variable",
-      new PublishConnectionVariableMissingError("why", { file: "a", variable: "B" }),
+      new PublishConnectionVariableMissingError("why", {
+        file: "a",
+        variable: "B",
+      }),
       "E_CREDENTIAL_MISSING",
     ],
     [
       "a shared variable",
-      new PublishConnectionVariableSharedError("why", { file: "a", variable: "B" }),
+      new PublishConnectionVariableSharedError("why", {
+        file: "a",
+        variable: "B",
+      }),
       "E_VALIDATION",
     ],
     [
       "a variable of the wrong kind",
-      new PublishConnectionVariableKindError("why", { file: "a", variable: "B" }),
+      new PublishConnectionVariableKindError("why", {
+        file: "a",
+        variable: "B",
+      }),
       "E_VALIDATION",
     ],
   ] as const)("reports %s as %s", (_name, error, code) => {

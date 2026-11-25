@@ -833,7 +833,9 @@ describe("ZitadelRuntime.resolve", () => {
   it("rejects a non-http(s) URL with E_VALIDATION", async ({ dir }) => {
     await expect(
       ZitadelRuntime.resolve({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
-    ).rejects.toMatchObject({ name: "LocalServerUrlInvalidError" });
+    ).rejects.toMatchObject({
+      name: "LocalServerUrlInvalidError",
+    });
   });
 
   it("rejects an unparseable URL with E_VALIDATION", async ({ dir }) => {
@@ -858,13 +860,16 @@ describe("ZitadelRuntime.resolve", () => {
   }) => {
     await writeLocalRuntime(dir, "http://localhost:9");
 
-    const error = await ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" }).catch(
-      (caught: unknown) => {
-        return caught;
-      },
-    );
+    const error = await ZitadelRuntime.resolve({
+      cwd: dir,
+      serverFlag: "local",
+    }).catch((caught: unknown) => {
+      return caught;
+    });
 
-    expect(error).toMatchObject({ name: "LocalServerNotRespondingError" });
+    expect(error).toMatchObject({
+      name: "LocalServerNotRespondingError",
+    });
     expect(toZitadelError(error).code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
   });
 });

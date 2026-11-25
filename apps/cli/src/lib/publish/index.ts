@@ -20,9 +20,3 @@ export {
   PublishError,
   PublishReleaseRejectedError,
 } from "./errors";
-export type {
-  PublishConfigInvalidOptions,
-  PublishConnectionOptions,
-  PublishErrorOptions,
-  PublishFinding,
-} from "./errors";

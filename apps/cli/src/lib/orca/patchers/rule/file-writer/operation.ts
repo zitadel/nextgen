@@ -115,7 +115,9 @@ export abstract class Operation<Kind extends FileOp["kind"]> {
     if (isClash) {
       throw new OrcaPatchFileConflictError(`${path} is not a regular file`, {
         hint: `Move or remove ${path} and rerun setup.`,
-        details: { path },
+        details: {
+          path,
+        },
       });
     }
 

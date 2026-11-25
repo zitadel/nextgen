@@ -185,10 +185,14 @@ describe("VariableService.heldByName", () => {
     await expect(
       service({
         listVariables: async () => {
-          throw new BackendForbiddenError("Forbidden", { status: 403 });
+          throw new BackendForbiddenError("Forbidden", {
+            status: 403,
+          });
         },
       }).heldByName("primary"),
-    ).rejects.toMatchObject({ name: "BackendForbiddenError" });
+    ).rejects.toMatchObject({
+      name: "BackendForbiddenError",
+    });
   });
 });
 
@@ -351,7 +355,9 @@ describe("VariableService.set", () => {
   it("writes a plain preview value for a name the project has not entered", async () => {
     await expect(
       setPreviewOver(async () => {
-        throw new BackendNotFoundError("no such variable", { status: 404 });
+        throw new BackendNotFoundError("no such variable", {
+          status: 404,
+        });
       }),
     ).resolves.toMatchObject({ outcome: "set" });
   });
@@ -359,7 +365,9 @@ describe("VariableService.set", () => {
   it("leaves the check to whoever can read the primary values on a 403", async () => {
     await expect(
       setPreviewOver(async () => {
-        throw new BackendForbiddenError("Forbidden", { status: 403 });
+        throw new BackendForbiddenError("Forbidden", {
+          status: 403,
+        });
       }),
     ).resolves.toMatchObject({ outcome: "set" });
   });
@@ -367,9 +375,13 @@ describe("VariableService.set", () => {
   it("fails on a credential the server does not accept, rather than reading it as no secret", async () => {
     await expect(
       setPreviewOver(async () => {
-        throw new BackendUnauthorizedError("Unauthorized", { status: 401 });
+        throw new BackendUnauthorizedError("Unauthorized", {
+          status: 401,
+        });
       }),
-    ).rejects.toMatchObject({ name: "BackendUnauthorizedError" });
+    ).rejects.toMatchObject({
+      name: "BackendUnauthorizedError",
+    });
   });
 
   it("fails on any other error, since writing on an unknown is the outcome it guards against", async () => {

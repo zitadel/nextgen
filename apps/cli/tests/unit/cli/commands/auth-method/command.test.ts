@@ -738,7 +738,11 @@ describe("AuthMethodCommand.write", () => {
     const change = read.config.schemas.disable(read.schema, "passkey", { force: true });
     const consent = await Consent.request(
       { verb: "disable", name: "disable passkey", message: "Disable passkey?" },
-      aConsentSession({ interactive: false, force: true, dryRun: false }),
+      aConsentSession({
+        interactive: false,
+        force: true,
+        dryRun: false,
+      }),
     );
 
     await writer.writeChange(read, change, consent);

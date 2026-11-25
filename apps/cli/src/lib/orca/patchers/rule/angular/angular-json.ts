@@ -21,7 +21,9 @@ export function angularProxyEdit(opts: {
     if (source === undefined) {
       throw new OrcaPatchFileMissingError("Cannot wire Angular proxy: angular.json not found", {
         hint: "Run setup from an Angular project.",
-        details: { path: "angular.json" },
+        details: {
+          path: "angular.json",
+        },
       });
     }
     const root = parseJsonObject(source, "angular.json");

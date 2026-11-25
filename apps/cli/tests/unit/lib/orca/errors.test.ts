@@ -61,7 +61,10 @@ describe("the orca errors", () => {
     [new OrcaInternalError("why"), "OrcaInternalError", "fault"],
   ])("is an OrcaError named %#", (error, name, category) => {
     expect(error).toBeInstanceOf(OrcaError);
-    expect(error).toMatchObject({ name, category });
+    expect(error).toMatchObject({
+      name,
+      category,
+    });
   });
 });
 

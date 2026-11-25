@@ -17,7 +17,10 @@ const FRAMEWORK_MISMATCH_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
   hint: "Rerun setup without --framework, or with --framework {detected}, to set up this app, or point --cwd at the {requestedName} app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
-  details: { requested: "{requested}", detected: "{detected}" },
+  details: {
+    requested: "{requested}",
+    detected: "{detected}",
+  },
 } as const satisfies Refusal;
 
 /**
@@ -138,7 +141,9 @@ export class DetectFramework extends WizardStep<
               detected: String(detected),
               requestedName: String(requestedName ?? requested),
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;

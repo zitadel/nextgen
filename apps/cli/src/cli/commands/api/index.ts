@@ -71,14 +71,28 @@ const FORCE_REQUIRED_REFUSAL = {
 const OPERATION_UNKNOWN_REFUSAL = {
   message: "{message}",
   hint: "{hint}",
-  next: [{ id: "api:ls", flags: { json: true } }],
+  next: [
+    {
+      id: "api:ls",
+      flags: {
+        json: true,
+      },
+    },
+  ],
 } as const satisfies Refusal;
 
 /** How a path whose method does not pick one operation is refused. */
 const OPERATION_AMBIGUOUS_REFUSAL = {
   message: "{message}",
   hint: "{hint}",
-  next: [{ id: "api:ls", flags: { json: true } }],
+  next: [
+    {
+      id: "api:ls",
+      flags: {
+        json: true,
+      },
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -96,7 +110,9 @@ function resolveTarget(ref: string, method?: string): Target {
             message: error.message,
             hint: error.hint ?? "",
           }),
-          { cause: error },
+          {
+            cause: error,
+          },
         );
       }
       throw error;
@@ -108,7 +124,9 @@ function resolveTarget(ref: string, method?: string): Target {
           message: error.message,
           hint: error.hint ?? "",
         }),
-        { cause: error },
+        {
+          cause: error,
+        },
       );
     }
     throw error;

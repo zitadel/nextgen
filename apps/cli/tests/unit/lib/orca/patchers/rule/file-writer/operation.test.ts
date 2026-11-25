@@ -49,7 +49,9 @@ describe("Operation", () => {
       new EditOp({ kind: "edit", path: [], edit: () => "" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({ name: "OrcaInternalError" });
+    expect(error).toMatchObject({
+      name: "OrcaInternalError",
+    });
   });
 
   it("refuses a directory where a file is needed, before the op looks at it", async ({ dir }) => {
@@ -81,7 +83,9 @@ describe("Operation", () => {
       new WriteOp({ kind: "write", path: "x", contents: "c" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({ name: "OrcaPatchFileConflictError" });
+    expect(error).toMatchObject({
+      name: "OrcaPatchFileConflictError",
+    });
   });
 
   it("lets a directory op act on a directory", async ({ dir }) => {

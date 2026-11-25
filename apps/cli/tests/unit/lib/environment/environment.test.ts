@@ -340,7 +340,9 @@ describe("Environment.resolve", () => {
       await write(dir, ".env.development.local", { ZITADEL_URL: "ftp://file.example" });
 
       await expect(resolve(dir)).rejects.toBeInstanceOf(EnvironmentServerInvalidError);
-      await expect(reported(resolve(dir))).rejects.toMatchObject({ code: "E_VALIDATION" });
+      await expect(reported(resolve(dir))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
     });
 
     it("names the file a malformed server came from", async ({ dir }) => {
@@ -365,7 +367,12 @@ describe("Environment.resolve", () => {
       await write(dir, "staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
 
       await expect(
-        reported(resolve(dir, { envName: "staging", envFile: "staging.env" })),
+        reported(
+          resolve(dir, {
+            envName: "staging",
+            envFile: "staging.env",
+          }),
+        ),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("--env-file"),
@@ -373,37 +380,61 @@ describe("Environment.resolve", () => {
     });
 
     it("refuses an --env-file that does not exist", async ({ dir }) => {
-      await expect(resolve(dir, { envFile: "missing.env" })).rejects.toBeInstanceOf(
-        EnvironmentFileMissingError,
-      );
-      await expect(reported(resolve(dir, { envFile: "missing.env" }))).rejects.toMatchObject({
+      await expect(
+        resolve(dir, {
+          envFile: "missing.env",
+        }),
+      ).rejects.toBeInstanceOf(EnvironmentFileMissingError);
+      await expect(
+        reported(
+          resolve(dir, {
+            envFile: "missing.env",
+          }),
+        ),
+      ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("missing.env"),
       });
     });
 
     it("refuses an environment name that would escape the project directory", async ({ dir }) => {
-      await expect(resolve(dir, { envName: "../evil" })).rejects.toBeInstanceOf(
-        EnvironmentNameInvalidError,
-      );
-      await expect(reported(resolve(dir, { envName: "../evil" }))).rejects.toMatchObject({
+      await expect(
+        resolve(dir, {
+          envName: "../evil",
+        }),
+      ).rejects.toBeInstanceOf(EnvironmentNameInvalidError);
+      await expect(
+        reported(
+          resolve(dir, {
+            envName: "../evil",
+          }),
+        ),
+      ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("valid environment name"),
       });
-      await expect(resolve(dir, { env: { ZITADEL_ENV: "a/b" } })).rejects.toBeInstanceOf(
-        EnvironmentNameInvalidError,
-      );
-      await expect(resolve(dir, { envName: "a..b" })).rejects.toBeInstanceOf(
-        EnvironmentNameInvalidError,
-      );
+      await expect(
+        resolve(dir, {
+          env: {
+            ZITADEL_ENV: "a/b",
+          },
+        }),
+      ).rejects.toBeInstanceOf(EnvironmentNameInvalidError);
+      await expect(
+        resolve(dir, {
+          envName: "a..b",
+        }),
+      ).rejects.toBeInstanceOf(EnvironmentNameInvalidError);
     });
 
     it.for(["local", "staging.local"])(
       "refuses %s, whose files are another environment's",
       async (name, { dir }) => {
-        await expect(resolve(dir, { envName: name })).rejects.toBeInstanceOf(
-          EnvironmentNameInvalidError,
-        );
+        await expect(
+          resolve(dir, {
+            envName: name,
+          }),
+        ).rejects.toBeInstanceOf(EnvironmentNameInvalidError);
       },
     );
 

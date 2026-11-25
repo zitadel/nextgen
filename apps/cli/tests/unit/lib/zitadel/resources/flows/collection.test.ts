@@ -298,7 +298,9 @@ describe("Flows.resolveForSso", () => {
       return config.flows.resolveForSso(customers(ssoSchema()));
     });
 
-    expect(error).toMatchObject({ category: "missing" });
+    expect(error).toMatchObject({
+      category: "missing",
+    });
     expect(error).toMatchObject({
       message: "No login flow runs against customers",
       details: { schema: CUSTOMERS },

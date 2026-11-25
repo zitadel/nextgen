@@ -29,11 +29,17 @@ describe("the backend errors", () => {
     ["unavailable", new BackendUnavailableError("why"), "unavailable", true],
   ] as const)("reports a %s failure as %s, retryable %s", (_name, error, category, retryable) => {
     expect(error).toBeInstanceOf(BackendError);
-    expect(error).toMatchObject({ category, retryable });
+    expect(error).toMatchObject({
+      category,
+      retryable,
+    });
   });
 
   it("reports a failure no subclass names as unknown and not retryable", () => {
-    expect(new BackendError("why")).toMatchObject({ category: "unknown", retryable: false });
+    expect(new BackendError("why")).toMatchObject({
+      category: "unknown",
+      retryable: false,
+    });
   });
 
   it("reports a server that does not implement the request as not implemented", () => {
@@ -55,17 +61,30 @@ describe("the backend errors' codes, hints and details", () => {
     const error = new BackendConflictError("why", {
       status: 409,
       url: "http://x/y",
-      body: { a: 1 },
+      body: {
+        a: 1,
+      },
     });
 
-    expect(error.details).toEqual({ status: 409, url: "http://x/y", body: { a: 1 } });
+    expect(error.details).toEqual({
+      status: 409,
+      url: "http://x/y",
+      body: {
+        a: 1,
+      },
+    });
   });
 
   it("names the fields the server rejected in its hint", () => {
     const error = new BackendConflictError("why", {
       status: 409,
       url: "http://x/y",
-      body: { code: "idp.field_immutable", details: { fields: ["issuer"] } },
+      body: {
+        code: "idp.field_immutable",
+        details: {
+          fields: ["issuer"],
+        },
+      },
     });
 
     expect(error.hint).toBe("The server rejected this field: issuer.");
@@ -87,7 +106,10 @@ describe("the backend errors' codes, hints and details", () => {
     const error = new BackendNotFoundError("Not Found", {
       status: 404,
       url: "http://x/y",
-      body: { code: "req.not_found", message: "no" },
+      body: {
+        code: "req.not_found",
+        message: "no",
+      },
     });
 
     expect(error.message).toBe("http://x/y has no such endpoint on this Zitadel server");
@@ -101,9 +123,15 @@ describe("the backend errors' codes, hints and details", () => {
       "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
     ],
   ] as const)("words the hint of a %s request", (reason, hint) => {
-    const error = new BackendUnavailableError("why", { url: "http://x", reason });
+    const error = new BackendUnavailableError("why", {
+      url: "http://x",
+      reason,
+    });
 
     expect(error.hint).toBe(hint);
-    expect(error.details).toEqual({ url: "http://x", reason });
+    expect(error.details).toEqual({
+      url: "http://x",
+      reason,
+    });
   });
 });

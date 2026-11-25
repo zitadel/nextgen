@@ -147,7 +147,14 @@ export class ZitadelError extends Error {
   readonly raised: string;
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
-    super(message, opts.cause === undefined ? undefined : { cause: opts.cause });
+    super(
+      message,
+      opts.cause === undefined
+        ? undefined
+        : {
+            cause: opts.cause,
+          },
+    );
     this.name = "ZitadelError";
     this.raised = message;
     this.code = code;
@@ -272,8 +279,16 @@ export function toZitadelError(error: unknown): ZitadelError {
     };
 
     return new ZitadelError(typed.code, typed.message, {
-      ...(typed.hint === undefined ? {} : { hint: typed.hint }),
-      ...(typed.details === undefined ? {} : { details: typed.details }),
+      ...(typed.hint === undefined
+        ? {}
+        : {
+            hint: typed.hint,
+          }),
+      ...(typed.details === undefined
+        ? {}
+        : {
+            details: typed.details,
+          }),
     });
   }
 

@@ -47,7 +47,13 @@ describe("the local server errors", () => {
     ["busy", new LocalServerBusyError({}), "conflict", "E_CONFLICT"],
     [
       "stop",
-      new LocalServerStopError("stuck", {}, { status: "failed" }),
+      new LocalServerStopError(
+        "stuck",
+        {},
+        {
+          status: "failed",
+        },
+      ),
       "invalid",
       "E_VALIDATION",
     ],
@@ -71,8 +77,13 @@ describe("the local server errors", () => {
     [
       "start exited",
       new LocalServerStartExitedError(
-        { port: 1, server_url: "http://x" },
-        { status: "stopped" },
+        {
+          port: 1,
+          server_url: "http://x",
+        },
+        {
+          status: "stopped",
+        },
         {},
       ),
       "unavailable",
@@ -81,8 +92,13 @@ describe("the local server errors", () => {
     [
       "start timeout",
       new LocalServerStartTimeoutError(
-        { port: 1, server_url: "http://x" },
-        { status: "stopped" },
+        {
+          port: 1,
+          server_url: "http://x",
+        },
+        {
+          status: "stopped",
+        },
         {},
       ),
       "unavailable",
@@ -115,9 +131,16 @@ describe("the local server errors", () => {
 
   it("keeps the facts of a failed start", () => {
     const error = new LocalServerStartTimeoutError(
-      { port: 1, server_url: "http://x" },
-      { status: "stopped" },
-      { id: 1 },
+      {
+        port: 1,
+        server_url: "http://x",
+      },
+      {
+        status: "stopped",
+      },
+      {
+        id: 1,
+      },
       "log",
     );
 
@@ -139,9 +162,11 @@ describe("the local server errors", () => {
   });
 
   it("states a hint that names no flag or command", () => {
-    expect(new LocalServerNotRespondingError({ server_url: "http://localhost:8080" }).hint).toBe(
-      "No healthy local server responded at http://localhost:8080.",
-    );
+    expect(
+      new LocalServerNotRespondingError({
+        server_url: "http://localhost:8080",
+      }).hint,
+    ).toBe("No healthy local server responded at http://localhost:8080.");
     expect(new LocalServerNotStartedError({}).hint).toBe(
       "No local server has been started in this directory or a parent.",
     );

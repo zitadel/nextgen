@@ -30,7 +30,10 @@ describe("AddDepOp", () => {
       new AddDepOp({ kind: "add-dep", name: "a", version: "^1" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({ name: "OrcaPatchFileMissingError", category: "missing" });
+    expect(error).toMatchObject({
+      name: "OrcaPatchFileMissingError",
+      category: "missing",
+    });
   });
 
   it("adds the dependency, and names it for the report", async ({ dir }) => {

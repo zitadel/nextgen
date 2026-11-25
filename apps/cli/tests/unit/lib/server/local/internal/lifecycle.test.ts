@@ -254,9 +254,13 @@ describe("Lifecycle", () => {
       const world = new World();
       world.takenPorts.add(9000);
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
-        LocalServerPortBusyError,
-      );
+      await expect(
+        world
+          .server({
+            port: 9000,
+          })
+          .start(),
+      ).rejects.toBeInstanceOf(LocalServerPortBusyError);
       expect(world.launched).toEqual([]);
     });
 
@@ -265,9 +269,13 @@ describe("Lifecycle", () => {
       await world.server().start();
       world.takenPorts.add(9000);
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
-        LocalServerPortBusyError,
-      );
+      await expect(
+        world
+          .server({
+            port: 9000,
+          })
+          .start(),
+      ).rejects.toBeInstanceOf(LocalServerPortBusyError);
 
       expect(world.terminated).toEqual([]);
       await expect(world.server().state()).resolves.toMatchObject({ kind: "running" });
@@ -359,9 +367,13 @@ describe("Lifecycle", () => {
         w.takenPorts.add(record.port);
       };
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
-        LocalServerStartExitedError,
-      );
+      await expect(
+        world
+          .server({
+            port: 9000,
+          })
+          .start(),
+      ).rejects.toBeInstanceOf(LocalServerStartExitedError);
 
       expect(world.launched).toEqual([9000]);
     });
@@ -401,9 +413,13 @@ describe("Lifecycle", () => {
       const world = new World();
       world.reservedPorts.add(9000);
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
-        LocalServerPortBusyError,
-      );
+      await expect(
+        world
+          .server({
+            port: 9000,
+          })
+          .start(),
+      ).rejects.toBeInstanceOf(LocalServerPortBusyError);
     });
 
     it("lets go of its port claim once the server answers", async () => {

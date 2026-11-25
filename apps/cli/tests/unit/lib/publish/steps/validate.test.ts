@@ -229,7 +229,10 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toMatchObject({ refusedKey: true, literalSecret: false });
+      expect(error).toMatchObject({
+        refusedKey: true,
+        literalSecret: false,
+      });
     });
   });
 
@@ -258,7 +261,9 @@ describe("validateStep", () => {
       });
 
       expect(error).toBeInstanceOf(PublishError);
-      expect(error).toMatchObject({ literalSecret: true });
+      expect(error).toMatchObject({
+        literalSecret: true,
+      });
     });
 
     it("states no literal secret and no refused key for a refusal that has neither", async () => {
@@ -268,7 +273,10 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toMatchObject({ literalSecret: false, refusedKey: false });
+      expect(error).toMatchObject({
+        literalSecret: false,
+        refusedKey: false,
+      });
     });
 
     it("leaves out the subject-claim advice when the connections could not be listed", async () => {

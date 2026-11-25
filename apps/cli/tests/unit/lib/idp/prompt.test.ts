@@ -27,7 +27,11 @@ function asking(piped: string | undefined): Questions {
     piped === undefined
       ? Object.assign(Readable.from([]), { isTTY: true })
       : Readable.from([piped]);
-  return Asker.for({ interactive: false, force: false, stdin });
+  return Asker.for({
+    interactive: false,
+    force: false,
+    stdin,
+  });
 }
 
 /**

@@ -701,7 +701,12 @@ describe("DeploymentService.deployToPrimary", () => {
 
   it("reports a revoked release, which trying again would fail the same way", async () => {
     const deploymentService = deployWith([], async () => {
-      throw new BackendConflictError("revoked", { status: 409, body: { code: "rel.revoked" } });
+      throw new BackendConflictError("revoked", {
+        status: 409,
+        body: {
+          code: "rel.revoked",
+        },
+      });
     });
 
     await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toEqual({
@@ -714,7 +719,12 @@ describe("DeploymentService.deployToPrimary", () => {
       fakeClient({
         listDeployments: { all: async () => [primary("dep_9")] },
         createDeployment: async () => {
-          throw new BackendConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw new BackendConflictError("raced", {
+            status: 409,
+            body: {
+              code: "dep.conflict",
+            },
+          });
         },
       }),
       "proj_1",
@@ -728,7 +738,12 @@ describe("DeploymentService.deployToPrimary", () => {
 
   it("reports a race with nothing current when the guard's deployment is gone", async () => {
     const deploymentService = deployWith([], async () => {
-      throw new BackendConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+      throw new BackendConflictError("raced", {
+        status: 409,
+        body: {
+          code: "dep.conflict",
+        },
+      });
     });
 
     await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toEqual({
@@ -744,13 +759,20 @@ describe("DeploymentService.deployToPrimary", () => {
       .fn<() => Promise<readonly ListDeployments200DeploymentsItem[]>>()
       .mockResolvedValueOnce([])
       .mockRejectedValue(
-        new BackendForbiddenError("the token may not list deployments", { status: 403 }),
+        new BackendForbiddenError("the token may not list deployments", {
+          status: 403,
+        }),
       );
     const deploymentService = new DeploymentService(
       fakeClient({
         listDeployments: { all: reads },
         createDeployment: async () => {
-          throw new BackendConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw new BackendConflictError("raced", {
+            status: 409,
+            body: {
+              code: "dep.conflict",
+            },
+          });
         },
       }),
       "proj_1",

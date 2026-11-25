@@ -189,8 +189,14 @@ export class Asker implements Questions, Confirmer {
           `Cannot ${q.name} without --force in non-interactive mode`,
           {
             hint: confirmationHint(q.message),
-            ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
-            details: { question: q.message },
+            ...(q.retry === undefined
+              ? {}
+              : {
+                  nextCommands: [q.retry],
+                }),
+            details: {
+              question: q.message,
+            },
           },
         );
       }
@@ -271,8 +277,16 @@ export class Asker implements Questions, Confirmer {
    */
   private refusal(q: AnyQuestion, message: string, hint?: string): ZitadelError {
     return new ZitadelError("E_VALIDATION", message, {
-      ...(hint === undefined ? {} : { hint }),
-      ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
+      ...(hint === undefined
+        ? {}
+        : {
+            hint,
+          }),
+      ...(q.retry === undefined
+        ? {}
+        : {
+            nextCommands: [q.retry],
+          }),
     });
   }
 

@@ -72,7 +72,9 @@ export class AddDepOp extends Operation<"add-dep"> {
     if (!source.before) {
       throw new OrcaPatchFileMissingError("package.json is required to add Zitadel dependencies", {
         hint: "Run setup from a project that has a package.json.",
-        details: { path: "package.json" },
+        details: {
+          path: "package.json",
+        },
       });
     }
     if (isNoop) {

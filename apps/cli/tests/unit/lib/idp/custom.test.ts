@@ -130,7 +130,14 @@ describe("selectionFromFlags for a catalog provider", () => {
 
   it("refuses a custom setting the provider would ignore", () => {
     const error = refusal(() =>
-      selectionFromFlags("google", { issuer: "https://x.example", scopes: "openid" }, flag),
+      selectionFromFlags(
+        "google",
+        {
+          issuer: "https://x.example",
+          scopes: "openid",
+        },
+        flag,
+      ),
     );
 
     expect(error.message).toBe("--issuer, --scopes only applies to a custom connection");

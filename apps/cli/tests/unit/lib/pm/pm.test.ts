@@ -232,7 +232,11 @@ describe("PM.installDependencies when the run fails", () => {
 
     const error = await rejectionOf(() => {
       return PM.named("npm").installDependencies(
-        { needed: true, dryRun: false, skipInstall: false },
+        {
+          needed: true,
+          dryRun: false,
+          skipInstall: false,
+        },
         {
           cwd: dir,
           env: {},
@@ -248,6 +252,9 @@ describe("PM.installDependencies when the run fails", () => {
     });
 
     expect(error).toBeInstanceOf(PmCommandFailedError);
-    expect(error).toMatchObject({ message: "npm install failed", cause });
+    expect(error).toMatchObject({
+      message: "npm install failed",
+      cause,
+    });
   });
 });

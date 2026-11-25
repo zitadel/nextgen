@@ -1,24 +1,4 @@
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-
-/**
- * What a consent failure carries beyond its message.
- */
-export type ConsentErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Anything asking for consent fails with on purpose.
@@ -27,15 +7,15 @@ export type ConsentErrorOptions = {
  * A caller catches this, or one of its subclasses; the CLI turns it into its
  * own error in one place.
  */
-export class ConsentError extends Error implements Categorized {
+export abstract class ConsentError extends Error {
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "unknown";
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
   /** The stable product code the failure is reported with. */
-  readonly code: ZitadelErrorCode = "E_VALIDATION";
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * What to do about it.
@@ -53,8 +33,22 @@ export class ConsentError extends Error implements Categorized {
    * @param message - What went wrong.
    * @param options - What to do about it, the facts behind it, and its cause.
    */
-  constructor(message: string, options: ConsentErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      readonly hint?: string | undefined;
+      readonly details?: Readonly<Record<string, unknown>> | undefined;
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(
+      message,
+      options.cause === undefined
+        ? undefined
+        : {
+            cause: options.cause,
+          },
+    );
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
@@ -79,7 +73,9 @@ export class ConsentRequiredError extends ConsentError {
   constructor(action: string, question: string) {
     super(`Cannot ${action} without --force in non-interactive mode`, {
       hint: question,
-      details: { question },
+      details: {
+        question,
+      },
     });
   }
 }

@@ -19,14 +19,18 @@ type Needs = Fact<"flags" | "choice" | "target">;
 const SETTING_REFUSED_REFUSAL = {
   message: "{message}",
   hint: "Fix {flag} and run the command again.",
-  details: { flag: "{flag}" },
+  details: {
+    flag: "{flag}",
+  },
 } as const satisfies Refusal;
 
 /** How a custom connection that lacks settings is refused. */
 const SETTINGS_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Describe the connection, e.g. {example}",
-  details: { missing: "{missing}" },
+  details: {
+    missing: "{missing}",
+  },
 } as const satisfies Refusal;
 
 /**
@@ -73,8 +77,13 @@ export class SelectConnection extends WizardStep<
       .catch((error: unknown) => {
         if (error instanceof IdpSettingRefusedError) {
           throw Object.assign(
-            refusalError(SETTING_REFUSED_REFUSAL, { message: error.message, flag: error.flag }),
-            { cause: error },
+            refusalError(SETTING_REFUSED_REFUSAL, {
+              message: error.message,
+              flag: error.flag,
+            }),
+            {
+              cause: error,
+            },
           );
         }
         if (error instanceof IdpSettingsMissingError) {
@@ -84,7 +93,9 @@ export class SelectConnection extends WizardStep<
               example: customExample(ENABLE_FLAG_NAMES),
               missing: error.missing,
             }),
-            { cause: error },
+            {
+              cause: error,
+            },
           );
         }
         throw error;

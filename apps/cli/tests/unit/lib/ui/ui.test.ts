@@ -29,14 +29,20 @@ describe("Ui", () => {
       const ui = watched();
       ui.describe("Removing an origin");
 
-      await Asker.for(ui.session()).yesNo({ name: "remove the origin", message: "Remove it?" });
+      await Asker.for(ui.session()).yesNo({
+        name: "remove the origin",
+        message: "Remove it?",
+      });
 
       expect(printed(person)).toContain("┌  Removing an origin");
     });
 
     it("is never asked when nobody is watching", async ({ terminal }) => {
       await expect(
-        Asker.for(scripted().session()).yesNo({ name: "remove the origin", message: "Remove it?" }),
+        Asker.for(scripted().session()).yesNo({
+          name: "remove the origin",
+          message: "Remove it?",
+        }),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
       expect(printed(terminal)).toBe("");
     });
@@ -70,7 +76,10 @@ describe("Ui", () => {
       const ui = watched();
       ui.describe("Listing origins");
       const cancelled = await asTerminal(() => {
-        return Asker.for(ui.session()).yesNo({ name: "list them", message: "List them?" });
+        return Asker.for(ui.session()).yesNo({
+          name: "list them",
+          message: "List them?",
+        });
       }).catch((error: unknown) => error);
 
       const asked = printed(person);

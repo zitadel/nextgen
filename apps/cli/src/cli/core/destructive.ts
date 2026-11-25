@@ -16,7 +16,9 @@ const CONFIRMATION_REQUIRED_REFUSAL = {
   message: "{message}",
   hint: "Ask a person first: {question} Pass --force only once they agree.",
   next: ["{retry}"],
-  details: { question: "{question}" },
+  details: {
+    question: "{question}",
+  },
 } as const satisfies Refusal;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
@@ -175,10 +177,17 @@ export function Destructive<
         throw Object.assign(
           refusalError(
             CONFIRMATION_REQUIRED_REFUSAL,
-            { message: error.message, question: retried.message },
-            { retry: retried.retry === undefined ? [] : [retried.retry] },
+            {
+              message: error.message,
+              question: retried.message,
+            },
+            {
+              retry: retried.retry === undefined ? [] : [retried.retry],
+            },
           ),
-          { cause: error },
+          {
+            cause: error,
+          },
         );
       });
     }

@@ -472,7 +472,11 @@ export class Publisher {
     });
     throw new PublishReleaseRejectedError(
       `The release body does not match what the API takes, so nothing was sent:\n${lines.join("\n")}`,
-      { details: { issues } },
+      {
+        details: {
+          issues,
+        },
+      },
     );
   }
 }

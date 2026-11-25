@@ -32,19 +32,25 @@ describe("the identity-provider errors", () => {
   it("keeps the flag a refused setting came from", () => {
     const error = new IdpSettingRefusedError("--slug: bad", "--slug");
 
-    expect(toZitadelError(error).details).toEqual({ flag: "--slug" });
+    expect(toZitadelError(error).details).toEqual({
+      flag: "--slug",
+    });
   });
 
   it("keeps the settings that do not belong with the provider", () => {
     const error = new IdpSettingsConflictError("bad", ["--issuer"]);
 
-    expect(toZitadelError(error).details).toEqual({ flags: ["--issuer"] });
+    expect(toZitadelError(error).details).toEqual({
+      flags: ["--issuer"],
+    });
   });
 
   it("keeps the settings a custom connection lacks", () => {
     const error = new IdpSettingsMissingError("bad", ["--slug"]);
 
-    expect(toZitadelError(error).details).toEqual({ missing: ["--slug"] });
+    expect(toZitadelError(error).details).toEqual({
+      missing: ["--slug"],
+    });
   });
 });
 
