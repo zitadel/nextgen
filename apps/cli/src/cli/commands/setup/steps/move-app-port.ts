@@ -24,7 +24,7 @@ import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
-import { Project, ProjectSecretMissingError } from "@/lib/project";
+import { Project, ProjectConfigMissingError, ProjectSecretMissingError } from "@/lib/project";
 
 /**
  * The env file setup writes for the CLI's own commands. Every command setup
@@ -47,6 +47,17 @@ const SECRET_MISSING_REFUSAL = {
       flags: {
         fix: true,
       },
+    },
+  ],
+} as const satisfies Refusal;
+
+/** What a directory with no `zitadel.json` is reported as. */
+const PROJECT_CONFIG_MISSING_REFUSAL = {
+  message: "zitadel.json was not found",
+  hint: "Set the project up first.",
+  next: [
+    {
+      id: "setup",
     },
   ],
 } as const satisfies Refusal;
@@ -156,11 +167,11 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
         hint: "Pass --dev-port with the port the app should run on.",
       });
     }
-    const source = (await Project.at(this.deps.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
     const moving = this.deps.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${this.deps.dryRun ? " (dry run)" : ""}`,
     );
     try {
+      const source = (await Project.at(this.deps.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
       const orca = createOrca(LocalRuntime.DIR);
       const context = await loadPatchContext(this.deps.cwd, orca, this.deps.cliVersion);
       const previousIssuer = context.issuer;
@@ -414,6 +425,9 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       };
     } catch (error) {
       moving.fail();
+      if (error instanceof ProjectConfigMissingError) {
+        throw refusalError(PROJECT_CONFIG_MISSING_REFUSAL, {});
+      }
       if (error instanceof ProjectSecretMissingError) {
         throw refusalError(SECRET_MISSING_REFUSAL, {});
       }

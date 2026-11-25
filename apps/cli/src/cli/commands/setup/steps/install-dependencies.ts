@@ -1,13 +1,7 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
-import {
-  type DependencyInstall,
-  type InstallContext,
-  PM,
-  PmCommandFailedError,
-  type Runner,
-} from "@/lib/pm";
+import { type DependencyInstall, type InstallContext, PM, type Runner } from "@/lib/pm";
 import { Guidance, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { WizardStep } from "@/lib/wizard";
 
@@ -156,11 +150,8 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
                       name: error.name,
                       message: error.message,
                       code:
-                        error instanceof PmCommandFailedError
-                          ? error.exit
-                          : "code" in error
-                            ? error.code
-                            : undefined,
+                        ("exit" in error ? error.exit : undefined) ??
+                        ("code" in error ? error.code : undefined),
                     }
                   : {
                       message: String(error),

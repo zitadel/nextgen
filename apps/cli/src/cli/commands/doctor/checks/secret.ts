@@ -2,12 +2,23 @@ import { join } from "node:path";
 
 import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
 import { Dotenv } from "@/lib/environment";
-import { Project, ProjectSecretMissingError } from "@/lib/project";
+import { Project, ProjectConfigMissingError, ProjectSecretMissingError } from "@/lib/project";
 import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
 import { AbstractSanityCheck, type CheckContext } from "./types";
 import { refusalError, type Refusal } from "@/cli/core/refusal";
+
+/** What a directory with no `zitadel.json` is reported as. */
+const CONFIG_MISSING_REFUSAL = {
+  message: "zitadel.json was not found",
+  hint: "Set the project up first.",
+  next: [
+    {
+      id: "setup",
+    },
+  ],
+} as const satisfies Refusal;
 
 /** What a project with no `.zitadel/secret` is reported as. */
 const SECRET_MISSING_REFUSAL = {
@@ -70,35 +81,42 @@ export class SecretCheck extends AbstractSanityCheck {
         `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
       );
     }
-    const config = await Project.at(ctx.cwd).config();
-    const configured = config.data.project;
-    if (projectId !== configured) {
-      throw new Error(
-        `${DEVELOPMENT_ENV_FILE} names project ${projectId} but zitadel.json names ${typeof configured === "string" ? configured : "no project"}, so its secrets are not restored`,
-      );
+    try {
+      const config = await Project.at(ctx.cwd).config();
+      const configured = config.data.project;
+      if (projectId !== configured) {
+        throw new Error(
+          `${DEVELOPMENT_ENV_FILE} names project ${projectId} but zitadel.json names ${typeof configured === "string" ? configured : "no project"}, so its secrets are not restored`,
+        );
+      }
+      if (ctx.dryRun) {
+        return;
+      }
+      const project = await new ProjectService(
+        createZitadelClient({
+          userAgent: Runtime.current().userAgent(),
+          baseUrl: config.server ?? ZitadelRuntime.DEFAULT,
+          token: projectSecret,
+          signal: ctx.signal,
+        }),
+      ).get(projectId);
+      if (project.id !== projectId) {
+        throw new Error(`The server returned project ${project.id}, not ${projectId}`);
+      }
+      const origins = Origins.wrap(project.origins);
+      await Project.at(ctx.cwd).writeSecret({
+        project_id: project.id,
+        project_secret: projectSecret,
+        preview_secret: previewSecret,
+        primary_origins: [...origins.primary],
+        preview_origins: [...origins.preview],
+        created_at: project.created_at,
+      });
+    } catch (error) {
+      if (error instanceof ProjectConfigMissingError) {
+        throw refusalError(CONFIG_MISSING_REFUSAL, {});
+      }
+      throw error;
     }
-    if (ctx.dryRun) {
-      return;
-    }
-    const project = await new ProjectService(
-      createZitadelClient({
-        userAgent: Runtime.current().userAgent(),
-        baseUrl: config.server ?? ZitadelRuntime.DEFAULT,
-        token: projectSecret,
-        signal: ctx.signal,
-      }),
-    ).get(projectId);
-    if (project.id !== projectId) {
-      throw new Error(`The server returned project ${project.id}, not ${projectId}`);
-    }
-    const origins = Origins.wrap(project.origins);
-    await Project.at(ctx.cwd).writeSecret({
-      project_id: project.id,
-      project_secret: projectSecret,
-      preview_secret: previewSecret,
-      primary_origins: [...origins.primary],
-      preview_origins: [...origins.preview],
-      created_at: project.created_at,
-    });
   }
 }

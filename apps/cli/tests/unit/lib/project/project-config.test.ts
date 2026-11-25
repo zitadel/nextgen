@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { Project, ProjectConfigMalformedError, ProjectConfigMissingError } from "@/lib/project";
+import { Project, ProjectConfigMissingError, ProjectMalformedError } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
@@ -51,7 +51,7 @@ describe("Project.config", () => {
     await writeFile(join(cwd, "zitadel.json"), "{ not valid json");
 
     await expect(Project.at(cwd).config()).rejects.toThrow();
-    await expect(Project.at(cwd).config()).rejects.toBeInstanceOf(ProjectConfigMalformedError);
+    await expect(Project.at(cwd).config()).rejects.toBeInstanceOf(ProjectMalformedError);
   });
 
   it("rejects a non-object JSON root via parseJsonObject", async () => {

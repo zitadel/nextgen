@@ -85,11 +85,10 @@ export class Manifest {
   static async readIfExists(dir: string): Promise<Manifest | undefined> {
     const path = join(dir, "package.json");
     const text = await readIfExists(path);
-    if (text === undefined) {
-      return undefined;
-    }
     try {
-      return new Manifest(parseJsonObject(text, path) as PackageJson);
+      return text === undefined
+        ? undefined
+        : new Manifest(parseJsonObject(text, path) as PackageJson);
     } catch (error) {
       throw new PmManifestInvalidError(path, {
         cause: error,

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { Project, ProjectSecretMalformedError, ProjectSecretMissingError } from "@/lib/project";
+import { Project, ProjectMalformedError, ProjectSecretMissingError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 const VALID_SECRET = {
@@ -88,7 +88,7 @@ describe("Project.secret", () => {
     await writeFile(join(cwd, ".zitadel/secret"), "{ broken");
 
     await expect(Project.at(cwd).secret()).rejects.toThrow();
-    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectSecretMalformedError);
+    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectMalformedError);
   });
 });
 

@@ -145,8 +145,6 @@ export type ZitadelErrorOptions = {
    */
   nextCommands?: readonly Suggested[];
   details?: unknown;
-  /** The failure this one reports, so a caller that knows it can still find it. */
-  cause?: unknown;
 };
 
 /**
@@ -170,14 +168,7 @@ export class ZitadelError extends Error {
   readonly raised: string;
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
-    super(
-      message,
-      opts.cause === undefined
-        ? undefined
-        : {
-            cause: opts.cause,
-          },
-    );
+    super(message);
     this.name = "ZitadelError";
     this.raised = message;
     this.code = code;

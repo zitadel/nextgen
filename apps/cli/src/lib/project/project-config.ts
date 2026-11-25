@@ -5,7 +5,7 @@ import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
 
-import { ProjectConfigMalformedError, ProjectConfigMissingError } from "./errors";
+import { ProjectConfigMissingError, ProjectMalformedError } from "./errors";
 
 /**
  * A project's `zitadel.json`: the committed record of how setup configured it.
@@ -42,7 +42,7 @@ export class ProjectConfig {
    * @param cwd - The project's directory.
    * @returns The project's configuration.
    * @throws {@link ProjectConfigMissingError} When there is no `zitadel.json`.
-   * @throws {@link ProjectConfigMalformedError} When it is not a JSON object.
+   * @throws {@link ProjectMalformedError} When it is not a JSON object.
    */
   static async read(cwd: string): Promise<ProjectConfig> {
     try {
@@ -50,7 +50,7 @@ export class ProjectConfig {
       try {
         return new ProjectConfig(parseJsonObject(text, "zitadel.json"));
       } catch (error) {
-        throw new ProjectConfigMalformedError(
+        throw new ProjectMalformedError(
           error instanceof Error ? error.message : "zitadel.json is malformed",
           {
             cause: error,

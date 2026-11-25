@@ -74,28 +74,35 @@ export class PmManifestInvalidError extends PmError {
       readonly cause?: unknown;
     } = {},
   ) {
-    super(
+    const message =
       options.cause instanceof Error
         ? options.cause.message
-        : `Cannot read ${path} as a package.json`,
-      options,
-    );
+        : `Cannot read ${path} as a package.json`;
+    super(message, options);
     this.details = {
-      path,
+      original: {
+        name: options.cause instanceof Error ? options.cause.name : "Error",
+        message,
+      },
     };
     this.path = path;
   }
 }
 
 /**
- * A package manager command that could not start or did not succeed. The
- * reason lives in the package manager's own output, which nothing here
- * interprets, so this is the generic wrapper and carries no guidance.
+ * A package manager command that did not succeed, or could not start for a
+ * reason nothing here interprets. The reason lives in the package manager's
+ * own output, so this is the generic wrapper and carries no guidance.
  */
 export class PmCommandFailedError extends PmError {
   override readonly category: ErrorCategory = "unknown";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * Structured facts about the failure, for a `--json` reader.
+   */
+  override readonly details: Readonly<Record<string, unknown>>;
 
   /**
    * The errno string or the exit code.
@@ -135,8 +142,101 @@ export class PmCommandFailedError extends PmError {
             cause: options.cause,
           },
     );
+    this.details = {
+      original: {
+        name: "Error",
+        message,
+        code: options.exit,
+      },
+    };
     this.exit = options.exit;
     this.signal = options.signal;
     this.output = options.output;
+  }
+}
+
+/**
+ * A package manager command that could not start because the program or its
+ * directory is not there.
+ */
+export class PmCommandNotStartedError extends PmError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * What to do about it.
+   */
+  override readonly hint: string = "A required file or directory is missing.";
+
+  /**
+   * Structured facts about the failure, for a `--json` reader.
+   */
+  override readonly details: Readonly<Record<string, unknown>>;
+
+  /**
+   * The errno string the operating system gave.
+   */
+  readonly exit: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What the operating system said.
+   * @param exit - The errno string the operating system gave.
+   */
+  constructor(message: string, exit: string) {
+    super(message);
+    this.details = {
+      original: {
+        name: "Error",
+        message,
+        code: exit,
+      },
+    };
+    this.exit = exit;
+  }
+}
+
+/**
+ * A package manager command that could not start because the operating system
+ * refused to run it.
+ */
+export class PmCommandNotPermittedError extends PmError {
+  override readonly category: ErrorCategory = "denied";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_AUTH";
+
+  /**
+   * What to do about it.
+   */
+  override readonly hint: string = "Check file permissions or run with the right user.";
+
+  /**
+   * Structured facts about the failure, for a `--json` reader.
+   */
+  override readonly details: Readonly<Record<string, unknown>>;
+
+  /**
+   * The errno string the operating system gave.
+   */
+  readonly exit: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What the operating system said.
+   * @param exit - The errno string the operating system gave.
+   */
+  constructor(message: string, exit: string) {
+    super(`Permission denied: ${message}`);
+    this.details = {
+      original: {
+        name: "Error",
+        message,
+        code: exit,
+      },
+    };
+    this.exit = exit;
   }
 }

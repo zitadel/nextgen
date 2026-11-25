@@ -98,33 +98,10 @@ export class ProjectSecretMissingError extends ProjectError {
 }
 
 /**
- * `zitadel.json` cannot be read as what it should be: it is not JSON or not an object.
+ * `zitadel.json` or `.zitadel/secret` cannot be read as what it should be: it is not JSON, not an
+ * object, or lacks what it must hold.
  */
-export class ProjectConfigMalformedError extends ProjectError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * Make the failure.
-   *
-   * @param message - What went wrong.
-   * @param options - The error that caused this one, if any.
-   */
-  constructor(
-    message: string,
-    options: {
-      readonly cause?: unknown;
-    } = {},
-  ) {
-    super(message, options);
-  }
-}
-
-/**
- * `.zitadel/secret` cannot be read as what it should be: it is not JSON, not an object, or lacks what it must hold.
- */
-export class ProjectSecretMalformedError extends ProjectError {
+export class ProjectMalformedError extends ProjectError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";

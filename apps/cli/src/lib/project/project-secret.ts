@@ -5,7 +5,7 @@ import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { parseJsonObject, stableStringify } from "@/lib/json";
 
-import { ProjectSecretMalformedError, ProjectSecretMissingError } from "./errors";
+import { ProjectMalformedError, ProjectSecretMissingError } from "./errors";
 import { SecretFile } from "./secret-file";
 
 /**
@@ -75,7 +75,7 @@ export class ProjectSecret {
    * @param cwd - The project's directory.
    * @returns The secret.
    * @throws {@link ProjectSecretMissingError} When there is no secret.
-   * @throws {@link ProjectSecretMalformedError} When the file is not JSON or
+   * @throws {@link ProjectMalformedError} When the file is not JSON or
    *   lacks a required field.
    */
   static async read(cwd: string): Promise<ProjectSecret> {
@@ -89,7 +89,7 @@ export class ProjectSecret {
           typeof secret.preview_secret !== "string" ||
           !Array.isArray(secret.preview_origins)
         ) {
-          throw new ProjectSecretMalformedError(".zitadel/secret is missing required fields");
+          throw new ProjectMalformedError(".zitadel/secret is missing required fields");
         }
         // primary_origins was added with kinded origins; older secrets only have
         // preview_origins. A missing array reads as empty so doctor --fix can
@@ -98,11 +98,14 @@ export class ProjectSecret {
           secret.primary_origins = [];
         }
         if (!Array.isArray(secret.primary_origins)) {
-          throw new ProjectSecretMalformedError(".zitadel/secret is missing required fields");
+          throw new ProjectMalformedError(".zitadel/secret is missing required fields");
         }
         return new ProjectSecret(cwd, secret as ProjectSecretData);
       } catch (error) {
-        throw new ProjectSecretMalformedError(
+        if (error instanceof ProjectMalformedError) {
+          throw error;
+        }
+        throw new ProjectMalformedError(
           error instanceof Error ? error.message : ".zitadel/secret is malformed",
           {
             cause: error,

@@ -3,7 +3,11 @@ import { execa } from "execa";
 import { Cmd } from "@/lib/cmd";
 import { Output } from "@/lib/ui/output";
 
-import { PmCommandFailedError } from "./errors";
+import {
+  PmCommandFailedError,
+  PmCommandNotPermittedError,
+  PmCommandNotStartedError,
+} from "./errors";
 import type { PMName } from "./pm";
 
 /**
@@ -128,7 +132,9 @@ export class PackageCommand {
    * off the terminal altogether.
    *
    * @param options - Where and how it runs.
-   * @throws {@link PmCommandFailedError} When the command cannot start or exits non-zero.
+   * @throws {@link PmCommandNotStartedError} When the program or its directory is not there.
+   * @throws {@link PmCommandNotPermittedError} When the operating system refuses to run it.
+   * @throws {@link PmCommandFailedError} When the command cannot start otherwise or exits non-zero.
    */
   async run(options: RunOptions): Promise<void> {
     const capture = options.captureOutput === true;
@@ -151,12 +157,16 @@ export class PackageCommand {
     }
     const result = await subprocess;
     if (result.code !== undefined && result.exitCode === undefined) {
-      throw new PmCommandFailedError(
-        result.originalMessage ?? result.message ?? `${this.display} did not start`,
-        {
-          exit: result.code,
-        },
-      );
+      const message = result.originalMessage ?? result.message ?? "";
+      if (result.code === "ENOENT") {
+        throw new PmCommandNotStartedError(message, result.code);
+      }
+      if (result.code === "EACCES" || result.code === "EPERM") {
+        throw new PmCommandNotPermittedError(message, result.code);
+      }
+      throw new PmCommandFailedError(message, {
+        exit: result.code,
+      });
     }
     if (result.failed) {
       const detail = result.signal

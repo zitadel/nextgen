@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { toZitadelError } from "@/lib/errors";
-import { PmCommandFailedError, PmError, PmManifestInvalidError } from "@/lib/pm";
+import {
+  PmCommandFailedError,
+  PmCommandNotPermittedError,
+  PmCommandNotStartedError,
+  PmError,
+  PmManifestInvalidError,
+} from "@/lib/pm";
 
 describe("the package manager errors", () => {
   it("reports an unreadable manifest as invalid, keeping the parse error", () => {
@@ -19,7 +25,10 @@ describe("the package manager errors", () => {
       code: "E_VALIDATION",
       message: "bad",
       details: {
-        path: "/app/package.json",
+        original: {
+          name: "SyntaxError",
+          message: "bad",
+        },
       },
     });
   });
@@ -45,6 +54,55 @@ describe("the package manager errors", () => {
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
       message: "npm install failed with exit 1",
+      details: {
+        original: {
+          name: "Error",
+          message: "npm install failed with exit 1",
+          code: 1,
+        },
+      },
+    });
+  });
+
+  it("reports a program or directory that is not there as missing, with main's hint", () => {
+    const error = new PmCommandNotStartedError("spawn npm ENOENT", "ENOENT");
+
+    expect(error).toBeInstanceOf(PmError);
+    expect(error.category).toBe("missing");
+    expect(error.retryable).toBe(false);
+    expect(error.exit).toBe("ENOENT");
+    expect(toZitadelError(error)).toMatchObject({
+      code: "E_VALIDATION",
+      message: "spawn npm ENOENT",
+      hint: "A required file or directory is missing.",
+      details: {
+        original: {
+          name: "Error",
+          message: "spawn npm ENOENT",
+          code: "ENOENT",
+        },
+      },
+    });
+  });
+
+  it("reports a refused command as denied, with main's message and hint", () => {
+    const error = new PmCommandNotPermittedError("spawn npm EACCES", "EACCES");
+
+    expect(error).toBeInstanceOf(PmError);
+    expect(error.category).toBe("denied");
+    expect(error.retryable).toBe(false);
+    expect(error.exit).toBe("EACCES");
+    expect(toZitadelError(error)).toMatchObject({
+      code: "E_AUTH",
+      message: "Permission denied: spawn npm EACCES",
+      hint: "Check file permissions or run with the right user.",
+      details: {
+        original: {
+          name: "Error",
+          message: "spawn npm EACCES",
+          code: "EACCES",
+        },
+      },
     });
   });
 });

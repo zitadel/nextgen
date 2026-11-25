@@ -7,8 +7,33 @@ import { readIfReadable } from "@/lib/fs";
 import { refusalError, type Refusal } from "@/cli/core/refusal";
 import { issuerFromPort, Orca, OrcaFrameworkMissingError } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { Project } from "@/lib/project";
+import { Project, ProjectConfigMissingError, ProjectSecretMissingError } from "@/lib/project";
 import { CliPackage } from "@/lib/upgrade";
+
+/** What a directory with no `zitadel.json` is reported as. */
+const CONFIG_MISSING_REFUSAL = {
+  message: "zitadel.json was not found",
+  hint: "Set the project up first.",
+  next: [
+    {
+      id: "setup",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** What a project with no `.zitadel/secret` is reported as. */
+const SECRET_MISSING_REFUSAL = {
+  message: ".zitadel/secret was not found",
+  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+  next: [
+    {
+      id: "doctor",
+      flags: {
+        fix: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
 
 /** What a directory with no app of a framework orca knows is reported as. */
 const FRAMEWORK_NOT_DETECTED_REFUSAL = {
@@ -93,6 +118,12 @@ export async function loadPatchContext(
       },
     };
   } catch (error) {
+    if (error instanceof ProjectConfigMissingError) {
+      throw refusalError(CONFIG_MISSING_REFUSAL, {});
+    }
+    if (error instanceof ProjectSecretMissingError) {
+      throw refusalError(SECRET_MISSING_REFUSAL, {});
+    }
     if (error instanceof OrcaFrameworkMissingError) {
       throw refusalError(FRAMEWORK_NOT_DETECTED_REFUSAL, {});
     }

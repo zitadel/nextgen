@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { toZitadelError } from "@/lib/errors";
 import {
-  ProjectConfigMalformedError,
   ProjectConfigMissingError,
   ProjectEnvValueMultilineError,
   ProjectEnvValueUnquotableError,
   ProjectError,
-  ProjectSecretMalformedError,
+  ProjectMalformedError,
   ProjectSecretMissingError,
 } from "@/lib/project";
 
@@ -15,8 +14,7 @@ describe("the project errors", () => {
   it.each([
     ["missing config", new ProjectConfigMissingError(), "missing", "E_VALIDATION"],
     ["missing secret", new ProjectSecretMissingError(), "missing", "E_VALIDATION"],
-    ["malformed config", new ProjectConfigMalformedError("bad"), "invalid", "E_VALIDATION"],
-    ["malformed secret", new ProjectSecretMalformedError("bad"), "invalid", "E_VALIDATION"],
+    ["malformed file", new ProjectMalformedError("bad"), "invalid", "E_VALIDATION"],
     ["multi-line value", new ProjectEnvValueMultilineError("KEY"), "invalid", "E_VALIDATION"],
     ["unquotable value", new ProjectEnvValueUnquotableError("KEY"), "invalid", "E_VALIDATION"],
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
