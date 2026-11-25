@@ -15,9 +15,9 @@ import { UPDATE_CHECK_VARIABLE, ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 import {
   type BreakingChange,
   CliPackage,
-  InstallError,
+  UpgradeInstallFailedError,
   PackageInstaller,
-  ReleaseLookupError,
+  UpgradeReleaseLookupError,
   ReleaseNotes,
   Upgrader,
   type UpgradeResult,
@@ -170,7 +170,7 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
     const { plan, breaking, notes } = await this.planned(upgrader);
 
     const result = await upgrader.apply(plan).catch(async (error: unknown) => {
-      if (!(error instanceof InstallError)) {
+      if (!(error instanceof UpgradeInstallFailedError)) {
         throw error;
       }
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
@@ -268,10 +268,14 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
     upgrader: Upgrader,
   ): Promise<{ plan: Plan; breaking: readonly BreakingChange[]; notes: ReleaseNotes }> {
     const plan = await upgrader.plan().catch(async (error: unknown) => {
-      if (!(error instanceof ReleaseLookupError)) {
+      if (!(error instanceof UpgradeReleaseLookupError)) {
         throw error;
       }
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
+        details: {
+          reason: error.message,
+          ...(error.cause === undefined ? {} : { cause: errorMessage(error.cause) }),
+        },
         hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
         nextCommands: [await this.again("upgrade", {})],
       });

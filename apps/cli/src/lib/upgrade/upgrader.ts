@@ -1,6 +1,6 @@
 import type { ReleaseChannel } from "./channel";
 import { Dependencies } from "./dependencies";
-import { ReleaseLookupError } from "./errors";
+import { UpgradeReleaseLookupError } from "./errors";
 import type { PackageInstaller } from "./installer";
 import { UpgradePlan } from "./plan";
 
@@ -83,13 +83,13 @@ export class Upgrader {
    * newest release and not yesterday's answer.
    *
    * @returns The plan.
-   * @throws A {@link ReleaseLookupError} when the latest release cannot be looked up.
+   * @throws A {@link UpgradeReleaseLookupError} when the latest release cannot be looked up.
    */
   async plan(): Promise<UpgradePlan> {
     const { cliVersion, cwd, scope, channel } = this.options;
     const latest = await channel.latest({ fresh: true });
     if (latest === undefined) {
-      throw new ReleaseLookupError();
+      throw new UpgradeReleaseLookupError();
     }
     return UpgradePlan.create({
       cliVersion,
@@ -104,7 +104,7 @@ export class Upgrader {
    *
    * @param plan - What {@link Upgrader.plan} returned.
    * @returns What was done.
-   * @throws An `InstallError` when the install fails.
+   * @throws An `UpgradeInstallFailedError` when the install fails.
    */
   async apply(plan: UpgradePlan): Promise<UpgradeResult> {
     const { dryRun, installer } = this.options;

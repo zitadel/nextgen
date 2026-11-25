@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 
 import { Cache } from "@/lib/upgrade/cache";
 import { ReleaseChannel } from "@/lib/upgrade/channel";
-import { InstallError, ReleaseLookupError } from "@/lib/upgrade";
+import { UpgradeInstallFailedError, UpgradeReleaseLookupError } from "@/lib/upgrade";
 import { PackageInstaller } from "@/lib/upgrade/installer";
 import { Upgrader } from "@/lib/upgrade/upgrader";
 import { test } from "@tests/fixtures";
@@ -52,7 +52,7 @@ describe("Upgrader.plan", () => {
     expect(plan.packages).toEqual([{ name: "@zitadel/sdk-next", from: "1.0.0", to: "2.0.0" }]);
   });
 
-  it("fails with a ReleaseLookupError when the latest release cannot be looked up", async ({
+  it("fails with a UpgradeReleaseLookupError when the latest release cannot be looked up", async ({
     upgrader,
     server,
   }) => {
@@ -62,7 +62,7 @@ describe("Upgrader.plan", () => {
       return upgrader(true).plan();
     });
 
-    expect(error).toBeInstanceOf(ReleaseLookupError);
+    expect(error).toBeInstanceOf(UpgradeReleaseLookupError);
   });
 });
 
@@ -103,7 +103,7 @@ describe("Upgrader.apply", () => {
 });
 
 describe("Upgrader.apply when the install fails", () => {
-  it("fails with an InstallError that names the install and keeps the cause", async ({
+  it("fails with an UpgradeInstallFailedError that names the install and keeps the cause", async ({
     upgrader,
     dir,
   }) => {
@@ -119,7 +119,7 @@ describe("Upgrader.apply when the install fails", () => {
       return upgrade.apply(plan);
     });
 
-    expect(error).toBeInstanceOf(InstallError);
+    expect(error).toBeInstanceOf(UpgradeInstallFailedError);
     expect(error).toMatchObject({
       command: { display: expect.stringContaining("@zitadel/sdk-next@2.0.0") },
       cause: expect.anything(),

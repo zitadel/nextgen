@@ -5,7 +5,7 @@ import { afterEach, describe, expect } from "vitest";
 
 import { PM } from "@/lib/pm";
 import { Dependencies } from "@/lib/upgrade/dependencies";
-import { InstallError } from "@/lib/upgrade";
+import { UpgradeInstallFailedError } from "@/lib/upgrade";
 import { PackageInstaller, type PlannedInstall } from "@/lib/upgrade/installer";
 import { UpgradePlan } from "@/lib/upgrade/plan";
 import { Release } from "@/lib/upgrade/release";
@@ -53,7 +53,9 @@ describe("PackageInstaller.plan", () => {
 });
 
 describe("PackageInstaller.install", () => {
-  it("fails with an InstallError that names the install and keeps the cause", async ({ dir }) => {
+  it("fails with an UpgradeInstallFailedError that names the install and keeps the cause", async ({
+    dir,
+  }) => {
     await project(dir, { "@zitadel/api": "1.0.0" });
     const install = await installerIn(dir).plan(await aPlan(dir));
     if (install === undefined) {
@@ -64,7 +66,7 @@ describe("PackageInstaller.install", () => {
       return installerIn(join(dir, "missing")).install(install);
     });
 
-    expect(error).toBeInstanceOf(InstallError);
+    expect(error).toBeInstanceOf(UpgradeInstallFailedError);
     expect(error).toMatchObject({ command: install.shown, cause: expect.anything() });
   });
 
@@ -85,7 +87,7 @@ describe("PackageInstaller.install", () => {
       return installerIn(dir).install(install);
     });
 
-    expect(error).toBeInstanceOf(InstallError);
+    expect(error).toBeInstanceOf(UpgradeInstallFailedError);
     expect(error).toMatchObject({ cause: { code: 3 } });
   });
 });

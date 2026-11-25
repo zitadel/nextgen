@@ -12,7 +12,7 @@ const LIBRARY = join(import.meta.dirname, "../../../../src/lib/upgrade");
  * CLI. This checks direct imports only.
  */
 const ALLOWED =
-  /^(\.\/|node:|semver$|execa$|@\/lib\/(ci|fs|json|pm|telemetry\/identity|ui\/output)$)/;
+  /^(\.\/|node:|semver$|execa$|@\/lib\/(ci|errors|fs|json|pm|telemetry\/identity|ui\/output)$)/;
 
 /** Every module a source imports: `from "x"`, `import "x"` and `import("x")`. */
 function importsIn(source: string): string[] {
