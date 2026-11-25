@@ -16,7 +16,11 @@ import (
 const (
 	jobColumns = `id, name, payload, unique_key, run_at, not_after, lease_until, lease_by, lease_token,` +
 		` attempt, max_attempts, last_error, status, completed_at`
+	// Qualified for UPDATE…FROM CTE RETURNING: bare "id" is ambiguous with picked.id.
+	jobColumnsJ = `j.id, j.name, j.payload, j.unique_key, j.run_at, j.not_after, j.lease_until, j.lease_by, j.lease_token,` +
+		` j.attempt, j.max_attempts, j.last_error, j.status, j.completed_at`
 	jobScheduleColumns = `id, name, period, run_at, lease_until, lease_by, lease_token, last_error, attempt`
+	jobScheduleColumnsS = `s.id, s.name, s.period, s.run_at, s.lease_until, s.lease_by, s.lease_token, s.last_error, s.attempt`
 
 	insertJobStmt = `INSERT INTO zitadel_nextgen.jobs` +
 		` (id, name, payload, unique_key, run_at, not_after, attempt, max_attempts, status)` +
@@ -58,7 +62,7 @@ UPDATE zitadel_nextgen.jobs j SET
     last_error = COALESCE(j.last_error, 'not_after')
 FROM picked
 WHERE j.id = picked.id
-RETURNING ` + jobColumns
+RETURNING ` + jobColumnsJ
 
 	claimJobsStmt = `
 WITH picked AS (
@@ -79,7 +83,7 @@ UPDATE zitadel_nextgen.jobs j SET
     lease_token = encode(gen_random_bytes(16), 'hex')
 FROM picked
 WHERE j.id = picked.id
-RETURNING ` + jobColumns
+RETURNING ` + jobColumnsJ
 
 	claimSchedulesStmt = `
 WITH picked AS (
@@ -97,7 +101,7 @@ UPDATE zitadel_nextgen.job_schedules s SET
     lease_token = encode(gen_random_bytes(16), 'hex')
 FROM picked
 WHERE s.id = picked.id
-RETURNING ` + jobScheduleColumns
+RETURNING ` + jobScheduleColumnsS
 
 	heartbeatJobStmt = `UPDATE zitadel_nextgen.jobs` +
 		` SET lease_until = NOW() + $3::INTERVAL` +
