@@ -2,7 +2,11 @@ import { Cmd } from "@/lib/cmd";
 import { isObject } from "@/lib/json";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
-import { LocalServerDownError, ZitadelRuntime } from "@/lib/server";
+import {
+  LocalServerNotRespondingError,
+  LocalServerNotStartedError,
+  ZitadelRuntime,
+} from "@/lib/server";
 import { resolve } from "node:path";
 import { WizardStep } from "@/lib/wizard";
 
@@ -17,11 +21,27 @@ import {
 } from "@/cli/commands/setup/shared";
 import { Project } from "@/lib/project";
 
-/** How `--server local` with nothing running is refused. */
+/** How `--server local` with no server ever started is refused. */
 const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
-  hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "{reason} Run `zitadel start`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  next: ["{start}", "{setup}"],
+} as const satisfies Refusal;
+
+/** How `--server local` with a recorded server that does not answer is refused. */
+const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "Local Zitadel server is not running",
+  hint: "{reason} Run `zitadel start` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  next: ["{start}", "{setup}"],
+} as const satisfies Refusal;
+
+/** How `--server local` with a recorded server in another folder that does not answer is refused. */
+const LOCAL_SERVER_ELSEWHERE_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "Local Zitadel server is not running",
+  hint: "{reason} It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
@@ -126,45 +146,70 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
+    const retry = retryOptionsFromFlags(flags);
+    const recovery = ssoRecovery(retry, suggest);
+    const scripting =
+      retry.sso && retry.sso.length > 0
+        ? "The rerun asks for the client id and secret, because a command carries neither. " +
+          "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+        : "";
+    const recovered =
+      recovery.commands.length > 0
+        ? `${recovery.hint}${recovery.commands.join(" ")} `
+        : recovery.hint;
     const server = await ZitadelRuntime.resolve({
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
-    }).catch((error: unknown) => {
-      if (!(error instanceof LocalServerDownError)) {
+    })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerNotStartedError) {
+          throw Object.assign(
+            refusalError(
+              NO_LOCAL_SERVER_REFUSAL,
+              { reason: error.hint ?? "", scripting, recovery: recovered },
+              {
+                start: { id: "start", flags: {} },
+                setup: { id: "setup", flags: setupRetryFlags(retry) },
+              },
+            ),
+            { cause: error },
+          );
+        }
         throw error;
-      }
-      const details = isObject(error.details) ? error.details : {};
-      const { directory } = details;
-      const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
-      const startFlags: { cwd?: string } = {};
-      if (elsewhere) {
-        startFlags.cwd = directory;
-      }
-      const retry = retryOptionsFromFlags(flags);
-      const recovery = ssoRecovery(retry, suggest);
-      throw refusalError(
-        NO_LOCAL_SERVER_REFUSAL,
-        {
-          reason: `${error.hint ?? ""}${elsewhere ? ` It was started in ${Cmd.quote(directory)}.` : ""} `,
-          scripting:
-            retry.sso && retry.sso.length > 0
-              ? "The rerun asks for the client id and secret, because a command carries neither. " +
-                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-              : "",
-          recovery:
-            recovery.commands.length > 0
-              ? `${recovery.hint}${recovery.commands.join(" ")} `
-              : recovery.hint,
-        },
-        {
-          start: { id: "start", flags: startFlags },
-          setup: {
-            id: "setup",
-            flags: setupRetryFlags(retry),
-          },
-        },
-      );
-    });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerNotRespondingError) {
+          const { directory } = isObject(error.details) ? error.details : {};
+          const elsewhere =
+            typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
+          throw Object.assign(
+            elsewhere
+              ? refusalError(
+                  LOCAL_SERVER_ELSEWHERE_REFUSAL,
+                  {
+                    reason: error.hint ?? "",
+                    directory: Cmd.quote(directory),
+                    scripting,
+                    recovery: recovered,
+                  },
+                  {
+                    start: { id: "start", flags: { cwd: directory } },
+                    setup: { id: "setup", flags: setupRetryFlags(retry) },
+                  },
+                )
+              : refusalError(
+                  LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
+                  { reason: error.hint ?? "", scripting, recovery: recovered },
+                  {
+                    start: { id: "start", flags: {} },
+                    setup: { id: "setup", flags: setupRetryFlags(retry) },
+                  },
+                ),
+            { cause: error },
+          );
+        }
+        throw error;
+      });
     if (!(await isDirectoryOrMissing(meta.cwd))) {
       throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
         cwd: meta.cwd,

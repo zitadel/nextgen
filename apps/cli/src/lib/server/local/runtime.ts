@@ -6,7 +6,8 @@ import { dirname, join, resolve } from "node:path";
 
 import { errorMessage } from "@/lib/errors";
 import {
-  LocalServerDownError,
+  LocalServerNotRespondingError,
+  LocalServerNotStartedError,
   LocalServerFileError,
   LocalServerInternalError,
   LocalServerMalformedError,
@@ -427,11 +428,11 @@ export async function checkLocalServerHealth(
 export function localServerNotRunning(
   serverUrl?: string,
   directory?: string,
-): LocalServerDownError {
+): LocalServerNotRespondingError | LocalServerNotStartedError {
   if (serverUrl) {
-    return new LocalServerDownError("not-responding", { server_url: serverUrl, directory });
+    return new LocalServerNotRespondingError({ server_url: serverUrl, directory });
   } else {
-    return new LocalServerDownError("not-running", { server_url: serverUrl });
+    return new LocalServerNotStartedError({ server_url: serverUrl });
   }
 }
 

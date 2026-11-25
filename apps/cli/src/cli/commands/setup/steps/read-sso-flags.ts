@@ -108,11 +108,14 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: undefined,
       };
     }
-    const given =
+    const selection = selectionFromFlags(
+      flags.sso,
       flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
         ? await askCustomSettings(customValues, this.deps.ask)
-        : customValues;
-    const selection = this.selected(flags.sso, given);
+        : customValues,
+      SETUP_FLAG_NAMES,
+      SSO_CUSTOM_EXAMPLE,
+    );
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       warnings.report(loopback);
@@ -159,20 +162,5 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         },
       },
     };
-  }
-
-  /**
-   * The provider the flags choose, or the refusal of what they say about it.
-   *
-   * @param provider - The provider the flags name.
-   * @param given - The custom settings the flags gave.
-   * @returns The selection.
-   * @throws {@link ZitadelError} When the settings cannot be used.
-   */
-  private selected(
-    provider: string,
-    given: ReturnType<typeof customFlagValues>,
-  ): ReturnType<typeof selectionFromFlags> {
-    return selectionFromFlags(provider, given, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
   }
 }

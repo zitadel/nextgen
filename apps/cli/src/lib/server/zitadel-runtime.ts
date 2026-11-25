@@ -767,7 +767,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * @param cwd - The directory the run addresses.
    * @param fetcher - What asks whether the server answers (`fetch` by default).
    * @returns The address of the server running there.
-   * @throws {LocalServerDownError} when no server was started there, or when the recorded one is not running.
+   * @throws {LocalServerNotStartedError} when no server was started there, and {LocalServerNotRespondingError} when the recorded one is not running.
    */
   static async resolveUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
@@ -925,7 +925,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * enough: another folder's server may have taken the port since.
    *
    * @returns The address.
-   * @throws {LocalServerDownError} when no folder from here up started a server, or when the recorded one is not running.
+   * @throws {LocalServerNotStartedError} when no folder from here up started a server, and {LocalServerNotRespondingError} when the recorded one is not running.
    */
   runningUrl(): Promise<string> {
     return LocalRuntime.resolveUrl(this.cwd, this.directory.fetcher);

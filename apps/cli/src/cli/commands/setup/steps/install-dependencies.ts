@@ -1,6 +1,6 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { log, warnings, type BoxAction } from "@/lib/ui";
-import { ZitadelError } from "@/lib/errors";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import {
   type DependencyInstall,
   type InstallContext,
@@ -15,6 +15,14 @@ import { WizardStep } from "@/lib/wizard";
  * How many of a failed after-install script's last output lines its warning quotes.
  */
 const QUOTED_OUTPUT_LINES = 20;
+
+/** How a dependency install that failed is refused. */
+const INSTALL_FAILED_REFUSAL = {
+  message: "Dependency install failed: {command}",
+  hint: "Run {command} in {cwd}, then start the app with {dev}.",
+  next: ["{install}"],
+  details: { command: "{command}", cwd: "{cwd}", original: "{original}" },
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -158,15 +166,13 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         const installCommand = packageManager.install();
         const original = error.cause ?? error;
 
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `Dependency install failed: ${installCommand.display}`,
-          {
-            hint: `Run ${installCommand.display} in ${this.deps.cwd}, then start the app with ${devCommand.display}.`,
-            nextCommands: [shownInstall],
-            details: {
+        throw Object.assign(
+          refusalError(
+            INSTALL_FAILED_REFUSAL,
+            {
               command: installCommand.display,
               cwd: this.deps.cwd,
+              dev: devCommand.display,
               original:
                 original instanceof Error
                   ? {
@@ -178,7 +184,9 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
                       message: String(original),
                     },
             },
-          },
+            { install: shownInstall },
+          ),
+          { cause: error },
         );
       });
     if (install.status === "completed" && afterInstallScript !== undefined) {

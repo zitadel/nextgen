@@ -393,8 +393,7 @@ describe("LocalRuntime", () => {
   describe("logs", () => {
     it("refuses a directory that never started a server", async ({ dir }) => {
       await expect(at(dir).logs({ tail: 10 })).rejects.toMatchObject({
-        name: "LocalServerDownError",
-        reason: "not-running",
+        name: "LocalServerNotStartedError",
       });
     });
 
@@ -526,7 +525,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt(url);
 
       await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
-        name: "LocalServerDownError",
+        name: "LocalServerNotRespondingError",
       });
     });
 
@@ -539,7 +538,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt(url);
 
       await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
-        name: "LocalServerDownError",
+        name: "LocalServerNotRespondingError",
       });
     });
 
@@ -552,8 +551,7 @@ describe("LocalRuntime", () => {
       await mkdir(app);
 
       await expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects.toMatchObject({
-        name: "LocalServerDownError",
-        reason: "not-responding",
+        name: "LocalServerNotRespondingError",
         details: { server_url: url, directory: cwd },
       });
     });
@@ -563,7 +561,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt();
 
       await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
-        name: "LocalServerDownError",
+        name: "LocalServerNotRespondingError",
       });
     });
 
@@ -573,8 +571,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt("http://localhost:8080");
 
       await expect(LocalRuntime.resolveUrl(dir, fetcher)).rejects.toMatchObject({
-        name: "LocalServerDownError",
-        reason: "not-running",
+        name: "LocalServerNotStartedError",
       });
     });
 
@@ -870,7 +867,7 @@ describe("ZitadelRuntime.resolve", () => {
       },
     );
 
-    expect(error).toMatchObject({ name: "LocalServerDownError", reason: "not-responding" });
+    expect(error).toMatchObject({ name: "LocalServerNotRespondingError" });
     expect(toZitadelError(error).code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
   });
 });

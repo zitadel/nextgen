@@ -6,7 +6,8 @@ import {
   LocalServerBinaryError,
   LocalServerBusyError,
   LocalServerDockerMissingError,
-  LocalServerDownError,
+  LocalServerNotRespondingError,
+  LocalServerNotStartedError,
   LocalServerError,
   LocalServerFileError,
   LocalServerInternalError,
@@ -19,7 +20,7 @@ import {
 
 describe("the local server errors", () => {
   it.each([
-    ["down", new LocalServerDownError("not-running", {}), "conflict", "E_LOCAL_SERVER_NOT_RUNNING"],
+    ["down", new LocalServerNotStartedError({}), "conflict", "E_LOCAL_SERVER_NOT_RUNNING"],
     ["malformed", new LocalServerMalformedError("record", "bad"), "invalid", "E_VALIDATION"],
     ["busy", new LocalServerBusyError({}), "unavailable", "E_CONFLICT"],
     ["stop", new LocalServerStopError("server", "stuck"), "conflict", "E_CONFLICT"],
@@ -94,7 +95,7 @@ describe("the local server errors", () => {
 
 describe("the local server errors' codes", () => {
   it.each([
-    ["not running", new LocalServerDownError("not-running", {}), "E_LOCAL_SERVER_NOT_RUNNING"],
+    ["not running", new LocalServerNotStartedError({}), "E_LOCAL_SERVER_NOT_RUNNING"],
     ["another start", new LocalServerBusyError({}), "E_CONFLICT"],
     ["a held port", new LocalServerPortBusyError(8080), "E_PORT_IN_USE"],
     ["no free port", new LocalServerPortFullError(8080, 8090), "E_PORT_IN_USE"],
@@ -112,13 +113,13 @@ describe("the local server errors' codes", () => {
   it.each([
     [
       "a server nobody started",
-      new LocalServerDownError("not-running", {}),
+      new LocalServerNotStartedError({}),
       "No local server has been started in this directory or a parent.",
       [{ id: "start", flags: {} }],
     ],
     [
       "a server that does not answer",
-      new LocalServerDownError("not-responding", {
+      new LocalServerNotRespondingError({
         server_url: "http://localhost:8080",
         directory: "/app",
       }),

@@ -110,54 +110,54 @@ function folderFlag(details: Readonly<Record<string, unknown>>): { cwd?: string 
   return typeof details.directory === "string" ? { cwd: details.directory } : {};
 }
 
-/** Why no local server answers. */
-export type LocalServerDownReason = "not-running" | "not-responding";
-
-/** What to do about each reason no local server answers. */
-const DOWN_ADVICE: Record<
-  LocalServerDownReason,
-  (details: Readonly<Record<string, unknown>>) => LocalServerErrorOptions
-> = {
-  "not-running": (details) => {
-    return {
-      hint: "No local server has been started in this directory or a parent.",
-      nextCommands: [{ id: "start", flags: folderFlag(details) }],
-    };
-  },
-  "not-responding": (details) => {
-    return {
-      hint: `No healthy local server responded at ${String(details.server_url)}.`,
-      nextCommands: [{ id: "start", flags: folderFlag(details) }],
-    };
-  },
-};
-
 /**
- * There is no running local server for a folder: none was started in it or a
- * parent, or the one that was is not running.
+ * No local server was started in this folder or a parent.
  */
-export class LocalServerDownError extends LocalServerError {
+export class LocalServerNotStartedError extends LocalServerError {
   override readonly retryable: boolean = false;
 
   /** The stable product code the failure is reported with. */
   override get code(): ZitadelErrorCode {
     return "E_LOCAL_SERVER_NOT_RUNNING";
   }
-  /** Whether there is no record at all, or a record whose server does not answer. */
-  readonly reason: LocalServerDownReason;
 
   /**
    * Creates the error.
    *
-   * @param reason - Whether no server was started, or the recorded one is not running.
-   * @param details - The address the record names and the folder that holds it.
+   * @param details - The address the record names.
    */
-  constructor(reason: LocalServerDownReason, details: Readonly<Record<string, unknown>>) {
+  constructor(details: Readonly<Record<string, unknown>>) {
     super("conflict", "Local Zitadel server is not running", {
-      ...DOWN_ADVICE[reason](details),
+      hint: "No local server has been started in this directory or a parent.",
+      nextCommands: [{ id: "start", flags: folderFlag(details) }],
       details,
     });
-    this.reason = reason;
+  }
+}
+
+/**
+ * The local server a folder started is not running: it does not answer at the
+ * address it recorded.
+ */
+export class LocalServerNotRespondingError extends LocalServerError {
+  override readonly retryable: boolean = false;
+
+  /** The stable product code the failure is reported with. */
+  override get code(): ZitadelErrorCode {
+    return "E_LOCAL_SERVER_NOT_RUNNING";
+  }
+
+  /**
+   * Creates the error.
+   *
+   * @param details - The address the record names and the folder that holds it.
+   */
+  constructor(details: Readonly<Record<string, unknown>>) {
+    super("conflict", "Local Zitadel server is not running", {
+      hint: `No healthy local server responded at ${String(details.server_url)}.`,
+      nextCommands: [{ id: "start", flags: folderFlag(details) }],
+      details,
+    });
   }
 }
 
