@@ -224,6 +224,7 @@ export const EVENT_TYPES = [
   "schema.created",
   "session.deleted",
   "session.established",
+  "session.expired",
   "team.created",
   "team.deactivated",
   "team.updated",
