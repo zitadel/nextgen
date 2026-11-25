@@ -440,6 +440,8 @@ webhooks:
     $ref: endpoints/events/webhooks/session-deleted.yaml
   session.established:
     $ref: endpoints/events/webhooks/session-established.yaml
+  session.expired:
+    $ref: endpoints/events/webhooks/session-expired.yaml
   team.created:
     $ref: endpoints/events/webhooks/team-created.yaml
   team.deactivated:

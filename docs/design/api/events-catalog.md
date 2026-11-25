@@ -121,7 +121,7 @@ are not inputs to the live risk evaluator
 
 - The user as a record: `user.created`, `user.updated`, `user.deleted`.
 - A session or a token that belongs to a user: `session.established`,
-  `session.deleted`, `auth.token.issued`, `auth.token.revoked`.
+  `session.deleted`, `session.expired`, `auth.token.issued`, `auth.token.revoked`.
 - A sign-in, once its attempt has resolved a user: `auth.attempt.created`,
   `auth.attempt.handed_off`, `auth.check.succeeded`, `auth.check.failed`,
   `auth.sso.authorization.failed`, `auth.sso.exchange.failed`,
@@ -190,6 +190,7 @@ tracked below.
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
 | `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |
 | `DeleteSessionByID` (operator/API revoke) | `session.deleted` | `session` | `session` | `reason` (`revoked`) |
+| sessions.gc reaper (SessionsGC.Perform) | `session.expired` | `session` | `session` | _(empty; actor type system) |
 | Signup challenge issued | `flow.signup_challenge.issued` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | Signup proof consumed | `flow.signup_challenge.consumed` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
@@ -267,7 +268,6 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `user.deactivated` | [#878](https://github.com/zitadel/nextgen/issues/878) per-row emit from team cascade / UserService.Deactivate — `reason` enum; no primary-id echo |
 | `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
-| `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

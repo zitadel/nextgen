@@ -160,6 +160,7 @@ const (
 	SchemaCreatedOperation                   OperationName = "SchemaCreated"
 	SessionDeletedOperation                  OperationName = "SessionDeleted"
 	SessionEstablishedOperation              OperationName = "SessionEstablished"
+	SessionExpiredOperation                  OperationName = "SessionExpired"
 	TeamCreatedOperation                     OperationName = "TeamCreated"
 	TeamDeactivatedOperation                 OperationName = "TeamDeactivated"
 	TeamUpdatedOperation                     OperationName = "TeamUpdated"

@@ -49,6 +49,7 @@ oneOf:
   - $ref: types/schema-created-event.yaml
   - $ref: types/session-deleted-event.yaml
   - $ref: types/session-established-event.yaml
+  - $ref: types/session-expired-event.yaml
   - $ref: types/team-created-event.yaml
   - $ref: types/team-deactivated-event.yaml
   - $ref: types/team-updated-event.yaml
@@ -106,6 +107,7 @@ discriminator:
     schema.created: types/schema-created-event.yaml
     session.deleted: types/session-deleted-event.yaml
     session.established: types/session-established-event.yaml
+    session.expired: types/session-expired-event.yaml
     team.created: types/team-created-event.yaml
     team.deactivated: types/team-deactivated-event.yaml
     team.updated: types/team-updated-event.yaml

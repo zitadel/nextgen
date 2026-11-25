@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/jobs"
 	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
@@ -28,6 +29,7 @@ type Config struct {
 	Schema          SchemaConfig           `mapstructure:"schema"`
 	Keys            KeysConfig             `mapstructure:"keys"`
 	Session         service.SessionConfig  `mapstructure:"session"`
+	Jobs            jobs.Config            `mapstructure:"jobs"`
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
 	Events          EventsConfig           `mapstructure:"events"`
@@ -160,11 +162,6 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
-}
-
-type SessionConfig struct {
-	DefaultTTL time.Duration `mapstructure:"default_ttl"`
-	MaxTTL     time.Duration `mapstructure:"max_ttl"`
 }
 
 type ServerConfig struct {

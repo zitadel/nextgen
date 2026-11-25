@@ -104,6 +104,7 @@ const (
 
 	EventTypeSessionEstablished EventType = "session.established"
 	EventTypeSessionDeleted     EventType = "session.deleted"
+	EventTypeSessionExpired     EventType = "session.expired"
 
 	EventTypeSignupChallengeIssued   EventType = "flow.signup_challenge.issued"
 	EventTypeSignupChallengeConsumed EventType = "flow.signup_challenge.consumed"
