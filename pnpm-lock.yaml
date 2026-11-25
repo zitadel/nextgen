@@ -566,6 +566,9 @@ catalogs:
     type-fest:
       specifier: ^5.10.0
       version: 5.10.0
+    typedoc:
+      specifier: ^0.28.20
+      version: 0.28.20
     typescript:
       specifier: ^6.0.3
       version: 6.0.3
@@ -694,6 +697,9 @@ importers:
       turbo:
         specifier: 'catalog:'
         version: 2.11.10
+      typedoc:
+        specifier: 'catalog:'
+        version: 0.28.20(typescript@6.0.3)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -2003,7 +2009,7 @@ importers:
         version: 2.15.0(@types/node@24.19.2)(typescript@6.0.3)
       orval:
         specifier: 'catalog:'
-        version: 8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@6.0.3)))(typedoc@0.28.19(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7)
+        version: 8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7)
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.30(typescript@6.0.3))(@vue/language-core@3.3.14)(oxc-resolver@11.21.2)(publint@0.3.25)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.3.14(typescript@6.0.3))
@@ -16604,8 +16610,8 @@ packages:
     peerDependencies:
       typedoc: 0.28.x
 
-  typedoc@0.28.19:
-    resolution: {integrity: sha512-wKh+lhdmMFivMlc6vRRcMGXeGEHGU2g8a2CkPTJjJlwRf1iXbimWIPcFolCqe4E0d/FRtGszpIrsp3WLpDB8Pw==}
+  typedoc@0.28.20:
+    resolution: {integrity: sha512-uSKqkh8Cr48vllnEy+jdaAgOeR6Y+QCBW7usgUsKj7gJEfR7stw9U/fE49LBnj2tPRKPY0c0EBJSWe9Appmplg==}
     engines: {node: '>= 18', pnpm: '>= 10'}
     hasBin: true
     peerDependencies:
@@ -19480,7 +19486,6 @@ snapshots:
       '@shikijs/themes': 3.23.0
       '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.1.0
-    optional: true
 
   '@github/catalyst@1.8.1': {}
 
@@ -23789,7 +23794,6 @@ snapshots:
     dependencies:
       '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.1.0
-    optional: true
 
   '@shikijs/engine-oniguruma@4.6.0':
     dependencies:
@@ -23799,7 +23803,6 @@ snapshots:
   '@shikijs/langs@3.23.0':
     dependencies:
       '@shikijs/types': 3.23.0
-    optional: true
 
   '@shikijs/langs@4.6.0':
     dependencies:
@@ -23814,7 +23817,6 @@ snapshots:
   '@shikijs/themes@3.23.0':
     dependencies:
       '@shikijs/types': 3.23.0
-    optional: true
 
   '@shikijs/themes@4.6.0':
     dependencies:
@@ -23824,7 +23826,6 @@ snapshots:
     dependencies:
       '@shikijs/vscode-textmate': 10.1.0
       '@types/hast': 3.0.5
-    optional: true
 
   '@shikijs/types@4.6.0':
     dependencies:
@@ -29885,7 +29886,6 @@ snapshots:
   linkify-it@5.0.2:
     dependencies:
       uc.micro: 2.1.0
-    optional: true
 
   liquidjs@10.30.1:
     dependencies:
@@ -30087,8 +30087,7 @@ snapshots:
 
   lucide@1.72.0: {}
 
-  lunr@2.3.9:
-    optional: true
+  lunr@2.3.9: {}
 
   lz-string@1.5.0: {}
 
@@ -30159,7 +30158,6 @@ snapshots:
       mdurl: 2.0.0
       punycode.js: 2.3.1
       uc.micro: 2.1.0
-    optional: true
 
   markdown-table@3.0.4: {}
 
@@ -30475,8 +30473,7 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mdurl@2.0.0:
-    optional: true
+  mdurl@2.0.0: {}
 
   media-typer@0.3.0: {}
 
@@ -31915,7 +31912,7 @@ snapshots:
   ordered-binary@1.6.1:
     optional: true
 
-  orval@8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@6.0.3)))(typedoc@0.28.19(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7):
+  orval@8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7):
     dependencies:
       '@commander-js/extra-typings': 15.0.0(commander@15.0.0)
       '@orval/angular': 8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
@@ -31945,8 +31942,8 @@ snapshots:
       string-argv: 0.3.2
     optionalDependencies:
       prettier: 3.9.10
-      typedoc: 0.28.19(typescript@6.0.3)
-      typedoc-plugin-markdown: 4.11.0(typedoc@0.28.19(typescript@6.0.3))
+      typedoc: 0.28.20(typescript@6.0.3)
+      typedoc-plugin-markdown: 4.11.0(typedoc@0.28.20(typescript@6.0.3))
     transitivePeerDependencies:
       - '@faker-js/faker'
       - '@modelcontextprotocol/server'
@@ -32607,8 +32604,7 @@ snapshots:
       inherits: 2.0.4
       pump: 2.0.1
 
-  punycode.js@2.3.1:
-    optional: true
+  punycode.js@2.3.1: {}
 
   punycode@2.3.1: {}
 
@@ -34413,12 +34409,12 @@ snapshots:
 
   type-level-regexp@0.1.17: {}
 
-  typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@6.0.3)):
+  typedoc-plugin-markdown@4.11.0(typedoc@0.28.20(typescript@6.0.3)):
     dependencies:
-      typedoc: 0.28.19(typescript@6.0.3)
+      typedoc: 0.28.20(typescript@6.0.3)
     optional: true
 
-  typedoc@0.28.19(typescript@6.0.3):
+  typedoc@0.28.20(typescript@6.0.3):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
@@ -34426,7 +34422,6 @@ snapshots:
       minimatch: 11.0.4
       typescript: 6.0.3
       yaml: 2.9.1
-    optional: true
 
   typescript@5.4.5: {}
 
@@ -34460,8 +34455,7 @@ snapshots:
 
   typical@4.0.0: {}
 
-  uc.micro@2.1.0:
-    optional: true
+  uc.micro@2.1.0: {}
 
   ufo@1.6.4: {}
 

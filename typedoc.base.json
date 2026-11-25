@@ -1,0 +1,30 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "out": "dist/api-docs",
+  "gitRevision": "main",
+  "sourceLinkTemplate": "https://github.com/zitadel/nextgen/blob/main/{path}#L{line}",
+  "githubPages": false,
+  "hideGenerator": true,
+  "treatWarningsAsErrors": true,
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  },
+  "requiredToBeDocumented": [
+    "Class",
+    "Function",
+    "Interface",
+    "TypeAlias",
+    "Variable",
+    "Property",
+    "Method",
+    "Accessor",
+    "Constructor",
+    "Enum",
+    "EnumMember"
+  ]
+}

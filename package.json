@@ -39,6 +39,7 @@
     "sharp": "catalog:",
     "tsx": "catalog:",
     "turbo": "catalog:",
+    "typedoc": "catalog:",
     "typescript": "catalog:",
     "verdaccio": "6.11.1",
     "vite": "catalog:",
