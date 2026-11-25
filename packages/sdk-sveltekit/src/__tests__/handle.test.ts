@@ -375,6 +375,32 @@ describe("proxied requests without a body", () => {
   });
 });
 
+describe("a proxied redirect", () => {
+  it("keeps a path that starts with two slashes on the origin of the request", async () => {
+    const backend = createServer((_request, response) => {
+      const { port } = backend.address() as AddressInfo;
+      response.writeHead(302, { location: `http://127.0.0.1:${port}//evil.example/x?a=1` });
+      response.end();
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+    let served: Response | undefined;
+
+    try {
+      served = await serve(
+        "http://localhost:3000/__nextgen/ping",
+        {},
+        { url: `http://127.0.0.1:${port}` },
+      );
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
+
+    expect(served?.status).toBe(302);
+    expect(served?.headers.get("location")).toBe("http://localhost:3000/evil.example/x?a=1");
+  });
+});
+
 describe("a login redirect", () => {
   it("is an absolute URL on the origin of the request and carries the requested path", async () => {
     const served = await serve(

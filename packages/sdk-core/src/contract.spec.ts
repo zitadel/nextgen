@@ -1073,6 +1073,7 @@ describe("server SDK middleware tests ↔ the blocks they share", () => {
     "an empty backend URL",
     "an empty project secret",
     "a login redirect",
+    "a proxied redirect",
     "proxied OAuth paths of another project",
     "an unsafe login path",
     "a cleared session cookie",

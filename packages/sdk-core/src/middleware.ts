@@ -489,8 +489,10 @@ export function refusedProxyResponse(): Response {
  * Nothing legitimate on this path points off-origin: an outbound redirect to an identity provider
  * travels as `step.redirect_url` in a JSON body and the widget performs it, never as a proxied
  * header. A relative reference resolves against the path it came from, so `next?flow=x` answered
- * to `/__nextgen/idp/google/callback` means `/__nextgen/idp/google/next?flow=x`. An unparseable
- * value has nothing to forward.
+ * to `/__nextgen/idp/google/callback` means `/__nextgen/idp/google/next?flow=x`. A path that
+ * starts with several slashes, such as `//evil.example/x` after a host, keeps one: left alone it
+ * would read as a protocol-relative URL and name another origin. An unparseable value has nothing
+ * to forward.
  *
  * @param location - The `Location` value of the upstream response.
  * @param selfUrl - The own request URL of the app.
@@ -503,7 +505,8 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
   try {
     const base = new URL(selfUrl);
     const target = new URL(location, base);
-    return new URL(`${target.pathname}${target.search}${target.hash}`, base).toString();
+    const path = target.pathname.replace(/^\/+/, "/");
+    return new URL(`${path}${target.search}${target.hash}`, base).toString();
   } catch {
     return undefined;
   }

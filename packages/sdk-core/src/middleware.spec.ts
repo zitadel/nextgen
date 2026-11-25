@@ -93,6 +93,20 @@ describe("filterResponseHeaders", () => {
     }
   });
 
+  it("keeps a path that starts with several slashes on this app", () => {
+    for (const location of [
+      "https://zitadel.internal//evil.com/x",
+      "https://zitadel.internal///evil.com/x",
+      "https://zitadel.internal/\\evil.com/x",
+      "//zitadel.internal//evil.com/x",
+    ]) {
+      expect(
+        filterResponseHeaders(upstream({ location }), CALLBACK).get("location"),
+        location,
+      ).toBe(`${APP}/evil.com/x`);
+    }
+  });
+
   it("drops a redirect when the caller names no request URL", () => {
     expect(filterResponseHeaders(upstream({ location: `${APP}/login` })).has("location")).toBe(
       false,
