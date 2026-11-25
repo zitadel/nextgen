@@ -279,6 +279,7 @@ export default class Start extends Telemetered(
         throw refusalError(
           DOCKER_UNAVAILABLE_REFUSAL,
           {
+            ...error,
             message: error.message,
           },
           {
@@ -295,7 +296,8 @@ export default class Start extends Telemetered(
         throw refusalError(
           PORT_IN_USE_REFUSAL,
           {
-            port: error.port,
+            ...error,
+            message: error.message,
             url: LocalRuntime.urlOf(error.port),
             listeners: await this.machine().listeners(error.port, {
               timeoutMs: 5000,
@@ -313,28 +315,35 @@ export default class Start extends Telemetered(
       }
       if (error instanceof LocalServerPortFullError) {
         throw refusalError(NO_FREE_PORT_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
       if (error instanceof LocalServerStartCleanupFailedError) {
         throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
       if (error instanceof LocalServerStartExitedError) {
         throw refusalError(SERVER_NOT_READY_REFUSAL, {
+          ...error,
           message: error.message,
           hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
         });
       }
       if (error instanceof LocalServerStartTimeoutError) {
         throw refusalError(SERVER_NOT_READY_REFUSAL, {
+          ...error,
           message: error.message,
           hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
         });
       }
       if (error instanceof LocalServerStopError) {
-        throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {});
+        throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
       }
       throw error;
     }

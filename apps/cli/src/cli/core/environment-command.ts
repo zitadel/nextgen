@@ -3,9 +3,7 @@ import type { Consent } from "@/lib/consent";
 import {
   Environment,
   EnvironmentNameInvalidError,
-  EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
-  EnvironmentValueMissingError,
   EnvironmentValueUnboundError,
   type ServerAddresses,
 } from "@/lib/environment";
@@ -38,16 +36,6 @@ const SOURCES_CONFLICT_REFUSAL = {
 const NAME_INVALID_REFUSAL = {
   message: "{message}",
   hint: "Pass a safe --env or set ZITADEL_ENV.",
-} as const satisfies Refusal;
-
-/** How a server address that is not a URL is refused. */
-const SERVER_INVALID_REFUSAL = {
-  message: "{message}",
-} as const satisfies Refusal;
-
-/** How a value set in no source is refused when its environment has a project to add it to. */
-const VALUE_MISSING_REFUSAL = {
-  message: "{message}",
 } as const satisfies Refusal;
 
 /** How a value set in no source is refused when its environment has no project at all. */
@@ -191,26 +179,25 @@ export abstract class EnvironmentCommand extends BaseCommand {
     } catch (error) {
       if (error instanceof EnvironmentSourcesConflictError) {
         throw refusalError(SOURCES_CONFLICT_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
       if (error instanceof EnvironmentNameInvalidError) {
         throw refusalError(NAME_INVALID_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof EnvironmentServerInvalidError) {
-        throw refusalError(SERVER_INVALID_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
       if (error instanceof LocalServerNotRunningError) {
         throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
       if (error instanceof LocalServerNotRespondingError) {
         throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
@@ -218,6 +205,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
         throw refusalError(
           LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL,
           {
+            ...error,
             message: error.message,
           },
           {
@@ -232,11 +220,13 @@ export abstract class EnvironmentCommand extends BaseCommand {
       }
       if (error instanceof LocalServerRecordMalformedError) {
         throw refusalError(RECORD_MALFORMED_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }
@@ -385,6 +375,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
         throw refusalError(
           VALUE_MISSING_UNBOUND_REFUSAL,
           {
+            ...error,
             message: error.message,
           },
           {
@@ -403,11 +394,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
                   },
           },
         );
-      }
-      if (error instanceof EnvironmentValueMissingError) {
-        throw refusalError(VALUE_MISSING_REFUSAL, {
-          message: error.message,
-        });
       }
       throw error;
     }

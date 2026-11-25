@@ -302,11 +302,13 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
         } catch (error) {
           if (error instanceof LocalServerRecordMalformedError) {
             throw refusalError(RECORD_MALFORMED_REFUSAL, {
+              ...error,
               message: error.message,
             });
           }
           if (error instanceof LocalServerRecordUnreadableError) {
             throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+              ...error,
               message: error.message,
             });
           }

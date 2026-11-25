@@ -152,21 +152,22 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         serverFlag: meta.serverFlag,
       });
     } catch (error) {
-      const retry = retryOptionsFromFlags(flags);
-      const recovery = ssoRecovery(retry, suggest);
-      const scripting =
-        retry.sso && retry.sso.length > 0
-          ? "The rerun asks for the client id and secret, because a command carries neither. " +
-            "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-          : "";
-      const recovered =
-        recovery.commands.length > 0
-          ? `${recovery.hint}${recovery.commands.join(" ")} `
-          : recovery.hint;
       if (error instanceof LocalServerNotRunningError) {
+        const retry = retryOptionsFromFlags(flags);
+        const recovery = ssoRecovery(retry, suggest);
+        const scripting =
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "";
+        const recovered =
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
+            : recovery.hint;
         throw refusalError(
           NO_LOCAL_SERVER_REFUSAL,
           {
+            ...error,
             message: error.message,
             scripting,
             recovery: recovered,
@@ -184,9 +185,21 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         );
       }
       if (error instanceof LocalServerNotRespondingError) {
+        const retry = retryOptionsFromFlags(flags);
+        const recovery = ssoRecovery(retry, suggest);
+        const scripting =
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "";
+        const recovered =
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
+            : recovery.hint;
         throw refusalError(
           LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
           {
+            ...error,
             message: error.message,
             scripting,
             recovery: recovered,
@@ -204,9 +217,21 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         );
       }
       if (error instanceof LocalServerNotRespondingElsewhereError) {
+        const retry = retryOptionsFromFlags(flags);
+        const recovery = ssoRecovery(retry, suggest);
+        const scripting =
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "";
+        const recovered =
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
+            : recovery.hint;
         throw refusalError(
           LOCAL_SERVER_ELSEWHERE_REFUSAL,
           {
+            ...error,
             message: error.message,
             scripting,
             recovery: recovered,

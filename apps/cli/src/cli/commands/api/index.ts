@@ -13,7 +13,6 @@ import {
   BackendUnauthorizedError,
   type ZitadelClient,
 } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
 import { Output } from "@/lib/ui";
 import { ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -95,6 +94,16 @@ const OPERATION_AMBIGUOUS_REFUSAL = {
   ],
 } as const satisfies Refusal;
 
+/** How a call the server did not authenticate is refused. */
+const UNAUTHORIZED_SECRET_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "{server} did not accept the {credential} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and {credential} in the environment, or pick one with --env or --env-file.",
+  details: {
+    server: "{server}",
+  },
+} as const satisfies Refusal;
+
 /**
  * The operation an operation id or a path names, or the refusal that says how to
  * list them.
@@ -105,11 +114,13 @@ function resolveTarget(ref: string, method?: string): Target {
   } catch (error) {
     if (error instanceof BackendOperationUnknownError) {
       throw refusalError(OPERATION_UNKNOWN_REFUSAL, {
+        ...error,
         message: error.message,
       });
     }
     if (error instanceof BackendOperationAmbiguousError) {
       throw refusalError(OPERATION_AMBIGUOUS_REFUSAL, {
+        ...error,
         message: error.message,
       });
     }
@@ -439,20 +450,23 @@ export default class Api extends Telemetered(
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
-    const response = await (flags.paginate
-      ? operationService.callAll(request)
-      : operationService.call(request)
-    ).catch((error: unknown) => {
+    // biome-ignore lint/plugin: the code after the call needs `response` and must not sit inside the try that translates its errors
+    let response: Awaited<ReturnType<typeof operationService.call>>;
+    try {
+      response = await (flags.paginate
+        ? operationService.callAll(request)
+        : operationService.call(request));
+    } catch (error) {
       if (error instanceof BackendUnauthorizedError && operation.auth === "secret") {
-        throw new ZitadelError("E_AUTH", error.message, {
-          hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
-          details: {
-            server,
-          },
+        throw refusalError(UNAUTHORIZED_SECRET_REFUSAL, {
+          ...error,
+          message: error.message,
+          server,
+          credential: CREDENTIALS.project,
         });
       }
       throw error;
-    });
+    }
 
     if (response.body === undefined) {
       return {

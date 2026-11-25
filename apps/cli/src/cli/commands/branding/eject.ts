@@ -75,6 +75,14 @@ const UNKNOWN_DESIGN_REFUSAL = {
   hint: `Pick one of: ${DESIGN_CATALOG}.`,
 } as const satisfies Refusal;
 
+/** How a branding file that already exists is refused. */
+const FILE_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun with --force to replace it, or edit the existing file directly.",
+  next: ["{again}"],
+} as const satisfies Refusal;
+
 /** Whether `value` names a design the CLI ships. */
 function isBrandingDesign(value: string): value is BrandingDesign {
   return (BRANDING_DESIGNS as readonly string[]).includes(value);
@@ -310,10 +318,14 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
       }
     } catch (error) {
       if (error instanceof ZitadelConfigFileExistsError) {
-        throw new ZitadelError("E_CONFLICT", error.message, {
-          hint: "Rerun with --force to replace it, or edit the existing file directly.",
-          nextCommands: [await this.again("branding:eject", { with: { design, force: true } })],
-        });
+        throw refusalError(
+          FILE_EXISTS_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          { again: await this.again("branding:eject", { with: { design, force: true } }) },
+        );
       }
       throw error;
     }

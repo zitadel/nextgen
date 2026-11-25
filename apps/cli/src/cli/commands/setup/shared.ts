@@ -836,6 +836,27 @@ export async function scaffoldOf(
   }
 }
 
+/** How setup refuses to replace a password policy file that is already there. */
+const PASSWORD_POLICY_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+} as const satisfies Refusal;
+
+/** How setup refuses to replace a signup policy file that is already there. */
+const SIGNUP_POLICY_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
+} as const satisfies Refusal;
+
+/** How setup refuses to replace any other file that is already there. */
+const FILE_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+} as const satisfies Refusal;
+
 /**
  * The refusal setup words for a file it will not write, with what to do about
  * that file; any other error as it is.
@@ -868,17 +889,20 @@ export function setupRefusal(
     return connectionRefusal(error.path, planned.chosen.selection);
   }
   if (error.path === PasswordPolicy.PATH) {
-    return new ZitadelError("E_CONFLICT", error.message, {
-      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+    return refusalError(PASSWORD_POLICY_EXISTS_REFUSAL, {
+      ...error,
+      message: error.message,
     });
   }
   if (error.path === SignupPolicy.PATH) {
-    return new ZitadelError("E_CONFLICT", error.message, {
-      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
+    return refusalError(SIGNUP_POLICY_EXISTS_REFUSAL, {
+      ...error,
+      message: error.message,
     });
   }
-  return new ZitadelError("E_CONFLICT", error.message, {
-    hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+  return refusalError(FILE_EXISTS_REFUSAL, {
+    ...error,
+    message: error.message,
   });
 }
 

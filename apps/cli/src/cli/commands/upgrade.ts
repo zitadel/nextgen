@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { execa } from "execa";
 
-import { errorMessage, ZitadelError } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { painted } from "@/lib/oclif/rendering";
@@ -25,12 +25,29 @@ import {
 import { Project } from "@/lib/project";
 import { Previewable } from "@/cli/core/previewable";
 import { BaseCommand } from "@/cli/core";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * How long the new release's `doctor --fix` may run before it counts as failed.
  */
 const DOCTOR_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** How an install that failed is refused. */
+const INSTALL_FAILED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "Could not install the new packages",
+  hint: "{reason}. Nothing else changed; fix that and rerun.",
+  next: ["{install}", "{again}"],
+} as const satisfies Refusal;
+
+/** How a release that cannot be looked up is refused. */
+const RELEASE_LOOKUP_REFUSAL = {
+  code: "E_NETWORK",
+  message: "Could not look up the latest Zitadel release",
+  hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
+  next: ["{again}"],
+} as const satisfies Refusal;
 
 /** What the upgrader planned: the packages to move and the release they move to. */
 type Plan = Awaited<ReturnType<Upgrader["plan"]>>;
@@ -169,15 +186,27 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
     });
     const { plan, breaking, notes } = await this.planned(upgrader);
 
-    const result = await upgrader.apply(plan).catch(async (error: unknown) => {
-      if (!(error instanceof UpgradeInstallFailedError)) {
-        throw error;
+    // biome-ignore lint/plugin: the code after the install needs `result` and must not sit inside the try that translates its errors
+    let result: Awaited<ReturnType<typeof upgrader.apply>>;
+    try {
+      result = await upgrader.apply(plan);
+    } catch (error) {
+      if (error instanceof UpgradeInstallFailedError) {
+        throw refusalError(
+          INSTALL_FAILED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            reason: errorMessage(error.cause),
+          },
+          {
+            install: suggestedCommandOf(error.command),
+            again: await this.again("upgrade", {}),
+          },
+        );
       }
-      throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
-        hint: `${errorMessage(error.cause)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [suggestedCommandOf(error.command), await this.again("upgrade", {})],
-      });
-    });
+      throw error;
+    }
 
     const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
 
@@ -267,15 +296,23 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
   private async planned(
     upgrader: Upgrader,
   ): Promise<{ plan: Plan; breaking: readonly BreakingChange[]; notes: ReleaseNotes }> {
-    const plan = await upgrader.plan().catch(async (error: unknown) => {
-      if (!(error instanceof UpgradeReleaseLookupError)) {
-        throw error;
+    // biome-ignore lint/plugin: the code after the lookup needs `plan` and must not sit inside the try that translates its errors
+    let plan: Plan;
+    try {
+      plan = await upgrader.plan();
+    } catch (error) {
+      if (error instanceof UpgradeReleaseLookupError) {
+        throw refusalError(
+          RELEASE_LOOKUP_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          { again: await this.again("upgrade", {}) },
+        );
       }
-      throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
-        hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
-        nextCommands: [await this.again("upgrade", {})],
-      });
-    });
+      throw error;
+    }
 
     const notes = new ReleaseNotes();
     const breaking: readonly BreakingChange[] = plan.upToDate
