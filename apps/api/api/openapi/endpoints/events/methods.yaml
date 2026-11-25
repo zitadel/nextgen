@@ -102,8 +102,8 @@ get:
     - name: release_id
       in: query
       description: |
-        Only events of requests served by this release, such as one variant of
-        an A/B test of the sign-in.
+        Only events of requests served by this release, a pinned release
+        included.
       schema:
         type: string
     - name: deployment_id
