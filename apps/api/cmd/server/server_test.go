@@ -218,7 +218,7 @@ func TestLoadConfigForAServerThatRunsOnlyWhileItServes(t *testing.T) {
 }
 
 // server.lifecycle is one fact about where the server runs, and the settings
-// a pause changes take their defaults from it (ADR 089). Each stays a setting
+// a pause changes take their defaults from it (ADR 097). Each stays a setting
 // of its own: what the configuration says outranks the default.
 func TestLoadConfigLifecycle(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())

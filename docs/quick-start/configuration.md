@@ -26,7 +26,7 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 What the server does outside a request (its timers, its writes after a
 response) depends on what the platform does with the process between
 requests. Say which it is with `server.lifecycle`
-([ADR 089](../adrs/089-server-lifecycle.md)). Two questions pick the value:
+([ADR 097](../adrs/097-server-lifecycle.md)). Two questions pick the value:
 
 1. Does the platform give the process CPU after a response is sent? If not:
    `request_only`.

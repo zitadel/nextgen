@@ -55,7 +55,7 @@ through any wrapping.
 
 Work outside a request (a timer, a flusher, work at start) may never run
 where the platform pauses the process or stops its last instance
-([ADR 089](../../../docs/adrs/089-server-lifecycle.md)).
+([ADR 097](../../../docs/adrs/097-server-lifecycle.md)).
 
 - Start it as a `background.Task` through the group in `cmd/server`, with an
   answer for each `server.lifecycle`; never with a bare `go`.

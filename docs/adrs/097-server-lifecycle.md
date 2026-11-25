@@ -1,4 +1,4 @@
-# ADR 089: The Server's Lifecycle
+# ADR 097: The Server's Lifecycle
 
 > **Status:** Implemented
 > **Date:** 2026-11-11

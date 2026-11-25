@@ -445,7 +445,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// Everything the server does outside a request starts through this
 	// group, which holds each task to what it does in the server's lifecycle
-	// (ADR 089).
+	// (ADR 097).
 	tasks := background.NewGroup(cfg.Server.Lifecycle)
 	defer tasks.Close()
 
@@ -921,7 +921,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 }
 
 // lifecycleDefaults sets the defaults that depend on server.lifecycle
-// (ADR 089). A value the configuration sets itself outranks them, as it does
+// (ADR 097). A value the configuration sets itself outranks them, as it does
 // every default.
 //
 // A paused process measures time it did not run: it wakes with its idle

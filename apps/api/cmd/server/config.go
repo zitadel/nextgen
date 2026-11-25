@@ -219,7 +219,7 @@ type ServerConfig struct {
 	// process between requests. It turns nothing on by itself. Each
 	// background task says what it does in each (internal/background), and
 	// the settings a pause changes take their defaults from it: IdleTimeout
-	// and events.request.flush_wait (ADR 089).
+	// and events.request.flush_wait (ADR 097).
 	Lifecycle background.Lifecycle `mapstructure:"lifecycle"`
 }
 

@@ -20,7 +20,7 @@
 //     becomes a --user-file.
 //   - The pause. A function is paused between requests, which the launcher
 //     tells a deployment's server as server.lifecycle: request_only; what
-//     the server then does differently is the server's (ADR 089). Its
+//     the server then does differently is the server's (ADR 097). Its
 //     hourly audit event purge cannot run on a timer here: a Vercel Cron Job
 //     (repo-root vercel.json) calls the server's retention trigger instead,
 //     with CRON_SECRET as its bearer token, which becomes
@@ -537,7 +537,7 @@ func prepareServer(extra []string) ([]string, error) {
 	// one fact is all the launcher says: the server holds its background
 	// work to it and takes server.idle_timeout and
 	// events.request.flush_wait from it, unless a NEXTGEN_* variable sets
-	// those (ADR 089). A local run keeps running, and purges on its own
+	// those (ADR 097). A local run keeps running, and purges on its own
 	// timer without a CRON_SECRET.
 	if deployed(env) {
 		pinned["NEXTGEN_SERVER_LIFECYCLE"] = string(background.RequestOnly)
