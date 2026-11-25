@@ -6,10 +6,12 @@ This is the API reference. The README on GitHub covers installation and a walkth
 
 ## Main components
 
-The package has three entry points.
+The package has five entry points.
 
 - `@zitadel/sdk-nuxt/module` holds the Nuxt module. It is the default export, listed under `modules` in `nuxt.config.ts` and configured under the `zitadel` key with {@link index!ZitadelMiddlewareOptions}. It installs everything below, so most apps need nothing else.
 - `@zitadel/sdk-nuxt/server` holds {@link server!createZitadelMiddleware}, which builds the Nitro middleware by hand for an app that wants to register it itself in `server/middleware`, and {@link server!getAuth}, which reads the verified session from the H3 event in a server route or API handler.
+- `@zitadel/sdk-nuxt/client` holds the browser configuration helpers {@link client!configureZitadel}, {@link client!getApi} and {@link client!getZitadelConfig}, the same ones every SDK's client entry has.
+- `@zitadel/sdk-nuxt/components` re-exports the typed Vue widgets and their types from `@zitadel/sdk-vue`, so an app imports everything for Nuxt from one package. Apps that prefer the raw `<zitadel-login>` elements can keep using them.
 - `@zitadel/sdk-nuxt` holds {@link index!useZitadelProject}, which returns the {@link index!ZitadelProject} handle to pass to a widget's `project` prop, and `businessLocales`, the copy overlay the client plugin provides as `$zitadelBusinessLocales`. Importing this entry also registers the widget elements in the browser.
 
 The module also auto-imports two composables that are not exported from an entry: `useAuth()` returns the client-safe session state (the raw token is left out of the server-rendered payload), and `useZitadelApi()` returns the typed API client for the configured project.

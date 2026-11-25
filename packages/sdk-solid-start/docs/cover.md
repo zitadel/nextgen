@@ -5,7 +5,9 @@ a component library: it proxies the browser's calls to your Zitadel server,
 checks the session on every request, and lets your server functions and routes
 ask who is signed in. It is for developers building a SolidStart app that signs
 its users in through Zitadel. The login and sign-out widgets live in
-`@zitadel/sdk-solid`; this package supplies what they talk to.
+`@zitadel/sdk-solid`, which this package re-exports from
+`@zitadel/sdk-solid-start/components`, so an app imports everything for
+SolidStart from one package; the middleware supplies what the widgets talk to.
 
 ## Main components
 
@@ -40,10 +42,11 @@ no session redirects to the login path with the requested path in `?next=`; if
 the server cannot say whether the session is live, the route answers `503`
 instead of sending a signed-in user to the login page.
 
-The package renders no markup of its own, so nothing from it appears in
-server-rendered HTML and there is nothing to hydrate. Render the widgets with
-`@zitadel/sdk-solid`, loaded client-only, and point their `proxy-path` at the
-same path the middleware proxies.
+The middleware renders no markup of its own, so nothing from it appears in
+server-rendered HTML and there is nothing to hydrate. Render the widgets from
+`@zitadel/sdk-solid-start/components` (they are `@zitadel/sdk-solid`'s widgets),
+loaded client-only, and point their `proxy-path` at the same path the
+middleware proxies.
 
 ## Edge runtimes
 

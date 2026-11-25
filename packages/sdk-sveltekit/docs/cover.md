@@ -5,7 +5,9 @@ a few helpers: the hook proxies the auth backend same-origin, verifies the
 session on every request, and guards the routes you mark as protected. It is
 for developers wiring Zitadel into a SvelteKit app by hand; the `zitadel setup`
 CLI scaffolds the same wiring for a new project. The login and session
-widgets are not in this package: they come from `@zitadel/sdk-svelte`.
+widgets are built in `@zitadel/sdk-svelte`, and this package re-exports them from
+`@zitadel/sdk-sveltekit/components`, so an app imports everything for SvelteKit
+from one package.
 
 ## Main components
 
@@ -25,7 +27,8 @@ widgets are not in this package: they come from `@zitadel/sdk-svelte`.
 
 ## How it works
 
-There are no components here, so nothing renders markup. The hook sits in
+The hook renders no markup. The widgets, which the components entry re-exports,
+are separate from it. The hook sits in
 front of every request:
 
 - `/__nextgen/*` is forwarded to your Zitadel server, so the browser only ever

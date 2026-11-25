@@ -2459,6 +2459,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-vue':
+        specifier: workspace:*
+        version: link:../sdk-vue
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -2566,6 +2569,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-qwik':
+        specifier: workspace:*
+        version: link:../sdk-qwik
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -2737,6 +2743,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-solid':
+        specifier: workspace:*
+        version: link:../sdk-solid
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -2844,6 +2853,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-svelte':
+        specifier: workspace:*
+        version: link:../sdk-svelte
       ufo:
         specifier: 'catalog:'
         version: 1.6.4

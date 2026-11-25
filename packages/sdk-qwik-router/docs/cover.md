@@ -11,7 +11,7 @@ The server half of the Zitadel SDK for Qwik 2 apps. It is a single Qwik Router `
 
 ## How it works
 
-This package is not a wrapper around a custom element: it renders nothing, so there is no dynamic or compiled component to choose between, no `project-id` or `proxy-path` attribute in server-rendered markup, no custom element definition and no hydration step. Those belong to `@zitadel/sdk-qwik`, which renders `<zitadel-login>` and friends.
+The handler renders nothing, so there is no dynamic or compiled component to choose between, no `project-id` or `proxy-path` attribute in server-rendered markup, no custom element definition and no hydration step. Those belong to `@zitadel/sdk-qwik`, which renders `<zitadel-login>` and friends. This package re-exports its widgets and their types from `@zitadel/sdk-qwik-router/components`, so an app imports everything for Qwik Router from one package.
 
 What this package does is run on every request, in this order:
 

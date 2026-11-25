@@ -43,6 +43,14 @@
       "source": "src/client.ts",
       "kind": "client",
       "extras": []
+    },
+    "./components": {
+      "source": "src/components.ts",
+      "kind": "widgets",
+      "extras": [
+        "businessLocales",
+        "configureZitadel"
+      ]
     }
   }
 }

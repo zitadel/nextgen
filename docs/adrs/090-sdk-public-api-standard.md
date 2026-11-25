@@ -21,10 +21,12 @@ There are two families.
    `sdk-angular`) have one entry, `.`, of kind `ui`.
 2. **Meta-framework SDKs** (`sdk-next`, `sdk-tanstack-start`, `sdk-nuxt`,
    `sdk-sveltekit`, `sdk-qwik-router`, `sdk-solid-start`) have a `./server`
-   entry (kind `server`) and a `./client` entry (kind `client`). Where the
-   framework renders the widgets itself (`sdk-next`, `sdk-tanstack-start`),
-   one more entry has kind `widgets`. Any other entry has kind `other` and
-   states every name it exports.
+   entry (kind `server`), a `./client` entry (kind `client`) and a
+   `./components` entry (kind `widgets`) that re-exports the widgets of the
+   matching UI SDK (see "Widgets come through the framework SDK"). `sdk-next`
+   and `sdk-tanstack-start` keep their own widget entry names (`./components`
+   and `./react`). Any other entry has kind `other` and states every name it
+   exports.
 
 ## The names
 
@@ -69,6 +71,51 @@ request and is `async`, so it keeps the name it has always had.
 
 A new SDK picks the name its framework uses, decides whether it is a factory
 by what it returns, and writes the reason in the three places above.
+
+## Widgets come through the framework SDK
+
+Every meta-framework SDK exports the widgets and their types, so an app
+imports everything Zitadel adds to its framework from one package. The widgets
+themselves live in a UI SDK, and the framework SDK re-exports them **by name**
+from a `./components` entry:
+
+| Framework SDK | Re-exports the widgets of |
+| --- | --- |
+| `sdk-next`, `sdk-tanstack-start` | `sdk-react` |
+| `sdk-sveltekit` | `sdk-svelte` |
+| `sdk-qwik-router` | `sdk-qwik` |
+| `sdk-solid-start` | `sdk-solid` |
+| `sdk-nuxt` | `sdk-vue` |
+
+The reasons, so that nobody removes the re-export as redundant:
+
+- **One import path for an app.** An app that imports from the framework SDK
+  does not change when a widget moves between packages; only the re-export
+  line changes.
+- **One rule, not two.** `sdk-next` and `sdk-tanstack-start` already worked
+  this way, and the other four did not, which made the same name appear in
+  one SDK's reference and be missing from its sibling's. The standard now
+  says the same thing for all six.
+- **The server entries stay light.** The widgets are in their own
+  `./components` entry, never in `./server` or `./client`, because the server
+  entries run on edge runtimes and must not pull the widget package and its
+  custom-element registration into a server bundle.
+- **Nothing breaks.** The names are added, and the UI SDKs keep every export
+  they have. An app that imports from the UI SDK keeps working, and the CLI
+  scaffolders keep importing from it; moving them is a separate, deliberate
+  change because the Orca patchers are sensitive.
+
+Rules that follow:
+
+- Re-export by name, never `export *`, as the rule below says. The contract
+  spec lists the exact names (`widgets` kind) and fails when one is missing.
+- The UI SDK is a runtime `dependency` of the framework SDK, not a peer, and
+  the framework SDK's `build` and `dev` tasks depend on the UI SDK's build.
+- A name added to or removed from a UI SDK's widget surface changes its
+  framework SDKs' `./components` entries in the same change.
+- `sdk-nuxt` also has a `./client` entry (the same configuration helpers every
+  client entry has). Its `.` entry keeps registering the raw custom elements,
+  so apps that use `<zitadel-login>` directly keep working.
 
 ## Rules
 

@@ -83,6 +83,10 @@ consumer-agent contract is the CLI's
   (the root's `check-go-work`).
 - **Resource IDs**: never write ULID/UUID helpers; mint them as
   [storage](apps/api/internal/storage/AGENTS.md) says ([ADR 047](docs/adrs/047-dialect-id-generation.md)).
+- **SDK widget re-exports**: every meta-framework SDK re-exports its UI SDK's
+  widgets and types from `./components`; never remove or "deduplicate" them
+  ([why](docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk),
+  [rule](packages/AGENTS.md)).
 - **Wire casing**: fields, enum values and parameters are `snake_case`;
   the server's `lint` lints the spec ([openapi](apps/api/api/openapi/AGENTS.md)).
 - **CLI contract**: keep `--json` output one parseable envelope on stdout;

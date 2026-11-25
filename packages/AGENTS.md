@@ -1,7 +1,9 @@
 # Agent Instructions — `packages/`
 
 Rules for the packages without an `AGENTS.md` of their own: the SDKs
-(`packages/sdk-*`), `packages/api` and `packages/config`.
+(`packages/sdk-*`), `packages/api` and `packages/config`. The SDKs that
+re-export widgets, or whose widgets are re-exported, also have a short
+`AGENTS.md` that says so; read it before changing their exports.
 
 ## The SDKs (`packages/sdk-*`)
 
@@ -29,6 +31,21 @@ change needs a changeset, and the whole train versions together.
   function Next.js calls), and a name that starts with `create` is a factory
   that returns the handler. Write the reason in the `public-api.json` entry,
   in the TSDoc of the function and in [ADR 090](../docs/adrs/090-sdk-public-api-standard.md).
+- **Every meta-framework SDK re-exports the widgets of its UI SDK. Never
+  remove, narrow or "deduplicate" that re-export.** `sdk-next` and
+  `sdk-tanstack-start` re-export `sdk-react`, `sdk-sveltekit` re-exports
+  `sdk-svelte`, `sdk-qwik-router` re-exports `sdk-qwik`, `sdk-solid-start`
+  re-exports `sdk-solid` and `sdk-nuxt` re-exports `sdk-vue`, from a
+  `./components` entry (kind `widgets`), by name and never `export *`. It looks
+  redundant, because the widgets also exist in the UI SDK, and it is deliberate:
+  an app imports everything for its framework from one package, a widget can
+  move between packages without breaking an app, and the references of the
+  sibling SDKs show the same names. The UI SDK is a runtime `dependency` (not a
+  peer) and its build runs first. Widgets stay out of `./server` and `./client`,
+  which load on edge runtimes. A widget name added to or removed from a UI SDK
+  changes the framework SDK's `./components` in the same change. The reasons are
+  in [ADR 090](../docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk);
+  `sdk-core`'s contract spec fails when a name is missing.
 - **Reach the API package only through `sdk-core`.** An SDK imports
   `@zitadel/sdk-core/config`, never `@zitadel/api`, and a name an app can see is
   declared by hand in `sdk-core`, never re-exported from the generated client.

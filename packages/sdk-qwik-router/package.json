@@ -25,6 +25,10 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js"
+    },
+    "./components": {
+      "types": "./dist/components.d.ts",
+      "import": "./dist/components.js"
     }
   },
   "files": [
@@ -34,8 +38,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/client.ts src/types.ts --format esm --dts --clean && attw --pack . --profile=esm-only",
-    "dev": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/client.ts --format esm --dts --watch",
+    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/client.ts src/components.ts src/types.ts --format esm --dts --clean && attw --pack . --profile=esm-only",
+    "dev": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/client.ts src/components.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "lint": "biome check .",
@@ -44,6 +48,7 @@
   },
   "dependencies": {
     "@zitadel/sdk-core": "workspace:*",
+    "@zitadel/sdk-qwik": "workspace:*",
     "ufo": "catalog:"
   },
   "peerDependencies": {
