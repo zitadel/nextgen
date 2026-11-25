@@ -18,8 +18,7 @@ import { OrcaError } from "./orca";
 import { PmError } from "./pm";
 import { ProjectError } from "./project";
 import { PublishError } from "./publish";
-import { LocalServerError } from "./server";
-import { SuggestionError, type Suggested } from "./suggestion";
+import type { Suggested } from "./suggestion";
 import { SyncError } from "./sync";
 import { UpgradeError } from "./upgrade";
 import { WizardError } from "./wizard";
@@ -183,6 +182,43 @@ export class ZitadelError extends Error {
 }
 
 /**
+ * The base of every error a package raises on purpose.
+ *
+ * @remarks
+ * A package's own base extends this, and each condition extends that. The
+ * boundary reports any of them by the `code` the class states, without
+ * knowing which package raised it.
+ */
+export abstract class ZitadelLibError extends Error {
+  /** The kind of failure; a subclass states its own. */
+  abstract readonly category: ErrorCategory;
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  abstract readonly retryable: boolean;
+
+  /** The stable product code the failure is reported with; a subclass states its own. */
+  abstract readonly code: ZitadelErrorCode;
+
+  /**
+   * Make a package failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param cause - The failure this one wraps, when it wraps one.
+   */
+  constructor(message: string, cause?: unknown) {
+    super(
+      message,
+      cause === undefined
+        ? undefined
+        : {
+            cause,
+          },
+    );
+    this.name = new.target.name;
+  }
+}
+
+/**
  * A prompt the person walked away from. A drawn prompt closes its own chain
  * when that happens, so whoever ends the run needs to tell this from any
  * other cancellation, which leaves the chain open: the class says so, where a
@@ -306,18 +342,8 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(error.code, error.message);
   }
 
-  if (error instanceof LocalServerError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof SuggestionError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
+  if (error instanceof ZitadelLibError) {
+    return new ZitadelError(error.code, error.message);
   }
 
   if (error instanceof IdpError) {
