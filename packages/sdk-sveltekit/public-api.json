@@ -22,11 +22,14 @@
     "./server": {
       "source": "src/server.ts",
       "kind": "server",
-      "extras": ["NextgenHandle"]
+      "extras": [
+        "NextgenHandle"
+      ]
     },
     "./client": {
       "source": "src/client.ts",
-      "kind": "client"
+      "kind": "client",
+      "extras": []
     }
   }
 }

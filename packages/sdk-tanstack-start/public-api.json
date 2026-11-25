@@ -26,16 +26,24 @@
     "./server": {
       "source": "src/server.ts",
       "kind": "server",
-      "extras": ["NextgenRequestDecision", "NextgenRequestOptions", "RequestMiddlewareContext", "handleNextgenRequest"]
+      "extras": [
+        "NextgenRequestDecision",
+        "NextgenRequestOptions",
+        "RequestMiddlewareContext",
+        "handleNextgenRequest"
+      ]
     },
     "./client": {
       "source": "src/client.ts",
-      "kind": "client"
+      "kind": "client",
+      "extras": []
     },
     "./react": {
       "source": "src/react.tsx",
       "kind": "widgets",
-      "extras": ["businessLocales"]
+      "extras": [
+        "businessLocales"
+      ]
     }
   }
 }

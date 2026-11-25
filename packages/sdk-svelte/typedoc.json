@@ -1,4 +1,5 @@
 {
+  "$schema": "https://typedoc.org/schema.json",
   "extends": [
     "../../typedoc.base.json"
   ],
@@ -8,8 +9,5 @@
   ],
   "tsconfig": "tsconfig.docs.json",
   "readme": "docs/cover.md",
-  "out": "dist/api-docs",
-  "intentionallyNotExported": [
-    "ZitadelWidgetAttributes"
-  ]
+  "out": "dist/api-docs"
 }

@@ -7,7 +7,7 @@
   "hideGenerator": true,
   "treatWarningsAsErrors": true,
   "validation": {
-    "notExported": true,
+    "notExported": false,
     "invalidLink": true,
     "notDocumented": true
   },

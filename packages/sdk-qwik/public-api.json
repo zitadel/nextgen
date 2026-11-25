@@ -2,7 +2,8 @@
   "entries": {
     ".": {
       "source": "src/index.tsx",
-      "kind": "ui"
+      "kind": "ui",
+      "extras": []
     }
   }
 }

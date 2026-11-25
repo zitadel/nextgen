@@ -20,11 +20,14 @@
     "./module": {
       "source": "src/module.ts",
       "kind": "other",
-      "extras": ["default"]
+      "extras": [
+        "default"
+      ]
     },
     "./server": {
       "source": "src/server.ts",
-      "kind": "server"
+      "kind": "server",
+      "extras": []
     }
   }
 }

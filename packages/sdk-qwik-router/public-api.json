@@ -25,11 +25,16 @@
     "./server": {
       "source": "src/server.ts",
       "kind": "server",
-      "extras": ["QwikCookieOptions", "QwikCookieValue", "QwikRequestEvent"]
+      "extras": [
+        "QwikCookieOptions",
+        "QwikCookieValue",
+        "QwikRequestEvent"
+      ]
     },
     "./client": {
       "source": "src/client.ts",
-      "kind": "client"
+      "kind": "client",
+      "extras": []
     }
   }
 }

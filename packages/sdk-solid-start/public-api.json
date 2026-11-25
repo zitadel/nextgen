@@ -24,11 +24,15 @@
     "./server": {
       "source": "src/server.ts",
       "kind": "server",
-      "extras": ["SolidFetchEvent", "SolidMiddlewareConfig"]
+      "extras": [
+        "SolidFetchEvent",
+        "SolidMiddlewareConfig"
+      ]
     },
     "./client": {
       "source": "src/client.ts",
-      "kind": "client"
+      "kind": "client",
+      "extras": []
     }
   }
 }
