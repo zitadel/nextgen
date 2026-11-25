@@ -187,6 +187,8 @@ export const EVENT_TYPES = [
   "auth.check.succeeded",
   "auth.factor.passkey.enrolled",
   "auth.factor.password.set",
+  "auth.request.created",
+  "auth.request.exchange.failed",
   "auth.sso.authorization.failed",
   "auth.sso.exchange.failed",
   "auth.sso.exchange.succeeded",
@@ -208,6 +210,7 @@ export const EVENT_TYPES = [
   "invitation.cancelled",
   "invitation.created",
   "invitation.rejected",
+  "oauth_settings.created",
   "origin.added",
   "origin.removed",
   "policy.created",
@@ -243,8 +246,9 @@ void EVERY_EVENT_TYPE;
 
 /**
  * The types that record something failing: a sign-in check or a single
- * sign-on step that did not pass, a user that could not be created. Each is
- * one range of the type index, so the preset fills its pages.
+ * sign-on step that did not pass, an authorization code that was refused, a
+ * user that could not be created. Each is one range of the type index, so the
+ * preset fills its pages.
  */
 export const FAILURE_TYPES: readonly string[] = EVENT_TYPES.filter((type) =>
   /\.failed$/.test(type),

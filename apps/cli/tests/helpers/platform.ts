@@ -1,5 +1,7 @@
 import {
   acceptInvitation,
+  expireInvitation,
+  rejectInvitation,
   completeClaimChallenge,
   resetPlatformStore,
   setupPlatformHandlers,
@@ -28,6 +30,25 @@ const OriginRequest = z.object({
 const ProjectRequest = z.object({
   name: z.string().optional(),
 });
+
+/** A request the mock platform answered. */
+export interface ObservedRequest {
+  readonly method: string;
+  readonly path: string;
+}
+
+/** Every request the mock platform has been asked since the last spec ended. */
+const observed: ObservedRequest[] = [];
+
+/**
+ * The requests the mock platform has answered so far, in order, so a run can be
+ * held to what it asked of the platform by comparing the list before and after.
+ *
+ * @returns A copy of the list.
+ */
+export function requestsObserved(): readonly ObservedRequest[] {
+  return [...observed];
+}
 
 /** What the platform was asked to publish, for a surface the mock does not keep. */
 export interface Captured<T> {
@@ -242,6 +263,21 @@ export interface PlatformMock {
    */
   acceptsInvitation(invitationId: string): void;
 
+  /**
+   * Declines the invitation, as the person it was for following its link and
+   * declining would.
+   *
+   * @param invitationId - The invitation to decline.
+   */
+  declinesInvitation(invitationId: string): void;
+
+  /**
+   * Lets the invitation expire, as 72 hours passing would.
+   *
+   * @param invitationId - The invitation to expire.
+   */
+  expiresInvitation(invitationId: string): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -294,9 +330,17 @@ export function usePlatformMock(): PlatformMock {
   const server = setupServer(...setupPlatformHandlers());
   const watchers: NodeJS.Timeout[] = [];
 
+  server.events.on("request:start", ({ request }) => {
+    observed.push({
+      method: request.method,
+      path: new URL(request.url).pathname,
+    });
+  });
+
   beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
   afterAll(() => server.close());
   afterEach(() => {
+    observed.splice(0);
     for (const watcher of watchers.splice(0)) {
       clearInterval(watcher);
     }
@@ -736,12 +780,23 @@ export function usePlatformMock(): PlatformMock {
         http.get("*/invitations/:id", () => {
           return HttpResponse.json(invitation);
         }),
+        http.delete("*/invitations/:id", () => {
+          return new HttpResponse(null, { status: 204 });
+        }),
       );
       return name;
     },
 
     acceptsInvitation(invitationId) {
       acceptInvitation(invitationId);
+    },
+
+    declinesInvitation(invitationId) {
+      rejectInvitation(invitationId);
+    },
+
+    expiresInvitation(invitationId) {
+      expireInvitation(invitationId);
     },
 
     recovers() {

@@ -453,6 +453,7 @@ describe("local runtime commands", () => {
     dir: cwd,
     other,
     daemon,
+    terminal,
   }) => {
     // After an upgrade the folder may still run the previous release's server.
     // Its API is that release's, and setup against it fails halfway.
@@ -467,6 +468,7 @@ describe("local runtime commands", () => {
       .runtime.pid;
     daemon.adopt(olderPid);
 
+    terminal.tty(true);
     const newer = await runCliForTest(["start", "--cwd", cwd, "--port", String(port)], {
       ZITADEL_SERVER_BINARY: fake.binPath,
       ZITADEL_SERVER_BINARY_VERSION: "1.0.0-alpha.2",

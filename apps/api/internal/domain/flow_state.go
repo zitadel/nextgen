@@ -209,16 +209,14 @@ func (s *FlowState) ClearPendingChallenge() {
 }
 
 type CollectedFlowData struct {
-	UserData    map[string]any
-	UserID      string
-	AuthMethods CollectedAuthMethodData
+	UserData map[string]any
+	UserID   string
+	// AuthMethods holds the credentials submitted for `x-auth-methods`
+	// fields, keyed by method name (e.g. [AuthMethodPassword]).
+	AuthMethods map[string]string `json:",omitempty"`
 	// SSOConflictConnectionID is the connection whose sign-in collided with
 	// the bound user (user_already_exists from an external identity). The
 	// steps shown to that user leave this provider out: choosing it again
 	// collides again. Cleared with the bound user.
 	SSOConflictConnectionID string `json:",omitempty"`
-}
-
-type CollectedAuthMethodData struct {
-	Password string
 }

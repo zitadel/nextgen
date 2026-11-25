@@ -19,7 +19,17 @@ vi.mock("@/cli/commands/setup/shared", async (importOriginal) => {
   return { ...(await importOriginal<object>()), askCustomSettings: vi.fn() };
 });
 
-import { confirm, intro, isCancel, log, multiselect, outro, select } from "@clack/prompts";
+import {
+  CANCEL_SYMBOL,
+  confirm,
+  intro,
+  isCancel,
+  log,
+  multiselect,
+  outro,
+  select,
+  text,
+} from "@clack/prompts";
 
 import Setup, {
   refuseUnusableFlags,
@@ -1710,11 +1720,7 @@ describe("setup", () => {
       const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT));
 
       expect(parseJson(res.stdout)).toMatchObject({
-        warnings: [
-          expect.stringContaining(
-            `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: npx @zitadel/cli@`,
-          ),
-        ],
+        warnings: [expect.stringContaining(`Port ${port} is already in use`)],
       });
     });
 
@@ -2098,7 +2104,8 @@ describe("setup", () => {
   });
 
   describe("against a platform that deploys what setup wrote", () => {
-    it("says in the chain that it deployed what it wrote", async ({ dir }) => {
+    it("says in the chain that it deployed what it wrote", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await aNextApp(dir);
 
       const res = await runCliForTest(
@@ -2191,7 +2198,8 @@ describe("setup", () => {
   });
 
   describe("when its first deploy fails", () => {
-    it("names the deploy in the box when its own deploy failed", async ({ dir }) => {
+    it("names the deploy in the box when its own deploy failed", async ({ dir, terminal }) => {
+      terminal.tty(true);
       await aNextApp(dir);
       server.use(
         http.post("*/releases/build", () => {
@@ -3200,6 +3208,50 @@ describe("Setup.run", () => {
     });
   });
 
+  describe("with Enter pressed at every question", () => {
+    /**
+     * Answers every question the way Enter does: with the choice it starts on, the text it is
+     * filled with, or what is ticked. A question asked a second time is walked away from, since
+     * Enter would answer it the same way again and go round forever.
+     */
+    function pressingEnterAtEveryQuestion(): void {
+      const asked = new Set<string>();
+      const enter = <T>(message: string, answer: T | undefined): T | typeof CANCEL_SYMBOL => {
+        if (answer === undefined || asked.has(message)) {
+          return CANCEL_SYMBOL;
+        }
+        asked.add(message);
+        return answer;
+      };
+      vi.mocked(isCancel).mockImplementation((value) => {
+        return value === CANCEL_SYMBOL;
+      });
+      vi.mocked(confirm).mockImplementation(async ({ message, initialValue }) => {
+        return enter(message, initialValue ?? true);
+      });
+      vi.mocked(select).mockImplementation(async ({ message, initialValue, options }) => {
+        return enter(message, initialValue ?? options[0]?.value);
+      });
+      vi.mocked(multiselect).mockImplementation(async ({ message, initialValues }) => {
+        return enter(message, initialValues ?? []);
+      });
+      vi.mocked(text).mockImplementation(async ({ message, initialValue }) => {
+        return enter(message, initialValue);
+      });
+    }
+
+    it("sets up the app", async ({ dir }) => {
+      await aNextApp(dir);
+      pressingEnterAtEveryQuestion();
+
+      await asTerminal(() => {
+        return Setup.run(["--cwd", dir, "--server", CLOUD, "--skip-install"], config);
+      });
+
+      expect(existsSync(join(dir, "zitadel.json"))).toBe(true);
+    });
+  });
+
   describe("in a directory without an app", () => {
     beforeEach(async () => {
       vi.stubEnv("PATH", await aFakeAppGeneratorPath());
@@ -3664,13 +3716,28 @@ describe("refuseUnusableFlags", () => {
 
 describe("SettleAnswers", () => {
   /**
+   * The app's folder, which the run is in.
+   */
+  const APP = "/tmp/app";
+
+  /**
+   * A dev server, listening on both loopback addresses.
+   */
+  const NODE_ON_3000 = [
+    { address: "127.0.0.1:3000", command: "node", host: "127.0.0.1", pid: 4242, port: 3000 },
+    { address: "[::1]:3000", command: "node", host: "[::1]", pid: 4242, port: 3000 },
+  ];
+
+  /**
    * Settles the answers of a run that asks nothing, for an app on port 3000 that no flag moved.
    *
+   * @param machine - What holds the port.
    * @param suggest - Renders the suggested command.
    * @returns Once the step has said what it has to.
    */
   async function settleOnTakenPort3000(machine: LocalMachine, suggest = aSuggest()): Promise<void> {
     await new SettleAnswers({
+      cwd: APP,
       dryRun: false,
       machine,
       nonInteractive: true,
@@ -3689,6 +3756,68 @@ describe("SettleAnswers", () => {
 
   beforeEach(() => {
     warnings.take();
+  });
+
+  describe("when the app's own dev server holds the port", () => {
+    it("says nothing, since the app is already on it", async () => {
+      await settleOnTakenPort3000(
+        new FakeMachine({
+          taken: [3000],
+          runningIn: { 3000: APP },
+          listening: { 3000: NODE_ON_3000 },
+        }),
+      );
+
+      expect(warnings.take()).toEqual([]);
+    });
+  });
+
+  describe("when a process outside the app's folder holds the port", () => {
+    it("names it once, and offers to stop it or move the app", async () => {
+      await settleOnTakenPort3000(
+        new FakeMachine({
+          taken: [3000],
+          runningIn: { 3000: "/tmp/other-app" },
+          listening: { 3000: NODE_ON_3000 },
+          nextFree: () => 3001,
+        }),
+        aSuggest({}, "1.2.3"),
+      );
+
+      expect(warnings.take()).toEqual([
+        "Port 3000 is already in use by node (pid 4242), which runs outside this app's folder. Stop it, or run setup with a free port: npx @zitadel/cli@1.2.3 setup --dev-port 3001",
+      ]);
+    });
+  });
+
+  describe("when a process outside the app's folder holds the port and the ones after it", () => {
+    it("names it, and asks for a free port by the flag alone", async () => {
+      await settleOnTakenPort3000(
+        new FakeMachine({
+          taken: [3000],
+          runningIn: { 3000: "/tmp/other-app" },
+          listening: { 3000: NODE_ON_3000 },
+          nextFree: () => undefined,
+        }),
+      );
+
+      expect(warnings.take()).toEqual([
+        "Port 3000 and the ports after it are already in use, port 3000 by node (pid 4242), which runs outside this app's folder. Stop it, or run setup with --dev-port and a free port.",
+      ]);
+    });
+  });
+
+  describe("when what holds the port cannot be named", () => {
+    it("leaves it to the reader whether that is the app's dev server", async () => {
+      await settleOnTakenPort3000(
+        new FakeMachine({ taken: [3000], nextFree: () => 3001 }),
+        aSuggest({}, "1.2.3"),
+      );
+
+      expect(warnings.take()).toEqual([
+        "Port 3000 is already in use. If that is not this app's dev server, run setup with a free port: npx @zitadel/cli@1.2.3 setup --dev-port 3001",
+      ]);
+    });
   });
 
   describe("when a later port is free", () => {

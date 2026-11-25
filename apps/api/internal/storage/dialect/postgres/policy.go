@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -78,8 +77,6 @@ func (s policyStatements) CreatePolicy(ctx context.Context, entity *domain.Polic
 		).Scan(&entity.UpdatedAt); err != nil {
 			return wrapError(err)
 		}
-		// pgx scans timestamptz in Local; reads normalize to UTC.
-		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindPolicy, entity.ProjectID, entity.ID))
 	})
@@ -101,7 +98,6 @@ func (s policyStatements) RevisePolicy(ctx context.Context, entity *domain.Polic
 	).Scan(&entity.UpdatedAt); err != nil {
 		return policystore.ReviseNotFound(wrapError(err))
 	}
-	entity.UpdatedAt = entity.UpdatedAt.UTC()
 	entity.RevisionID = revisionID
 	return nil
 }
@@ -183,9 +179,8 @@ func (s policyStatements) getOne(ctx context.Context, filter database.Filter[dom
 
 func scanPolicy(row pgx.CollectableRow) (*domain.Policy, error) {
 	var (
-		entity               domain.Policy
-		config               []byte
-		createdAt, updatedAt time.Time
+		entity domain.Policy
+		config []byte
 	)
 	if err := row.Scan(
 		&entity.ProjectID,
@@ -193,13 +188,12 @@ func scanPolicy(row pgx.CollectableRow) (*domain.Policy, error) {
 		&entity.Operation,
 		&entity.RevisionID,
 		&config,
-		&createdAt,
-		&updatedAt,
+		&entity.CreatedAt,
+		&entity.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
 	entity.Config = config
-	entity.CreatedAt, entity.UpdatedAt = createdAt.UTC(), updatedAt.UTC()
 	return &entity, nil
 }
 

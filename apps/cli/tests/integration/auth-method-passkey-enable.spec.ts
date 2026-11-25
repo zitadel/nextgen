@@ -180,6 +180,8 @@ describe("auth-method passkey enable", () => {
               notices: [{ severity: "warning", message: NOT_OFFERED_WARNING }],
               title: "Would enable passkey for default-human-user (dry run)",
               dry_run: true,
+              verb: "enable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",
@@ -230,6 +232,8 @@ describe("auth-method passkey enable", () => {
               notices: [{ severity: "warning", message: NOT_OFFERED_WARNING }],
               title: "Would enable passkey for default-human-user (dry run)",
               dry_run: true,
+              verb: "enable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",
@@ -273,6 +277,8 @@ describe("auth-method passkey enable", () => {
               notices: [{ severity: "warning", message: NOT_OFFERED_WARNING }],
               title: "Nothing to enable for default-human-user (dry run)",
               dry_run: true,
+              verb: "enable",
+              topic: "auth-method",
               next_args: [
                 [
                   "auth-method",

@@ -21,6 +21,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@dagrejs/dagre": "catalog:",
     "@fontsource/arimo": "catalog:",
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",

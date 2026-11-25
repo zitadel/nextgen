@@ -275,6 +275,67 @@ describe("UserSchema.requiredByServer", () => {
   });
 });
 
+describe("UserSchema.requiredUniqueByServer", () => {
+  it("names the top-level property that holds a required nested unique one", () => {
+    const schema = UserSchema.of(
+      aFile(
+        "schemas",
+        SCHEMA_FILE,
+        aUserSchema({
+          required: ["contact"],
+          properties: {
+            contact: {
+              type: "object",
+              required: ["email"],
+              properties: { email: { type: "string", "x-unique": "project" } },
+            },
+          },
+        }),
+      ),
+    );
+
+    expect(schema.requiredUniqueByServer).toEqual(["contact"]);
+  });
+
+  it("finds a property required through an allOf where that branch defines it", () => {
+    const schema = UserSchema.of(
+      aFile(
+        "schemas",
+        SCHEMA_FILE,
+        aUserSchema({
+          properties: { name: { type: "string" } },
+          allOf: [
+            {
+              required: ["email"],
+              properties: { email: { type: "string", "x-unique": "project" } },
+            },
+          ],
+        }),
+      ),
+    );
+
+    expect(schema.requiredUniqueByServer).toEqual(["email"]);
+  });
+
+  it("leaves out a required property that is not unique", () => {
+    const schema = UserSchema.of(
+      aFile(
+        "schemas",
+        SCHEMA_FILE,
+        aUserSchema({
+          required: ["name"],
+          properties: {
+            name: { type: "string" },
+            email: { type: "string", "x-unique": "project" },
+          },
+        }),
+      ),
+    );
+
+    expect(schema.requiredUniqueByServer).toEqual([]);
+  });
+});
+
 describe("UserSchema.providers", () => {
   it("lists every provider x-auth-methods.sso names, in order", () => {
     const schema = UserSchema.of(

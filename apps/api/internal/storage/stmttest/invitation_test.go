@@ -303,37 +303,6 @@ func TestInvitationStatements_DeleteUnaccepted(t *testing.T) {
 	})
 }
 
-func TestInvitationStatements_DeleteCancellable(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureProject(t, d.stmts)
-		now := invitationNow()
-
-		pending := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		rejected := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, "user_2", now)
-		require.NoError(t, err)
-		for _, id := range []string{pending.ID, rejected.ID} {
-			require.NoError(t, d.stmts.DeleteCancellableInvitation(t.Context(), projectID, id, now))
-			_, err := d.stmts.GetInvitationByID(t.Context(), projectID, id)
-			assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		}
-
-		// An expired or accepted invitation keeps its row.
-		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
-		accepted := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, "user_1", now)
-		require.NoError(t, err)
-		for _, id := range []string{expired.ID, accepted.ID, pending.ID} {
-			err := d.stmts.DeleteCancellableInvitation(t.Context(), projectID, id, now)
-			assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		}
-		for _, id := range []string{expired.ID, accepted.ID} {
-			_, err := d.stmts.GetInvitationByID(t.Context(), projectID, id)
-			assert.NoError(t, err)
-		}
-	})
-}
-
 func TestInvitationStatements_CountPending(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)

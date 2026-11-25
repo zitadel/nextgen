@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 /**
  * The lifecycle status pill, shared by every resource that has one — users
  * (`active`, `suspended`, `deactivated`, `pending_purge`), teams (`active`,
- * `deactivated`), deployments (`live`, `inactive`) and login flows (`draft`).
+ * `deactivated`), deployments (`live`, `inactive`) and login flows (`draft`),
+ * and by a project's members for access that has `expired`.
  *
  * `Badge` is the design-system component and already carries every
  * dimension of the pill — `h-5`, `gap-1`, `px-2 py-0.5`, `rounded-full`,
@@ -16,10 +17,8 @@ import { cn } from "@/lib/utils";
  * The dot's colour is the status's tone (`statusTone`), never a colour chosen
  * per status: see "Status tones" in `docs/styling.md` for what each tone means.
  *
- * The label is the API's own value, title-cased (`statusLabel`). The Teams mock writes the
- * second state as `Inactive`, but the endpoint returns `deactivated` and the
- * team detail reads the same field — showing two words for one state would be
- * the console inventing vocabulary the API does not have.
+ * The label is the API's own value, title-cased (`statusLabel`), unless the
+ * resource names the state in its own word (`label`).
  */
 
 /**
@@ -28,7 +27,7 @@ import { cn } from "@/lib/utils";
  *
  * - `positive`: in force and working.
  * - `caution`: held for now; someone can lift it.
- * - `critical`: on its way out, and not coming back by itself.
+ * - `critical`: on its way out, or gone, and not coming back by itself.
  * - `neutral`: off, or not yet on; nothing is happening.
  */
 export type StatusTone = "positive" | "caution" | "critical" | "neutral";
@@ -43,6 +42,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
   live: "positive",
   suspended: "caution",
   pending_purge: "critical",
+  expired: "critical",
   deactivated: "neutral",
   inactive: "neutral",
   draft: "neutral",
@@ -100,7 +100,7 @@ export function statusOptions(statuses: readonly string[]): FilterOption[] {
   }));
 }
 
-export function StatusBadge({ status }: { status?: string }) {
+export function StatusBadge({ status, label }: { status?: string; label?: string }) {
   // A record the server has not stamped simply has no status, and an em dash is
   // honest where a pill would imply a state we do not know.
   if (!status) return <span className="text-muted-foreground">—</span>;
@@ -108,7 +108,7 @@ export function StatusBadge({ status }: { status?: string }) {
   return (
     <Badge variant="secondary">
       <StatusDot status={status} />
-      {statusLabel(status)}
+      {label ?? statusLabel(status)}
     </Badge>
   );
 }

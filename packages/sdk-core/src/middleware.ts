@@ -162,6 +162,166 @@ export function requiresProjectSecret(method: string, pathname: string): boolean
   return method.toUpperCase() === "POST" && operationPath(pathname) === "/sessions/exchange";
 }
 
+// ─── Proxy routing ───────────────────────────────────────────────────────────
+
+/**
+ * The root path RFC 8414 §3.1 puts an issuer's metadata under: the issuer's
+ * own path follows it.
+ */
+const AUTHORIZATION_SERVER_METADATA = "/.well-known/oauth-authorization-server";
+
+/** The path every OAuth issuer of the server lives under, before its project id. */
+const OAUTH_PREFIX = "/oauth";
+
+/** The only proxy path the server builds an issuer from. */
+const DEFAULT_PROXY_PATH = "/__nextgen";
+
+const warned = new Set<string>();
+
+/** Says `message` once per process on the app's server log. */
+function warnOnce(message: string): void {
+  if (warned.has(message)) {
+    return;
+  }
+  warned.add(message);
+  console.error(`[nextgen] ${message}`);
+}
+
+/** What decides where the proxy sends a request. */
+export interface ProxyRouteOptions {
+  /** The path prefix the app proxies, e.g. `"/__nextgen"`. */
+  readonly proxyPath: string;
+  /** The project this app signs its users in to. */
+  readonly projectId: string | undefined;
+  /** The app's login page, a path starting with a single `/`. */
+  readonly loginPath: string;
+}
+
+/** Where a request the proxy handles goes. */
+export interface ProxyRoute {
+  /**
+   * The path on the server, e.g. `/api/v1/flows`. Empty for a request to the
+   * proxy path itself.
+   */
+  readonly path: string;
+  /**
+   * The proxy answers `404` itself and forwards nothing: the path names an
+   * OAuth issuer that is not this app's project.
+   */
+  readonly refused: boolean;
+  /**
+   * Headers that tell the server how the request reached the app. Set them on
+   * the request to the server, replacing whatever the client sent under those
+   * names:
+   *
+   * - `x-forwarded-prefix`: the proxy path. The server builds the OAuth issuer
+   *   from it, and the issuer must equal the URL the client fetched
+   *   (RFC 8414 §3.3).
+   * - `x-zitadel-login-path`: the app's login page, where the server sends an
+   *   authorization request (ADR 081 §7). Only the path of `loginPath` goes:
+   *   the server accepts no query or fragment.
+   */
+  readonly headers: Readonly<Record<string, string>>;
+}
+
+/** Whether `path` is `prefix` or lies under it. */
+function isUnder(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/**
+ * Where the proxy sends a request, or `undefined` when the request is not
+ * the proxy's.
+ *
+ * - A path under `proxyPath` goes to the server without the prefix.
+ * - The RFC 8414 metadata of the project's OAuth issuer sits outside the
+ *   prefix. The issuer is `{origin}{proxyPath}/oauth/{projectId}`, so a client
+ *   reads its metadata at
+ *   `/.well-known/oauth-authorization-server{proxyPath}/oauth/{projectId}`,
+ *   which goes to the server's
+ *   `/.well-known/oauth-authorization-server/oauth/{projectId}`. OpenID
+ *   Connect Discovery needs no mapping: it sits under the issuer, and so
+ *   under `proxyPath`.
+ * - An OAuth path of another project, or of any when the app has no project,
+ *   is refused. The server takes the issuer's origin from the forwarded
+ *   headers, so an app that forwarded another project's issuer would lend
+ *   that project its origin. The platform project's issuer, `/oauth` itself,
+ *   is never reached through an app either.
+ *
+ * @param pathname - The request's path.
+ * @param options  - The app's proxy path, project and login page.
+ */
+export function proxyRoute(pathname: string, options: ProxyRouteOptions): ProxyRoute | undefined {
+  const { proxyPath, loginPath } = options;
+  const headers = {
+    "x-forwarded-prefix": proxyPath,
+    "x-zitadel-login-path": loginPath.split(/[?#]/, 1)[0] ?? loginPath,
+  };
+  if (isUnder(pathname, proxyPath)) {
+    const path = pathname.slice(proxyPath.length);
+    const refused =
+      isUnder(path, OAUTH_PREFIX) && !servesIssuer(options, (own) => isUnder(path, own));
+    return { path, refused, headers };
+  }
+  const issuers = `${AUTHORIZATION_SERVER_METADATA}${proxyPath}${OAUTH_PREFIX}`;
+  if (isUnder(pathname, issuers)) {
+    const issuer = `${OAUTH_PREFIX}${pathname.slice(issuers.length)}`;
+    return {
+      path: `${AUTHORIZATION_SERVER_METADATA}${issuer}`,
+      refused: !servesIssuer(options, (own) => issuer === own),
+      headers,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Whether an OAuth path is one of this app's issuer, by `isOwn`, which gets
+ * the issuer's path on the server. On the app's server log it says once why
+ * the app is no issuer when its own setup is the reason: no project is
+ * configured, or the proxy path is not the one the server knows.
+ */
+function servesIssuer(options: ProxyRouteOptions, isOwn: (ownIssuer: string) => boolean): boolean {
+  const { proxyPath, projectId } = options;
+  if (!projectId) {
+    warnOnce(
+      "No project id is configured, so this app's OAuth issuer answers 404. " +
+        "Set ZITADEL_PROJECT_ID (or the `projectId` option) to the project this app signs its users in to.",
+    );
+    return false;
+  }
+  if (!isOwn(`${OAUTH_PREFIX}/${projectId}`)) {
+    return false;
+  }
+  if (proxyPath !== DEFAULT_PROXY_PATH) {
+    warnOnce(
+      `The proxy path is "${proxyPath}", but the server serves a project's OAuth issuer only ` +
+        `under "${DEFAULT_PROXY_PATH}", so this app's issuer answers 404. ` +
+        "Leave `proxyPath` at its default to make this app an issuer.",
+    );
+  }
+  return true;
+}
+
+/**
+ * The answer to a request {@link proxyRoute} refuses: the `404` the server
+ * gives for an issuer it does not serve, so a client reads the same answer
+ * whether the app or the server refused. It never says why: the caller is
+ * anonymous, and the app's server log names a cause in the app's own setup.
+ */
+export function refusedProxyResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      error: "invalid_request",
+      error_description: "no authorization server at this issuer",
+    }),
+    {
+      status: 404,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+    },
+  );
+}
+
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**
@@ -804,7 +964,8 @@ export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
 
 /**
  * Union of all possible client-safe auth states. Returned by the client
- * session reads (`useAuth()` in sdk-nuxt, `getSession()` in sdk-next).
+ * session reads (`getSession()` in `./session`, which sdk-next and the SPA
+ * SDKs re-export, and `useAuth()` in sdk-nuxt).
  * Token is intentionally absent — use the server-side helpers when the raw
  * token is needed.
  */
@@ -850,7 +1011,11 @@ export type NextgenMiddlewareOptions = {
    *
    * Sign-in with an external provider currently requires the default: the
    * provider returns to `/__nextgen/idp/{slug}/callback`, which is proxied only under
-   * the default prefix.
+   * the default prefix. So does the project's OAuth issuer,
+   * `{origin}/__nextgen/oauth/{projectId}`: the proxy also serves its metadata
+   * at `/.well-known/oauth-authorization-server/__nextgen/oauth/{projectId}`,
+   * and answers `404` for an OAuth path of any other project
+   * ({@link proxyRoute}).
    * @default "/__nextgen"
    */
   proxyPath?: string;
@@ -882,6 +1047,9 @@ export type NextgenMiddlewareOptions = {
    * Pathname to redirect unauthenticated users to.
    * A `next` query parameter carries the requested path and query string,
    * where `<zitadel-login>` returns after sign-in.
+   *
+   * The proxy tells the server this path on every request, without its query,
+   * and the server sends an OAuth authorization request there.
    * @default "/login"
    */
   loginPath?: string;
@@ -1317,16 +1485,10 @@ function signedOut(): UnauthState {
   return { isAuthenticated: false, session: null };
 }
 
-let warnedMissingProject = false;
-
 /** Says once per process why no session counts: no project is configured. */
 function warnMissingProject(): void {
-  if (warnedMissingProject) {
-    return;
-  }
-  warnedMissingProject = true;
-  console.error(
-    "[nextgen] No project id is configured, so no session counts as signed in. " +
+  warnOnce(
+    "No project id is configured, so no session counts as signed in. " +
       "Set ZITADEL_PROJECT_ID (or the `projectId` option) to the project this app signs its users in to.",
   );
 }

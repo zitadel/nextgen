@@ -320,6 +320,11 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   capture.
 - `sessionStorage` holds it only while the page needs it. It's cleared on
   accept, decline, an unknown token, and sign-out.
+- A session can end without sign-out (it expires, or is revoked elsewhere), so
+  the token belongs to the first signed-in account the page shows it to: for
+  any other account that signs in on the tab it is dropped unshown. The page
+  names the signed-in account and offers **Use another account**, the one
+  path that hands the token to the next sign-in.
 
 **Authority**
 - Creating, listing, reading and cancelling run the same project `admin` check
@@ -447,6 +452,29 @@ This refines §3's lookup and §4's adapter and self-accept rules (#2853).
   lookup returns the creator as a user reference, as the members list does.
   It is null when a project secret created the invitation.
 
+## Amendment (2026-11-12): `invitation_cancelled`
+
+§9 sends no event when a pending invitation is cancelled. Cancel deletes the
+row, so a cancelled journey ends at `invitation_created` and counts against
+the 72-hour acceptance rate as an invitation nobody opened, the same error
+`invitation_rejected` was added to avoid.
+
+| Event | Sent by | When |
+|---|---|---|
+| `invitation_cancelled` | the console's invitations list; `zitadel invitation cancel` | after the API confirms the cancel |
+
+- It carries `role` and `invitation_journey_id`, like the other three.
+- A replace sends no `invitation_cancelled`: the new invitation keeps the
+  journey, so the journey goes on.
+- The cancel answers `204` with no body, so `zitadel invitation cancel
+  <invitation_id>` reads the invitation before it asks to confirm. The
+  question names who the invitation is for and its role, and the event takes
+  its role and journey from that read. A cancel with no id picks from the
+  pending and declined invitations, which it has already read.
+- Cancelling a declined invitation sends none: its journey already ended
+  with `invitation_rejected`.
+- The 72-hour acceptance rate leaves out cancelled journeys.
+
 ## Amendment (2026-11-13): a decline keeps the metadata, and the list's filters
 
 This replaces §4's erasure rule for declines and §4's cancel rule, and the
@@ -501,3 +529,19 @@ earlier amendment of this date.
     "responded_at": "2026-11-05T08:12:44Z"
   }
   ```
+
+## Amendment (2026-11-23): cancel removes an expired invitation
+
+This replaces the cancel rule in the 2026-11-11 and the first 2026-11-13
+amendments.
+
+- **Cancel deletes any invitation that wasn't accepted:** pending, expired or
+  rejected, the same rows replace deletes. An administrator removes an
+  expired invitation and its metadata without making a new link, before the
+  cleanup job exists.
+- An accepted invitation still answers the same `404` as an unknown id.
+- **Cancelling an expired invitation sends no product event
+  `invitation_cancelled`** (§9), as for a declined one: its journey already
+  counts as not accepted, and the 72-hour acceptance rate leaves out
+  cancelled journeys. The audit event `invitation.cancelled` (§5) is still
+  written for every cancel.

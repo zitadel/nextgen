@@ -58,7 +58,7 @@ func validateReleaseReferencesClosed(content ReleaseContent, pointers []ReleaseP
 	}
 	for _, schema := range content.Schemas {
 		objectType := *schema.ObjectType
-		authMethods, err := newSchemaReader(documents[objectType]).AuthMethods()
+		authMethods, err := NewSchemaReader(documents[objectType]).AuthMethods()
 		if err != nil {
 			return ErrInternal(err).WithMessage("failed to read user schema auth methods")
 		}
@@ -79,7 +79,7 @@ func errReleaseUnresolved(kind ReleasePointerKind, handle, field, ref string) er
 // x-auth-methods.sso.providers. Used when assembling a release to auto-pin
 // connections the schema references.
 func SchemaSSOProviderSlugs(document *jsonschema.Schema) ([]string, error) {
-	authMethods, err := newSchemaReader(document).AuthMethods()
+	authMethods, err := NewSchemaReader(document).AuthMethods()
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to read user schema auth methods")
 	}

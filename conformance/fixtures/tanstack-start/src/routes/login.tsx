@@ -13,7 +13,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />
     </div>
   );

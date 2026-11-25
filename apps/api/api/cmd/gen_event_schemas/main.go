@@ -59,6 +59,8 @@ var payloadByEventType = map[string]string{
 	"auth.attempt.handed_off":        "empty-event-payload.yaml",
 	"auth.check.failed":              "auth-check-payload.yaml",
 	"auth.check.succeeded":           "auth-check-payload.yaml",
+	"auth.request.created":           "auth-request-created-payload.yaml",
+	"auth.request.exchange.failed":   "auth-request-exchange-failed-payload.yaml",
 
 	"auth.sso.authorization.failed": "auth-check-payload.yaml",
 	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
@@ -71,6 +73,8 @@ var payloadByEventType = map[string]string{
 	"schema.created": "schema-created-payload.yaml",
 
 	"branding.created": "branding-created-payload.yaml",
+
+	"oauth_settings.created": "oauth-settings-created-payload.yaml",
 
 	"policy.created": "policy-payload.yaml",
 	"policy.updated": "policy-payload.yaml",
@@ -172,6 +176,11 @@ var webhookByEventType = map[string]webhookDoc{
 		"password."},
 	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. The event is also sent " +
 		"when a factor is recorded without a challenge, as on sign-up."},
+	"auth.request.created": {description: "An app started a sign-in at the OAuth authorization endpoint. The " +
+		"payload names the app by its `client_id`."},
+	"auth.request.exchange.failed": {description: "An app presented an authorization code at the OAuth token endpoint, " +
+		"and a check refused it. The code is used up all the same. The payload names the app by its `client_id` " +
+		"and says which check refused the code in `reason`."},
 
 	"auth.sso.authorization.failed": {description: "A sign-in through an identity provider (SSO) failed at the provider. " +
 		"It answered with an error, `access_denied` included, or the callback carried no code."},
@@ -190,6 +199,10 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"branding.created": {description: "A branding revision was created."},
 
+	"oauth_settings.created": {description: "A project published a new revision of its OAuth settings, " +
+		"which say whether its OAuth authorization server answers. A release build publishes one when the " +
+		"bundle's `oauth` resource differs from every earlier revision."},
+
 	"policy.created": {description: "A project published the first revision of its policy for an operation. " +
 		"A policy guards an operation, such as setting a password."},
 	"policy.updated": {description: "A project published a new revision of its policy for an operation. The " +
@@ -199,8 +212,10 @@ var webhookByEventType = map[string]webhookDoc{
 		"build of the project's configuration, which a deployment makes live."},
 	"release.revoked": {description: "A release was revoked."},
 
-	"application.created": {description: "A registered application was created."},
-	"application.updated": {description: "A registered application was revised. The payload holds the new " +
+	"application.created": {description: "An application was created, through the API or by the release build " +
+		"that first declared it."},
+	"application.updated": {description: "An application was revised, through the API or by a release build. " +
+		"The payload holds the new " +
 		"revision, the name when it changed, and the clients the revision added."},
 
 	"idp.created": {description: "An identity provider (IdP) connection was created."},

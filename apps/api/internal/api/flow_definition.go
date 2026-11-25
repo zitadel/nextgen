@@ -189,11 +189,16 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 			for name, apiGate := range step.GetGates().Value {
 				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo (grvijayan): validate in the domain layer
 
-				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
-				for k, v := range apiGate.GetConfig().Value {
-					var val any
-					if err := json.Unmarshal(v, &val); err == nil {
-						cfg[k] = val
+				// A gate without config stays without one, as storage reads
+				// it back, so an unchanged flow compares equal on rebuild.
+				var cfg map[string]any
+				if apiGate.GetConfig().IsSet() {
+					cfg = make(map[string]any, len(apiGate.GetConfig().Value))
+					for k, v := range apiGate.GetConfig().Value {
+						var val any
+						if err := json.Unmarshal(v, &val); err == nil {
+							cfg[k] = val
+						}
 					}
 				}
 				gates[name] = domain.FlowStepGate{

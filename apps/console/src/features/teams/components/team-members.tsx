@@ -62,6 +62,8 @@ export function Members({ teamId, loaded }: { teamId: string; loaded: MembersPag
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
+              // The designed empty state tells you to add members from the CLI,
+              // so it waits for an endpoint that adds one.
               <ResourceEmptyRow colSpan={3}>No members yet.</ResourceEmptyRow>
             ) : (
               rows.map((user) => (

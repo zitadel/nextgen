@@ -16,6 +16,16 @@ export type CreatedInvitation = Readonly<CreateInvitation201>;
 /** The lifecycle states an invitation can be in. */
 export type InvitationStatus = Invitation["status"];
 
+/**
+ * Every status but accepted: what the console and `invitation list` show by
+ * default, and what a cancel deletes. Whoever accepted is a member now.
+ */
+export const UNACCEPTED_INVITATION_STATUSES: readonly InvitationStatus[] = [
+  "pending",
+  "expired",
+  "rejected",
+];
+
 /** The kinds of invitation the API declares. */
 export type InvitationType = Invitation["type"];
 
@@ -46,6 +56,19 @@ export function invitationRole(invitation: Invitation): string {
   return invitation.type === "project_member"
     ? invitation.project_member.relation
     : invitation.team_member.role;
+}
+
+/**
+ * What the invitation grants, its type and role in one word: `project_viewer`,
+ * `project_editor`, `project_admin`, or `team_member`.
+ *
+ * @param invitation - The invitation.
+ * @returns The type and role combined.
+ */
+export function invitationGrant(invitation: Invitation): string {
+  return invitation.type === "project_member"
+    ? `project_${invitation.project_member.relation}`
+    : "team_member";
 }
 
 /** The invitations of one project: create or replace, list, read and cancel (ADR 086). */
@@ -108,14 +131,15 @@ export class InvitationService extends ApiService {
   }
 
   /**
-   * Every pending invitation, for a person to pick one from.
+   * Every invitation a cancel accepts, pending, expired or declined, for a
+   * person to pick one from.
    *
-   * @returns The pending invitations, newest first.
+   * @returns The cancellable invitations, newest first.
    */
-  async pending(): Promise<readonly Invitation[]> {
+  async cancellable(): Promise<readonly Invitation[]> {
     return this.client.listInvitations.all({
       project_id: this.projectId,
-      status: ["pending"],
+      status: [...UNACCEPTED_INVITATION_STATUSES],
     });
   }
 

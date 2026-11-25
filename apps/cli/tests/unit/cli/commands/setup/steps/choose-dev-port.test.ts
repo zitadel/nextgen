@@ -168,6 +168,43 @@ describe("ChooseDevPort", () => {
     });
   });
 
+  describe("when the app's own dev server holds the detected port", () => {
+    const machine = new FakeMachine({ taken: [3000], runningIn: { 3000: APP_DIR } });
+
+    it("keeps the detected port", async () => {
+      const answers = await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ devPort: 3000 }),
+        CONTEXT,
+      );
+
+      expect(answers.devPort).toBe(3000);
+    });
+
+    it("does not ask", async () => {
+      await new ChooseDevPort(aPromptDeps(undefined, machine)).ask(
+        setupAnswers({ devPort: 3000 }),
+        CONTEXT,
+      );
+
+      expect(text).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when another app's dev server holds the detected port", () => {
+    it("asks", async () => {
+      vi.mocked(text).mockResolvedValueOnce("3001");
+
+      await new ChooseDevPort(
+        aPromptDeps(
+          undefined,
+          new FakeMachine({ taken: [3000], runningIn: { 3000: "/tmp/other-app" } }),
+        ),
+      ).ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+
+      expect(text).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("with --dev-port", () => {
     const machine = new FakeMachine({ taken: [5000] });
 

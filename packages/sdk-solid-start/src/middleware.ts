@@ -1,6 +1,7 @@
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
+  ProxyRoute,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -11,7 +12,9 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -109,7 +112,7 @@ function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
+ * Forwards a request the proxy handles to the upstream auth backend and returns the
  * upstream response, including its `Set-Cookie` headers. Hop-by-hop headers are
  * stripped in both directions, a `location` is kept only as a redirect onto this
  * app, and the session cookie travels under this project's name in the browser
@@ -119,12 +122,12 @@ async function proxyRequest(
   event: SolidFetchEvent,
   url: URL,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.request.method;
@@ -132,6 +135,9 @@ async function proxyRequest(
   const body = hasBody ? await event.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event, url);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,
@@ -348,8 +354,14 @@ export function createNextgenMiddleware(
       return;
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url2, url, proxyPath, projectId, projectSecret, proxyTimeoutMs);
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      return refusedProxyResponse();
+    }
+    if (route) {
+      return proxyRequest(event, url2, url, route, projectId, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, url2, {
