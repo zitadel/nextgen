@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { EllipsisVertical, Plus } from "lucide-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -109,7 +109,7 @@ export function ProjectOrigins({
           onOpenChange={setAddOpen}
           onChanged={onChanged}
           trigger={
-            <Button variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
+            <Button variant="outline" size="sm" className={CARD_ACTION_BUTTON}>
               <Plus aria-hidden />
               Add origin
             </Button>
@@ -169,7 +169,12 @@ function OriginRow({
           )}
           <CopyButton value={origin.pattern} label={`Copy ${origin.pattern}`} size="inline" />
         </div>
-        <RowMenu name={origin.pattern} size="icon-xs" contentClassName="w-50">
+        <RowMenu
+          name={origin.pattern}
+          icon={EllipsisVertical}
+          size="icon-xs"
+          contentClassName="w-50"
+        >
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>Edit</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
