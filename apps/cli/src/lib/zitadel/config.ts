@@ -14,7 +14,6 @@ import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
   ZitadelConfigFileBrokenError,
-  ZitadelConfigDeployEmptyError,
   ZitadelConfigError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -455,7 +454,7 @@ export class ZitadelConfig {
         return file.kind !== "policy-test";
       }).length;
     if (fileCount === 0) {
-      throw new ZitadelConfigDeployEmptyError("There is nothing in .zitadel/ to deploy");
+      throw new ZitadelConfigError("There is nothing in .zitadel/ to deploy");
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
       throw new ZitadelConfigError(

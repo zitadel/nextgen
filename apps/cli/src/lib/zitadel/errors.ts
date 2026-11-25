@@ -403,30 +403,6 @@ export class ZitadelConfigEditMethodInUseError extends ZitadelConfigError {
 }
 
 /**
- * A login flow that already has errors, so it cannot be checked against a
- * changed schema.
- */
-export class ZitadelConfigFlowsUncheckedError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * Make the failure for these issues.
-   *
-   * @param input - The heading and the issues.
-   * @param input.heading - The line the listed issues follow.
-   * @param input.issues - Every issue, as the server's flow rules word it.
-   */
-  constructor(input: { readonly heading: string; readonly issues: readonly FlowIssue[] }) {
-    const listed = input.issues.map((item) => {
-      return `  - ${item.path}: ${item.issue.message}`;
-    });
-    super([input.heading, ...listed].join("\n"));
-  }
-}
-
-/**
  * A file or directory that cannot be read because the operating system refused
  * to let this process read it.
  */
@@ -434,13 +410,6 @@ export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
-}
-
-/** The bundle cannot be built because `.zitadel/` holds nothing to put in it. */
-export class ZitadelConfigDeployEmptyError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /** A bug in this package: something that cannot happen unless the code is wrong. */

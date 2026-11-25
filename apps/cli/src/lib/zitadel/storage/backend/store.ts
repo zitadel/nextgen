@@ -261,9 +261,9 @@ export abstract class Store implements ConfigStore {
           }
           const message = `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`;
           if (code === "EACCES" || code === "EPERM") {
-            throw new ZitadelConfigFileUnreadableError(message);
+            throw new ZitadelConfigFileUnreadableError(message, error);
           }
-          throw new ZitadelConfigError(message);
+          throw new ZitadelConfigError(message, error);
         }
       },
       missing,

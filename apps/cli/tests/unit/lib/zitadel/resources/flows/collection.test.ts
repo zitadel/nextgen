@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ZitadelConfigFlowsUncheckedError,
+  ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigResourceMissingError,
   type ConfigOptions,
   UserSchema,
@@ -319,7 +319,7 @@ describe("Flows.resolveForSso", () => {
       return config.flows.resolveForSso(customers(ssoSchema()), slug("acme-sso"));
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigFlowsUncheckedError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
   });
 });
 

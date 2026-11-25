@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditMethodInUseError,
-  ZitadelConfigFlowsUncheckedError,
   type JsonObject,
 } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
@@ -299,7 +298,7 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigFlowsUncheckedError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",
@@ -475,7 +474,7 @@ describe("assertMethodUnused", () => {
       assertMethodUnused(edit, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigFlowsUncheckedError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",

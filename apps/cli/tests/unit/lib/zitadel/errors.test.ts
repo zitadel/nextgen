@@ -7,10 +7,8 @@ import {
   ZitadelConfigSchemaAmbiguousError,
   ZitadelConfigSchemaMissingError,
   ZitadelConfigFileBrokenError,
-  ZitadelConfigDeployEmptyError,
   ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditMethodInUseError,
-  ZitadelConfigFlowsUncheckedError,
   CONFIG_DIRECTORIES,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -123,22 +121,6 @@ function refusalOf(
     uses,
   });
 }
-
-describe("ZitadelConfigFlowsUncheckedError", () => {
-  it("lists each issue under the heading", () => {
-    const error = new ZitadelConfigFlowsUncheckedError({
-      heading: "A login flow has errors, so it cannot be checked against the changed schema:",
-      issues: [BROKEN],
-    });
-
-    expect(error.message).toBe(
-      [
-        "A login flow has errors, so it cannot be checked against the changed schema:",
-        `  - ${FLOW_PATH}: broken`,
-      ].join("\n"),
-    );
-  });
-});
 
 describe("ZitadelConfigEditBreaksFlowsError", () => {
   it("lists each issue under the heading as the flow rules word it", () => {
@@ -317,15 +299,6 @@ describe("ZitadelConfigFileUnreadableError", () => {
     expect(new ZitadelConfigFileUnreadableError("x.json cannot be read")).toMatchObject({
       category: "denied",
       code: "E_AUTH",
-    });
-  });
-});
-
-describe("ZitadelConfigDeployEmptyError", () => {
-  it("is a validation failure when there is nothing to deploy", () => {
-    expect(new ZitadelConfigDeployEmptyError("nothing here")).toMatchObject({
-      category: "invalid",
-      code: "E_VALIDATION",
     });
   });
 });

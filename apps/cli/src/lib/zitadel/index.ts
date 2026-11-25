@@ -54,7 +54,6 @@ export type {
 } from "@/lib/zitadel/resources/document";
 export {
   ZitadelConfigConnectionExistsError,
-  ZitadelConfigDeployEmptyError,
   ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigEditMethodInUseError,
@@ -62,7 +61,6 @@ export {
   ZitadelConfigFileBrokenError,
   ZitadelConfigFileExistsError,
   ZitadelConfigFileUnreadableError,
-  ZitadelConfigFlowsUncheckedError,
   ZitadelConfigInternalError,
   ZitadelConfigResourceClashError,
   ZitadelConfigResourceMissingError,
