@@ -777,9 +777,11 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Renders `step.identifier` as the control a password manager pairs with the
-   * password input. No `name` keeps it out of every submission; clipping it
-   * rather than `display:none` or `type="hidden"` keeps a manager able to see
-   * it. It lives here and not in the template because the sanitiser drops a
+   * password input. No `name` keeps it out of every submission; the `id` is its
+   * only handle, since Chrome reports a control with neither as an issue and
+   * asks for a stable one. Clipping it rather than `display:none` or
+   * `type="hidden"` keeps a manager able to see it. It lives here and not in
+   * the template because the sanitiser drops a
    * raw `<input>` from template output, so ejected templates get it for free.
    *
    * `value` is the attribute, not a `.value` property binding: a manager
@@ -794,6 +796,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const identifier = this.response?.step.identifier;
     if (!identifier?.value) return nothing;
     return html`<input
+      id="zl-paired-identifier"
       type="text"
       part="paired-identifier"
       readonly
