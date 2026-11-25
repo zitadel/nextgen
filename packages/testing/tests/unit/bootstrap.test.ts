@@ -79,6 +79,7 @@ describe("bootstrapProject", () => {
       previewSecret: "preview_1",
       schemaId: "sch_1",
       flowId: "flowdef_1",
+      releaseId: "rel_1",
     });
 
     expect(captured.projectBody).toMatchObject({
