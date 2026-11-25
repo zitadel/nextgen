@@ -93,13 +93,17 @@ name or an address.
 
 ## Errors
 
-Every failure of the package is a `LocalServerError`: a `kind`, a code, a
-message and the facts behind it, never a hint or a next command. The commands
-say what to do about each kind (`src/lib/suggestion/local-server-advice.ts`,
-applied by `BaseCommand`), and `start` words its own refusals from the
-lifecycle's errors (`DockerUnavailableError`, `PortInUseError`,
-`NoFreePortError`, `ServerStartError`, `ServerStopError`, all subclasses) in
-`src/cli/commands/server/start.ts`. `reset` takes a `DestroyPermit`, not
+Every failure of the package is a `LocalServerError`, defined with its
+subclasses in `errors.ts`: a category, a message and the facts behind it, never
+a hint or a next command. The commands say what to do about each one
+(`src/lib/suggestion/local-server-advice.ts`, applied by `BaseCommand`), and
+`start` words its own refusals from the lifecycle's errors
+(`LocalServerDockerMissingError`, `LocalServerPortBusyError`,
+`LocalServerPortFullError`, `LocalServerStartError`, `LocalServerStopError`) in
+`src/cli/commands/server/start.ts`. A `docker` call that ran and failed is a
+plain `Error` carrying its command and stderr. The boundary
+(`toZitadelError`) reports `LocalServerDownError` as `E_LOCAL_SERVER_NOT_RUNNING`
+and the two port errors as `E_PORT_IN_USE`. `reset` takes a `DestroyPermit`, not
 `Consent`; the package says what it is doing through a `progress` callback the
 command gives it, not through `log`.
 

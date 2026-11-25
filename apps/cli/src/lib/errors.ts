@@ -3,6 +3,12 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { BackendError, BackendUnavailableError, type BackendUnavailableReason } from "./backend";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
+import {
+  LocalServerDownError,
+  LocalServerError,
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+} from "./server/errors";
 import { ZitadelConfigError, ZitadelConfigEditBreaksFlowsError } from "./zitadel";
 
 /**
@@ -204,6 +210,26 @@ const CATEGORY_CODES: Record<ErrorCategory, ZitadelErrorCode> = {
   unexpected: "E_VALIDATION",
 };
 
+/**
+ * The code a failure of the local server is reported with.
+ *
+ * @param error - The failure.
+ * @returns `E_LOCAL_SERVER_NOT_RUNNING` for no server, `E_PORT_IN_USE` for a port that
+ *   is held or a range with none free, and the code of its category for any other.
+ */
+function localServerErrorCode(error: LocalServerError): ZitadelErrorCode {
+  if (error instanceof LocalServerDownError) {
+    return "E_LOCAL_SERVER_NOT_RUNNING";
+  } else if (
+    error instanceof LocalServerPortBusyError ||
+    error instanceof LocalServerPortFullError
+  ) {
+    return "E_PORT_IN_USE";
+  } else {
+    return CATEGORY_CODES[error.category];
+  }
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -333,6 +359,15 @@ export function toZitadelError(error: unknown): ZitadelError {
       error.hint?.includes("deploy --dry-run")
         ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
         : {}),
+    });
+  }
+
+  // The local server's own failures: the two a command words by name keep the
+  // codes they always had; every other one is reported by its category.
+  if (error instanceof LocalServerError) {
+    return new ZitadelError(localServerErrorCode(error), error.message, {
+      ...(error.hint === undefined ? {} : { hint: error.hint }),
+      details: error.details ?? { original: pickErrorShape(error) },
     });
   }
 

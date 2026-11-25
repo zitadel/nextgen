@@ -1,7 +1,7 @@
 import { isObject } from "@/lib/json";
 import { interpolate, type Refusal, refusalError } from "@/cli/core/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
-import { LocalServerError, ZitadelRuntime } from "@/lib/server";
+import { LocalServerDownError, ZitadelRuntime } from "@/lib/server";
 import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
 import { Cmd } from "@/lib/cmd";
 import { resolve } from "node:path";
@@ -131,10 +131,10 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
     }).catch((error: unknown) => {
-      if (!(error instanceof LocalServerError) || error.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+      if (!(error instanceof LocalServerDownError)) {
         throw error;
       }
-      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
+      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.reason];
       const details = isObject(error.details) ? error.details : {};
       const { directory } = details;
       const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);

@@ -1,4 +1,17 @@
-import type { LocalServerErrorKind } from "@/lib/server";
+import {
+  LocalServerAdminError,
+  LocalServerBinaryError,
+  LocalServerBusyError,
+  LocalServerDockerMissingError,
+  LocalServerDownError,
+  type LocalServerError,
+  LocalServerFileError,
+  LocalServerMalformedError,
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+  LocalServerStartError,
+  LocalServerStopError,
+} from "@/lib/server";
 import { PM } from "@/lib/pm";
 import { type Suggested, suggestedCommandOf } from "./index";
 import { CliPackage } from "@/lib/upgrade";
@@ -30,21 +43,17 @@ export const LOCAL_SERVER_ADVICE = {
       "No healthy local server responded at {server_url}. It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back.",
     next: [{ id: "start" }],
   },
-  "not-started": {
-    hint: "Run `zitadel start` first.",
-    next: [{ id: "start" }],
-  },
-  "record-unreadable": {
+  "file-unreadable": {
     hint: "Check that {path} and its directory are readable by you.",
+  },
+  "file-blocked": {
+    hint: "Move or delete {path}: something is in the way of the local data directory.",
   },
   "record-malformed": {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
     elsewhere:
       "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
     next: [{ id: "reset", flags: { force: true } }, { id: "start" }],
-  },
-  "admin-unreadable": {
-    hint: "Check that {path} is readable by you; `zitadel start` writes it owner-only.",
   },
   "admin-malformed": {
     hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
@@ -54,9 +63,6 @@ export const LOCAL_SERVER_ADVICE = {
     hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
     next: [{ id: "logs" }],
   },
-  "env-unreadable": {
-    hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
-  },
   "package-missing": {
     hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
     next: [suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`]))],
@@ -64,10 +70,6 @@ export const LOCAL_SERVER_ADVICE = {
   "cannot-launch": {
     hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
     next: [suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`]))],
-  },
-  "docker-failed": {
-    hint: "Check that Docker is installed, running, and reachable from this shell.",
-    next: [{ id: "doctor" }],
   },
   "start-in-progress": {
     hint: "Wait for it to finish, or delete {lock_file} if no start is running.",
@@ -99,12 +101,56 @@ export const LOCAL_SERVER_ADVICE = {
   "processes-unlistable": {
     hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
   },
-  "permit-mismatch": {
-    hint: "A reset acts on one folder only. Run it from the folder whose server you mean to reset.",
-  },
   "server-did-not-stop": {
     hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
   },
-} satisfies Record<LocalServerErrorKind, LocalServerAdvice> as Readonly<
-  Record<LocalServerErrorKind, LocalServerAdvice>
->;
+} satisfies Record<string, LocalServerAdvice>;
+
+/** What a failure of the local server is advised by: one entry of {@link LOCAL_SERVER_ADVICE}. */
+export type LocalServerAdviceKey = keyof typeof LOCAL_SERVER_ADVICE;
+
+/**
+ * Which advice goes with a failure of the local server.
+ *
+ * @param error - What the package threw.
+ * @returns The key of its advice, or `undefined` for a failure that has none.
+ */
+export function localServerAdviceKey(error: LocalServerError): LocalServerAdviceKey | undefined {
+  if (error instanceof LocalServerDownError) {
+    return error.reason;
+  } else if (error instanceof LocalServerMalformedError) {
+    return error.reason === "record"
+      ? "record-malformed"
+      : error.reason === "admin"
+        ? "admin-malformed"
+        : undefined;
+  } else if (error instanceof LocalServerBusyError) {
+    return "start-in-progress";
+  } else if (error instanceof LocalServerStartError) {
+    return "server-did-not-start";
+  } else if (error instanceof LocalServerStopError) {
+    return error.reason === "processes"
+      ? "processes-did-not-stop"
+      : error.reason === "unlistable"
+        ? "processes-unlistable"
+        : "server-did-not-stop";
+  } else if (error instanceof LocalServerPortBusyError) {
+    return "port-in-use";
+  } else if (error instanceof LocalServerPortFullError) {
+    return "no-free-port";
+  } else if (error instanceof LocalServerDockerMissingError) {
+    return "docker-unavailable";
+  } else if (error instanceof LocalServerBinaryError) {
+    return error.reason === "missing" ? "package-missing" : "cannot-launch";
+  } else if (error instanceof LocalServerFileError) {
+    return error.reason === "unreadable" ? "file-unreadable" : "file-blocked";
+  } else if (error instanceof LocalServerAdminError) {
+    return error.reason === "rejected"
+      ? "admin-not-found"
+      : error.reason === "session"
+        ? "session-exchange-failed"
+        : "platform-missing";
+  } else {
+    return undefined;
+  }
+}

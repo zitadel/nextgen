@@ -2,12 +2,12 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import {
-  DockerUnavailableError,
+  LocalServerDockerMissingError,
   LocalRuntime,
-  NoFreePortError,
-  PortInUseError,
-  ServerStartError,
-  ServerStopError,
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+  LocalServerStartError,
+  LocalServerStopError,
 } from "@/lib/server";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
@@ -294,7 +294,7 @@ export default class Start extends Telemetered(
     const { runtime: record, alreadyRunning } = await server
       .launch(request)
       .catch(async (error: unknown) => {
-        if (error instanceof DockerUnavailableError) {
+        if (error instanceof LocalServerDockerMissingError) {
           throw refusalError(
             DOCKER_UNAVAILABLE_REFUSAL,
             { detail: error.detail },
@@ -303,7 +303,7 @@ export default class Start extends Telemetered(
               retry,
             },
           );
-        } else if (error instanceof PortInUseError) {
+        } else if (error instanceof LocalServerPortBusyError) {
           const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
             return port !== error.port;
           });
@@ -322,12 +322,12 @@ export default class Start extends Telemetered(
               }),
             },
           );
-        } else if (error instanceof NoFreePortError) {
+        } else if (error instanceof LocalServerPortFullError) {
           throw refusalError(NO_FREE_PORT_REFUSAL, {
             message: error.message,
             first: error.firstPort,
           });
-        } else if (error instanceof ServerStartError) {
+        } else if (error instanceof LocalServerStartError) {
           const details = {
             ...error.details,
             server_url: error.record.server_url,
@@ -348,10 +348,10 @@ export default class Start extends Telemetered(
               details,
             });
           }
-        } else if (error instanceof ServerStopError) {
+        } else if (error instanceof LocalServerStopError) {
           throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
             runtime: error.record,
-            stop: error.outcome,
+            stop: error.outcome ?? null,
           });
         } else {
           throw error;

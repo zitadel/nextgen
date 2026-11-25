@@ -2,9 +2,26 @@ import { describe, expect, it } from "vitest";
 
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
-import { LOCAL_SERVER_ADVICE } from "@/lib/suggestion/local-server-advice";
+import {
+  LOCAL_SERVER_ADVICE,
+  type LocalServerAdvice,
+  type LocalServerAdviceKey,
+} from "@/lib/suggestion/local-server-advice";
 import { Spelling } from "@/lib/suggestion/spelling";
-import { LocalServerError, type LocalServerErrorKind } from "@/lib/server";
+import {
+  LocalServerAdminError,
+  LocalServerBinaryError,
+  LocalServerBusyError,
+  LocalServerDockerMissingError,
+  LocalServerDownError,
+  type LocalServerError,
+  LocalServerFileError,
+  LocalServerMalformedError,
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+  LocalServerStartError,
+  LocalServerStopError,
+} from "@/lib/server";
 import { aConfigAt } from "@tests/helpers/suggestions";
 
 /** A local-server command that records the failure envelope it would print. */
@@ -45,20 +62,86 @@ function publicHint(hint: string): string {
     .replaceAll("`", "");
 }
 
-const KINDS = Object.keys(LOCAL_SERVER_ADVICE) as LocalServerErrorKind[];
+const FAILURES: Record<LocalServerAdviceKey, () => LocalServerError> = {
+  "not-running": () => {
+    return new LocalServerDownError("not-running", { fact: 1 });
+  },
+  "not-responding": () => {
+    return new LocalServerDownError("not-responding", { fact: 1 });
+  },
+  "file-unreadable": () => {
+    return new LocalServerFileError("unreadable", "It failed", { details: { fact: 1 } });
+  },
+  "file-blocked": () => {
+    return new LocalServerFileError("blocked", "It failed", { details: { fact: 1 } });
+  },
+  "record-malformed": () => {
+    return new LocalServerMalformedError("record", "It failed", { details: { fact: 1 } });
+  },
+  "admin-malformed": () => {
+    return new LocalServerMalformedError("admin", "It failed", { details: { fact: 1 } });
+  },
+  "admin-not-found": () => {
+    return new LocalServerAdminError("rejected", "It failed", { details: { fact: 1 } });
+  },
+  "package-missing": () => {
+    return new LocalServerBinaryError("missing", "It failed", { details: { fact: 1 } });
+  },
+  "cannot-launch": () => {
+    return new LocalServerBinaryError("blocked", "It failed", { details: { fact: 1 } });
+  },
+  "start-in-progress": () => {
+    return new LocalServerBusyError({ fact: 1 });
+  },
+  "session-exchange-failed": () => {
+    return new LocalServerAdminError("session", "It failed", { details: { fact: 1 } });
+  },
+  "platform-missing": () => {
+    return new LocalServerAdminError("platform-missing", "It failed", { details: { fact: 1 } });
+  },
+  "processes-did-not-stop": () => {
+    return new LocalServerStopError("processes", "It failed", { details: { fact: 1 } });
+  },
+  "docker-unavailable": () => {
+    return new LocalServerDockerMissingError("no daemon");
+  },
+  "no-free-port": () => {
+    return new LocalServerPortFullError(8080, 8179);
+  },
+  "port-in-use": () => {
+    return new LocalServerPortBusyError(8080);
+  },
+  "server-did-not-start": () => {
+    return new LocalServerStartError(
+      "timeout",
+      { port: 1, server_url: "http://x" },
+      { status: "stopped" },
+      { fact: 1 },
+    );
+  },
+  "processes-unlistable": () => {
+    return new LocalServerStopError("unlistable", "It failed", { details: { fact: 1 } });
+  },
+  "server-did-not-stop": () => {
+    return new LocalServerStopError("server", "It failed", { details: { fact: 1 } });
+  },
+};
+
+const KINDS = Object.keys(LOCAL_SERVER_ADVICE) as LocalServerAdviceKey[];
 
 describe("BaseCommand advice for failures of the local server", () => {
   it.each(KINDS)("adds the advice for a %s failure of the local server", async (kind) => {
     const command = new Failing([], aConfigAt(VERSION));
 
-    await command.failWith(new LocalServerError(kind, "E_VALIDATION", "It failed", { fact: 1 }));
+    const failure = FAILURES[kind]();
+
+    await command.failWith(failure);
 
     expect(command.json).toEqual([
       expect.objectContaining({
         status: "error",
-        message: "It failed",
+        message: failure.message,
         hint: publicHint(LOCAL_SERVER_ADVICE[kind].hint),
-        details: { fact: 1 },
       }),
     ]);
   });
@@ -77,13 +160,11 @@ describe("BaseCommand advice for failures of the local server", () => {
     const command = new Failing([], aConfigAt(VERSION));
 
     await command.failWith(
-      new LocalServerError("admin-unreadable", "E_VALIDATION", "It failed", {
-        path: "/p/admin.json",
-      }),
+      new LocalServerFileError("unreadable", "It failed", { details: { path: "/p/admin.json" } }),
     );
 
     expect(command.json).toEqual([
-      expect.objectContaining({ hint: expect.stringContaining("Check that /p/admin.json is") }),
+      expect.objectContaining({ hint: expect.stringContaining("Check that /p/admin.json and") }),
     ]);
   });
 
@@ -91,9 +172,7 @@ describe("BaseCommand advice for failures of the local server", () => {
     const command = new Failing([], aConfigAt(VERSION));
 
     await command.failWith(
-      new LocalServerError("record-malformed", "E_VALIDATION", "It failed", {
-        directory: "/parent",
-      }),
+      new LocalServerMalformedError("record", "It failed", { details: { directory: "/parent" } }),
     );
 
     expect(JSON.stringify(command.json)).toContain("--cwd /parent");
@@ -103,9 +182,7 @@ describe("BaseCommand advice for failures of the local server", () => {
     const command = new Failing([], aConfigAt(VERSION));
 
     await command.failWith(
-      new LocalServerError("admin-malformed", "E_VALIDATION", "It failed", {
-        path: "/p/admin.json",
-      }),
+      new LocalServerMalformedError("admin", "It failed", { details: { path: "/p/admin.json" } }),
     );
 
     expect(JSON.stringify(command.json)).toContain("rm /p/admin.json");
@@ -115,8 +192,8 @@ describe("BaseCommand advice for failures of the local server", () => {
     const command = new Failing([], aConfigAt(VERSION));
 
     await command.failWith(
-      new LocalServerError("admin-malformed", "E_VALIDATION", "It failed", {
-        path: "/my dir/admin.json",
+      new LocalServerMalformedError("admin", "It failed", {
+        details: { path: "/my dir/admin.json" },
       }),
     );
 
@@ -127,9 +204,7 @@ describe("BaseCommand advice for failures of the local server", () => {
     const command = new Failing([], aConfigAt(VERSION));
 
     await command.failWith(
-      new LocalServerError("record-malformed", "E_VALIDATION", "It failed", {
-        directory: "/my dir",
-      }),
+      new LocalServerMalformedError("record", "It failed", { details: { directory: "/my dir" } }),
     );
 
     expect(command.json).toEqual([
@@ -148,9 +223,7 @@ describe("BaseCommand advice for failures of the local server", () => {
     const command = new Failing([], aConfigAt(VERSION));
 
     await command.failWith(
-      new LocalServerError("package-missing", "E_VALIDATION", "It failed", {
-        directory: "/elsewhere",
-      }),
+      new LocalServerBinaryError("missing", "It failed", { details: { directory: "/elsewhere" } }),
     );
 
     expect(command.json).toEqual([expect.objectContaining({ status: "error" })]);
@@ -160,7 +233,7 @@ describe("BaseCommand advice for failures of the local server", () => {
   it.each(["admin-not-found", "session-exchange-failed"] as const)(
     "never has an agent run a reset for a %s failure",
     (kind) => {
-      const advice: { next?: readonly unknown[] } = LOCAL_SERVER_ADVICE[kind];
+      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[kind];
 
       expect(
         (advice.next ?? []).filter((step) => {

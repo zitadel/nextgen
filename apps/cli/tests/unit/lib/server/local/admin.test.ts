@@ -130,10 +130,9 @@ describe("local admin", () => {
     const error = await readLocalAdmin(cwd).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
-      code: "E_VALIDATION",
-      kind: "admin-malformed",
+      name: "LocalServerMalformedError",
+      reason: "admin",
       hint: undefined,
-      nextCommands: undefined,
     });
   });
 
@@ -147,7 +146,9 @@ describe("local admin", () => {
 
       try {
         await expect(ensureLocalAdmin(cwd)).rejects.toMatchObject({
-          kind: "admin-unreadable",
+          name: "LocalServerFileError",
+          reason: "unreadable",
+          category: "auth",
           message: expect.stringMatching(/cannot be read/),
         });
       } finally {

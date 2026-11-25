@@ -3,13 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { ManualClock } from "@tests/fixtures/clock";
 
 import {
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+  LocalServerStartError,
+  LocalServerStopError,
+} from "@/lib/server/errors";
+import {
   claimFreePort,
   Lifecycle,
   launched,
-  NoFreePortError,
-  PortInUseError,
-  ServerStartError,
-  ServerStopError,
   type HealthProbe,
   type Launcher,
   type PortProbe,
@@ -251,7 +253,9 @@ describe("Lifecycle", () => {
       const world = new World();
       world.takenPorts.add(9000);
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(PortInUseError);
+      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
+        LocalServerPortBusyError,
+      );
       expect(world.launched).toEqual([]);
     });
 
@@ -260,7 +264,9 @@ describe("Lifecycle", () => {
       await world.server().start();
       world.takenPorts.add(9000);
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(PortInUseError);
+      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
+        LocalServerPortBusyError,
+      );
 
       expect(world.terminated).toEqual([]);
       await expect(world.server().state()).resolves.toMatchObject({ kind: "running" });
@@ -300,7 +306,7 @@ describe("Lifecycle", () => {
       world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
       world.terminateResult = "failed";
 
-      await expect(world.server().start()).rejects.toBeInstanceOf(ServerStopError);
+      await expect(world.server().start()).rejects.toBeInstanceOf(LocalServerStopError);
     });
 
     it("does not call another server's answer its own when its process dies at once", async () => {
@@ -316,7 +322,7 @@ describe("Lifecycle", () => {
         .start()
         .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(ServerStartError);
+      expect(error).toBeInstanceOf(LocalServerStartError);
       expect(error).toMatchObject({ reason: "exited" });
       await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
     });
@@ -395,7 +401,9 @@ describe("Lifecycle", () => {
       const world = new World();
       world.reservedPorts.add(9000);
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(PortInUseError);
+      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
+        LocalServerPortBusyError,
+      );
     });
 
     it("lets go of its port claim once the server answers", async () => {
@@ -461,7 +469,7 @@ describe("Lifecycle", () => {
       world.writeError = new Error("read-only file system");
       world.terminateResult = "failed";
 
-      await expect(world.server().start()).rejects.toBeInstanceOf(ServerStopError);
+      await expect(world.server().start()).rejects.toBeInstanceOf(LocalServerStopError);
     });
 
     it("does not retry a launch that failed for another reason", async () => {
@@ -561,7 +569,7 @@ describe("Lifecycle", () => {
         throw new Error("docker daemon is gone");
       };
 
-      await expect(world.server().start()).rejects.toBeInstanceOf(ServerStopError);
+      await expect(world.server().start()).rejects.toBeInstanceOf(LocalServerStopError);
     });
 
     it("does not let a claim that cannot be removed hide a successful start", async () => {
@@ -602,7 +610,7 @@ describe("Lifecycle", () => {
       const world = new World();
       world.ports = { isFree: async () => false, reserve: async () => async () => undefined };
 
-      await expect(world.server().start()).rejects.toBeInstanceOf(NoFreePortError);
+      await expect(world.server().start()).rejects.toBeInstanceOf(LocalServerPortFullError);
     });
   });
 
@@ -646,7 +654,7 @@ describe("Lifecycle", () => {
       world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
       world.terminateResult = "failed";
 
-      await expect(world.server().stop()).rejects.toBeInstanceOf(ServerStopError);
+      await expect(world.server().stop()).rejects.toBeInstanceOf(LocalServerStopError);
     });
   });
 });
@@ -698,7 +706,7 @@ describe("claimFreePort", () => {
 
     it("refuses a port that was asked for", async () => {
       await expect(claimFreePort(takenOnceClaimed([]), 9200)).rejects.toBeInstanceOf(
-        PortInUseError,
+        LocalServerPortBusyError,
       );
     });
 
@@ -727,7 +735,9 @@ describe("claimFreePort", () => {
       reserve: async () => async () => undefined,
     };
 
-    await expect(claimFreePort(ports, undefined, 8080)).rejects.toBeInstanceOf(NoFreePortError);
+    await expect(claimFreePort(ports, undefined, 8080)).rejects.toBeInstanceOf(
+      LocalServerPortFullError,
+    );
     expect(tried).toHaveLength(100);
   });
 
@@ -741,7 +751,9 @@ describe("claimFreePort", () => {
       reserve: async () => async () => undefined,
     };
 
-    await expect(claimFreePort(ports, undefined, 65_530)).rejects.toBeInstanceOf(NoFreePortError);
+    await expect(claimFreePort(ports, undefined, 65_530)).rejects.toBeInstanceOf(
+      LocalServerPortFullError,
+    );
     expect(Math.max(...tried)).toBe(65_535);
   });
 });

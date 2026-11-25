@@ -1,10 +1,14 @@
 import { resolve } from "node:path";
 
 import { Cmd } from "@/lib/cmd";
-import { failureText, ZitadelError } from "@/lib/errors";
+import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { LocalServerError } from "@/lib/server";
-import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
+import {
+  LOCAL_SERVER_ADVICE,
+  type LocalServerAdvice,
+  localServerAdviceKey,
+} from "@/lib/suggestion/local-server-advice";
 import {
   isSuggestion,
   shellCommand,
@@ -69,12 +73,16 @@ export class Failure {
     if (!(error instanceof LocalServerError)) {
       return error;
     }
-    const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
+    const key = localServerAdviceKey(error);
+    if (key === undefined) {
+      return error;
+    }
+    const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[key];
     const details: Record<string, unknown> = isObject(error.details) ? { ...error.details } : {};
     const { directory } = details;
     const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(cwd);
     const removal: Suggested[] =
-      error.kind === "admin-malformed" && typeof details.path === "string"
+      key === "admin-malformed" && typeof details.path === "string"
         ? [shellCommand("rm", Cmd.quote(details.path))]
         : [];
     const steps = (advice.next ?? []).map((step) => {
@@ -125,7 +133,7 @@ export class Failure {
       ),
       ...(retargeted.length > 0 ? { suggested_args: retargeted } : {}),
     };
-    return new ZitadelError(error.code, error.message, {
+    return new ZitadelError(toZitadelError(error).code, error.message, {
       hint: interpolate(hint ?? advice.hint, quoted),
       nextCommands: [...removal, ...next],
       details: error.details && visible,

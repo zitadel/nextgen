@@ -4,7 +4,14 @@ import { join, resolve } from "node:path";
 import { SERVER } from "@/constants";
 import type { Parsed } from "@zitadel/config/idp";
 
-import { ZitadelError, errorMessage } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
+import {
+  LocalServerDockerMissingError,
+  LocalServerInternalError,
+  LocalServerMalformedError,
+  LocalServerPortBusyError,
+  LocalServerStopError,
+} from "@/lib/server/errors";
 import { currentUser } from "@/lib/uidgid";
 
 import {
@@ -17,7 +24,6 @@ import {
   defaultLocalServerImageForCliVersion,
   type DestroyPermit,
   DockerLauncher,
-  DockerUnavailableError,
   EMPTY_SUMMARY,
   ensureContainerIdentity,
   ensureLocalAdmin,
@@ -37,7 +43,6 @@ import {
   type LocalAdmin,
   localContainerName,
   localRuntimePaths,
-  LocalServerError,
   localServerNotRunning,
   type LocalServers,
   localServerUrl,
@@ -50,7 +55,6 @@ import {
   type ManagedRuntimeProcess,
   peekRuntimeMetadata,
   PLATFORM_PROJECT_ID,
-  PortInUseError,
   readLocalAdmin,
   readNearestRuntimeMetadata,
   readPlatformRuntime,
@@ -146,7 +150,7 @@ export abstract class ZitadelRuntime {
    *
    * @param input - The project directory and the `--server` flag, when given.
    * @returns The server and where it came from.
-   * @throws {ZitadelError} `E_VALIDATION` when the flag is not an http(s) URL,
+   * @throws {LocalServerMalformedError} when the flag is not an http(s) URL,
    *   or the local server's own error when `local` is not running.
    */
   static async resolve(input: ResolveServerInput): Promise<ResolvedServer> {
@@ -193,17 +197,17 @@ export abstract class ZitadelRuntime {
    *
    * @param value - The server's address.
    * @returns The origin.
-   * @throws {ZitadelError} `E_VALIDATION` when it is not an http(s) URL.
+   * @throws {LocalServerMalformedError} when it is not an http(s) URL.
    */
   static origin(value: string): string {
     if (!URL.canParse(value)) {
-      throw new ZitadelError("E_VALIDATION", `Invalid server "${value}"`, {
+      throw new LocalServerMalformedError("url", `Invalid server "${value}"`, {
         hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
       });
     }
     const url = new URL(value);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new ZitadelError("E_VALIDATION", `Server URL must use http(s): ${value}`, {
+      throw new LocalServerMalformedError("url", `Server URL must use http(s): ${value}`, {
         hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
       });
     }
@@ -245,7 +249,7 @@ export abstract class ZitadelRuntime {
    * serves it apart from the API, and `/ui/console/` on any other server.
    *
    * @returns The console's address, with its trailing slash.
-   * @throws {ZitadelError} `E_VALIDATION` when the address is not an http(s) URL.
+   * @throws {LocalServerMalformedError} when the address is not an http(s) URL.
    */
   consoleUrl(): string {
     if (this.isCloud()) {
@@ -534,7 +538,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param cwd - The directory.
    * @returns The record, or `undefined` when none was written there.
-   * @throws {LocalServerError} `record-unreadable` or `record-malformed` when it cannot be used.
+   * @throws {LocalServerFileError} or {LocalServerMalformedError} when it cannot be used.
    */
   static read(cwd: string): Promise<RuntimeMetadata | undefined> {
     return readRuntimeMetadata(cwd);
@@ -545,7 +549,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param cwd - Where to start looking.
    * @returns The record and the directory it was found in, or `undefined` when no directory above has one.
-   * @throws {LocalServerError} `record-unreadable` or `record-malformed` when it cannot be used.
+   * @throws {LocalServerFileError} or {LocalServerMalformedError} when it cannot be used.
    */
   static readNearest(cwd: string): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
     return readNearestRuntimeMetadata(cwd);
@@ -763,7 +767,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * @param cwd - The directory the run addresses.
    * @param fetcher - What asks whether the server answers (`fetch` by default).
    * @returns The address of the server running there.
-   * @throws {LocalServerError} `not-running` when no server was started there, or `not-responding` when the recorded one is not running.
+   * @throws {LocalServerDownError} when no server was started there, or when the recorded one is not running.
    */
   static async resolveUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
@@ -819,7 +823,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param servers - The processes of this machine.
    * @returns What was stopped, or that the processes cannot be listed here.
-   * @throws {LocalServerError} `processes-did-not-stop` when a process did not stop.
+   * @throws {LocalServerStopError} when a process did not stop.
    */
   static async stopAll(servers: LocalServers): Promise<SweepResult> {
     const discovery = await servers.current();
@@ -839,11 +843,10 @@ export class LocalRuntime extends ZitadelRuntime {
         return result.stop_result.status === "failed";
       })
     ) {
-      throw new LocalServerError(
-        "processes-did-not-stop",
-        "E_VALIDATION",
+      throw new LocalServerStopError(
+        "processes",
         "Some managed local runtime processes did not stop",
-        { supported: true, results },
+        { details: { supported: true, results } },
       );
     }
     return { supported: true, results };
@@ -922,7 +925,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * enough: another folder's server may have taken the port since.
    *
    * @returns The address.
-   * @throws {LocalServerError} `not-running` when no folder from here up started a server, or `not-responding` when the recorded one is not running.
+   * @throws {LocalServerDownError} when no folder from here up started a server, or when the recorded one is not running.
    */
   runningUrl(): Promise<string> {
     return LocalRuntime.resolveUrl(this.cwd, this.directory.fetcher);
@@ -1018,7 +1021,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param request - What the command was asked for.
    * @returns The server's record, and whether it was already running.
-   * @throws {DockerUnavailableError} When a Docker start is asked for and Docker does not answer.
+   * @throws {LocalServerDockerMissingError} When a Docker start is asked for and Docker does not answer.
    */
   async launch(
     request: StartRequest,
@@ -1091,7 +1094,7 @@ export class LocalRuntime extends ZitadelRuntime {
         options.port !== other.port &&
         !(await new TcpPorts().isFree(options.port))
       ) {
-        throw new PortInUseError(options.port);
+        throw new LocalServerPortBusyError(options.port);
       }
       if (config.backend === "binary") {
         // A server another CLI release started serves that release's API, and
@@ -1135,10 +1138,10 @@ export class LocalRuntime extends ZitadelRuntime {
 
       const { image } = config;
       const docker = await this.directory.docker.available().catch((error: unknown) => {
-        throw new DockerUnavailableError(error);
+        throw new LocalServerDockerMissingError(error);
       });
       if (docker.status !== 0) {
-        throw new DockerUnavailableError(docker.stderr || "docker version failed");
+        throw new LocalServerDockerMissingError(docker.stderr || "docker version failed");
       }
       if (existing?.backend === "binary") {
         await this.directory.processes.stopRecord(existing);
@@ -1250,17 +1253,13 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param permit - The caller's proof that deleting is meant.
    * @returns What stopping the server did.
-   * @throws {LocalServerError} `permit-mismatch` when the permit is for another folder.
-   * @throws {LocalServerError} `server-did-not-stop` when a process on this folder's data would not stop.
-   * @throws {LocalServerError} `processes-unlistable` when the record cannot be read and the machine's processes cannot be listed.
+   * @throws {LocalServerInternalError} when the permit is for another folder.
+   * @throws {LocalServerStopError} when a process on this folder's data would not stop.
+   * @throws {LocalServerStopError} when the record cannot be read and the machine's processes cannot be listed.
    */
   async reset(permit: DestroyPermit): Promise<StopReport> {
     if (resolve(permit.folder) !== resolve(this.cwd)) {
-      throw new LocalServerError(
-        "permit-mismatch",
-        "E_VALIDATION",
-        `The permit is for ${permit.folder}, not ${this.cwd}`,
-      );
+      throw new LocalServerInternalError(`The permit is for ${permit.folder}, not ${this.cwd}`);
     }
     // A record that cannot be read must not stop the reset that is its way out.
     const record = await peekRuntimeMetadata(this.cwd);
@@ -1284,11 +1283,10 @@ export class LocalRuntime extends ZitadelRuntime {
           },
         );
         if (recordExists) {
-          throw new LocalServerError(
-            "processes-unlistable",
-            "E_VALIDATION",
+          throw new LocalServerStopError(
+            "unlistable",
             "The local runtime record cannot be read and the machine's processes cannot be listed",
-            { error: discovery.error },
+            { details: { error: discovery.error } },
           );
         }
       }
@@ -1325,12 +1323,9 @@ export class LocalRuntime extends ZitadelRuntime {
           return orphan.stop_result.status === "failed";
         })
       ) {
-        throw new LocalServerError(
-          "server-did-not-stop",
-          "E_VALIDATION",
-          "Local Zitadel server did not stop",
-          { stop_results: orphans },
-        );
+        throw new LocalServerStopError("server", "Local Zitadel server did not stop", {
+          details: { stop_results: orphans },
+        });
       }
     }
     await removeLocalData(this.cwd);
@@ -1406,11 +1401,7 @@ export class LocalRuntime extends ZitadelRuntime {
   private async recordedRuntime(): Promise<RuntimeMetadata> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (!runtime) {
-      throw new LocalServerError(
-        "not-started",
-        "E_VALIDATION",
-        "Local Zitadel runtime has not been started",
-      );
+      throw localServerNotRunning();
     }
     return runtime;
   }
@@ -1425,18 +1416,15 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param runtime - The folder's record, if it has one.
    * @returns What stopping did.
-   * @throws {LocalServerError} `server-did-not-stop` when a recorded process was still running afterwards.
+   * @throws {LocalServerStopError} when a recorded process was still running afterwards.
    */
   private async halt(runtime: RuntimeMetadata | undefined): Promise<StopReport> {
     if (runtime?.backend === "binary") {
       const outcome = await this.directory.processes.stopRecord(runtime);
       if (outcome.status === "failed") {
-        throw new LocalServerError(
-          "server-did-not-stop",
-          "E_VALIDATION",
-          "Local Zitadel server did not stop",
-          { runtime, stop_result: outcome },
-        );
+        throw new LocalServerStopError("server", "Local Zitadel server did not stop", {
+          details: { runtime, stop_result: outcome },
+        });
       }
       return { runtime, stopped: outcome.status !== "stale", outcome };
     }

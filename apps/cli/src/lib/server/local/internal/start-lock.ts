@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { LocalServerError } from "../local-server-error";
+import { LocalServerBusyError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 import { type Clock, SystemClock } from "@/lib/clock";
 
@@ -177,12 +177,7 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
       return release;
     }
     if (clock.now() >= deadline) {
-      throw new LocalServerError(
-        "start-in-progress",
-        "E_CONFLICT",
-        "Another `zitadel start` is still running in this directory",
-        { lock_file: lockFile, owner_pid: await readOwner(lockFile) },
-      );
+      throw new LocalServerBusyError({ lock_file: lockFile, owner_pid: await readOwner(lockFile) });
     }
     await clock.wait(pollMs);
   }

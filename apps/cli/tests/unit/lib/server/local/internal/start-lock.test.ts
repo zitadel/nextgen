@@ -289,8 +289,8 @@ describe("withStartLock", () => {
         clock: new ManualClock(),
       }),
     ).rejects.toMatchObject({
-      code: "E_CONFLICT",
-      kind: "start-in-progress",
+      name: "LocalServerBusyError",
+      category: "conflict",
       details: expect.objectContaining({ lock_file: lock }),
     });
     await release?.();

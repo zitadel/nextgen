@@ -5,7 +5,12 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { errorMessage } from "@/lib/errors";
-import { LocalServerError } from "./local-server-error";
+import {
+  LocalServerDownError,
+  LocalServerFileError,
+  LocalServerInternalError,
+  LocalServerMalformedError,
+} from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 
 import { readIfExists } from "@/lib/fs";
@@ -276,9 +281,9 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
       return false;
     }
-    throw new LocalServerError("record-unreadable", "E_VALIDATION", `${path} cannot be read`, {
-      path,
-      cause: errorMessage(error),
+    throw new LocalServerFileError("unreadable", `${path} cannot be read`, {
+      details: { path, cause: errorMessage(error) },
+      cause: error,
     });
   }
 }
@@ -419,21 +424,14 @@ export async function checkLocalServerHealth(
  * @param directory - The folder that holds the record.
  * @returns The error.
  */
-export function localServerNotRunning(serverUrl?: string, directory?: string): LocalServerError {
+export function localServerNotRunning(
+  serverUrl?: string,
+  directory?: string,
+): LocalServerDownError {
   if (serverUrl) {
-    return new LocalServerError(
-      "not-responding",
-      "E_LOCAL_SERVER_NOT_RUNNING",
-      "Local Zitadel server is not running",
-      { server_url: serverUrl, directory },
-    );
+    return new LocalServerDownError("not-responding", { server_url: serverUrl, directory });
   } else {
-    return new LocalServerError(
-      "not-running",
-      "E_LOCAL_SERVER_NOT_RUNNING",
-      "Local Zitadel server is not running",
-      { server_url: serverUrl },
-    );
+    return new LocalServerDownError("not-running", { server_url: serverUrl });
   }
 }
 
@@ -538,11 +536,13 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       continue;
     }
     if (!info.isDirectory()) {
-      throw new Error(`${current} exists but is not a directory`);
+      throw new LocalServerFileError("blocked", `${current} exists but is not a directory`, {
+        details: { path: current },
+      });
     }
     return current;
   }
-  throw new Error(`${path} has no existing directory above it`);
+  throw new LocalServerInternalError(`${path} has no existing directory above it`);
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {
@@ -606,11 +606,11 @@ function explicitUrlPort(value: string): number | undefined {
   }
 }
 
-function malformedRuntime(input: Record<string, unknown>, directory: string): LocalServerError {
-  return new LocalServerError(
-    "record-malformed",
-    "E_VALIDATION",
-    `${LOCAL_RUNTIME_FILE} is malformed`,
-    { ...input, directory },
-  );
+function malformedRuntime(
+  input: Record<string, unknown>,
+  directory: string,
+): LocalServerMalformedError {
+  return new LocalServerMalformedError("record", `${LOCAL_RUNTIME_FILE} is malformed`, {
+    details: { ...input, directory },
+  });
 }

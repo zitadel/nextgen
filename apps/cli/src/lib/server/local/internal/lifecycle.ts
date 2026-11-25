@@ -10,8 +10,12 @@
  * process is spawned or how a port is probed, the tests that make it cheap to
  * change stop being able to cover it.
  */
-import { errorMessage } from "@/lib/errors";
-import { LocalServerError } from "../local-server-error";
+import {
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+  LocalServerStartError,
+  LocalServerStopError,
+} from "@/lib/server/errors";
 import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/server/local/runtime";
 import { type Clock, SystemClock } from "@/lib/clock";
 
@@ -176,105 +180,6 @@ const MAX_PORT = 65_535;
 const PORT_RACE_RETRIES = 3;
 
 /**
- * Docker did not answer, so a Docker start cannot begin. The CLI says what to
- * do about it; the package only reports that it happened and what Docker said.
- */
-export class DockerUnavailableError extends LocalServerError {
-  /** What Docker said, or that it said nothing. */
-  readonly detail: string;
-
-  /**
-   * @param reason - What asking Docker failed with: its error, or the text it printed.
-   */
-  constructor(reason: unknown) {
-    const detail = errorMessage(reason).trim() || "no reason given";
-    super("docker-unavailable", "E_NETWORK", "Docker is not reachable", { detail });
-    this.name = "DockerUnavailableError";
-    this.detail = detail;
-  }
-}
-
-/** Every port in the search range was taken. */
-export class NoFreePortError extends LocalServerError {
-  readonly firstPort: number;
-
-  constructor(firstPort: number) {
-    super(
-      "no-free-port",
-      "E_PORT_IN_USE",
-      `No free port from ${String(firstPort)} to ${String(Math.min(firstPort + PORT_SEARCH_RANGE - 1, MAX_PORT))}`,
-      { first_port: firstPort },
-    );
-    this.name = "NoFreePortError";
-    this.firstPort = firstPort;
-  }
-}
-
-/** A port that was explicitly asked for is held, so the start is refused rather than moved. */
-export class PortInUseError extends LocalServerError {
-  readonly port: number;
-
-  constructor(port: number) {
-    super("port-in-use", "E_PORT_IN_USE", `Port ${String(port)} is already in use`, { port });
-    this.name = "PortInUseError";
-    this.port = port;
-  }
-}
-
-/** What a start says when its server did not become ready, by why. */
-const START_FAILURES = {
-  exited: "The server exited before it became healthy",
-  timeout: "The server did not become healthy in time",
-} as const;
-
-/**
- * A server was launched but did not become ready. `cleanup` says what stopping
- * it did, `logTail` is what it logged: the lifecycle reads the log before
- * cleaning up because cleaning up a container removes its log, which is the
- * only explanation of why it failed.
- */
-export class ServerStartError<R extends ServerRecord> extends LocalServerError {
-  readonly reason: "exited" | "timeout";
-  readonly record: R;
-  readonly cleanup: StopOutcome;
-  readonly logTail: string | undefined;
-  /** What identifies the server, from {@link Launcher.describe}. */
-  override readonly details: Readonly<Record<string, unknown>>;
-
-  constructor(
-    reason: "exited" | "timeout",
-    record: R,
-    cleanup: StopOutcome,
-    details: Readonly<Record<string, unknown>>,
-    logTail?: string,
-  ) {
-    super("server-did-not-start", "E_NETWORK", START_FAILURES[reason], details);
-    this.name = "ServerStartError";
-    this.reason = reason;
-    this.record = record;
-    this.cleanup = cleanup;
-    this.logTail = logTail;
-    this.details = details;
-  }
-}
-
-/** A server that had to be stopped (to restart or move it) was still running afterwards. */
-export class ServerStopError<R extends ServerRecord> extends LocalServerError {
-  readonly record: R;
-  readonly outcome: StopOutcome;
-
-  constructor(record: R, outcome: StopOutcome) {
-    super("server-did-not-stop", "E_VALIDATION", "The server did not stop", {
-      runtime: record,
-      stop_result: outcome,
-    });
-    this.name = "ServerStopError";
-    this.record = record;
-    this.outcome = outcome;
-  }
-}
-
-/**
  * One server for one directory: it starts, reports on and stops the server whose
  * record the directory's store holds. Everything it touches arrives through its
  * dependencies, so the lifecycle is testable without processes or sockets.
@@ -396,8 +301,8 @@ export class Lifecycle<R extends ServerRecord> {
         if (
           requested === undefined &&
           attempt < PORT_RACE_RETRIES &&
-          !(error instanceof ServerStopError) &&
-          (!(error instanceof ServerStartError) || error.reason === "exited") &&
+          !(error instanceof LocalServerStopError) &&
+          (!(error instanceof LocalServerStartError) || error.reason === "exited") &&
           !(await this.deps.ports.isFree(claim.port))
         ) {
           return undefined;
@@ -435,7 +340,11 @@ export class Lifecycle<R extends ServerRecord> {
     } catch (error) {
       const outcome = await this.terminateQuietly(record);
       if (outcome.status === "failed") {
-        throw new ServerStopError(record, outcome);
+        throw new LocalServerStopError("server", "The server did not stop", {
+          record,
+          outcome,
+          details: { runtime: record, stop_result: outcome },
+        });
       }
       throw error;
     }
@@ -450,14 +359,14 @@ export class Lifecycle<R extends ServerRecord> {
     }
   }
 
-  /** Launches on the port and waits until it is ready; throws {@link ServerStartError} if it does not become so. */
+  /** Launches on the port and waits until it is ready; throws {@link LocalServerStartError} if it does not become so. */
   private async launchAndWait(port: number): Promise<Launched<R>> {
     const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
     await this.save(record);
     try {
       await this.waitUntilReady(record);
     } catch (error) {
-      if (!(error instanceof ServerStartError)) {
+      if (!(error instanceof LocalServerStartError)) {
         // Something other than the server failing (a probe that threw): the
         // server is still running and must not be left behind.
         await this.terminateQuietly(record);
@@ -488,7 +397,7 @@ export class Lifecycle<R extends ServerRecord> {
   /** Refuses a port that is held. Used before anything is torn down, so a refusal changes nothing. */
   private async assertFree(port: number): Promise<void> {
     if (!(await this.deps.ports.isFree(port))) {
-      throw new PortInUseError(port);
+      throw new LocalServerPortBusyError(port);
     }
   }
 
@@ -496,7 +405,11 @@ export class Lifecycle<R extends ServerRecord> {
   private async terminate(record: R): Promise<StopOutcome> {
     const outcome = await this.deps.launcher.terminate(record);
     if (outcome.status === "failed") {
-      throw new ServerStopError(record, outcome);
+      throw new LocalServerStopError("server", "The server did not stop", {
+        record,
+        outcome,
+        details: { runtime: record, stop_result: outcome },
+      });
     }
     return outcome;
   }
@@ -535,12 +448,12 @@ export class Lifecycle<R extends ServerRecord> {
   private async startFailure(
     reason: "exited" | "timeout",
     record: R,
-  ): Promise<ServerStartError<R>> {
+  ): Promise<LocalServerStartError<R>> {
     // The log goes first: cleaning up may remove it with the server.
     const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => {
       return undefined;
     });
-    return new ServerStartError(
+    return new LocalServerStartError(
       reason,
       record,
       await this.terminateQuietly(record),
@@ -569,11 +482,11 @@ export async function claimFreePort(
   if (requested !== undefined) {
     const release = await ports.reserve(requested);
     if (!release) {
-      throw new PortInUseError(requested);
+      throw new LocalServerPortBusyError(requested);
     }
     if (!(await ports.isFree(requested))) {
       await release();
-      throw new PortInUseError(requested);
+      throw new LocalServerPortBusyError(requested);
     }
     return { port: requested, release };
   }
@@ -594,7 +507,7 @@ export async function claimFreePort(
     }
     await release();
   }
-  throw new NoFreePortError(first);
+  throw new LocalServerPortFullError(first, Math.min(first + PORT_SEARCH_RANGE - 1, MAX_PORT));
 }
 
 export function serverUrlFor(port: number): string {

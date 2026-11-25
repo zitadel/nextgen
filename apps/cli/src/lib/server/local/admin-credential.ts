@@ -7,7 +7,7 @@ import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 import { errorMessage } from "@/lib/errors";
-import { LocalServerError } from "./local-server-error";
+import { LocalServerFileError, LocalServerMalformedError } from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
@@ -79,12 +79,10 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw new LocalServerError(
-      "admin-unreadable",
-      "E_VALIDATION",
-      `${LOCAL_ADMIN_FILE} cannot be read`,
-      { path: join(cwd, LOCAL_ADMIN_FILE), cause: errorMessage(error) },
-    );
+    throw new LocalServerFileError("unreadable", `${LOCAL_ADMIN_FILE} cannot be read`, {
+      details: { path: join(cwd, LOCAL_ADMIN_FILE), cause: errorMessage(error) },
+      cause: error,
+    });
   });
   if (raw === undefined) return undefined;
 
@@ -114,23 +112,13 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
  * could never sign in. Removing the file and resetting the data lets the next
  * start mint a fresh credential and import it.
  */
-function malformedAdminFile(cwd: string, cause?: unknown): LocalServerError {
+function malformedAdminFile(cwd: string, cause?: unknown): LocalServerMalformedError {
   const details = { path: join(cwd, LOCAL_ADMIN_FILE), directory: cwd };
-  if (cause) {
-    return new LocalServerError(
-      "admin-malformed",
-      "E_VALIDATION",
-      `${LOCAL_ADMIN_FILE} is malformed`,
-      { ...details, cause: errorMessage(cause) },
-    );
-  } else {
-    return new LocalServerError(
-      "admin-malformed",
-      "E_VALIDATION",
-      `${LOCAL_ADMIN_FILE} is malformed`,
-      details,
-    );
-  }
+
+  return new LocalServerMalformedError("admin", `${LOCAL_ADMIN_FILE} is malformed`, {
+    details: cause ? { ...details, cause: errorMessage(cause) } : details,
+    cause,
+  });
 }
 
 /**

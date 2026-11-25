@@ -145,8 +145,8 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     await expect(launching).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      kind: "cannot-launch",
+      name: "LocalServerBinaryError",
+      reason: "blocked",
     });
   });
 
@@ -179,8 +179,8 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     await expect(launching).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      kind: "package-missing",
+      name: "LocalServerBinaryError",
+      reason: "missing",
     });
     resolver.missing = false;
   });
