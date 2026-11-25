@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
+import { toZitadelError, type ZitadelError } from "@/lib/errors";
+import { IdpError } from "@/lib/idp";
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import Setup from "@/cli/commands/setup";
 import {
@@ -37,8 +38,8 @@ function refusal(run: () => unknown): ZitadelError {
   try {
     run();
   } catch (error) {
-    expect(error).toBeInstanceOf(ZitadelError);
-    return error as ZitadelError;
+    expect(error).toBeInstanceOf(IdpError);
+    return toZitadelError(error);
   }
   throw new Error("expected a refusal");
 }

@@ -8,6 +8,7 @@ import {
   EnvironmentInvalidError,
   EnvironmentValueMissingError,
 } from "./environment";
+import { IdpError, IdpProviderUnknownError, IdpSettingInvalidError } from "./idp";
 import { isObject } from "./json";
 import { ProjectError, ProjectFileMalformedError, ProjectFileMissingError } from "./project";
 import type { Suggested } from "./suggestion";
@@ -490,6 +491,33 @@ function projectErrorAdvice(error: ProjectError): {
   return { hint: error.hint };
 }
 
+/**
+ * What to do about a refused provider or setting, worded with the flags the
+ * caller named the settings by, which the library only passes along.
+ *
+ * @param error - The failure.
+ * @returns The advice, or `undefined` when the library's own hint is enough.
+ */
+function idpErrorHint(error: IdpError): string | undefined {
+  if (!(error instanceof IdpSettingInvalidError)) {
+    return error.hint;
+  }
+
+  const { field, given, providerField, example } = error.facts;
+
+  if (error.reason === "invalid") {
+    return `Fix ${field} and run the command again.`;
+  }
+
+  if (error.reason === "conflicting") {
+    const count = given?.length ?? 0;
+
+    return `Add ${providerField} custom, or remove ${new Intl.PluralRules("en").select(count) === "one" ? "it" : "them"}.`;
+  }
+
+  return `Describe the connection, e.g. ${example}`;
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -684,6 +712,21 @@ export function toZitadelError(error: unknown): ZitadelError {
       {
         ...(hint === undefined ? {} : { hint }),
         ...(nextCommands === undefined ? {} : { nextCommands }),
+        ...(error.details === undefined ? {} : { details: error.details }),
+      },
+    );
+  }
+
+  // A provider or a setting that cannot be used: a provider nothing answers to
+  // keeps the code it always had, until the codes are decided.
+  if (error instanceof IdpError) {
+    const hint = idpErrorHint(error);
+
+    return new ZitadelError(
+      error instanceof IdpProviderUnknownError ? "E_VALIDATION" : CATEGORY_CODES[error.category],
+      error.message,
+      {
+        ...(hint === undefined ? {} : { hint }),
         ...(error.details === undefined ? {} : { details: error.details }),
       },
     );

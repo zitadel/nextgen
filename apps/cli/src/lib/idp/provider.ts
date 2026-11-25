@@ -148,7 +148,7 @@ export class ProviderChoice {
    * @param run - Whether someone is there to ask for the settings left out.
    * @returns The choice, with no provider yet when a person will be asked for
    *   the rest.
-   * @throws {@link ZitadelError} When the provider is unknown, a custom setting
+   * @throws {@link IdpError} When the provider is unknown, a custom setting
    *   accompanies a catalog provider, or a script leaves out a custom
    *   connection's setting.
    */
@@ -177,7 +177,7 @@ export class ProviderChoice {
    *   checked against.
    * @param ask - How a question is asked: the running command's `this.ask`.
    * @returns The provider, checked.
-   * @throws {@link ZitadelError} When a setting is refused.
+   * @throws {@link IdpError} When a setting is refused.
    * @throws {@link ZitadelConfigError} When the slug names a connection that cannot
    *   be reused, or a flow would reject the provider.
    */

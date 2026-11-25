@@ -13,8 +13,9 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
-import { ZitadelError } from "@/lib/errors";
 import type { SuggestFlags } from "@/lib/suggestion";
+
+import { IdpProviderUnknownError, IdpSettingInvalidError } from "./errors";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -250,15 +251,17 @@ export function givenCustomFlags(
  * @param name - The flag, as the command spells it.
  * @param parsed - What the platform's parser made of the value.
  * @returns The parsed value.
- * @throws {@link ZitadelError} With `E_VALIDATION` naming the flag when the
- *   parser refused the value.
+ * @throws {@link IdpSettingInvalidError} Naming the flag when the parser
+ *   refused the value.
  */
 function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
   if (!parsed.ok) {
-    throw new ZitadelError("E_VALIDATION", `${name}: ${parsed.problem}`, {
-      hint: `Fix ${name} and run the command again.`,
-      details: { flag: name },
-    });
+    throw new IdpSettingInvalidError(
+      "invalid",
+      `${name}: ${parsed.problem}`,
+      { field: name },
+      { details: { flag: name } },
+    );
   }
 
   return parsed.value;
@@ -274,8 +277,8 @@ function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
  *
  * @param values - The settings the flags gave.
  * @param flag - How the command spells each flag.
- * @throws {@link ZitadelError} With `E_VALIDATION` naming the first flag whose
- *   value the platform refuses.
+ * @throws {@link IdpSettingInvalidError} Naming the first flag whose value the
+ *   platform refuses.
  */
 export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlagNames): void {
   if (values.slug !== undefined) {
@@ -310,9 +313,9 @@ export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlag
  * @param flag - How the command spells each flag.
  * @param example - A complete command line, for the refusal of an incomplete one.
  * @returns The provider, checked.
- * @throws {@link ZitadelError} With `E_VALIDATION` when a setting accompanies a
- *   catalog provider, the provider is unknown, a custom connection lacks a
- *   setting, or a setting is refused.
+ * @throws {@link IdpSettingInvalidError} When a setting accompanies a catalog
+ *   provider, a custom connection lacks a setting, or a setting is refused.
+ * @throws {@link IdpProviderUnknownError} When the provider is unknown.
  */
 export function selectionFromFlags(
   provider: string,
@@ -326,21 +329,17 @@ export function selectionFromFlags(
     // A catalog provider knows its own name, issuer and scopes, so a setting
     // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new IdpSettingInvalidError(
+        "conflicting",
         `${given.join(", ")} only applies to a custom connection`,
-        {
-          hint: `Add ${flag.provider} ${CUSTOM_PROVIDER}, or remove ${new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them"}.`,
-          details: { flags: given },
-        },
+        { given, providerField: flag.provider },
+        { details: { flags: given } },
       );
     }
     const selection = parseProviderSelection(provider);
     if (selection === undefined) {
       const known = [...IDP_PROVIDERS, CUSTOM_PROVIDER];
-      throw new ZitadelError("E_VALIDATION", `Unknown provider ${provider}`, {
-        hint: `Use one of ${known.join(", ")}.`,
-      });
+      throw new IdpProviderUnknownError(provider, known);
     }
 
     return selection;
@@ -351,10 +350,12 @@ export function selectionFromFlags(
     const missing = [flag.slug, flag.displayName, flag.issuer].filter((name) => {
       return !given.includes(name);
     });
-    throw new ZitadelError("E_VALIDATION", `A custom connection needs ${missing.join(", ")}`, {
-      hint: `Describe the connection, e.g. ${example}`,
-      details: { missing },
-    });
+    throw new IdpSettingInvalidError(
+      "missing",
+      `A custom connection needs ${missing.join(", ")}`,
+      { missing, example },
+      { details: { missing } },
+    );
   }
 
   return {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
-import { ProviderChoice } from "@/lib/idp";
+import { toZitadelError } from "@/lib/errors";
+import { IdpError, ProviderChoice } from "@/lib/idp";
 import { ZitadelConfigError, Connection } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -39,8 +39,11 @@ describe("ProviderChoice.fromFlags", () => {
       return ProviderChoice.fromFlags({ provider: "nope" }, SCRIPTED);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
-    expect(error).toMatchObject({ code: "E_VALIDATION", message: "Unknown provider nope" });
+    expect(error).toBeInstanceOf(IdpError);
+    expect(toZitadelError(error)).toMatchObject({
+      code: "E_VALIDATION",
+      message: "Unknown provider nope",
+    });
   });
 
   it("refuses a custom setting beside a catalog provider", () => {
@@ -48,8 +51,8 @@ describe("ProviderChoice.fromFlags", () => {
       return ProviderChoice.fromFlags({ provider: "google", slug: "acme" }, SCRIPTED);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
-    expect(error).toMatchObject({ code: "E_VALIDATION" });
+    expect(error).toBeInstanceOf(IdpError);
+    expect(toZitadelError(error)).toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("holds a script to the flags and names the ones a custom connection lacks", () => {
@@ -57,8 +60,8 @@ describe("ProviderChoice.fromFlags", () => {
       return ProviderChoice.fromFlags({ provider: "custom", slug: "acme" }, SCRIPTED);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
-    expect(error).toMatchObject({
+    expect(error).toBeInstanceOf(IdpError);
+    expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
       details: { missing: ["--display-name", "--issuer"] },
     });
