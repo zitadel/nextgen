@@ -89,7 +89,7 @@ export class Upgrader {
     const { cliVersion, cwd, scope, channel } = this.options;
     const latest = await channel.latest({ fresh: true });
     if (latest === undefined) {
-      throw new UpgradeReleaseLookupError();
+      throw new UpgradeReleaseLookupError("Could not look up the latest release");
     }
     return UpgradePlan.create({
       cliVersion,

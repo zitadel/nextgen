@@ -8,7 +8,7 @@ const INSTALL = PM.named("npm").addExact(["@zitadel/api@2.0.0"]);
 
 describe("UpgradeReleaseLookupError", () => {
   it("is named, and says only that no release was found", () => {
-    const error = new UpgradeReleaseLookupError();
+    const error = new UpgradeReleaseLookupError("Could not look up the latest release");
 
     expect([error.name, error.message]).toEqual([
       "UpgradeReleaseLookupError",
@@ -16,12 +16,12 @@ describe("UpgradeReleaseLookupError", () => {
     ]);
   });
 
-  it("is unavailable and worth retrying", () => {
-    const error = new UpgradeReleaseLookupError();
+  it("is a generic failure that is not worth retrying unchanged", () => {
+    const error = new UpgradeReleaseLookupError("Could not look up the latest release");
 
     expect(error).toBeInstanceOf(UpgradeError);
-    expect([error.category, error.retryable]).toEqual(["unavailable", true]);
-    expect(toZitadelError(error).code).toBe("E_NETWORK");
+    expect([error.category, error.retryable]).toEqual(["unknown", false]);
+    expect(toZitadelError(error).code).toBe("E_VALIDATION");
   });
 });
 
