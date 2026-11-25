@@ -610,6 +610,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
 		retentionJob.Trigger(),
+		jobsEngine.Trigger(),
 		oauthHandlers)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
@@ -1147,6 +1148,7 @@ func buildHTTPMux(
 	runtime runtimeResolver,
 	requestEvents *audit.RequestBuffer,
 	retentionTrigger http.Handler,
+	jobsTrigger http.Handler,
 	oauthHandlers *oauth.Handlers,
 ) (http.Handler, error) {
 	mux := http.NewServeMux()
@@ -1219,6 +1221,11 @@ func buildHTTPMux(
 	// of the middleware a client's request passes.
 	if retentionTrigger != nil {
 		mux.Handle(audit.RetentionTriggerPath, observe(retentionTrigger))
+	}
+	// Jobs Cron drain (jobs.trigger_secret, ADR 065): same operator mount
+	// shape as retention — RunDueOnce until empty or request budget.
+	if jobsTrigger != nil {
+		mux.Handle(jobs.TriggerPath, observe(jobsTrigger))
 	}
 	// Where browsers post the violations of the console's and the error
 	// page's policies, and on the hosted cloud those of every service's
