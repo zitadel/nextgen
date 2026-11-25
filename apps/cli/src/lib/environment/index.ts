@@ -14,12 +14,12 @@ export { Environment } from "./environment";
 export {
   EnvironmentError,
   EnvironmentFileMissingError,
-  EnvironmentInvalidError,
+  EnvironmentNameInvalidError,
+  EnvironmentServerInvalidError,
+  EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
 } from "./errors";
 export type {
   EnvironmentErrorOptions,
-  EnvironmentInvalidOptions,
-  EnvironmentInvalidReason,
   EnvironmentValueMissingOptions,
 } from "./errors";

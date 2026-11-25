@@ -10,7 +10,8 @@ import { it } from "@tests/fixtures";
 import {
   Environment,
   EnvironmentFileMissingError,
-  EnvironmentInvalidError,
+  EnvironmentNameInvalidError,
+  EnvironmentServerInvalidError,
   EnvironmentValueMissingError,
 } from "@/lib/environment";
 import { ZitadelRuntime } from "@/lib/server";
@@ -338,7 +339,7 @@ describe("Environment.resolve", () => {
     it("refuses a server that is not an http(s) URL", async ({ dir }) => {
       await write(dir, ".env.development.local", { ZITADEL_URL: "ftp://file.example" });
 
-      await expect(resolve(dir)).rejects.toBeInstanceOf(EnvironmentInvalidError);
+      await expect(resolve(dir)).rejects.toBeInstanceOf(EnvironmentServerInvalidError);
       await expect(reported(resolve(dir))).rejects.toMatchObject({ code: "E_VALIDATION" });
     });
 
@@ -346,7 +347,7 @@ describe("Environment.resolve", () => {
       await write(dir, ".env", { ZITADEL_URL: "localhost:8080" });
 
       await expect(resolve(dir)).rejects.toMatchObject({
-        reason: "server-url",
+        name: "EnvironmentServerInvalidError",
         message: expect.stringContaining("ZITADEL_URL from .env"),
       });
     });
@@ -383,17 +384,17 @@ describe("Environment.resolve", () => {
 
     it("refuses an environment name that would escape the project directory", async ({ dir }) => {
       await expect(resolve(dir, { envName: "../evil" })).rejects.toBeInstanceOf(
-        EnvironmentInvalidError,
+        EnvironmentNameInvalidError,
       );
       await expect(reported(resolve(dir, { envName: "../evil" }))).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("valid environment name"),
       });
       await expect(resolve(dir, { env: { ZITADEL_ENV: "a/b" } })).rejects.toBeInstanceOf(
-        EnvironmentInvalidError,
+        EnvironmentNameInvalidError,
       );
       await expect(resolve(dir, { envName: "a..b" })).rejects.toBeInstanceOf(
-        EnvironmentInvalidError,
+        EnvironmentNameInvalidError,
       );
     });
 
@@ -401,7 +402,7 @@ describe("Environment.resolve", () => {
       "refuses %s, whose files are another environment's",
       async (name, { dir }) => {
         await expect(resolve(dir, { envName: name })).rejects.toBeInstanceOf(
-          EnvironmentInvalidError,
+          EnvironmentNameInvalidError,
         );
       },
     );

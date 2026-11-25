@@ -1,6 +1,6 @@
 import { Project } from "@/lib/project";
 
-import { EnvironmentInvalidError } from "./errors";
+import { EnvironmentNameInvalidError } from "./errors";
 import type { Resolved } from "./types";
 
 /** The environment names a platform build announces, by the variable it sets. */
@@ -76,14 +76,15 @@ export class EnvironmentName implements Resolved {
    * @param env - The process environment.
    * @param flag - The `--env` flag, when given.
    * @returns The name, and the source that named it.
-   * @throws {@link EnvironmentInvalidError} When the name is not usable in a path.
+   * @throws {@link EnvironmentNameInvalidError} When the name is not usable in a path.
    */
   static resolve(env: NodeJS.ProcessEnv, flag?: string): EnvironmentName {
     const name = new EnvironmentName(EnvironmentName.detect(env, flag));
     if (!EnvironmentName.isValid(name.value)) {
-      throw new EnvironmentInvalidError("name", `${name.value} is not a valid environment name`, {
-        source: name.source,
-      });
+      throw new EnvironmentNameInvalidError(
+        `${name.value} is not a valid environment name`,
+        name.source,
+      );
     }
     return name;
   }

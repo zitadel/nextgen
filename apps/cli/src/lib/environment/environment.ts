@@ -8,7 +8,8 @@ import { Dotenv } from "./dotenv";
 import { EnvironmentName } from "./environment-name";
 import {
   EnvironmentFileMissingError,
-  EnvironmentInvalidError,
+  EnvironmentServerInvalidError,
+  EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
 } from "./errors";
 import { InitialRelease } from "./initial-release";
@@ -86,16 +87,15 @@ export class Environment {
    *
    * @param input - The directory, the process environment and the flags.
    * @returns The resolved environment.
-   * @throws {@link EnvironmentInvalidError} When `--env` and `--env-file` are
-   *   both given, the name is not usable or a server is not a URL.
+   * @throws {@link EnvironmentSourcesConflictError} When `--env` and `--env-file` are
+   *   both given.
+   * @throws {@link EnvironmentNameInvalidError} When the name is not usable.
+   * @throws {@link EnvironmentServerInvalidError} When a server is not a URL.
    * @throws {@link EnvironmentFileMissingError} When the file is missing.
    */
   static async resolve(input: ResolveEnvironmentInput): Promise<Environment> {
     if (input.envName && input.envFile) {
-      throw new EnvironmentInvalidError(
-        "both-sources",
-        "--env and --env-file cannot be used together",
-      );
+      throw new EnvironmentSourcesConflictError("--env and --env-file cannot be used together");
     }
     const name = EnvironmentName.resolve(input.env, input.envName);
 
@@ -328,18 +328,17 @@ export class Environment {
    * @param value - The value a source supplied.
    * @param source - Where it came from, for the error.
    * @returns The origin.
-   * @throws {@link EnvironmentInvalidError} naming where it came from.
+   * @throws {@link EnvironmentServerInvalidError} naming where it came from.
    */
   private static originFrom(servers: ServerAddresses, value: string, source: string): string {
     try {
       return servers.origin(value);
     } catch (error) {
-      throw new EnvironmentInvalidError(
-        "server-url",
+      throw new EnvironmentServerInvalidError(
         `ZITADEL_URL from ${source} is not a valid server: ${value}`,
+        source,
+        SERVER,
         {
-          source,
-          example: SERVER,
           cause: error,
           ...(error instanceof Error ? { details: { cause: error.message } } : {}),
         },

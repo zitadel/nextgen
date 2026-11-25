@@ -2,16 +2,16 @@ import { createZitadelClient } from "@/lib/backend";
 import type { Consent } from "@/lib/consent";
 import {
   Environment,
-  EnvironmentInvalidError,
-  type EnvironmentInvalidReason,
+  EnvironmentNameInvalidError,
+  EnvironmentSourcesConflictError,
   type ServerAddresses,
 } from "@/lib/environment";
-import { ZitadelError } from "@/lib/errors";
 import { resolveCwd } from "@/lib/paths";
 import { Asker } from "./asker";
 import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags } from "./environment-flags";
+import { type Refusal, refusalError } from "./refusal";
 import { byName } from "@/lib/names";
 import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 
@@ -19,15 +19,17 @@ export type { Connection } from "./types";
 
 import { Runtime } from "@/lib/runtime";
 
-/**
- * What to add to the hint of an environment that cannot be used, where it
- * names the flags and the variable this command takes it from.
- */
-const ENVIRONMENT_FLAG_ADVICE: Readonly<Record<EnvironmentInvalidReason, string | undefined>> = {
-  "both-sources": "--env picks the .env.<name>.local files; --env-file names one file outright.",
-  name: "Pass a safe --env or set ZITADEL_ENV.",
-  "server-url": undefined,
-};
+/** How an environment named by its name and by a file is refused. */
+const SOURCES_CONFLICT_REFUSAL = {
+  message: "{message}",
+  hint: "--env picks the .env.<name>.local files; --env-file names one file outright.",
+} as const satisfies Refusal;
+
+/** How an environment name that cannot be used in a path is refused. */
+const NAME_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "{hint} Pass a safe --env or set ZITADEL_ENV.",
+} as const satisfies Refusal;
 
 /**
  * A command that talks to a project. The server, the project and the
@@ -102,15 +104,27 @@ export abstract class EnvironmentCommand extends BaseCommand {
       serverFlag: options.source ?? text(flags.server),
       envName: text(flags.env),
       envFile: text(flags.envFile),
-    }).catch((error: unknown) => {
-      if (!(error instanceof EnvironmentInvalidError)) {
+    })
+      .catch((error: unknown) => {
+        if (error instanceof EnvironmentSourcesConflictError) {
+          throw Object.assign(refusalError(SOURCES_CONFLICT_REFUSAL, { message: error.message }), {
+            cause: error,
+          });
+        }
         throw error;
-      }
-      throw new ZitadelError(error.code, error.message, {
-        hint: [error.hint, ENVIRONMENT_FLAG_ADVICE[error.reason]].filter(Boolean).join(" "),
-        details: error.details,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof EnvironmentNameInvalidError) {
+          throw Object.assign(
+            refusalError(NAME_INVALID_REFUSAL, {
+              message: error.message,
+              hint: error.hint ?? "",
+            }),
+            { cause: error },
+          );
+        }
+        throw error;
       });
-    });
 
     return super.toMeta(given, {
       source: this.environment.values.ZITADEL_URL?.value ?? "",
@@ -219,12 +233,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.nonInteractive && !this.meta.dryRun && options.prompt !== false,
       ask: Asker.for(this.ui.session()),
     };
-    const required = async (key: Parameters<typeof environment.requireInteractive>[0]) => {
-      return environment.requireInteractive(key, ask);
-    };
-    const server = await required("ZITADEL_URL");
-    const projectId = await required("ZITADEL_PROJECT_ID");
-    const token = await required(CREDENTIALS[credential]);
+    const server = await environment.requireInteractive("ZITADEL_URL", ask);
+    const projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
+    const token = await environment.requireInteractive(CREDENTIALS[credential], ask);
     this.ui.ranAgainst(projectId, server);
 
     return {

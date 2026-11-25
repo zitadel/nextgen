@@ -81,85 +81,69 @@ export class EnvironmentError extends Error implements Categorized {
 }
 
 /**
- * What is wrong with what the person gave: `name` is an environment name that
- * cannot be used in a path, `server-url` a server that is not a URL, and
- * `both-sources` an environment named and a file given for it as well.
+ * An environment named by its name and by a file as well.
  */
-export type EnvironmentInvalidReason = "name" | "server-url" | "both-sources";
-
-/**
- * What an invalid input carries for the command to word its advice.
- */
-export type EnvironmentInvalidOptions = EnvironmentErrorOptions & {
-  /**
-   * What named the value: for a name, the flag, variable or default that did;
-   * for a server, the file or flag that supplied it.
-   */
-  readonly source?: string | undefined;
-
-  /**
-   * A well-formed value of the same kind, to show.
-   */
-  readonly example?: string | undefined;
-};
-
-/** What to do about an invalid input, by why, in words that name no flag. */
-const INVALID_HINTS: Record<
-  EnvironmentInvalidReason,
-  (options: EnvironmentInvalidOptions) => string
-> = {
-  "both-sources": () => {
-    return "An environment is named by its name or by a file, not both.";
-  },
-  name: (options) => {
-    return (
-      `The ${options.source} environment name may use only letters, digits, dot, dash ` +
-      'and underscore, may not contain "..", and may not be `local` or end in `.local`.'
-    );
-  },
-  "server-url": (options) => {
-    return `Fix or remove ZITADEL_URL in ${options.source}; it must be a URL such as ${options.example}.`;
-  },
-};
-
-/**
- * An input the environment cannot be resolved from.
- */
-export class EnvironmentInvalidError extends EnvironmentError {
+export class EnvironmentSourcesConflictError extends EnvironmentError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
   /**
-   * What is wrong with it.
+   * Make the failure.
+   *
+   * @param message - What went wrong.
    */
-  readonly reason: EnvironmentInvalidReason;
+  constructor(message: string) {
+    super(message, { hint: "An environment is named by its name or by a file, not both." });
+  }
+}
 
-  /**
-   * What named the value, when that matters.
-   */
-  readonly source: string | undefined;
-
-  /**
-   * A well-formed value of the same kind.
-   */
-  readonly example: string | undefined;
+/**
+ * An environment name that cannot be used in a path.
+ */
+export class EnvironmentNameInvalidError extends EnvironmentError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * Make the failure.
    *
-   * @param reason - What is wrong with the input.
    * @param message - What went wrong.
-   * @param options - Where it came from, an example, the facts and the cause.
+   * @param source - The flag, variable or default that named it.
+   */
+  constructor(message: string, source: string) {
+    super(message, {
+      hint:
+        `The ${source} environment name may use only letters, digits, dot, dash ` +
+        'and underscore, may not contain "..", and may not be `local` or end in `.local`.',
+    });
+  }
+}
+
+/**
+ * A server address a source supplied that is not a URL.
+ */
+export class EnvironmentServerInvalidError extends EnvironmentError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong.
+   * @param source - The file or flag that supplied it.
+   * @param example - A well-formed address, to show.
+   * @param options - The facts behind it, and the cause.
    */
   constructor(
-    reason: EnvironmentInvalidReason,
     message: string,
-    options: EnvironmentInvalidOptions = {},
+    source: string,
+    example: string,
+    options: Pick<EnvironmentErrorOptions, "details" | "cause"> = {},
   ) {
-    super(message, { ...options, hint: INVALID_HINTS[reason](options) });
-    this.reason = reason;
-    this.source = options.source;
-    this.example = options.example;
+    super(message, {
+      ...options,
+      hint: `Fix or remove ZITADEL_URL in ${source}; it must be a URL such as ${example}.`,
+    });
   }
 }
 

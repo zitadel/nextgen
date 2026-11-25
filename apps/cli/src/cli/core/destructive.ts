@@ -1,13 +1,23 @@
 import { type Interfaces, Flags } from "@oclif/core";
 
 import { Consent, ConsentRequiredError, type Gate } from "@/lib/consent";
-import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
+import { CANCELLED } from "@/lib/errors";
 
 import { Asker } from "./asker";
 import type { BaseCommand } from "./base";
 import type { EFFECT } from "./effect";
 import type { CommandResult } from "./types";
 import type { CommandClass } from "@/lib/oclif/command-class";
+import { type Refusal, refusalError } from "./refusal";
+
+/** How a destructive action nobody can agree to is refused. */
+const CONFIRMATION_REQUIRED_REFUSAL = {
+  code: "E_CONFIRMATION_REQUIRED",
+  message: "{message}",
+  hint: "Ask a person first: {question} Pass --force only once they agree.",
+  next: ["{retry}"],
+  details: { question: "{question}" },
+} as const satisfies Refusal;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {
@@ -162,12 +172,14 @@ export function Destructive<
         if (!(error instanceof ConsentRequiredError)) {
           throw error;
         }
-        throw new ZitadelError(error.code, error.message, {
-          hint: confirmationHint(error.question),
-          nextCommands: error.nextCommands,
-          details: error.details,
-          cause: error,
-        });
+        throw Object.assign(
+          refusalError(
+            CONFIRMATION_REQUIRED_REFUSAL,
+            { message: error.message, question: error.question },
+            { retry: error.retry === undefined ? [] : [error.retry] },
+          ),
+          { cause: error },
+        );
       });
     }
   }
