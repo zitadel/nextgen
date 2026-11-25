@@ -1,5 +1,7 @@
 import type { Interfaces } from "@oclif/core";
 
+import { SuggestionInternalError } from "./errors";
+
 /**
  * The relations between a command's flags (`exclusive`, `dependsOn`,
  * `required`), declared once where the flags are, so the parser enforces them
@@ -86,7 +88,9 @@ export function relatedFlags<
   for (const [name, relation] of Object.entries(relations ?? {})) {
     const definition = declared[name];
     if (definition === undefined) {
-      throw new Error(`flags(): a relation names --${name}, which is not declared`);
+      throw new SuggestionInternalError(
+        `flags(): a relation names --${name}, which is not declared`,
+      );
     }
     const { exclusive, dependsOn, excludedWhen, required } = relation as {
       exclusive?: readonly string[];

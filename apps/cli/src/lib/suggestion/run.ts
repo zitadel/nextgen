@@ -2,6 +2,8 @@ import { errorMessage, ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/ui/log";
 import { named } from "@/lib/names";
 
+import { SuggestionInternalError } from "./errors";
+
 import {
   commandOf,
   type Declared,
@@ -161,7 +163,7 @@ export class RunSuggestions {
   argsOf(command: SuggestedCommand): readonly string[] {
     const words = this.words.get(command);
     if (words === undefined) {
-      throw new Error(`${command} was not rendered by this run`);
+      throw new SuggestionInternalError(`${command} was not rendered by this run`);
     }
 
     return words;
@@ -192,7 +194,9 @@ export class RunSuggestions {
       return !target.flags.has(spelled(name)) && !ANSWERING.includes(name);
     });
     if (undeclared.length > 0) {
-      throw new Error(`${id} declares no --${undeclared.map(spelled).join(", --")} to leave out`);
+      throw new SuggestionInternalError(
+        `${id} declares no --${undeclared.map(spelled).join(", --")} to leave out`,
+      );
     }
     const redact = withoutCredentials;
     const positional = (

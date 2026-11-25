@@ -6,6 +6,7 @@ import { thrownBy } from "@tests/helpers/thrown-value";
 
 import {
   Spelling,
+  SuggestionInternalError,
   WHAT_CHANGED,
   andTheRest,
   commandOf,
@@ -576,6 +577,12 @@ describe("declaredOf", () => {
     expect(() => {
       return declaredOf("nonesuch", undefined);
     }).toThrow("nonesuch is not a command");
+  });
+
+  it("refuses it with a SuggestionInternalError", () => {
+    expect(() => {
+      return declaredOf("nonesuch", undefined);
+    }).toThrow(SuggestionInternalError);
   });
 });
 
