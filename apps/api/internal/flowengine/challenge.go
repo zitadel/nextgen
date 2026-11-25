@@ -102,7 +102,6 @@ func (r *Runtime) issueChallenge(pc *processCtx, method string, resolved, fields
 		IssuedAt:    r.now(),
 		Provisional: out.Provisional,
 	}
-	pc.issued = true
 	return r.renderPendingChallenge(pc, resolved)
 }
 

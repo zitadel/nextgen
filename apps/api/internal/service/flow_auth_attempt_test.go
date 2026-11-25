@@ -176,38 +176,6 @@ func TestFlowAuthAttemptAdapter_Usable(t *testing.T) {
 	}
 }
 
-// The stored challenge decides whether a pending registration creates its
-// user, as it does at verification.
-func TestFlowAuthAttemptAdapter_ProvisionalRegistration(t *testing.T) {
-	provisional, _ := registrationChallengeAttempt(t, "user_minted01", true, time.Now())
-	enrollment, _ := registrationChallengeAttempt(t, "user_1", false, time.Now())
-	readFailed := errors.New("read failed")
-	for _, tc := range []struct {
-		name        string
-		attempt     *domain.AuthAttempt
-		readErr     error
-		provisional bool
-	}{
-		{name: "provisional registration", attempt: provisional, provisional: true},
-		{name: "enrollment of a pinned user", attempt: enrollment},
-		{name: "superseded ceremony", attempt: &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}},
-		{name: "attempt gone", readErr: domain.ErrAuthAttemptNotFound()},
-		{name: "read fails", readErr: readFailed},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			adapter := service.NewFlowAuthAttemptAdapter(&fakeAuthAttempts{}, attemptDB(t, tc.attempt, tc.readErr), nil, nil)
-
-			got, err := adapter.ProvisionalRegistration(t.Context(), "proj", "att-1", "ch-reg-1")
-			if tc.readErr == readFailed {
-				require.ErrorIs(t, err, readFailed)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tc.provisional, got)
-		})
-	}
-}
-
 func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
 	fake := &fakeAuthAttempts{
 		issueAttempt:  attemptWithUserChallenge("ch-user"),

@@ -443,9 +443,7 @@ func (r *Runtime) Start(ctx context.Context, in StartInput) (StepResult, error) 
 		return StepResult{}, err
 	}
 	result := StepResult{State: state, Step: step}
-	if err := r.announceSignupGate(ctx, in.Definition, &result, false); err != nil {
-		return StepResult{}, err
-	}
+	announceSignupGate(in.Definition, &result)
 	return result, nil
 }
 
@@ -458,8 +456,6 @@ type processCtx struct {
 	state       *State
 	currentStep *domain.FlowDefinitionStep
 	in          SubmitInput
-	// issued is set once the submission issues the pending challenge.
-	issued bool
 }
 
 // Process advances the flow one step by dispatching the submission to
@@ -498,9 +494,7 @@ func (r *Runtime) Process(ctx context.Context, defs Definitions, state *State, i
 	if err != nil {
 		return result, err
 	}
-	if err := r.announceSignupGate(ctx, def, &result, pc.issued); err != nil {
-		return StepResult{}, err
-	}
+	announceSignupGate(def, &result)
 	return result, nil
 }
 

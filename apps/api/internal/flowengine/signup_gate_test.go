@@ -2,7 +2,6 @@ package flowengine_test
 
 import (
 	"encoding/json"
-	"errors"
 	"testing"
 	"time"
 
@@ -52,14 +51,10 @@ func TestSignupGate_OnSuccessThatSpendsTheProof(t *testing.T) {
 	assert.True(t, rendered.Step.SignupRequired, "render")
 }
 
-// A pending passkey registration announces the gate when it creates its user.
-// The challenge records that at issue, and one issued by an earlier request
-// is confirmed with the attempt: a cookie replayed after the ceremony was
-// superseded, or after the attempt is gone, carries a challenge the attempt
-// no longer holds, and announces nothing.
+// A pending passkey registration announces the gate when it creates its user,
+// as the sealed cookie's pending challenge records at issue.
 func TestSignupGate_PendingPasskeyRegistration(t *testing.T) {
 	t.Parallel()
-	readFailed := errors.New("read failed")
 	registration := func(provisional bool) *flowengine.PendingChallenge {
 		return &flowengine.PendingChallenge{ID: "reg-1", Method: flowengine.ChallengeMethodPasskeyRegister, Options: []byte(`{}`), Provisional: provisional}
 	}
@@ -68,18 +63,13 @@ func TestSignupGate_PendingPasskeyRegistration(t *testing.T) {
 		// createsUser has the step's on_success create the user as well.
 		createsUser bool
 		pending     *flowengine.PendingChallenge
-		// confirm is what the attempt answers; nil when it is not asked.
-		confirm *bool
-		readErr error
-		gated   bool
+		gated       bool
 	}{
-		{name: "provisional registration", pending: registration(true), confirm: new(true), gated: true},
-		{name: "superseded or gone at the attempt", pending: registration(true), confirm: new(false)},
+		{name: "provisional registration", pending: registration(true), gated: true},
 		{name: "enrollment of a pinned user", pending: registration(false)},
 		{name: "passkey sign-in", pending: &flowengine.PendingChallenge{ID: "pk-1", Method: flowengine.ChallengeMethodPasskey, Options: []byte(`{}`)}},
 		{name: "no ceremony pending"},
 		{name: "on_success creates the user too", createsUser: true, pending: registration(true), gated: true},
-		{name: "read fails", pending: registration(true), confirm: new(false), readErr: readFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -89,11 +79,6 @@ func TestSignupGate_PendingPasskeyRegistration(t *testing.T) {
 				def.Steps[0].OnSuccess = new(domain.FlowOnSuccessCreateUser)
 			}
 			w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(nil, nil)
-			if tc.confirm != nil {
-				w.authAttemptService.EXPECT().
-					ProvisionalRegistration(gomock.Any(), testProjectID, "attempt-1", "reg-1").
-					Return(*tc.confirm, tc.readErr)
-			}
 			state := &flowengine.State{
 				ID:            "flow-1",
 				ProjectID:     testProjectID,
@@ -109,19 +94,14 @@ func TestSignupGate_PendingPasskeyRegistration(t *testing.T) {
 			}
 
 			rendered, err := w.sm.Render(t.Context(), served(def), state)
-			if tc.readErr != nil {
-				require.ErrorIs(t, err, readFailed)
-				return
-			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.gated, rendered.Step.SignupRequired)
 		})
 	}
 }
 
-// The submission that issues a registration announces what the issued
-// challenge says without asking the attempt again; a later submission that
-// resumes the pending ceremony asks, as a render does.
+// The submission that issues a registration and a later one that resumes the
+// pending ceremony both announce what the issued challenge says.
 func TestSignupGate_IssuedPasskeyRegistration(t *testing.T) {
 	t.Parallel()
 	for _, provisional := range []bool{true, false} {
@@ -157,17 +137,52 @@ func TestSignupGate_IssuedPasskeyRegistration(t *testing.T) {
 			assert.Equal(t, provisional, issued.State.PendingChallenge.Provisional, "the cookie keeps what the issued challenge said")
 			assert.Equal(t, provisional, issued.Step.SignupRequired, "issue leg")
 
-			if provisional {
-				w.authAttemptService.EXPECT().
-					ProvisionalRegistration(gomock.Any(), testProjectID, "attempt-1", "reg-1").
-					Return(true, nil)
-			}
 			resumed, err := w.sm.Process(t.Context(), served(def), issued.State, submit)
 			require.NoError(t, err)
 			require.NotNil(t, resumed.Step.Challenge)
 			assert.Equal(t, provisional, resumed.Step.SignupRequired, "resume leg")
 		})
 	}
+}
+
+// A submission resuming a provisional registration an earlier request issued
+// announces the gate from the cookie; the strict mock fails any attempt call
+// beyond the usability check every submission makes.
+func TestSignupGate_EarlierRegistrationReadsNoAttempt(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := passkeyRegisterDefinition()
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	state := &flowengine.State{
+		ID:            "flow-1",
+		ProjectID:     testProjectID,
+		UserSchemaURL: defaultSchemaURL,
+		Progress: flowengine.Progress{
+			DefinitionID:   def.ID,
+			Purpose:        domain.FlowDefinitionPurposeLogin,
+			CurrentPurpose: domain.FlowDefinitionPurposeLogin,
+			CurrentStep:    "register",
+		},
+		PendingChallenge: &flowengine.PendingChallenge{
+			ID:          "reg-1",
+			Method:      flowengine.ChallengeMethodPasskeyRegister,
+			Options:     []byte(`{}`),
+			Provisional: true,
+		},
+		AuthAttemptID: "attempt-1",
+	}
+
+	resumed, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resumed.Step.Challenge)
+	assert.Equal(t, "reg-1", resumed.Step.Challenge.ChallengeID)
+	assert.True(t, resumed.Step.SignupRequired)
 }
 
 // The pending challenge's Provisional rides the sealed state.

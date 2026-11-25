@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -51,26 +50,6 @@ func (a *FlowAuthAttemptAdapter) Usable(ctx context.Context, projectID, attemptI
 		return false, fmt.Errorf("flow service: read auth attempt: %w", err)
 	}
 	return !attempt.IsExpired() && !attempt.IsHandedOff(), nil
-}
-
-// ProvisionalRegistration reads the attempt's stored challenge, which decides
-// at verification whether the registration creates its user.
-func (a *FlowAuthAttemptAdapter) ProvisionalRegistration(ctx context.Context, projectID, attemptID, challengeID string) (bool, error) {
-	attempt, err := a.db.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
-	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
-		// Nothing to gate: the attestation is refused with the attempt.
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("flow service: read auth attempt: %w", err)
-	}
-	stored, ok := attempt.ChallengeByID(challengeID)
-	if !ok {
-		// A superseded ceremony fails as stale when its attestation arrives.
-		return false, nil
-	}
-	registration, ok := stored.(*domain.AuthChallengePasskeyRegistration)
-	return ok && registration.Provisional, nil
 }
 
 func (a *FlowAuthAttemptAdapter) SubmitIdentifier(ctx context.Context, in flowengine.SubmitIdentifierInput) (string, error) {

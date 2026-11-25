@@ -23,9 +23,7 @@ func (r *Runtime) Render(ctx context.Context, defs Definitions, state *State) (S
 	if err != nil {
 		return result, err
 	}
-	if err := r.announceSignupGate(ctx, def, &result, false); err != nil {
-		return StepResult{}, err
-	}
+	announceSignupGate(def, &result)
 	return result, nil
 }
 

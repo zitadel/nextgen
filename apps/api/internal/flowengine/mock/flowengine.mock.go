@@ -183,45 +183,6 @@ func (c *MockAuthAttemptServiceIssueChallengeCall) DoAndReturn(f func(context.Co
 	return c
 }
 
-// ProvisionalRegistration mocks base method.
-func (m *MockAuthAttemptService) ProvisionalRegistration(ctx context.Context, projectID, attemptID, challengeID string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProvisionalRegistration", ctx, projectID, attemptID, challengeID)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ProvisionalRegistration indicates an expected call of ProvisionalRegistration.
-func (mr *MockAuthAttemptServiceMockRecorder) ProvisionalRegistration(ctx, projectID, attemptID, challengeID any) *MockAuthAttemptServiceProvisionalRegistrationCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProvisionalRegistration", reflect.TypeOf((*MockAuthAttemptService)(nil).ProvisionalRegistration), ctx, projectID, attemptID, challengeID)
-	return &MockAuthAttemptServiceProvisionalRegistrationCall{Call: call}
-}
-
-// MockAuthAttemptServiceProvisionalRegistrationCall wrap *gomock.Call
-type MockAuthAttemptServiceProvisionalRegistrationCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAuthAttemptServiceProvisionalRegistrationCall) Return(arg0 bool, arg1 error) *MockAuthAttemptServiceProvisionalRegistrationCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAuthAttemptServiceProvisionalRegistrationCall) Do(f func(context.Context, string, string, string) (bool, error)) *MockAuthAttemptServiceProvisionalRegistrationCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthAttemptServiceProvisionalRegistrationCall) DoAndReturn(f func(context.Context, string, string, string) (bool, error)) *MockAuthAttemptServiceProvisionalRegistrationCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // Start mocks base method.
 func (m *MockAuthAttemptService) Start(ctx context.Context, in flowengine.CreateAttemptInput) (string, error) {
 	m.ctrl.T.Helper()
