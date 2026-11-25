@@ -35,6 +35,12 @@ export const PANEL_HEAD_CELL =
 /** Body cell of a table inside a panel card. */
 export const PANEL_BODY_CELL = "px-0 py-3 text-sm";
 
+/**
+ * A table inside a panel card, on fixed columns. Below 576px the card scrolls
+ * it sideways rather than squeezing the columns.
+ */
+export const PANEL_TABLE_FIXED = "min-w-[36rem] table-fixed text-sm";
+
 /** An identifier or value in a row or cell (a client ID, a variable's value): monospace, 12px/20px. */
 export const MONO_VALUE = "font-mono text-xs leading-5";
 

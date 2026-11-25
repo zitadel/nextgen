@@ -1,7 +1,11 @@
 import { CLI_VARIABLE_SET, CliCommand } from "@/components/cli-hint";
 import { DetailSection } from "@/components/detail-page";
-import { RESOURCE_TABLE_FIXED } from "@/components/resource-list";
-import { MONO_VALUE, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
+import {
+  MONO_VALUE,
+  PANEL_BODY_CELL,
+  PANEL_HEAD_CELL,
+  PANEL_TABLE_FIXED,
+} from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import {
   Table,
@@ -57,9 +61,8 @@ export function ProjectVariables({ variables }: { variables: Variables }) {
         </p>
       ) : (
         // Fixed columns in the design's proportions, so a long value widens
-        // nothing: it truncates in its cell. Below the lists' minimum width the
-        // table scrolls inside the card instead of crushing its columns.
-        <Table className={cn(RESOURCE_TABLE_FIXED, "text-sm")}>
+        // nothing: it truncates in its cell.
+        <Table className={PANEL_TABLE_FIXED}>
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className={cn(HEAD, "w-[26%]")}>Name</TableHead>

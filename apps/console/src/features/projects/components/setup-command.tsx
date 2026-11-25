@@ -1,4 +1,5 @@
 import { cliSetup } from "@/components/cli-hint";
+import { MONO_VALUE } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { trackEvent } from "@/addon/analytics";
 import { serverOrigin } from "@/api/server-origin";
@@ -17,10 +18,10 @@ export function SetupCommand() {
 
   return (
     <div className="flex items-start gap-2 rounded-md border border-border bg-muted pr-1 pl-3">
-      <span aria-hidden className="py-1.5 font-mono text-xs leading-5 text-muted-foreground">
+      <span aria-hidden className={`py-1.5 ${MONO_VALUE} text-muted-foreground`}>
         $
       </span>
-      <code className="min-w-0 flex-1 py-1.5 font-mono text-xs leading-5 text-foreground wrap-anywhere">
+      <code className={`min-w-0 flex-1 py-1.5 ${MONO_VALUE} text-foreground wrap-anywhere`}>
         {command}
       </code>
       {/* The console's one call to action: the copy is what reaches the

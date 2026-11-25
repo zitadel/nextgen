@@ -525,16 +525,15 @@ async function seedVariables(): Promise<boolean> {
       signal: AbortSignal.timeout(5_000),
     }).then((response) => response.ok);
   try {
-    const [primary, preview] = await Promise.all([
-      set("primary", {
-        GOOGLE_CLIENT_ID: "prod-client-123",
-        GOOGLE_CLIENT_SECRET: { value: "dev-real-primary", secret: true },
-      }),
-      set("preview", {
-        GOOGLE_CLIENT_ID: "preview-client-456",
-        GOOGLE_CLIENT_SECRET: { value: "dev-real-preview", secret: true },
-      }),
-    ]);
+    // One kind at a time: both write the same project's variables.
+    const primary = await set("primary", {
+      GOOGLE_CLIENT_ID: "prod-client-123",
+      GOOGLE_CLIENT_SECRET: { value: "dev-real-primary", secret: true },
+    });
+    const preview = await set("preview", {
+      GOOGLE_CLIENT_ID: "preview-client-456",
+      GOOGLE_CLIENT_SECRET: { value: "dev-real-preview", secret: true },
+    });
     return primary && preview;
   } catch {
     return false;

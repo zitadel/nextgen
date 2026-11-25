@@ -110,6 +110,15 @@ describe("project variables", () => {
     expect(count.getByText("3")).toBeInTheDocument();
   });
 
+  it("scrolls the table inside its card rather than crushing its columns", async () => {
+    stubVariables({ GOOGLE_CLIENT_ID: { primary: "prod-client-123" } });
+    await renderProject();
+
+    const table = (await variables()).getByRole("table");
+    expect(table).toHaveClass("min-w-[36rem]", "table-fixed");
+    expect(table.parentElement).toHaveClass("overflow-x-auto");
+  });
+
   it("points at the CLI when no variable is set", async () => {
     stubVariables({});
     await renderProject();
