@@ -64,6 +64,7 @@ type AllStatements interface {
 	AuthzCatalogStatements
 	AuthzResolverStatements
 	EventStatements
+	JobStatements
 	Statements
 }
 
@@ -1090,6 +1091,39 @@ type AuthzResolverStatements interface {
 	CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error)
 	CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
+}
+
+// JobStatements persists queued jobs and periodic schedules (ADR 065).
+// Statements are tx-passive: callers open txs for Enqueue and SetPeriodic;
+// the Engine opens txs for Take / Heartbeat / Complete / Fail / DeleteCompleted.
+type JobStatements interface {
+	Statements
+	// Enqueue inserts a queued job on the caller's executor. When a live row
+	// (pending or leased) already holds unique_key, that row is kept and
+	// returned; the caller's transaction is never failed for that collision.
+	Enqueue(ctx context.Context, job *domain.Job) (*domain.Job, error)
+	// SetPeriodic inserts or updates period for name. It does not overwrite
+	// lease_until, lease_by, lease_token, or run_at while a live lease holds
+	// the schedule.
+	SetPeriodic(ctx context.Context, name string, period time.Duration, opts domain.PeriodicOpts) (*domain.JobSchedule, error)
+	// Take leases up to limit due work whose name is in names, or marks
+	// past-not_after queued rows dead without Perform. Empty names leases
+	// nothing for Perform; past-not_after expiry is name-agnostic and may
+	// still return DeadOnTake results.
+	Take(ctx context.Context, limit int, leaseBy string, leaseFor time.Duration, names []string) ([]domain.TakeResult, error)
+	// Heartbeat extends lease_until when id and lease_token match. A mismatch
+	// is a no-op.
+	Heartbeat(ctx context.Context, id, leaseToken string, leaseFor time.Duration) error
+	// Complete applies success for the matching lease_token. Queued → done;
+	// periodic → run_at = now + period, lease cleared. A mismatch is a no-op.
+	Complete(ctx context.Context, id, leaseToken string) error
+	// Fail applies failure for the matching lease_token. Queued → pending with
+	// backoff, or dead at max_attempts / not_after. Periodic → run_at =
+	// now + period, never dead. A mismatch is a no-op.
+	Fail(ctx context.Context, id, leaseToken string, cause error, backoff time.Duration) error
+	// DeleteCompleted deletes done/dead queued rows with completed_at older
+	// than completedBefore. It never deletes pending or leased rows.
+	DeleteCompleted(ctx context.Context, completedBefore time.Time) (int64, error)
 }
 
 // EventStatements persists append-only wide events (ADR 048).
