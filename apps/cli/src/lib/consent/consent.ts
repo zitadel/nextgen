@@ -113,11 +113,17 @@ export class Consent {
     if (session.dryRun) {
       throw new ConsentInternalError(`A dry run asked for consent to ${gate.name}`);
     }
-    const nobodyCanAnswer = !session.force && !session.interactive;
     try {
-      if (nobodyCanAnswer) {
-        gate.refuse?.();
-        throw new ConsentRequiredError(gate.name, gate.message, gate.retry);
+      if (!session.force && !session.interactive) {
+        try {
+          gate.refuse?.();
+        } catch (refusal) {
+          if (typeof refusal === "object" && refusal !== null) {
+            refusals.add(refusal);
+          }
+          throw refusal;
+        }
+        throw new ConsentRequiredError(gate.name, gate.message);
       }
       const agreed = await session.confirmer.confirm({
         name: gate.name,
@@ -133,7 +139,7 @@ export class Consent {
       granted.add(consent);
       return consent;
     } catch (error) {
-      if (nobodyCanAnswer && typeof error === "object" && error !== null) {
+      if (error instanceof ConsentRequiredError) {
         refusals.add(error);
       }
       throw error;

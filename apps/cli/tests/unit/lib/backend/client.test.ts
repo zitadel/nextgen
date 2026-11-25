@@ -197,7 +197,7 @@ describe("responseFailure", () => {
       "refused",
     );
 
-    expect([error.isServerCode("rel.revoked"), error.isServerCode("rel.in_use")]).toEqual([
+    expect([error.serverCode === "rel.revoked", error.serverCode === "rel.in_use"]).toEqual([
       true,
       false,
     ]);

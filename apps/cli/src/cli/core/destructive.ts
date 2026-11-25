@@ -175,8 +175,8 @@ export function Destructive<
         throw Object.assign(
           refusalError(
             CONFIRMATION_REQUIRED_REFUSAL,
-            { message: error.message, question: error.question },
-            { retry: error.retry === undefined ? [] : [error.retry] },
+            { message: error.message, question: retried.message },
+            { retry: retried.retry === undefined ? [] : [retried.retry] },
           ),
           { cause: error },
         );

@@ -16,7 +16,6 @@ import type { Connection, ConnectionSetting, UserSchema, ZitadelConfig } from "@
 
 import {
   type CustomFlagValues,
-  customExample,
   customFlagValues,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
@@ -164,8 +163,7 @@ export class ProviderChoice {
     if (provider === CUSTOM_PROVIDER && run.interactive && !complete) {
       return new ProviderChoice(undefined, values);
     }
-    const example = customExample(ENABLE_FLAG_NAMES);
-    const selection = selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, example);
+    const selection = selectionFromFlags(provider, values, ENABLE_FLAG_NAMES);
 
     return new ProviderChoice(selection, values);
   }
@@ -186,9 +184,8 @@ export class ProviderChoice {
       return this.selection;
     }
     const settings = await this.askCustomSettings(target, ask);
-    const example = customExample(ENABLE_FLAG_NAMES);
 
-    return selectionFromFlags(CUSTOM_PROVIDER, settings, ENABLE_FLAG_NAMES, example);
+    return selectionFromFlags(CUSTOM_PROVIDER, settings, ENABLE_FLAG_NAMES);
   }
 
   /**

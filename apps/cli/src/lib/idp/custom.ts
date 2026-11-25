@@ -15,7 +15,12 @@ import {
 
 import type { SuggestFlags } from "@/lib/suggestion";
 
-import { IdpProviderUnknownError, IdpSettingInvalidError } from "./errors";
+import {
+  IdpProviderUnknownError,
+  IdpSettingRefusedError,
+  IdpSettingsConflictError,
+  IdpSettingsMissingError,
+} from "./errors";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -251,17 +256,12 @@ export function givenCustomFlags(
  * @param name - The flag, as the command spells it.
  * @param parsed - What the platform's parser made of the value.
  * @returns The parsed value.
- * @throws {@link IdpSettingInvalidError} Naming the flag when the parser
+ * @throws {@link IdpSettingRefusedError} Naming the flag when the parser
  *   refused the value.
  */
 function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
   if (!parsed.ok) {
-    throw new IdpSettingInvalidError(
-      "invalid",
-      `${name}: ${parsed.problem}`,
-      { field: name },
-      { details: { flag: name } },
-    );
+    throw new IdpSettingRefusedError(`${name}: ${parsed.problem}`, name);
   }
 
   return parsed.value;
@@ -277,7 +277,7 @@ function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
  *
  * @param values - The settings the flags gave.
  * @param flag - How the command spells each flag.
- * @throws {@link IdpSettingInvalidError} Naming the first flag whose value the
+ * @throws {@link IdpSettingRefusedError} Naming the first flag whose value the
  *   platform refuses.
  */
 export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlagNames): void {
@@ -311,17 +311,17 @@ export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlag
  * @param provider - The provider the command line names.
  * @param values - The settings the flags gave.
  * @param flag - How the command spells each flag.
- * @param example - A complete command line, for the refusal of an incomplete one.
  * @returns The provider, checked.
- * @throws {@link IdpSettingInvalidError} When a setting accompanies a catalog
- *   provider, a custom connection lacks a setting, or a setting is refused.
+ * @throws {@link IdpSettingsConflictError} When a setting accompanies a catalog
+ *   provider.
+ * @throws {@link IdpSettingsMissingError} When a custom connection lacks a setting.
+ * @throws {@link IdpSettingRefusedError} When a setting is refused.
  * @throws {@link IdpProviderUnknownError} When the provider is unknown.
  */
 export function selectionFromFlags(
   provider: string,
   values: CustomFlagValues,
   flag: CustomFlagNames,
-  example: string,
 ): ProviderSelection {
   const given = givenCustomFlags(values, flag);
 
@@ -329,11 +329,9 @@ export function selectionFromFlags(
     // A catalog provider knows its own name, issuer and scopes, so a setting
     // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
-      throw new IdpSettingInvalidError(
-        "conflicting",
+      throw new IdpSettingsConflictError(
         `${given.join(", ")} only applies to a custom connection`,
-        { given, providerField: flag.provider },
-        { details: { flags: given } },
+        given,
       );
     }
     const selection = parseProviderSelection(provider);
@@ -350,12 +348,7 @@ export function selectionFromFlags(
     const missing = [flag.slug, flag.displayName, flag.issuer].filter((name) => {
       return !given.includes(name);
     });
-    throw new IdpSettingInvalidError(
-      "missing",
-      `A custom connection needs ${missing.join(", ")}`,
-      { missing, example },
-      { details: { missing } },
-    );
+    throw new IdpSettingsMissingError(`A custom connection needs ${missing.join(", ")}`, missing);
   }
 
   return {

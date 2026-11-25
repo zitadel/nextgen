@@ -1,6 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * What a consent failure carries beyond its message.
@@ -17,11 +15,6 @@ export type ConsentErrorOptions = {
   readonly details?: Readonly<Record<string, unknown>> | undefined;
 
   /**
-   * What to run next, as suggestion objects the failure handler renders.
-   */
-  readonly nextCommands?: readonly Suggested[] | undefined;
-
-  /**
    * The error that caused this one.
    */
   readonly cause?: unknown;
@@ -36,18 +29,13 @@ export type ConsentErrorOptions = {
  */
 export class ConsentError extends Error implements Categorized {
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "conflict";
+  readonly category: ErrorCategory = "unknown";
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
+  /** The stable product code the failure is reported with. */
+  readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * What to do about it.
@@ -60,12 +48,6 @@ export class ConsentError extends Error implements Categorized {
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
-   * What to run next, as suggestion objects the failure handler renders with the
-   * run's scope.
-   */
-  readonly nextCommands: readonly Suggested[] | undefined;
-
-  /**
    * Make a consent failure.
    *
    * @param message - What went wrong.
@@ -76,7 +58,6 @@ export class ConsentError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
-    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -85,40 +66,21 @@ export class ConsentError extends Error implements Categorized {
  * refused: only a person may agree to it.
  */
 export class ConsentRequiredError extends ConsentError {
-  override readonly category: ErrorCategory = "conflict";
+  override readonly category = "conflict";
   override readonly retryable: boolean = false;
-
-  /** The stable product code the failure is reported with. */
-  override get code(): ZitadelErrorCode {
-    return "E_CONFIRMATION_REQUIRED";
-  }
-
-  /**
-   * The question a person would have been asked.
-   */
-  readonly question: string;
-
-  /**
-   * The command again with consent given, for an agent to run once a person
-   * agrees.
-   */
-  readonly retry: SuggestedCommand | undefined;
+  override readonly code: ZitadelErrorCode = "E_CONFIRMATION_REQUIRED";
 
   /**
    * Make the failure.
    *
    * @param action - The action as a lowercase phrase.
    * @param question - The question a person would have been asked.
-   * @param retry - The command again with consent given, when there is one.
    */
-  constructor(action: string, question: string, retry?: SuggestedCommand) {
+  constructor(action: string, question: string) {
     super(`Cannot ${action} without --force in non-interactive mode`, {
       hint: question,
       details: { question },
-      nextCommands: retry === undefined ? undefined : [retry],
     });
-    this.question = question;
-    this.retry = retry;
   }
 }
 
@@ -126,6 +88,7 @@ export class ConsentRequiredError extends ConsentError {
  * A bug in this package: something that cannot happen unless the code is wrong.
  */
 export class ConsentInternalError extends ConsentError {
-  override readonly category: ErrorCategory = "fault";
+  override readonly category = "fault";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }

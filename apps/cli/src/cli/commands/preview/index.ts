@@ -9,7 +9,16 @@ import { filled, reads, type Refused } from "@/cli/core/flags";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { PreviewExpiries, PreviewUrls } from "@/lib/preview";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
+import {
+  deployMessage,
+  MESSAGE_MAX_LENGTH,
+  messageTooLong,
+  PublishConfigInvalidError,
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
+  Publisher,
+} from "@/lib/publish";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Ttl, TtlError } from "@/lib/ttl";
@@ -58,6 +67,56 @@ const ORIGIN = {
     hint: "Pass the preview URLs with --origin; production is deployed after merge.",
   },
 } as const satisfies Refused<string>;
+
+/** What a refusal adds when a key may be one a newer server declares. */
+const NEWER_SERVER = " A key a newer Zitadel server added needs a CLI as new as the server.";
+
+/** How a configuration with errors in it is refused. */
+const CONFIG_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the files named above and rerun; no changes were made.{newer}",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a configuration with a secret written into a file is refused. */
+const CONFIG_INVALID_SECRET_REFUSAL = {
+  message: "{message}",
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".{newer}',
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a connection whose client id and secret name one variable is refused. */
+const VARIABLE_SHARED_REFUSAL = {
+  message: "{message}",
+  hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a client secret that is not a secret variable is refused. */
+const SECRET_KIND_REFUSAL = {
+  message: "{message}",
+  hint: "The client secret must be a secret variable: publish it with the command below.",
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a client id that is not a plain variable is refused. */
+const PLAIN_KIND_REFUSAL = {
+  message: "{message}",
+  hint: "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a connection that names a variable the project does not have is refused. */
+const VARIABLE_MISSING_REFUSAL = {
+  code: "E_CREDENTIAL_MISSING",
+  message: "{message}",
+  hint: "Publish it with the command below, then deploy again.",
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
 
 /**
  * How long a preview stays live, as `7d`, `12h` or `90m`. A value that is not
@@ -275,13 +334,83 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, publisher } = await this.connected(flags);
-    const prepared = await publisher.prepare({
-      cwd: this.cwd,
-      env: this.env,
-      mode: "preview",
-      dryRun: true,
-      compare: false,
-    });
+    const prepared = await publisher
+      .prepare({
+        cwd: this.cwd,
+        env: this.env,
+        mode: "preview",
+        dryRun: true,
+        compare: false,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
+          throw Object.assign(
+            refusalError(
+              CONFIG_INVALID_SECRET_REFUSAL,
+              {
+                message: error.message,
+                newer: error.refusedKey ? NEWER_SERVER : "",
+                details: error.details ?? null,
+              },
+              { next: { id: "variable:set", args: { name: "NAME" }, flags: { secret: true } } },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConfigInvalidError) {
+          throw Object.assign(
+            refusalError(CONFIG_INVALID_REFUSAL, {
+              message: error.message,
+              newer: error.refusedKey ? NEWER_SERVER : "",
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableSharedError) {
+          throw Object.assign(
+            refusalError(VARIABLE_SHARED_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableKindError) {
+          const wantsSecret = error.field === "client_secret";
+          throw Object.assign(
+            refusalError(
+              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: wantsSecret, preview: true },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableMissingError) {
+          throw Object.assign(
+            refusalError(
+              VARIABLE_MISSING_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: error.field === "client_secret", preview: true },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        throw error;
+      });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
     }
@@ -341,13 +470,83 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, client, projectId, publisher } = await this.connected(flags);
-    const prepared = await publisher.prepare({
-      cwd: this.cwd,
-      env: this.env,
-      mode: "preview",
-      dryRun: false,
-      compare: false,
-    });
+    const prepared = await publisher
+      .prepare({
+        cwd: this.cwd,
+        env: this.env,
+        mode: "preview",
+        dryRun: false,
+        compare: false,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
+          throw Object.assign(
+            refusalError(
+              CONFIG_INVALID_SECRET_REFUSAL,
+              {
+                message: error.message,
+                newer: error.refusedKey ? NEWER_SERVER : "",
+                details: error.details ?? null,
+              },
+              { next: { id: "variable:set", args: { name: "NAME" }, flags: { secret: true } } },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConfigInvalidError) {
+          throw Object.assign(
+            refusalError(CONFIG_INVALID_REFUSAL, {
+              message: error.message,
+              newer: error.refusedKey ? NEWER_SERVER : "",
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableSharedError) {
+          throw Object.assign(
+            refusalError(VARIABLE_SHARED_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableKindError) {
+          const wantsSecret = error.field === "client_secret";
+          throw Object.assign(
+            refusalError(
+              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: wantsSecret, preview: true },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableMissingError) {
+          throw Object.assign(
+            refusalError(
+              VARIABLE_MISSING_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: error.field === "client_secret", preview: true },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        throw error;
+      });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
     }

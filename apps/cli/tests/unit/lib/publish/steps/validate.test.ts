@@ -224,14 +224,12 @@ describe("validateStep", () => {
       });
     });
 
-    it("says a key a newer server added needs a CLI as new as the server", async () => {
-      const error = await rejectionOf(() => {
+    it("states that a key a newer server added is among the refused ones", async () => {
+      const error = await rejectionOfRun(() => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toMatchObject({
-        hint: "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
-      });
+      expect(error).toMatchObject({ refusedKey: true, literalSecret: false });
     });
   });
 
@@ -252,30 +250,25 @@ describe("validateStep", () => {
       });
     });
 
-    it("tells a literal client_secret how to publish it", async () => {
+    it("states that a literal client_secret is among the refused findings", async () => {
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
 
-      const error = await rejectionOf(() => {
+      const error = await rejectionOfRun(() => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
-      expect(error).toMatchObject({
-        hint: expect.stringContaining("Publish a secret with the command below"),
-        nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
-      });
+      expect(error).toBeInstanceOf(PublishError);
+      expect(error).toMatchObject({ literalSecret: true });
     });
 
-    it("words the hint of a refusal without claiming the server enforces every rule", async () => {
+    it("states no literal secret and no refused key for a refusal that has neither", async () => {
       const config = aConfig({ flows: { "login.json": { name: "bad" } } });
 
-      const error = await rejectionOf(() => {
+      const error = await rejectionOfRun(() => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toMatchObject({
-        hint: "Fix the files named above and rerun; no changes were made.",
-      });
+      expect(error).toMatchObject({ literalSecret: false, refusedKey: false });
     });
 
     it("leaves out the subject-claim advice when the connections could not be listed", async () => {

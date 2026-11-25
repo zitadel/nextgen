@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   PublishConfigInvalidError,
-  PublishConnectionError,
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
   PublishError,
   PublishReleaseRejectedError,
 } from "@/lib/publish";
@@ -22,19 +24,19 @@ describe("the publish errors", () => {
     ],
     [
       "shared variable",
-      new PublishConnectionError("shared-variable", "shared", { file: "a.json", variable: "X" }),
+      new PublishConnectionVariableSharedError("shared", { file: "a.json", variable: "X" }),
       "invalid",
       "E_VALIDATION",
     ],
     [
       "wrong kind",
-      new PublishConnectionError("wrong-kind", "kind", { file: "a.json", variable: "X" }),
+      new PublishConnectionVariableKindError("kind", { file: "a.json", variable: "X" }),
       "invalid",
       "E_VALIDATION",
     ],
     [
       "missing variable",
-      new PublishConnectionError("missing-variable", "missing", { file: "a.json", variable: "X" }),
+      new PublishConnectionVariableMissingError("missing", { file: "a.json", variable: "X" }),
       "conflict",
       "E_CREDENTIAL_MISSING",
     ],
@@ -56,34 +58,36 @@ describe("the publish errors", () => {
     expect(toZitadelError(error).details).toEqual({ issues: findings });
   });
 
-  it("words the hint of a literal secret with the command that publishes one", () => {
+  it("states a literal secret and a refused key as facts, with no command to run", () => {
     const error = new PublishConfigInvalidError("bad", {
       findings: [],
       literalSecret: true,
       refusedKey: true,
     });
 
-    expect(toZitadelError(error)).toMatchObject({
-      hint: expect.stringContaining("A key a newer Zitadel server added"),
-      nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
-    });
+    expect(error).toMatchObject({ literalSecret: true, refusedKey: true });
+    expect(toZitadelError(error).nextCommands).toBeUndefined();
   });
 
-  it("suggests publishing a missing variable as a preview one in a preview", () => {
-    const error = new PublishConnectionError("missing-variable", "missing", {
+  it("carries the variable, the field and the mode a missing variable was named with", () => {
+    const error = new PublishConnectionVariableMissingError("missing", {
       file: "a.json",
       field: "client_id",
       variable: "ID",
       mode: "preview",
     });
 
-    expect(toZitadelError(error).nextCommands).toEqual([
-      { id: "variable:set", args: { name: "ID" }, flags: { secret: false, preview: true } },
-    ]);
+    expect(error).toMatchObject({
+      file: "a.json",
+      field: "client_id",
+      variable: "ID",
+      mode: "preview",
+    });
+    expect(toZitadelError(error).nextCommands).toBeUndefined();
   });
 
   it("keeps the hint of a wrong-kind variable free of flags", () => {
-    const error = new PublishConnectionError("wrong-kind", "kind", {
+    const error = new PublishConnectionVariableKindError("kind", {
       file: "a.json",
       variable: "X",
     });
@@ -94,11 +98,23 @@ describe("the publish errors", () => {
 
 describe("the publish errors' codes", () => {
   it.each([
-    ["a missing variable", "missing-variable", "E_CREDENTIAL_MISSING"],
-    ["a shared variable", "shared-variable", "E_VALIDATION"],
-    ["a variable of the wrong kind", "wrong-kind", "E_VALIDATION"],
-  ] as const)("reports %s as %s", (_name, reason, code) => {
-    expect(new PublishConnectionError(reason, "why", { file: "a", variable: "B" }).code).toBe(code);
+    [
+      "a missing variable",
+      new PublishConnectionVariableMissingError("why", { file: "a", variable: "B" }),
+      "E_CREDENTIAL_MISSING",
+    ],
+    [
+      "a shared variable",
+      new PublishConnectionVariableSharedError("why", { file: "a", variable: "B" }),
+      "E_VALIDATION",
+    ],
+    [
+      "a variable of the wrong kind",
+      new PublishConnectionVariableKindError("why", { file: "a", variable: "B" }),
+      "E_VALIDATION",
+    ],
+  ] as const)("reports %s as %s", (_name, error, code) => {
+    expect(error.code).toBe(code);
   });
 
   it("reports a rejected release as a validation failure", () => {

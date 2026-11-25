@@ -1,5 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
+import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * What a publish failure carries beyond its message.
@@ -14,11 +13,6 @@ export type PublishErrorOptions = {
    * Structured facts about the failure, for a `--json` reader.
    */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * What to run next, as suggestion objects the failure handler renders.
-   */
-  readonly nextCommands?: readonly Suggested[] | undefined;
 
   /**
    * The error that caused this one.
@@ -36,18 +30,13 @@ export type PublishErrorOptions = {
  */
 export class PublishError extends Error implements Categorized {
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "invalid";
+  readonly category: ErrorCategory = "unknown";
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
+  /** The stable product code the failure is reported with. */
+  readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * What to do about it.
@@ -60,12 +49,6 @@ export class PublishError extends Error implements Categorized {
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
-   * What to run next, as suggestion objects the failure handler renders with the
-   * run's scope.
-   */
-  readonly nextCommands: readonly Suggested[] | undefined;
-
-  /**
    * Make a publish failure.
    *
    * @param message - What went wrong.
@@ -76,7 +59,6 @@ export class PublishError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
-    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -123,6 +105,10 @@ export type PublishConfigInvalidOptions = PublishErrorOptions & {
  * The configuration has errors, so nothing was sent.
  */
 export class PublishConfigInvalidError extends PublishError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
   /**
    * Every finding that stopped the publish.
    */
@@ -145,32 +131,16 @@ export class PublishConfigInvalidError extends PublishError {
    * @param options - The findings and what they say about the fix.
    */
   constructor(message: string, options: PublishConfigInvalidOptions) {
-    const fix = options.literalSecret
-      ? 'Publish a secret with the command below and reference it as "${{ NAME }}".'
-      : "Fix the files named above and rerun; no changes were made.";
     super(message, {
       ...options,
-      hint: options.refusedKey
-        ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
-        : fix,
+      hint: "No changes were made.",
       details: options.details ?? { issues: options.findings },
-      nextCommands: options.literalSecret
-        ? [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }]
-        : undefined,
     });
     this.findings = options.findings;
     this.literalSecret = options.literalSecret;
     this.refusedKey = options.refusedKey;
   }
 }
-
-/**
- * What is wrong with the variable a connection names: `shared-variable` is one
- * variable named for both the client id and the secret, `wrong-kind` a variable
- * that is a secret where it must not be or the reverse, and `missing-variable`
- * a variable the project does not have.
- */
-export type PublishConnectionReason = "shared-variable" | "wrong-kind" | "missing-variable";
 
 /**
  * What a refused connection needs the command to word its advice.
@@ -202,48 +172,13 @@ export type PublishConnectionOptions = PublishErrorOptions & {
   readonly mode?: "deploy" | "preview" | undefined;
 };
 
-/** What to do about a refused connection, by why: the hint and the command that publishes the variable. */
-const CONNECTION_ADVICE: Record<
-  PublishConnectionReason,
-  (wantsSecret: boolean, publish: Suggested) => PublishErrorOptions
-> = {
-  "shared-variable": () => {
-    return {
-      hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-    };
-  },
-  "wrong-kind": (wantsSecret, publish) => {
-    return {
-      hint: wantsSecret
-        ? "The client secret must be a secret variable: publish it with the command below."
-        : "The client id must be a plain variable the engine can read back: publish it as a plain variable with the command below.",
-      nextCommands: [publish],
-    };
-  },
-  "missing-variable": (_wantsSecret, publish) => {
-    return {
-      hint: "Publish it with the command below, then deploy again.",
-      nextCommands: [publish],
-    };
-  },
-};
-
 /**
- * A connection names a variable the project cannot supply as the field needs.
+ * One variable named for both the client id and the client secret of a connection.
  */
-export class PublishConnectionError extends PublishError {
-  override readonly category: ErrorCategory;
+export class PublishConnectionVariableSharedError extends PublishError {
+  override readonly category = "invalid";
   override readonly retryable: boolean = false;
-
-  /** The stable product code: a variable the project lacks is a missing credential. */
-  override get code(): ZitadelErrorCode {
-    return this.reason === "missing-variable" ? "E_CREDENTIAL_MISSING" : super.code;
-  }
-
-  /**
-   * What is wrong with the variable.
-   */
-  readonly reason: PublishConnectionReason;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * The connection file.
@@ -256,12 +191,12 @@ export class PublishConnectionError extends PublishError {
   readonly variable: string;
 
   /**
-   * The credential field that names it.
+   * The credential field that names it; absent when two fields share it.
    */
   readonly field: "client_id" | "client_secret" | undefined;
 
   /**
-   * Whether the variable the project holds is a secret.
+   * Whether the variable the project holds is a secret, when it holds one.
    */
   readonly isSecret: boolean | undefined;
 
@@ -273,23 +208,118 @@ export class PublishConnectionError extends PublishError {
   /**
    * Make the failure.
    *
-   * @param reason - What is wrong with the variable.
    * @param message - What went wrong.
    * @param options - The connection, the variable and the facts behind them.
    */
-  constructor(reason: PublishConnectionReason, message: string, options: PublishConnectionOptions) {
-    const wantsSecret = options.field === "client_secret";
-    const publish: Suggested = {
-      id: "variable:set",
-      args: { name: options.variable },
-      flags: { secret: wantsSecret, preview: options.mode === "preview" },
-    };
+  constructor(message: string, options: PublishConnectionOptions) {
     super(message, {
       ...options,
-      ...CONNECTION_ADVICE[reason](wantsSecret, publish),
+      hint: "The client id and the client secret each need a variable of their own.",
     });
-    this.reason = reason;
-    this.category = reason === "missing-variable" ? "conflict" : "invalid";
+    this.file = options.file;
+    this.variable = options.variable;
+    this.field = options.field;
+    this.isSecret = options.isSecret;
+    this.mode = options.mode;
+  }
+}
+
+/**
+ * A connection names a variable of the wrong kind: a secret where a plain one is needed, or the reverse.
+ */
+export class PublishConnectionVariableKindError extends PublishError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The connection file.
+   */
+  readonly file: string;
+
+  /**
+   * The variable it names.
+   */
+  readonly variable: string;
+
+  /**
+   * The credential field that names it; absent when two fields share it.
+   */
+  readonly field: "client_id" | "client_secret" | undefined;
+
+  /**
+   * Whether the variable the project holds is a secret, when it holds one.
+   */
+  readonly isSecret: boolean | undefined;
+
+  /**
+   * Which kind of publish was refused.
+   */
+  readonly mode: "deploy" | "preview" | undefined;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong.
+   * @param options - The connection, the variable and the facts behind them.
+   */
+  constructor(message: string, options: PublishConnectionOptions) {
+    super(message, {
+      ...options,
+      hint: "The variable the project holds is not the kind the field needs.",
+    });
+    this.file = options.file;
+    this.variable = options.variable;
+    this.field = options.field;
+    this.isSecret = options.isSecret;
+    this.mode = options.mode;
+  }
+}
+
+/**
+ * A connection names a variable the project does not have.
+ */
+export class PublishConnectionVariableMissingError extends PublishError {
+  override readonly category = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
+
+  /**
+   * The connection file.
+   */
+  readonly file: string;
+
+  /**
+   * The variable it names.
+   */
+  readonly variable: string;
+
+  /**
+   * The credential field that names it; absent when two fields share it.
+   */
+  readonly field: "client_id" | "client_secret" | undefined;
+
+  /**
+   * Whether the variable the project holds is a secret, when it holds one.
+   */
+  readonly isSecret: boolean | undefined;
+
+  /**
+   * Which kind of publish was refused.
+   */
+  readonly mode: "deploy" | "preview" | undefined;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong.
+   * @param options - The connection, the variable and the facts behind them.
+   */
+  constructor(message: string, options: PublishConnectionOptions) {
+    super(message, {
+      ...options,
+      hint: "The project does not hold the variable the connection names.",
+    });
     this.file = options.file;
     this.variable = options.variable;
     this.field = options.field;
@@ -301,4 +331,8 @@ export class PublishConnectionError extends PublishError {
 /**
  * The release the files make is not one the API takes, so nothing was sent.
  */
-export class PublishReleaseRejectedError extends PublishError {}
+export class PublishReleaseRejectedError extends PublishError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}

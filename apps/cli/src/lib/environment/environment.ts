@@ -252,7 +252,7 @@ export class Environment {
     });
     const file = this.envFile ?? (bound ? boundFile : undefined);
     const unbound = file === undefined && this.values.ZITADEL_PROJECT_ID === undefined;
-    throw new EnvironmentValueMissingError({
+    throw new EnvironmentValueMissingError(`${key} is not set for the ${name} environment`, {
       key,
       environment: name,
       consulted: this.consulted.map((entry) => {
@@ -339,7 +339,6 @@ export class Environment {
         source,
         SERVER,
         {
-          cause: error,
           ...(error instanceof Error ? { details: { cause: error.message } } : {}),
         },
       );

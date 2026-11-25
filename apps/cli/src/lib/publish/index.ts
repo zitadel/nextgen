@@ -14,14 +14,15 @@ export {
 } from "./publisher";
 export {
   PublishConfigInvalidError,
-  PublishConnectionError,
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
   PublishError,
   PublishReleaseRejectedError,
 } from "./errors";
 export type {
   PublishConfigInvalidOptions,
   PublishConnectionOptions,
-  PublishConnectionReason,
   PublishErrorOptions,
   PublishFinding,
 } from "./errors";

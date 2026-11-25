@@ -44,7 +44,7 @@ import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { customExample, IdpSettingInvalidError, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { customExample, IdpSettingsMissingError, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { Ui, warnings } from "@/lib/ui";
 import { Asker } from "@/cli/core";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
@@ -4006,7 +4006,7 @@ describe("ReadSsoFlags", () => {
           return readingFlags(true);
         });
 
-        expect(error).toBeInstanceOf(IdpSettingInvalidError);
+        expect(error).toBeInstanceOf(IdpSettingsMissingError);
         expect(error).toMatchObject({ code: "E_VALIDATION" });
       });
 

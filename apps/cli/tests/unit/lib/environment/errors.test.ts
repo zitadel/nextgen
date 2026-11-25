@@ -37,16 +37,18 @@ describe("the environment errors", () => {
     expect(toZitadelError(error).hint).toContain("The --env environment name may use only");
   });
 
-  it("words the advice for a server that is not a URL", () => {
+  it("states the server a source supplied and an example of one", () => {
     const error = new EnvironmentServerInvalidError("bad", ".env", "https://zitadel.example");
 
-    expect(toZitadelError(error).hint).toBe(
-      "Fix or remove ZITADEL_URL in .env; it must be a URL such as https://zitadel.example.",
-    );
+    expect(error).toMatchObject({
+      source: ".env",
+      example: "https://zitadel.example",
+      hint: "ZITADEL_URL from .env must be a URL such as https://zitadel.example.",
+    });
   });
 
-  it("points an environment with no project at env add", () => {
-    const error = new EnvironmentValueMissingError({
+  it("states what an environment with no project lacks, with no advice", () => {
+    const error = new EnvironmentValueMissingError("ZITADEL_PROJECT_ID is not set", {
       key: "ZITADEL_PROJECT_ID",
       environment: "staging",
       consulted: ["process environment", ".env"],
@@ -58,9 +60,15 @@ describe("the environment errors", () => {
 
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
-      hint: expect.stringContaining("Set ZITADEL_PROJECT_ID in .env.staging.local"),
-      nextCommands: [{ id: "env:add", args: { name: "staging" }, flags: {} }],
+      hint: "Consulted, in order: process environment, .env.",
+      details: {
+        environment: "staging",
+        variable: "ZITADEL_PROJECT_ID",
+        consulted: ["process environment", ".env"],
+      },
     });
+    expect(error).toMatchObject({ unbound: true, boundFile: ".env.staging.local" });
+    expect(toZitadelError(error).nextCommands).toBeUndefined();
   });
 });
 

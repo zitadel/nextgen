@@ -36,10 +36,8 @@ describe("the backend errors", () => {
     expect(new BackendError("why")).toMatchObject({ category: "unknown", retryable: false });
   });
 
-  it("reports a server that does not implement the request as an unsupported shape", () => {
-    expect(toZitadelError(new BackendUnsupportedError("why")).code).toBe(
-      "E_UNSUPPORTED_PROJECT_SHAPE",
-    );
+  it("reports a server that does not implement the request as not implemented", () => {
+    expect(toZitadelError(new BackendUnsupportedError("why")).code).toBe("E_NOT_IMPLEMENTED");
   });
 });
 
@@ -48,7 +46,7 @@ describe("the backend errors' codes, hints and details", () => {
     [new BackendNotFoundError("why"), "E_NOT_FOUND"],
     [new BackendConflictError("why"), "E_CONFLICT"],
     [new BackendUnavailableError("why"), "E_NETWORK"],
-    [new BackendUnsupportedError("why"), "E_UNSUPPORTED_PROJECT_SHAPE"],
+    [new BackendUnsupportedError("why"), "E_NOT_IMPLEMENTED"],
   ] as const)("reports %# with its code", (error, code) => {
     expect(error.code).toBe(code);
   });
@@ -107,17 +105,5 @@ describe("the backend errors' codes, hints and details", () => {
 
     expect(error.hint).toBe(hint);
     expect(error.details).toEqual({ url: "http://x", reason });
-  });
-});
-
-describe("BackendError.withheld", () => {
-  it.each([
-    ["a miss", new BackendNotFoundError("gone"), true],
-    ["a refusal of permission", new BackendForbiddenError("not allowed"), true],
-    ["a rejected credential", new BackendUnauthorizedError("who are you"), false],
-    ["a conflict", new BackendConflictError("raced"), false],
-    ["a failure nothing names", new BackendError("odd"), false],
-  ])("is %s: %s", (_name, error, withheld) => {
-    expect(error.withheld).toBe(withheld);
   });
 });

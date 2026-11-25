@@ -1,13 +1,19 @@
 import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
-import { IdpError, IdpProviderUnknownError, IdpSettingInvalidError } from "@/lib/idp";
+import {
+  IdpError,
+  IdpProviderUnknownError,
+  IdpSettingRefusedError,
+  IdpSettingsConflictError,
+  IdpSettingsMissingError,
+} from "@/lib/idp";
 
 describe("the identity-provider errors", () => {
   it.each([
-    ["invalid", new IdpSettingInvalidError("invalid", "bad", { field: "--slug" }), "invalid"],
-    ["conflicting", new IdpSettingInvalidError("conflicting", "bad", {}), "invalid"],
-    ["missing", new IdpSettingInvalidError("missing", "bad", {}), "invalid"],
+    ["refused", new IdpSettingRefusedError("bad", "--slug"), "invalid"],
+    ["conflict", new IdpSettingsConflictError("bad", ["--issuer"]), "invalid"],
+    ["missing", new IdpSettingsMissingError("bad", ["--slug"]), "invalid"],
     ["unknown", new IdpProviderUnknownError("okta", ["google"]), "missing"],
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(IdpError);
@@ -18,41 +24,37 @@ describe("the identity-provider errors", () => {
     expect(toZitadelError(new IdpProviderUnknownError("okta", ["google", "custom"]))).toMatchObject(
       {
         code: "E_VALIDATION",
-        hint: "Use one of google, custom.",
+        hint: "Known providers: google, custom.",
       },
     );
   });
 
-  it("words the advice for a refused setting with the flag it came from", () => {
-    const error = new IdpSettingInvalidError("invalid", "--slug: bad", { field: "--slug" });
+  it("keeps the flag a refused setting came from", () => {
+    const error = new IdpSettingRefusedError("--slug: bad", "--slug");
 
-    expect(toZitadelError(error).hint).toBe("Fix --slug and run the command again.");
+    expect(toZitadelError(error).details).toEqual({ flag: "--slug" });
   });
 
-  it("words the advice for settings that do not belong with the provider flag", () => {
-    const error = new IdpSettingInvalidError("conflicting", "bad", {
-      given: ["--issuer"],
-      providerField: "--provider",
-    });
+  it("keeps the settings that do not belong with the provider", () => {
+    const error = new IdpSettingsConflictError("bad", ["--issuer"]);
 
-    expect(toZitadelError(error).hint).toBe("Add --provider custom, or remove it.");
+    expect(toZitadelError(error).details).toEqual({ flags: ["--issuer"] });
   });
 
-  it("words the advice for a missing setting with the example", () => {
-    const error = new IdpSettingInvalidError("missing", "bad", { example: "--provider custom" });
+  it("keeps the settings a custom connection lacks", () => {
+    const error = new IdpSettingsMissingError("bad", ["--slug"]);
 
-    expect(toZitadelError(error).hint).toBe("Describe the connection, e.g. --provider custom");
-  });
-
-  it("words the hint with the names the caller gave the settings", () => {
-    expect(new IdpSettingInvalidError("invalid", "bad", { field: "slug" }).hint).toBe(
-      "Fix slug and run the command again.",
-    );
+    expect(toZitadelError(error).details).toEqual({ missing: ["--slug"] });
   });
 });
 
 describe("the identity-provider errors' codes", () => {
-  it("reports an unknown provider as a validation failure, not a missing thing", () => {
-    expect(new IdpProviderUnknownError("x", ["google"]).code).toBe("E_VALIDATION");
+  it.each([
+    ["a refused setting", new IdpSettingRefusedError("bad", "--slug")],
+    ["settings that conflict", new IdpSettingsConflictError("bad", ["--issuer"])],
+    ["settings that are missing", new IdpSettingsMissingError("bad", ["--slug"])],
+    ["an unknown provider", new IdpProviderUnknownError("x", ["google"])],
+  ] as const)("reports %s as a validation failure", (_name, error) => {
+    expect(error.code).toBe("E_VALIDATION");
   });
 });

@@ -1,5 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
+import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * What an environment failure carries beyond its message.
@@ -14,11 +13,6 @@ export type EnvironmentErrorOptions = {
    * Structured facts about the failure, for a `--json` reader.
    */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * What to run next, as suggestion objects the failure handler renders.
-   */
-  readonly nextCommands?: readonly Suggested[] | undefined;
 
   /**
    * The error that caused this one.
@@ -36,18 +30,13 @@ export type EnvironmentErrorOptions = {
  */
 export class EnvironmentError extends Error implements Categorized {
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "invalid";
+  readonly category: ErrorCategory = "unknown";
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
   readonly retryable: boolean = false;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
+  /** The stable product code the failure is reported with. */
+  readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * What to do about it.
@@ -60,12 +49,6 @@ export class EnvironmentError extends Error implements Categorized {
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
-   * What to run next, as suggestion objects the failure handler renders with the
-   * run's scope.
-   */
-  readonly nextCommands: readonly Suggested[] | undefined;
-
-  /**
    * Make an environment failure.
    *
    * @param message - What went wrong.
@@ -76,7 +59,6 @@ export class EnvironmentError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
-    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -84,8 +66,9 @@ export class EnvironmentError extends Error implements Categorized {
  * An environment named by its name and by a file as well.
  */
 export class EnvironmentSourcesConflictError extends EnvironmentError {
-  override readonly category: ErrorCategory = "invalid";
+  override readonly category = "invalid";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * Make the failure.
@@ -101,8 +84,9 @@ export class EnvironmentSourcesConflictError extends EnvironmentError {
  * An environment name that cannot be used in a path.
  */
 export class EnvironmentNameInvalidError extends EnvironmentError {
-  override readonly category: ErrorCategory = "invalid";
+  override readonly category = "invalid";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * Make the failure.
@@ -123,8 +107,19 @@ export class EnvironmentNameInvalidError extends EnvironmentError {
  * A server address a source supplied that is not a URL.
  */
 export class EnvironmentServerInvalidError extends EnvironmentError {
-  override readonly category: ErrorCategory = "invalid";
+  override readonly category = "invalid";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The file or flag that supplied it.
+   */
+  readonly source: string;
+
+  /**
+   * A well-formed address, to show.
+   */
+  readonly example: string;
 
   /**
    * Make the failure.
@@ -142,8 +137,10 @@ export class EnvironmentServerInvalidError extends EnvironmentError {
   ) {
     super(message, {
       ...options,
-      hint: `Fix or remove ZITADEL_URL in ${source}; it must be a URL such as ${example}.`,
+      hint: `ZITADEL_URL from ${source} must be a URL such as ${example}.`,
     });
+    this.source = source;
+    this.example = example;
   }
 }
 
@@ -151,13 +148,9 @@ export class EnvironmentServerInvalidError extends EnvironmentError {
  * The file an environment was told to read does not exist.
  */
 export class EnvironmentFileMissingError extends EnvironmentError {
-  override readonly category: ErrorCategory = "missing";
+  override readonly category = "missing";
   override readonly retryable: boolean = false;
-
-  /** The stable product code the failure is reported with. */
-  override get code(): ZitadelErrorCode {
-    return "E_VALIDATION";
-  }
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * The path that was given.
@@ -177,9 +170,13 @@ export class EnvironmentFileMissingError extends EnvironmentError {
 }
 
 /**
- * What a missing value needs the command to word its advice.
+ * A value the command cannot run without is set in no source.
  */
-export type EnvironmentValueMissingOptions = {
+export class EnvironmentValueMissingError extends EnvironmentError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
   /**
    * The variable that is not set.
    */
@@ -215,83 +212,46 @@ export type EnvironmentValueMissingOptions = {
    * The directory the run addressed.
    */
   readonly cwd: string;
-};
-
-/**
- * A value the command cannot run without is set in no source.
- */
-export class EnvironmentValueMissingError extends EnvironmentError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-
-  /**
-   * The variable that is not set.
-   */
-  readonly key: string;
-
-  /**
-   * The environment it is not set for.
-   */
-  readonly environment: string;
-
-  /**
-   * Every source the chain looked in, in order.
-   */
-  readonly consulted: readonly string[];
-
-  /**
-   * The file the value belongs in, when the run reads one.
-   */
-  readonly file: string | undefined;
-
-  /**
-   * The file an environment of this name binds its project in.
-   */
-  readonly boundFile: string;
-
-  /**
-   * Whether the environment has no project at all.
-   */
-  readonly unbound: boolean;
-
-  /**
-   * The directory the run addressed.
-   */
-  readonly cwd: string;
 
   /**
    * Make the failure.
    *
-   * @param options - The variable, the environment and where it was looked for.
+   * @param message - What went wrong.
+   * @param facts - The variable, the environment and where it was looked for.
+   * @param facts.key - The variable that is not set.
+   * @param facts.environment - The environment it is not set for.
+   * @param facts.consulted - Every source the chain looked in, in order.
+   * @param facts.file - The file the value belongs in, when the run reads one.
+   * @param facts.boundFile - The file an environment of this name binds its project in.
+   * @param facts.unbound - Whether the environment has no project at all.
+   * @param facts.cwd - The directory the run addressed.
    */
-  constructor(options: EnvironmentValueMissingOptions) {
-    const consulted = `Consulted, in order: ${options.consulted.join(", ")}.`;
-    // Run in the directory this run addressed, which need not be the shell's:
-    // `setup` and `env add` both write their files there.
-    const elsewhere = options.cwd === process.cwd() ? {} : { cwd: options.cwd };
-    super(`${options.key} is not set for the ${options.environment} environment`, {
-      hint: options.unbound
-        ? `${consulted} Set ${options.key} in ${options.boundFile} or the process environment.`
-        : `${consulted} Set ${options.key} in ${options.file ?? `${options.boundFile} or the process environment`}${options.file === undefined ? "" : " or the process environment"}.`,
+  constructor(
+    message: string,
+    facts: {
+      readonly key: string;
+      readonly environment: string;
+      readonly consulted: readonly string[];
+      readonly file: string | undefined;
+      readonly boundFile: string;
+      readonly unbound: boolean;
+      readonly cwd: string;
+    },
+  ) {
+    super(message, {
+      hint: `Consulted, in order: ${facts.consulted.join(", ")}.`,
       details: {
-        environment: options.environment,
-        variable: options.key,
-        consulted: options.consulted,
+        environment: facts.environment,
+        variable: facts.key,
+        consulted: facts.consulted,
       },
-      nextCommands: options.unbound
-        ? [
-            options.environment === "development"
-              ? { id: "setup", flags: elsewhere }
-              : { id: "env:add", args: { name: options.environment }, flags: elsewhere },
-          ]
-        : undefined,
     });
-    this.key = options.key;
-    this.environment = options.environment;
-    this.consulted = options.consulted;
-    this.file = options.file;
-    this.boundFile = options.boundFile;
-    this.unbound = options.unbound;
-    this.cwd = options.cwd;
+    this.key = facts.key;
+    this.environment = facts.environment;
+    this.consulted = facts.consulted;
+    this.file = facts.file;
+    this.boundFile = facts.boundFile;
+    this.unbound = facts.unbound;
+    this.cwd = facts.cwd;
   }
 }

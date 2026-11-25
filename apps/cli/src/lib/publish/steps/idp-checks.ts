@@ -1,5 +1,9 @@
 import { BackendForbiddenError, type VariableService } from "@/lib/backend";
-import { PublishConnectionError } from "@/lib/publish/errors";
+import {
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
+} from "@/lib/publish/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
 import type { Connection } from "@/lib/zitadel";
 
@@ -30,9 +34,12 @@ const VARIABLE_KIND = {
  *
  * @param ctx - The step's context: the connections and the variables.
  * @returns Nothing when every connection's variables are held as it needs.
- * @throws {@link PublishConnectionError} When a connection's client id and
- *   secret name one variable, a variable is not the kind its field needs, or
- *   the project does not hold the variable a connection names.
+ * @throws {@link PublishConnectionVariableSharedError} When a connection's client id
+ *   and secret name one variable.
+ * @throws {@link PublishConnectionVariableKindError} When a variable is not the kind
+ *   its field needs.
+ * @throws {@link PublishConnectionVariableMissingError} When the project does not
+ *   hold the variable a connection names.
  * @throws {@link BackendForbiddenError} When a deploy's token may not read the
  *   variables.
  */
@@ -82,9 +89,12 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  * @param ctx - The step's context.
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
- * @throws {@link PublishConnectionError} When the client id and secret name
- *   one variable, a variable is not the kind its field needs, or a named
- *   variable is not held.
+ * @throws {@link PublishConnectionVariableSharedError} When the client id and secret
+ *   name one variable.
+ * @throws {@link PublishConnectionVariableKindError} When a variable is not the kind
+ *   its field needs.
+ * @throws {@link PublishConnectionVariableMissingError} When a named variable is not
+ *   held.
  */
 function checkCredentialVariables(
   ctx: StepContext,
@@ -112,8 +122,7 @@ function checkCredentialVariables(
   const idVariable: string | undefined = id?.variable;
   const secretVariable: string | undefined = secret?.variable;
   if (idVariable !== undefined && idVariable === secretVariable) {
-    throw new PublishConnectionError(
-      "shared-variable",
+    throw new PublishConnectionVariableSharedError(
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
       { file, variable: idVariable, mode: ctx.mode, details: { variable: idVariable, file } },
     );
@@ -124,16 +133,14 @@ function checkCredentialVariables(
     const wantsSecret = field === "client_secret";
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
-      throw new PublishConnectionError(
-        "missing-variable",
+      throw new PublishConnectionVariableMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
         { file, field, variable, mode: ctx.mode, details: { variable, field, file } },
       );
     }
     if (isSecret !== wantsSecret) {
       const kind = isSecret ? "a secret" : "not a secret";
-      throw new PublishConnectionError(
-        "wrong-kind",
+      throw new PublishConnectionVariableKindError(
         `${file}: ${field} names the variable ${variable}, which is ${kind}`,
         {
           file,

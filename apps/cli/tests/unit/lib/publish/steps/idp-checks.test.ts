@@ -120,19 +120,15 @@ describe("validateConnections", () => {
     it("suggests publishing a missing variable", async () => {
       const context = aStepContext({ config: ACME, client: holdingVariables({}) });
 
-      const error = await rejectionOf(() => {
+      const error = await rejectionOfRun(() => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
-        nextCommands: [
-          {
-            id: "variable:set",
-            args: { name: "ACME_CLIENT_SECRET" },
-            flags: { secret: true, preview: false },
-          },
-        ],
+        variable: "ACME_CLIENT_SECRET",
+        field: "client_secret",
+        mode: "deploy",
       });
     });
 
@@ -221,19 +217,15 @@ describe("validateConnections", () => {
     it("suggests setting the missing credential for the preview kind", async () => {
       const context = aStepContext({ config: ACME, mode: "preview", client: holdingVariables({}) });
 
-      const error = await rejectionOf(() => {
+      const error = await rejectionOfRun(() => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
-        nextCommands: [
-          {
-            id: "variable:set",
-            args: { name: "ACME_CLIENT_SECRET" },
-            flags: { secret: true, preview: true },
-          },
-        ],
+        variable: "ACME_CLIENT_SECRET",
+        field: "client_secret",
+        mode: "preview",
       });
     });
 

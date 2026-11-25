@@ -470,66 +470,61 @@ describe("Environment.require", () => {
     }
   });
 
-  it("points a development environment at setup and any other at env add", async ({ dir }) => {
+  it("states whether the environment has no project, for the command to point it at setup or env add", async ({
+    dir,
+  }) => {
     const development = await resolve(dir);
     const production = await resolve(dir, { envName: "production" });
 
-    expect(reportedBy(() => development.require("ZITADEL_URL"))).toMatchObject({
-      nextCommands: [{ id: "setup", flags: { cwd: dir } }],
+    expect(thrownBy(() => development.require("ZITADEL_URL"))).toMatchObject({
+      environment: "development",
+      unbound: true,
+      cwd: dir,
     });
-    expect(reportedBy(() => production.require("ZITADEL_URL"))).toMatchObject({
-      nextCommands: [{ id: "env:add", args: { name: "production" }, flags: { cwd: dir } }],
+    expect(thrownBy(() => production.require("ZITADEL_URL"))).toMatchObject({
+      environment: "production",
+      unbound: true,
+      cwd: dir,
     });
   });
 
-  it("points an --env-file run at that file", async ({ dir }) => {
+  it("states the file an --env-file run reads", async ({ dir }) => {
     await write(dir, "ci.env", { ZITADEL_URL: "https://ci.example" });
     const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
-    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
-      hint: expect.stringContaining("Set ZITADEL_PROJECT_ID in ci.env"),
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
+      key: "ZITADEL_PROJECT_ID",
+      file: expect.stringContaining("ci.env"),
     });
   });
 
-  it("never sends an --env-file run to setup, which would create a new project", async ({
-    dir,
-  }) => {
+  it("never marks an --env-file run unbound, which would send it to setup", async ({ dir }) => {
     await write(dir, "ci.env", { ZITADEL_URL: "https://ci.example" });
     const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
-    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
-      nextCommands: undefined,
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
+      unbound: false,
     });
   });
 
-  it("points an environment env add already bound at its own file", async ({ dir }) => {
+  it("states the file an environment env add already bound", async ({ dir }) => {
     await write(dir, ".env.production.local", { ZITADEL_PROJECT_ID: "proj_production" });
     const environment = await resolve(dir, { envName: "production" });
 
-    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
-      hint: expect.stringContaining("Set ZITADEL_PROJECT_SECRET in .env.production.local"),
-      nextCommands: undefined,
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
+      file: expect.stringContaining(".env.production.local"),
+      unbound: false,
     });
   });
 
-  it("sends no one to env add when the process environment already names the project", async ({
-    dir,
-  }) => {
+  it("is not unbound when the process environment already names the project", async ({ dir }) => {
     const environment = await resolve(dir, {
       envName: "production",
       env: { ZITADEL_PROJECT_ID: "proj_ci" },
     });
 
-    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
-      nextCommands: undefined,
-    });
-  });
-
-  it("runs the env add it suggests in the directory this run addressed", async ({ dir }) => {
-    const environment = await resolve(dir, { envName: "staging" });
-
-    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
-      nextCommands: [{ id: "env:add", args: { name: "staging" }, flags: { cwd: dir } }],
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
+      unbound: false,
     });
   });
 

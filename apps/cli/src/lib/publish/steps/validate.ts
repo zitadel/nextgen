@@ -106,7 +106,7 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
     return `  - ${finding.file}: ${finding.message}`;
   });
   // Any refused key may be one a newer server declares and this CLI's
-  // meta-schema does not know yet.
+  // meta-schema does not know yet, so the hint says what fixes that too.
   const refusedKey = errors.some((finding) => {
     return UserSchema.refusesKey(finding);
   });

@@ -19,7 +19,4 @@ export {
   EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
 } from "./errors";
-export type {
-  EnvironmentErrorOptions,
-  EnvironmentValueMissingOptions,
-} from "./errors";
+export type { EnvironmentErrorOptions } from "./errors";

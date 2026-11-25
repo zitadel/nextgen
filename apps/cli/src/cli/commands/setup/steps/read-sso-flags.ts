@@ -1,9 +1,14 @@
 import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { askCustomSettings, type Fact, type SetupServices } from "@/cli/commands/setup/shared";
 import {
   customExample,
   customFlagValues,
+  IdpProviderUnknownError,
+  IdpSettingRefusedError,
+  IdpSettingsConflictError,
+  IdpSettingsMissingError,
   loopbackIssuerWarning,
   selectionFromFlags,
   SETUP_FLAG_KEYS,
@@ -24,6 +29,33 @@ const ID_TO_FILL_IN = "<id>";
  * What a command line describing a custom connection looks like, for an error to show.
  */
 const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
+
+/** How a setting the platform refuses is refused. */
+const SETTING_REFUSED_REFUSAL = {
+  message: "{message}",
+  hint: "Fix {flag} and run the command again.",
+  details: { flag: "{flag}" },
+} as const satisfies Refusal;
+
+/** How settings of a custom connection given with a catalog provider are refused. */
+const SETTINGS_CONFLICT_REFUSAL = {
+  message: "{message}",
+  hint: "Add {provider} {custom}, or remove {them}.",
+  details: { flags: "{flags}" },
+} as const satisfies Refusal;
+
+/** How a custom connection that lacks settings is refused. */
+const SETTINGS_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: "Describe the connection, e.g. {example}",
+  details: { missing: "{missing}" },
+} as const satisfies Refusal;
+
+/** How a provider that is neither in the catalog nor custom is refused. */
+const PROVIDER_UNKNOWN_REFUSAL = {
+  message: "{message}",
+  hint: "Use one of {known}.",
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -108,14 +140,54 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: undefined,
       };
     }
-    const selection = selectionFromFlags(
-      flags.sso,
+    const settings =
       flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
         ? await askCustomSettings(customValues, this.deps.ask)
-        : customValues,
-      SETUP_FLAG_NAMES,
-      SSO_CUSTOM_EXAMPLE,
-    );
+        : customValues;
+    const selection = await Promise.resolve(settings)
+      .then((given) => {
+        return selectionFromFlags(flags.sso ?? "", given, SETUP_FLAG_NAMES);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof IdpSettingRefusedError) {
+          throw Object.assign(
+            refusalError(SETTING_REFUSED_REFUSAL, { message: error.message, flag: error.flag }),
+            { cause: error },
+          );
+        }
+        if (error instanceof IdpSettingsConflictError) {
+          throw Object.assign(
+            refusalError(SETTINGS_CONFLICT_REFUSAL, {
+              message: error.message,
+              provider: SETUP_FLAG_NAMES.provider,
+              custom: CUSTOM_PROVIDER,
+              them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
+              flags: error.given,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof IdpSettingsMissingError) {
+          throw Object.assign(
+            refusalError(SETTINGS_MISSING_REFUSAL, {
+              message: error.message,
+              example: SSO_CUSTOM_EXAMPLE,
+              missing: error.missing,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof IdpProviderUnknownError) {
+          throw Object.assign(
+            refusalError(PROVIDER_UNKNOWN_REFUSAL, {
+              message: error.message,
+              known: error.known.join(", "),
+            }),
+            { cause: error },
+          );
+        }
+        throw error;
+      });
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       warnings.report(loopback);

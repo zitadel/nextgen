@@ -131,7 +131,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
             if (isCancellation(error) || this.deps.signal.aborted) {
               throw error;
             }
-            return !(error instanceof BackendRejectedError && error.isServerCode("req.invalid"));
+            return !(error instanceof BackendRejectedError && error.serverCode === "req.invalid");
           },
         );
       const scaffold = await scaffoldOf(this.deps.cwd, this.deps.force, answers, signupPolicy);

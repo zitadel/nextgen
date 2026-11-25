@@ -18,7 +18,7 @@
  * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
  * depends sideways only on `lib/zitadel` (the configuration a provider is
  * added to) and shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (the error categories), `lib/ui` (`Questions` and `warnings.report`) and
+ * `lib/errors` (`ZitadelError`), `lib/ui` (`Questions` and `warnings.report`) and
  * `lib/suggestion` (the type of a command a run suggests, which
  * the running command renders and hands in).
  */
@@ -27,10 +27,10 @@ export { callbackUriFor } from "./callback";
 export {
   IdpError,
   IdpProviderUnknownError,
-  IdpSettingInvalidError,
+  IdpSettingRefusedError,
+  IdpSettingsConflictError,
+  IdpSettingsMissingError,
   type IdpErrorOptions,
-  type IdpSettingFacts,
-  type IdpSettingReason,
 } from "./errors";
 export {
   type CredentialNames,

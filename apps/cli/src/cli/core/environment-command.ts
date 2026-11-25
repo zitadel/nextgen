@@ -3,7 +3,9 @@ import type { Consent } from "@/lib/consent";
 import {
   Environment,
   EnvironmentNameInvalidError,
+  EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
+  EnvironmentValueMissingError,
   type ServerAddresses,
 } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
@@ -29,6 +31,28 @@ const SOURCES_CONFLICT_REFUSAL = {
 const NAME_INVALID_REFUSAL = {
   message: "{message}",
   hint: "{hint} Pass a safe --env or set ZITADEL_ENV.",
+} as const satisfies Refusal;
+
+/** How a server address that is not a URL is refused. */
+const SERVER_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Fix or remove ZITADEL_URL in {source}; it must be a URL such as {example}.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a value set in no source is refused when its environment has a project to add it to. */
+const VALUE_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: "{hint} Set {key} in {file} or the process environment.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a value set in no source is refused when its environment has no project at all. */
+const VALUE_MISSING_UNBOUND_REFUSAL = {
+  message: "{message}",
+  hint: "{hint} Set {key} in {boundFile} or the process environment, or run `zitadel env add {environment}`.",
+  details: "{details}",
+  next: ["{next}"],
 } as const satisfies Refusal;
 
 /**
@@ -119,6 +143,20 @@ export abstract class EnvironmentCommand extends BaseCommand {
             refusalError(NAME_INVALID_REFUSAL, {
               message: error.message,
               hint: error.hint ?? "",
+            }),
+            { cause: error },
+          );
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof EnvironmentServerInvalidError) {
+          throw Object.assign(
+            refusalError(SERVER_INVALID_REFUSAL, {
+              message: error.message,
+              source: error.source,
+              example: error.example,
+              details: error.details ?? null,
             }),
             { cause: error },
           );
@@ -233,9 +271,52 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.nonInteractive && !this.meta.dryRun && options.prompt !== false,
       ask: Asker.for(this.ui.session()),
     };
-    const server = await environment.requireInteractive("ZITADEL_URL", ask);
-    const projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
-    const token = await environment.requireInteractive(CREDENTIALS[credential], ask);
+    const { server, projectId, token } = await (async () => {
+      return {
+        server: await environment.requireInteractive("ZITADEL_URL", ask),
+        projectId: await environment.requireInteractive("ZITADEL_PROJECT_ID", ask),
+        token: await environment.requireInteractive(CREDENTIALS[credential], ask),
+      };
+    })().catch((error: unknown) => {
+      if (error instanceof EnvironmentValueMissingError && error.unbound) {
+        // Run in the directory this run addressed, which need not be the
+        // shell's: `setup` and `env add` both write their files there.
+        const elsewhere = error.cwd === process.cwd() ? {} : { cwd: error.cwd };
+        throw Object.assign(
+          refusalError(
+            VALUE_MISSING_UNBOUND_REFUSAL,
+            {
+              message: error.message,
+              hint: error.hint ?? "",
+              key: error.key,
+              boundFile: error.boundFile,
+              environment: error.environment,
+              details: error.details ?? null,
+            },
+            {
+              next:
+                error.environment === "development"
+                  ? { id: "setup", flags: elsewhere }
+                  : { id: "env:add", args: { name: error.environment }, flags: elsewhere },
+            },
+          ),
+          { cause: error },
+        );
+      }
+      if (error instanceof EnvironmentValueMissingError) {
+        throw Object.assign(
+          refusalError(VALUE_MISSING_REFUSAL, {
+            message: error.message,
+            hint: error.hint ?? "",
+            key: error.key,
+            file: error.file ?? error.boundFile,
+            details: error.details ?? null,
+          }),
+          { cause: error },
+        );
+      }
+      throw error;
+    });
     this.ui.ranAgainst(projectId, server);
 
     return {

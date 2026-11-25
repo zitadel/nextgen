@@ -16,6 +16,10 @@ import {
   MESSAGE_MAX_LENGTH,
   type Lockout,
   messageTooLong,
+  PublishConfigInvalidError,
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
   Publisher,
 } from "@/lib/publish";
 import {
@@ -123,6 +127,56 @@ export function missingPrimaryOrigin(input: {
  */
 const LOCKOUT_ACTION = "deploy a release that leaves existing users unable to sign in";
 
+/** What a refusal adds when a key may be one a newer server declares. */
+const NEWER_SERVER = " A key a newer Zitadel server added needs a CLI as new as the server.";
+
+/** How a configuration with errors in it is refused. */
+const CONFIG_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the files named above and rerun; no changes were made.{newer}",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a configuration with a secret written into a file is refused. */
+const CONFIG_INVALID_SECRET_REFUSAL = {
+  message: "{message}",
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".{newer}',
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a connection whose client id and secret name one variable is refused. */
+const VARIABLE_SHARED_REFUSAL = {
+  message: "{message}",
+  hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a client secret that is not a secret variable is refused. */
+const SECRET_KIND_REFUSAL = {
+  message: "{message}",
+  hint: "The client secret must be a secret variable: publish it with the command below.",
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a client id that is not a plain variable is refused. */
+const PLAIN_KIND_REFUSAL = {
+  message: "{message}",
+  hint: "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a connection that names a variable the project does not have is refused. */
+const VARIABLE_MISSING_REFUSAL = {
+  code: "E_CREDENTIAL_MISSING",
+  message: "{message}",
+  hint: "Publish it with the command below, then deploy again.",
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
 const NEEDS_MESSAGE_REFUSAL = {
   message: "A deploy needs a message in non-interactive mode",
   hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
@@ -220,13 +274,83 @@ export default class Deploy extends Telemetered(
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
     this.annotate({ stage: "validation" });
-    const prepared = await publisher.prepare({
-      cwd: this.cwd,
-      env: this.env,
-      mode: "deploy",
-      dryRun: true,
-      compare: true,
-    });
+    const prepared = await publisher
+      .prepare({
+        cwd: this.cwd,
+        env: this.env,
+        mode: "deploy",
+        dryRun: true,
+        compare: true,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
+          throw Object.assign(
+            refusalError(
+              CONFIG_INVALID_SECRET_REFUSAL,
+              {
+                message: error.message,
+                newer: error.refusedKey ? NEWER_SERVER : "",
+                details: error.details ?? null,
+              },
+              { next: { id: "variable:set", args: { name: "NAME" }, flags: { secret: true } } },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConfigInvalidError) {
+          throw Object.assign(
+            refusalError(CONFIG_INVALID_REFUSAL, {
+              message: error.message,
+              newer: error.refusedKey ? NEWER_SERVER : "",
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableSharedError) {
+          throw Object.assign(
+            refusalError(VARIABLE_SHARED_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableKindError) {
+          const wantsSecret = error.field === "client_secret";
+          throw Object.assign(
+            refusalError(
+              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: wantsSecret, preview: false },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableMissingError) {
+          throw Object.assign(
+            refusalError(
+              VARIABLE_MISSING_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: error.field === "client_secret", preview: false },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        throw error;
+      });
     this.annotate({ stage: undefined });
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);
@@ -305,13 +429,83 @@ export default class Deploy extends Telemetered(
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
     this.annotate({ stage: "validation" });
-    const prepared = await publisher.prepare({
-      cwd: this.cwd,
-      env: this.env,
-      mode: "deploy",
-      dryRun: false,
-      compare: true,
-    });
+    const prepared = await publisher
+      .prepare({
+        cwd: this.cwd,
+        env: this.env,
+        mode: "deploy",
+        dryRun: false,
+        compare: true,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
+          throw Object.assign(
+            refusalError(
+              CONFIG_INVALID_SECRET_REFUSAL,
+              {
+                message: error.message,
+                newer: error.refusedKey ? NEWER_SERVER : "",
+                details: error.details ?? null,
+              },
+              { next: { id: "variable:set", args: { name: "NAME" }, flags: { secret: true } } },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConfigInvalidError) {
+          throw Object.assign(
+            refusalError(CONFIG_INVALID_REFUSAL, {
+              message: error.message,
+              newer: error.refusedKey ? NEWER_SERVER : "",
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableSharedError) {
+          throw Object.assign(
+            refusalError(VARIABLE_SHARED_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            }),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableKindError) {
+          const wantsSecret = error.field === "client_secret";
+          throw Object.assign(
+            refusalError(
+              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: wantsSecret, preview: false },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        if (error instanceof PublishConnectionVariableMissingError) {
+          throw Object.assign(
+            refusalError(
+              VARIABLE_MISSING_REFUSAL,
+              { message: error.message, details: error.details ?? null },
+              {
+                next: {
+                  id: "variable:set",
+                  args: { name: error.variable },
+                  flags: { secret: error.field === "client_secret", preview: false },
+                },
+              },
+            ),
+            { cause: error },
+          );
+        }
+        throw error;
+      });
     this.annotate({ stage: undefined });
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);
