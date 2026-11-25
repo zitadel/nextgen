@@ -212,21 +212,19 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 	if req.AuthRequestID != nil {
 		in.AuthRequest = &flowengine.AuthRequestRef{ID: *req.AuthRequestID}
 	}
+	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
+		if resolution.Deployment != nil {
+			in.DeploymentID = resolution.Deployment.ID
+		}
+		if resolution.Release != nil {
+			in.ReleaseID = resolution.Release.ID
+		}
+	}
 
 	result, err := s.stateMachine.Start(ctx, in)
 	if err != nil {
 		return flowengine.StepResult{}, err
 	}
-	result.State.ID = flowID
-	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
-		if resolution.Deployment != nil {
-			result.State.DeploymentID = resolution.Deployment.ID
-		}
-		if resolution.Release != nil {
-			result.State.ReleaseID = resolution.Release.ID
-		}
-	}
-
 	if err := s.attachSignupGate(ctx, s.flowDefinitions(req.Definition.ProjectID, req.Definition), &result); err != nil {
 		return flowengine.StepResult{}, err
 	}

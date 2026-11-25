@@ -149,6 +149,10 @@ type StartInput struct {
 	AuthRequest   *AuthRequestRef
 	RedirectURI   *string
 	UserSchemaURL string
+	// DeploymentID and ReleaseID are what the request resolved to; the state
+	// keeps them for every later request of the flow.
+	DeploymentID string
+	ReleaseID    string
 }
 
 // SubmitInput carries a single client submission.
@@ -398,6 +402,8 @@ func (r *Runtime) Start(ctx context.Context, in StartInput) (StepResult, error) 
 		ID:            in.ID,
 		ProjectID:     in.Definition.ProjectID,
 		UserSchemaURL: in.UserSchemaURL,
+		DeploymentID:  in.DeploymentID,
+		ReleaseID:     in.ReleaseID,
 		Progress: Progress{
 			DefinitionID:   in.Definition.ID,
 			Purpose:        in.Purpose,

@@ -354,7 +354,12 @@ type fakeStateMachine struct {
 func (f *fakeStateMachine) Start(ctx context.Context, in flowengine.StartInput) (flowengine.StepResult, error) {
 	f.gotStartCtx = ctx
 	f.gotStartInput = in
-	return namesDefinition(f.startResult, in.Definition.ID), f.startErr
+	result := namesDefinition(f.startResult, in.Definition.ID)
+	if result.State != nil {
+		// As the engine does, the state records what the flow started with.
+		result.State.ID, result.State.DeploymentID, result.State.ReleaseID = in.ID, in.DeploymentID, in.ReleaseID
+	}
+	return result, f.startErr
 }
 
 func (f *fakeStateMachine) Process(ctx context.Context, defs flowengine.Definitions, state *flowengine.State, in flowengine.SubmitInput) (flowengine.StepResult, error) {
@@ -445,6 +450,28 @@ func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 	assert.NotEmpty(t, res.State.ID, "flow id was not minted")
 	assert.NotEmpty(t, sm.gotStartInput.Session.ID, "session id was not minted")
 	assert.Equal(t, testUserSchema.URL, sm.gotStartInput.UserSchemaURL, "the objectType resolves to the revision")
+}
+
+// A flow keeps the deployment and release its start resolved to.
+func TestFlowService_Start_PassesTheResolvedDeploymentAndRelease(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	sm := &fakeStateMachine{startResult: flowengine.StepResult{State: &flowengine.State{ProjectID: def.ProjectID}, Step: &flowengine.Step{Name: "start"}}}
+	ctx := service.WithRuntimeResolution(t.Context(), &service.RuntimeResolution{
+		Deployment: &domain.Deployment{ID: "dep_1"},
+		Release: &domain.Release{ID: "rel_1", Pointers: []domain.ReleasePointer{{
+			Kind:       domain.ReleasePointerKindSchema,
+			Handle:     "human-user",
+			RevisionID: testUserSchema.URL,
+		}}},
+	})
+
+	_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil).Start(ctx, service.StartFlowRequest{
+		Definition: def,
+		Purpose:    domain.FlowDefinitionPurposeLogin,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "dep_1", sm.gotStartInput.DeploymentID)
+	assert.Equal(t, "rel_1", sm.gotStartInput.ReleaseID)
 }
 
 // Path B auth.attempt.created runs inside stateMachine.Start. The flow id

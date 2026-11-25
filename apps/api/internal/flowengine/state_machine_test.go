@@ -281,13 +281,18 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
+		DeploymentID:  "dep_1",
+		ReleaseID:     "rel_1",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	require.Equal(t, "credentials", result.State.CurrentStep)
+	assert.Equal(t, "flow_01TEST", result.State.ID)
 	assert.Equal(t, testProjectID, result.State.ProjectID)
 	assert.Equal(t, defaultSchemaURL, result.State.UserSchemaURL)
+	assert.Equal(t, "dep_1", result.State.DeploymentID, "later requests read the deployment the flow started under")
+	assert.Equal(t, "rel_1", result.State.ReleaseID, "later requests read the release the flow started under")
 	assert.True(t, containsFieldName(result.Step.Fields, "email"))
 	act, ok := findAction(result.Step.Actions, flowengine.ActionSubmit)
 	assert.True(t, ok)
