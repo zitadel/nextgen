@@ -198,9 +198,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListPolicyRevisionsOperation: []string{
 		"policy.read",
 	},
-	ListProjectAdminsOperation: []string{
-		"project.write",
-	},
 	ListProjectMembersOperation: []string{
 		"project.write",
 	},
@@ -372,7 +369,6 @@ var operationRolesSessionCookie = map[string][]string{
 	ListMyTeamsOperation:            []string{},
 	ListPoliciesOperation:           []string{},
 	ListPolicyRevisionsOperation:    []string{},
-	ListProjectAdminsOperation:      []string{},
 	ListProjectMembersOperation:     []string{},
 	ListReleasesOperation:           []string{},
 	ListSchemasOperation:            []string{},
