@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
-import { Project } from "@/lib/project";
+import { toZitadelError } from "@/lib/errors";
+import { Project, ProjectFileMalformedError, ProjectFileMissingError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 const VALID_SECRET = {
@@ -39,8 +39,8 @@ describe("Project.secret", () => {
       await Project.at(cwd).secret();
       expect.unreachable("expected ProjectSecret.read to throw");
     } catch (error) {
-      expect(error).toBeInstanceOf(ZitadelError);
-      const zerr = error as ZitadelError;
+      expect(error).toBeInstanceOf(ProjectFileMissingError);
+      const zerr = toZitadelError(error);
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
       expect(zerr.hint).toContain("zitadel doctor --fix");
@@ -81,14 +81,12 @@ describe("Project.secret", () => {
     });
   });
 
-  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async ({
-    dir: cwd,
-  }) => {
+  it("reports malformed JSON as a malformed file, not a missing one", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/secret"), "{ broken");
 
     await expect(Project.at(cwd).secret()).rejects.toThrow();
-    await expect(Project.at(cwd).secret()).rejects.not.toBeInstanceOf(ZitadelError);
+    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectFileMalformedError);
   });
 });
 

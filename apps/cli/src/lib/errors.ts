@@ -9,6 +9,7 @@ import {
   EnvironmentValueMissingError,
 } from "./environment";
 import { isObject } from "./json";
+import { ProjectError, ProjectFileMalformedError, ProjectFileMissingError } from "./project";
 import type { Suggested } from "./suggestion";
 import {
   LocalServerDownError,
@@ -456,6 +457,39 @@ function environmentErrorAdvice(error: EnvironmentError): {
   return {};
 }
 
+/**
+ * What to do about a failure with a project's files, worded with the CLI's
+ * commands, which the library leaves out.
+ *
+ * @param error - The failure.
+ * @returns The advice and the commands to run next, each left out when there
+ *   is none.
+ */
+function projectErrorAdvice(error: ProjectError): {
+  hint?: string;
+  nextCommands?: readonly Suggested[];
+} {
+  if (error instanceof ProjectFileMissingError) {
+    return error.file === "secret"
+      ? {
+          hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+          nextCommands: [{ id: "doctor", flags: { fix: true } }],
+        }
+      : { hint: "Set the project up first.", nextCommands: [{ id: "setup" }] };
+  }
+
+  if (error instanceof ProjectFileMalformedError) {
+    return error.file === "secret"
+      ? {
+          hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+          nextCommands: [{ id: "doctor", flags: { fix: true } }],
+        }
+      : { hint: "Fix zitadel.json, which is the project's committed configuration." };
+  }
+
+  return { hint: error.hint };
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -630,6 +664,22 @@ export function toZitadelError(error: unknown): ZitadelError {
       error instanceof EnvironmentFileMissingError
         ? "E_VALIDATION"
         : CATEGORY_CODES[error.category],
+      error.message,
+      {
+        ...(hint === undefined ? {} : { hint }),
+        ...(nextCommands === undefined ? {} : { nextCommands }),
+        ...(error.details === undefined ? {} : { details: error.details }),
+      },
+    );
+  }
+
+  // The project's own files: a missing one keeps the code it always had, until
+  // the codes are decided.
+  if (error instanceof ProjectError) {
+    const { hint, nextCommands } = projectErrorAdvice(error);
+
+    return new ZitadelError(
+      error instanceof ProjectFileMissingError ? "E_VALIDATION" : CATEGORY_CODES[error.category],
       error.message,
       {
         ...(hint === undefined ? {} : { hint }),

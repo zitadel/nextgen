@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
+
+import { ProjectFileMalformedError, ProjectFileMissingError } from "./errors";
 
 /**
  * A project's `zitadel.json`: the committed record of how setup configured it.
@@ -34,27 +35,31 @@ export class ProjectConfig {
   }
 
   /**
-   * Reads and parses `zitadel.json`. A missing file becomes an actionable
-   * `E_VALIDATION` error pointing at `setup`; other errors (malformed JSON)
-   * propagate unchanged.
+   * Reads and parses `zitadel.json`. A missing file and one that is not a JSON
+   * object are failures of their own; any other error (the operating system
+   * refusing the read) propagates unchanged.
    *
    * @param cwd - The project's directory.
    * @returns The project's configuration.
-   * @throws {@link ZitadelError} When there is no `zitadel.json`.
+   * @throws {@link ProjectFileMissingError} When there is no `zitadel.json`.
+   * @throws {@link ProjectFileMalformedError} When it is not a JSON object.
    */
   static async read(cwd: string): Promise<ProjectConfig> {
-    try {
-      return new ProjectConfig(
-        parseJsonObject(await readFile(join(cwd, "zitadel.json"), "utf8"), "zitadel.json"),
-      );
-    } catch (error) {
+    const text = await readFile(join(cwd, "zitadel.json"), "utf8").catch((error: unknown) => {
       if (isErrno(error, "ENOENT")) {
-        throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
-          hint: "Set the project up first.",
-          nextCommands: [{ id: "setup" }],
-        });
+        throw new ProjectFileMissingError("config", "zitadel.json was not found", { cause: error });
       }
       throw error;
+    });
+
+    try {
+      return new ProjectConfig(parseJsonObject(text, "zitadel.json"));
+    } catch (error) {
+      throw new ProjectFileMalformedError(
+        "config",
+        error instanceof Error ? error.message : "zitadel.json is malformed",
+        { cause: error },
+      );
     }
   }
 

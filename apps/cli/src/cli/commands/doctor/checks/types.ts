@@ -1,6 +1,12 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { errorMessage, toZitadelError, ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
-import { OrcaError, type Orca } from "@/lib/orca";
+import {
+  errorMessage,
+  isCategorized,
+  toZitadelError,
+  ZitadelError,
+  type ZitadelErrorCode,
+} from "@/lib/errors";
+import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 
 /**
@@ -151,7 +157,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         path: this.path,
       };
     } catch (thrown) {
-      const error = thrown instanceof OrcaError ? toZitadelError(thrown) : thrown;
+      const error = isCategorized(thrown) ? toZitadelError(thrown) : thrown;
 
       return {
         name: this.name,

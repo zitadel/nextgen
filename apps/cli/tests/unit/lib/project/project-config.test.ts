@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
-import { Project } from "@/lib/project";
+import { toZitadelError } from "@/lib/errors";
+import { Project, ProjectFileMalformedError, ProjectFileMissingError } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
@@ -35,8 +35,8 @@ describe("Project.config", () => {
       await Project.at(cwd).config();
       expect.unreachable("expected ProjectConfig.read to throw");
     } catch (error) {
-      expect(error).toBeInstanceOf(ZitadelError);
-      const zerr = error as ZitadelError;
+      expect(error).toBeInstanceOf(ProjectFileMissingError);
+      const zerr = toZitadelError(error);
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain("zitadel.json was not found");
       expect(zerr.hint).toBe("Set the project up first.");
@@ -44,12 +44,12 @@ describe("Project.config", () => {
     }
   });
 
-  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async () => {
+  it("reports malformed JSON as a malformed file, not a missing one", async () => {
     const cwd = await makeTempDir();
     await writeFile(join(cwd, "zitadel.json"), "{ not valid json");
 
     await expect(Project.at(cwd).config()).rejects.toThrow();
-    await expect(Project.at(cwd).config()).rejects.not.toBeInstanceOf(ZitadelError);
+    await expect(Project.at(cwd).config()).rejects.toBeInstanceOf(ProjectFileMalformedError);
   });
 
   it("rejects a non-object JSON root via parseJsonObject", async () => {
