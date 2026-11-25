@@ -290,15 +290,19 @@ export function failureText(message: string): FailureText {
 }
 
 /**
- * Normalises any thrown value into a {@link ZitadelError}. Inspection is
- * ordered most-specific-first (already-normalised, HTTP status, then
- * errno/filesystem, no response, Zod-like, generic `Error`, then a
- * catch-all) so the most actionable category and hint win. A cancelled
- * request arrives already normalised, as the `E_CANCELLED` error that
- * `./interrupt` aborts it with. This is the boundary that lets the rest
- * of the CLI `throw` plain errors yet still produce consistent, categorised
- * output. The original error shape is preserved under `details` for
- * debugging without leaking it into the user-facing message.
+ * Normalises any thrown value into a {@link ZitadelError}.
+ *
+ * @remarks
+ * A {@link ZitadelError} is returned as it is, an `AbortError` is the run
+ * being cancelled, and an error a package raised on purpose (an {@link isLibError})
+ * is reported with the `code`, `hint` and `details` it carries itself: this
+ * function knows no package and branches on no class. What is left is errno,
+ * Zod-like and plain errors, which are reported as `E_VALIDATION` unless errno
+ * says more, with the original shape under `details` for debugging without
+ * leaking it into the message.
+ *
+ * @param error - Whatever was caught.
+ * @returns The error the CLI reports.
  */
 export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof ZitadelError) {

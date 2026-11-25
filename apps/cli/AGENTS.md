@@ -325,6 +325,22 @@
   keeps its variables in the mixin's static `flagVariables`, which the reference reads
   from each command.
 
+## Errors
+
+- Keep errors on three levels: `Error`, a `<Package>Error` base, and `<Package><Condition>Error` classes extending the base.
+- Put every error of a package in `errors.ts` at the package root, exported from the barrel; import them from the barrel outside the package.
+- Derive a class's `name` from the class; never write a literal `name`.
+- Give every error `category`, `retryable`, `code`, `hint` and `details`; override `code` only for a condition with its own public code.
+- Pick `category` from the seven kinds by the ordered decision list in the TSDoc of `ERROR_CATEGORIES` in `src/lib/errors.ts`.
+- Give a class only to a condition a caller catches or that needs its own guidance; vary one condition with a `reason`.
+- Never throw `ZitadelError` or a `Refusal` from `src/lib`; keep `src/lib` free of `src/cli` imports.
+- Write a lib `hint` without a flag or command; the catching command adds flag wording and `nextCommands`.
+- Catch one typed error in a command and rethrow with flags; pass `cause`.
+- Branch on an error once: handled or not, `retryable`, or one `category`; never an `instanceof` chain or a message match.
+- Type an error only when it is handled; let an unanticipated failure bubble as unknown.
+- Report cancellation as an `AbortError` from the run's signal; never add a cancelled class.
+- Throw plain errors from utilities.
+
 ## Telemetry
 
 Anonymous product analytics: a copy of each event to Vercel Web Analytics

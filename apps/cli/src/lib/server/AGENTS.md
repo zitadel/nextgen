@@ -101,9 +101,9 @@ run's own folder is left out). `start` words its own refusals from the
 lifecycle's errors (`LocalServerDockerMissingError`, `LocalServerPortBusyError`,
 `LocalServerPortFullError`, `LocalServerStartError`, `LocalServerStopError`) in
 `src/cli/commands/server/start.ts`. A `docker` call that ran and failed is a
-plain `Error` carrying its command and stderr. The boundary
-(`toZitadelError`) reports `LocalServerDownError` as `E_LOCAL_SERVER_NOT_RUNNING`
-and the two port errors as `E_PORT_IN_USE`. `reset` takes a `DestroyPermit`, not
+plain `Error` carrying its command and stderr. Each error carries its
+own `code`: `LocalServerDownError` is `E_LOCAL_SERVER_NOT_RUNNING` and the two
+port errors are `E_PORT_IN_USE`. `reset` takes a `DestroyPermit`, not
 `Consent`; the package says what it is doing through a `progress` callback the
 command gives it, not through `log`.
 
