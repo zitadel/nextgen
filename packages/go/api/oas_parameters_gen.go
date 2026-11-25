@@ -621,7 +621,7 @@ type ListEventsParams struct {
 	FlowID OptString `json:",omitempty,omitzero"`
 	// Only events of this HTTP request ID.
 	RequestID OptString `json:",omitempty,omitzero"`
-	// Only events of requests served by this release, such as one variant of an A/B test of the sign-in.
+	// Only events of requests served by this release, a pinned release included.
 	ReleaseID OptString `json:",omitempty,omitzero"`
 	// Only events of requests served by this deployment.
 	DeploymentID OptString `json:",omitempty,omitzero"`
