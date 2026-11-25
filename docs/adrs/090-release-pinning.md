@@ -1,4 +1,4 @@
-# ADR 092: Release Pinning
+# ADR 090: Release Pinning
 
 > **Status:** Proposed
 > **Date:** 2026-11-25
@@ -24,6 +24,9 @@ A build of the app can pin the release it was built against.
   this origin.
 - A release that was never deployed to the origin, or that was revoked, is
   refused with an error the app can show.
+- A pinned request without an `Origin` is refused too. Without a pin, such a
+  request gets the project's newest deployment; with one, that would silently
+  serve a different release than the one asked for.
 - The rest of the sign-in stays on the same release, as it does today.
 - Pinning is optional. Without the header, nothing changes.
 
