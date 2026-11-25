@@ -97,6 +97,8 @@ function InviteForm({
 
   // ADR 030: a refusal's own message is the human-facing string.
   const create = useSubmit(async () => {
+    // Unreachable from the form, whose only submit button is disabled until a
+    // role is picked; it narrows the type.
     if (!relation) return;
     onCreated(await createProjectInvitation(projectId, { relation, name: name.trim() }));
   }, "The invitation could not be created.");

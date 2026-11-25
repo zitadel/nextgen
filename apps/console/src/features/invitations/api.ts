@@ -26,8 +26,14 @@ export type InvitationsRead =
   | { denied: true }
   | { error: string };
 
-/** The server's refusal for anyone who is not an admin of the project. */
-const PERMISSION_DENIED = "inv.permission_denied";
+/**
+ * The server's refusals of the list for anyone who is not an admin of the
+ * project: `inv.permission_denied` for a role that is too weak, and
+ * `inv.not_found` where the caller's access does not reach the project's
+ * invitations at all (a narrower grant). A list names no invitation, so its
+ * `not_found` can mean nothing else.
+ */
+const LIST_DENIED = new Set(["inv.permission_denied", "inv.not_found"]);
 
 /**
  * The page's first read, with a failure as a value: the Members tab stays
@@ -39,7 +45,7 @@ export async function readInvitationsForPage(projectId: string): Promise<Invitat
   try {
     return await readInvitations(projectId);
   } catch (cause) {
-    if (apiErrorCode(cause) === PERMISSION_DENIED) return { denied: true };
+    if (LIST_DENIED.has(apiErrorCode(cause) ?? "")) return { denied: true };
     return { error: describeError(cause, "The invitations could not be read.") };
   }
 }

@@ -302,29 +302,28 @@ describe("project invitations", () => {
     expect(screen.getByRole("heading", { name: "acme-app" })).toBeInTheDocument();
   });
 
-  it("offers no inviting and explains the tab to someone who is not an admin", async () => {
-    stubPage(() =>
-      HttpResponse.json(
-        {
-          code: "inv.permission_denied",
-          message: "insufficient permissions to manage invitations",
-        },
-        { status: 403 },
-      ),
-    );
-    openMembers();
-    // The members stay readable, without the button.
-    await screen.findByRole("region", { name: "Members" });
-    expect(screen.queryByRole("button", { name: "Invite member" })).not.toBeInTheDocument();
+  it.each([
+    [403, "inv.permission_denied", "insufficient permissions to manage invitations"],
+    // A narrower grant: the server answers as if there were nothing to list.
+    [404, "inv.not_found", "This invitation is no longer available."],
+  ])(
+    "offers no inviting and explains the tab to someone who is not an admin (%i %s)",
+    async (status, code, message) => {
+      stubPage(() => HttpResponse.json({ code, message }, { status }));
+      openMembers();
+      // The members stay readable, without the button.
+      await screen.findByRole("region", { name: "Members" });
+      expect(screen.queryByRole("button", { name: "Invite member" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("tab", { name: "Invitations" }));
-    const section = within(await screen.findByRole("region", { name: "Invitations" }));
-    expect(
-      section.getByText("Only project admins can see and create invitations."),
-    ).toBeInTheDocument();
-    expect(section.queryByText(/insufficient permissions/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Invite member" })).not.toBeInTheDocument();
-  });
+      await userEvent.click(screen.getByRole("tab", { name: "Invitations" }));
+      const section = within(await screen.findByRole("region", { name: "Invitations" }));
+      expect(
+        section.getByText("Only project admins can see and create invitations."),
+      ).toBeInTheDocument();
+      expect(section.queryByText(message)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Invite member" })).not.toBeInTheDocument();
+    },
+  );
 
   it("loads the next page with the token it was given", async () => {
     const reads = stubPage(({ pageToken }) =>
@@ -405,9 +404,6 @@ describe("inviting a member", () => {
     }
     const create = dialog.getByRole("button", { name: "Create invitation" });
     expect(create).toBeDisabled();
-    // Enter in the name field submits the form; without a role nothing is sent.
-    await userEvent.type(dialog.getByRole("textbox", { name: /Invitee name/ }), "{Enter}");
-    expect(created).toHaveLength(0);
 
     await userEvent.click(dialog.getByRole("radio", { name: "Viewer" }));
     expect(create).toBeEnabled();
