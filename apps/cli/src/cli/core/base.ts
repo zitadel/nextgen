@@ -171,9 +171,6 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
       force: false,
     },
     this.presentation(),
-    (reason) => {
-      this.abortRun(reason);
-    },
   );
 
   /**
@@ -560,9 +557,6 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
         force: this.meta.force,
       },
       this.presentation(),
-      (reason) => {
-        this.abortRun(reason);
-      },
     );
     this.ui.describe(
       (this.constructor as typeof BaseCommand).heading ??

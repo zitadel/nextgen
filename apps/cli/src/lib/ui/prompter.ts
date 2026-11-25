@@ -76,11 +76,6 @@ export type Prompting = {
    * @typeParam T - What the prompt resolves to.
    */
   around?: <T>(draw: () => Promise<T>) => Promise<T>;
-  /**
-   * Aborts the run's signal. A prompt the person walks away from calls it with
-   * the `AbortError` it then throws.
-   */
-  abort?: (reason: DOMException) => void;
 };
 
 /**
@@ -103,15 +98,12 @@ export type PromptSession = Prompting & {
  */
 export class DrawnPrompter implements Prompter {
   private readonly guide: boolean;
-  private readonly abort: ((reason: DOMException) => void) | undefined;
 
   /**
    * @param guide - Whether the prompts are drawn with clack's guide beside them.
-   * @param abort - Aborts the run's signal when the person walks away from a prompt.
    */
-  constructor(guide: boolean, abort?: (reason: DOMException) => void) {
+  constructor(guide: boolean) {
     this.guide = guide;
-    this.abort = abort;
   }
 
   /**
@@ -261,8 +253,7 @@ export class DrawnPrompter implements Prompter {
    *
    * @param answer - What the prompt returned.
    * @returns The answer, when there is one.
-   * @throws An `AbortError`, after the run's signal is aborted with it, when the prompt was
-   *   cancelled.
+   * @throws An `AbortError` when the prompt was cancelled.
    */
   private chosen<T>(answer: T | symbol): T {
     if (isCancel(answer)) {
@@ -272,9 +263,7 @@ export class DrawnPrompter implements Prompter {
       } else {
         cancel(CANCELLED);
       }
-      const reason = new DOMException("Cancelled by user", "AbortError");
-      this.abort?.(reason);
-      throw reason;
+      throw new DOMException("Cancelled by user", "AbortError");
     }
     return answer as T;
   }

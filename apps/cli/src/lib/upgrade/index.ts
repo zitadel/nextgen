@@ -1,7 +1,6 @@
 export { CliPackage } from "./cli-package";
 export {
   UpgradeError,
-  type UpgradeErrorOptions,
   UpgradeInstallFailedError,
   UpgradeReleaseLookupError,
 } from "./errors";

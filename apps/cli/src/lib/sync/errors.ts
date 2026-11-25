@@ -1,25 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-
-/**
- * What a sync failure carries beyond its message.
- */
-export type SyncErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Anything reading the record of what was synced fails with on purpose.
@@ -30,42 +9,30 @@ export type SyncErrorOptions = {
  * operating system refusing to read the file, is not one of these: it bubbles
  * as it was thrown.
  */
-export class SyncError extends Error implements Categorized {
-  /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "invalid";
+export abstract class SyncError extends Error {
+  /** The kind of failure, which the boundary reports it as. */
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
-
-  /**
-   * What to do about it.
-   */
-  readonly hint: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details: Readonly<Record<string, unknown>> | undefined;
+  /** The stable product code the failure is reported with. */
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * Make a sync failure.
    *
    * @param message - What went wrong.
-   * @param options - What to do about it, the facts behind it, and its cause.
+   * @param options - The error that caused this one, if any.
    */
-  constructor(message: string, options: SyncErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(message, options);
     this.name = new.target.name;
-    this.hint = options.hint;
-    this.details = options.details;
   }
 }
 
@@ -76,6 +43,19 @@ export class SyncError extends Error implements Categorized {
 export class SyncStateMalformedError extends SyncError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * What to do about it.
+   */
+  readonly hint: string =
+    "The file records which platform resource each local file was synced as. " +
+    "Fix or remove it, then run this command again.";
+
+  /**
+   * Structured facts about the failure, for a `--json` reader.
+   */
+  readonly details: Readonly<Record<string, unknown>>;
 
   /**
    * The state file's path, relative to the project.
@@ -94,14 +74,17 @@ export class SyncStateMalformedError extends SyncError {
    * @param problem - What is wrong with it.
    * @param options - The cause.
    */
-  constructor(file: string, problem: string, options: SyncErrorOptions = {}) {
-    super(`Cannot read ${file}: ${problem}`, {
-      hint:
-        "The file records which platform resource each local file was synced as. " +
-        "Fix or remove it, then run this command again.",
-      details: { file },
-      ...options,
-    });
+  constructor(
+    file: string,
+    problem: string,
+    options: {
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(`Cannot read ${file}: ${problem}`, options);
+    this.details = {
+      file,
+    };
     this.file = file;
     this.problem = problem;
   }

@@ -4,9 +4,11 @@ export { Project } from "./project";
 export type { ProjectConfig } from "./project-config";
 export type { ProjectSecret, ProjectSecretData } from "./project-secret";
 export {
-  ProjectEnvValueError,
+  ProjectConfigMalformedError,
+  ProjectConfigMissingError,
+  ProjectEnvValueMultilineError,
+  ProjectEnvValueUnquotableError,
   ProjectError,
-  ProjectFileMalformedError,
-  ProjectFileMissingError,
+  ProjectSecretMalformedError,
+  ProjectSecretMissingError,
 } from "./errors";
-export type { ProjectEnvValueReason, ProjectErrorOptions, ProjectFile } from "./errors";

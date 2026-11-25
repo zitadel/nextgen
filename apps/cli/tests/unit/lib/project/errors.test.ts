@@ -2,65 +2,58 @@ import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
 import {
-  ProjectEnvValueError,
+  ProjectConfigMalformedError,
+  ProjectConfigMissingError,
+  ProjectEnvValueMultilineError,
+  ProjectEnvValueUnquotableError,
   ProjectError,
-  ProjectFileMalformedError,
-  ProjectFileMissingError,
+  ProjectSecretMalformedError,
+  ProjectSecretMissingError,
 } from "@/lib/project";
 
 describe("the project errors", () => {
   it.each([
-    ["missing config", new ProjectFileMissingError("config", "gone"), "missing", "E_VALIDATION"],
-    ["missing secret", new ProjectFileMissingError("secret", "gone"), "missing", "E_VALIDATION"],
-    ["malformed", new ProjectFileMalformedError("config", "bad"), "invalid", "E_VALIDATION"],
-    ["env value", new ProjectEnvValueError("line-break", "KEY"), "invalid", "E_VALIDATION"],
+    ["missing config", new ProjectConfigMissingError(), "missing", "E_VALIDATION"],
+    ["missing secret", new ProjectSecretMissingError(), "missing", "E_VALIDATION"],
+    ["malformed config", new ProjectConfigMalformedError("bad"), "invalid", "E_VALIDATION"],
+    ["malformed secret", new ProjectSecretMalformedError("bad"), "invalid", "E_VALIDATION"],
+    ["multi-line value", new ProjectEnvValueMultilineError("KEY"), "invalid", "E_VALIDATION"],
+    ["unquotable value", new ProjectEnvValueUnquotableError("KEY"), "invalid", "E_VALIDATION"],
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(ProjectError);
     expect(error.category).toBe(category);
+    expect(error.retryable).toBe(false);
     expect(toZitadelError(error).code).toBe(code);
   });
 
-  it("points a missing secret at doctor --fix", () => {
-    expect(toZitadelError(new ProjectFileMissingError("secret", "gone"))).toMatchObject({
-      hint: expect.stringContaining("Restore the project secret"),
-      nextCommands: [{ id: "doctor", flags: { fix: true } }],
-    });
-  });
-
-  it("points a malformed secret at doctor --fix as well", () => {
-    expect(toZitadelError(new ProjectFileMalformedError("secret", "bad"))).toMatchObject({
-      nextCommands: [{ id: "doctor", flags: { fix: true } }],
-    });
-  });
-
-  it("points a missing config at setup", () => {
-    expect(toZitadelError(new ProjectFileMissingError("config", "gone"))).toMatchObject({
+  it("says a missing config is to be set up first, naming no command", () => {
+    expect(toZitadelError(new ProjectConfigMissingError())).toMatchObject({
+      message: "zitadel.json was not found",
       hint: "Set the project up first.",
-      nextCommands: [{ id: "setup" }],
+      nextCommands: undefined,
+    });
+  });
+
+  it("says where a missing secret can be restored from, naming no command", () => {
+    expect(toZitadelError(new ProjectSecretMissingError())).toMatchObject({
+      message: ".zitadel/secret was not found",
+      hint: "The project secret can be restored from .env.development.local.",
+      nextCommands: undefined,
     });
   });
 
   it("keeps the library's own hint for a value a .env cannot hold", () => {
-    const error = new ProjectEnvValueError("unquotable", "KEY");
-
-    expect(toZitadelError(error).hint).toBe(
+    expect(toZitadelError(new ProjectEnvValueUnquotableError("KEY")).hint).toBe(
       "Set it in the process environment instead of a .env file.",
+    );
+    expect(toZitadelError(new ProjectEnvValueMultilineError("KEY")).hint).toBe(
+      "A .env value is a single line; remove the newline or store the value another way.",
     );
   });
 
   it("keeps the cause of a missing file", () => {
     const cause = new Error("ENOENT");
 
-    expect(new ProjectFileMissingError("secret", "gone", { cause }).cause).toBe(cause);
-  });
-});
-
-describe("the project errors' codes", () => {
-  it("reports a missing file as a validation failure, not a missing thing", () => {
-    expect(new ProjectFileMissingError("config", "why").code).toBe("E_VALIDATION");
-  });
-
-  it("reports a malformed file as a validation failure", () => {
-    expect(new ProjectFileMalformedError("config", "why").code).toBe("E_VALIDATION");
+    expect(new ProjectSecretMissingError({ cause }).cause).toBe(cause);
   });
 });

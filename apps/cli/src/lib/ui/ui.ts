@@ -68,14 +68,9 @@ export class Ui {
   /**
    * @param audience - Who is watching.
    * @param presentation - Which of the two shapes the command draws.
-   * @param abortRun - Aborts the run's signal, for a prompt the person walks away from.
    */
-  constructor(
-    audience: Audience,
-    presentation: Presentation = "wizard",
-    abortRun?: (reason: DOMException) => void,
-  ) {
-    this.chain = new Chain(audience, presentation, abortRun);
+  constructor(audience: Audience, presentation: Presentation = "wizard") {
+    this.chain = new Chain(audience, presentation);
     this.printer = new LogPrinter(this.chain);
   }
 

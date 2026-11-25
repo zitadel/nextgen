@@ -1,26 +1,5 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 import type { PackageCommand } from "@/lib/pm";
-
-/**
- * What an upgrade failure carries beyond its message.
- */
-export type UpgradeErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
 
 /**
  * Anything planning or applying an upgrade fails with on purpose.
@@ -29,42 +8,30 @@ export type UpgradeErrorOptions = {
  * A caller catches this, or one of its subclasses, and words the failure for
  * its own person. A failure nothing here anticipated bubbles as it was thrown.
  */
-export class UpgradeError extends Error implements Categorized {
-  /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "invalid";
+export abstract class UpgradeError extends Error {
+  /** The kind of failure, which the boundary reports it as. */
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
-
-  /**
-   * What to do about it.
-   */
-  readonly hint: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details: Readonly<Record<string, unknown>> | undefined;
+  /** The stable product code the failure is reported with. */
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * Make an upgrade failure.
    *
    * @param message - What went wrong.
-   * @param options - What to do about it, the facts behind it, and its cause.
+   * @param options - The error that caused this one, if any.
    */
-  constructor(message: string, options: UpgradeErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(message, options);
     this.name = new.target.name;
-    this.hint = options.hint;
-    this.details = options.details;
   }
 }
 
@@ -75,14 +42,13 @@ export class UpgradeError extends Error implements Categorized {
 export class UpgradeReleaseLookupError extends UpgradeError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
 
   /**
    * Make the failure.
-   *
-   * @param options - What was known about why, and the cause.
    */
-  constructor(options: UpgradeErrorOptions = {}) {
-    super("Could not look up the latest release", options);
+  constructor() {
+    super("Could not look up the latest release");
   }
 }
 
@@ -94,6 +60,7 @@ export class UpgradeReleaseLookupError extends UpgradeError {
 export class UpgradeInstallFailedError extends UpgradeError {
   override readonly category: ErrorCategory = "unknown";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * The install, as the person's shell reads it, so it can be offered again.
@@ -107,7 +74,9 @@ export class UpgradeInstallFailedError extends UpgradeError {
    * @param cause - What the package manager failed with.
    */
   constructor(command: PackageCommand, cause: unknown) {
-    super("Could not install the new packages", { cause });
+    super("Could not install the new packages", {
+      cause,
+    });
     this.command = command;
   }
 }

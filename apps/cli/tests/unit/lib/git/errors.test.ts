@@ -7,30 +7,31 @@ import {
   GitInternalError,
 } from "@/lib/git/errors";
 
-describe("GitError", () => {
-  it("carries its message, name and category", () => {
-    expect(new GitError("invalid", "why")).toMatchObject({
-      message: "why",
-      name: "GitError",
-      category: "invalid",
-    });
-  });
-
-  it("keeps the error that caused it", () => {
-    const cause = new Error("underneath");
-
-    expect(new GitError("unknown", "why", { cause }).cause).toBe(cause);
-  });
-});
-
 describe("the git errors' retryable trait", () => {
   it.each([
-    new GitError("unknown", "why"),
     new GitBinaryMissingError("why"),
     new GitCommandFailedError("why"),
     new GitInternalError("why"),
   ])("is false for %#", (error) => {
     expect(error.retryable).toBe(false);
+  });
+});
+
+describe("the git errors' code", () => {
+  it.each([
+    new GitBinaryMissingError("why"),
+    new GitCommandFailedError("why"),
+    new GitInternalError("why"),
+  ])("is E_VALIDATION for %#", (error) => {
+    expect(error.code).toBe("E_VALIDATION");
+  });
+});
+
+describe("a git error's cause", () => {
+  it("is kept", () => {
+    const cause = new Error("underneath");
+
+    expect(new GitCommandFailedError("why", { cause }).cause).toBe(cause);
   });
 });
 
@@ -42,7 +43,7 @@ describe("GitBinaryMissingError", () => {
   it("is a precondition under its own name", () => {
     expect(new GitBinaryMissingError("why")).toMatchObject({
       name: "GitBinaryMissingError",
-      category: "invalid",
+      category: "conflict",
     });
   });
 });

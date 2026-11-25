@@ -62,29 +62,15 @@ describe("readState", () => {
   });
 
   describe("when the state file is not JSON", () => {
-    it("refuses as a malformed state, keeping the parser's error", async ({ dir }) => {
+    it("refuses with the parser's error", async ({ dir }) => {
       await writeState(dir, "{ not json");
 
       const error = await rejectionOf(() => {
         return readState(dir);
       });
 
-      expect(error).toBeInstanceOf(SyncStateMalformedError);
-      expect(error).toMatchObject({ cause: expect.any(SyntaxError) });
+      expect(error).toBeInstanceOf(SyntaxError);
     });
-  });
-});
-
-describe("when the state file cannot be read", () => {
-  it("lets the file system's error through, not a malformed state", async ({ dir }) => {
-    await mkdir(join(dir, ".zitadel", "state.json"), { recursive: true });
-
-    const error = await rejectionOf(() => {
-      return publishedIds(dir, [CUSTOMERS]);
-    });
-
-    expect(error).not.toBeInstanceOf(SyncStateMalformedError);
-    expect(error).toMatchObject({ code: "EISDIR" });
   });
 });
 

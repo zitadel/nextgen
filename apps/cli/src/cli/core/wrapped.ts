@@ -2,7 +2,7 @@ import { format } from "node:util";
 
 import type { Command } from "@oclif/core";
 
-import { isLibError, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import { refusalError, type Refusal } from "@/cli/core/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -122,7 +122,7 @@ export function Wrapped<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
       const returned: unknown = await real
         .run()
         .catch((error: unknown) => {
-          if (error instanceof ZitadelError || isLibError(error)) {
+          if (error instanceof ZitadelError) {
             throw error;
           }
 

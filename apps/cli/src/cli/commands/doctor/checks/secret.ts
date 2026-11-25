@@ -2,11 +2,27 @@ import { join } from "node:path";
 
 import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
 import { Dotenv } from "@/lib/environment";
-import { Project } from "@/lib/project";
+import { Project, ProjectSecretMissingError } from "@/lib/project";
 import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
+import { refusalError, type Refusal } from "@/cli/core/refusal";
+
 import { AbstractSanityCheck, type CheckContext } from "./types";
+
+/** What a project with no `.zitadel/secret` is reported as. */
+const SECRET_MISSING_REFUSAL = {
+  message: ".zitadel/secret was not found",
+  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+  next: [
+    {
+      id: "doctor",
+      flags: {
+        fix: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
 
 /**
  * The env file the CLI reads, which setup fills with the project's credentials.
@@ -24,7 +40,14 @@ export class SecretCheck extends AbstractSanityCheck {
   protected readonly summary = ".zitadel/secret parses";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    await Project.at(ctx.cwd).secret();
+    try {
+      await Project.at(ctx.cwd).secret();
+    } catch (error) {
+      if (error instanceof ProjectSecretMissingError) {
+        throw refusalError(SECRET_MISSING_REFUSAL, {});
+      }
+      throw error;
+    }
   }
 
   /**

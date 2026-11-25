@@ -55,7 +55,14 @@ export class Manifest {
    */
   static async read(dir: string): Promise<Manifest> {
     const path = join(dir, "package.json");
-    return Manifest.parse(await readFile(path, "utf8"), path);
+    const text = await readFile(path, "utf8");
+    try {
+      return new Manifest(parseJsonObject(text, path) as PackageJson);
+    } catch (error) {
+      throw new PmManifestInvalidError(path, {
+        cause: error,
+      });
+    }
   }
 
   /**
@@ -78,23 +85,15 @@ export class Manifest {
   static async readIfExists(dir: string): Promise<Manifest | undefined> {
     const path = join(dir, "package.json");
     const text = await readIfExists(path);
-    return text === undefined ? undefined : Manifest.parse(text, path);
-  }
-
-  /**
-   * Parses the text of a `package.json`.
-   *
-   * @param text - The file's contents.
-   * @param path - The file's path, for the error.
-   * @returns The manifest.
-   * @throws {@link PmManifestInvalidError} When the text is not JSON or its
-   *   root is not an object; the parse error is its cause.
-   */
-  private static parse(text: string, path: string): Manifest {
+    if (text === undefined) {
+      return undefined;
+    }
     try {
       return new Manifest(parseJsonObject(text, path) as PackageJson);
     } catch (error) {
-      throw new PmManifestInvalidError(path, { cause: error });
+      throw new PmManifestInvalidError(path, {
+        cause: error,
+      });
     }
   }
 }

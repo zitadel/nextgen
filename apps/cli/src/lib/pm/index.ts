@@ -1,8 +1,6 @@
 export {
   PmCommandFailedError,
-  type PmCommandFailedOptions,
   PmError,
-  type PmErrorOptions,
   PmManifestInvalidError,
 } from "./errors";
 export type { PackageJson } from "./manifest";

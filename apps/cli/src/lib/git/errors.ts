@@ -1,5 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Every error the git package throws.
@@ -11,36 +10,30 @@ import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors"
  * nothing useful. The temporary staging area's file-system calls can still
  * fail with Node's own errors. Whether a failure is fatal is the caller's choice.
  */
-export class GitError extends Error implements Categorized {
+export abstract class GitError extends Error {
   /** The kind of failure, which the boundary reports it as. */
-  readonly category: ErrorCategory;
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
+  /** The stable product code the failure is reported with. */
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * Creates the error.
    *
-   * @param category - What kind of failure it is.
    * @param message - What went wrong.
    * @param options - The error that caused this one, if any.
    */
   constructor(
-    category: ErrorCategory,
     message: string,
-    options: { readonly cause?: unknown } = {},
+    options: {
+      readonly cause?: unknown;
+    } = {},
   ) {
     super(message, options);
     this.name = new.target.name;
-    this.category = category;
   }
 
   /**
@@ -80,15 +73,9 @@ export class GitError extends Error implements Categorized {
  * failure is thrown.
  */
 export class GitBinaryMissingError extends GitError {
+  override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
-  /**
-   * Creates the error.
-   *
-   * @param message - The message Node gave.
-   */
-  constructor(message: string) {
-    super("invalid", message);
-  }
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /**
@@ -98,26 +85,14 @@ export class GitBinaryMissingError extends GitError {
  * Carries git's own words and no advice, because nothing knows why.
  */
 export class GitCommandFailedError extends GitError {
+  override readonly category: ErrorCategory = "unknown";
   override readonly retryable: boolean = false;
-  /**
-   * Creates the error.
-   *
-   * @param message - What git said, or what this package says when git said nothing.
-   */
-  constructor(message: string) {
-    super("unknown", message);
-  }
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /** A bug in this package: something that cannot happen unless the code is wrong. */
 export class GitInternalError extends GitError {
+  override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
-  /**
-   * Creates the error.
-   *
-   * @param message - What the code found impossible.
-   */
-  constructor(message: string) {
-    super("fault", message);
-  }
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }

@@ -4,7 +4,7 @@ import { text } from "node:stream/consumers";
 
 import { Flags, type Command, type Interfaces, Parser } from "@oclif/core";
 
-import { errorMessage, isLibError, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import { parseJsonObject, wordOf } from "@/lib/json";
 import { kebab } from "@/lib/names";
 import { environmentFlags } from "./environment-flags";
@@ -360,11 +360,16 @@ export class Input {
     try {
       await this.check(await Input.textOf(source));
     } catch (error) {
-      if (error instanceof ZitadelError || isLibError(error)) {
+      if (error instanceof ZitadelError) {
         throw error;
       }
+      if (error instanceof SyntaxError) {
+        throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
+          problem: "--input is not valid JSON",
+        });
+      }
       throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
-        problem: error instanceof SyntaxError ? "--input is not valid JSON" : errorMessage(error),
+        problem: error instanceof Error ? error.message : String(error),
       });
     }
   }

@@ -1,25 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-
-/**
- * What a package manager failure carries beyond its message.
- */
-export type PmErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Anything reading a project's manifest or running its package manager fails
@@ -31,42 +10,30 @@ export type PmErrorOptions = {
  * operating system refusing to read the file, is not one of these: it bubbles
  * as it was thrown.
  */
-export class PmError extends Error implements Categorized {
-  /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "invalid";
+export abstract class PmError extends Error {
+  /** The kind of failure, which the boundary reports it as. */
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
-
-  /**
-   * What to do about it.
-   */
-  readonly hint: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details: Readonly<Record<string, unknown>> | undefined;
+  /** The stable product code the failure is reported with. */
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * Make a package manager failure.
    *
    * @param message - What went wrong.
-   * @param options - What to do about it, the facts behind it, and its cause.
+   * @param options - The error that caused this one, if any.
    */
-  constructor(message: string, options: PmErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(message, options);
     this.name = new.target.name;
-    this.hint = options.hint;
-    this.details = options.details;
   }
 }
 
@@ -77,6 +44,12 @@ export class PmError extends Error implements Categorized {
 export class PmManifestInvalidError extends PmError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * Structured facts about the failure, for a `--json` reader.
+   */
+  readonly details: Readonly<Record<string, unknown>>;
 
   /**
    * The path of the file that was read.
@@ -89,37 +62,21 @@ export class PmManifestInvalidError extends PmError {
    * @param path - The path of the file that was read.
    * @param options - The cause, which says what is wrong with the file.
    */
-  constructor(path: string, options: PmErrorOptions = {}) {
+  constructor(
+    path: string,
+    options: {
+      readonly cause?: unknown;
+    } = {},
+  ) {
     const reason = options.cause instanceof Error ? `: ${options.cause.message}` : "";
 
-    super(`Cannot read ${path} as a package.json${reason}`, {
-      details: { path },
-      ...options,
-    });
+    super(`Cannot read ${path} as a package.json${reason}`, options);
+    this.details = {
+      path,
+    };
     this.path = path;
   }
 }
-
-/**
- * What a failed package manager command leaves behind, for whoever reports it.
- */
-export type PmCommandFailedOptions = PmErrorOptions & {
-  /**
-   * The errno string of a command that could not start, or the exit code of
-   * one that ran and failed.
-   */
-  readonly exit?: string | number | undefined;
-
-  /**
-   * The signal that ended the command, when one did.
-   */
-  readonly signal?: string | null | undefined;
-
-  /**
-   * What the command printed, when its output was captured.
-   */
-  readonly output?: string | undefined;
-};
 
 /**
  * A package manager command that could not start or did not succeed. The
@@ -129,6 +86,7 @@ export type PmCommandFailedOptions = PmErrorOptions & {
 export class PmCommandFailedError extends PmError {
   override readonly category: ErrorCategory = "unknown";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
    * The errno string or the exit code.
@@ -151,8 +109,16 @@ export class PmCommandFailedError extends PmError {
    * @param message - What went wrong.
    * @param options - The exit, signal, captured output and cause.
    */
-  constructor(message: string, options: PmCommandFailedOptions = {}) {
-    super(message, options);
+  constructor(
+    message: string,
+    options: {
+      readonly exit?: string | number | undefined;
+      readonly signal?: string | null | undefined;
+      readonly output?: string | undefined;
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.exit = options.exit;
     this.signal = options.signal;
     this.output = options.output;

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { Project, ProjectFileMalformedError, ProjectFileMissingError } from "@/lib/project";
+import { Project, ProjectSecretMalformedError, ProjectSecretMissingError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 const VALID_SECRET = {
@@ -39,12 +39,12 @@ describe("Project.secret", () => {
       await Project.at(cwd).secret();
       expect.unreachable("expected ProjectSecret.read to throw");
     } catch (error) {
-      expect(error).toBeInstanceOf(ProjectFileMissingError);
+      expect(error).toBeInstanceOf(ProjectSecretMissingError);
       const zerr = toZitadelError(error);
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
-      expect(zerr.hint).toContain("Restore the project secret");
-      expect(zerr.nextCommands).toEqual([{ id: "doctor", flags: { fix: true } }]);
+      expect(zerr.hint).toContain("The project secret can be restored");
+      expect(zerr.nextCommands).toBeUndefined();
     }
   });
 
@@ -86,7 +86,7 @@ describe("Project.secret", () => {
     await writeFile(join(cwd, ".zitadel/secret"), "{ broken");
 
     await expect(Project.at(cwd).secret()).rejects.toThrow();
-    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectFileMalformedError);
+    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectSecretMalformedError);
   });
 });
 

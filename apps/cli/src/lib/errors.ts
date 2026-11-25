@@ -2,8 +2,6 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 
 import type { Suggested } from "./suggestion";
 
-export type { Suggested };
-
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
  *
@@ -39,49 +37,16 @@ export const CANCELLED = "Cancelled";
  *    including an unsupported shape or version.
  *
  * Whether trying the identical request again may work is a separate trait,
- * {@link Categorized.retryable}.
+ * the `retryable` property of the error.
  */
-export const ERROR_CATEGORIES = [
-  "invalid",
-  "missing",
-  "conflict",
-  "denied",
-  "unavailable",
-  "fault",
-  "unknown",
-] as const;
-
-/** One of the {@link ERROR_CATEGORIES}. */
-export type ErrorCategory = (typeof ERROR_CATEGORIES)[number];
-
-/** What an error carries when it says what kind of failure it is. */
-export interface Categorized {
-  /** The kind of failure. */
-  readonly category: ErrorCategory;
-  /**
-   * Whether the identical request, with nothing changed by anyone, may succeed
-   * on a later attempt: a network failure, a timeout, a 429 or 5xx, a lock
-   * another start holds, a server still starting. False for anything a person
-   * has to change first.
-   */
-  readonly retryable: boolean;
-  /** What to do about it, when the package that raised it knows. */
-  readonly hint?: string | undefined;
-  /** Structured facts about the failure, for a `--json` reader. */
-  readonly details?: unknown;
-  /**
-   * What to run next, as `{ id, ... }` suggestion objects the failure handler
-   * renders with the run's scope, so a package says which command without
-   * knowing how this run spells it.
-   */
-  readonly nextCommands?: readonly Suggested[] | undefined;
-}
-
-/** What an error a package raises carries, for the boundary to report it. */
-export interface LibError extends Categorized {
-  /** The stable product code the failure is reported with. */
-  readonly code: ZitadelErrorCode;
-}
+export type ErrorCategory =
+  | "invalid"
+  | "missing"
+  | "conflict"
+  | "denied"
+  | "unavailable"
+  | "fault"
+  | "unknown";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -109,29 +74,6 @@ export type ZitadelErrorCode =
   | "E_CREDENTIAL_MISSING"
   | "E_NOT_IMPLEMENTED"
   | "E_CANCELLED";
-
-/** The code each kind of failure is reported with, unless a class's condition has one of its own. */
-const CATEGORY_CODES = {
-  invalid: "E_VALIDATION",
-  missing: "E_NOT_FOUND",
-  conflict: "E_CONFLICT",
-  denied: "E_AUTH",
-  unavailable: "E_NETWORK",
-  fault: "E_VALIDATION",
-  unknown: "E_VALIDATION",
-} as const satisfies Record<ErrorCategory, ZitadelErrorCode>;
-
-/**
- * The code a failure of `category` is reported with, which every package's
- * base error answers its `code` with unless a class's condition has a code of
- * its own.
- *
- * @param category - What kind of failure it is.
- * @returns The stable product code of that kind.
- */
-export function codeOf(category: ErrorCategory): ZitadelErrorCode {
-  return CATEGORY_CODES[category];
-}
 
 /**
  * Maps each {@link ZitadelErrorCode} to the process exit code the CLI
@@ -206,7 +148,7 @@ export class ZitadelError extends Error {
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
     super(message, opts.cause === undefined ? undefined : { cause: opts.cause });
-    this.name = new.target.name;
+    this.name = "ZitadelError";
     this.raised = message;
     this.code = code;
     this.hint = opts.hint;
@@ -294,7 +236,7 @@ export function failureText(message: string): FailureText {
  *
  * @remarks
  * A {@link ZitadelError} is returned as it is, an `AbortError` is the run
- * being cancelled, and an error a package raised on purpose (an {@link isLibError})
+ * being cancelled, and an error a package raised on purpose (one carrying a `category` and a `code`)
  * is reported with the `code`, `hint` and `details` it carries itself: this
  * function knows no package and branches on no class. What is left is errno,
  * Zod-like and plain errors, which are reported as `E_VALIDATION` unless errno
@@ -311,17 +253,27 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   // The run being stopped, by a prompt walked away from or by anything else
   // that aborts, is the person's decision and not a failure.
-  if (isAbortError(error)) {
+  if (error instanceof Error && error.name === "AbortError") {
     return new ZitadelError("E_CANCELLED", "Cancelled by user");
   }
 
   // An error a package raised on purpose carries the code, hint and details
   // it is reported with.
-  if (isLibError(error)) {
-    return new ZitadelError(error.code, error.message, {
-      ...(error.hint === undefined ? {} : { hint: error.hint }),
-      ...(error.nextCommands === undefined ? {} : { nextCommands: error.nextCommands }),
-      ...(error.details === undefined ? {} : { details: error.details }),
+  if (
+    error instanceof Error &&
+    "category" in error &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    const typed = error as Error & {
+      code: ZitadelErrorCode;
+      hint?: string | undefined;
+      details?: unknown;
+    };
+
+    return new ZitadelError(typed.code, typed.message, {
+      ...(typed.hint === undefined ? {} : { hint: typed.hint }),
+      ...(typed.details === undefined ? {} : { details: typed.details }),
     });
   }
 
@@ -363,18 +315,6 @@ export function toZitadelError(error: unknown): ZitadelError {
 }
 
 /**
- * Whether `error` is an `AbortError`: the platform's way to say an operation
- * was stopped, which is what the run's signal rejects with and what a prompt
- * the person walked away from throws.
- *
- * @param error - Whatever was caught.
- * @returns True for an error named `AbortError`.
- */
-export function isAbortError(error: unknown): error is Error {
-  return error instanceof Error && error.name === "AbortError";
-}
-
-/**
  * Whether `error` is the run being cancelled, which a caller that swallows
  * failures must still let through: the person asked the command to stop, so a
  * best-effort read that failed because of it has nothing to report, and
@@ -390,23 +330,9 @@ export function isAbortError(error: unknown): error is Error {
  * @returns True for an `AbortError` or an `E_CANCELLED` error.
  */
 export function isCancellation(error: unknown): boolean {
-  return isAbortError(error) || (error instanceof ZitadelError && error.code === "E_CANCELLED");
-}
-
-/**
- * Whether a caught value is an error a package raised on purpose: one that
- * says what kind of failure it is and the code it is reported with.
- *
- * @param error - Whatever was caught.
- * @returns True for an `Error` carrying a `category` and a `code`.
- */
-export function isLibError(error: unknown): error is Error & LibError {
   return (
-    error instanceof Error &&
-    ERROR_CATEGORIES.some((category) => {
-      return category === (error as Partial<Categorized>).category;
-    }) &&
-    typeof (error as Partial<LibError>).code === "string"
+    (error instanceof Error && error.name === "AbortError") ||
+    (error instanceof ZitadelError && error.code === "E_CANCELLED")
   );
 }
 

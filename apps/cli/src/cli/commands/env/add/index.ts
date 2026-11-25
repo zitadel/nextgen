@@ -20,7 +20,7 @@ import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-proj
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
-import { Project } from "@/lib/project";
+import { Project, ProjectConfigMissingError } from "@/lib/project";
 import { ChoosingServerCommand } from "@/cli/commands/server-command";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { Telemetered } from "@/cli/telemetry/telemetered";
@@ -30,6 +30,17 @@ const FILE_EXISTS_REFUSAL = {
   code: "E_CONFLICT",
   message: "{file} already exists",
   hint: "Pass --force to overwrite it.",
+} as const satisfies Refusal;
+
+/** What a directory that setup has not made a project is refused for. */
+const NO_CONFIG_REFUSAL = {
+  message: "zitadel.json was not found",
+  hint: "Set the project up first.",
+  next: [
+    {
+      id: "setup",
+    },
+  ],
 } as const satisfies Refusal;
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
@@ -561,7 +572,14 @@ export default class EnvAdd extends Telemetered(
       path,
     };
     const givenServer = await this.givenServer();
-    const config = await Project.at(cwd).config();
+    const config = await Project.at(cwd)
+      .config()
+      .catch((error: unknown) => {
+        if (error instanceof ProjectConfigMissingError) {
+          throw refusalError(NO_CONFIG_REFUSAL, {});
+        }
+        throw error;
+      });
     const frameworkId = config.frameworkId;
     const publicVariable =
       typeof frameworkId === "string"

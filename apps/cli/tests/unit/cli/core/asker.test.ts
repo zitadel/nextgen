@@ -797,23 +797,6 @@ describe("Asker", () => {
 
         expect(error).toMatchObject({ name: "AbortError" });
       });
-
-      it.each(kinds)(
-        "aborts the run's signal with it when %s is cancelled",
-        async (_kind, prompt, act) => {
-          const controller = new AbortController();
-
-          const error = await cancelled(prompt(true), act, {
-            ...ask,
-            guide: true,
-            abort: (reason) => {
-              controller.abort(reason);
-            },
-          });
-
-          expect(controller.signal.reason).toBe(error);
-        },
-      );
     });
   });
 });

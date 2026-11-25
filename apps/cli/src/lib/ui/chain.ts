@@ -46,21 +46,14 @@ export class Chain implements Drawing, Narratable {
   private readonly progress = new Progress(this);
   /** Whether a wizard's prompt was walked away from, which closed the chain itself. */
   private promptCancelled = false;
-  private readonly abortRun: ((reason: DOMException) => void) | undefined;
 
   /**
    * @param audience - Who is watching.
    * @param presentation - Which of the two shapes the command draws.
-   * @param abortRun - Aborts the run's signal, for a prompt the person walks away from.
    */
-  constructor(
-    audience: Audience,
-    presentation: Presentation = "wizard",
-    abortRun?: (reason: DOMException) => void,
-  ) {
+  constructor(audience: Audience, presentation: Presentation = "wizard") {
     this.audience = audience;
     this.presentation = presentation;
-    this.abortRun = abortRun;
   }
 
   /** Whether this command's output is a chain at all. See {@link Presentation}. */
@@ -273,7 +266,6 @@ export class Chain implements Drawing, Narratable {
     const session = {
       interactive: audience.interactive,
       force: audience.force,
-      ...(this.abortRun === undefined ? {} : { abort: this.abortRun }),
     };
 
     return this.presentation === "plain"

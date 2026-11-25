@@ -1,20 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { responseFailure } from "@/lib/backend";
-import { GitError } from "@/lib/git";
 import {
   BackendForbiddenError,
   BackendUnauthorizedError,
   BackendUnavailableError,
 } from "@/lib/backend";
 import {
-  ERROR_CATEGORIES,
   EXIT_CODES,
   ZitadelError,
   errorMessage,
   failureText,
   isCancellation,
-  isLibError,
   toZitadelError,
 } from "@/lib/errors";
 import {
@@ -678,44 +675,51 @@ describe("a failure as a person is shown it", () => {
   });
 });
 
-describe("toZitadelError for an error that says its category", () => {
-  it.each([
-    ["invalid", "E_VALIDATION"],
-    ["missing", "E_NOT_FOUND"],
-    ["conflict", "E_CONFLICT"],
-    ["denied", "E_AUTH"],
-    ["unavailable", "E_NETWORK"],
-    ["fault", "E_VALIDATION"],
-    ["unknown", "E_VALIDATION"],
-  ] as const)("reports %s as %s", (category, code) => {
-    expect(toZitadelError(new GitError(category, "why"))).toMatchObject({ code, message: "why" });
+describe("toZitadelError for an error that says its code", () => {
+  it.each([["E_VALIDATION"], ["E_NOT_FOUND"], ["E_CONFLICT"], ["E_AUTH"], ["E_NETWORK"]] as const)(
+    "reports the error's own code %s",
+    (code) => {
+      const error = Object.assign(new Error("why"), {
+        category: "invalid",
+        retryable: false,
+        code,
+        hint: "Try something else.",
+        details: {
+          file: "a.json",
+        },
+      });
+
+      expect(toZitadelError(error)).toMatchObject({
+        code,
+        message: "why",
+        hint: "Try something else.",
+        details: {
+          file: "a.json",
+        },
+      });
+    },
+  );
+
+  it("leaves the hint and details off an error that carries none", () => {
+    const error = Object.assign(new Error("why"), {
+      category: "fault",
+      retryable: false,
+      code: "E_VALIDATION",
+    });
+
+    expect(toZitadelError(error)).toMatchObject({
+      code: "E_VALIDATION",
+      message: "why",
+      hint: undefined,
+      details: undefined,
+    });
   });
 
-  it("names a code for every category", () => {
-    expect(ERROR_CATEGORIES).toHaveLength(7);
-  });
-});
+  it("reports an error with a code and no category as a system error", () => {
+    const error = Object.assign(new Error("denied"), {
+      code: "EACCES",
+    });
 
-describe("isLibError", () => {
-  it.each(ERROR_CATEGORIES)("accepts an error whose category is %s and has a code", (category) => {
-    expect(isLibError(new GitError(category, "why"))).toBe(true);
-  });
-
-  it("refuses an error with no category", () => {
-    expect(isLibError(new Error("why"))).toBe(false);
-  });
-
-  it("refuses an error with a category and no code", () => {
-    expect(isLibError(Object.assign(new Error("why"), { category: "invalid" }))).toBe(false);
-  });
-
-  it("refuses an error whose category is not one of the set", () => {
-    expect(isLibError(Object.assign(new Error("why"), { category: "other", code: "E_X" }))).toBe(
-      false,
-    );
-  });
-
-  it("refuses a value that is not an error", () => {
-    expect(isLibError({ category: "invalid", code: "E_VALIDATION" })).toBe(false);
+    expect(toZitadelError(error).code).toBe("E_AUTH");
   });
 });

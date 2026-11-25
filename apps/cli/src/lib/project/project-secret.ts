@@ -5,7 +5,7 @@ import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { parseJsonObject, stableStringify } from "@/lib/json";
 
-import { ProjectFileMalformedError, ProjectFileMissingError } from "./errors";
+import { ProjectSecretMalformedError, ProjectSecretMissingError } from "./errors";
 import { SecretFile } from "./secret-file";
 
 /**
@@ -74,70 +74,47 @@ export class ProjectSecret {
    *
    * @param cwd - The project's directory.
    * @returns The secret.
-   * @throws {@link ProjectFileMissingError} When there is no secret.
-   * @throws {@link ProjectFileMalformedError} When the file is not JSON or
+   * @throws {@link ProjectSecretMissingError} When there is no secret.
+   * @throws {@link ProjectSecretMalformedError} When the file is not JSON or
    *   lacks a required field.
    */
   static async read(cwd: string): Promise<ProjectSecret> {
-    const text = await readFile(join(cwd, PATH), "utf8").catch((error: unknown) => {
+    try {
+      const secret = parseJsonObject(await readFile(join(cwd, PATH), "utf8"), PATH);
+      if (
+        typeof secret.project_id !== "string" ||
+        typeof secret.project_secret !== "string" ||
+        typeof secret.preview_secret !== "string" ||
+        !Array.isArray(secret.preview_origins)
+      ) {
+        throw new ProjectSecretMalformedError(".zitadel/secret is missing required fields");
+      }
+      // primary_origins was added with kinded origins; older secrets only have
+      // preview_origins. A missing array reads as empty so doctor --fix can
+      // still rebuild from the rest of the file.
+      if (secret.primary_origins === undefined) {
+        secret.primary_origins = [];
+      }
+      if (!Array.isArray(secret.primary_origins)) {
+        throw new ProjectSecretMalformedError(".zitadel/secret is missing required fields");
+      }
+      return new ProjectSecret(cwd, secret as ProjectSecretData);
+    } catch (error) {
       if (isErrno(error, "ENOENT")) {
-        throw new ProjectFileMissingError("secret", ".zitadel/secret was not found", {
+        throw new ProjectSecretMissingError({
+          cause: error,
+        });
+      }
+      if (
+        error instanceof SyntaxError ||
+        (error instanceof Error && error.message === `${PATH} must contain a JSON object`)
+      ) {
+        throw new ProjectSecretMalformedError(error.message, {
           cause: error,
         });
       }
       throw error;
-    });
-
-    return new ProjectSecret(cwd, ProjectSecret.parse(text));
-  }
-
-  /**
-   * The JSON object a file holds.
-   *
-   * @param text - The contents of the file.
-   * @returns The object.
-   * @throws {@link ProjectFileMalformedError} When the file is not a JSON object.
-   */
-  private static objectOf(text: string): Record<string, unknown> {
-    try {
-      return parseJsonObject(text, PATH);
-    } catch (error) {
-      throw new ProjectFileMalformedError(
-        "secret",
-        error instanceof Error ? error.message : `${PATH} is malformed`,
-        { cause: error },
-      );
     }
-  }
-
-  /**
-   * The secret's fields, checked.
-   *
-   * @param text - The contents of the file.
-   * @returns What the file holds.
-   * @throws {@link ProjectFileMalformedError} When the file is not JSON or
-   *   lacks a required field.
-   */
-  private static parse(text: string): ProjectSecretData {
-    const secret = ProjectSecret.objectOf(text);
-    if (
-      typeof secret.project_id !== "string" ||
-      typeof secret.project_secret !== "string" ||
-      typeof secret.preview_secret !== "string" ||
-      !Array.isArray(secret.preview_origins)
-    ) {
-      throw new ProjectFileMalformedError("secret", ".zitadel/secret is missing required fields");
-    }
-    // primary_origins was added with kinded origins; older secrets only have
-    // preview_origins. A missing array reads as empty so doctor --fix can
-    // still rebuild from the rest of the file.
-    if (secret.primary_origins === undefined) {
-      secret.primary_origins = [];
-    }
-    if (!Array.isArray(secret.primary_origins)) {
-      throw new ProjectFileMalformedError("secret", ".zitadel/secret is missing required fields");
-    }
-    return secret as ProjectSecretData;
   }
 
   /**

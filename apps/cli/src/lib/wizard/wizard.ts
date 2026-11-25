@@ -107,29 +107,6 @@ type Runner<Initial extends object, State extends object, Result> = (
 ) => Promise<Progress<State, Result>>;
 
 /**
- * Takes back what ran, then throws the error that stopped the run. When the
- * undo itself fails, the error that stopped the run is kept as the cause of the
- * failure thrown in its place, so it is never lost.
- *
- * @param error - What stopped the run.
- * @param undo - Takes back what ran.
- * @returns Never: it always throws.
- * @throws The error that stopped the run, or a {@link WizardInternalError} with
- *   it as the cause when the undo failed.
- */
-async function undoneThrowing(error: unknown, undo: Undo): Promise<never> {
-  try {
-    await undo();
-  } catch (failure) {
-    throw new WizardInternalError("A step could not be undone after the run failed", {
-      cause: error,
-      details: { undoFailure: failure instanceof Error ? failure.message : String(failure) },
-    });
-  }
-  throw error;
-}
-
-/**
  * Does nothing, for the start of a run, where nothing has run to undo.
  *
  * @returns Once it has done nothing.
@@ -268,14 +245,16 @@ export class Wizard<Initial extends object, State extends object, Result> {
       };
       const finished = await attempt().catch(async (error: unknown) => {
         told(() => options.watch?.failed?.(step.key, error));
-        return undoneThrowing(error, before.undo);
+        await before.undo();
+        throw error;
       });
       if (finished.kind === "continue") {
         told(() => options.watch?.finished?.(step.key, finished.state));
         try {
           observe?.(finished.state);
         } catch (error) {
-          return undoneThrowing(error, finished.undo);
+          await finished.undo();
+          throw error;
         }
       }
       return finished;
@@ -318,7 +297,8 @@ export class Wizard<Initial extends object, State extends object, Result> {
       };
       return attempt().catch(async (error: unknown) => {
         told(() => options.watch?.failed?.(step.key, error));
-        return undoneThrowing(error, before.undo);
+        await before.undo();
+        throw error;
       });
     };
     return new Wizard(this.name, keys, runner);
@@ -368,7 +348,8 @@ export class Wizard<Initial extends object, State extends object, Result> {
 
         return answered;
       } catch (error) {
-        return undoneThrowing(error, progress.undo);
+        await progress.undo();
+        throw error;
       }
     });
   }

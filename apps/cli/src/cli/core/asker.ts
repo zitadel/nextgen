@@ -109,7 +109,7 @@ export class Asker implements Questions, Confirmer {
    * @returns The questions, bound to the session.
    */
   static for(session: Session): Asker {
-    return new Asker(session, new DrawnPrompter(session.guide ?? true, session.abort));
+    return new Asker(session, new DrawnPrompter(session.guide ?? true));
   }
 
   /** Free text. With `optional`, `undefined` when nothing was given. */

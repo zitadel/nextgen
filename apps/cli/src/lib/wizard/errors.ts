@@ -1,25 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-
-/**
- * What a wizard failure carries beyond its message.
- */
-export type WizardErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Anything the wizard engine fails with on purpose.
@@ -28,52 +7,40 @@ export type WizardErrorOptions = {
  * What a step throws is not one of these: it passes through as it was thrown,
  * after what had finished is undone.
  */
-export class WizardError extends Error implements Categorized {
-  /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "fault";
+export abstract class WizardError extends Error {
+  /** The kind of failure, which the boundary reports it as. */
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
-
-  /**
-   * What to do about it.
-   */
-  readonly hint: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details: Readonly<Record<string, unknown>> | undefined;
+  /** The stable product code the failure is reported with. */
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * Make a wizard failure.
    *
    * @param message - What went wrong.
-   * @param options - What to do about it, the facts behind it, and its cause.
+   * @param options - The error that caused this one, if any.
    */
-  constructor(message: string, options: WizardErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(message, options);
     this.name = new.target.name;
-    this.hint = options.hint;
-    this.details = options.details;
   }
 }
 
 /**
  * The engine's own guard tripped: a wizard that is put together wrongly, such
- * as two steps of one name, or a run whose undo failed while it undid the
- * failure that stopped it (that failure is the cause). Either is a defect in
- * the code that built the wizard, not something a person can fix.
+ * as two steps of one name. It is a defect in the code that built the wizard,
+ * not something a person can fix.
  */
 export class WizardInternalError extends WizardError {
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }

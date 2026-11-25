@@ -17,11 +17,10 @@ describe("UpgradeReleaseLookupError", () => {
   });
 
   it("is unavailable and worth retrying", () => {
-    const cause = new Error("offline");
-    const error = new UpgradeReleaseLookupError({ cause });
+    const error = new UpgradeReleaseLookupError();
 
     expect(error).toBeInstanceOf(UpgradeError);
-    expect([error.category, error.retryable, error.cause]).toEqual(["unavailable", true, cause]);
+    expect([error.category, error.retryable]).toEqual(["unavailable", true]);
     expect(toZitadelError(error).code).toBe("E_NETWORK");
   });
 });

@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { errorMessage } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { isObject } from "@/lib/json";
 
@@ -24,22 +25,14 @@ const STATE_PATH = ".zitadel/state.json";
  *
  * @param cwd - The project root.
  * @returns The file's sections, unchecked.
- * @throws {@link SyncStateMalformedError} When the file is not JSON, or does
- *   not hold an object.
- * @throws {@link Error} When the file cannot be read, with the system's error:
- *   a missing file is `ENOENT`.
+ * @throws {@link Error} When the file is missing, is not JSON, or does not
+ *   hold an object.
  */
 export async function readState(cwd: string): Promise<StoredState> {
   const raw = await readFile(join(cwd, STATE_PATH), "utf8");
-  const parsed = ((): unknown => {
-    try {
-      return JSON.parse(raw);
-    } catch (error) {
-      throw new SyncStateMalformedError(STATE_PATH, "it is not valid JSON", { cause: error });
-    }
-  })();
+  const parsed: unknown = JSON.parse(raw);
   if (!isObject(parsed)) {
-    throw new SyncStateMalformedError(STATE_PATH, "it does not hold an object");
+    throw new Error(`${STATE_PATH} does not hold an object`);
   }
   return parsed;
 }
@@ -81,49 +74,50 @@ export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): P
  * @param cwd - The project root.
  * @param paths - The project-relative paths of the files to look up.
  * @returns The ids, by path; a path with none is left out.
- * @throws {@link SyncStateMalformedError} When the state file is not JSON, or
- *   an entry it holds for one of the paths is malformed.
+ * @throws {@link SyncStateMalformedError} When the state file cannot be read
+ *   or parsed, or an entry it holds for one of the paths is malformed.
  */
 export async function publishedIds(
   cwd: string,
   paths: readonly string[],
 ): Promise<ReadonlyMap<string, readonly string[]>> {
-  const state = await readState(cwd).catch((error: unknown) => {
+  try {
+    const state = await readState(cwd);
+    const resources = state.resources;
+    if (resources === undefined) {
+      return new Map();
+    }
+    if (!isObject(resources)) {
+      throw new Error("resources is not an object");
+    }
+    const entries = paths.flatMap((path): readonly (readonly [string, readonly string[]])[] => {
+      const entry = resources[path];
+      if (entry === undefined) {
+        return [];
+      }
+      if (!isObject(entry)) {
+        throw new Error(`resources["${path}"] is not an object`);
+      }
+      const ids = [entry.id, entry.previousId].filter((id) => {
+        return id !== undefined;
+      });
+      // An empty id is corrupt too: dropping it would fall back to URL
+      // matching and could skip the flow pinned to the real published id.
+      const valid = ids.filter((id): id is string => {
+        return typeof id === "string" && id !== "";
+      });
+      if (valid.length !== ids.length) {
+        throw new Error(`resources["${path}"] has an id that is not a non-empty string`);
+      }
+      return [[path, valid]];
+    });
+    return new Map(entries);
+  } catch (error) {
     if (isErrno(error, "ENOENT")) {
-      return undefined;
+      return new Map();
     }
-    throw error;
-  });
-  const resources = state?.resources;
-  if (resources === undefined) {
-    return new Map();
-  }
-  if (!isObject(resources)) {
-    throw new SyncStateMalformedError(STATE_PATH, "resources is not an object");
-  }
-  const entries = paths.flatMap((path): readonly (readonly [string, readonly string[]])[] => {
-    const entry = resources[path];
-    if (entry === undefined) {
-      return [];
-    }
-    if (!isObject(entry)) {
-      throw new SyncStateMalformedError(STATE_PATH, `resources["${path}"] is not an object`);
-    }
-    const ids = [entry.id, entry.previousId].filter((id) => {
-      return id !== undefined;
+    throw new SyncStateMalformedError(STATE_PATH, errorMessage(error), {
+      cause: error,
     });
-    // An empty id is corrupt too: dropping it would fall back to URL
-    // matching and could skip the flow pinned to the real published id.
-    const valid = ids.filter((id): id is string => {
-      return typeof id === "string" && id !== "";
-    });
-    if (valid.length !== ids.length) {
-      throw new SyncStateMalformedError(
-        STATE_PATH,
-        `resources["${path}"] has an id that is not a non-empty string`,
-      );
-    }
-    return [[path, valid]];
-  });
-  return new Map(entries);
+  }
 }
