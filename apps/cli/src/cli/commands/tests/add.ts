@@ -9,7 +9,7 @@ import type { Admitted, CommandResult } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { prose } from "@/lib/oclif/rendering";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import { createOrca, OrcaPatchFileOverwriteError } from "@/lib/orca";
+import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
@@ -63,13 +63,6 @@ const INSTALL_REFUSAL = {
     cwd: "{cwd}",
     message: "{message}",
   },
-} as const satisfies Refusal;
-
-/** How a file the suite would write over, holding something else, is refused. */
-const FILE_OVERWRITE_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "Rerun with --force if you want the CLI to replace this file.",
 } as const satisfies Refusal;
 
 /** What the app's `package.json` declares, as far as the suite cares. */
@@ -357,22 +350,11 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
       declared: manifest.dependencies,
       scripts: new Set(Object.keys(manifest.scripts)),
     });
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let planned: Awaited<ReturnType<FileWriter["scaffold"]>>;
-    try {
-      planned = await new FileWriter({
-        cwd: this.cwd,
-        dryRun: true,
-        force: this.force,
-      }).scaffold(plan);
-    } catch (error) {
-      if (error instanceof OrcaPatchFileOverwriteError) {
-        throw refusalError(FILE_OVERWRITE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const planned = await new FileWriter({
+      cwd: this.cwd,
+      dryRun: true,
+      force: this.force,
+    }).scaffold(plan);
 
     return {
       framework,

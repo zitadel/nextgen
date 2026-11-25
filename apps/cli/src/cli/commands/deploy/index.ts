@@ -16,18 +16,8 @@ import {
   MESSAGE_MAX_LENGTH,
   type Lockout,
   messageTooLong,
-  PublishConfigInvalidError,
-  PublishConfigLiteralSecretError,
-  PublishConfigLiteralSecretRefusedKeyError,
-  PublishConfigRefusedKeyError,
-  PublishConnectionVariableClientIdMissingError,
-  PublishConnectionVariableClientSecretMissingError,
-  PublishConnectionVariableNotPlainError,
-  PublishConnectionVariableNotSecretError,
-  PublishConnectionVariableSharedError,
   Publisher,
 } from "@/lib/publish";
-import { ZitadelConfigDeployEmptyError } from "@/lib/zitadel";
 import {
   type NextOf,
   type Suggested,
@@ -133,66 +123,6 @@ export function missingPrimaryOrigin(input: {
  */
 const LOCKOUT_ACTION = "deploy a release that leaves existing users unable to sign in";
 
-/** How a `.zitadel/` that holds nothing to deploy is refused. */
-const DEPLOY_EMPTY_REFUSAL = {
-  message: "{message}",
-  hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
-} as const satisfies Refusal;
-
-/** How a configuration with errors in it is refused. */
-const CONFIG_INVALID_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the files named above and rerun; no changes were made.",
-} as const satisfies Refusal;
-
-/** How a configuration with errors in it, one of them a key a newer server added, is refused. */
-const CONFIG_INVALID_NEWER_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
-} as const satisfies Refusal;
-
-/** How a configuration with a secret written into a file is refused. */
-const CONFIG_INVALID_SECRET_REFUSAL = {
-  message: "{message}",
-  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
-  next: ["{next}"],
-} as const satisfies Refusal;
-
-/** How a configuration with a secret written into a file and a key a newer server added is refused. */
-const CONFIG_INVALID_SECRET_NEWER_REFUSAL = {
-  message: "{message}",
-  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}". A key a newer Zitadel server added needs a CLI as new as the server.',
-  next: ["{next}"],
-} as const satisfies Refusal;
-
-/** How a connection whose client id and secret name one variable is refused. */
-const VARIABLE_SHARED_REFUSAL = {
-  message: "{message}",
-  hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-} as const satisfies Refusal;
-
-/** How a client secret that is not a secret variable is refused. */
-const SECRET_KIND_REFUSAL = {
-  message: "{message}",
-  hint: "The client secret must be a secret variable: publish it with the command below.",
-  next: ["{next}"],
-} as const satisfies Refusal;
-
-/** How a client id that is not a plain variable is refused. */
-const PLAIN_KIND_REFUSAL = {
-  message: "{message}",
-  hint: "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-  next: ["{next}"],
-} as const satisfies Refusal;
-
-/** How a connection that names a variable the project does not have is refused. */
-const VARIABLE_MISSING_REFUSAL = {
-  code: "E_CREDENTIAL_MISSING",
-  message: "{message}",
-  hint: "Publish it with the command below, then deploy again.",
-  next: ["{next}"],
-} as const satisfies Refusal;
-
 const NEEDS_MESSAGE_REFUSAL = {
   message: "A deploy needs a message in non-interactive mode",
   hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
@@ -290,157 +220,13 @@ export default class Deploy extends Telemetered(
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
     this.annotate({ stage: "validation" });
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let prepared: Awaited<ReturnType<Publisher["prepare"]>>;
-    try {
-      prepared = await publisher.prepare({
-        cwd: this.cwd,
-        env: this.env,
-        mode: "deploy",
-        dryRun: true,
-        compare: true,
-      });
-    } catch (error) {
-      if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
-        throw refusalError(
-          CONFIG_INVALID_SECRET_NEWER_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: "NAME",
-              },
-              flags: {
-                secret: true,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConfigLiteralSecretError) {
-        throw refusalError(
-          CONFIG_INVALID_SECRET_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: "NAME",
-              },
-              flags: {
-                secret: true,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConfigRefusedKeyError) {
-        throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConfigInvalidError) {
-        throw refusalError(CONFIG_INVALID_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConnectionVariableSharedError) {
-        throw refusalError(VARIABLE_SHARED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConnectionVariableNotSecretError) {
-        throw refusalError(
-          SECRET_KIND_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: true,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConnectionVariableNotPlainError) {
-        throw refusalError(
-          PLAIN_KIND_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: false,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConnectionVariableClientIdMissingError) {
-        throw refusalError(
-          VARIABLE_MISSING_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: false,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConnectionVariableClientSecretMissingError) {
-        throw refusalError(
-          VARIABLE_MISSING_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: true,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof ZitadelConfigDeployEmptyError) {
-        throw refusalError(DEPLOY_EMPTY_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const prepared = await publisher.prepare({
+      cwd: this.cwd,
+      env: this.env,
+      mode: "deploy",
+      dryRun: true,
+      compare: true,
+    });
     this.annotate({ stage: undefined });
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);
@@ -519,157 +305,13 @@ export default class Deploy extends Telemetered(
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
     this.annotate({ stage: "validation" });
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let prepared: Awaited<ReturnType<Publisher["prepare"]>>;
-    try {
-      prepared = await publisher.prepare({
-        cwd: this.cwd,
-        env: this.env,
-        mode: "deploy",
-        dryRun: false,
-        compare: true,
-      });
-    } catch (error) {
-      if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
-        throw refusalError(
-          CONFIG_INVALID_SECRET_NEWER_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: "NAME",
-              },
-              flags: {
-                secret: true,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConfigLiteralSecretError) {
-        throw refusalError(
-          CONFIG_INVALID_SECRET_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: "NAME",
-              },
-              flags: {
-                secret: true,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConfigRefusedKeyError) {
-        throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConfigInvalidError) {
-        throw refusalError(CONFIG_INVALID_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConnectionVariableSharedError) {
-        throw refusalError(VARIABLE_SHARED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConnectionVariableNotSecretError) {
-        throw refusalError(
-          SECRET_KIND_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: true,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConnectionVariableNotPlainError) {
-        throw refusalError(
-          PLAIN_KIND_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: false,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConnectionVariableClientIdMissingError) {
-        throw refusalError(
-          VARIABLE_MISSING_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: false,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConnectionVariableClientSecretMissingError) {
-        throw refusalError(
-          VARIABLE_MISSING_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: true,
-                preview: false,
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof ZitadelConfigDeployEmptyError) {
-        throw refusalError(DEPLOY_EMPTY_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const prepared = await publisher.prepare({
+      cwd: this.cwd,
+      env: this.env,
+      mode: "deploy",
+      dryRun: false,
+      compare: true,
+    });
     this.annotate({ stage: undefined });
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);

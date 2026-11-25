@@ -3,19 +3,9 @@ import { z } from "zod";
 
 import {
   LocalRuntime,
-  LocalServerAdminFileMalformedError,
-  LocalServerAdminPlatformMissingError,
-  LocalServerAdminUnreadableError,
-  LocalServerBinaryBlockedError,
-  LocalServerBinaryMissingError,
-  LocalServerBusyError,
-  LocalServerDockerFailedError,
   LocalServerDockerMissingError,
-  LocalServerEnvUnreadableError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
-  LocalServerRecordMalformedError,
-  LocalServerRecordUnreadableError,
   LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
@@ -25,14 +15,7 @@ import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
 import type { NextSteps } from "@/cli/core/next-steps";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import { PM } from "@/lib/pm";
-import { CliPackage } from "@/lib/upgrade";
-import {
-  Guidance,
-  shellCommand,
-  type SuggestedCommand,
-  suggestedCommandOf,
-} from "@/lib/suggestion";
+import { Guidance, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -60,18 +43,6 @@ const PORT = {
     max: MAX_PORT,
   },
 } as const satisfies Refused<number>;
-
-/** How a start of the local server is refused: LocalServerDockerFailedError. */
-const DOCKER_FAILED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that Docker is installed, running, and reachable from this shell.",
-  next: [
-    {
-      id: "doctor",
-    },
-  ],
-} as const satisfies Refusal;
 
 /** How a start is refused when Docker, which a Docker start needs, does not answer. */
 const DOCKER_UNAVAILABLE_REFUSAL = {
@@ -155,101 +126,6 @@ const SERVER_NOT_READY_AND_RUNNING_REFUSAL = {
 const SERVER_WOULD_NOT_STOP_REFUSAL = {
   message: "Existing local Zitadel server did not stop",
   hint: "Stop the existing local runtime manually, then rerun start.",
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerBinaryMissingError. */
-const BINARY_MISSING_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-  next: ["{reinstall}"],
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerBinaryBlockedError. */
-const BINARY_BLOCKED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-  next: ["{reinstall}"],
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerBusyError. */
-const START_IN_PROGRESS_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "Wait for it to finish, or delete the lock file named above if no start is running.",
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerRecordMalformedError. */
-const RECORD_MALFORMED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a start is refused when the local admin file is not in the shape it is written in. */
-const ADMIN_FILE_MALFORMED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Delete the local admin file and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a start is refused when the runtime record of this folder cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
-} as const satisfies Refusal;
-
-/** How a start is refused when the local admin file cannot be read. */
-const ADMIN_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that the local admin file is readable by you; `zitadel start` writes it owner-only.",
-} as const satisfies Refusal;
-
-/** How a start is refused when an environment file the local server reads cannot be read. */
-const ENV_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "The environment file exists but could not be read; fix its permissions or remove it.",
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerAdminPlatformMissingError. */
-const PLATFORM_MISSING_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
-  next: [
-    {
-      id: "stop",
-    },
-    {
-      id: "start",
-    },
-  ],
 } as const satisfies Refusal;
 
 /**
@@ -394,7 +270,7 @@ export default class Start extends Telemetered(
   protected async apply({ flags }: Admitted<typeof Start>): Promise<CommandResult> {
     const { server, request } = await this.planned(flags);
     const retry = await this.again("start", {});
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    // biome-ignore lint/plugin: the code after the launch needs `started` and must not sit inside the try that translates the launch's errors
     let started: Awaited<ReturnType<typeof server.launch>>;
     try {
       started = await server.launch(request);
@@ -421,12 +297,16 @@ export default class Start extends Telemetered(
           {
             port: error.port,
             url: LocalRuntime.urlOf(error.port),
-            listeners: await this.machine().listeners(error.port, { timeoutMs: 5000 }),
+            listeners: await this.machine().listeners(error.port, {
+              timeoutMs: 5000,
+            }),
           },
           {
             alternate: this.suggest({
               id: "start",
-              flags: { port: alternatePort },
+              flags: {
+                port: alternatePort,
+              },
             }),
           },
         );
@@ -455,68 +335,6 @@ export default class Start extends Telemetered(
       }
       if (error instanceof LocalServerStopError) {
         throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {});
-      }
-      if (error instanceof LocalServerBinaryMissingError) {
-        throw refusalError(
-          BINARY_MISSING_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
-          },
-        );
-      }
-      if (error instanceof LocalServerBinaryBlockedError) {
-        throw refusalError(
-          BINARY_BLOCKED_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
-          },
-        );
-      }
-      if (error instanceof LocalServerBusyError) {
-        throw refusalError(START_IN_PROGRESS_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerAdminFileMalformedError) {
-        throw refusalError(ADMIN_FILE_MALFORMED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerAdminUnreadableError) {
-        throw refusalError(ADMIN_UNREADABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerEnvUnreadableError) {
-        throw refusalError(ENV_UNREADABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerAdminPlatformMissingError) {
-        throw refusalError(PLATFORM_MISSING_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerDockerFailedError) {
-        throw refusalError(DOCKER_FAILED_REFUSAL, {
-          message: error.message,
-        });
       }
       throw error;
     }

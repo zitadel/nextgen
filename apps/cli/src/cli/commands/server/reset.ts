@@ -1,15 +1,5 @@
-import {
-  DestroyPermit,
-  LocalServerOrphansStopError,
-  LocalServerPermitMismatchError,
-  LocalServerProcessesStopError,
-  LocalServerProcessesUnlistableError,
-  LocalServerRecordMalformedError,
-  LocalServerRecordUnreadableError,
-  LocalServerStopError,
-} from "@/lib/server";
+import { DestroyPermit } from "@/lib/server";
 import type { CommandResult } from "@/cli/core";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { Previewable } from "@/cli/core/previewable";
@@ -26,66 +16,6 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 type ResetTarget =
   | Readonly<{ backend: "binary"; pid: number; log_path: string }>
   | Readonly<{ backend: "docker" | "missing"; container_name: string }>;
-
-/** How a reset is refused when processes it asked to stop are still running. */
-const PROCESSES_DID_NOT_STOP_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
-} as const satisfies Refusal;
-
-/** How a reset is refused when the machine cannot list its processes. */
-const PROCESSES_UNLISTABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
-} as const satisfies Refusal;
-
-/** How a reset is refused when the server is still running afterwards. */
-const SERVER_DID_NOT_STOP_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
-} as const satisfies Refusal;
-
-/** How a reset is refused when its permit is for another folder. */
-const PERMIT_MISMATCH_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "A reset acts on one folder only. Run it from the folder whose server you mean to reset.",
-} as const satisfies Refusal;
-
-/** How a reset is refused when a process on the folder's data is still running. */
-const ORPHANS_DID_NOT_STOP_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
-} as const satisfies Refusal;
-
-/** How a reset is refused when the runtime record of this folder is not in the shape it is written in. */
-const RECORD_MALFORMED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a reset is refused when the runtime record of this folder cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
-} as const satisfies Refusal;
 
 /**
  * `zitadel reset`: stops and removes this folder's server and deletes its data.
@@ -153,46 +83,7 @@ export default class Reset extends Telemetered(
         `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
       ].join("\n"),
       apply: async () => {
-        try {
-          await this.serverInThisFolder().reset(DestroyPermit.forFolder(this.cwd));
-        } catch (error) {
-          if (error instanceof LocalServerProcessesStopError) {
-            throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-              message: error.message,
-            });
-          }
-          if (error instanceof LocalServerProcessesUnlistableError) {
-            throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-              message: error.message,
-            });
-          }
-          if (error instanceof LocalServerStopError) {
-            throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-              message: error.message,
-            });
-          }
-          if (error instanceof LocalServerPermitMismatchError) {
-            throw refusalError(PERMIT_MISMATCH_REFUSAL, {
-              message: error.message,
-            });
-          }
-          if (error instanceof LocalServerOrphansStopError) {
-            throw refusalError(ORPHANS_DID_NOT_STOP_REFUSAL, {
-              message: error.message,
-            });
-          }
-          if (error instanceof LocalServerRecordMalformedError) {
-            throw refusalError(RECORD_MALFORMED_REFUSAL, {
-              message: error.message,
-            });
-          }
-          if (error instanceof LocalServerRecordUnreadableError) {
-            throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-              message: error.message,
-            });
-          }
-          throw error;
-        }
+        await this.serverInThisFolder().reset(DestroyPermit.forFolder(this.cwd));
         const title = "Local Zitadel server runtime reset";
 
         return {
@@ -216,23 +107,7 @@ export default class Reset extends Telemetered(
    * @returns The target as the result describes it, and the line naming what runs the server.
    */
   private async targeted(): Promise<{ target: ResetTarget; owner: Fact }> {
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let record: Awaited<ReturnType<ReturnType<typeof this.serverInThisFolder>["record"]>>;
-    try {
-      record = await this.serverInThisFolder().record();
-    } catch (error) {
-      if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const record = await this.serverInThisFolder().record();
 
     if (record !== undefined && record.backend === "binary") {
       return {

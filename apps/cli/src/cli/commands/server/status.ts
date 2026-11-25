@@ -3,13 +3,7 @@ import pTimeout from "p-timeout";
 import { UserService } from "@/lib/backend";
 import { Claim, type ClaimState } from "@/lib/claim";
 import { isCancellation } from "@/lib/errors";
-import {
-  LocalRuntime,
-  LocalServerRecordMalformedError,
-  LocalServerRecordUnreadableError,
-  ZitadelRuntime,
-} from "@/lib/server";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { CommandResult, Connection, MetaOptions } from "@/cli/core";
 import type { GlobalOptions } from "@/cli/core/types";
@@ -22,7 +16,7 @@ import {
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { Project, ProjectConfigMissingError } from "@/lib/project";
+import { Project } from "@/lib/project";
 import { TestKit } from "@/lib/test-kit";
 import { ProjectCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
@@ -55,17 +49,6 @@ type ProjectStatus =
        */
       claim?: ClaimState;
     };
-
-/** What a directory that setup has not made a project is refused for. */
-const NO_CONFIG_REFUSAL = {
-  message: "zitadel.json was not found",
-  hint: "Set the project up first.",
-  next: [
-    {
-      id: "setup",
-    },
-  ],
-} as const satisfies Refusal;
 
 /**
  * Reads which project the run is about and in what state it is.
@@ -127,16 +110,7 @@ async function projectStatus(
         };
   }
 
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let config: Awaited<ReturnType<ReturnType<typeof Project.at>["config"]>>;
-  try {
-    config = await Project.at(cwd).config();
-  } catch (error) {
-    if (error instanceof ProjectConfigMissingError) {
-      throw refusalError(NO_CONFIG_REFUSAL, {});
-    }
-    throw error;
-  }
+  const config = await Project.at(cwd).config();
   const secret = (await Project.at(cwd).hasSecret()) ? await Project.at(cwd).secret() : undefined;
   if (secret === undefined && resolvedProjectId === undefined) {
     return {
@@ -365,31 +339,6 @@ function nextCommandsFor(
   return commands;
 }
 
-/** How a status is refused when the runtime record of this folder is not in the shape it is written in. */
-const RECORD_MALFORMED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a status is refused when the runtime record of this folder cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
-} as const satisfies Refusal;
-
 /**
  * `zitadel status` — summarize the local server and project state.
  *
@@ -419,26 +368,12 @@ export default class Status extends Telemetered(ProjectCommand) {
     if (flags.server !== "local") {
       return super.toMeta(flags, options);
     }
-    try {
-      const runtime = await LocalRuntime.read(
-        resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
-      );
-      return super.toMeta(flags, {
-        source: runtime?.server_url ?? LocalRuntime.DEFAULT_URL,
-      });
-    } catch (error) {
-      if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const runtime = await LocalRuntime.read(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    return super.toMeta(flags, {
+      source: runtime?.server_url ?? LocalRuntime.DEFAULT_URL,
+    });
   }
 
   /**
@@ -447,25 +382,9 @@ export default class Status extends Telemetered(ProjectCommand) {
    * @returns The summary of both, and what to do next.
    */
   protected async execute(): Promise<CommandResult> {
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let server: Awaited<ReturnType<ReturnType<typeof LocalRuntime.forFolder>["status"]>>;
-    try {
-      server = await LocalRuntime.forFolder(this.cwd, {
-        cliVersion: this.cliVersion,
-      }).status();
-    } catch (error) {
-      if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const server = await LocalRuntime.forFolder(this.cwd, {
+      cliVersion: this.cliVersion,
+    }).status();
     const serverLifecycle = server.lifecycle;
 
     const project = await projectStatus(

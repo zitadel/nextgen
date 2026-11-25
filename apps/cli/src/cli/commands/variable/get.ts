@@ -1,27 +1,14 @@
 import { Flags } from "@oclif/core";
 
-import { BackendNotFoundError, VariableService } from "@/lib/backend";
+import { VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { fieldsFlag } from "@/cli/core/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 import { ReadCommand } from "@/cli/commands/bases";
 import { variableNameArg } from "./name";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-
-const PREVIEW_NOT_FOUND_REFUSAL = {
-  code: "E_NOT_FOUND",
-  message: "{message}",
-  hint: "A name has a preview value only once one is set with `--preview`.",
-} as const satisfies Refusal;
-
-const PRIMARY_NOT_FOUND_REFUSAL = {
-  code: "E_NOT_FOUND",
-  message: "{message}",
-  hint: "Set one with `variable set`.",
-} as const satisfies Refusal;
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -73,41 +60,27 @@ export default class VariableGet extends Telemetered(ReadCommand) {
    */
   protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<CommandResult> {
     const variableService = await this.service(VariableService);
-    try {
-      const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
-      this.annotate({
-        is_secret: variable.secret,
-      });
+    const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
+    this.annotate({
+      is_secret: variable.secret,
+    });
 
-      const title = `Read ${escapeControlCharacters(args.name)}`;
-      const cell = VariableView.of(variable).cell();
-      const view = this.viewRecord(variable, flags.fields, ["value"]);
+    const title = `Read ${escapeControlCharacters(args.name)}`;
+    const cell = VariableView.of(variable).cell();
+    const view = this.viewRecord(variable, flags.fields, ["value"]);
 
-      return {
-        status: "ok",
-        data: view.data,
-        summary: {
-          title,
-          sections: [],
-          lines: this.tabulateDetail(undefined, view.columns, {
-            name: variable.name,
-            secret: variable.secret,
-            value: cell.value === "" ? '""' : cell.value,
-          }).split("\n"),
-        },
-      };
-    } catch (error) {
-      if (error instanceof BackendNotFoundError && flags.preview) {
-        throw refusalError(PREVIEW_NOT_FOUND_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof BackendNotFoundError) {
-        throw refusalError(PRIMARY_NOT_FOUND_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    return {
+      status: "ok",
+      data: view.data,
+      summary: {
+        title,
+        sections: [],
+        lines: this.tabulateDetail(undefined, view.columns, {
+          name: variable.name,
+          secret: variable.secret,
+          value: cell.value === "" ? '""' : cell.value,
+        }).split("\n"),
+      },
+    };
   }
 }

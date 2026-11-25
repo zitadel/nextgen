@@ -6,7 +6,6 @@ import {
   LocalServerNotRunningError,
   ZitadelRuntime,
 } from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -23,24 +22,24 @@ import { Project } from "@/lib/project";
 /** How `--server local` with no server ever started is refused. */
 const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
-  message: "Local Zitadel server is not running",
-  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  message: "{message}",
+  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
 /** How `--server local` with a recorded server that does not answer is refused. */
 const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
-  message: "Local Zitadel server is not running",
-  hint: "{reason} Run `zitadel start` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  message: "{message}",
+  hint: "Run `zitadel start` to bring it back. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
 /** How `--server local` with a recorded server in another folder that does not answer is refused. */
 const LOCAL_SERVER_ELSEWHERE_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
-  message: "Local Zitadel server is not running",
-  hint: "{reason} It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  message: "{message}",
+  hint: "It was started in another directory: run `zitadel start` there, or with --cwd, to bring it back. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
@@ -145,7 +144,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    // biome-ignore lint/plugin: the checks after the resolve need `server` and must not sit inside the try that translates its errors
     let server: Awaited<ReturnType<typeof ZitadelRuntime.resolve>>;
     try {
       server = await ZitadelRuntime.resolve({
@@ -153,21 +152,22 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         serverFlag: meta.serverFlag,
       });
     } catch (error) {
+      const retry = retryOptionsFromFlags(flags);
+      const recovery = ssoRecovery(retry, suggest);
+      const scripting =
+        retry.sso && retry.sso.length > 0
+          ? "The rerun asks for the client id and secret, because a command carries neither. " +
+            "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+          : "";
+      const recovered =
+        recovery.commands.length > 0
+          ? `${recovery.hint}${recovery.commands.join(" ")} `
+          : recovery.hint;
       if (error instanceof LocalServerNotRunningError) {
-        const retry = retryOptionsFromFlags(flags);
-        const recovery = ssoRecovery(retry, suggest);
-        const scripting =
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "";
-        const recovered =
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint;
         throw refusalError(
           NO_LOCAL_SERVER_REFUSAL,
           {
+            message: error.message,
             scripting,
             recovery: recovered,
           },
@@ -184,21 +184,10 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         );
       }
       if (error instanceof LocalServerNotRespondingError) {
-        const retry = retryOptionsFromFlags(flags);
-        const recovery = ssoRecovery(retry, suggest);
-        const scripting =
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "";
-        const recovered =
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint;
         throw refusalError(
           LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
           {
-            reason: `No healthy local server responded at ${error.serverUrl}.`,
+            message: error.message,
             scripting,
             recovery: recovered,
           },
@@ -215,22 +204,10 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         );
       }
       if (error instanceof LocalServerNotRespondingElsewhereError) {
-        const retry = retryOptionsFromFlags(flags);
-        const recovery = ssoRecovery(retry, suggest);
-        const scripting =
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "";
-        const recovered =
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint;
         throw refusalError(
           LOCAL_SERVER_ELSEWHERE_REFUSAL,
           {
-            reason: `No healthy local server responded at ${error.serverUrl}.`,
-            directory: Cmd.quote(error.directory),
+            message: error.message,
             scripting,
             recovery: recovered,
           },

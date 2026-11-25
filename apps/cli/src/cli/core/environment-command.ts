@@ -1,5 +1,4 @@
 import { createZitadelClient } from "@/lib/backend";
-import { Cmd } from "@/lib/cmd";
 import type { Consent } from "@/lib/consent";
 import {
   Environment,
@@ -73,7 +72,7 @@ const LOCAL_SERVER_NOT_RUNNING_REFUSAL = {
 const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "No healthy local server responded at {server_url}. Run `zitadel start` to bring it back.",
+  hint: "Run `zitadel start` to bring it back.",
   next: [
     {
       id: "start",
@@ -85,11 +84,7 @@ const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
 const LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "No healthy local server responded at {server_url}. It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back.",
-  details: {
-    server_url: "{server_url}",
-    suggested_args: [["start", "--cwd", "{path}"]],
-  },
+  hint: "It was started in another directory: run `zitadel start` there to bring it back.",
   next: ["{start}"],
 } as const satisfies Refusal;
 
@@ -217,7 +212,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
       if (error instanceof LocalServerNotRespondingError) {
         throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
           message: error.message,
-          server_url: error.serverUrl,
         });
       }
       if (error instanceof LocalServerNotRespondingElsewhereError) {
@@ -225,9 +219,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
           LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL,
           {
             message: error.message,
-            server_url: error.serverUrl,
-            directory: Cmd.quote(error.directory),
-            path: error.directory,
           },
           {
             start: {
@@ -359,16 +350,28 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.nonInteractive && !this.meta.dryRun && options.prompt !== false,
       ask: this.ui.questions(),
     };
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let server: string;
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let projectId: string;
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let token: string;
     try {
-      server = await environment.requireInteractive("ZITADEL_URL", ask);
-      projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
-      token = await environment.requireInteractive(CREDENTIALS[credential], ask);
+      const server = await environment.requireInteractive("ZITADEL_URL", ask);
+      const projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
+      const token = await environment.requireInteractive(CREDENTIALS[credential], ask);
+      this.ui.ranAgainst(projectId, server);
+
+      return {
+        client: createZitadelClient({
+          userAgent: Runtime.current().userAgent(),
+          baseUrl: server,
+          token,
+          signal: this.signal,
+          ...(options.timeoutMs === undefined
+            ? {}
+            : {
+                timeoutMs: options.timeoutMs,
+              }),
+        }),
+        projectId,
+        server,
+        environment,
+      };
     } catch (error) {
       if (error instanceof EnvironmentValueUnboundError) {
         // Run in the directory this run addressed, which need not be the
@@ -408,24 +411,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
       }
       throw error;
     }
-    this.ui.ranAgainst(projectId, server);
-
-    return {
-      client: createZitadelClient({
-        userAgent: Runtime.current().userAgent(),
-        baseUrl: server,
-        token,
-        signal: this.signal,
-        ...(options.timeoutMs === undefined
-          ? {}
-          : {
-              timeoutMs: options.timeoutMs,
-            }),
-      }),
-      projectId,
-      server,
-      environment,
-    };
   }
 }
 

@@ -10,54 +10,7 @@ import {
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
-import {
-  Connection,
-  ZitadelConfigEditBreaksFlowsError,
-  ZitadelConfigEditMethodInUseError,
-  ZitadelConfigFlowsUncheckedError,
-} from "@/lib/zitadel";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
-
-/**
- * What a change that would break a login flow is refused for.
- */
-const EDIT_BREAKS_FLOWS_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the steps named above, then run the command again.",
-} as const satisfies Refusal;
-
-/**
- * What a change that disables a method login flows still use is refused for.
- */
-const EDIT_METHOD_IN_USE_REFUSAL = {
-  message: "{message}",
-  hint: "Edit those steps first; login flows are not edited for you. `zitadel deploy --dry-run` checks the edited flow; then run the command again.",
-  next: [
-    {
-      id: "deploy",
-      flags: {
-        dryRun: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
-
-/**
- * What a change is refused for when a login flow already has errors, so it
- * cannot be checked against the change: a dry-run deploy reports the same issues.
- */
-const FLOWS_UNCHECKED_REFUSAL = {
-  message: "{message}",
-  hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
-  next: [
-    {
-      id: "deploy",
-      flags: {
-        dryRun: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
+import { Connection } from "@/lib/zitadel";
 
 /**
  * What the step reads from what is known.
@@ -121,32 +74,11 @@ export class PlanChange extends WizardStep<
     needs: Needs,
   ): Promise<Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">> {
     const candidate = Connection.forProvider(needs.provider, needs.target.schema);
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let preview: ReturnType<typeof needs.target.config.connections.enable>;
-    try {
-      preview = needs.target.config.connections.enable(
-        needs.target.schema,
-        candidate,
-        needs.options,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelConfigFlowsUncheckedError) {
-        throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigEditMethodInUseError) {
-        throw refusalError(EDIT_METHOD_IN_USE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigEditBreaksFlowsError) {
-        throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const preview = needs.target.config.connections.enable(
+      needs.target.schema,
+      candidate,
+      needs.options,
+    );
     const loopback = loopbackIssuerWarning(
       needs.selection,
       await this.deps.machine.loopbackReach(needs.target.cwd, needs.remote.server),

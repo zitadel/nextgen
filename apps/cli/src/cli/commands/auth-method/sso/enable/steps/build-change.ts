@@ -2,32 +2,6 @@ import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { log } from "@/lib/ui";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
-import { ZitadelConfigEditBreaksFlowsError, ZitadelConfigFlowsUncheckedError } from "@/lib/zitadel";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
-
-/**
- * What a change that would break a login flow is refused for.
- */
-const EDIT_BREAKS_FLOWS_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the steps named above, then run the command again.",
-} as const satisfies Refusal;
-
-/**
- * What a change is refused for when the login flows cannot be checked against it.
- */
-const FLOWS_UNCHECKED_REFUSAL = {
-  message: "{message}",
-  hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
-  next: [
-    {
-      id: "deploy",
-      flags: {
-        dryRun: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
 
 /**
  * What the step reads from the steps before it.
@@ -64,30 +38,14 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
    * @throws {@link ZitadelError} When saving the change would be refused.
    */
   async run(needs: Needs): Promise<Fact<"change">> {
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let change: Needs["preview"];
-    try {
-      change =
-        needs.given.endpoints === undefined
-          ? needs.preview
-          : needs.target.config.connections.enable(
-              needs.target.schema,
-              needs.candidate.withEndpoints(needs.given.endpoints).document,
-              needs.options,
-            );
-    } catch (error) {
-      if (error instanceof ZitadelConfigFlowsUncheckedError) {
-        throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigEditBreaksFlowsError) {
-        throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const change =
+      needs.given.endpoints === undefined
+        ? needs.preview
+        : needs.target.config.connections.enable(
+            needs.target.schema,
+            needs.candidate.withEndpoints(needs.given.endpoints).document,
+            needs.options,
+          );
     if (needs.summary.reused) {
       log.debug(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);
     }

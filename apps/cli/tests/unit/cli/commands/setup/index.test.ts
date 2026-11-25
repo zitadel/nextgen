@@ -1079,7 +1079,7 @@ describe("setup", () => {
 
       expect(res).toFailWith("E_LOCAL_SERVER_NOT_RUNNING");
       expect(parseJson(res.stdout)).toMatchObject({
-        hint: expect.stringContaining("Start local Zitadel first"),
+        hint: expect.stringContaining("Run `zitadel start`"),
         next_commands: [
           expectedPublicCliCommand(`start --cwd ${dir}`),
           expectedPublicCliCommand(`setup --framework next --server local --cwd ${dir}`),

@@ -1,11 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  LocalRuntime,
-  LocalServerDockerFailedError,
-  LocalServerNotStartedError,
-} from "@/lib/server";
+import { LocalRuntime } from "@/lib/server";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
@@ -50,30 +46,6 @@ const NOT_STARTED_REFUSAL = {
   message: "Local Zitadel runtime has not been started",
   hint: "Start the local server first.",
   next: [{ id: "start" }],
-} as const satisfies Refusal;
-
-/** How a runtime that was never started is refused. */
-const RUNTIME_NOT_STARTED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Run `zitadel start` first.",
-  next: [
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a failed Docker call is refused. */
-const DOCKER_FAILED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that Docker is installed, running, and reachable from this shell.",
-  next: [
-    {
-      id: "doctor",
-    },
-  ],
 } as const satisfies Refusal;
 
 /**
@@ -127,30 +99,16 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
     }
 
     if (flags.follow) {
-      try {
-        await server.follow({
-          tail: flags.tail,
-          level: flags.level,
-          print: (lines) => {
-            if (!lines.isEmpty) {
-              process.stdout.write(`${lines.drawn(Output.color).join("\n")}\n`);
-            }
-          },
-          signal: this.signal,
-        });
-      } catch (error) {
-        if (error instanceof LocalServerNotStartedError) {
-          throw refusalError(RUNTIME_NOT_STARTED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerDockerFailedError) {
-          throw refusalError(DOCKER_FAILED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        throw error;
-      }
+      await server.follow({
+        tail: flags.tail,
+        level: flags.level,
+        print: (lines) => {
+          if (!lines.isEmpty) {
+            process.stdout.write(`${lines.drawn(Output.color).join("\n")}\n`);
+          }
+        },
+        signal: this.signal,
+      });
 
       const title = "Stopped following local Zitadel logs";
       if (Output.screen) {
@@ -174,24 +132,7 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
         };
       }
     } else {
-      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-      let logged: Awaited<ReturnType<typeof server.logs>>;
-      try {
-        logged = await server.logs({ tail: flags.tail, level: flags.level });
-      } catch (error) {
-        if (error instanceof LocalServerNotStartedError) {
-          throw refusalError(RUNTIME_NOT_STARTED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerDockerFailedError) {
-          throw refusalError(DOCKER_FAILED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-      const { runtime, lines } = logged;
+      const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
       const shown = lines.drawn(Output.color);
       const title = "Local Zitadel server logs";
 

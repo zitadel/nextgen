@@ -169,19 +169,15 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
     });
     const { plan, breaking, notes } = await this.planned(upgrader);
 
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let result: Awaited<ReturnType<Upgrader["apply"]>>;
-    try {
-      result = await upgrader.apply(plan);
-    } catch (error) {
-      if (error instanceof UpgradeInstallFailedError) {
-        throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
-          hint: `${errorMessage(error.cause)}. Nothing else changed; fix that and rerun.`,
-          nextCommands: [suggestedCommandOf(error.command), await this.again("upgrade", {})],
-        });
+    const result = await upgrader.apply(plan).catch(async (error: unknown) => {
+      if (!(error instanceof UpgradeInstallFailedError)) {
+        throw error;
       }
-      throw error;
-    }
+      throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
+        hint: `${errorMessage(error.cause)}. Nothing else changed; fix that and rerun.`,
+        nextCommands: [suggestedCommandOf(error.command), await this.again("upgrade", {})],
+      });
+    });
 
     const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
 
@@ -271,19 +267,15 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
   private async planned(
     upgrader: Upgrader,
   ): Promise<{ plan: Plan; breaking: readonly BreakingChange[]; notes: ReleaseNotes }> {
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let plan: Awaited<ReturnType<Upgrader["plan"]>>;
-    try {
-      plan = await upgrader.plan();
-    } catch (error) {
-      if (error instanceof UpgradeReleaseLookupError) {
-        throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
-          hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
-          nextCommands: [await this.again("upgrade", {})],
-        });
+    const plan = await upgrader.plan().catch(async (error: unknown) => {
+      if (!(error instanceof UpgradeReleaseLookupError)) {
+        throw error;
       }
-      throw error;
-    }
+      throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
+        hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
+        nextCommands: [await this.again("upgrade", {})],
+      });
+    });
 
     const notes = new ReleaseNotes();
     const breaking: readonly BreakingChange[] = plan.upToDate

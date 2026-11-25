@@ -1,7 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca, OrcaFrameworkMismatchError, OrcaFrameworkMissingError } from "@/lib/orca";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { createOrca, OrcaFrameworkMissingError } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
@@ -11,17 +10,6 @@ import {
   type SetupServices,
   setupRetryFlags,
 } from "@/cli/commands/setup/shared";
-
-/** How an app of another framework than the one asked for is refused. */
-const FRAMEWORK_MISMATCH_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "Rerun setup without --framework, or with --framework {detected}, to set up this app, or point --cwd at the {requestedName} app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
-  details: {
-    requested: "{requested}",
-    detected: "{detected}",
-  },
-} as const satisfies Refusal;
 
 /**
  * The framework a rerun is told to scaffold when the available ones include it.
@@ -115,17 +103,18 @@ export class DetectFramework extends WizardStep<
       detecting.done(
         `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
       );
+      const found = {
+        app: {
+          framework: facts.id,
+          devPort: facts.devPort,
+        },
+        detected: facts,
+        scaffoldedBesideFiles: false,
+      };
       return {
         orca,
-        found: {
-          app: {
-            framework: facts.id,
-            devPort: facts.devPort,
-          },
-          detected: facts,
-          scaffoldedBesideFiles: false,
-        },
-        scaffoldedFramework: false,
+        found,
+        scaffoldedFramework: found.detected === undefined,
       };
     } catch (error) {
       if (error instanceof OrcaFrameworkMissingError) {
@@ -174,38 +163,31 @@ export class DetectFramework extends WizardStep<
             details: { frameworks: choices },
           });
         }
+        const found = {
+          app: await orca.planScaffold(
+            this.deps.cwd,
+            flags.framework ||
+              (await this.deps.ask.select({
+                name: "framework",
+                message: "Which framework would you like to scaffold?",
+                options: orca.availableFrameworks().map((choice) => {
+                  return {
+                    value: choice.id,
+                    label: choice.displayName,
+                  };
+                }),
+              })),
+          ),
+          detected: undefined,
+          scaffoldedBesideFiles: !target.scaffoldable,
+        };
         return {
           orca,
-          found: {
-            app: await orca.planScaffold(
-              this.deps.cwd,
-              flags.framework ||
-                (await this.deps.ask.select({
-                  name: "framework",
-                  message: "Which framework would you like to scaffold?",
-                  options: orca.availableFrameworks().map((choice) => {
-                    return {
-                      value: choice.id,
-                      label: choice.displayName,
-                    };
-                  }),
-                })),
-            ),
-            detected: undefined,
-            scaffoldedBesideFiles: !target.scaffoldable,
-          },
-          scaffoldedFramework: true,
+          found,
+          scaffoldedFramework: found.detected === undefined,
         };
       }
       detecting.fail();
-      if (error instanceof OrcaFrameworkMismatchError) {
-        throw refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
-          message: error.message,
-          requested: error.requested,
-          detected: error.detected,
-          requestedName: orca.displayName(error.requested),
-        });
-      }
       throw error;
     }
   }

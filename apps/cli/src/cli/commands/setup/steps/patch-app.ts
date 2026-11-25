@@ -8,37 +8,10 @@ import {
   type SetupServices,
 } from "@/cli/commands/setup/shared";
 import { errorMessage } from "@/lib/errors";
-import {
-  OrcaPatchFileOverwriteError,
-  OrcaPatchLayoutConflictError,
-  OrcaRendererPendingError,
-} from "@/lib/orca";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { isErrno } from "@/lib/errno";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
-
-/** How a file the patch would write over, holding something else, is refused. */
-const PATCH_OVERWRITE_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "Rerun with --force if you want the CLI to replace this file.",
-} as const satisfies Refusal;
-
-/** How a file of the app that leaves the integration broken is refused. */
-const PATCH_LAYOUT_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "--force can't fix this: it only replaces files at the paths setup writes.",
-} as const satisfies Refusal;
-
-/** How a renderer that is declared and not published yet is refused. */
-const RENDERER_PENDING_REFUSAL = {
-  code: "E_NOT_IMPLEMENTED",
-  message: "{message}",
-  hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
-} as const satisfies Refusal;
 
 /**
  * The env files the patch merges a project's id and secrets into: `.env.local`
@@ -149,7 +122,7 @@ export class PatchApp extends WizardStep<
     const patching = this.deps.ui.begin(
       `Patching project files${this.deps.dryRun ? " (dry run)" : ""}`,
     );
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    // biome-ignore lint/plugin: the files written are read after the call, outside the try that rolls the env files back
     let patched: Awaited<ReturnType<typeof patcher.patch>>;
     try {
       patched = await patcher.patch(patchContext(framework, project), {
@@ -160,21 +133,6 @@ export class PatchApp extends WizardStep<
     } catch (error) {
       await this.rollBack(envFilesBefore);
       patching.fail();
-      if (error instanceof OrcaPatchFileOverwriteError) {
-        throw refusalError(PATCH_OVERWRITE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof OrcaPatchLayoutConflictError) {
-        throw refusalError(PATCH_LAYOUT_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof OrcaRendererPendingError) {
-        throw refusalError(RENDERER_PENDING_REFUSAL, {
-          message: error.message,
-        });
-      }
       throw error;
     }
     for (const file of patched.filesWritten) {

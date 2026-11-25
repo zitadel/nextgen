@@ -1,17 +1,8 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { toZitadelError } from "@/lib/errors";
-import { OrcaScaffoldOccupiedError } from "@/lib/orca";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
-
-/** How a directory that already holds something is refused as a place to scaffold. */
-const SCAFFOLD_OCCUPIED_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "Pass --force to scaffold into a non-empty directory, or run setup from an existing supported app project.",
-} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -75,38 +66,29 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
     const current = scaffolding
       ? this.deps.ui.begin(`Scaffolding a new ${app.framework} project`)
       : undefined;
-    try {
-      const newApp = scaffolding
-        ? await orca
-            .scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
-            .catch((error) => {
-              current?.fail();
-              throw error;
-            })
-        : undefined;
-      if (newApp !== undefined) {
-        current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
-      }
-      const created = detected ?? newApp?.facts;
-      return {
-        newApp,
-        framework:
-          created === undefined
-            ? undefined
-            : {
-                ...created,
-                devPort: answers.devPort,
-                url: issuer,
-              },
-      };
-    } catch (error) {
-      if (error instanceof OrcaScaffoldOccupiedError) {
-        throw refusalError(SCAFFOLD_OCCUPIED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
+    const newApp = scaffolding
+      ? await orca
+          .scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
+          .catch((error) => {
+            current?.fail();
+            throw error;
+          })
+      : undefined;
+    if (newApp !== undefined) {
+      current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }
+    const created = detected ?? newApp?.facts;
+    return {
+      newApp,
+      framework:
+        created === undefined
+          ? undefined
+          : {
+              ...created,
+              devPort: answers.devPort,
+              url: issuer,
+            },
+    };
   }
 
   /**

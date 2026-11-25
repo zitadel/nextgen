@@ -3,7 +3,6 @@ import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
 
 import { ClaimService } from "@/lib/backend";
-import { EnvironmentValueMissingError, EnvironmentValueUnboundError } from "@/lib/environment";
 import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
@@ -22,17 +21,6 @@ import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
 import { ChangeCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-
-/** How a value set in no source is refused when its environment has a project to add it to. */
-const VALUE_MISSING_REFUSAL = {
-  message: "{message}",
-} as const satisfies Refusal;
-
-/** How a value set in no source is refused when its environment has no project at all. */
-const VALUE_MISSING_UNBOUND_REFUSAL = {
-  message: "{message}",
-  next: ["{next}"],
-} as const satisfies Refusal;
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -422,57 +410,17 @@ export default class Claim extends Telemetered(ChangeCommand) {
             id: "claim",
             flags: { noOpen: flags.noOpen, timeout: flags.timeout },
           });
-    try {
-      const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
-      const localSecret = (await Project.at(this.cwd).hasSecret())
-        ? await Project.at(this.cwd).secret()
-        : undefined;
-      const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
+    const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
+    const localSecret = (await Project.at(this.cwd).hasSecret())
+      ? await Project.at(this.cwd).secret()
+      : undefined;
+    const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
 
-      return {
-        startOver,
-        projectId,
-        localRecord,
-      };
-    } catch (error) {
-      if (error instanceof EnvironmentValueUnboundError) {
-        // Run in the directory this run addressed, which need not be the
-        // shell's: `setup` and `env add` both write their files there.
-        const elsewhere =
-          this.cwd === process.cwd()
-            ? {}
-            : {
-                cwd: this.cwd,
-              };
-        throw refusalError(
-          VALUE_MISSING_UNBOUND_REFUSAL,
-          {
-            message: error.message,
-          },
-          {
-            next:
-              this.environment.name.value === "development"
-                ? {
-                    id: "setup",
-                    flags: elsewhere,
-                  }
-                : {
-                    id: "env:add",
-                    args: {
-                      name: this.environment.name.value,
-                    },
-                    flags: elsewhere,
-                  },
-          },
-        );
-      }
-      if (error instanceof EnvironmentValueMissingError) {
-        throw refusalError(VALUE_MISSING_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    return {
+      startOver,
+      projectId,
+      localRecord,
+    };
   }
 
   /**

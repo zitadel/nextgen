@@ -13,8 +13,7 @@ import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/li
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor } from "@/lib/idp";
 import type { CommandResult } from "@/cli/core";
-import { refusalError, type Refusal } from "@/cli/core/refusal";
-import { Orca, OrcaPatchFileMissingError, createOrca, issuerFromPort } from "@/lib/orca";
+import { Orca, createOrca, issuerFromPort } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
 import { WHAT_CHANGED } from "@/lib/suggestion";
@@ -24,7 +23,7 @@ import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
-import { Project, ProjectConfigMissingError, ProjectSecretMissingError } from "@/lib/project";
+import { Project } from "@/lib/project";
 
 /**
  * The env file setup writes for the CLI's own commands. Every command setup
@@ -36,38 +35,6 @@ import { Project, ProjectConfigMissingError, ProjectSecretMissingError } from "@
  * created.
  */
 export const RECOVERY_ENV_FILE = ".env.development.local";
-
-/** What a project with no `.zitadel/secret` is refused for. */
-const SECRET_MISSING_REFUSAL = {
-  message: ".zitadel/secret was not found",
-  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
-  next: [
-    {
-      id: "doctor",
-      flags: {
-        fix: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
-
-/** What a directory with no `zitadel.json` is reported as. */
-const PROJECT_CONFIG_MISSING_REFUSAL = {
-  message: "zitadel.json was not found",
-  hint: "Set the project up first.",
-  next: [
-    {
-      id: "setup",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** What a project with no `zitadel.json` is refused for when the app moves. */
-const CONFIG_MISSING_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "zitadel.json was not found",
-  hint: "Run `zitadel setup` first.",
-} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -167,11 +134,11 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
         hint: "Pass --dev-port with the port the app should run on.",
       });
     }
+    const source = (await Project.at(this.deps.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
     const moving = this.deps.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${this.deps.dryRun ? " (dry run)" : ""}`,
     );
     try {
-      const source = (await Project.at(this.deps.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
       const orca = createOrca(LocalRuntime.DIR);
       const context = await loadPatchContext(this.deps.cwd, orca, this.deps.cliVersion);
       const previousIssuer = context.issuer;
@@ -425,15 +392,6 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       };
     } catch (error) {
       moving.fail();
-      if (error instanceof ProjectConfigMissingError) {
-        throw refusalError(PROJECT_CONFIG_MISSING_REFUSAL, {});
-      }
-      if (error instanceof ProjectSecretMissingError) {
-        throw refusalError(SECRET_MISSING_REFUSAL, {});
-      }
-      if (error instanceof OrcaPatchFileMissingError) {
-        throw refusalError(CONFIG_MISSING_REFUSAL, {});
-      }
       throw error;
     }
   }

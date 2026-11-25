@@ -1,33 +1,6 @@
 import { WizardStep } from "@/lib/wizard";
-import {
-  OrcaPatchFileOverwriteError,
-  OrcaPatchLayoutConflictError,
-  OrcaRendererPendingError,
-} from "@/lib/orca";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-
-/** How a file the patch would write over, holding something else, is refused. */
-const PATCH_OVERWRITE_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "Rerun with --force if you want the CLI to replace this file.",
-} as const satisfies Refusal;
-
-/** How a file of the app that leaves the integration broken is refused. */
-const PATCH_LAYOUT_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "--force can't fix this: it only replaces files at the paths setup writes.",
-} as const satisfies Refusal;
-
-/** How a renderer that is declared and not published yet is refused. */
-const RENDERER_PENDING_REFUSAL = {
-  code: "E_NOT_IMPLEMENTED",
-  message: "{message}",
-  hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
-} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -81,45 +54,26 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
   async run(needs: Needs): Promise<object> {
     const { framework, issuer, patchContext, patcher } = needs;
     if (framework !== undefined && !this.deps.dryRun) {
-      try {
-        await patcher.patch(
-          patchContext(framework, {
-            id: "dry-run-0000",
-            name: "dry-run",
-            project_secret: "sk_proj_dry_run_full",
-            preview_secret: "sk_proj_dry_run_preview",
-            origins: [
-              {
-                pattern: issuer,
-                kind: "primary",
-              },
-            ],
-            created_at: "2026-04-21T14:03:11.000Z",
-          }),
-          {
-            cwd: this.deps.cwd,
-            dryRun: true,
-            force: this.deps.force,
-          },
-        );
-      } catch (error) {
-        if (error instanceof OrcaPatchFileOverwriteError) {
-          throw refusalError(PATCH_OVERWRITE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof OrcaPatchLayoutConflictError) {
-          throw refusalError(PATCH_LAYOUT_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof OrcaRendererPendingError) {
-          throw refusalError(RENDERER_PENDING_REFUSAL, {
-            message: error.message,
-          });
-        }
-        throw error;
-      }
+      await patcher.patch(
+        patchContext(framework, {
+          id: "dry-run-0000",
+          name: "dry-run",
+          project_secret: "sk_proj_dry_run_full",
+          preview_secret: "sk_proj_dry_run_preview",
+          origins: [
+            {
+              pattern: issuer,
+              kind: "primary",
+            },
+          ],
+          created_at: "2026-04-21T14:03:11.000Z",
+        }),
+        {
+          cwd: this.deps.cwd,
+          dryRun: true,
+          force: this.deps.force,
+        },
+      );
     }
     return {};
   }

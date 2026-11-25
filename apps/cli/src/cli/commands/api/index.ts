@@ -70,7 +70,7 @@ const FORCE_REQUIRED_REFUSAL = {
 /** How an operation id or a path that names nothing the API has is refused. */
 const OPERATION_UNKNOWN_REFUSAL = {
   message: "{message}",
-  hint: "{hint}",
+  hint: "List them with `zitadel api ls`, or give a path such as /users/query.",
   next: [
     {
       id: "api:ls",
@@ -84,7 +84,7 @@ const OPERATION_UNKNOWN_REFUSAL = {
 /** How a path whose method does not pick one operation is refused. */
 const OPERATION_AMBIGUOUS_REFUSAL = {
   message: "{message}",
-  hint: "{hint}",
+  hint: "Pass -X with one of the methods named above.",
   next: [
     {
       id: "api:ls",
@@ -106,17 +106,11 @@ function resolveTarget(ref: string, method?: string): Target {
     if (error instanceof BackendOperationUnknownError) {
       throw refusalError(OPERATION_UNKNOWN_REFUSAL, {
         message: error.message,
-        hint: ref.startsWith("/")
-          ? "List the paths with `zitadel api ls`."
-          : "List them with `zitadel api ls`, or give a path such as /users/query.",
       });
     }
     if (error instanceof BackendOperationAmbiguousError) {
       throw refusalError(OPERATION_AMBIGUOUS_REFUSAL, {
         message: error.message,
-        hint: ref.startsWith("/")
-          ? "Pass -X with one of the methods the path takes."
-          : "Leave out -X, or pass -X with the method the operation has.",
       });
     }
     throw error;
@@ -445,13 +439,10 @@ export default class Api extends Telemetered(
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let response: Awaited<ReturnType<typeof operationService.call>>;
-    try {
-      response = await (flags.paginate
-        ? operationService.callAll(request)
-        : operationService.call(request));
-    } catch (error) {
+    const response = await (flags.paginate
+      ? operationService.callAll(request)
+      : operationService.call(request)
+    ).catch((error: unknown) => {
       if (error instanceof BackendUnauthorizedError && operation.auth === "secret") {
         throw new ZitadelError("E_AUTH", error.message, {
           hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
@@ -461,7 +452,7 @@ export default class Api extends Telemetered(
         });
       }
       throw error;
-    }
+    });
 
     if (response.body === undefined) {
       return {

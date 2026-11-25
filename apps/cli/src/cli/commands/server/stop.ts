@@ -1,15 +1,7 @@
 import { Flags } from "@oclif/core";
 
-import {
-  LocalRuntime,
-  LocalServerProcessesStopError,
-  LocalServerProcessesUnlistableError,
-  LocalServerRecordMalformedError,
-  LocalServerRecordUnreadableError,
-  LocalServerStopError,
-} from "@/lib/server";
+import { LocalRuntime } from "@/lib/server";
 import type { Admitted, CommandResult } from "@/cli/core";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { Previewable } from "@/cli/core/previewable";
@@ -17,52 +9,6 @@ import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-
-/** How a stop is refused when processes it asked to stop are still running. */
-const PROCESSES_DID_NOT_STOP_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
-} as const satisfies Refusal;
-
-/** How a stop is refused when the machine cannot list its processes. */
-const PROCESSES_UNLISTABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
-} as const satisfies Refusal;
-
-/** How a stop is refused when the server is still running afterwards. */
-const SERVER_DID_NOT_STOP_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
-} as const satisfies Refusal;
-
-/** How a stop is refused when the runtime record of this folder is not in the shape it is written in. */
-const RECORD_MALFORMED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a stop is refused when the runtime record of this folder cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
-} as const satisfies Refusal;
 
 /**
  * `zitadel stop`: stops this folder's server and keeps its data, or, with
@@ -238,38 +184,7 @@ export default class Stop extends Telemetered(
    */
   protected async apply({ flags }: Admitted<typeof Stop>): Promise<CommandResult> {
     if (flags.all) {
-      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-      let sweep: Awaited<ReturnType<typeof LocalRuntime.stopAll>>;
-      try {
-        sweep = await LocalRuntime.stopAll(this.localServers());
-      } catch (error) {
-        if (error instanceof LocalServerProcessesStopError) {
-          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerProcessesUnlistableError) {
-          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerStopError) {
-          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordMalformedError) {
-          throw refusalError(RECORD_MALFORMED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordUnreadableError) {
-          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        throw error;
-      }
+      const sweep = await LocalRuntime.stopAll(this.localServers());
       if (!sweep.supported) {
         const title = "Managed local runtime process discovery is unavailable";
 
@@ -333,38 +248,7 @@ export default class Stop extends Telemetered(
     }
 
     const server = this.serverInThisFolder();
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let record: Awaited<ReturnType<typeof server.record>>;
-    try {
-      record = await server.record();
-    } catch (error) {
-      if (error instanceof LocalServerProcessesStopError) {
-        throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerProcessesUnlistableError) {
-        throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerStopError) {
-        throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const record = await server.record();
 
     if (record !== undefined && record.backend === "binary") {
       const facts: Fact[] = [
@@ -372,39 +256,7 @@ export default class Stop extends Telemetered(
         ["Process", String(record.pid)],
         ["Data", record.data_dir],
       ];
-      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-      let result: Awaited<ReturnType<typeof server.stop>>;
-      try {
-        result = await server.stop();
-      } catch (error) {
-        if (error instanceof LocalServerProcessesStopError) {
-          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerProcessesUnlistableError) {
-          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerStopError) {
-          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordMalformedError) {
-          throw refusalError(RECORD_MALFORMED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordUnreadableError) {
-          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-      const { stopped, outcome } = result;
+      const { stopped, outcome } = await server.stop();
       const title = this.stoppedTitle(stopped);
 
       return {
@@ -431,39 +283,7 @@ export default class Stop extends Telemetered(
         ["Container", record.container_name],
         ["Data", record.data_dir],
       ];
-      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-      let result: Awaited<ReturnType<typeof server.stop>>;
-      try {
-        result = await server.stop();
-      } catch (error) {
-        if (error instanceof LocalServerProcessesStopError) {
-          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerProcessesUnlistableError) {
-          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerStopError) {
-          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordMalformedError) {
-          throw refusalError(RECORD_MALFORMED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordUnreadableError) {
-          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-      const { stopped } = result;
+      const { stopped } = await server.stop();
       const title = this.stoppedTitle(stopped);
 
       return {
@@ -488,39 +308,7 @@ export default class Stop extends Telemetered(
         ["Runtime", "missing"],
         ["Container", containerName],
       ];
-      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-      let result: Awaited<ReturnType<typeof server.stop>>;
-      try {
-        result = await server.stop();
-      } catch (error) {
-        if (error instanceof LocalServerProcessesStopError) {
-          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerProcessesUnlistableError) {
-          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerStopError) {
-          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordMalformedError) {
-          throw refusalError(RECORD_MALFORMED_REFUSAL, {
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerRecordUnreadableError) {
-          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-      const { stopped } = result;
+      const { stopped } = await server.stop();
       const title = this.stoppedTitle(stopped);
 
       return {

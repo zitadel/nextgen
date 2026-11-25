@@ -4,43 +4,10 @@ import { parseEnv } from "node:util";
 
 import { Environment } from "@/lib/environment";
 import { readIfReadable } from "@/lib/fs";
-import { refusalError, type Refusal } from "@/cli/core/refusal";
-import { issuerFromPort, Orca, OrcaFrameworkMissingError } from "@/lib/orca";
+import { issuerFromPort, Orca } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { Project, ProjectConfigMissingError, ProjectSecretMissingError } from "@/lib/project";
+import { Project } from "@/lib/project";
 import { CliPackage } from "@/lib/upgrade";
-
-/** What a directory with no `zitadel.json` is reported as. */
-const CONFIG_MISSING_REFUSAL = {
-  message: "zitadel.json was not found",
-  hint: "Set the project up first.",
-  next: [
-    {
-      id: "setup",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** What a project with no `.zitadel/secret` is reported as. */
-const SECRET_MISSING_REFUSAL = {
-  message: ".zitadel/secret was not found",
-  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
-  next: [
-    {
-      id: "doctor",
-      flags: {
-        fix: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
-
-/** What a directory with no app of a framework orca knows is reported as. */
-const FRAMEWORK_NOT_DETECTED_REFUSAL = {
-  code: "E_FRAMEWORK_NOT_DETECTED",
-  message: "Could not detect a supported app framework",
-  hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
-} as const satisfies Refusal;
 
 /**
  * Reconstructs a {@link PatchContext} from the on-disk project (config,
@@ -69,28 +36,9 @@ export async function loadPatchContext(
   orca: Orca,
   cliVersion: string,
 ): Promise<PatchContext> {
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let config: Awaited<ReturnType<ReturnType<typeof Project.at>["config"]>>;
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let secret: Awaited<ReturnType<ReturnType<typeof Project.at>["secret"]>>;
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let framework: Awaited<ReturnType<typeof orca.detect>>;
-  try {
-    config = await Project.at(cwd).config();
-    secret = await Project.at(cwd).secret();
-    framework = await orca.detect(cwd);
-  } catch (error) {
-    if (error instanceof ProjectConfigMissingError) {
-      throw refusalError(CONFIG_MISSING_REFUSAL, {});
-    }
-    if (error instanceof ProjectSecretMissingError) {
-      throw refusalError(SECRET_MISSING_REFUSAL, {});
-    }
-    if (error instanceof OrcaFrameworkMissingError) {
-      throw refusalError(FRAMEWORK_NOT_DETECTED_REFUSAL, {});
-    }
-    throw error;
-  }
+  const config = await Project.at(cwd).config();
+  const secret = await Project.at(cwd).secret();
+  const framework = await orca.detect(cwd);
   const scaffold = await Orca.readManifest(cwd);
   const configured = await configuredIssuer(cwd);
   const issuerScaffold = configured === undefined ? await Orca.readManifest(cwd) : undefined;
