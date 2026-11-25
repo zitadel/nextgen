@@ -85,9 +85,8 @@ func TestFlowPinsRelease(t *testing.T) {
 
 // TestFlowEventsNameTheServingRelease lists the events of flows by the release
 // that served them: a pinned flow's events name the pinned release and its
-// deployment, not the origin's newest, so the two variants of an A/B test of
-// the sign-in read apart. The first release is no longer what the origin
-// serves, so only the pinned flow can have written its events.
+// deployment, not the origin's newest. The first release is no longer what the
+// origin serves, so only the pinned flow can have written its events.
 func TestFlowEventsNameTheServingRelease(t *testing.T) {
 	t.Parallel()
 
