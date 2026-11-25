@@ -4,7 +4,7 @@ import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import {
   LocalServerNotRespondingError,
-  LocalServerNotStartedError,
+  LocalServerNotRunningError,
   ZitadelRuntime,
 } from "@/lib/server";
 import { resolve } from "node:path";
@@ -151,7 +151,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
       serverFlag: meta.serverFlag,
     })
       .catch((error: unknown) => {
-        if (error instanceof LocalServerNotStartedError) {
+        if (error instanceof LocalServerNotRunningError) {
           const retry = retryOptionsFromFlags(flags);
           const recovery = ssoRecovery(retry, suggest);
           const scripting =
@@ -210,7 +210,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
               ? refusalError(
                   LOCAL_SERVER_ELSEWHERE_REFUSAL,
                   {
-                    reason: error.hint ?? "",
+                    reason: `No healthy local server responded at ${String(error.details?.server_url)}.`,
                     directory: Cmd.quote(directory),
                     scripting,
                     recovery: recovered,
@@ -231,7 +231,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
               : refusalError(
                   LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
                   {
-                    reason: error.hint ?? "",
+                    reason: `No healthy local server responded at ${String(error.details?.server_url)}.`,
                     scripting,
                     recovery: recovered,
                   },

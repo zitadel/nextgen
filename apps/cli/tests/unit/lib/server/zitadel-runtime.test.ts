@@ -298,7 +298,7 @@ describe("LocalRuntime", () => {
           stopPid: async (pid) => ({ pid, status: "failed", target: "process", signal: "SIGKILL" }),
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects.toMatchObject({
-        name: "LocalServerProcessesStopError",
+        name: "LocalServerOrphansStopError",
         category: "invalid",
       });
 
@@ -569,7 +569,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt("http://localhost:8080");
 
       await expect(LocalRuntime.resolveUrl(dir, fetcher)).rejects.toMatchObject({
-        name: "LocalServerNotStartedError",
+        name: "LocalServerNotRunningError",
       });
     });
 

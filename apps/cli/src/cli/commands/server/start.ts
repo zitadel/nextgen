@@ -8,8 +8,8 @@ import {
   LocalServerBinaryBlockedError,
   LocalServerBinaryMissingError,
   LocalServerBusyError,
+  LocalServerDockerFailedError,
   LocalServerDockerMissingError,
-  LocalServerFileBlockedError,
   LocalServerFileUnreadableError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
@@ -57,6 +57,19 @@ const PORT = {
     max: MAX_PORT,
   },
 } as const satisfies Refused<number>;
+
+/** How a start of the local server is refused: LocalServerDockerFailedError. */
+const DOCKER_FAILED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that Docker is installed, running, and reachable from this shell.",
+  details: "{details}",
+  next: [
+    {
+      id: "doctor",
+    },
+  ],
+} as const satisfies Refusal;
 
 /** How a start is refused when Docker, which a Docker start needs, does not answer. */
 const DOCKER_UNAVAILABLE_REFUSAL = {
@@ -222,14 +235,6 @@ const FILE_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerFileBlockedError. */
-const FILE_BLOCKED_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
   details: "{details}",
 } as const satisfies Refusal;
 
@@ -565,18 +570,17 @@ export default class Start extends Telemetered(
         throw error;
       })
       .catch((error: unknown) => {
-        if (error instanceof LocalServerFileBlockedError) {
-          throw refusalError(FILE_BLOCKED_REFUSAL, {
+        if (error instanceof LocalServerAdminPlatformMissingError) {
+          throw refusalError(PLATFORM_MISSING_REFUSAL, {
             message: error.message,
             details: error.details ?? null,
-            path: String(error.details?.path ?? ""),
           });
         }
         throw error;
       })
       .catch((error: unknown) => {
-        if (error instanceof LocalServerAdminPlatformMissingError) {
-          throw refusalError(PLATFORM_MISSING_REFUSAL, {
+        if (error instanceof LocalServerDockerFailedError) {
+          throw refusalError(DOCKER_FAILED_REFUSAL, {
             message: error.message,
             details: error.details ?? null,
           });

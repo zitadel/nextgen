@@ -7,7 +7,9 @@ import type { Parsed } from "@zitadel/config/idp";
 import { errorMessage } from "@/lib/errors";
 import {
   LocalServerDockerMissingError,
-  LocalServerInternalError,
+  LocalServerNotStartedError,
+  LocalServerOrphansStopError,
+  LocalServerPermitMismatchError,
   LocalServerPortBusyError,
   LocalServerProcessesStopError,
   LocalServerProcessesUnlistableError,
@@ -769,7 +771,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * @param cwd - The directory the run addresses.
    * @param fetcher - What asks whether the server answers (`fetch` by default).
    * @returns The address of the server running there.
-   * @throws {LocalServerNotStartedError} when no server was started there, and {LocalServerNotRespondingError} when the recorded one is not running.
+   * @throws {LocalServerNotRunningError} when no server was started there, and {LocalServerNotRespondingError} when the recorded one is not running.
    */
   static async resolveUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
@@ -928,7 +930,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * enough: another folder's server may have taken the port since.
    *
    * @returns The address.
-   * @throws {LocalServerNotStartedError} when no folder from here up started a server, and {LocalServerNotRespondingError} when the recorded one is not running.
+   * @throws {LocalServerNotRunningError} when no folder from here up started a server, and {LocalServerNotRespondingError} when the recorded one is not running.
    */
   runningUrl(): Promise<string> {
     return LocalRuntime.resolveUrl(this.cwd, this.directory.fetcher);
@@ -1256,13 +1258,15 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param permit - The caller's proof that deleting is meant.
    * @returns What stopping the server did.
-   * @throws {LocalServerInternalError} when the permit is for another folder.
+   * @throws {LocalServerPermitMismatchError} when the permit is for another folder.
    * @throws {LocalServerProcessesStopError} when a process on this folder's data would not stop.
    * @throws {LocalServerProcessesUnlistableError} when the record cannot be read and the machine's processes cannot be listed.
    */
   async reset(permit: DestroyPermit): Promise<StopReport> {
     if (resolve(permit.folder) !== resolve(this.cwd)) {
-      throw new LocalServerInternalError(`The permit is for ${permit.folder}, not ${this.cwd}`);
+      throw new LocalServerPermitMismatchError(
+        `The permit is for ${permit.folder}, not ${this.cwd}`,
+      );
     }
     // A record that cannot be read must not stop the reset that is its way out.
     const record = await peekRuntimeMetadata(this.cwd);
@@ -1329,7 +1333,7 @@ export class LocalRuntime extends ZitadelRuntime {
           return orphan.stop_result.status === "failed";
         })
       ) {
-        throw new LocalServerProcessesStopError("Local Zitadel server did not stop", {
+        throw new LocalServerOrphansStopError("Local Zitadel server did not stop", {
           details: {
             stop_results: orphans,
           },
@@ -1409,7 +1413,7 @@ export class LocalRuntime extends ZitadelRuntime {
   private async recordedRuntime(): Promise<RuntimeMetadata> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (!runtime) {
-      throw localServerNotRunning();
+      throw new LocalServerNotStartedError();
     }
     return runtime;
   }

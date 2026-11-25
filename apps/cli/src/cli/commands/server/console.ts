@@ -6,7 +6,6 @@ import {
   AdminSession,
   LocalRuntime,
   LocalServerAdminFileMalformedError,
-  LocalServerFileBlockedError,
   LocalServerFileUnreadableError,
   ZitadelRuntime,
 } from "@/lib/server";
@@ -53,14 +52,6 @@ const FILE_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerFileBlockedError. */
-const FILE_BLOCKED_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
   details: "{details}",
 } as const satisfies Refusal;
 
@@ -267,16 +258,6 @@ export default class Console extends Telemetered(
       .catch((error: unknown) => {
         if (error instanceof LocalServerFileUnreadableError) {
           throw refusalError(FILE_UNREADABLE_REFUSAL, {
-            message: error.message,
-            details: error.details ?? null,
-            path: String(error.details?.path ?? ""),
-          });
-        }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof LocalServerFileBlockedError) {
-          throw refusalError(FILE_BLOCKED_REFUSAL, {
             message: error.message,
             details: error.details ?? null,
             path: String(error.details?.path ?? ""),

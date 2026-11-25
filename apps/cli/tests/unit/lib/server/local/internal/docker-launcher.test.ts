@@ -229,7 +229,7 @@ describe("DockerLauncher", () => {
 
       await expect(
         launcher().launch({ port: 8090, serverUrl: "http://localhost:8090" }),
-      ).rejects.toThrow("Start local Zitadel container failed");
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
 
       const verbs = calls.map((call) => call.args[0]);
       expect(verbs.lastIndexOf("inspect")).toBeGreaterThan(verbs.indexOf("run"));

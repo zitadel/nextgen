@@ -9,13 +9,17 @@ import {
   LocalServerBinaryBlockedError,
   LocalServerBinaryMissingError,
   LocalServerBusyError,
+  LocalServerDockerFailedError,
   LocalServerDockerMissingError,
   LocalServerError,
   LocalServerFileBlockedError,
   LocalServerFileUnreadableError,
   LocalServerInternalError,
   LocalServerNotRespondingError,
+  LocalServerNotRunningError,
   LocalServerNotStartedError,
+  LocalServerOrphansStopError,
+  LocalServerPermitMismatchError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerProcessesStopError,
@@ -29,7 +33,8 @@ import {
 
 describe("the local server errors", () => {
   it.each([
-    ["not started", new LocalServerNotStartedError({}), "conflict", "E_LOCAL_SERVER_NOT_RUNNING"],
+    ["not running", new LocalServerNotRunningError({}), "conflict", "E_LOCAL_SERVER_NOT_RUNNING"],
+    ["not started", new LocalServerNotStartedError(), "invalid", "E_VALIDATION"],
     [
       "not responding",
       new LocalServerNotRespondingError({}),
@@ -67,10 +72,13 @@ describe("the local server errors", () => {
     ["port busy", new LocalServerPortBusyError(8080), "unavailable", "E_PORT_IN_USE"],
     ["port full", new LocalServerPortFullError(8080, 8179), "unavailable", "E_PORT_IN_USE"],
     ["docker", new LocalServerDockerMissingError("no daemon"), "unavailable", "E_NETWORK"],
+    ["docker failed", new LocalServerDockerFailedError("failed"), "invalid", "E_VALIDATION"],
+    ["permit mismatch", new LocalServerPermitMismatchError("other"), "invalid", "E_VALIDATION"],
+    ["orphans stop", new LocalServerOrphansStopError("stuck"), "invalid", "E_VALIDATION"],
     ["binary missing", new LocalServerBinaryMissingError("gone"), "invalid", "E_VALIDATION"],
     ["binary blocked", new LocalServerBinaryBlockedError("gone"), "invalid", "E_VALIDATION"],
     ["unreadable file", new LocalServerFileUnreadableError("bad"), "invalid", "E_VALIDATION"],
-    ["blocked file", new LocalServerFileBlockedError("in the way"), "conflict", "E_CONFLICT"],
+    ["blocked file", new LocalServerFileBlockedError("in the way"), "invalid", "E_VALIDATION"],
     ["admin rejected", new LocalServerAdminRejectedError("no"), "denied", "E_AUTH"],
     ["admin session", new LocalServerAdminSessionError("no"), "denied", "E_AUTH"],
     ["platform missing", new LocalServerAdminPlatformMissingError("no"), "invalid", "E_VALIDATION"],
@@ -166,8 +174,8 @@ describe("the local server errors", () => {
       new LocalServerNotRespondingError({
         server_url: "http://localhost:8080",
       }).hint,
-    ).toBe("No healthy local server responded at http://localhost:8080.");
-    expect(new LocalServerNotStartedError({}).hint).toBe(
+    ).toBe("No healthy local server responded at the recorded address.");
+    expect(new LocalServerNotRunningError({}).hint).toBe(
       "No local server has been started in this directory or a parent.",
     );
   });

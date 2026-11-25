@@ -53,7 +53,7 @@ export abstract class LocalServerError extends Error {
 }
 
 /** No local server was started in this folder or a parent. */
-export class LocalServerNotStartedError extends LocalServerError {
+export class LocalServerNotRunningError extends LocalServerError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_LOCAL_SERVER_NOT_RUNNING";
@@ -72,6 +72,19 @@ export class LocalServerNotStartedError extends LocalServerError {
   }
 }
 
+/** The local runtime has not been started, so it has no record to read. */
+export class LocalServerNotStartedError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = "The local runtime has not been started.";
+
+  /** Creates the error. */
+  constructor() {
+    super("Local Zitadel runtime has not been started");
+  }
+}
+
 /**
  * The local server a folder started is not running: it does not answer at the
  * address it recorded.
@@ -80,7 +93,8 @@ export class LocalServerNotRespondingError extends LocalServerError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_LOCAL_SERVER_NOT_RUNNING";
-  override readonly hint: string | undefined;
+  override readonly hint: string | undefined =
+    "No healthy local server responded at the recorded address.";
 
   /**
    * Creates the error.
@@ -91,7 +105,6 @@ export class LocalServerNotRespondingError extends LocalServerError {
     super("Local Zitadel server is not running", {
       details,
     });
-    this.hint = `No healthy local server responded at ${String(details.server_url)}.`;
   }
 }
 
@@ -269,6 +282,69 @@ export class LocalServerProcessesUnlistableError extends LocalServerError {
   }
 }
 
+/** A `docker` call ran and failed. */
+export class LocalServerDockerFailedError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = "The docker command failed.";
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong.
+   * @param options - The facts behind it: the command and what it printed or failed with.
+   */
+  constructor(
+    message: string,
+    options: {
+      details?: Readonly<Record<string, unknown>> | undefined;
+    } = {},
+  ) {
+    super(message, options);
+  }
+}
+
+/** A reset was asked for in a folder other than the one its permit is for. */
+export class LocalServerPermitMismatchError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = "A reset acts on one folder only.";
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong.
+   */
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** A process on the folder's data was still running after a reset stopped it. */
+export class LocalServerOrphansStopError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = "A process on this folder's data is still running.";
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong.
+   * @param options - The facts behind it, the processes and what stopping each did.
+   */
+  constructor(
+    message: string,
+    options: {
+      details?: Readonly<Record<string, unknown>> | undefined;
+    } = {},
+  ) {
+    super(message, options);
+  }
+}
+
 /**
  * Docker cannot be run, so a Docker start cannot begin. The package reports
  * that it happened and what Docker said.
@@ -374,11 +450,10 @@ export class LocalServerFileUnreadableError extends LocalServerError {
 
 /** Something that is not a directory is in the way of the local data directory. */
 export class LocalServerFileBlockedError extends LocalServerError {
-  override readonly category: ErrorCategory = "conflict";
+  override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_CONFLICT";
-  override readonly hint: string | undefined =
-    "Something is in the way of the local data directory.";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = undefined;
 
   /**
    * Creates the error.

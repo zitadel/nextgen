@@ -119,20 +119,20 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
  * start mint a fresh credential and import it.
  */
 function malformedAdminFile(cwd: string, cause?: unknown): LocalServerAdminFileMalformedError {
-  const details = {
-    path: join(cwd, LOCAL_ADMIN_FILE),
-    directory: cwd,
-  };
-
-  return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`, {
-    details: cause
-      ? {
-          ...details,
-          cause: errorMessage(cause),
-        }
-      : details,
-    cause,
-  });
+  const details = { path: join(cwd, LOCAL_ADMIN_FILE), directory: cwd };
+  if (cause) {
+    return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`, {
+      details: {
+        ...details,
+        cause: errorMessage(cause),
+      },
+      cause,
+    });
+  } else {
+    return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`, {
+      details,
+    });
+  }
 }
 
 /**

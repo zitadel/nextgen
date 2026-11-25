@@ -1,6 +1,6 @@
 import { execa } from "execa";
 
-import { LocalServerDockerMissingError } from "@/lib/server/errors";
+import { LocalServerDockerFailedError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 
 import {
@@ -244,7 +244,7 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
 
     const args = ["manifest", "inspect", image];
     const result = await runDocker(args).catch((error: unknown) => {
-      throw new LocalServerDockerMissingError(error);
+      throw dockerError(`Inspect Docker image ${image}`, args, error);
     });
     if (result.status === 0) {
       return "remote";
@@ -409,7 +409,7 @@ async function streamDocker(
   const result = await subprocess;
   if (result.failed && !result.isCanceled) {
     if (result.exitCode === undefined) {
-      throw new LocalServerDockerMissingError(result);
+      throw result;
     } else {
       throw new Error(`docker ${args.join(" ")} exited with status ${result.exitCode}`);
     }
@@ -430,7 +430,7 @@ async function requireDocker(
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
   const result = await runDocker(args, env).catch((error: unknown) => {
-    throw new LocalServerDockerMissingError(error);
+    throw dockerError(action, args, error);
   });
   if (result.status !== 0) {
     throw dockerError(action, args, result);
@@ -444,7 +444,7 @@ async function requireDocker(
 async function imageExists(image: string): Promise<boolean> {
   const args = ["image", "inspect", image];
   const result = await runDocker(args).catch((error: unknown) => {
-    throw new LocalServerDockerMissingError(error);
+    throw dockerError(`Inspect Docker image ${image}`, args, error);
   });
   return result.status === 0;
 }
@@ -463,17 +463,17 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
 /**
  * Wraps a failed `docker` call, keeping its command and stderr for whoever is debugging.
  */
-function dockerError(action: string, args: string[], cause: unknown): Error {
+function dockerError(action: string, args: string[], cause: unknown): LocalServerDockerFailedError {
   if (cause && typeof cause === "object" && "stderr" in cause) {
-    return new Error(`${action} failed`, {
-      cause: {
+    return new LocalServerDockerFailedError(`${action} failed`, {
+      details: {
         command: ["docker", ...args],
         stderr: String((cause as { stderr?: unknown }).stderr),
       },
     });
   } else {
-    return new Error(`${action} failed`, {
-      cause: {
+    return new LocalServerDockerFailedError(`${action} failed`, {
+      details: {
         command: ["docker", ...args],
         cause,
       },

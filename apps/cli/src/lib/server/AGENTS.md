@@ -93,17 +93,9 @@ name or an address.
 
 ## Errors
 
-Every failure of the package is a `LocalServerError`, defined with its
-subclasses in `errors.ts`: one class per condition a caller handles, each
-stating a literal message, category, retryable, code, a neutral hint, its facts
-and its cause. There are no reason fields, and a hint names no command or flag.
-The commands that catch a class word it with their own refusal template and
-next commands; `start` does so for the lifecycle's errors
-(`LocalServerDockerMissingError`, `LocalServerPortBusyError`,
-`LocalServerPortFullError`, `LocalServerStartExitedError`,
-`LocalServerStartTimeoutError`, `LocalServerStopError`) in
-`src/cli/commands/server/start.ts`. A `docker` call that ran and failed is a
-plain `Error` carrying its command and stderr. `reset` takes a `DestroyPermit`, not
+Every failure of the package is a `LocalServerError` subclass in `errors.ts`.
+The commands that catch a class word it with their own refusal and next
+commands. `reset` takes a `DestroyPermit`, not
 `Consent`; the package says what it is doing through a `progress` callback the
 command gives it, not through `log`.
 

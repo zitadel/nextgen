@@ -1,5 +1,7 @@
 import {
   DestroyPermit,
+  LocalServerOrphansStopError,
+  LocalServerPermitMismatchError,
   LocalServerProcessesStopError,
   LocalServerProcessesUnlistableError,
   LocalServerStopError,
@@ -41,6 +43,21 @@ const PROCESSES_UNLISTABLE_REFUSAL = {
 
 /** How a start of the local server is refused: LocalServerStopError. */
 const SERVER_DID_NOT_STOP_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerPermitMismatchError. */
+const PERMIT_MISMATCH_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "A reset acts on one folder only. Run it from the folder whose server you mean to reset.",
+} as const satisfies Refusal;
+
+/** How a start of the local server is refused: LocalServerOrphansStopError. */
+const ORPHANS_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
@@ -136,6 +153,23 @@ export default class Reset extends Telemetered(
           .catch((error: unknown) => {
             if (error instanceof LocalServerStopError) {
               throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+                message: error.message,
+                details: error.details ?? null,
+              });
+            }
+            throw error;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof LocalServerPermitMismatchError) {
+              throw refusalError(PERMIT_MISMATCH_REFUSAL, {
+                message: error.message,
+              });
+            }
+            throw error;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof LocalServerOrphansStopError) {
+              throw refusalError(ORPHANS_DID_NOT_STOP_REFUSAL, {
                 message: error.message,
                 details: error.details ?? null,
               });
