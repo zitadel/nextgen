@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	// PrefixAuthRequest prefixes a stored authorization request's id, the
@@ -93,12 +96,29 @@ func NewAuthRequestBinding() (nonce, hash string, err error) {
 	return nonce, HashSecret(nonce), nil
 }
 
-// NewAuthCode generates an authorization code: 32 random bytes, of which only
-// the HashSecret is stored.
-func NewAuthCode() (code, hash string, err error) {
+// NewAuthCode generates an authorization code, `<deploymentID>.<random>`
+// with 32 random bytes, or the random part alone without a deployment. Only
+// the HashSecret of the whole code is stored, so a changed prefix finds no
+// request. The prefix tells the token endpoint which deployment serves the
+// client; it is not a secret. Neither part can hold a `.`: the random part
+// is base64url, and a deployment ID is `dep_` and a ULID or UUID.
+func NewAuthCode(deploymentID string) (code, hash string, err error) {
 	code, err = randomSecret(32)
 	if err != nil {
 		return "", "", err
 	}
+	if deploymentID != "" {
+		code = deploymentID + "." + code
+	}
 	return code, HashSecret(code), nil
+}
+
+// AuthCodeDeploymentID is the deployment a code names, the text before its
+// first `.`, or empty when it has none.
+func AuthCodeDeploymentID(code string) string {
+	deploymentID, _, _ := strings.Cut(code, ".")
+	if deploymentID == code {
+		return ""
+	}
+	return deploymentID
 }

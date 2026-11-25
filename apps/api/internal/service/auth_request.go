@@ -22,7 +22,8 @@ type AuthRequestService interface {
 	// nonce the browser's binding cookie holds.
 	Create(ctx context.Context, request *domain.AuthRequest) (bindingNonce string, err error)
 	// IssueCode gives the request its authorization code, for the user and
-	// session the login signed in. A request gets one code; an unknown
+	// session the login signed in. The code names the request's deployment
+	// first ([domain.NewAuthCode]). A request gets one code; an unknown
 	// request, an expired one, or one that already has a code returns
 	// [domain.ErrAuthCodeNotIssued].
 	IssueCode(ctx context.Context, projectID, authRequestID, userID, sessionID string) (code string, err error)
@@ -95,7 +96,19 @@ func (s *authRequestService) IssueCode(ctx context.Context, projectID, authReque
 	if userID == "" || sessionID == "" {
 		return "", domain.ErrInternal(nil).WithMessage("an authorization code needs a user and a session")
 	}
-	code, hash, err := domain.NewAuthCode()
+	// The code names the request's deployment, so the token endpoint can
+	// authenticate a client that deployment declares.
+	request, err := s.db.Statements().GetAuthRequest(ctx, projectID, authRequestID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return "", domain.ErrAuthCodeNotIssued()
+		}
+		if _, ok := errors.AsType[*database.UnavailableError](err); ok {
+			return "", domain.ErrUnavailable().WithParent(err)
+		}
+		return "", domain.ErrInternal(err).WithMessage("failed to read the authorization request")
+	}
+	code, hash, err := domain.NewAuthCode(request.DeploymentID)
 	if err != nil {
 		return "", err
 	}
