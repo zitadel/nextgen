@@ -133,13 +133,25 @@ describe("toZitadelError", () => {
       new ZitadelConfigFileUnreadableError("x.json cannot be read (EPERM)"),
       "E_AUTH",
     ],
+    [
+      "a ZitadelConfigError for any other errno",
+      new ZitadelConfigError("x.json cannot be read (EIO)"),
+      "E_VALIDATION",
+    ],
   ])("maps %s to %s", (_name, err, code) => {
     expect(toZitadelError(err).code).toBe(code);
   });
 
-  it("leaves out the hint and details a ZitadelConfigError has none of", () => {
+  it("reports an error a package raised by the code and message its class states", () => {
     const result = toZitadelError(new ZitadelConfigError("boom"));
-    expect([result.hint, result.details]).toEqual([undefined, undefined]);
+
+    expect(result).toBeInstanceOf(ZitadelError);
+    expect([result.code, result.message]).toEqual(["E_VALIDATION", "boom"]);
+    expect([result.hint, result.details, result.nextCommands]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
   });
 
   it.each([

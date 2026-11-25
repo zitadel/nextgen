@@ -7,26 +7,6 @@ import {
   GitInternalError,
 } from "@/lib/git/errors";
 
-describe("the git errors' retryable trait", () => {
-  it.each([
-    new GitBinaryMissingError("why"),
-    new GitCommandFailedError("why"),
-    new GitInternalError("why"),
-  ])("is false for %#", (error) => {
-    expect(error.retryable).toBe(false);
-  });
-});
-
-describe("the git errors' code", () => {
-  it.each([
-    new GitBinaryMissingError("why"),
-    new GitCommandFailedError("why"),
-    new GitInternalError("why"),
-  ])("is E_VALIDATION for %#", (error) => {
-    expect(error.code).toBe("E_VALIDATION");
-  });
-});
-
 describe("a git error's cause", () => {
   it("is kept", () => {
     const cause = new Error("underneath");
@@ -44,6 +24,8 @@ describe("GitBinaryMissingError", () => {
     expect(new GitBinaryMissingError("why")).toMatchObject({
       name: "GitBinaryMissingError",
       category: "conflict",
+      retryable: false,
+      code: "E_VALIDATION",
     });
   });
 });
@@ -57,6 +39,8 @@ describe("GitCommandFailedError", () => {
     expect(new GitCommandFailedError("why")).toMatchObject({
       name: "GitCommandFailedError",
       category: "unknown",
+      retryable: false,
+      code: "E_VALIDATION",
     });
   });
 });
@@ -70,6 +54,8 @@ describe("GitInternalError", () => {
     expect(new GitInternalError("why")).toMatchObject({
       name: "GitInternalError",
       category: "fault",
+      retryable: false,
+      code: "E_VALIDATION",
     });
   });
 });

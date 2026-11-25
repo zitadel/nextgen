@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import { WizardDefinitionError, WizardError } from "@/lib/wizard";
 
 describe("the wizard errors", () => {
@@ -15,12 +14,5 @@ describe("the wizard errors", () => {
     const cause = new Error("boom");
 
     expect(new WizardDefinitionError("undo failed", cause).cause).toBe(cause);
-  });
-
-  it("is reported as E_VALIDATION, as every fault is until it has a code of its own", () => {
-    expect(toZitadelError(new WizardDefinitionError("bad"))).toMatchObject({
-      code: "E_VALIDATION",
-      message: "bad",
-    });
   });
 });

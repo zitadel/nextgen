@@ -63,6 +63,10 @@ describe("the backend errors' codes", () => {
   });
 
   it("carries why a request got no usable response", () => {
-    expect(new BackendUnavailableError("why", { reason: "timeout" }).reason).toBe("timeout");
+    expect(
+      new BackendUnavailableError("why", {
+        reason: "timeout",
+      }).reason,
+    ).toBe("timeout");
   });
 });

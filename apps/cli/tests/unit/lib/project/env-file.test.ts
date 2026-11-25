@@ -61,6 +61,7 @@ describe("Project.envFile", () => {
     const appended = Project.envFile(path).append("ZITADEL_PROJECT_SECRET", "a\nb");
     await expect(appended).rejects.toBeInstanceOf(ProjectEnvValueError);
     await expect(appended).rejects.toMatchObject({
+      code: "E_VALIDATION",
       message: expect.stringContaining("ZITADEL_PROJECT_SECRET"),
     });
     await expect(readFile(path, "utf8")).rejects.toMatchObject({ code: "ENOENT" });

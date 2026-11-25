@@ -57,21 +57,23 @@ describe("getRenderer", () => {
     expect(spec.status).toBe("available");
   });
 
-  it("throws a pending OrcaRendererError for the declared-but-unpublished web-component renderer", () => {
+  it("throws E_NOT_IMPLEMENTED for the declared-but-unpublished web-component renderer", () => {
     try {
       getRenderer("web-component");
       expect.unreachable("getRenderer should throw for a not-implemented renderer");
     } catch (error) {
       expect(error).toBeInstanceOf(OrcaRendererPendingError);
+      expect((error as OrcaRendererPendingError).code).toBe("E_NOT_IMPLEMENTED");
     }
   });
 
-  it("throws an unknown OrcaRendererError for an unknown renderer id", () => {
+  it("throws E_VALIDATION for an unknown renderer id", () => {
     try {
       getRenderer("vue");
       expect.unreachable("getRenderer should throw for an unknown renderer");
     } catch (error) {
       expect(error).toBeInstanceOf(OrcaInvalidError);
+      expect((error as OrcaInvalidError).code).toBe("E_VALIDATION");
     }
   });
 

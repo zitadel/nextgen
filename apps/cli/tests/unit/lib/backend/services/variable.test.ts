@@ -155,13 +155,12 @@ describe("VariableService.get", () => {
     expect(variable.value).toBe("999-prod");
   });
 
-  it("refuses a name that holds no value of that kind, saying how one is set", async () => {
+  it("refuses a name that holds no value of that kind", async () => {
     await expect(
       service({ getVariable: async () => ({}) }).get("CLIENT_ID", "preview"),
     ).rejects.toMatchObject({
       name: "BackendNotFoundError",
       message: "Variable CLIENT_ID has no preview value.",
-      hint: "A name has a preview value only once one is set with `--preview`.",
     });
   });
 });

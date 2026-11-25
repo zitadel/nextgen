@@ -5,6 +5,7 @@ import { it } from "@tests/fixtures";
 
 import { ApiCall } from "@/cli/core/crud/api-call";
 import { createZitadelClient, Operation, OperationService } from "@/lib/backend";
+import { toZitadelError } from "@/lib/errors";
 import { forcedConsent } from "@tests/helpers/consent";
 
 const signal = new AbortController().signal;
@@ -174,7 +175,7 @@ describe("OperationService.call", () => {
     expect(failure).toMatchObject({
       name: "BackendUnavailableError",
     });
-    expect(failure).toMatchObject({ code: "E_NETWORK" });
+    expect(toZitadelError(failure).code).toBe("E_NETWORK");
   });
 
   it("answers what the server wrote as it wrote it, for whatever prints it to escape", async ({
@@ -207,9 +208,15 @@ describe("OperationService.call", () => {
       (caught: unknown) => caught,
     );
 
-    expect(error).toMatchObject({
+    expect(toZitadelError(error)).toMatchObject({
       code: "E_NOT_FOUND",
-      details: { status: 404, body: { code: "team.not_found", message: "no \u001b[31mteam" } },
+      details: {
+        status: 404,
+        body: {
+          code: "team.not_found",
+          message: "no \u001b[31mteam",
+        },
+      },
     });
   });
 });
