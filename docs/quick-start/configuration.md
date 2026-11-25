@@ -364,6 +364,13 @@ is `zitadel_auth_attempt_outcomes_total`.
 | `zitadel.flow.step.transitions` | counter | `{transition}` | `operation`: `start`, `submit`, `render`; `result`: `step`, `complete`, `error` | Flow engine operations, by entry point and where they left the flow. Step names are defined per project and are deliberately not an attribute. |
 | `zitadel.audit.insert.duration` | histogram | `s` | `source`: `request`, `event` | Duration of one audit insert: a single event in its transaction, or one attempt to write a batch of buffered request events (a retried batch is timed per attempt). |
 | `zitadel.audit.events.written` | counter | `{event}` | `type`: fixed in code | Audit events handed to storage successfully, by event type. An event written inside a transaction that later rolls back is still counted. |
+| `zitadel.jobs.taken` | counter | `{job}` | `name`: fixed in code | Jobs leased for Perform by the Engine, by handler name. DeadOnTake expiries are not counted here. |
+| `zitadel.jobs.completed` | counter | `{job}` | `name`: fixed in code | Jobs whose Perform succeeded and Complete matched the lease token, by handler name. |
+| `zitadel.jobs.failed` | counter | `{job}` | `name`: fixed in code | Jobs whose Perform returned an error and Fail was applied, by handler name. |
+| `zitadel.jobs.dead` | counter | `{job}` | `name`: fixed in code | Queued jobs that Fail moved to dead (max_attempts reached), by handler name. |
+| `zitadel.jobs.expired` | counter | `{job}` | `name`: fixed in code | Queued jobs Take marked dead for past not_after without Perform (DeadOnTake), by handler name. |
+| `zitadel.jobs.perform.duration` | histogram | `s` | `name`: fixed in code | Duration of one handler Perform, by handler name. |
+| `zitadel.jobs.take.lag` | histogram | `s` | `name`: fixed in code | Wall time from the job's run_at until Take leased it for Perform, by handler name. |
 | `zitadel.cache.lookups` | counter | - | `cache`: fixed in code; `result`: `hit`, `miss` | Cache lookups, split into hits and misses. |
 | `zitadel.cache.evictions` | counter | - | `cache`: fixed in code | Entries dropped from a cache because it was full. |
 | `zitadel.cache.entries` | gauge | - | `cache`: fixed in code | Entries currently held in a cache. |
