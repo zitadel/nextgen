@@ -5,6 +5,7 @@ package integration_test
 import (
 	"crypto/ed25519"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -126,6 +127,24 @@ func TestOAuthCodeRedemption(t *testing.T) {
 		_, _, err = requests.RedeemCode(t.Context(), input(code))
 		assert.ErrorIs(t, err, domain.ErrAuthCodeInvalid(), "a replayed code is refused")
 		assert.Empty(t, exchangeFailures(t, request.ID), "a replayed code consumes nothing")
+	})
+
+	// The hash covers the whole code, so the deployment it names cannot be
+	// changed.
+	t.Run("a code names its deployment and a changed prefix finds no code", func(t *testing.T) {
+		userID := harness.CreateUserWithTeam(t, project.ID)
+		code, request, _ := issue(t, userID)
+		assert.Equal(t, deployment.ID, domain.AuthCodeDeploymentID(code))
+		_, random, _ := strings.Cut(code, ".")
+
+		for _, changed := range []string{"dep_other." + random, random} {
+			_, _, err := requests.RedeemCode(t.Context(), input(changed))
+			assert.ErrorIs(t, err, domain.ErrAuthCodeInvalid(), "code %q", changed)
+		}
+		assert.Empty(t, exchangeFailures(t, request.ID), "a changed code consumes nothing")
+
+		_, _, err := requests.RedeemCode(t.Context(), input(code))
+		require.NoError(t, err, "the code still redeems")
 	})
 
 	t.Run("a refused redemption consumes the code", func(t *testing.T) {

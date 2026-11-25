@@ -85,10 +85,17 @@ func TestAuthRequestService_IssueCode(t *testing.T) {
 		name      string
 		userID    string
 		sessionID string
-		setErr    error
-		wantErr   error
+		// deploymentID is the stored request's; the code names it first.
+		deploymentID string
+		getErr       error
+		setErr       error
+		wantErr      error
 	}{
-		{name: "issued", userID: "user_1", sessionID: "sess_1"},
+		{name: "issued", userID: "user_1", sessionID: "sess_1", deploymentID: "dep_1"},
+		{name: "issued_without_deployment", userID: "user_1", sessionID: "sess_1"},
+		{name: "unknown_request", userID: "user_1", sessionID: "sess_1", getErr: database.NewNoRowFoundError(nil), wantErr: domain.ErrAuthCodeNotIssued()},
+		{name: "read_unavailable", userID: "user_1", sessionID: "sess_1", getErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
+		{name: "read_fails", userID: "user_1", sessionID: "sess_1", getErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
 		{name: "no_user", sessionID: "sess_1", wantErr: domain.ErrInternal(nil)},
 		{name: "no_session", userID: "user_1", wantErr: domain.ErrInternal(nil)},
 		// The request is unknown, expired, or already has a code.
@@ -107,7 +114,11 @@ func TestAuthRequestService_IssueCode(t *testing.T) {
 				storedNow time.Time
 			)
 			if tt.userID != "" && tt.sessionID != "" {
-				pool.EXPECT().Statements().Return(stmts)
+				pool.EXPECT().Statements().Return(stmts).AnyTimes()
+				stmts.EXPECT().GetAuthRequest(gomock.Any(), "proj_1", "authreq_1").
+					Return(&domain.AuthRequest{ProjectID: "proj_1", ID: "authreq_1", DeploymentID: tt.deploymentID}, tt.getErr)
+			}
+			if tt.userID != "" && tt.sessionID != "" && tt.getErr == nil {
 				stmts.EXPECT().SetAuthRequestCode(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, r *domain.AuthRequest, now time.Time) error {
 					stored, storedNow = r, now
 					return tt.setErr
@@ -123,6 +134,7 @@ func TestAuthRequestService_IssueCode(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, stored)
+			assert.Equal(t, tt.deploymentID, domain.AuthCodeDeploymentID(code), "the code names the request's deployment")
 			assert.Equal(t, "proj_1", stored.ProjectID)
 			assert.Equal(t, "authreq_1", stored.ID)
 			assert.Equal(t, domain.HashSecret(code), stored.CodeHash)
