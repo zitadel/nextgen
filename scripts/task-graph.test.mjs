@@ -344,8 +344,10 @@ describe.sequential("task graph cache and ordering contracts", () => {
       // The conformance fixtures reach their SDKs through `^build`
       // (conformance/suite/turbo.json), so only the ones that install it move:
       // the Svelte and the SvelteKit app.
+      // A fixture has no `docs:api` script, so that task runs nothing.
       const changedFixtures = [...next.values()]
         .filter(({ taskId }) => /^@zitadel\/conformance-[^#]+#/.test(taskId))
+        .filter(({ command }) => command !== "<NONEXISTENT>")
         .filter(({ taskId, hash }) => hash !== baseline.get(taskId).hash)
         .map(({ taskId }) => taskId)
         .sort();
