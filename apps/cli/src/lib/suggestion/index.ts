@@ -3,7 +3,6 @@ import type { Interfaces } from "@oclif/core";
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
 import type { PackageCommand } from "@/lib/pm";
-import { SuggestionInternalError } from "./errors";
 import { Spelling } from "./spelling";
 
 import type { RELATIONS } from "./relations";
@@ -491,9 +490,7 @@ export function shellCommand(program: Program, ...words: readonly string[]): Sug
  */
 export function suggestedCommandOf(command: PackageCommand): SuggestedCommand {
   if (command.verb === "run" && command.operands[0] === Spelling.BINARY) {
-    throw new SuggestionInternalError(
-      `${command.display} runs the CLI: suggest it as { id, args, flags }`,
-    );
+    throw new Error(`${command.display} runs the CLI: suggest it as { id, args, flags }`);
   }
 
   return command.display as SuggestedCommand;
@@ -527,7 +524,7 @@ const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
  */
 export function pipedFrom(variable: string, command: SuggestedCommand): SuggestedCommand {
   if (!VARIABLE.test(variable)) {
-    throw new SuggestionInternalError(`${variable} is no shell variable's name`);
+    throw new Error(`${variable} is no shell variable's name`);
   }
 
   return `printf '%s' "$${variable}" | ${command}` as SuggestedCommand;
@@ -683,7 +680,7 @@ function refuseBroken(id: string, input: LooseInput, target: Declared): void {
   );
   for (const [name, flag] of target.flags) {
     if (flag.required === true && !given.has(name)) {
-      throw new SuggestionInternalError(`${id} requires --${name}`);
+      throw new Error(`${id} requires --${name}`);
     }
     if (!given.has(name)) {
       continue;
@@ -692,20 +689,20 @@ function refuseBroken(id: string, input: LooseInput, target: Declared): void {
       return given.has(other);
     });
     if (clash !== undefined) {
-      throw new SuggestionInternalError(`${id} refuses --${name} with --${clash}`);
+      throw new Error(`${id} refuses --${name} with --${clash}`);
     }
     const missing = flag.dependsOn?.find((other) => {
       return !given.has(other);
     });
     if (missing !== undefined) {
-      throw new SuggestionInternalError(`${id} takes --${name} only with --${missing}`);
+      throw new Error(`${id} takes --${name} only with --${missing}`);
     }
   }
   const missingArg = target.requiredArgs?.find((arg) => {
     return input.args?.[named(arg)] === undefined;
   });
   if (missingArg !== undefined) {
-    throw new SuggestionInternalError(`${id} requires its ${missingArg}`);
+    throw new Error(`${id} requires its ${missingArg}`);
   }
 }
 
@@ -743,7 +740,7 @@ export function suggestionWords(
     // The target was looked up to get here, so the id is a command. Its help
     // reads nothing else, and is the same in every directory.
     if (input.args !== undefined || input.flags !== undefined || input.rest !== undefined) {
-      throw new SuggestionInternalError(`${id}'s help takes no arguments or flags`);
+      throw new Error(`${id}'s help takes no arguments or flags`);
     }
 
     return [...words, "--help"];
@@ -754,7 +751,7 @@ export function suggestionWords(
     const flag = spelled(name);
     const declared = target.flags.get(flag);
     if (declared === undefined) {
-      throw new SuggestionInternalError(`${id} declares no --${flag}`);
+      throw new Error(`${id} declares no --${flag}`);
     }
     if (value === undefined) {
       continue;
@@ -788,9 +785,7 @@ export function suggestionWords(
   const gap = present.indexOf(false);
   const after = gap === -1 ? -1 : present.indexOf(true, gap);
   if (after !== -1) {
-    throw new SuggestionInternalError(
-      `${id} takes its ${target.args[after]} only after its ${target.args[gap]}`,
-    );
+    throw new Error(`${id} takes its ${target.args[after]} only after its ${target.args[gap]}`);
   }
   const positional = [
     ...target.args.flatMap((arg) => {
@@ -804,7 +799,7 @@ export function suggestionWords(
     });
   });
   if (unknown.length > 0) {
-    throw new SuggestionInternalError(`${id} declares no argument ${unknown.join(", ")}`);
+    throw new Error(`${id} declares no argument ${unknown.join(", ")}`);
   }
   const delimited = positional.some((word) => {
     return word.startsWith("-");
@@ -864,7 +859,7 @@ export type Declaring = Readonly<{
  */
 export function declaredOf(id: string, loaded: Declaring | undefined): Declared {
   if (loaded === undefined) {
-    throw new SuggestionInternalError(`${id} is not a command`);
+    throw new Error(`${id} is not a command`);
   }
 
   return {
@@ -908,9 +903,5 @@ export function renderSuggestion(
   return commandOf(suggestionWords(next.id, next, target, scope), cliVersion);
 }
 
-export {
-  SuggestionError,
-  SuggestionInternalError,
-} from "./errors";
 export { Guidance } from "./guidance";
 export { Spelling } from "./spelling";
