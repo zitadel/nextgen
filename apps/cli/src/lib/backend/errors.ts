@@ -1,6 +1,7 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import { ZitadelLibError } from "@/lib/errors";
+import type { ZitadelErrorCode } from "@/lib/errors";
 
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{
@@ -25,23 +26,14 @@ export type BackendErrorOptions = Readonly<{
  * (it carries the status, the URL and the body), and a request the backend
  * itself would not make (it carries only a message).
  */
-export abstract class BackendError extends Error {
-  /** The kind of failure; a subclass states its own. */
-  abstract readonly category: ErrorCategory;
-  /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  abstract readonly retryable: boolean;
-  /** The stable product code the failure is reported with; a subclass states its own. */
-  abstract readonly code: ZitadelErrorCode;
+export abstract class BackendError extends ZitadelLibError {
   readonly status: number | undefined;
   readonly url: string | undefined;
   readonly body: unknown;
   readonly requestId: string | undefined;
 
   constructor(message: string, options: BackendErrorOptions = {}) {
-    super(message, {
-      cause: options.cause,
-    });
-    this.name = new.target.name;
+    super(message, options.cause);
     this.status = options.status;
     this.url = options.url;
     this.body = options.body;
