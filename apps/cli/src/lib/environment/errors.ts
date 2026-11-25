@@ -40,11 +40,6 @@ export type EnvironmentErrorOptions = {
  * these: it bubbles as it was thrown.
  */
 export class EnvironmentError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "EnvironmentError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -77,6 +72,7 @@ export class EnvironmentError extends Error implements Categorized {
    */
   constructor(message: string, options: EnvironmentErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -109,10 +105,6 @@ export type EnvironmentInvalidOptions = EnvironmentErrorOptions & {
  * An input the environment cannot be resolved from.
  */
 export class EnvironmentInvalidError extends EnvironmentError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "EnvironmentInvalidError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
@@ -154,10 +146,6 @@ export class EnvironmentInvalidError extends EnvironmentError {
  * The file an environment was told to read does not exist.
  */
 export class EnvironmentFileMissingError extends EnvironmentError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "EnvironmentFileMissingError";
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
 
@@ -228,10 +216,6 @@ export type EnvironmentValueMissingOptions = {
  * A value the command cannot run without is set in no source.
  */
 export class EnvironmentValueMissingError extends EnvironmentError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "EnvironmentValueMissingError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 

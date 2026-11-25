@@ -40,11 +40,6 @@ export type OrcaErrorOptions = {
  * these: it bubbles as it was thrown.
  */
 export class OrcaError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -77,6 +72,7 @@ export class OrcaError extends Error implements Categorized {
    */
   constructor(message: string, options: OrcaErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -95,10 +91,6 @@ export type OrcaFrameworkReason = "none" | "unknown" | "layout" | "outdated" | "
  * A framework, or an app of one, that orca cannot work with.
  */
 export class OrcaFrameworkError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaFrameworkError";
   override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
 
@@ -162,10 +154,6 @@ export type OrcaScaffoldBlockedReason = "occupied" | "node" | "command";
  * A scaffold that cannot start until something in the way is dealt with.
  */
 export class OrcaScaffoldBlockedError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaScaffoldBlockedError";
   override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
 
@@ -192,10 +180,6 @@ export class OrcaScaffoldBlockedError extends OrcaError {
  * A file a patch needs, and the project does not have.
  */
 export class OrcaPatchFileMissingError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaPatchFileMissingError";
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
 }
@@ -222,10 +206,6 @@ export type OrcaPatchFileConflictOptions = OrcaErrorOptions & {
  * A file of the project that a patch cannot be written over.
  */
 export class OrcaPatchFileConflictError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaPatchFileConflictError";
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
 
@@ -251,10 +231,6 @@ export class OrcaPatchFileConflictError extends OrcaError {
  * shape the patch handles, or is broken.
  */
 export class OrcaPatchFileUnsupportedError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaPatchFileUnsupportedError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 }
@@ -269,10 +245,6 @@ export type OrcaRendererReason = "unknown" | "pending";
  * A renderer that cannot be used.
  */
 export class OrcaRendererError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaRendererError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
@@ -303,10 +275,6 @@ export class OrcaRendererError extends OrcaError {
  * A bug in this package: something that cannot happen unless the code is wrong.
  */
 export class OrcaInternalError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaInternalError";
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
 }

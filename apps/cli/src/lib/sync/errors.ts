@@ -41,11 +41,6 @@ export type SyncErrorOptions = {
  * as it was thrown.
  */
 export class SyncError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "SyncError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -78,6 +73,7 @@ export class SyncError extends Error implements Categorized {
    */
   constructor(message: string, options: SyncErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -88,10 +84,6 @@ export class SyncError extends Error implements Categorized {
  * JSON, or a section of it has the wrong shape.
  */
 export class SyncStateMalformedError extends SyncError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "SyncStateMalformedError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 

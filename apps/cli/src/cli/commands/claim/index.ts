@@ -38,6 +38,7 @@ class NotFinished extends Error {
 
   constructor(attempt: number) {
     super("The claim is not finished");
+    this.name = new.target.name;
     this.attempt = attempt;
   }
 }

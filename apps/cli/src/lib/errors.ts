@@ -175,7 +175,7 @@ export class ZitadelError extends Error {
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
     super(message, opts.cause === undefined ? undefined : { cause: opts.cause });
-    this.name = "ZitadelError";
+    this.name = new.target.name;
     this.raised = message;
     this.code = code;
     this.hint = opts.hint;

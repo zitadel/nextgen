@@ -107,7 +107,7 @@ export class LocalServerError extends Error implements Categorized {
    */
   constructor(category: ErrorCategory, message: string, options: LocalServerErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.name = "LocalServerError";
+    this.name = new.target.name;
     this.category = category;
     this.hint = options.hint;
     this.details = options.details;
@@ -150,7 +150,6 @@ export class LocalServerDownError extends LocalServerError {
    */
   constructor(reason: LocalServerDownReason, details: Readonly<Record<string, unknown>>) {
     super("conflict", "Local Zitadel server is not running", { details });
-    this.name = "LocalServerDownError";
     this.reason = reason;
   }
 }
@@ -192,7 +191,6 @@ export class LocalServerMalformedError extends LocalServerError {
     options: LocalServerErrorOptions = {},
   ) {
     super("invalid", message, options);
-    this.name = "LocalServerMalformedError";
     this.reason = reason;
   }
 }
@@ -217,7 +215,6 @@ export class LocalServerBusyError extends LocalServerError {
    */
   constructor(details: Readonly<Record<string, unknown>>) {
     super("unavailable", "Another `zitadel start` is still running in this directory", { details });
-    this.name = "LocalServerBusyError";
   }
 }
 
@@ -274,7 +271,6 @@ export class LocalServerStopError<R = unknown> extends LocalServerError {
     options: LocalServerErrorOptions & Readonly<{ record?: R; outcome?: unknown }> = {},
   ) {
     super(reason === "unlistable" ? "invalid" : "conflict", message, options);
-    this.name = "LocalServerStopError";
     this.reason = reason;
     this.record = options.record;
     this.outcome = options.outcome;
@@ -303,7 +299,6 @@ export class LocalServerDockerMissingError extends LocalServerError {
   constructor(reason: unknown) {
     const detail = errorMessage(reason).trim() || "no reason given";
     super("unavailable", "Docker is not reachable", { details: { detail }, cause: reason });
-    this.name = "LocalServerDockerMissingError";
     this.detail = detail;
   }
 }
@@ -341,7 +336,6 @@ export class LocalServerBinaryError extends LocalServerError {
     options: LocalServerErrorOptions = {},
   ) {
     super("invalid", message, options);
-    this.name = "LocalServerBinaryError";
     this.reason = reason;
   }
 }
@@ -379,7 +373,6 @@ export class LocalServerFileError extends LocalServerError {
     options: LocalServerErrorOptions = {},
   ) {
     super(LocalServerFileError.categoryOf(reason, options.cause), message, options);
-    this.name = "LocalServerFileError";
     this.reason = reason;
   }
 
@@ -437,7 +430,6 @@ export class LocalServerAdminError extends LocalServerError {
     options: LocalServerErrorOptions = {},
   ) {
     super(reason === "platform-missing" ? "invalid" : "denied", message, options);
-    this.name = "LocalServerAdminError";
     this.reason = reason;
   }
 }
@@ -452,7 +444,6 @@ export class LocalServerInternalError extends LocalServerError {
    */
   constructor(message: string) {
     super("fault", message);
-    this.name = "LocalServerInternalError";
   }
 }
 
@@ -479,7 +470,6 @@ export class LocalServerPortBusyError extends LocalServerError {
    */
   constructor(port: number) {
     super("unavailable", `Port ${String(port)} is already in use`, { details: { port } });
-    this.name = "LocalServerPortBusyError";
     this.port = port;
   }
 }
@@ -510,7 +500,6 @@ export class LocalServerPortFullError extends LocalServerError {
     super("unavailable", `No free port from ${String(firstPort)} to ${String(lastPort)}`, {
       details: { first_port: firstPort },
     });
-    this.name = "LocalServerPortFullError";
     this.firstPort = firstPort;
   }
 }
@@ -568,7 +557,6 @@ export class LocalServerStartError<R extends ServerRecord> extends LocalServerEr
     logTail?: string,
   ) {
     super("unavailable", START_FAILURES[reason], { details });
-    this.name = "LocalServerStartError";
     this.reason = reason;
     this.record = record;
     this.cleanup = cleanup;

@@ -41,11 +41,6 @@ export type ProjectErrorOptions = {
  * it was thrown.
  */
 export class ProjectError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ProjectError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -78,6 +73,7 @@ export class ProjectError extends Error implements Categorized {
    */
   constructor(message: string, options: ProjectErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -93,10 +89,6 @@ export type ProjectFile = "config" | "secret";
  * A file the project is meant to have is not there.
  */
 export class ProjectFileMissingError extends ProjectError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ProjectFileMissingError";
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
 
@@ -128,10 +120,6 @@ export class ProjectFileMissingError extends ProjectError {
  * not an object, or lacks what it must hold.
  */
 export class ProjectFileMalformedError extends ProjectError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ProjectFileMalformedError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
@@ -163,10 +151,6 @@ export type ProjectEnvValueReason = "line-break" | "unquotable";
  * A value that a `.env` file cannot hold faithfully, so it is not written.
  */
 export class ProjectEnvValueError extends ProjectError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ProjectEnvValueError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 

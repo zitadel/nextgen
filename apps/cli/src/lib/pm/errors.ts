@@ -42,11 +42,6 @@ export type PmErrorOptions = {
  * as it was thrown.
  */
 export class PmError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "PmError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -79,6 +74,7 @@ export class PmError extends Error implements Categorized {
    */
   constructor(message: string, options: PmErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -89,10 +85,6 @@ export class PmError extends Error implements Categorized {
  * root is not an object.
  */
 export class PmManifestInvalidError extends PmError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "PmManifestInvalidError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
@@ -145,10 +137,6 @@ export type PmCommandFailedOptions = PmErrorOptions & {
  * interprets, so this is the generic wrapper and carries no guidance.
  */
 export class PmCommandFailedError extends PmError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "PmCommandFailedError";
   override readonly category: ErrorCategory = "unknown";
   override readonly retryable: boolean = false;
 

@@ -49,7 +49,7 @@ export class GitError extends Error implements Categorized {
     options: { readonly cause?: unknown } = {},
   ) {
     super(message, options);
-    this.name = "GitError";
+    this.name = new.target.name;
     this.category = category;
   }
 
@@ -98,7 +98,6 @@ export class GitBinaryMissingError extends GitError {
    */
   constructor(message: string) {
     super("invalid", message);
-    this.name = "GitBinaryMissingError";
   }
 }
 
@@ -117,7 +116,6 @@ export class GitCommandFailedError extends GitError {
    */
   constructor(message: string) {
     super("unknown", message);
-    this.name = "GitCommandFailedError";
   }
 }
 
@@ -131,6 +129,5 @@ export class GitInternalError extends GitError {
    */
   constructor(message: string) {
     super("fault", message);
-    this.name = "GitInternalError";
   }
 }

@@ -39,11 +39,6 @@ export type IdpErrorOptions = {
  * own error in one place, wording the advice with its flags.
  */
 export class IdpError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "IdpError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -76,6 +71,7 @@ export class IdpError extends Error implements Categorized {
    */
   constructor(message: string, options: IdpErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -122,10 +118,6 @@ export type IdpSettingFacts = {
  * The settings given for a provider cannot be used.
  */
 export class IdpSettingInvalidError extends IdpError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "IdpSettingInvalidError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
@@ -163,10 +155,6 @@ export class IdpSettingInvalidError extends IdpError {
  * The provider named is neither one in the catalog nor a custom connection.
  */
 export class IdpProviderUnknownError extends IdpError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "IdpProviderUnknownError";
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
 

@@ -39,11 +39,6 @@ export type ZitadelConfigErrorOptions = {
  * own error in one place.
  */
 export class ZitadelConfigError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -76,6 +71,7 @@ export class ZitadelConfigError extends Error implements Categorized {
    */
   constructor(message: string, options: ZitadelConfigErrorOptions = {}) {
     super(message);
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -104,11 +100,6 @@ export type FileProblem = {
  * Every broken file is named at once, so one run lists everything to fix.
  */
 export class ZitadelConfigFileBrokenError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigFileBrokenError";
-
   /**
    * Every broken file, and what is wrong with each.
    */
@@ -145,23 +136,13 @@ export class ZitadelConfigFileBrokenError extends ZitadelConfigError {
 /**
  * An edit that cannot be made without discarding something written by hand.
  */
-export class ZitadelConfigEditRefusedError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigEditRefusedError";
-}
+export class ZitadelConfigEditRefusedError extends ZitadelConfigError {}
 
 /**
  * A handle that cannot name a file: the server supplied it, and a file named
  * after it would land outside its kind's directory or be one `read` never loads.
  */
 export class ZitadelConfigHandleInvalidError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigHandleInvalidError";
-
   /**
    * Refuse a handle that is not a single safe path segment.
    *
@@ -180,10 +161,6 @@ export class ZitadelConfigHandleInvalidError extends ZitadelConfigError {
  * with one slug, or a new connection whose file name another one already has.
  */
 export class ZitadelConfigResourceClashError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigResourceClashError";
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
 }
@@ -192,10 +169,6 @@ export class ZitadelConfigResourceClashError extends ZitadelConfigError {
  * Something the run named that the configuration does not have.
  */
 export class ZitadelConfigResourceMissingError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigResourceMissingError";
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
 }
@@ -230,7 +203,6 @@ const SCHEMA_CHOICE_CATEGORIES: Record<ZitadelConfigSchemaChoiceReason, ErrorCat
  * was named and there is more than one.
  */
 export class ZitadelConfigSchemaChoiceError extends ZitadelConfigError {
-  override readonly name: string = "ZitadelConfigSchemaChoiceError";
   override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
 
@@ -331,10 +303,6 @@ export type NoSignInLeft = {
  * what it is made from.
  */
 export class ZitadelConfigEditLockoutError extends ZitadelConfigError implements NoSignInLeft {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigEditLockoutError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
@@ -390,7 +358,6 @@ export class ZitadelConfigEditLockoutError extends ZitadelConfigError implements
  * its own.
  */
 export class ZitadelConfigFileExistsError extends ZitadelConfigError {
-  override readonly name: string = "ZitadelConfigFileExistsError";
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
 
@@ -430,11 +397,6 @@ export class ZitadelConfigFileExistsError extends ZitadelConfigError {
  */
 export class ZitadelConfigConnectionClientIdError extends ZitadelConfigError {
   /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigConnectionClientIdError";
-
-  /**
    * The project-relative path of the connection.
    */
   readonly path: string;
@@ -464,10 +426,6 @@ export class ZitadelConfigConnectionClientIdError extends ZitadelConfigError {
  * so it is not an OIDC connection to reuse at all.
  */
 export class ZitadelConfigConnectionNotOidcError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigConnectionNotOidcError";
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
 
@@ -496,11 +454,6 @@ export class ZitadelConfigConnectionNotOidcError extends ZitadelConfigError {
  * such as a blank display name.
  */
 export class ZitadelConfigConnectionUnusableError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigConnectionUnusableError";
-
   /**
    * The project-relative path of the connection.
    */
@@ -582,11 +535,6 @@ export type BrokenFlows =
  * still uses it.
  */
 export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigEditBreaksFlowsError";
-
   /**
    * Whether a dry-run deploy would report the same issues.
    */
@@ -709,14 +657,12 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
  * any other failure of the file system reaches the caller as it came.
  */
 export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
-  override readonly name: string = "ZitadelConfigFileUnreadableError";
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
 }
 
 /** The bundle cannot be built from what `.zitadel/` holds. */
 export class ZitadelConfigDeployBlockedError extends ZitadelConfigError {
-  override readonly name: string = "ZitadelConfigDeployBlockedError";
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
 
@@ -742,7 +688,6 @@ export class ZitadelConfigDeployBlockedError extends ZitadelConfigError {
 
 /** A bug in this package: something that cannot happen unless the code is wrong. */
 export class ZitadelConfigInternalError extends ZitadelConfigError {
-  override readonly name: string = "ZitadelConfigInternalError";
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
 }

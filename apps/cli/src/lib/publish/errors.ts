@@ -40,11 +40,6 @@ export type PublishErrorOptions = {
  * these: it bubbles as it was thrown.
  */
 export class PublishError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "PublishError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -77,6 +72,7 @@ export class PublishError extends Error implements Categorized {
    */
   constructor(message: string, options: PublishErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -125,11 +121,6 @@ export type PublishConfigInvalidOptions = PublishErrorOptions & {
  * The configuration has errors, so nothing was sent.
  */
 export class PublishConfigInvalidError extends PublishError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "PublishConfigInvalidError";
-
   /**
    * Every finding that stopped the publish.
    */
@@ -204,10 +195,6 @@ export type PublishConnectionOptions = PublishErrorOptions & {
  * A connection names a variable the project cannot supply as the field needs.
  */
 export class PublishConnectionError extends PublishError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "PublishConnectionError";
   override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
 
@@ -268,9 +255,4 @@ export class PublishConnectionError extends PublishError {
 /**
  * The release the files make is not one the API takes, so nothing was sent.
  */
-export class PublishReleaseRejectedError extends PublishError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "PublishReleaseRejectedError";
-}
+export class PublishReleaseRejectedError extends PublishError {}

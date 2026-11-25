@@ -40,11 +40,6 @@ export type ConsentErrorOptions = {
  * own error in one place.
  */
 export class ConsentError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ConsentError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "conflict";
 
@@ -77,6 +72,7 @@ export class ConsentError extends Error implements Categorized {
    */
   constructor(message: string, options: ConsentErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -87,10 +83,6 @@ export class ConsentError extends Error implements Categorized {
  * refused: only a person may agree to it.
  */
 export class ConsentRequiredError extends ConsentError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ConsentRequiredError";
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
 
@@ -130,10 +122,6 @@ export class ConsentRequiredError extends ConsentError {
  * A bug in this package: something that cannot happen unless the code is wrong.
  */
 export class ConsentInternalError extends ConsentError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ConsentInternalError";
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
 }

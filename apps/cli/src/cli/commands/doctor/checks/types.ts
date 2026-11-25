@@ -95,6 +95,7 @@ export class CheckFailure extends Error {
    */
   constructor(message: string, details: CheckOutcome["details"]) {
     super(message);
+    this.name = new.target.name;
     this.details = details;
   }
 }

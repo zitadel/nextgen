@@ -17,7 +17,7 @@ export class TtlError extends Error {
    */
   constructor(message: string, hint: string) {
     super(message);
-    this.name = "TtlError";
+    this.name = new.target.name;
     this.hint = hint;
   }
 }

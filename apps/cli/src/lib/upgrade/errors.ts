@@ -40,11 +40,6 @@ export type UpgradeErrorOptions = {
  * its own person. A failure nothing here anticipated bubbles as it was thrown.
  */
 export class UpgradeError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "UpgradeError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "invalid";
 
@@ -77,6 +72,7 @@ export class UpgradeError extends Error implements Categorized {
    */
   constructor(message: string, options: UpgradeErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -87,10 +83,6 @@ export class UpgradeError extends Error implements Categorized {
  * a caller words the failure for its own person, with its own suggestions.
  */
 export class UpgradeReleaseLookupError extends UpgradeError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "UpgradeReleaseLookupError";
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
 
@@ -110,10 +102,6 @@ export class UpgradeReleaseLookupError extends UpgradeError {
  * failure for its own person.
  */
 export class UpgradeInstallFailedError extends UpgradeError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "UpgradeInstallFailedError";
   override readonly category: ErrorCategory = "unknown";
   override readonly retryable: boolean = false;
 

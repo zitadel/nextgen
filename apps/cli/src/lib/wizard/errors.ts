@@ -39,11 +39,6 @@ export type WizardErrorOptions = {
  * after what had finished is undone.
  */
 export class WizardError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "WizardError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "fault";
 
@@ -76,6 +71,7 @@ export class WizardError extends Error implements Categorized {
    */
   constructor(message: string, options: WizardErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -88,10 +84,6 @@ export class WizardError extends Error implements Categorized {
  * the code that built the wizard, not something a person can fix.
  */
 export class WizardInternalError extends WizardError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "WizardInternalError";
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
 }

@@ -39,11 +39,6 @@ export type SuggestionErrorOptions = {
  * never types a suggestion, so none is the person's to fix.
  */
 export class SuggestionError extends Error implements Categorized {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "SuggestionError";
-
   /** The kind of failure; a subclass states its own. */
   readonly category: ErrorCategory = "fault";
 
@@ -76,6 +71,7 @@ export class SuggestionError extends Error implements Categorized {
    */
   constructor(message: string, options: SuggestionErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
   }
@@ -87,10 +83,6 @@ export class SuggestionError extends Error implements Categorized {
  * That is a defect in the CLI code that built it.
  */
 export class SuggestionInternalError extends SuggestionError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "SuggestionInternalError";
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
 }
