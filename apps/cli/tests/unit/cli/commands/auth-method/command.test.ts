@@ -724,7 +724,10 @@ describe("AuthMethodCommand.write", () => {
       return writer.writeChange(read, change);
     });
 
-    expect(error).toEqual(new Error("A destructive operation ran without consent"));
+    expect(error).toMatchObject({
+      message: "A destructive operation ran without consent",
+      category: "fault",
+    });
   });
 
   it("writes a change that removes the last way in with consent", async ({ dir }) => {

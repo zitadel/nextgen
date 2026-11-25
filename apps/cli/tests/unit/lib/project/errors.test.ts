@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
+import { reported } from "@/cli/core/advice";
 import {
   ProjectEnvValueError,
   ProjectError,
@@ -17,24 +17,24 @@ describe("the project errors", () => {
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(ProjectError);
     expect(error.category).toBe(category);
-    expect(toZitadelError(error).code).toBe(code);
+    expect(reported(error).code).toBe(code);
   });
 
   it("points a missing secret at doctor --fix", () => {
-    expect(toZitadelError(new ProjectFileMissingError("secret", "gone"))).toMatchObject({
+    expect(reported(new ProjectFileMissingError("secret", "gone"))).toMatchObject({
       hint: expect.stringContaining("zitadel doctor --fix"),
       nextCommands: [{ id: "doctor", flags: { fix: true } }],
     });
   });
 
   it("points a malformed secret at doctor --fix as well", () => {
-    expect(toZitadelError(new ProjectFileMalformedError("secret", "bad"))).toMatchObject({
+    expect(reported(new ProjectFileMalformedError("secret", "bad"))).toMatchObject({
       nextCommands: [{ id: "doctor", flags: { fix: true } }],
     });
   });
 
   it("points a missing config at setup", () => {
-    expect(toZitadelError(new ProjectFileMissingError("config", "gone"))).toMatchObject({
+    expect(reported(new ProjectFileMissingError("config", "gone"))).toMatchObject({
       hint: "Set the project up first.",
       nextCommands: [{ id: "setup" }],
     });
@@ -43,9 +43,7 @@ describe("the project errors", () => {
   it("keeps the library's own hint for a value a .env cannot hold", () => {
     const error = new ProjectEnvValueError("unquotable", "KEY");
 
-    expect(toZitadelError(error).hint).toBe(
-      "Set it in the process environment instead of a .env file.",
-    );
+    expect(reported(error).hint).toBe("Set it in the process environment instead of a .env file.");
   });
 
   it("keeps the cause of a missing file", () => {

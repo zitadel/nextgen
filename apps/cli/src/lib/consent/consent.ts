@@ -161,7 +161,11 @@ export class Consent {
    * @returns Whether {@link Consent.request} threw it as a refusal.
    */
   static isRefusal(error: unknown): boolean {
-    return typeof error === "object" && error !== null && refusals.has(error);
+    if (typeof error !== "object" || error === null) {
+      return false;
+    }
+
+    return refusals.has(error) || (error instanceof Error && Consent.isRefusal(error.cause));
   }
 
   /**

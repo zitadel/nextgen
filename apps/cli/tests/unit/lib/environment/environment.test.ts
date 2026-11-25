@@ -12,7 +12,7 @@ import {
   EnvironmentInvalidError,
   EnvironmentValueMissingError,
 } from "@/lib/environment";
-import { toZitadelError } from "@/lib/errors";
+import { reported as cliError } from "@/cli/core/advice";
 import { ZitadelRuntime } from "@/lib/server";
 import type { Questions } from "@/lib/ui";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -32,7 +32,7 @@ vi.mock("@clack/prompts", () => ({
  */
 function reported(pending: Promise<unknown>): Promise<unknown> {
   return pending.catch((error: unknown) => {
-    throw toZitadelError(error);
+    throw cliError(error);
   });
 }
 
@@ -43,7 +43,7 @@ function reported(pending: Promise<unknown>): Promise<unknown> {
  * @returns The CLI's error.
  */
 function reportedBy(run: () => unknown): unknown {
-  return toZitadelError(thrownBy(run));
+  return cliError(thrownBy(run));
 }
 
 /**

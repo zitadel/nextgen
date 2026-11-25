@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { BackendForbiddenError } from "@/lib/backend";
-import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
+import { reported } from "@/cli/core/advice";
 import { PublishError } from "@/lib/publish";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
@@ -20,7 +21,7 @@ import { rejectionOf as rejectionOfRun } from "@tests/helpers/thrown-value";
 const rejectionOf = async (run: () => unknown): Promise<unknown> => {
   const error = await rejectionOfRun(run);
 
-  return error instanceof PublishError ? toZitadelError(error) : error;
+  return error instanceof PublishError ? reported(error) : error;
 };
 
 /**

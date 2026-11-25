@@ -1,11 +1,17 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import {
-  categoryCode,
-  type Categorized,
-  type ErrorCategory,
-  type ZitadelErrorCode,
-} from "@/lib/errors";
+import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+
+/** The code each kind of failure is reported with, unless a class's condition has one of its own. */
+const CATEGORY_CODES = {
+  invalid: "E_VALIDATION",
+  missing: "E_NOT_FOUND",
+  conflict: "E_CONFLICT",
+  denied: "E_AUTH",
+  unavailable: "E_NETWORK",
+  fault: "E_VALIDATION",
+  unknown: "E_VALIDATION",
+} as const satisfies Record<ErrorCategory, ZitadelErrorCode>;
 
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{
@@ -46,7 +52,7 @@ export class BackendError extends Error implements Categorized {
    * its category has unless a class's condition has a code of its own.
    */
   get code(): ZitadelErrorCode {
-    return categoryCode(this.category);
+    return CATEGORY_CODES[this.category];
   }
   readonly status: number | undefined;
   readonly url: string | undefined;
@@ -68,8 +74,13 @@ export class BackendError extends Error implements Categorized {
     this.url = options.url;
     this.body = options.body;
     this.requestId = options.requestId;
-    this.hint = options.hint;
-    this.details = options.details;
+    const answered = options.status !== undefined && options.url !== undefined;
+    this.hint =
+      options.hint ??
+      (answered && options.status !== 404 ? rejectionHint(options.body) : undefined);
+    this.details =
+      options.details ??
+      (answered ? { status: options.status, url: options.url, body: options.body } : undefined);
   }
 
   /**
@@ -94,7 +105,44 @@ export class BackendNotFoundError extends BackendError {
   override readonly name: string = "BackendNotFoundError";
 
   constructor(message: string, options: BackendErrorOptions = {}) {
-    super(message, options, "missing");
+    super(...BackendNotFoundError.worded(message, options), "missing");
+  }
+
+  /**
+   * What a miss says for itself. A 404 carrying the platform's error envelope
+   * is a domain-level miss from a real Zitadel API, except `req.not_found`,
+   * which the server answers for a path no operation of its version has; one
+   * without the envelope means the endpoint is missing, so the URL is not a
+   * Zitadel platform API at all.
+   *
+   * @param message - The server's message.
+   * @param options - What the failure carries.
+   * @returns The message and options the error is made with.
+   */
+  private static worded(
+    message: string,
+    options: BackendErrorOptions,
+  ): [string, BackendErrorOptions] {
+    if (options.status !== 404 || options.url === undefined) {
+      return [message, options];
+    }
+    const serverCode = apiErrorCode(options.body);
+    if (serverCode === "req.not_found") {
+      return [
+        `${options.url} has no such endpoint on this Zitadel server`,
+        {
+          ...options,
+          hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
+        },
+      ];
+    }
+    if (serverCode === undefined) {
+      return [
+        `${message} — ${options.url} has no such endpoint; is this a Zitadel platform API?`,
+        options,
+      ];
+    }
+    return [message, options];
   }
 }
 
@@ -201,6 +249,15 @@ export type BackendUnavailableErrorOptions = BackendErrorOptions &
     reason?: BackendUnavailableReason | undefined;
   }>;
 
+/** What to do about a request that got no usable response, by why. */
+const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
+  unreachable: "Check your connection and the server URL (ZITADEL_URL).",
+  timeout:
+    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+  unreadable:
+    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+};
+
 /** The server could not be used: it did not answer, or it failed with a `5xx`. */
 export class BackendUnavailableError extends BackendError {
   override readonly retryable: boolean = true;
@@ -208,7 +265,141 @@ export class BackendUnavailableError extends BackendError {
   readonly reason: BackendUnavailableReason | undefined;
 
   constructor(message: string, options: BackendUnavailableErrorOptions = {}) {
-    super(message, options, "unavailable");
+    super(
+      message,
+      options.reason === undefined
+        ? options
+        : {
+            ...options,
+            hint: NETWORK_HINTS[options.reason],
+            details: { url: options.url, reason: options.reason },
+          },
+      "unavailable",
+    );
     this.reason = options.reason;
   }
+}
+
+/**
+ * What a refusal's body says is wrong, as one hint.
+ *
+ * @remarks
+ * The platform names the fields it rejected, and the message does not repeat
+ * them: `idp.field_immutable` says only "the field is fixed for the life of
+ * the connection". Promoting them to the hint puts the answer where the
+ * failure is read, not only in `--json`. The same goes for what a refusal says
+ * is missing, and for each resource a rejected release names.
+ *
+ * @param body - The parsed body the server answered with.
+ * @returns The hint, or `undefined` when the body names nothing.
+ */
+function rejectionHint(body: unknown): string | undefined {
+  const fields = listedInDetails(body, "fields");
+  const missing = listedInDetails(body, "missing");
+  const resources = rejectedResources(body);
+  const hint = [
+    ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
+    ...(fields.length > 0
+      ? [
+          `The server rejected ${new Intl.PluralRules("en").select(fields.length) === "one" ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+        ]
+      : []),
+    ...(missing.length > 0
+      ? [
+          `The server reports ${new Intl.PluralRules("en").select(missing.length) === "one" ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
+        ]
+      : []),
+  ].join(" ");
+
+  return hint === "" ? undefined : hint;
+}
+
+/**
+ * The names a platform error envelope lists under `key`, if any: the dotted
+ * field paths it blames (`fields`), or what it reports missing (`missing`).
+ *
+ * The envelope nests them under `details`, and the server wraps its own
+ * `details` map in the response's `details` field, so the names arrive at
+ * `body.details.details.<key>`. Both depths are read: the extra wrapper is
+ * the serialiser's doing rather than part of the contract, and a reader that
+ * insisted on it would go silent the day it goes away.
+ */
+function listedInDetails(
+  body: unknown,
+  key: "fields" | "missing",
+  seen = new Set<string>(),
+  depth = 0,
+): string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [...seen];
+  }
+  const listed = (body as Record<string, unknown>)[key];
+  if (Array.isArray(listed)) {
+    for (const name of listed) {
+      if (typeof name === "string" && name !== "") {
+        seen.add(name);
+      }
+    }
+  }
+
+  return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
+}
+
+/**
+ * The resources a refusal names, one line each: `<kind> <handle>: <message>`.
+ * A rejected release carries the reason per schema or flow under
+ * `details.resources`, and the top-level message only says the release was
+ * invalid, so without these lines the reason shows only in `--json`. A flow
+ * keeps its reason in the resource's own `details.details`, behind a generic
+ * message, so that text is appended when the message does not already hold it.
+ * A connection names what it refused there too, as a list: the fields an
+ * `idp.field_immutable` blames, or the endpoints an `idp.endpoints_partial`
+ * reports missing. Those are appended the same way.
+ */
+function rejectedResources(body: unknown, depth = 0): readonly string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [];
+  }
+  const listed = (body as Record<string, unknown>).resources;
+  if (Array.isArray(listed)) {
+    return listed.flatMap((item) => {
+      return resourceLine(item) ?? [];
+    });
+  }
+  return rejectedResources((body as { details?: unknown }).details, depth + 1);
+}
+
+function resourceLine(item: unknown): string | undefined {
+  if (!isObject(item)) {
+    return undefined;
+  }
+  const { kind, handle, message, details } = item as Record<string, unknown>;
+  const reason = typeof message === "string" ? message : "";
+  const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
+  const detail =
+    typeof nested === "string"
+      ? nested
+      : [...listedInDetails(details, "fields"), ...listedInDetails(details, "missing")].join(", ");
+  const text =
+    detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
+  if (text === "") {
+    return undefined;
+  }
+  const subject = [kind, handle]
+    .filter((part) => {
+      return typeof part === "string" && part !== "";
+    })
+    .join(" ");
+
+  return subject === "" ? text : `${subject}: ${text}`;
+}
+
+/**
+ * Whether a parsed body is an object, as the envelope's nested details are.
+ *
+ * @param value - Whatever the body held.
+ * @returns True for a non-null object.
+ */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

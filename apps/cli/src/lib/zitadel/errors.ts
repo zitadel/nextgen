@@ -1,14 +1,20 @@
 import type { ProviderSelection } from "@zitadel/config/idp";
 
-import {
-  categoryCode,
-  type Categorized,
-  type ErrorCategory,
-  type ZitadelErrorCode,
-} from "@/lib/errors";
+import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { JsonObject } from "@/lib/zitadel/types";
+
+/** The code each kind of failure is reported with, unless a class's condition has one of its own. */
+const CATEGORY_CODES = {
+  invalid: "E_VALIDATION",
+  missing: "E_NOT_FOUND",
+  conflict: "E_CONFLICT",
+  denied: "E_AUTH",
+  unavailable: "E_NETWORK",
+  fault: "E_VALIDATION",
+  unknown: "E_VALIDATION",
+} as const satisfies Record<ErrorCategory, ZitadelErrorCode>;
 
 /**
  * What a configuration failure carries beyond its message.
@@ -49,7 +55,7 @@ export class ZitadelConfigError extends Error implements Categorized {
    * its category has unless a class's condition has a code of its own.
    */
   get code(): ZitadelErrorCode {
-    return categoryCode(this.category);
+    return CATEGORY_CODES[this.category];
   }
 
   /**

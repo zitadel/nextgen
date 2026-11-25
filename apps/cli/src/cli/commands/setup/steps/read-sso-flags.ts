@@ -1,5 +1,6 @@
 import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 
+import { reported } from "@/cli/core/advice";
 import { askCustomSettings, type Fact, type SetupServices } from "@/cli/commands/setup/shared";
 import {
   customExample,
@@ -108,14 +109,11 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: undefined,
       };
     }
-    const selection = selectionFromFlags(
-      flags.sso,
+    const given =
       flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
         ? await askCustomSettings(customValues, this.deps.ask)
-        : customValues,
-      SETUP_FLAG_NAMES,
-      SSO_CUSTOM_EXAMPLE,
-    );
+        : customValues;
+    const selection = this.selected(flags.sso, given);
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       warnings.report(loopback);
@@ -162,5 +160,24 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         },
       },
     };
+  }
+
+  /**
+   * The provider the flags choose, or the refusal of what they say about it.
+   *
+   * @param provider - The provider the flags name.
+   * @param given - The custom settings the flags gave.
+   * @returns The selection.
+   * @throws {@link ZitadelError} When the settings cannot be used.
+   */
+  private selected(
+    provider: string,
+    given: ReturnType<typeof customFlagValues>,
+  ): ReturnType<typeof selectionFromFlags> {
+    try {
+      return selectionFromFlags(provider, given, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
+    } catch (error) {
+      throw reported(error);
+    }
   }
 }

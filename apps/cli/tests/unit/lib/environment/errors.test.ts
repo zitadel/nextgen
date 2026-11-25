@@ -6,7 +6,7 @@ import {
   EnvironmentInvalidError,
   EnvironmentValueMissingError,
 } from "@/lib/environment";
-import { toZitadelError } from "@/lib/errors";
+import { reported } from "@/cli/core/advice";
 
 describe("the environment errors", () => {
   it.each([
@@ -20,15 +20,13 @@ describe("the environment errors", () => {
   });
 
   it("reports a missing file with the code it always had", () => {
-    expect(toZitadelError(new EnvironmentFileMissingError("a.env", "gone")).code).toBe(
-      "E_VALIDATION",
-    );
+    expect(reported(new EnvironmentFileMissingError("a.env", "gone")).code).toBe("E_VALIDATION");
   });
 
   it("words the advice for a name that cannot be used", () => {
     const error = new EnvironmentInvalidError("name", "bad", { source: "--env" });
 
-    expect(toZitadelError(error).hint).toContain("The --env environment name may use only");
+    expect(reported(error).hint).toContain("The --env environment name may use only");
   });
 
   it("words the advice for a server that is not a URL", () => {
@@ -37,7 +35,7 @@ describe("the environment errors", () => {
       example: "https://zitadel.example",
     });
 
-    expect(toZitadelError(error).hint).toBe(
+    expect(reported(error).hint).toBe(
       "Fix or remove ZITADEL_URL in .env; it must be a URL such as https://zitadel.example.",
     );
   });
@@ -53,7 +51,7 @@ describe("the environment errors", () => {
       cwd: process.cwd(),
     });
 
-    expect(toZitadelError(error)).toMatchObject({
+    expect(reported(error)).toMatchObject({
       code: "E_VALIDATION",
       hint: expect.stringContaining("run `zitadel env add staging`"),
       nextCommands: [{ id: "env:add", args: { name: "staging" }, flags: {} }],

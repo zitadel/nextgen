@@ -1,5 +1,4 @@
 import {
-  categoryCode,
   errorMessage,
   type Categorized,
   type ErrorCategory,
@@ -7,6 +6,42 @@ import {
 } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import type { ServerRecord, StopOutcome } from "@/lib/server/local/internal/lifecycle";
+
+/** The code each kind of failure is reported with, unless a class's condition has one of its own. */
+const CATEGORY_CODES = {
+  invalid: "E_VALIDATION",
+  missing: "E_NOT_FOUND",
+  conflict: "E_CONFLICT",
+  denied: "E_AUTH",
+  unavailable: "E_NETWORK",
+  fault: "E_VALIDATION",
+  unknown: "E_VALIDATION",
+} as const satisfies Record<ErrorCategory, ZitadelErrorCode>;
+
+/**
+ * Which piece of advice goes with a failure of the local server: the CLI words
+ * it with its own commands and flags, and a failure names the one that fits it.
+ */
+export type LocalServerAdviceKey =
+  | "not-running"
+  | "not-responding"
+  | "file-unreadable"
+  | "file-blocked"
+  | "record-malformed"
+  | "admin-malformed"
+  | "admin-not-found"
+  | "package-missing"
+  | "cannot-launch"
+  | "start-in-progress"
+  | "session-exchange-failed"
+  | "platform-missing"
+  | "processes-did-not-stop"
+  | "docker-unavailable"
+  | "no-free-port"
+  | "port-in-use"
+  | "server-did-not-start"
+  | "processes-unlistable"
+  | "server-did-not-stop";
 
 /**
  * What a local server failure carries beyond its message.
@@ -41,7 +76,12 @@ export class LocalServerError extends Error implements Categorized {
    * its category has unless a class's condition has a code of its own.
    */
   get code(): ZitadelErrorCode {
-    return categoryCode(this.category);
+    return CATEGORY_CODES[this.category];
+  }
+
+  /** The advice that goes with this failure, when the CLI has any. */
+  get advice(): LocalServerAdviceKey | undefined {
+    return undefined;
   }
 
   /** What to do about it, when the package can say. */
@@ -69,12 +109,23 @@ export class LocalServerError extends Error implements Categorized {
 /** Why no local server answers. */
 export type LocalServerDownReason = "not-running" | "not-responding";
 
+/** The advice each reason of a LocalServerDownError has. */
+const DOWN_ADVICE: Record<LocalServerDownReason, LocalServerAdviceKey | undefined> = {
+  "not-running": "not-running",
+  "not-responding": "not-responding",
+};
+
 /**
  * There is no running local server for a folder: none was started in it or a
  * parent, or the one that was is not running.
  */
 export class LocalServerDownError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure, by its reason. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return DOWN_ADVICE[this.reason];
+  }
 
   /** The stable product code the failure is reported with. */
   override get code(): ZitadelErrorCode {
@@ -99,12 +150,24 @@ export class LocalServerDownError extends LocalServerError {
 /** What is malformed. */
 export type LocalServerMalformedReason = "record" | "admin" | "url";
 
+/** The advice each reason of a LocalServerMalformedError has. */
+const MALFORMED_ADVICE: Record<LocalServerMalformedReason, LocalServerAdviceKey | undefined> = {
+  record: "record-malformed",
+  admin: "admin-malformed",
+  url: undefined,
+};
+
 /**
  * Something the local server reads is not in the shape it is written in: the
  * runtime record, the admin file, or the address a server was named by.
  */
 export class LocalServerMalformedError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure, by its reason. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return MALFORMED_ADVICE[this.reason];
+  }
   /** What is malformed. */
   readonly reason: LocalServerMalformedReason;
 
@@ -130,6 +193,11 @@ export class LocalServerMalformedError extends LocalServerError {
 export class LocalServerBusyError extends LocalServerError {
   override readonly retryable: boolean = true;
 
+  /** The advice that goes with this failure. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return "start-in-progress";
+  }
+
   /** The stable product code the failure is reported with. */
   override get code(): ZitadelErrorCode {
     return "E_CONFLICT";
@@ -148,12 +216,24 @@ export class LocalServerBusyError extends LocalServerError {
 /** Why a server is not known to be stopped. */
 export type LocalServerStopReason = "server" | "processes" | "unlistable";
 
+/** The advice each reason of a LocalServerStopError has. */
+const STOP_ADVICE: Record<LocalServerStopReason, LocalServerAdviceKey | undefined> = {
+  server: "server-did-not-stop",
+  processes: "processes-did-not-stop",
+  unlistable: "processes-unlistable",
+};
+
 /**
  * A server that had to be stopped was still running afterwards, or the
  * machine could not say which processes were running.
  */
 export class LocalServerStopError<R = unknown> extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure, by its reason. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return STOP_ADVICE[this.reason];
+  }
 
   /** The stable product code: a machine that cannot list its processes is an unsupported shape. */
   override get code(): ZitadelErrorCode {
@@ -194,6 +274,11 @@ export class LocalServerStopError<R = unknown> extends LocalServerError {
  */
 export class LocalServerDockerMissingError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return "docker-unavailable";
+  }
   /** What Docker said, or that it said nothing. */
   readonly detail: string;
 
@@ -213,9 +298,20 @@ export class LocalServerDockerMissingError extends LocalServerError {
 /** Why the server program cannot be run. */
 export type LocalServerBinaryReason = "missing" | "blocked";
 
+/** The advice each reason of a LocalServerBinaryError has. */
+const BINARY_ADVICE: Record<LocalServerBinaryReason, LocalServerAdviceKey | undefined> = {
+  missing: "package-missing",
+  blocked: "cannot-launch",
+};
+
 /** The server program, `@zitadel/server`, is not installed or cannot be run. */
 export class LocalServerBinaryError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure, by its reason. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return BINARY_ADVICE[this.reason];
+  }
   /** Whether it is absent, or present and refused to start. */
   readonly reason: LocalServerBinaryReason;
 
@@ -240,9 +336,20 @@ export class LocalServerBinaryError extends LocalServerError {
 /** Why a file of the local server cannot be used. */
 export type LocalServerFileReason = "unreadable" | "blocked";
 
+/** The advice each reason of a LocalServerFileError has. */
+const FILE_ADVICE: Record<LocalServerFileReason, LocalServerAdviceKey | undefined> = {
+  unreadable: "file-unreadable",
+  blocked: "file-blocked",
+};
+
 /** A file or directory the local server needs exists but cannot be used. */
 export class LocalServerFileError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure, by its reason. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return FILE_ADVICE[this.reason];
+  }
   /** Whether it cannot be read, or something else is in its way. */
   readonly reason: LocalServerFileReason;
 
@@ -286,9 +393,21 @@ export class LocalServerFileError extends LocalServerError {
 /** Why the local admin cannot sign in. */
 export type LocalServerAdminReason = "rejected" | "session" | "platform-missing";
 
+/** The advice each reason of a LocalServerAdminError has. */
+const ADMIN_ADVICE: Record<LocalServerAdminReason, LocalServerAdviceKey | undefined> = {
+  rejected: "admin-not-found",
+  session: "session-exchange-failed",
+  "platform-missing": "platform-missing",
+};
+
 /** The local admin cannot sign in to its server. */
 export class LocalServerAdminError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure, by its reason. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return ADMIN_ADVICE[this.reason];
+  }
   /** Whether the server rejected the admin, refused its session, or has no platform project. */
   readonly reason: LocalServerAdminReason;
 
@@ -328,6 +447,11 @@ export class LocalServerInternalError extends LocalServerError {
 export class LocalServerPortBusyError extends LocalServerError {
   override readonly retryable: boolean = false;
 
+  /** The advice that goes with this failure. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return "port-in-use";
+  }
+
   /** The stable product code the failure is reported with. */
   override get code(): ZitadelErrorCode {
     return "E_PORT_IN_USE";
@@ -350,6 +474,11 @@ export class LocalServerPortBusyError extends LocalServerError {
 /** Every port in the search range was taken. */
 export class LocalServerPortFullError extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** The advice that goes with this failure. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return "no-free-port";
+  }
 
   /** The stable product code the failure is reported with. */
   override get code(): ZitadelErrorCode {
@@ -387,6 +516,11 @@ const START_FAILURES = {
  */
 export class LocalServerStartError<R extends ServerRecord> extends LocalServerError {
   override readonly retryable: boolean = true;
+
+  /** The advice that goes with this failure. */
+  override get advice(): LocalServerAdviceKey | undefined {
+    return "server-did-not-start";
+  }
   /** Whether the server died, or never answered in time. */
   readonly reason: "exited" | "timeout";
 

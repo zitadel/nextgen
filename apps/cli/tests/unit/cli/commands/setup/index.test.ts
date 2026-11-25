@@ -2384,7 +2384,7 @@ describe("setup", () => {
 
       const res = await runCliForTest(scriptedAgainst(dir, platform.url));
 
-      expect(res).toExitWith(3);
+      expect(res).toExitWith(5);
     });
 
     it("removes the .env.local it merged before it reached the failing file", async ({

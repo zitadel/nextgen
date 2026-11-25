@@ -2,6 +2,7 @@ import { createZitadelClient } from "@/lib/backend";
 import type { Consent } from "@/lib/consent";
 import { Environment, type ServerAddresses } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
+import { advised } from "./advice";
 import { Asker } from "./asker";
 import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -86,6 +87,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
       serverFlag: options.source ?? text(flags.server),
       envName: text(flags.env),
       envFile: text(flags.envFile),
+    }).catch((error: unknown) => {
+      throw advised(error);
     });
 
     return super.toMeta(given, {
@@ -195,9 +198,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.nonInteractive && !this.meta.dryRun && options.prompt !== false,
       ask: Asker.for(this.ui.session()),
     };
-    const server = await environment.requireInteractive("ZITADEL_URL", ask);
-    const projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
-    const token = await environment.requireInteractive(CREDENTIALS[credential], ask);
+    const required = async (key: Parameters<typeof environment.requireInteractive>[0]) => {
+      return environment.requireInteractive(key, ask).catch((error: unknown) => {
+        throw advised(error);
+      });
+    };
+    const server = await required("ZITADEL_URL");
+    const projectId = await required("ZITADEL_PROJECT_ID");
+    const token = await required(CREDENTIALS[credential]);
     this.ui.ranAgainst(projectId, server);
 
     return {

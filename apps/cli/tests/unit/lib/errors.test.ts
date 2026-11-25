@@ -3,15 +3,6 @@ import { describe, expect, it } from "vitest";
 import { responseFailure } from "@/lib/backend";
 import { GitError } from "@/lib/git";
 import {
-  OrcaFrameworkError,
-  OrcaInternalError,
-  OrcaPatchFileConflictError,
-  OrcaPatchFileMissingError,
-  OrcaPatchFileUnsupportedError,
-  OrcaRendererError,
-  OrcaScaffoldBlockedError,
-} from "@/lib/orca";
-import {
   BackendForbiddenError,
   BackendUnauthorizedError,
   BackendUnavailableError,
@@ -23,11 +14,11 @@ import {
   errorMessage,
   failureText,
   isCancellation,
-  isCategorized,
+  isLibError,
   toZitadelError,
 } from "@/lib/errors";
 import {
-  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigFileUnreadableError,
   ZitadelConfigError,
   ZitadelConfigResourceClashError,
   ZitadelConfigResourceMissingError,
@@ -136,19 +127,9 @@ describe("toZitadelError", () => {
     ],
     ["any other ZitadelConfigError", new ZitadelConfigError("not valid"), "E_VALIDATION"],
     [
-      "a ZitadelConfigError for a file the OS refused to read",
-      new ZitadelConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
+      "a file the OS refused to read",
+      new ZitadelConfigFileUnreadableError("x.json cannot be read (EACCES)"),
       "E_AUTH",
-    ],
-    [
-      "a ZitadelConfigError for a file the OS would not let it touch",
-      new ZitadelConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
-      "E_AUTH",
-    ],
-    [
-      "a ZitadelConfigError for any other errno",
-      new ZitadelConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
-      "E_VALIDATION",
     ],
   ])("maps %s to %s", (_name, err, code) => {
     expect(toZitadelError(err).code).toBe(code);
@@ -162,44 +143,6 @@ describe("toZitadelError", () => {
       "do this",
       { file: "a.json" },
     ]);
-  });
-
-  it.each([
-    [
-      "a method still in use",
-      {
-        kind: "method-in-use",
-        uses: [],
-        dryRun: true,
-        hint: "`zitadel deploy --dry-run` checks the edit.",
-      },
-      [{ id: "deploy", flags: { dryRun: true } }],
-    ],
-    [
-      "flows already broken on disk",
-      {
-        kind: "broken",
-        dryRun: true,
-        hint: "Fix those errors first (`zitadel deploy --dry-run` reports them).",
-      },
-      [{ id: "deploy", flags: { dryRun: true } }],
-    ],
-    [
-      "an edit that would break a flow, which is never saved",
-      { kind: "broken", hint: "Fix the steps named above, then run the command again." },
-      undefined,
-    ],
-  ] as const)("gives %s its follow-up", (_name, report, next) => {
-    const result = toZitadelError(
-      new ZitadelConfigEditBreaksFlowsError({
-        ...report,
-        file: "default-human-user.json",
-        heading: "A login flow would break:",
-        issues: [],
-      }),
-    );
-
-    expect(result.nextCommands).toEqual(next);
   });
 
   it("leaves out the hint and details a ZitadelConfigError has none of", () => {
@@ -229,7 +172,7 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_NETWORK");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
-    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL or --server).");
+    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL).");
     expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
   });
 
@@ -753,74 +696,26 @@ describe("toZitadelError for an error that says its category", () => {
   });
 });
 
-describe("isCategorized", () => {
-  it.each(ERROR_CATEGORIES)("accepts an error whose category is %s", (category) => {
-    expect(isCategorized(Object.assign(new Error("why"), { category }))).toBe(true);
+describe("isLibError", () => {
+  it.each(ERROR_CATEGORIES)("accepts an error whose category is %s and has a code", (category) => {
+    expect(isLibError(new GitError(category, "why"))).toBe(true);
   });
 
   it("refuses an error with no category", () => {
-    expect(isCategorized(new Error("why"))).toBe(false);
+    expect(isLibError(new Error("why"))).toBe(false);
+  });
+
+  it("refuses an error with a category and no code", () => {
+    expect(isLibError(Object.assign(new Error("why"), { category: "invalid" }))).toBe(false);
   });
 
   it("refuses an error whose category is not one of the set", () => {
-    expect(isCategorized(Object.assign(new Error("why"), { category: "other" }))).toBe(false);
+    expect(isLibError(Object.assign(new Error("why"), { category: "other", code: "E_X" }))).toBe(
+      false,
+    );
   });
 
   it("refuses a value that is not an error", () => {
-    expect(isCategorized({ category: "invalid" })).toBe(false);
-  });
-});
-
-describe("toZitadelError for an orca failure", () => {
-  it.each([
-    ["no app", new OrcaFrameworkError("none", "why"), "E_FRAMEWORK_NOT_DETECTED"],
-    [
-      "a framework with no detector",
-      new OrcaFrameworkError("unknown", "why"),
-      "E_FRAMEWORK_NOT_DETECTED",
-    ],
-    [
-      "an unsupported layout",
-      new OrcaFrameworkError("layout", "why"),
-      "E_UNSUPPORTED_PROJECT_SHAPE",
-    ],
-    ["an outdated app", new OrcaFrameworkError("outdated", "why"), "E_UNSUPPORTED_PROJECT_SHAPE"],
-    ["another framework", new OrcaFrameworkError("mismatch", "why"), "E_CONFLICT"],
-    ["an occupied directory", new OrcaScaffoldBlockedError("occupied", "why"), "E_CONFLICT"],
-    ["a Node too old", new OrcaScaffoldBlockedError("node", "why"), "E_VALIDATION"],
-    ["a missing command", new OrcaScaffoldBlockedError("command", "why"), "E_VALIDATION"],
-    ["a missing file", new OrcaPatchFileMissingError("why"), "E_NOT_FOUND"],
-    ["a conflicting file", new OrcaPatchFileConflictError("why"), "E_CONFLICT"],
-    ["an unsupported file", new OrcaPatchFileUnsupportedError("why"), "E_VALIDATION"],
-    ["an unknown renderer", new OrcaRendererError("unknown", "why"), "E_VALIDATION"],
-    ["a pending renderer", new OrcaRendererError("pending", "why"), "E_NOT_IMPLEMENTED"],
-    ["a bug", new OrcaInternalError("why"), "E_VALIDATION"],
-  ])("reports %s with its code", (_name, error, code) => {
-    expect(toZitadelError(error)).toMatchObject({ code, message: "why" });
-  });
-
-  it("words what to do next with the CLI's own flags", () => {
-    expect(toZitadelError(new OrcaFrameworkError("none", "why")).hint).toContain("--cwd");
-    expect(
-      toZitadelError(
-        new OrcaFrameworkError("mismatch", "why", {
-          details: { requested: "react", detected: "next", requestedName: "React" },
-        }),
-      ).hint,
-    ).toContain("--framework next");
-    expect(toZitadelError(new OrcaScaffoldBlockedError("occupied", "why")).hint).toContain(
-      "--force",
-    );
-    expect(toZitadelError(new OrcaRendererError("pending", "why")).hint).toContain("--renderer");
-  });
-
-  it("says whether replacing files would resolve a conflict", () => {
-    expect(
-      toZitadelError(new OrcaPatchFileConflictError("why", { force: "replaces" })).hint,
-    ).toContain("Rerun with --force");
-    expect(
-      toZitadelError(new OrcaPatchFileConflictError("why", { force: "useless" })).hint,
-    ).toContain("can't fix this");
-    expect(toZitadelError(new OrcaPatchFileConflictError("why")).hint).toBeUndefined();
+    expect(isLibError({ category: "invalid", code: "E_VALIDATION" })).toBe(false);
   });
 });

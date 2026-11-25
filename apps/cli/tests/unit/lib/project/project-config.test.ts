@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
+import { reported } from "@/cli/core/advice";
 import { Project, ProjectFileMalformedError, ProjectFileMissingError } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
 
@@ -36,7 +36,7 @@ describe("Project.config", () => {
       expect.unreachable("expected ProjectConfig.read to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ProjectFileMissingError);
-      const zerr = toZitadelError(error);
+      const zerr = reported(error);
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain("zitadel.json was not found");
       expect(zerr.hint).toBe("Set the project up first.");

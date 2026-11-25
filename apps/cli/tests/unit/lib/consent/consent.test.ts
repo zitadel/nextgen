@@ -11,7 +11,8 @@ import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 
 import { createZitadelClient } from "@/lib/backend";
 import { Consent, ConsentInternalError, ConsentRequiredError, type Gate } from "@/lib/consent";
-import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
+import { reported } from "@/cli/core/advice";
 import { aConsentSession } from "@tests/helpers/consent";
 import { aSuggest } from "@tests/helpers/suggestions";
 
@@ -84,7 +85,7 @@ describe("Consent", () => {
     });
 
     it("refuses without --force when nobody can be asked", async () => {
-      expect(toZitadelError(await refusalOf(scripted))).toMatchObject({
+      expect(reported(await refusalOf(scripted))).toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot remove API_URL from the project without --force in non-interactive mode",
         nextCommands: ["npx @zitadel/cli@0.1.0 variable rm API_URL --force"],

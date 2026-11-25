@@ -4,11 +4,7 @@ import { Cmd } from "@/lib/cmd";
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { LocalServerError } from "@/lib/server";
-import {
-  LOCAL_SERVER_ADVICE,
-  type LocalServerAdvice,
-  localServerAdviceKey,
-} from "@/lib/suggestion/local-server-advice";
+import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
 import {
   isSuggestion,
   shellCommand,
@@ -20,6 +16,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { NEXT_LABEL } from "@/lib/ui/summary";
 
+import { advised } from "./advice";
 import { interpolate } from "./refusal";
 import type { ErrorEnvelope, GlobalOptions } from "./types";
 
@@ -71,9 +68,9 @@ export class Failure {
    */
   static advised(error: unknown, cwd: string): unknown {
     if (!(error instanceof LocalServerError)) {
-      return error;
+      return advised(error);
     }
-    const key = localServerAdviceKey(error);
+    const key = error.advice;
     if (key === undefined) {
       return error;
     }

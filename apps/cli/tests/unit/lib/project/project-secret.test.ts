@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
+import { reported } from "@/cli/core/advice";
 import { Project, ProjectFileMalformedError, ProjectFileMissingError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
@@ -40,7 +40,7 @@ describe("Project.secret", () => {
       expect.unreachable("expected ProjectSecret.read to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ProjectFileMissingError);
-      const zerr = toZitadelError(error);
+      const zerr = reported(error);
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
       expect(zerr.hint).toContain("zitadel doctor --fix");

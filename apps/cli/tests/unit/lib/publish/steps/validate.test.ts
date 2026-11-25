@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SchemaService } from "@/lib/backend";
-import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
+import { reported } from "@/cli/core/advice";
 import { PublishError } from "@/lib/publish";
 import { validateStep } from "@/lib/publish/steps/validate";
 import {
@@ -30,7 +31,7 @@ import { rejectionOf as rejectionOfRun } from "@tests/helpers/thrown-value";
 const rejectionOf = async (run: () => unknown): Promise<unknown> => {
   const error = await rejectionOfRun(run);
 
-  return error instanceof PublishError ? toZitadelError(error) : error;
+  return error instanceof PublishError ? reported(error) : error;
 };
 
 /**

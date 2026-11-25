@@ -88,7 +88,7 @@ describe("PackageInstaller.install", () => {
     });
 
     expect(error).toBeInstanceOf(UpgradeInstallFailedError);
-    expect(error).toMatchObject({ cause: { code: 3 } });
+    expect(error).toMatchObject({ cause: { exit: 3 } });
   });
 });
 

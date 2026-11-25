@@ -290,7 +290,8 @@ describe("withStartLock", () => {
       }),
     ).rejects.toMatchObject({
       name: "LocalServerBusyError",
-      category: "conflict",
+      category: "unavailable",
+      retryable: true,
       details: expect.objectContaining({ lock_file: lock }),
     });
     await release?.();

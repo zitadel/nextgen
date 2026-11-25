@@ -1,25 +1,6 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import { BackendError } from "./backend";
-import type { ConsentRequiredError } from "./consent";
-import type {
-  EnvironmentInvalidReason,
-  EnvironmentInvalidError,
-  EnvironmentValueMissingError,
-} from "./environment";
-import type { IdpSettingInvalidError, IdpSettingReason } from "./idp";
-import { isObject } from "./json";
-import type { ProjectFileMalformedError, ProjectFileMissingError } from "./project";
 import type { Suggested } from "./suggestion";
-import type {
-  OrcaFrameworkError,
-  OrcaPatchFileConflictError,
-  OrcaPatchForce,
-  OrcaRendererError,
-  OrcaScaffoldBlockedError,
-} from "./orca";
-import type { PublishConfigInvalidError, PublishConnectionError } from "./publish";
-import type { ZitadelConfigEditBreaksFlowsError } from "./zitadel";
 
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
@@ -86,6 +67,12 @@ export interface Categorized {
   readonly hint?: string | undefined;
   /** Structured facts about the failure, for a `--json` reader. */
   readonly details?: unknown;
+}
+
+/** What an error a package raises carries, for the boundary to report it. */
+export interface LibError extends Categorized {
+  /** The stable product code the failure is reported with. */
+  readonly code: ZitadelErrorCode;
 }
 
 /**
@@ -162,6 +149,8 @@ export type ZitadelErrorOptions = {
    */
   nextCommands?: readonly Suggested[];
   details?: unknown;
+  /** The failure this one reports, so a caller that knows it can still find it. */
+  cause?: unknown;
 };
 
 /**
@@ -185,7 +174,7 @@ export class ZitadelError extends Error {
   readonly raised: string;
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
-    super(message);
+    super(message, opts.cause === undefined ? undefined : { cause: opts.cause });
     this.name = "ZitadelError";
     this.raised = message;
     this.code = code;
@@ -197,346 +186,6 @@ export class ZitadelError extends Error {
   get exitCode(): number {
     return EXIT_CODES[this.code] ?? 1;
   }
-}
-
-/**
- * The code each {@link ErrorCategory} is reported with.
- *
- * @remarks
- * `fault` and `unknown` have no code of their own yet, so they are reported
- * as `E_VALIDATION`, as every unrecognised error always was. Giving them their
- * own codes, with exit codes that no longer collide, is a separate decision;
- * this table is the one place it lands.
- */
-const CATEGORY_CODES: Readonly<Record<ErrorCategory, ZitadelErrorCode>> = {
-  invalid: "E_VALIDATION",
-  missing: "E_NOT_FOUND",
-  conflict: "E_CONFLICT",
-  denied: "E_AUTH",
-  unavailable: "E_NETWORK",
-  fault: "E_VALIDATION",
-  unknown: "E_VALIDATION",
-};
-
-/**
- * The code a category is reported with, which a class's `code` starts from.
- *
- * @param category - The kind of failure.
- * @returns Its stable product code.
- */
-export function categoryCode(category: ErrorCategory): ZitadelErrorCode {
-  return CATEGORY_CODES[category];
-}
-
-/**
- * Where a failure is reported with a code other than the one its category has,
- * keyed by the class's name, and by `name:reason` for one reason of a class.
- *
- * @remarks
- * The boundary reads this and {@link CATEGORY_CODES} as data: a class that a
- * command words by name, or that keeps the code it always had, has a row here
- * and nothing else changes.
- */
-const CODE_OVERRIDES: Record<string, ZitadelErrorCode> = {
-  BackendUnsupportedError: "E_UNSUPPORTED_PROJECT_SHAPE",
-  ConsentRequiredError: "E_CONFIRMATION_REQUIRED",
-  EnvironmentFileMissingError: "E_VALIDATION",
-  IdpProviderUnknownError: "E_VALIDATION",
-  LocalServerBusyError: "E_CONFLICT",
-  LocalServerDownError: "E_LOCAL_SERVER_NOT_RUNNING",
-  LocalServerPortBusyError: "E_PORT_IN_USE",
-  LocalServerPortFullError: "E_PORT_IN_USE",
-  "LocalServerStopError:unlistable": "E_UNSUPPORTED_PROJECT_SHAPE",
-  "OrcaFrameworkError:none": "E_FRAMEWORK_NOT_DETECTED",
-  "OrcaFrameworkError:unknown": "E_FRAMEWORK_NOT_DETECTED",
-  "OrcaFrameworkError:layout": "E_UNSUPPORTED_PROJECT_SHAPE",
-  "OrcaFrameworkError:outdated": "E_UNSUPPORTED_PROJECT_SHAPE",
-  OrcaPatchFileUnsupportedError: "E_VALIDATION",
-  "OrcaRendererError:pending": "E_NOT_IMPLEMENTED",
-  "PublishConnectionError:missing-variable": "E_CREDENTIAL_MISSING",
-  ProjectFileMissingError: "E_VALIDATION",
-};
-
-/**
- * The code an operating-system refusal is reported with, by its errno, for a
- * failure that carries it in `details.code`: a permission failure is
- * `E_AUTH`, as it is for any other file the CLI reads.
- */
-const ERRNO_CODES: Record<string, ZitadelErrorCode> = {
-  EACCES: "E_AUTH",
-  EPERM: "E_AUTH",
-};
-
-/**
- * What to do about a failure, as the CLI words it with its commands and flags,
- * which the library leaves out.
- */
-type Advice = {
-  /** What to do about it; the library's own hint when left out. */
-  hint?: string | undefined;
-  /** The commands to run next. */
-  nextCommands?: readonly Suggested[] | undefined;
-  /** The facts to report; the error's own when left out. */
-  details?: unknown;
-};
-
-/** Words the advice for one kind of failure. */
-type Adviser = (error: Error & Categorized) => Advice;
-
-/**
- * An {@link Adviser} for one class, which its table key guarantees it is given.
- *
- * @param advise - Words the advice for the class.
- * @returns The adviser the table holds.
- */
-function adviser<T extends Error & Categorized>(advise: (error: T) => Advice): Adviser {
-  return (error) => {
-    return advise(error as T);
-  };
-}
-
-/**
- * What a row of a table keyed by class is found under.
- *
- * @param table - The table.
- * @param error - The failure.
- * @returns The row for the class and its reason, else the row for the class, else `undefined`.
- */
-function lookup<T>(table: Readonly<Record<string, T>>, error: Error): T | undefined {
-  const reason = "reason" in error && typeof error.reason === "string" ? error.reason : undefined;
-
-  return (reason === undefined ? undefined : table[`${error.name}:${reason}`]) ?? table[error.name];
-}
-
-/**
- * What closes every refusal of a patch's preflight: `--force` is the obvious
- * next try after a conflict, and it changes nothing there.
- */
-const PREFLIGHT_FORCE_NOTE =
-  "--force can't fix this: it only replaces files at the paths setup writes.";
-
-/**
- * The CLI's advice added to what a failure's own hint says.
- *
- * @param error - The failure.
- * @param advice - What the CLI adds.
- * @returns The two, joined.
- */
-function afterHint(error: Error & Categorized, advice: string | undefined): Advice {
-  const hint = [error.hint, advice]
-    .filter((part) => {
-      return part !== undefined;
-    })
-    .join(" ");
-
-  return { hint: hint === "" ? undefined : hint };
-}
-
-/** What closes a patch's conflict with a file, by what would resolve it. */
-const PATCH_FORCE_ADVICE: Record<OrcaPatchForce, string | undefined> = {
-  replaces: "Rerun with --force if you want the CLI to replace this file.",
-  useless: PREFLIGHT_FORCE_NOTE,
-  none: undefined,
-};
-
-/** What to do about a failure to publish a connection, by the field it was for. */
-function connectionAdvice(error: PublishConnectionError): Advice {
-  const wantsSecret = error.field === "client_secret";
-  const setCommand: Suggested = {
-    id: "variable:set",
-    args: { name: error.variable },
-    flags: { secret: wantsSecret, preview: error.mode === "preview" },
-  };
-
-  return {
-    hint: wantsSecret
-      ? "The client secret must be a secret variable: publish it with the command below."
-      : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-    nextCommands: [setCommand],
-  };
-}
-
-/** What to do about a refused provider or setting, by why it was refused. */
-const IDP_SETTING_ADVICE: Record<IdpSettingReason, (error: IdpSettingInvalidError) => string> = {
-  invalid: (error) => {
-    return `Fix ${error.facts.field} and run the command again.`;
-  },
-  conflicting: (error) => {
-    const count = error.facts.given?.length ?? 0;
-
-    return `Add ${error.facts.providerField} custom, or remove ${new Intl.PluralRules("en").select(count) === "one" ? "it" : "them"}.`;
-  },
-  missing: (error) => {
-    return `Describe the connection, e.g. ${error.facts.example}`;
-  },
-};
-
-/** The advice for the secret project file a command can restore. */
-const RESTORE_SECRET: Advice = {
-  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
-  nextCommands: [{ id: "doctor", flags: { fix: true } }],
-};
-
-/**
- * What to do about a failure, by the class that raised it, and by `name:reason`
- * for one reason of a class: the CLI's words and commands, which the library
- * leaves out. A class with no row reports its own hint.
- */
-const ADVICE: Record<string, Adviser> = {
-  ConsentRequiredError: adviser<ConsentRequiredError>((error) => {
-    return {
-      hint: confirmationHint(error.question),
-      nextCommands: error.retry === undefined ? undefined : [error.retry],
-      details: error.details ?? { question: error.question },
-    };
-  }),
-  ZitadelConfigEditBreaksFlowsError: adviser<ZitadelConfigEditBreaksFlowsError>((error) => {
-    return {
-      hint: error.hint,
-      nextCommands: error.dryRun ? [{ id: "deploy", flags: { dryRun: true } }] : undefined,
-    };
-  }),
-  "OrcaFrameworkError:none": adviser<OrcaFrameworkError>((error) => {
-    return afterHint(
-      error,
-      "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
-    );
-  }),
-  "OrcaFrameworkError:mismatch": adviser<OrcaFrameworkError>((error) => {
-    const { requested, detected, requestedName } = error.details ?? {};
-
-    return afterHint(
-      error,
-      `Rerun setup without --framework, or with --framework ${String(detected)}, to set up this ` +
-        `app, or point --cwd at the ${String(requestedName ?? requested)} app you meant. Setup never ` +
-        "scaffolds a new app over one it detects, --force or not.",
-    );
-  }),
-  "OrcaScaffoldBlockedError:occupied": adviser<OrcaScaffoldBlockedError>((error) => {
-    return afterHint(
-      error,
-      "Pass --force to scaffold into a non-empty directory, or run setup from an existing " +
-        "supported app project.",
-    );
-  }),
-  OrcaPatchFileConflictError: adviser<OrcaPatchFileConflictError>((error) => {
-    return afterHint(error, PATCH_FORCE_ADVICE[error.force]);
-  }),
-  "OrcaRendererError:pending": adviser<OrcaRendererError>((error) => {
-    return afterHint(
-      error,
-      "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
-    );
-  }),
-  PublishConfigInvalidError: adviser<PublishConfigInvalidError>((error) => {
-    const fix = error.literalSecret
-      ? 'Publish a secret with the command below and reference it as "${{ NAME }}".'
-      : "Fix the files named above and rerun; no changes were made.";
-
-    return {
-      hint: error.refusedKey
-        ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
-        : fix,
-      nextCommands: error.literalSecret
-        ? [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }]
-        : undefined,
-    };
-  }),
-  "PublishConnectionError:shared-variable": () => {
-    return {
-      hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-    };
-  },
-  "PublishConnectionError:wrong-kind": adviser<PublishConnectionError>(connectionAdvice),
-  "PublishConnectionError:missing-variable": adviser<PublishConnectionError>((error) => {
-    return {
-      hint: "Publish it with the command below, then deploy again.",
-      nextCommands: connectionAdvice(error).nextCommands,
-    };
-  }),
-  EnvironmentInvalidError: adviser<EnvironmentInvalidError>((error) => {
-    return {
-      hint: ENVIRONMENT_INVALID_ADVICE[error.reason](error),
-    };
-  }),
-  EnvironmentValueMissingError: adviser<EnvironmentValueMissingError>((error) => {
-    const { key, file, boundFile, unbound, environment } = error;
-    const consulted = `Consulted, in order: ${error.consulted.join(", ")}.`;
-
-    if (!unbound) {
-      return {
-        hint: `${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
-      };
-    }
-
-    // Run in the directory this run addressed, which need not be the shell's:
-    // `setup` and `env add` both write their files there.
-    const elsewhere = error.cwd === process.cwd() ? {} : { cwd: error.cwd };
-
-    return {
-      hint: `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${environment}\`.`,
-      nextCommands: [
-        environment === "development"
-          ? { id: "setup", flags: elsewhere }
-          : { id: "env:add", args: { name: environment }, flags: elsewhere },
-      ],
-    };
-  }),
-  ProjectFileMissingError: adviser<ProjectFileMissingError>((error) => {
-    return error.file === "secret"
-      ? RESTORE_SECRET
-      : { hint: "Set the project up first.", nextCommands: [{ id: "setup" }] };
-  }),
-  ProjectFileMalformedError: adviser<ProjectFileMalformedError>((error) => {
-    return error.file === "secret"
-      ? RESTORE_SECRET
-      : { hint: "Fix zitadel.json, which is the project's committed configuration." };
-  }),
-  IdpSettingInvalidError: adviser<IdpSettingInvalidError>((error) => {
-    return { hint: IDP_SETTING_ADVICE[error.reason](error) };
-  }),
-};
-
-/** What to do about a refused environment, by why it was refused. */
-const ENVIRONMENT_INVALID_ADVICE: Record<
-  EnvironmentInvalidReason,
-  (error: EnvironmentInvalidError) => string
-> = {
-  "both-sources": () => {
-    return "--env picks the .env.<name>.local files; --env-file names one file outright.";
-  },
-  name: (error) => {
-    return (
-      `The ${error.source} environment name may use only letters, digits, dot, dash ` +
-      'and underscore, may not contain "..", and may not be `local` or end in `.local`. ' +
-      "Pass a safe --env or set ZITADEL_ENV."
-    );
-  },
-  "server-url": (error) => {
-    return `Fix or remove ZITADEL_URL in ${error.source}; it must be a URL such as ${error.example}.`;
-  },
-};
-
-/** What to do about a request that got no usable response, by its reason. */
-const NETWORK_HINTS: Record<string, string> = {
-  "BackendUnavailableError:unreachable":
-    "Check your connection and the server URL (ZITADEL_URL or --server).",
-  "BackendUnavailableError:timeout":
-    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
-  "BackendUnavailableError:unreadable":
-    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
-};
-
-/**
- * The code an operating-system refusal a failure carries is reported with.
- *
- * @param error - The failure.
- * @returns The code for its errno, or `undefined` when it carries none of them.
- */
-function errnoCode(error: Error & Categorized): ZitadelErrorCode | undefined {
-  const errno = isObject(error.details) ? error.details.code : undefined;
-
-  return typeof errno === "string" ? ERRNO_CODES[errno] : undefined;
 }
 
 /**
@@ -631,22 +280,12 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError("E_CANCELLED", "Cancelled by user");
   }
 
-  if (error instanceof BackendError) {
-    return fromBackendError(error);
-  }
-
-  // An error a package raised on purpose says what kind of failure it is, and
-  // the tables above say where it is reported differently and what to do.
-  if (isCategorized(error)) {
-    const advice = lookup(ADVICE, error)?.(error) ?? { hint: error.hint };
-    const details = advice.details ?? error.details;
-    const code =
-      lookup(CODE_OVERRIDES, error) ?? errnoCode(error) ?? CATEGORY_CODES[error.category];
-
-    return new ZitadelError(code, error.message, {
-      ...(advice.hint === undefined ? {} : { hint: advice.hint }),
-      ...(advice.nextCommands === undefined ? {} : { nextCommands: advice.nextCommands }),
-      ...(details === undefined ? {} : { details }),
+  // An error a package raised on purpose carries the code, hint and details
+  // it is reported with.
+  if (isLibError(error)) {
+    return new ZitadelError(error.code, error.message, {
+      ...(error.hint === undefined ? {} : { hint: error.hint }),
+      ...(error.details === undefined ? {} : { details: error.details }),
     });
   }
 
@@ -688,171 +327,6 @@ export function toZitadelError(error: unknown): ZitadelError {
 }
 
 /**
- * A {@link BackendError} as the CLI's error. One the server answered carries
- * its status, and is classified by it; one the backend raised itself carries
- * its class, and its message, hint and details as they were given.
- */
-function fromBackendError(error: BackendError): ZitadelError {
-  const network = lookup(NETWORK_HINTS, error);
-  if (network !== undefined) {
-    return new ZitadelError("E_NETWORK", error.message, {
-      hint: network,
-      details: { url: error.url, reason: "reason" in error ? error.reason : undefined },
-    });
-  }
-  const code = lookup(CODE_OVERRIDES, error) ?? CATEGORY_CODES[error.category];
-  if (error.status === undefined || error.url === undefined) {
-    return new ZitadelError(code, error.message, {
-      ...(error.hint === undefined ? {} : { hint: error.hint }),
-      ...(error.details === undefined ? {} : { details: error.details }),
-    });
-  }
-  const { status, url } = error;
-  const details = { status, url, body: error.body };
-  if (error.status === 404) {
-    // A 404 carrying the platform's error envelope (a `code` field) is a
-    // domain-level miss from a real Zitadel API — an unknown schema or
-    // project id — except `req.not_found`, which the server answers for a
-    // path no operation of its version has (ADR 076). Without the envelope
-    // the endpoint itself is missing: the CLI is pointed at a server that
-    // isn't a Zitadel platform API.
-    if (error.serverCode === "req.not_found") {
-      return new ZitadelError(
-        "E_NOT_FOUND",
-        `${error.url} has no such endpoint on this Zitadel server`,
-        {
-          hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
-          details,
-        },
-      );
-    }
-    const wrongServer = error.serverCode === undefined;
-    const message = wrongServer
-      ? `${error.message} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
-      : error.message;
-
-    return new ZitadelError("E_NOT_FOUND", message, { details });
-  }
-  // Which code a status gets was decided once, where the response became a
-  // backend error: a 409 is a conflict, a 410 is gone, a 429 or a 5xx is worth
-  // retrying, an origin the project does not hold is a refused target and not
-  // a bad credential. The category it carries is that decision.
-  // The platform names the fields it rejected, and the message does not
-  // repeat them: `idp.field_immutable` says only "the field is fixed for the
-  // life of the connection", which leaves the reader to guess which of a
-  // connection document's fields it meant. Promoting them to the hint puts
-  // the answer where the failure is read, not only in `--json`. The same
-  // goes for what a refusal says is missing: `idp.endpoints_partial` names
-  // the endpoints a connection left out only in `missing`.
-  const fields = listedInDetails(error.body, "fields");
-  const missing = listedInDetails(error.body, "missing");
-  const resources = rejectedResources(error.body);
-  const hint = [
-    ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
-    ...(fields.length > 0
-      ? [
-          `The server rejected ${new Intl.PluralRules("en").select(fields.length) === "one" ? "this field" : "these fields"}: ${fields.join(", ")}.`,
-        ]
-      : []),
-    ...(missing.length > 0
-      ? [
-          `The server reports ${new Intl.PluralRules("en").select(missing.length) === "one" ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
-        ]
-      : []),
-  ].join(" ");
-
-  return new ZitadelError(code, error.message, {
-    ...(hint !== "" ? { hint } : {}),
-    details,
-  });
-}
-
-/**
- * True when a response body looks like the platform's structured error
- * envelope (`{ code, message, … }`). Its presence proves the request reached
- * a real Zitadel platform API rather than an arbitrary HTTP server.
- */
-/**
- * The names a platform error envelope lists under `key`, if any: the dotted
- * field paths it blames (`fields`), or what it reports missing (`missing`).
- *
- * The envelope nests them under `details`, and the server wraps its own
- * `details` map in the response's `details` field, so the names arrive at
- * `body.details.details.<key>`. Both depths are read: the extra wrapper is
- * the serialiser's doing rather than part of the contract, and a reader that
- * insisted on it would go silent the day it goes away.
- */
-function listedInDetails(
-  body: unknown,
-  key: "fields" | "missing",
-  seen = new Set<string>(),
-  depth = 0,
-): string[] {
-  if (depth >= 4 || !isObject(body)) {
-    return [...seen];
-  }
-  const listed = (body as Record<string, unknown>)[key];
-  if (Array.isArray(listed)) {
-    for (const name of listed) {
-      if (typeof name === "string" && name !== "") {
-        seen.add(name);
-      }
-    }
-  }
-
-  return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
-}
-
-/**
- * The resources a refusal names, one line each: `<kind> <handle>: <message>`.
- * A rejected release carries the reason per schema or flow under
- * `details.resources`, and the top-level message only says the release was
- * invalid, so without these lines the reason shows only in `--json`. A flow
- * keeps its reason in the resource's own `details.details`, behind a generic
- * message, so that text is appended when the message does not already hold it.
- * A connection names what it refused there too, as a list: the fields an
- * `idp.field_immutable` blames, or the endpoints an `idp.endpoints_partial`
- * reports missing. Those are appended the same way.
- */
-function rejectedResources(body: unknown, depth = 0): readonly string[] {
-  if (depth >= 4 || !isObject(body)) {
-    return [];
-  }
-  const listed = (body as Record<string, unknown>).resources;
-  if (Array.isArray(listed)) {
-    return listed.flatMap((item) => {
-      return resourceLine(item) ?? [];
-    });
-  }
-  return rejectedResources((body as { details?: unknown }).details, depth + 1);
-}
-
-function resourceLine(item: unknown): string | undefined {
-  if (!isObject(item)) {
-    return undefined;
-  }
-  const { kind, handle, message, details } = item as Record<string, unknown>;
-  const reason = typeof message === "string" ? message : "";
-  const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
-  const detail =
-    typeof nested === "string"
-      ? nested
-      : [...listedInDetails(details, "fields"), ...listedInDetails(details, "missing")].join(", ");
-  const text =
-    detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
-  if (text === "") {
-    return undefined;
-  }
-  const subject = [kind, handle]
-    .filter((part) => {
-      return typeof part === "string" && part !== "";
-    })
-    .join(" ");
-
-  return subject === "" ? text : `${subject}: ${text}`;
-}
-
-/**
  * Whether `error` is an `AbortError`: the platform's way to say an operation
  * was stopped, which is what the run's signal rejects with and what a prompt
  * the person walked away from throws.
@@ -884,17 +358,19 @@ export function isCancellation(error: unknown): boolean {
 }
 
 /**
- * Whether a caught value is an error that says what kind of failure it is.
+ * Whether a caught value is an error a package raised on purpose: one that
+ * says what kind of failure it is and the code it is reported with.
  *
  * @param error - Whatever was caught.
- * @returns True for an `Error` whose `category` is one of {@link ERROR_CATEGORIES}.
+ * @returns True for an `Error` carrying a `category` and a `code`.
  */
-export function isCategorized(error: unknown): error is Error & Categorized {
+export function isLibError(error: unknown): error is Error & LibError {
   return (
     error instanceof Error &&
     ERROR_CATEGORIES.some((category) => {
       return category === (error as Partial<Categorized>).category;
-    })
+    }) &&
+    typeof (error as Partial<LibError>).code === "string"
   );
 }
 

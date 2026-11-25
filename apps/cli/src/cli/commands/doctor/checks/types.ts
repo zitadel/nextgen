@@ -1,7 +1,7 @@
 import type { Consent, Gate } from "@/lib/consent";
 import {
   errorMessage,
-  isCategorized,
+  isLibError,
   toZitadelError,
   ZitadelError,
   type ZitadelErrorCode,
@@ -157,7 +157,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         path: this.path,
       };
     } catch (thrown) {
-      const error = isCategorized(thrown) ? toZitadelError(thrown) : thrown;
+      const error = isLibError(thrown) ? toZitadelError(thrown) : thrown;
 
       return {
         name: this.name,

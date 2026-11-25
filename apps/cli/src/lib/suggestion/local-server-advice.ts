@@ -1,17 +1,4 @@
-import {
-  LocalServerAdminError,
-  LocalServerBinaryError,
-  LocalServerBusyError,
-  LocalServerDockerMissingError,
-  LocalServerDownError,
-  type LocalServerError,
-  LocalServerFileError,
-  LocalServerMalformedError,
-  LocalServerPortBusyError,
-  LocalServerPortFullError,
-  LocalServerStartError,
-  LocalServerStopError,
-} from "@/lib/server";
+import type { LocalServerAdviceKey } from "@/lib/server";
 import { PM } from "@/lib/pm";
 import { type Suggested, suggestedCommandOf } from "./index";
 import { CliPackage } from "@/lib/upgrade";
@@ -104,53 +91,4 @@ export const LOCAL_SERVER_ADVICE = {
   "server-did-not-stop": {
     hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
   },
-} satisfies Record<string, LocalServerAdvice>;
-
-/** What a failure of the local server is advised by: one entry of {@link LOCAL_SERVER_ADVICE}. */
-export type LocalServerAdviceKey = keyof typeof LOCAL_SERVER_ADVICE;
-
-/**
- * Which advice goes with a failure of the local server.
- *
- * @param error - What the package threw.
- * @returns The key of its advice, or `undefined` for a failure that has none.
- */
-export function localServerAdviceKey(error: LocalServerError): LocalServerAdviceKey | undefined {
-  if (error instanceof LocalServerDownError) {
-    return error.reason;
-  } else if (error instanceof LocalServerMalformedError) {
-    return error.reason === "record"
-      ? "record-malformed"
-      : error.reason === "admin"
-        ? "admin-malformed"
-        : undefined;
-  } else if (error instanceof LocalServerBusyError) {
-    return "start-in-progress";
-  } else if (error instanceof LocalServerStartError) {
-    return "server-did-not-start";
-  } else if (error instanceof LocalServerStopError) {
-    return error.reason === "processes"
-      ? "processes-did-not-stop"
-      : error.reason === "unlistable"
-        ? "processes-unlistable"
-        : "server-did-not-stop";
-  } else if (error instanceof LocalServerPortBusyError) {
-    return "port-in-use";
-  } else if (error instanceof LocalServerPortFullError) {
-    return "no-free-port";
-  } else if (error instanceof LocalServerDockerMissingError) {
-    return "docker-unavailable";
-  } else if (error instanceof LocalServerBinaryError) {
-    return error.reason === "missing" ? "package-missing" : "cannot-launch";
-  } else if (error instanceof LocalServerFileError) {
-    return error.reason === "unreadable" ? "file-unreadable" : "file-blocked";
-  } else if (error instanceof LocalServerAdminError) {
-    return error.reason === "rejected"
-      ? "admin-not-found"
-      : error.reason === "session"
-        ? "session-exchange-failed"
-        : "platform-missing";
-  } else {
-    return undefined;
-  }
-}
+} satisfies Record<LocalServerAdviceKey, LocalServerAdvice>;

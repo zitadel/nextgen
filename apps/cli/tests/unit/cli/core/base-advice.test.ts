@@ -2,16 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
-import {
-  LOCAL_SERVER_ADVICE,
-  type LocalServerAdvice,
-  type LocalServerAdviceKey,
-} from "@/lib/suggestion/local-server-advice";
+import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
 import { Spelling } from "@/lib/suggestion/spelling";
 import {
   LocalServerAdminError,
   LocalServerBinaryError,
   LocalServerBusyError,
+  type LocalServerAdviceKey,
   LocalServerDockerMissingError,
   LocalServerDownError,
   type LocalServerError,
@@ -135,6 +132,7 @@ describe("BaseCommand advice for failures of the local server", () => {
 
     const failure = FAILURES[kind]();
 
+    expect(failure.advice).toBe(kind);
     await command.failWith(failure);
 
     expect(command.json).toEqual([

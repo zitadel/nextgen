@@ -136,14 +136,14 @@ describe("assertMountsRootComponent", () => {
     });
   });
 
-  it("says --force can't fix it", async ({ dir }) => {
+  it("says replacing files would change nothing", async ({ dir }) => {
     const cwd = await project(dir, {
       "src/main.jsx": reactMain("./App.jsx"),
       "src/App.jsx": "export default function App() {}\n",
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
-      hint: expect.stringContaining("--force can't fix this"),
+      force: "useless",
     });
   });
 

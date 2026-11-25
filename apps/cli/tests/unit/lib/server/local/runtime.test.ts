@@ -148,7 +148,7 @@ describe("findUpward", () => {
       await chmod(join(app, ".zitadel/local"), 0o000);
 
       await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_AUTH",
       });
     },
   );
