@@ -1,5 +1,3 @@
-import { DEFAULT_ZITADEL_URL, nonEmpty, resolveZitadelUrl } from "@zitadel/sdk-core/middleware";
-
 /**
  * The backend URL used when no other source names one.
  *
@@ -7,7 +5,17 @@ import { DEFAULT_ZITADEL_URL, nonEmpty, resolveZitadelUrl } from "@zitadel/sdk-c
  * with no configuration. Nitro stores a runtime-config key the app left unset as an empty string,
  * so an empty value counts as unset, as it does in every server SDK.
  */
-export const DEFAULT_URL = DEFAULT_ZITADEL_URL;
+export const DEFAULT_URL = "http://localhost:8080";
+
+/**
+ * Narrows a value to a string, because Nitro hands runtime-config values over as `unknown`.
+ *
+ * @param value - The value to narrow.
+ * @returns The value when it is a string, otherwise an empty string, so `||` treats it as unset.
+ */
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
 /**
  * Resolves the Zitadel backend URL when the server runs.
@@ -22,7 +30,7 @@ export const DEFAULT_URL = DEFAULT_ZITADEL_URL;
  * @returns The backend URL, never empty.
  */
 export function resolveUrl(zitadel: Record<string, unknown> | undefined): string {
-  return resolveZitadelUrl(zitadel?.url, zitadel?.issuerUrl, process.env.ZITADEL_URL);
+  return text(zitadel?.url) || text(zitadel?.issuerUrl) || process.env.ZITADEL_URL || DEFAULT_URL;
 }
 
 /**
@@ -43,9 +51,5 @@ export function resolveProjectSecret(
   zitadel: Record<string, unknown> | undefined,
   option?: string,
 ): string | undefined {
-  return (
-    nonEmpty(option) ??
-    nonEmpty(zitadel?.projectSecret) ??
-    nonEmpty(process.env.ZITADEL_PROJECT_SECRET)
-  );
+  return option || text(zitadel?.projectSecret) || process.env.ZITADEL_PROJECT_SECRET || undefined;
 }

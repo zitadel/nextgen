@@ -12,14 +12,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  nonEmpty,
   proxyRoute,
   proxySessionCookies,
   refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
-  resolveZitadelUrl,
 } from "@zitadel/sdk-core/middleware";
 
 /**
@@ -612,11 +610,12 @@ export function createZitadelOnRequest(
     // `process.env` (set in production adapters) > localhost default. Qwik does
     // not surface `.env` files on `process.env`, so a factory-time read would
     // miss them and the proxy would fall back to :8080 ("fetch failed").
-    const url = resolveZitadelUrl(urlOption, ev.env?.get("ZITADEL_URL"), PROCESS_ENV.ZITADEL_URL);
+    const url =
+      urlOption || ev.env?.get("ZITADEL_URL") || PROCESS_ENV.ZITADEL_URL || "http://localhost:8080";
     const projectSecret =
-      nonEmpty(projectSecretOption) ??
-      nonEmpty(ev.env?.get("ZITADEL_PROJECT_SECRET")) ??
-      nonEmpty(PROCESS_ENV.ZITADEL_PROJECT_SECRET);
+      projectSecretOption ||
+      ev.env?.get("ZITADEL_PROJECT_SECRET") ||
+      PROCESS_ENV.ZITADEL_PROJECT_SECRET;
     const projectId =
       projectIdOption ??
       (ev.env?.get("ZITADEL_PROJECT_ID") ||

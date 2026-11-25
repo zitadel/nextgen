@@ -19,7 +19,6 @@ import {
   refusedProxyResponse,
   requiresProjectSecret,
   resolveSession,
-  resolveZitadelUrl,
   serializeSessionCookie,
   serverSessionCookieName,
   sessionCookieName,
@@ -178,20 +177,6 @@ describe("matchesRoutes", () => {
 
     expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
     expect(performance.now() - started).toBeLessThan(250);
-  });
-});
-
-describe("resolveZitadelUrl", () => {
-  it.each([
-    [[], "http://localhost:8080"],
-    [[undefined, null], "http://localhost:8080"],
-    [[""], "http://localhost:8080"],
-    [["", undefined, ""], "http://localhost:8080"],
-    [["https://a.example.com"], "https://a.example.com"],
-    [["", "https://b.example.com"], "https://b.example.com"],
-    [["https://a.example.com", "https://b.example.com"], "https://a.example.com"],
-  ])("resolves %j to %s", (sources, expected) => {
-    expect(resolveZitadelUrl(...sources)).toBe(expected);
   });
 });
 

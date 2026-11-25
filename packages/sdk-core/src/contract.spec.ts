@@ -1068,7 +1068,11 @@ describe("server SDK middleware tests ↔ the blocks they share", () => {
     "sdk-solid-start/src/__tests__/middleware.test.ts",
     "sdk-tanstack-start/src/__tests__/middleware.test.ts",
   ];
-  const titles = ["protected routes and encoded paths", "an empty backend URL"];
+  const titles = [
+    "protected routes and encoded paths",
+    "an empty backend URL",
+    "an empty project secret",
+  ];
 
   /**
    * Cuts a top-level `describe` block out of a test file.

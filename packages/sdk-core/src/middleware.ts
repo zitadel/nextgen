@@ -137,61 +137,6 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
 }
 
 /**
- * The backend URL that applies when no source names one.
- *
- * It is where `zitadel start` runs the local server, so a fresh app works against a local server
- * with no configuration.
- */
-export const DEFAULT_ZITADEL_URL = "http://localhost:8080";
-
-/**
- * Narrows a configuration value to a non-empty string.
- *
- * An empty string counts as unset: an environment variable that is declared but left empty, and a
- * runtime-config key that a framework fills with `""`, both mean "not configured".
- *
- * @param value - The value to check.
- * @returns The value when it is a non-empty string, otherwise `undefined`.
- *
- * @example
- * ```ts
- * nonEmpty(""); // undefined
- * nonEmpty("https://auth.example.com"); // "https://auth.example.com"
- * ```
- */
-export function nonEmpty(value: unknown): string | undefined {
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-/**
- * Resolves the backend URL from its sources, first to last.
- *
- * Every server SDK uses this one rule: the first source that is a non-empty string wins, and an
- * empty string, `null` or `undefined` falls through to the next. With no source left, the result
- * is {@link DEFAULT_ZITADEL_URL}. The result is never empty, so no backend call starts from an
- * empty base.
- *
- * @param sources - The candidate values in order of precedence, typically the `url` option, the
- *   framework's own configuration and the `ZITADEL_URL` environment variable.
- * @returns The first non-empty source, else {@link DEFAULT_ZITADEL_URL}.
- *
- * @example
- * ```ts
- * resolveZitadelUrl("", process.env.ZITADEL_URL); // the environment variable, or the default
- * resolveZitadelUrl("https://auth.example.com"); // "https://auth.example.com"
- * ```
- */
-export function resolveZitadelUrl(...sources: ReadonlyArray<unknown>): string {
-  for (const source of sources) {
-    const value = nonEmpty(source);
-    if (value !== undefined) {
-      return value;
-    }
-  }
-  return DEFAULT_ZITADEL_URL;
-}
-
-/**
  * The name of the query parameter that carries the path of a signed-out request to the login page.
  *
  * The `<zitadel-login>` widget reads it and returns there after sign-in.

@@ -30,14 +30,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  nonEmpty,
   proxyRoute,
   proxySessionCookies,
   refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
-  resolveZitadelUrl,
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
@@ -159,7 +157,7 @@ export async function zitadelMiddleware(
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
   } = options;
-  const url = resolveZitadelUrl(options.url, process.env.ZITADEL_URL);
+  const url = options.url || process.env.ZITADEL_URL || "http://localhost:8080";
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
@@ -308,7 +306,7 @@ async function proxyRequest(
   // Preserve an explicit caller credential so the exchange can use the future
   // publishable-key plane without being overwritten.
   if (requiresProjectSecret(req.method, suffix) && !upstreamHeaders.has("authorization")) {
-    const secret = nonEmpty(projectSecretOption) ?? nonEmpty(process.env.ZITADEL_PROJECT_SECRET);
+    const secret = projectSecretOption || process.env.ZITADEL_PROJECT_SECRET;
     if (secret) {
       upstreamHeaders.set("authorization", `Bearer ${secret}`);
     }

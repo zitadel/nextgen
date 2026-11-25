@@ -1,11 +1,7 @@
 import "server-only";
 
 import { getZitadelConfig } from "@zitadel/sdk-core/config";
-import {
-  checkOpaqueSessionToken,
-  jwtNamesProject,
-  resolveZitadelUrl,
-} from "@zitadel/sdk-core/middleware";
+import { checkOpaqueSessionToken, jwtNamesProject } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import { headers } from "next/headers";
 import { cache } from "react";
@@ -106,8 +102,8 @@ const checkOpaqueSession = cache(
  * `@zitadel/sdk-next/session` instead, which works on any page.
  *
  * The backend URL comes from `options.url`, else the `ZITADEL_URL` environment variable the
- * middleware reads, else `http://localhost:8080`. An empty value counts as unset. Reading `headers()` makes the route dynamic,
- * so a page that calls this function is rendered per request and cannot be statically generated.
+ * middleware reads, else `http://localhost:8080`. An empty value counts as unset. Reading
+ * `headers()` makes the route dynamic, so a page that calls this function is rendered per request and cannot be statically generated.
  *
  * This module is server-only. Importing it, or the package root, from a client component fails
  * the build. Client components read the state through {@link useAuth} from
@@ -155,7 +151,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     jwksTimeoutMs,
     opaqueTokenTimeoutMs = 5000,
   } = options;
-  const url = resolveZitadelUrl(options.url, process.env.ZITADEL_URL);
+  const url = options.url || process.env.ZITADEL_URL || "http://localhost:8080";
 
   if (!projectId) {
     warnMissingProject();

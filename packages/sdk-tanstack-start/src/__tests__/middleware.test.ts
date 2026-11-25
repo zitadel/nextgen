@@ -122,3 +122,36 @@ describe("an empty backend URL", () => {
     expect(requested).not.toEqual([]);
   });
 });
+
+describe("an empty project secret", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    ["", "", undefined],
+    ["", "from-env", "Bearer from-env"],
+    ["from-option", "from-env", "Bearer from-option"],
+  ])("with option %j and environment %j sends %s", async (option, environment, expected) => {
+    let authorization: string | undefined;
+    const backend = createServer((request, response) => {
+      authorization = request.headers.authorization;
+      response.end("{}");
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", environment);
+
+    try {
+      await serve(
+        "http://localhost:3000/__nextgen/api/v1/sessions/exchange",
+        { method: "POST" },
+        { url: `http://127.0.0.1:${port}`, projectSecret: option },
+      );
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
+
+    expect(authorization).toBe(expected);
+  });
+});

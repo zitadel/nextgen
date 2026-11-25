@@ -11,14 +11,12 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  nonEmpty,
   proxyRoute,
   proxySessionCookies,
   refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
-  resolveZitadelUrl,
   serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
@@ -372,9 +370,8 @@ export async function handleZitadelRequest(
     opaqueTokenTimeoutMs = 5000,
     clientAddress,
   } = options;
-  const url = resolveZitadelUrl(options.url, PROCESS_ENV.ZITADEL_URL);
-  const projectSecret =
-    nonEmpty(options.projectSecret) ?? nonEmpty(PROCESS_ENV.ZITADEL_PROJECT_SECRET);
+  const url = options.url || PROCESS_ENV.ZITADEL_URL || "http://localhost:8080";
+  const projectSecret = options.projectSecret || PROCESS_ENV.ZITADEL_PROJECT_SECRET;
 
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
