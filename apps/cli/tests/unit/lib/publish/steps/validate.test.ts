@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SchemaService } from "@/lib/backend";
-import {
-  PublishConfigInvalidError,
-  PublishConfigLiteralSecretError,
-  PublishConfigRefusedKeyError,
-  PublishError,
-} from "@/lib/publish";
+import { PublishConfigInvalidError, PublishError } from "@/lib/publish";
 import { validateStep } from "@/lib/publish/steps/validate";
 import {
   aBranding,
@@ -208,7 +203,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(PublishConfigRefusedKeyError);
+      expect(error).toBeInstanceOf(PublishConfigInvalidError);
     });
   });
 
@@ -236,7 +231,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(PublishConfigLiteralSecretError);
+      expect(error).toBeInstanceOf(PublishConfigInvalidError);
     });
 
     it("states no literal secret and no refused key for a refusal that has neither", async () => {

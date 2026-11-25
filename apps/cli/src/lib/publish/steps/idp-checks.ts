@@ -1,10 +1,7 @@
 import { BackendForbiddenError, type VariableService } from "@/lib/backend";
 import {
-  PublishConnectionVariableClientIdMissingError,
-  PublishConnectionVariableClientSecretMissingError,
-  PublishConnectionVariableNotPlainError,
-  PublishConnectionVariableNotSecretError,
-  PublishConnectionVariableSharedError,
+  PublishConfigInvalidError,
+  PublishConnectionVariableMissingError,
 } from "@/lib/publish/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
 import type { Connection } from "@/lib/zitadel";
@@ -36,15 +33,11 @@ const VARIABLE_KIND = {
  *
  * @param ctx - The step's context: the connections and the variables.
  * @returns Nothing when every connection's variables are held as it needs.
- * @throws {@link PublishConnectionVariableSharedError} When a connection's client id
- *   and secret name one variable.
- * @throws {@link PublishConnectionVariableNotSecretError} When the client secret names a
- *   plain variable.
- * @throws {@link PublishConnectionVariableNotPlainError} When the client id names a secret one.
- * @throws {@link PublishConnectionVariableClientIdMissingError} When the project does not
- *   hold the variable the client id names.
- * @throws {@link PublishConnectionVariableClientSecretMissingError} When the project does not
- *   hold the variable the client secret names.
+ * @throws {@link PublishConfigInvalidError} When a connection's client id and secret
+ *   name one variable, the client secret names a plain variable, or the client id
+ *   names a secret one.
+ * @throws {@link PublishConnectionVariableMissingError} When the project does not
+ *   hold a variable a connection names.
  * @throws {@link BackendForbiddenError} When a deploy's token may not read the
  *   variables.
  */
@@ -93,15 +86,11 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  *
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
- * @throws {@link PublishConnectionVariableSharedError} When the client id and secret
- *   name one variable.
- * @throws {@link PublishConnectionVariableNotSecretError} When the client secret names a
- *   plain variable.
- * @throws {@link PublishConnectionVariableNotPlainError} When the client id names a secret one.
- * @throws {@link PublishConnectionVariableClientIdMissingError} When the variable the client id
+ * @throws {@link PublishConfigInvalidError} When the client id and secret name one
+ *   variable, the client secret names a plain variable, or the client id names a
+ *   secret one.
+ * @throws {@link PublishConnectionVariableMissingError} When a variable a connection
  *   names is not held.
- * @throws {@link PublishConnectionVariableClientSecretMissingError} When the variable the client
- *   secret names is not held.
  */
 function checkCredentialVariables(
   connection: Connection,
@@ -128,7 +117,7 @@ function checkCredentialVariables(
   const idVariable: string | undefined = id?.variable;
   const secretVariable: string | undefined = secret?.variable;
   if (idVariable !== undefined && idVariable === secretVariable) {
-    throw new PublishConnectionVariableSharedError(
+    throw new PublishConfigInvalidError(
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
     );
   }
@@ -137,28 +126,19 @@ function checkCredentialVariables(
     const variable = use.variable;
     const wantsSecret = field === "client_secret";
     const isSecret = held.get(variable);
-    if (isSecret === undefined && wantsSecret) {
-      throw new PublishConnectionVariableClientSecretMissingError(
-        `${file}: ${field} names the variable ${variable}, which the project does not have`,
-        variable,
-      );
-    }
     if (isSecret === undefined) {
-      throw new PublishConnectionVariableClientIdMissingError(
+      throw new PublishConnectionVariableMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
-        variable,
       );
     }
     if (wantsSecret && !isSecret) {
-      throw new PublishConnectionVariableNotSecretError(
+      throw new PublishConfigInvalidError(
         `${file}: ${field} names the variable ${variable}, which is not a secret`,
-        variable,
       );
     }
     if (!wantsSecret && isSecret) {
-      throw new PublishConnectionVariableNotPlainError(
+      throw new PublishConfigInvalidError(
         `${file}: ${field} names the variable ${variable}, which is a secret`,
-        variable,
       );
     }
   }

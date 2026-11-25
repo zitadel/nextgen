@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BackendForbiddenError } from "@/lib/backend";
-import { PublishConnectionVariableClientSecretMissingError, PublishError } from "@/lib/publish";
+import { PublishConnectionVariableMissingError, PublishError } from "@/lib/publish";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import type { ClientStubs } from "@tests/helpers/fake-client";
@@ -109,7 +109,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
+      expect(error).toBeInstanceOf(PublishConnectionVariableMissingError);
       expect(error).toMatchObject({
         message: expect.stringContaining("ACME_CLIENT_SECRET"),
       });
@@ -204,7 +204,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
+      expect(error).toBeInstanceOf(PublishConnectionVariableMissingError);
       expect(error).toMatchObject({
         message: expect.stringContaining("ACME_CLIENT_SECRET"),
       });

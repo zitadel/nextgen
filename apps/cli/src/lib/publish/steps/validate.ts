@@ -1,12 +1,7 @@
 import { mapBounded } from "@/lib/map-bounded";
-import {
-  PublishConfigInvalidError,
-  PublishConfigLiteralSecretError,
-  PublishConfigLiteralSecretRefusedKeyError,
-  PublishConfigRefusedKeyError,
-} from "@/lib/publish/errors";
+import { PublishConfigInvalidError } from "@/lib/publish/errors";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
-import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, type Issue, type RuleId } from "@/lib/zitadel";
 
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
@@ -71,11 +66,7 @@ type ServerFinding = {
  * sent.
  *
  * @param findings - Every finding.
- * @throws {@link PublishConfigLiteralSecretRefusedKeyError} when a finding is a secret written
- *   into a file and one is a key this CLI does not know.
- * @throws {@link PublishConfigLiteralSecretError} when a finding is a secret written into a file.
- * @throws {@link PublishConfigRefusedKeyError} when a finding is a key this CLI does not know.
- * @throws {@link PublishConfigInvalidError} when any other finding is an error.
+ * @throws {@link PublishConfigInvalidError} when any finding is an error.
  */
 function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
@@ -84,27 +75,10 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   if (errors.length === 0) {
     return;
   }
-  const literalSecret = errors.some((finding) => {
-    return finding.rule === "connection/literal-secret";
-  });
   const lines = errors.map((finding) => {
     return `  - ${finding.file}: ${finding.message}`;
   });
-  // Any refused key may be one a newer server declares and this CLI's
-  // meta-schema does not know yet, so the hint says what fixes that too.
-  const refusedKey = errors.some((finding) => {
-    return UserSchema.refusesKey(finding);
-  });
   const message = `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`;
-  if (literalSecret && refusedKey) {
-    throw new PublishConfigLiteralSecretRefusedKeyError(message);
-  }
-  if (literalSecret) {
-    throw new PublishConfigLiteralSecretError(message);
-  }
-  if (refusedKey) {
-    throw new PublishConfigRefusedKeyError(message);
-  }
   throw new PublishConfigInvalidError(message);
 }
 

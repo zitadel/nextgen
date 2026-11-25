@@ -14,13 +14,6 @@ export {
 } from "./publisher";
 export {
   PublishConfigInvalidError,
-  PublishConfigLiteralSecretError,
-  PublishConfigLiteralSecretRefusedKeyError,
-  PublishConfigRefusedKeyError,
-  PublishConnectionVariableClientIdMissingError,
-  PublishConnectionVariableClientSecretMissingError,
-  PublishConnectionVariableNotPlainError,
-  PublishConnectionVariableNotSecretError,
-  PublishConnectionVariableSharedError,
+  PublishConnectionVariableMissingError,
   PublishError,
 } from "./errors";
