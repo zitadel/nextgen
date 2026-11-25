@@ -503,8 +503,7 @@ async function handleAuth(ev: ZitadelQwikRequestEvent, opts: AuthHandlerOptions)
   }
 
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = loginRedirectUrl(loginPath, ev.url);
-    throw ev.redirect(302, `${loginUrl.pathname}${loginUrl.search}`);
+    throw ev.redirect(302, loginRedirectUrl(loginPath, ev.url).toString());
   }
 }
 
@@ -544,8 +543,8 @@ async function handleAuth(ev: ZitadelQwikRequestEvent, opts: AuthHandlerOptions)
  * OnRequest and the call reads export const onRequest = createZitadelOnRequest(...). It is a
  * factory, called once to return the handler, so it starts with create.
  *
- * A signed-out request for a protected route is redirected with a relative URL, such as
- * `/login?next=%2Fadmin`, which the browser resolves against the origin it used.
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`, as in every server SDK.
  *
  * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
  * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer

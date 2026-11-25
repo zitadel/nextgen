@@ -326,3 +326,23 @@ describe("proxied requests without a body", () => {
     expect(received).toEqual([{ method: "POST", body: "" }]);
   });
 });
+
+describe("a login redirect", () => {
+  it("is an absolute URL on the origin of the request and carries the requested path", async () => {
+    const served = await serve(
+      "http://localhost:3000/admin/users?tab=open",
+      {},
+      {
+        url: "http://localhost:4000",
+        projectId: "project",
+        protectedRoutes: ["/admin*"],
+        loginPath: "/login",
+      },
+    );
+
+    expect(served.status).toBe(302);
+    expect(served.headers.get("location")).toBe(
+      "http://localhost:3000/login?next=%2Fadmin%2Fusers%3Ftab%3Dopen",
+    );
+  });
+});

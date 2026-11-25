@@ -1072,6 +1072,7 @@ describe("server SDK middleware tests ↔ the blocks they share", () => {
     "protected routes and encoded paths",
     "an empty backend URL",
     "an empty project secret",
+    "a login redirect",
     "proxied OAuth paths of another project",
     "an unsafe login path",
     "a cleared session cookie",
