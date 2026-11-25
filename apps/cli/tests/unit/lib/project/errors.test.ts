@@ -52,3 +52,13 @@ describe("the project errors", () => {
     expect(new ProjectFileMissingError("secret", "gone", { cause }).cause).toBe(cause);
   });
 });
+
+describe("the project errors' codes", () => {
+  it("reports a missing file as a validation failure, not a missing thing", () => {
+    expect(new ProjectFileMissingError("config", "why").code).toBe("E_VALIDATION");
+  });
+
+  it("reports a malformed file as a validation failure", () => {
+    expect(new ProjectFileMalformedError("config", "why").code).toBe("E_VALIDATION");
+  });
+});

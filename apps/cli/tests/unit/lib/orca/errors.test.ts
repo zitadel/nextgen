@@ -75,3 +75,30 @@ describe("the orca errors", () => {
     expect(new OrcaPatchFileConflictError("why", { force: "replaces" }).force).toBe("replaces");
   });
 });
+
+describe("the orca errors' codes", () => {
+  it.each([
+    ["no app", new OrcaFrameworkError("none", "why"), "E_FRAMEWORK_NOT_DETECTED"],
+    [
+      "a framework with no detector",
+      new OrcaFrameworkError("unknown", "why"),
+      "E_FRAMEWORK_NOT_DETECTED",
+    ],
+    [
+      "an unsupported layout",
+      new OrcaFrameworkError("layout", "why"),
+      "E_UNSUPPORTED_PROJECT_SHAPE",
+    ],
+    ["an outdated app", new OrcaFrameworkError("outdated", "why"), "E_UNSUPPORTED_PROJECT_SHAPE"],
+    ["another framework", new OrcaFrameworkError("mismatch", "why"), "E_CONFLICT"],
+    ["an occupied directory", new OrcaScaffoldBlockedError("occupied", "why"), "E_CONFLICT"],
+    ["a Node too old", new OrcaScaffoldBlockedError("node", "why"), "E_VALIDATION"],
+    ["a missing file", new OrcaPatchFileMissingError("why"), "E_NOT_FOUND"],
+    ["a conflicting file", new OrcaPatchFileConflictError("why"), "E_CONFLICT"],
+    ["an unknown renderer", new OrcaRendererError("unknown", "why"), "E_VALIDATION"],
+    ["a pending renderer", new OrcaRendererError("pending", "why"), "E_NOT_IMPLEMENTED"],
+    ["a bug", new OrcaInternalError("why"), "E_VALIDATION"],
+  ] as const)("reports %s as %s", (_name, error, code) => {
+    expect(error.code).toBe(code);
+  });
+});

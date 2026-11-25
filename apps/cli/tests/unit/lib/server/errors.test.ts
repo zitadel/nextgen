@@ -91,3 +91,35 @@ describe("the local server errors", () => {
     expect(toZitadelError(error)).toMatchObject({ code: "E_VALIDATION", hint: "Use a URL." });
   });
 });
+
+describe("the local server errors' codes", () => {
+  it.each([
+    ["not running", new LocalServerDownError("not-running", {}), "E_LOCAL_SERVER_NOT_RUNNING"],
+    ["another start", new LocalServerBusyError({}), "E_CONFLICT"],
+    ["a held port", new LocalServerPortBusyError(8080), "E_PORT_IN_USE"],
+    ["no free port", new LocalServerPortFullError(8080, 8090), "E_PORT_IN_USE"],
+    [
+      "processes that cannot be listed",
+      new LocalServerStopError("unlistable", "why"),
+      "E_UNSUPPORTED_PROJECT_SHAPE",
+    ],
+    ["a server that would not stop", new LocalServerStopError("server", "why"), "E_CONFLICT"],
+    ["a malformed record", new LocalServerMalformedError("record", "why"), "E_VALIDATION"],
+  ] as const)("reports %s as %s", (_name, error, code) => {
+    expect(error.code).toBe(code);
+  });
+
+  it.each([
+    [new LocalServerDownError("not-responding", {}), "not-responding"],
+    [new LocalServerMalformedError("url", "why"), undefined],
+    [new LocalServerStopError("processes", "why"), "processes-did-not-stop"],
+    [new LocalServerPortBusyError(8080), "port-in-use"],
+  ] as const)("names the advice that fits %#", (error, advice) => {
+    expect(error.advice).toBe(advice);
+  });
+
+  it("says a server that would not stop did not lose its port", () => {
+    expect(new LocalServerStopError("server", "why").mayBePortRace).toBe(false);
+    expect(new LocalServerPortBusyError(8080).mayBePortRace).toBe(true);
+  });
+});

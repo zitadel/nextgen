@@ -58,3 +58,13 @@ describe("the environment errors", () => {
     });
   });
 });
+
+describe("the environment errors' codes", () => {
+  it("reports a missing file as a validation failure, not a missing thing", () => {
+    expect(new EnvironmentFileMissingError("a.env", "why").code).toBe("E_VALIDATION");
+  });
+
+  it("reports an invalid input as a validation failure", () => {
+    expect(new EnvironmentInvalidError("name", "why").code).toBe("E_VALIDATION");
+  });
+});

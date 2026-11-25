@@ -91,3 +91,17 @@ describe("the publish errors", () => {
     expect(error.hint).toBeUndefined();
   });
 });
+
+describe("the publish errors' codes", () => {
+  it.each([
+    ["a missing variable", "missing-variable", "E_CREDENTIAL_MISSING"],
+    ["a shared variable", "shared-variable", "E_VALIDATION"],
+    ["a variable of the wrong kind", "wrong-kind", "E_VALIDATION"],
+  ] as const)("reports %s as %s", (_name, reason, code) => {
+    expect(new PublishConnectionError(reason, "why", { file: "a", variable: "B" }).code).toBe(code);
+  });
+
+  it("reports a rejected release as a validation failure", () => {
+    expect(new PublishReleaseRejectedError("why").code).toBe("E_VALIDATION");
+  });
+});

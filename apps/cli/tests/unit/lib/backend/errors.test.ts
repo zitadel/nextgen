@@ -41,3 +41,70 @@ describe("the backend errors", () => {
     );
   });
 });
+
+describe("the backend errors' codes, hints and details", () => {
+  it.each([
+    [new BackendNotFoundError("why"), "E_NOT_FOUND"],
+    [new BackendConflictError("why"), "E_CONFLICT"],
+    [new BackendUnavailableError("why"), "E_NETWORK"],
+    [new BackendUnsupportedError("why"), "E_UNSUPPORTED_PROJECT_SHAPE"],
+  ] as const)("reports %# with its code", (error, code) => {
+    expect(error.code).toBe(code);
+  });
+
+  it("carries the status, url and body of an answer as its details", () => {
+    const error = new BackendConflictError("why", {
+      status: 409,
+      url: "http://x/y",
+      body: { a: 1 },
+    });
+
+    expect(error.details).toEqual({ status: 409, url: "http://x/y", body: { a: 1 } });
+  });
+
+  it("names the fields the server rejected in its hint", () => {
+    const error = new BackendConflictError("why", {
+      status: 409,
+      url: "http://x/y",
+      body: { code: "idp.field_immutable", details: { fields: ["issuer"] } },
+    });
+
+    expect(error.hint).toBe("The server rejected this field: issuer.");
+  });
+
+  it("says a 404 without the platform's envelope may be a wrong server", () => {
+    const error = new BackendNotFoundError("Not Found", {
+      status: 404,
+      url: "http://x/y",
+      body: "<html>",
+    });
+
+    expect(error.message).toBe(
+      "Not Found — http://x/y has no such endpoint; is this a Zitadel platform API?",
+    );
+  });
+
+  it("says a path the server's version lacks is a mismatch of versions", () => {
+    const error = new BackendNotFoundError("Not Found", {
+      status: 404,
+      url: "http://x/y",
+      body: { code: "req.not_found", message: "no" },
+    });
+
+    expect(error.message).toBe("http://x/y has no such endpoint on this Zitadel server");
+    expect(error.hint).toContain("different versions");
+  });
+
+  it.each([
+    ["unreachable", "Check your connection and the server URL (ZITADEL_URL)."],
+    [
+      "timeout",
+      "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+    ],
+  ] as const)("words the hint of a %s request", (reason, hint) => {
+    const error = new BackendUnavailableError("why", { url: "http://x", reason });
+
+    expect(error.hint).toBe(hint);
+    expect(error.details).toEqual({ url: "http://x", reason });
+  });
+});

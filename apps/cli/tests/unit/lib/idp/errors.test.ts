@@ -46,3 +46,9 @@ describe("the identity-provider errors", () => {
     expect(new IdpSettingInvalidError("invalid", "bad", { field: "--slug" }).hint).toBeUndefined();
   });
 });
+
+describe("the identity-provider errors' codes", () => {
+  it("reports an unknown provider as a validation failure, not a missing thing", () => {
+    expect(new IdpProviderUnknownError("x", ["google"]).code).toBe("E_VALIDATION");
+  });
+});

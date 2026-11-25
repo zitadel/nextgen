@@ -27,3 +27,9 @@ describe("the consent errors", () => {
     expect(reported(new ConsentInternalError("bug")).code).toBe("E_VALIDATION");
   });
 });
+
+describe("the consent errors' codes", () => {
+  it("reports a refusal that needs a person as a confirmation required", () => {
+    expect(new ConsentRequiredError("remove X", "Remove X?").code).toBe("E_CONFIRMATION_REQUIRED");
+  });
+});
