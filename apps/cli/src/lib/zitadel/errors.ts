@@ -1,6 +1,6 @@
 import type { ProviderSelection } from "@zitadel/config/idp";
 
-import type { Categorized, ErrorCategory } from "@/constants";
+import type { Categorized, ErrorCategory } from "@/lib/errors";
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { JsonObject } from "@/lib/zitadel/types";

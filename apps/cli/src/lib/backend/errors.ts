@@ -1,6 +1,6 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import type { Categorized, ErrorCategory } from "@/constants";
+import type { Categorized, ErrorCategory } from "@/lib/errors";
 
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{

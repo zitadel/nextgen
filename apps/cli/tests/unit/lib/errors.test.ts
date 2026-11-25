@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { responseFailure } from "@/lib/backend";
-import { ERROR_CATEGORIES } from "@/constants";
 import { GitError } from "@/lib/git/errors";
 import {
   BackendForbiddenError,
@@ -9,6 +8,7 @@ import {
   BackendUnavailableError,
 } from "@/lib/backend/errors";
 import {
+  ERROR_CATEGORIES,
   EXIT_CODES,
   ZitadelError,
   errorMessage,
