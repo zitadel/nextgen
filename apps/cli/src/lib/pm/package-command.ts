@@ -165,7 +165,11 @@ export class PackageCommand {
       throw new PmCommandFailedError(`${this.display} failed with ${detail}`, {
         exit: result.exitCode ?? 1,
         signal: result.signal ?? null,
-        ...(capture ? { output: String(result.all ?? "") } : {}),
+        ...(capture
+          ? {
+              output: String(result.all ?? ""),
+            }
+          : {}),
       });
     }
   }

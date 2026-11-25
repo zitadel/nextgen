@@ -3,7 +3,6 @@ import { dirname, join, resolve } from "node:path";
 import { pathExists } from "@/lib/fs";
 import { Output } from "@/lib/ui/output";
 
-import { PmCommandFailedError } from "./errors";
 import { Manifest, type PackageJson } from "./manifest";
 import { PackageCommand, type Runner, type Verb } from "./package-command";
 
@@ -52,6 +51,8 @@ export type InstallContext = {
   task: <T>(label: string, work: () => Promise<T>, done?: (result: T) => string) => Promise<T>;
   /** Narrates the step when it is not drawn as a task: the CLI's `log`. */
   log: { info(message: string): void };
+  /** The error a failed install becomes. */
+  failed: (error: unknown, command: PackageCommand) => Error;
   /** What stands in for the process, for a test. */
   run?: Runner;
 };
@@ -141,8 +142,7 @@ export class PM {
    * @param plan - What the command decided.
    * @param context - Where to install and how the run goes.
    * @returns What the install did, and the command it ran or would run.
-   * @throws {@link PmCommandFailedError} When the package manager fails; any other failure of the
-   *   run is its cause.
+   * @throws What `context.failed` returns, when the package manager fails.
    */
   async installDependencies(plan: InstallPlan, context: InstallContext): Promise<InstallResult> {
     const command = this.install();
@@ -178,11 +178,7 @@ export class PM {
         };
         await (context.run === undefined ? command.run(options) : context.run(command, options));
       } catch (error) {
-        throw error instanceof PmCommandFailedError
-          ? error
-          : new PmCommandFailedError(`${command.display} failed`, {
-              cause: error,
-            });
+        throw context.failed(error, command);
       }
     };
 

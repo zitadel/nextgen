@@ -19,6 +19,12 @@ export abstract class SyncError extends Error {
   /** The stable product code the failure is reported with. */
   abstract readonly code: ZitadelErrorCode;
 
+  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
+  readonly hint?: string | undefined;
+
+  /** Structured facts about the failure, for a `--json` reader. */
+  readonly details?: Readonly<Record<string, unknown>> | undefined;
+
   /**
    * Make a sync failure.
    *
@@ -48,14 +54,14 @@ export class SyncStateMalformedError extends SyncError {
   /**
    * What to do about it.
    */
-  readonly hint: string =
+  override readonly hint: string =
     "The file records which platform resource each local file was synced as. " +
     "Fix or remove it, then run this command again.";
 
   /**
    * Structured facts about the failure, for a `--json` reader.
    */
-  readonly details: Readonly<Record<string, unknown>>;
+  override readonly details: Readonly<Record<string, unknown>>;
 
   /**
    * The state file's path, relative to the project.

@@ -45,24 +45,25 @@ export class ProjectConfig {
    * @throws {@link ProjectConfigMalformedError} When it is not a JSON object.
    */
   static async read(cwd: string): Promise<ProjectConfig> {
-    const text = await readFile(join(cwd, "zitadel.json"), "utf8").catch((error: unknown) => {
+    try {
+      const text = await readFile(join(cwd, "zitadel.json"), "utf8");
+      try {
+        return new ProjectConfig(parseJsonObject(text, "zitadel.json"));
+      } catch (error) {
+        throw new ProjectConfigMalformedError(
+          error instanceof Error ? error.message : "zitadel.json is malformed",
+          {
+            cause: error,
+          },
+        );
+      }
+    } catch (error) {
       if (isErrno(error, "ENOENT")) {
         throw new ProjectConfigMissingError({
           cause: error,
         });
       }
       throw error;
-    });
-
-    try {
-      return new ProjectConfig(parseJsonObject(text, "zitadel.json"));
-    } catch (error) {
-      throw new ProjectConfigMalformedError(
-        error instanceof Error ? error.message : "zitadel.json is malformed",
-        {
-          cause: error,
-        },
-      );
     }
   }
 

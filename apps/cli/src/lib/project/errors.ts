@@ -19,6 +19,12 @@ export abstract class ProjectError extends Error {
   /** The stable product code the failure is reported with. */
   abstract readonly code: ZitadelErrorCode;
 
+  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
+  readonly hint?: string | undefined;
+
+  /** Structured facts about the failure, for a `--json` reader. */
+  readonly details?: Readonly<Record<string, unknown>> | undefined;
+
   /**
    * Make a project failure.
    *
@@ -47,7 +53,7 @@ export class ProjectConfigMissingError extends ProjectError {
   /**
    * What to do about it.
    */
-  readonly hint: string = "Set the project up first.";
+  override readonly hint: string = "Set the project up first.";
 
   /**
    * Make the failure.
@@ -74,7 +80,8 @@ export class ProjectSecretMissingError extends ProjectError {
   /**
    * What to do about it.
    */
-  readonly hint: string = "The project secret can be restored from .env.development.local.";
+  override readonly hint: string =
+    "The project secret can be restored from .env.development.local.";
 
   /**
    * Make the failure.
@@ -99,11 +106,6 @@ export class ProjectConfigMalformedError extends ProjectError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
-   * What to do about it.
-   */
-  readonly hint: string = "Fix zitadel.json, which is the project's committed configuration.";
-
-  /**
    * Make the failure.
    *
    * @param message - What went wrong.
@@ -126,11 +128,6 @@ export class ProjectSecretMalformedError extends ProjectError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * What to do about it.
-   */
-  readonly hint: string = "The project secret can be restored from .env.development.local.";
 
   /**
    * Make the failure.
@@ -159,7 +156,7 @@ export class ProjectEnvValueMultilineError extends ProjectError {
   /**
    * What to do about it.
    */
-  readonly hint: string =
+  override readonly hint: string =
     "A .env value is a single line; remove the newline or store the value another way.";
 
   /**
@@ -189,7 +186,7 @@ export class ProjectEnvValueUnquotableError extends ProjectError {
   /**
    * What to do about it.
    */
-  readonly hint: string = "Set it in the process environment instead of a .env file.";
+  override readonly hint: string = "Set it in the process environment instead of a .env file.";
 
   /**
    * The variable whose value it is.

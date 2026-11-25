@@ -1,6 +1,6 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { log, warnings, type BoxAction } from "@/lib/ui";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { ZitadelError } from "@/lib/errors";
 import {
   type DependencyInstall,
   type InstallContext,
@@ -15,18 +15,6 @@ import { WizardStep } from "@/lib/wizard";
  * How many of a failed after-install script's last output lines its warning quotes.
  */
 const QUOTED_OUTPUT_LINES = 20;
-
-/** How a dependency install that failed is refused. */
-const INSTALL_FAILED_REFUSAL = {
-  message: "Dependency install failed: {command}",
-  hint: "Run {command} in {cwd}, then start the app with {dev}.",
-  next: ["{install}"],
-  details: {
-    command: "{command}",
-    cwd: "{cwd}",
-    original: "{original}",
-  },
-} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -152,55 +140,45 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         return this.deps.ui.task(label, work, done);
       },
       log,
-      ...(this.deps.run === undefined
-        ? {}
-        : {
-            run: this.deps.run,
-          }),
-    };
-    const { install } = await packageManager
-      .installDependencies(
-        {
-          needed: scaffoldedFramework || patched.depsAdded.length > 0,
-          dryRun: this.deps.dryRun,
-          skipInstall: Boolean(flags.skipInstall),
-        },
-        context,
-      )
-      .catch((error: unknown) => {
-        if (!(error instanceof PmCommandFailedError)) {
-          throw error;
-        }
-        const installCommand = packageManager.install();
-        const original = error.cause ?? error;
-
-        throw Object.assign(
-          refusalError(
-            INSTALL_FAILED_REFUSAL,
-            {
+      failed: (error, installCommand) => {
+        return new ZitadelError(
+          "E_VALIDATION",
+          `Dependency install failed: ${installCommand.display}`,
+          {
+            hint: `Run ${installCommand.display} in ${this.deps.cwd}, then start the app with ${devCommand.display}.`,
+            nextCommands: [shownInstall],
+            details: {
               command: installCommand.display,
               cwd: this.deps.cwd,
-              dev: devCommand.display,
               original:
-                original instanceof Error
+                error instanceof Error
                   ? {
-                      name: original.name,
-                      message: original.message,
-                      code: "code" in original ? original.code : undefined,
+                      name: error.name,
+                      message: error.message,
+                      code:
+                        error instanceof PmCommandFailedError
+                          ? error.exit
+                          : "code" in error
+                            ? error.code
+                            : undefined,
                     }
                   : {
-                      message: String(original),
+                      message: String(error),
                     },
             },
-            {
-              install: shownInstall,
-            },
-          ),
-          {
-            cause: error,
           },
         );
-      });
+      },
+      ...(this.deps.run === undefined ? {} : { run: this.deps.run }),
+    };
+    const { install } = await packageManager.installDependencies(
+      {
+        needed: scaffoldedFramework || patched.depsAdded.length > 0,
+        dryRun: this.deps.dryRun,
+        skipInstall: Boolean(flags.skipInstall),
+      },
+      context,
+    );
     if (install.status === "completed" && afterInstallScript !== undefined) {
       const command = packageManager.script(afterInstallScript);
       try {

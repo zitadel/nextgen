@@ -18,6 +18,12 @@ export abstract class UpgradeError extends Error {
   /** The stable product code the failure is reported with. */
   abstract readonly code: ZitadelErrorCode;
 
+  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
+  readonly hint?: string | undefined;
+
+  /** Structured facts about the failure, for a `--json` reader. */
+  readonly details?: Readonly<Record<string, unknown>> | undefined;
+
   /**
    * Make an upgrade failure.
    *
@@ -45,7 +51,8 @@ export class UpgradeReleaseLookupError extends UpgradeError {
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 
   /**
-   * Make the failure.
+   * Takes no arguments: there is nothing to say beyond the fact that the lookup
+   * found no release.
    */
   constructor() {
     super("Could not look up the latest release");
@@ -68,8 +75,6 @@ export class UpgradeInstallFailedError extends UpgradeError {
   readonly command: PackageCommand;
 
   /**
-   * Make the failure.
-   *
    * @param command - The install, as the person's shell reads it.
    * @param cause - What the package manager failed with.
    */

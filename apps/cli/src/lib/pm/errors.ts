@@ -20,6 +20,12 @@ export abstract class PmError extends Error {
   /** The stable product code the failure is reported with. */
   abstract readonly code: ZitadelErrorCode;
 
+  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
+  readonly hint?: string | undefined;
+
+  /** Structured facts about the failure, for a `--json` reader. */
+  readonly details?: Readonly<Record<string, unknown>> | undefined;
+
   /**
    * Make a package manager failure.
    *
@@ -49,7 +55,7 @@ export class PmManifestInvalidError extends PmError {
   /**
    * Structured facts about the failure, for a `--json` reader.
    */
-  readonly details: Readonly<Record<string, unknown>>;
+  override readonly details: Readonly<Record<string, unknown>>;
 
   /**
    * The path of the file that was read.
@@ -68,9 +74,12 @@ export class PmManifestInvalidError extends PmError {
       readonly cause?: unknown;
     } = {},
   ) {
-    const reason = options.cause instanceof Error ? `: ${options.cause.message}` : "";
-
-    super(`Cannot read ${path} as a package.json${reason}`, options);
+    super(
+      options.cause instanceof Error
+        ? options.cause.message
+        : `Cannot read ${path} as a package.json`,
+      options,
+    );
     this.details = {
       path,
     };

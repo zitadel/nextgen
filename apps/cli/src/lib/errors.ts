@@ -1,6 +1,20 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import type { Suggested } from "./suggestion";
+import { BackendError } from "./backend";
+import { ConsentError } from "./consent";
+import { EnvironmentError } from "./environment";
+import { GitError } from "./git";
+import { IdpError } from "./idp";
+import { OrcaError } from "./orca";
+import { PmError } from "./pm";
+import { ProjectError } from "./project";
+import { PublishError } from "./publish";
+import { LocalServerError } from "./server";
+import { SuggestionError, type Suggested } from "./suggestion";
+import { SyncError } from "./sync";
+import { UpgradeError } from "./upgrade";
+import { WizardError } from "./wizard";
+import { ZitadelConfigError } from "./zitadel";
 
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
@@ -255,11 +269,10 @@ export function failureText(message: string): FailureText {
  *
  * @remarks
  * A {@link ZitadelError} is returned as it is, and an error a package raised
- * on purpose (one carrying a `category` and a `code`) is reported with the `code`, `hint` and `details` it carries itself: this
- * function knows no package and branches on no class. What is left is errno,
- * Zod-like and plain errors, which are reported as `E_VALIDATION` unless errno
- * says more, with the original shape under `details` for debugging without
- * leaking it into the message.
+ * on purpose is reported with the `code`, `hint` and `details` its package base
+ * carries. What is left is errno, Zod-like and plain errors, which are reported
+ * as `E_VALIDATION` unless errno says more, with the original shape under
+ * `details` for debugging without leaking it into the message.
  *
  * @param error - Whatever was caught.
  * @returns The error the CLI reports.
@@ -269,31 +282,108 @@ export function toZitadelError(error: unknown): ZitadelError {
     return error;
   }
 
-  // An error a package raised on purpose carries the code, hint and details
-  // it is reported with.
-  if (
-    error instanceof Error &&
-    "category" in error &&
-    "code" in error &&
-    typeof error.code === "string"
-  ) {
-    const typed = error as Error & {
-      code: ZitadelErrorCode;
-      hint?: string | undefined;
-      details?: unknown;
-    };
+  if (error instanceof BackendError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
 
-    return new ZitadelError(typed.code, typed.message, {
-      ...(typed.hint === undefined
-        ? {}
-        : {
-            hint: typed.hint,
-          }),
-      ...(typed.details === undefined
-        ? {}
-        : {
-            details: typed.details,
-          }),
+  if (error instanceof ZitadelConfigError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof OrcaError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof LocalServerError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof SuggestionError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof IdpError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof PublishError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof ConsentError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof EnvironmentError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof GitError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof PmError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof ProjectError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof SyncError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof UpgradeError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
+    });
+  }
+
+  if (error instanceof WizardError) {
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: error.details,
     });
   }
 

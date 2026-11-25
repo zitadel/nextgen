@@ -2,7 +2,7 @@ import { posix } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { importsUnder, isOwnErrorsImport } from "@tests/helpers/source-imports";
+import { importsUnder } from "@tests/helpers/source-imports";
 
 const LAYER = posix.join("lib", "zitadel");
 
@@ -14,7 +14,7 @@ describe("the zitadel library's dependencies", () => {
           found.target.startsWith("lib/") &&
           found.target !== LAYER &&
           !found.target.startsWith(`${LAYER}/`) &&
-          !isOwnErrorsImport(found, LAYER)
+          !(found.file === `${LAYER}/errors.ts` && found.target === "lib/errors")
         );
       })
       .map((found) => {

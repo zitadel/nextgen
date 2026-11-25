@@ -13,7 +13,7 @@ import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
-import { type PackageCommand, PM, PmCommandFailedError } from "@/lib/pm";
+import { type PackageCommand, PM } from "@/lib/pm";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
@@ -128,6 +128,17 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
           return this.ui.task(label, work, done);
         },
         log,
+        failed: (error, command) => {
+          return refusalError(
+            INSTALL_REFUSAL,
+            {
+              command: command.display,
+              cwd: this.cwd,
+              message: String(error),
+            },
+            { install: this.shown(command, flags.cwd) },
+          );
+        },
       },
     );
 
@@ -197,38 +208,32 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
       force: this.force,
     }).scaffold(plan);
     const packageManager = await PM.detect(this.cwd);
-    const { install, command: installCommand } = await packageManager
-      .installDependencies(
-        {
-          needed: result.depsAdded.length > 0,
-          dryRun: false,
-          skipInstall: flags.skipInstall,
+    const { install, command: installCommand } = await packageManager.installDependencies(
+      {
+        needed: result.depsAdded.length > 0,
+        dryRun: false,
+        skipInstall: flags.skipInstall,
+      },
+      {
+        cwd: this.cwd,
+        env: this.env,
+        task: (label, work, done) => {
+          return this.ui.task(label, work, done);
         },
-        {
-          cwd: this.cwd,
-          env: this.env,
-          task: (label, work, done) => {
-            return this.ui.task(label, work, done);
-          },
-          log,
+        log,
+        failed: (error, command) => {
+          return refusalError(
+            INSTALL_REFUSAL,
+            {
+              command: command.display,
+              cwd: this.cwd,
+              message: String(error),
+            },
+            { install: this.shown(command, flags.cwd) },
+          );
         },
-      )
-      .catch((error: unknown) => {
-        if (!(error instanceof PmCommandFailedError)) {
-          throw error;
-        }
-        throw refusalError(
-          INSTALL_REFUSAL,
-          {
-            command: packageManager.install().display,
-            cwd: this.cwd,
-            message: String(error.cause ?? error),
-          },
-          {
-            install: this.shown(packageManager.install(), flags.cwd),
-          },
-        );
-      });
+      },
+    );
 
     const written = result.filesWritten.map((file) => {
       return relative(this.cwd, file).split(sep).join("/");

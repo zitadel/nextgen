@@ -17,6 +17,12 @@ export abstract class WizardError extends Error {
   /** The stable product code the failure is reported with. */
   abstract readonly code: ZitadelErrorCode;
 
+  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
+  readonly hint?: string | undefined;
+
+  /** Structured facts about the failure, for a `--json` reader. */
+  readonly details?: Readonly<Record<string, unknown>> | undefined;
+
   /**
    * Make a wizard failure.
    *

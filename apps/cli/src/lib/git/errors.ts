@@ -20,6 +20,12 @@ export abstract class GitError extends Error {
   /** The stable product code the failure is reported with. */
   abstract readonly code: ZitadelErrorCode;
 
+  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
+  readonly hint?: string | undefined;
+
+  /** Structured facts about the failure, for a `--json` reader. */
+  readonly details?: Readonly<Record<string, unknown>> | undefined;
+
   /**
    * Creates the error.
    *
@@ -42,8 +48,6 @@ export abstract class GitError extends Error {
    * git writes `warning:` and `hint:` lines before and after the line that
    * gives the reason, so the first `fatal:` or `error:` line is taken, then
    * the first line, then a fixed phrase when git said nothing.
-   *
-   * @returns The line that says why.
    */
   headline(): string {
     const lines = this.message
@@ -60,7 +64,6 @@ export abstract class GitError extends Error {
     if (reason !== undefined) {
       return reason;
     }
-
     return lines[0] ?? "git gave no reason";
   }
 }

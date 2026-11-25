@@ -13,6 +13,7 @@ import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/li
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor } from "@/lib/idp";
 import type { CommandResult } from "@/cli/core";
+import { refusalError, type Refusal } from "@/cli/core/refusal";
 import { Orca, createOrca, issuerFromPort } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
@@ -23,7 +24,7 @@ import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
-import { Project } from "@/lib/project";
+import { Project, ProjectSecretMissingError } from "@/lib/project";
 
 /**
  * The env file setup writes for the CLI's own commands. Every command setup
@@ -35,6 +36,20 @@ import { Project } from "@/lib/project";
  * created.
  */
 export const RECOVERY_ENV_FILE = ".env.development.local";
+
+/** What a project with no `.zitadel/secret` is refused for. */
+const SECRET_MISSING_REFUSAL = {
+  message: ".zitadel/secret was not found",
+  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+  next: [
+    {
+      id: "doctor",
+      flags: {
+        fix: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -392,6 +407,9 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       };
     } catch (error) {
       moving.fail();
+      if (error instanceof ProjectSecretMissingError) {
+        throw refusalError(SECRET_MISSING_REFUSAL, {});
+      }
       throw error;
     }
   }

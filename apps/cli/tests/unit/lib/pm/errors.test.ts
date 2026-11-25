@@ -17,7 +17,7 @@ describe("the package manager errors", () => {
     expect(error.cause).toBe(cause);
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
-      message: "Cannot read /app/package.json as a package.json: bad",
+      message: "bad",
       details: {
         path: "/app/package.json",
       },

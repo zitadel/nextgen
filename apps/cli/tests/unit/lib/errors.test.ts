@@ -659,46 +659,7 @@ describe("a failure as a person is shown it", () => {
   });
 });
 
-describe("toZitadelError for an error that says its code", () => {
-  it.each([["E_VALIDATION"], ["E_NOT_FOUND"], ["E_CONFLICT"], ["E_AUTH"], ["E_NETWORK"]] as const)(
-    "reports the error's own code %s",
-    (code) => {
-      const error = Object.assign(new Error("why"), {
-        category: "invalid",
-        retryable: false,
-        code,
-        hint: "Try something else.",
-        details: {
-          file: "a.json",
-        },
-      });
-
-      expect(toZitadelError(error)).toMatchObject({
-        code,
-        message: "why",
-        hint: "Try something else.",
-        details: {
-          file: "a.json",
-        },
-      });
-    },
-  );
-
-  it("leaves the hint and details off an error that carries none", () => {
-    const error = Object.assign(new Error("why"), {
-      category: "fault",
-      retryable: false,
-      code: "E_VALIDATION",
-    });
-
-    expect(toZitadelError(error)).toMatchObject({
-      code: "E_VALIDATION",
-      message: "why",
-      hint: undefined,
-      details: undefined,
-    });
-  });
-
+describe("toZitadelError for an error that carries a code", () => {
   it("reports an error with a code and no category as a system error", () => {
     const error = Object.assign(new Error("denied"), {
       code: "EACCES",
