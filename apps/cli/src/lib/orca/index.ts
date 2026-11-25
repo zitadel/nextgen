@@ -8,12 +8,7 @@ import { readDirIfExists } from "@/lib/fs";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
-import {
-  OrcaFrameworkMissingError,
-  OrcaFrameworkUnsupportedError,
-  OrcaInternalError,
-  OrcaScaffoldBlockedError,
-} from "./errors";
+import { OrcaFrameworkError, OrcaInternalError, OrcaScaffoldBlockedError } from "./errors";
 import { ManagedFile } from "./managed-file";
 import { patchers } from "./patchers";
 import type { Patcher } from "./patchers/types";
@@ -26,8 +21,7 @@ import type { Scaffolder } from "./scaffolders/types";
 export { issuerFromPort } from "./detectors/port";
 export {
   OrcaError,
-  OrcaFrameworkMissingError,
-  OrcaFrameworkUnsupportedError,
+  OrcaFrameworkError,
   OrcaInternalError,
   OrcaPatchFileConflictError,
   OrcaPatchFileMissingError,
@@ -37,7 +31,7 @@ export {
 } from "./errors";
 export type {
   OrcaErrorOptions,
-  OrcaFrameworkUnsupportedReason,
+  OrcaFrameworkReason,
   OrcaPatchFileConflictOptions,
   OrcaPatchForce,
   OrcaRendererReason,
@@ -165,8 +159,8 @@ export class Orca {
   /**
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
    * honouring an explicit `requested` framework. Throws
-   * {@link OrcaFrameworkMissingError} when nothing matches, and
-   * {@link OrcaFrameworkUnsupportedError} when `requested` has no detector, when
+   * {@link OrcaFrameworkError} (`none`) when nothing matches, and
+   * {@link OrcaFrameworkError} when `requested` has no detector, when
    * `cwd` holds an app of a framework other than `requested`, or when a detector
    * recognises an app it does not support.
    */
@@ -178,7 +172,7 @@ export class Orca {
       : this.detectors;
     if (requested && candidates.length === 0) {
       const supported = this.frameworkIds();
-      throw new OrcaFrameworkUnsupportedError("unknown", `Unsupported framework "${requested}"`, {
+      throw new OrcaFrameworkError("unknown", `Unsupported framework "${requested}"`, {
         hint: `Supported frameworks: ${supported.join(", ")}.`,
         details: { requested, supported },
       });
@@ -203,7 +197,7 @@ export class Orca {
         }
       }
     }
-    throw new OrcaFrameworkMissingError("Could not detect a supported app framework");
+    throw new OrcaFrameworkError("none", "Could not detect a supported app framework");
   }
 
   /**
@@ -215,10 +209,7 @@ export class Orca {
     try {
       return await this.detect(cwd);
     } catch (error) {
-      if (
-        error instanceof OrcaFrameworkMissingError ||
-        error instanceof OrcaFrameworkUnsupportedError
-      ) {
+      if (error instanceof OrcaFrameworkError) {
         return undefined;
       }
       throw error;
@@ -385,11 +376,11 @@ export class Orca {
   }
 
   /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
-  private frameworkMismatch(requested: string, detected: string): OrcaFrameworkUnsupportedError {
+  private frameworkMismatch(requested: string, detected: string): OrcaFrameworkError {
     const name = (id: string) => {
       return this.displayName(id);
     };
-    return new OrcaFrameworkUnsupportedError(
+    return new OrcaFrameworkError(
       "mismatch",
       `Setup detects ${name(detected)} here, not ${name(requested)}`,
       {

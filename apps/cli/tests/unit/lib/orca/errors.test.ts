@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   OrcaError,
-  OrcaFrameworkMissingError,
-  OrcaFrameworkUnsupportedError,
+  OrcaFrameworkError,
   OrcaInternalError,
   OrcaPatchFileConflictError,
   OrcaPatchFileMissingError,
@@ -29,7 +28,7 @@ describe("OrcaError", () => {
 
 describe("the orca errors", () => {
   it.each([
-    [new OrcaFrameworkMissingError("why"), "OrcaFrameworkMissingError", "missing"],
+    [new OrcaFrameworkError("none", "why"), "OrcaFrameworkError", "missing"],
     [new OrcaPatchFileMissingError("why"), "OrcaPatchFileMissingError", "missing"],
     [new OrcaPatchFileConflictError("why"), "OrcaPatchFileConflictError", "conflict"],
     [new OrcaPatchFileUnsupportedError("why"), "OrcaPatchFileUnsupportedError", "invalid"],
@@ -40,13 +39,21 @@ describe("the orca errors", () => {
   });
 
   it.each([
-    ["unknown", "invalid"],
-    ["layout", "invalid"],
-    ["outdated", "invalid"],
-    ["mismatch", "conflict"],
-  ] as const)("an unsupported framework for %s is %s", (reason, category) => {
-    expect(new OrcaFrameworkUnsupportedError(reason, "why")).toMatchObject({ reason, category });
-  });
+    ["none", "missing", true],
+    ["unknown", "invalid", true],
+    ["layout", "invalid", false],
+    ["outdated", "invalid", false],
+    ["mismatch", "conflict", false],
+  ] as const)(
+    "a framework error for %s is %s, scaffoldable %s",
+    (reason, category, scaffoldable) => {
+      expect(new OrcaFrameworkError(reason, "why")).toMatchObject({
+        reason,
+        category,
+        scaffoldable,
+      });
+    },
+  );
 
   it.each([
     ["occupied", "conflict"],

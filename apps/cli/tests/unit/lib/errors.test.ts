@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import { responseFailure } from "@/lib/backend";
 import { GitError } from "@/lib/git";
 import {
-  OrcaFrameworkMissingError,
-  OrcaFrameworkUnsupportedError,
+  OrcaFrameworkError,
   OrcaInternalError,
   OrcaPatchFileConflictError,
   OrcaPatchFileMissingError,
@@ -168,12 +167,21 @@ describe("toZitadelError", () => {
   it.each([
     [
       "a method still in use",
-      { kind: "method-in-use", uses: [], hint: "`zitadel deploy --dry-run` checks the edit." },
+      {
+        kind: "method-in-use",
+        uses: [],
+        dryRun: true,
+        hint: "`zitadel deploy --dry-run` checks the edit.",
+      },
       [{ id: "deploy", flags: { dryRun: true } }],
     ],
     [
       "flows already broken on disk",
-      { kind: "broken", hint: "Fix those errors first (`zitadel deploy --dry-run` reports them)." },
+      {
+        kind: "broken",
+        dryRun: true,
+        hint: "Fix those errors first (`zitadel deploy --dry-run` reports them).",
+      },
       [{ id: "deploy", flags: { dryRun: true } }],
     ],
     [
@@ -765,23 +773,19 @@ describe("isCategorized", () => {
 
 describe("toZitadelError for an orca failure", () => {
   it.each([
-    ["no app", new OrcaFrameworkMissingError("why"), "E_FRAMEWORK_NOT_DETECTED"],
+    ["no app", new OrcaFrameworkError("none", "why"), "E_FRAMEWORK_NOT_DETECTED"],
     [
       "a framework with no detector",
-      new OrcaFrameworkUnsupportedError("unknown", "why"),
+      new OrcaFrameworkError("unknown", "why"),
       "E_FRAMEWORK_NOT_DETECTED",
     ],
     [
       "an unsupported layout",
-      new OrcaFrameworkUnsupportedError("layout", "why"),
+      new OrcaFrameworkError("layout", "why"),
       "E_UNSUPPORTED_PROJECT_SHAPE",
     ],
-    [
-      "an outdated app",
-      new OrcaFrameworkUnsupportedError("outdated", "why"),
-      "E_UNSUPPORTED_PROJECT_SHAPE",
-    ],
-    ["another framework", new OrcaFrameworkUnsupportedError("mismatch", "why"), "E_CONFLICT"],
+    ["an outdated app", new OrcaFrameworkError("outdated", "why"), "E_UNSUPPORTED_PROJECT_SHAPE"],
+    ["another framework", new OrcaFrameworkError("mismatch", "why"), "E_CONFLICT"],
     ["an occupied directory", new OrcaScaffoldBlockedError("occupied", "why"), "E_CONFLICT"],
     ["a Node too old", new OrcaScaffoldBlockedError("node", "why"), "E_VALIDATION"],
     ["a missing command", new OrcaScaffoldBlockedError("command", "why"), "E_VALIDATION"],
@@ -796,10 +800,10 @@ describe("toZitadelError for an orca failure", () => {
   });
 
   it("words what to do next with the CLI's own flags", () => {
-    expect(toZitadelError(new OrcaFrameworkMissingError("why")).hint).toContain("--cwd");
+    expect(toZitadelError(new OrcaFrameworkError("none", "why")).hint).toContain("--cwd");
     expect(
       toZitadelError(
-        new OrcaFrameworkUnsupportedError("mismatch", "why", {
+        new OrcaFrameworkError("mismatch", "why", {
           details: { requested: "react", detected: "next", requestedName: "React" },
         }),
       ).hint,

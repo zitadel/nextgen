@@ -132,6 +132,22 @@ describe("ZitadelConfigEditBreaksFlowsError", () => {
     );
   });
 
+  it("says whether a dry-run deploy would report the same issues", () => {
+    const issues = [issueOn("password", "x")];
+
+    expect(refusalOf(issues).dryRun).toBe(false);
+    expect(
+      new ZitadelConfigEditBreaksFlowsError({
+        file: SCHEMA_PATH,
+        heading: "h",
+        hint: HINT,
+        dryRun: true,
+        issues,
+        kind: "broken",
+      }).dryRun,
+    ).toBe(true);
+  });
+
   it("carries the hint it was given", () => {
     const error = refusalOf([BROKEN]);
 

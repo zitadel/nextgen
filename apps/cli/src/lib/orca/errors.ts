@@ -64,40 +64,35 @@ export class OrcaError extends Error implements Categorized {
 }
 
 /**
- * Nothing in the directory is an app of a framework orca knows.
+ * Why a framework cannot be used: `none` is a directory with no app of a
+ * framework orca knows, `unknown` is a framework orca has no detector for,
+ * `layout` and `outdated` are an app of a shape or version it does not
+ * integrate, and `mismatch` is an app of another framework than the one asked
+ * for.
  */
-export class OrcaFrameworkMissingError extends OrcaError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "OrcaFrameworkMissingError";
-  override readonly category: ErrorCategory = "missing";
-  override readonly retryable: boolean = false;
-}
-
-/**
- * Why a framework cannot be used: `unknown` is a framework orca has no
- * detector for, `layout` and `outdated` are an app of a shape or version it
- * does not integrate, and `mismatch` is an app of another framework than the
- * one asked for.
- */
-export type OrcaFrameworkUnsupportedReason = "unknown" | "layout" | "outdated" | "mismatch";
+export type OrcaFrameworkReason = "none" | "unknown" | "layout" | "outdated" | "mismatch";
 
 /**
  * A framework, or an app of one, that orca cannot work with.
  */
-export class OrcaFrameworkUnsupportedError extends OrcaError {
+export class OrcaFrameworkError extends OrcaError {
   /**
    * The class's name, which a log or a stack trace shows.
    */
-  override readonly name: string = "OrcaFrameworkUnsupportedError";
+  override readonly name: string = "OrcaFrameworkError";
   override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
 
   /**
    * Why the framework cannot be used.
    */
-  readonly reason: OrcaFrameworkUnsupportedReason;
+  readonly reason: OrcaFrameworkReason;
+
+  /**
+   * Whether there is no app to integrate with, so a new one could be scaffolded
+   * into the directory: true for `none` and `unknown`.
+   */
+  readonly scaffoldable: boolean;
 
   /**
    * Make the failure.
@@ -106,16 +101,22 @@ export class OrcaFrameworkUnsupportedError extends OrcaError {
    * @param message - What went wrong.
    * @param options - What to do about it, the facts behind it, and its cause.
    */
-  constructor(
-    reason: OrcaFrameworkUnsupportedReason,
-    message: string,
-    options: OrcaErrorOptions = {},
-  ) {
+  constructor(reason: OrcaFrameworkReason, message: string, options: OrcaErrorOptions = {}) {
     super(message, options);
     this.reason = reason;
-    this.category = reason === "mismatch" ? "conflict" : "invalid";
+    this.scaffoldable = reason === "none" || reason === "unknown";
+    this.category = FRAMEWORK_CATEGORIES[reason];
   }
 }
+
+/** The kind of failure each {@link OrcaFrameworkReason} is. */
+const FRAMEWORK_CATEGORIES: Record<OrcaFrameworkReason, ErrorCategory> = {
+  none: "missing",
+  unknown: "invalid",
+  layout: "invalid",
+  outdated: "invalid",
+  mismatch: "conflict",
+};
 
 /**
  * Why a scaffold cannot start: `occupied` is a directory that already holds

@@ -1,4 +1,4 @@
-import { OrcaFrameworkUnsupportedError } from "@/lib/orca/errors";
+import { OrcaFrameworkError } from "@/lib/orca/errors";
 
 import {
   dependencySpecProvablyBelow,
@@ -33,7 +33,7 @@ export async function enforceVersionFloor(
 
   const declared = dependencySpecProvablyBelow(pkg, versionPackage, versionFloor);
   if (declared !== undefined) {
-    throw new OrcaFrameworkUnsupportedError(
+    throw new OrcaFrameworkError(
       "outdated",
       `${displayName} "${declared}" is below the supported floor — ${supported}`,
       { hint },
@@ -42,7 +42,7 @@ export async function enforceVersionFloor(
 
   const installed = await installedVersionBelow(cwd, versionPackage, versionFloor);
   if (installed !== undefined) {
-    throw new OrcaFrameworkUnsupportedError(
+    throw new OrcaFrameworkError(
       "outdated",
       `${displayName} ${installed.version} is installed (${installed.path}), below the supported floor — ${supported}`,
       { hint },

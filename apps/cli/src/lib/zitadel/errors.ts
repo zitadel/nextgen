@@ -580,6 +580,12 @@ type BrokenFlowsBase = {
   readonly hint: string;
 
   /**
+   * Whether a dry-run deploy would report the same issues, so a caller can point
+   * at it. False when not stated.
+   */
+  readonly dryRun?: boolean | undefined;
+
+  /**
    * Every issue, as the server's flow rules word it.
    */
   readonly issues: readonly FlowIssue[];
@@ -619,6 +625,11 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
   override readonly name: string = "ZitadelConfigEditBreaksFlowsError";
 
   /**
+   * Whether a dry-run deploy would report the same issues.
+   */
+  readonly dryRun: boolean;
+
+  /**
    * Make the failure for these issues.
    *
    * @param input - The schema, the heading and hint, the issues, and the steps
@@ -649,6 +660,7 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
       hint: input.hint,
       details: ZitadelConfigEditBreaksFlowsError.detailsOf(input, issues),
     });
+    this.dryRun = input.dryRun ?? false;
   }
 
   /**

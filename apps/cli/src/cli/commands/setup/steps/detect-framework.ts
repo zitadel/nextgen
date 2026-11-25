@@ -1,6 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca, OrcaFrameworkMissingError, OrcaFrameworkUnsupportedError } from "@/lib/orca";
+import { createOrca, OrcaFrameworkError } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
@@ -114,12 +114,7 @@ export class DetectFramework extends WizardStep<
         };
       })
       .catch(async (error) => {
-        if (
-          !(
-            error instanceof OrcaFrameworkMissingError ||
-            (error instanceof OrcaFrameworkUnsupportedError && error.reason === "unknown")
-          )
-        ) {
+        if (!(error instanceof OrcaFrameworkError && error.scaffoldable)) {
           detecting.fail();
           throw error;
         }
