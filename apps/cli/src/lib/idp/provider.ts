@@ -222,9 +222,9 @@ export class ProviderChoice {
    * @param existing - The connection the slug names, if any.
    * @returns Each stored setting the run uses; `undefined` for one the flags
    *   gave, and for both when no connection has the slug.
-   * @throws {@link ZitadelConfigConnectionNotOidcError} When the connection has no issuer,
+   * @throws {@link ZitadelConfigResourceClashError} When the connection has no issuer,
    *   whatever issuer was given.
-   * @throws {@link ZitadelConfigConnectionUnusableError} When a stored setting the run would
+   * @throws {@link ZitadelConfigError} When a stored setting the run would
    *   use cannot be used.
    */
   readStoredSettings(existing: Connection | undefined): StoredSettings {

@@ -1,24 +1,9 @@
 import type { ProviderSelection } from "@zitadel/config/idp";
 
+import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
-import type { JsonObject } from "@/lib/zitadel/types";
-
-/**
- * What a configuration failure carries beyond its message.
- */
-export type ConfigErrorOptions = {
-  /**
-   * What to do about it.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: JsonObject | undefined;
-};
 
 /**
  * Anything `lib/zitadel` fails with.
@@ -27,38 +12,15 @@ export type ConfigErrorOptions = {
  * A caller catches this, or one of its subclasses; the CLI turns it into its
  * own error in one place.
  */
-export class ZitadelConfigError extends Error {
+export class ZitadelConfigError extends ZitadelLibError {
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "invalid";
+  override readonly category: ErrorCategory = "invalid";
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  override readonly retryable: boolean = false;
 
   /** The stable product code the failure is reported with; a subclass states its own. */
-  readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * What to do about it.
-   */
-  readonly hint: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details: JsonObject | undefined;
-
-  /**
-   * Make a configuration failure.
-   *
-   * @param message - What went wrong.
-   * @param options - What to do about it, and the facts behind it.
-   */
-  constructor(message: string, options: ConfigErrorOptions = {}) {
-    super(message);
-    this.name = new.target.name;
-    this.hint = options.hint;
-    this.details = options.details;
-  }
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /**
@@ -89,11 +51,6 @@ export class ZitadelConfigFileBrokenError extends ZitadelConfigError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
-   * Every broken file, and what is wrong with each.
-   */
-  readonly problems: readonly FileProblem[];
-
-  /**
    * Make the failure for these files.
    *
    * @param problems - Every broken file, and what is wrong with each.
@@ -112,34 +69,7 @@ export class ZitadelConfigFileBrokenError extends ZitadelConfigError {
         `${paths.size} configuration ${new Intl.PluralRules("en").select(paths.size) === "one" ? "file is" : "files are"} not valid:`,
         ...lines,
       ].join("\n"),
-      {
-        hint: "Fix the files named above, then run the command again; nothing was changed.",
-        details: { problems },
-      },
     );
-    this.problems = problems;
-  }
-}
-
-/**
- * A handle that cannot name a file: the server supplied it, and a file named
- * after it would land outside its kind's directory or be one `read` never loads.
- */
-export class ZitadelConfigHandleInvalidError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * Refuse a handle that is not a single safe path segment.
-   *
-   * @param handle - The handle as the server gave it.
-   */
-  constructor(handle: string) {
-    super(`${JSON.stringify(handle)} cannot be the name of a file`, {
-      hint: "A handle must be a single name, without slashes or dots that climb out of its directory.",
-      details: { handle },
-    });
   }
 }
 
@@ -163,18 +93,6 @@ export class ZitadelConfigResourceMissingError extends ZitadelConfigError {
 }
 
 /**
- * The names of some schemas, for a failure's details.
- *
- * @param schemas - The schemas.
- * @returns Each one's name, in order.
- */
-function namesOf(schemas: readonly UserSchema[]): readonly string[] {
-  return schemas.map((schema) => {
-    return schema.name;
-  });
-}
-
-/**
  * A user schema asked for by a name no schema has, or asked for in a
  * configuration that has none.
  */
@@ -182,12 +100,6 @@ export class ZitadelConfigSchemaMissingError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
-
-  /**
-   * The name asked for, without a `.json` suffix, or `undefined` when none
-   * was.
-   */
-  readonly requested: string | undefined;
 
   /**
    * Every schema the configuration has; none when it has no schema at all.
@@ -205,13 +117,7 @@ export class ZitadelConfigSchemaMissingError extends ZitadelConfigError {
     const message = unnamed
       ? "There is no user schema under .zitadel/schemas"
       : `No user schema is named ${requested}`;
-    super(message, {
-      details: {
-        requested: requested ?? null,
-        known: namesOf(known),
-      },
-    });
-    this.requested = requested;
+    super(message);
     this.known = known;
   }
 }
@@ -231,12 +137,6 @@ export class ZitadelConfigSchemaAmbiguousError extends ZitadelConfigError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
-   * The name asked for, without a `.json` suffix, or `undefined` when none
-   * was.
-   */
-  readonly requested: string | undefined;
-
-  /**
    * Every schema that fits.
    */
   readonly candidates: readonly UserSchema[];
@@ -252,13 +152,7 @@ export class ZitadelConfigSchemaAmbiguousError extends ZitadelConfigError {
       requested === undefined
         ? "There is more than one user schema, and none was named"
         : `More than one user schema is named ${requested}`;
-    super(message, {
-      details: {
-        requested: requested ?? null,
-        candidates: namesOf(candidates),
-      },
-    });
-    this.requested = requested;
+    super(message);
     this.candidates = candidates;
   }
 }
@@ -338,9 +232,7 @@ export class ZitadelConfigEditLockoutError extends ZitadelConfigError implements
    * @param input - The schema, what is being turned off, and what it has left.
    */
   constructor(input: NoSignInLeft) {
-    super(`${input.path} would have no way to sign in left`, {
-      details: { file: input.path, usable: input.usable, alternatives: input.alternatives },
-    });
+    super(`${input.path} would have no way to sign in left`);
     this.path = input.path;
     this.schema = input.schema;
     this.disabling = input.disabling;
@@ -354,9 +246,7 @@ export class ZitadelConfigEditLockoutError extends ZitadelConfigError implements
  *
  * @remarks
  * Raised by every store alike, so a caller that scaffolds can say what to do
- * whichever store it has. The hint names no flag, as not every command that
- * writes a new file has `--force`; a caller that does replace files words
- * its own.
+ * whichever store it has.
  */
 export class ZitadelConfigFileExistsError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "conflict";
@@ -374,10 +264,7 @@ export class ZitadelConfigFileExistsError extends ZitadelConfigError {
    * @param path - The project-relative path that is already taken.
    */
   constructor(path: string) {
-    super(`${path} already exists`, {
-      hint: "Move or rename the file that is already there, then run the command again.",
-      details: { file: path },
-    });
+    super(`${path} already exists`);
     this.path = path;
   }
 }
@@ -414,166 +301,14 @@ export class ZitadelConfigConnectionExistsError extends ZitadelConfigError {
    * @param selection - The provider, as it was chosen.
    */
   constructor(path: string, selection: ProviderSelection) {
-    super(`${path} already exists`, {
-      hint:
-        "A connection file is yours to keep, so it is never replaced or removed. " +
-        "Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.",
-      details: { file: path },
-    });
+    super(`${path} already exists`);
     this.path = path;
     this.selection = selection;
   }
 }
 
 /**
- * A connection that holds its client id as a value, given another one.
- *
- * @remarks
- * Reusing the connection would keep the id it holds, so the one given would
- * silently not apply. A connection that references a variable holds no id to
- * disagree with.
- */
-export class ZitadelConfigConnectionClientIdError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * The project-relative path of the connection.
-   */
-  readonly path: string;
-
-  /**
-   * Make the failure for this connection.
-   *
-   * @param path - The project-relative path of the connection.
-   * @param stored - The client id the connection holds.
-   * @param supplied - The client id the developer gave.
-   */
-  constructor(path: string, stored: string, supplied: string) {
-    super(`${path} already uses client id ${stored}, not ${supplied}`, {
-      hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
-      details: {
-        file: path,
-        stored_client_id: stored,
-        supplied_client_id: supplied,
-      },
-    });
-    this.path = path;
-  }
-}
-
-/**
- * A connection with a slug wanted for an OIDC connection that has no issuer,
- * so it is not an OIDC connection to reuse at all.
- */
-export class ZitadelConfigConnectionNotOidcError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "conflict";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_CONFLICT";
-
-  /**
-   * The project-relative path of the connection.
-   */
-  readonly path: string;
-
-  /**
-   * Make the failure for this connection.
-   *
-   * @param path - The project-relative path of the connection.
-   * @param slug - Its slug.
-   */
-  constructor(path: string, slug: string) {
-    super(`${path} is already named ${slug} and is not an OIDC connection`, {
-      hint: "Fix the file, or choose another slug, then run the command again.",
-      details: { file: path, slug },
-    });
-    this.path = path;
-  }
-}
-
-/**
- * A setting a connection holds that the platform would not take as typed,
- * such as a blank display name.
- */
-export class ZitadelConfigConnectionUnusableError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * The project-relative path of the connection.
-   */
-  readonly path: string;
-
-  /**
-   * Make the failure for this setting.
-   *
-   * @param path - The project-relative path of the connection.
-   * @param slug - Its slug.
-   * @param what - How the message names the setting, such as "a display name".
-   * @param problem - What the platform's parser found wrong with it.
-   */
-  constructor(path: string, slug: string, what: string, problem: string) {
-    super(`${path} holds ${what} that cannot be used: ${problem}`, {
-      hint: "Fix it in that file, or choose another slug.",
-      details: { file: path, slug },
-    });
-    this.path = path;
-  }
-}
-
-/**
- * What every {@link BrokenFlows} report carries.
- */
-type BrokenFlowsBase = {
-  /**
-   * The user schema the change edits.
-   */
-  readonly file: string;
-
-  /**
-   * The line the listed issues follow.
-   */
-  readonly heading: string;
-
-  /**
-   * What to do about the issues.
-   */
-  readonly hint: string;
-
-  /**
-   * Every issue, as the server's flow rules word it.
-   */
-  readonly issues: readonly FlowIssue[];
-};
-
-/**
- * What a {@link ZitadelConfigEditBreaksFlowsError} reports: issues a change brings or a flow
- * already has, or a method being disabled that steps still use.
- */
-export type BrokenFlows =
-  | (BrokenFlowsBase & { readonly kind: "broken" })
-  | (BrokenFlowsBase & {
-      readonly kind: "method-in-use";
-
-      /**
-       * The steps that use the method being disabled.
-       *
-       * @remarks
-       * Each is listed in place of the issues on it; any other issue is listed
-       * as the server's rules word it.
-       */
-      readonly uses: readonly FlowMethodUse[];
-    });
-
-/**
- * A change a login flow would no longer validate after, or one that cannot be
- * judged because a flow already fails.
- *
- * @remarks
- * Its details name each issue and, for a method being disabled, each step that
- * still uses it.
+ * A change a login flow would no longer validate after.
  */
 export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
@@ -583,85 +318,55 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
   /**
    * Make the failure for these issues.
    *
-   * @param input - The schema, the heading and hint, the issues, and the steps
-   *   that use a method being disabled.
+   * @param input - The heading and the issues.
+   * @param input.heading - The line the listed issues follow.
+   * @param input.issues - Every issue, as the server's flow rules word it.
    */
-  constructor(input: BrokenFlows) {
-    const uses = ZitadelConfigEditBreaksFlowsError.usesOf(input);
+  constructor(input: { readonly heading: string; readonly issues: readonly FlowIssue[] }) {
+    const listed = input.issues.map((item) => {
+      return `  - ${item.path}: ${item.issue.message}`;
+    });
+    super([input.heading, ...listed].join("\n"));
+  }
+}
+
+/**
+ * A change that disables a sign-in method login flows still use.
+ */
+export class ZitadelConfigEditMethodInUseError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * Make the failure for these issues.
+   *
+   * @param input - The heading, the issues, and the steps that use the method.
+   * @param input.heading - The line the listed issues follow.
+   * @param input.issues - Every issue, as the server's flow rules word it.
+   * @param input.uses - The steps that use the method being disabled.
+   */
+  constructor(input: {
+    readonly heading: string;
+    readonly issues: readonly FlowIssue[];
+    readonly uses: readonly FlowMethodUse[];
+  }) {
     const unexplained = input.issues.filter((item) => {
-      return !uses.some((use) => {
+      return !input.uses.some((use) => {
         return use.path === item.path && use.step === item.issue.step;
       });
     });
     const unexplainedLines = unexplained.map((item) => {
       return `${item.path}: ${item.issue.message}`;
     });
-    const lines = [...uses.map(ZitadelConfigEditBreaksFlowsError.useLine), ...unexplainedLines];
+    const lines = [
+      ...input.uses.map(ZitadelConfigEditMethodInUseError.useLine),
+      ...unexplainedLines,
+    ];
     const listed = lines.map((line) => {
       return `  - ${line}`;
     });
-    const issues = input.issues.map((item): JsonObject => {
-      const issue = item.issue;
-      if (issue.step === undefined) {
-        return {
-          path: item.path,
-          rule: issue.rule,
-          message: issue.message,
-        };
-      }
-      return {
-        path: item.path,
-        rule: issue.rule,
-        message: issue.message,
-        step: issue.step,
-      };
-    });
-    super([input.heading, ...listed].join("\n"), {
-      hint: input.hint,
-      details: ZitadelConfigEditBreaksFlowsError.detailsOf(input, issues),
-    });
-  }
-
-  /**
-   * The steps a report says use a method being disabled.
-   *
-   * @param input - The report.
-   * @returns The steps; none for a report of issues alone.
-   */
-  private static usesOf(input: BrokenFlows): readonly FlowMethodUse[] {
-    if (input.kind === "broken") {
-      return [];
-    }
-    return input.uses;
-  }
-
-  /**
-   * The details a report carries for a `--json` reader.
-   *
-   * @param input - The report.
-   * @param issues - Its issues, as the details list them.
-   * @returns The schema and the issues, and for a method in use, each step.
-   */
-  private static detailsOf(input: BrokenFlows, issues: readonly JsonObject[]): JsonObject {
-    if (input.kind === "broken") {
-      return { file: input.file, issues };
-    }
-    const steps = input.uses.map((use): JsonObject => {
-      const targetedBy = use.targetedBy.map((item): JsonObject => {
-        if (item.purpose === undefined) {
-          return { step: item.step, transition: item.transition };
-        }
-        return { step: item.step, transition: item.transition, purpose: item.purpose };
-      });
-      return {
-        path: use.path,
-        step: use.step,
-        keeps: use.keeps,
-        entry_for: use.entryFor,
-        targeted_by: targetedBy,
-      };
-    });
-    return { file: input.file, issues, steps };
+    super([input.heading, ...listed].join("\n"));
   }
 
   /**
@@ -698,20 +403,8 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
 }
 
 /**
- * A change that disables a sign-in method login flows still use.
- */
-export class ZitadelConfigEditMethodInUseError extends ZitadelConfigEditBreaksFlowsError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
-/**
  * A login flow that already has errors, so it cannot be checked against a
  * changed schema.
- *
- * @remarks
- * Its details name the schema and each issue the flows already have.
  */
 export class ZitadelConfigFlowsUncheckedError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
@@ -721,44 +414,15 @@ export class ZitadelConfigFlowsUncheckedError extends ZitadelConfigError {
   /**
    * Make the failure for these issues.
    *
-   * @param input - The schema, the heading and hint, and the issues.
-   * @param input.file - The user schema the change edits.
+   * @param input - The heading and the issues.
    * @param input.heading - The line the listed issues follow.
-   * @param input.hint - What to do about the issues.
    * @param input.issues - Every issue, as the server's flow rules word it.
    */
-  constructor(input: {
-    readonly file: string;
-    readonly heading: string;
-    readonly hint: string;
-    readonly issues: readonly FlowIssue[];
-  }) {
+  constructor(input: { readonly heading: string; readonly issues: readonly FlowIssue[] }) {
     const listed = input.issues.map((item) => {
       return `  - ${item.path}: ${item.issue.message}`;
     });
-    const issues = input.issues.map((item): JsonObject => {
-      const issue = item.issue;
-      if (issue.step === undefined) {
-        return {
-          path: item.path,
-          rule: issue.rule,
-          message: issue.message,
-        };
-      }
-      return {
-        path: item.path,
-        rule: issue.rule,
-        message: issue.message,
-        step: issue.step,
-      };
-    });
-    super([input.heading, ...listed].join("\n"), {
-      hint: input.hint,
-      details: {
-        file: input.file,
-        issues,
-      },
-    });
+    super([input.heading, ...listed].join("\n"));
   }
 }
 

@@ -479,11 +479,8 @@ export abstract class ConfigDocument<Value = unknown> {
     if (region === undefined) {
       return;
     }
-    throw new ZitadelConfigError(`${this.path}: ${region}`, {
-      hint:
-        "This command edits that region, and it is not the shape it edits. " +
-        "Fix it against the dialect in .zitadel/meta/, then run the command again.",
-      details: { file: this.path, region },
-    });
+    throw new ZitadelConfigError(
+      `${this.path}: ${region}; fix it against the dialect in .zitadel/meta/`,
+    );
   }
 }

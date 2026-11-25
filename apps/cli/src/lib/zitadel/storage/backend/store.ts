@@ -259,27 +259,11 @@ export abstract class Store implements ConfigStore {
           if (code === "ENOENT" || code === "ENOTDIR") {
             return undefined;
           }
+          const message = `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`;
           if (code === "EACCES" || code === "EPERM") {
-            throw new ZitadelConfigFileUnreadableError(
-              `$file ${JSON.stringify(ref)} cannot be read`,
-              {
-                hint: "Create the referenced file or fix the path.",
-                details: {
-                  file: file.path,
-                  ref,
-                  code,
-                },
-              },
-            );
+            throw new ZitadelConfigFileUnreadableError(message);
           }
-          throw new ZitadelConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
-            hint: "Create the referenced file or fix the path.",
-            details: {
-              file: file.path,
-              ref,
-              ...(code === undefined ? {} : { code }),
-            },
-          });
+          throw new ZitadelConfigError(message);
         }
       },
       missing,
@@ -439,23 +423,10 @@ export abstract class Store implements ConfigStore {
    */
   private static unreadable(path: string, code: string | undefined): ZitadelConfigError {
     if (code === "EACCES" || code === "EPERM") {
-      return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`, {
-        hint: "Check that the file is readable, then run the command again.",
-        details: {
-          file: path,
-          code,
-        },
-      });
+      return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`);
     }
     return new ZitadelConfigError(
       `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
-      {
-        hint: "Check that the file is readable, then run the command again.",
-        details: {
-          file: path,
-          ...(code === undefined ? {} : { code }),
-        },
-      },
     );
   }
 
@@ -491,10 +462,9 @@ export abstract class Store implements ConfigStore {
   private assertClear(path: string, target: Path): void {
     const blocker = this.blockerOf(target);
     if (blocker !== undefined) {
-      throw new ZitadelConfigError(`${path} cannot be written (ENOTDIR)`, {
-        hint: `Remove ${blocker}, which is a file where a directory is needed, then run the command again.`,
-        details: { file: path, code: "ENOTDIR", blocker },
-      });
+      throw new ZitadelConfigError(
+        `${path} cannot be written (ENOTDIR): ${blocker} is a file where a directory is needed`,
+      );
     }
   }
 
@@ -505,10 +475,9 @@ export abstract class Store implements ConfigStore {
    * @returns The error to throw.
    */
   private static directoryInTheWay(path: string): ZitadelConfigError {
-    return new ZitadelConfigError(`${path} cannot be removed (EISDIR)`, {
-      hint: `Remove ${path}, which is a directory where a file is expected, then run the command again.`,
-      details: { file: path, code: "EISDIR" },
-    });
+    return new ZitadelConfigError(
+      `${path} cannot be removed (EISDIR): it is a directory where a file is expected`,
+    );
   }
 
   /**

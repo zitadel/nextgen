@@ -138,12 +138,9 @@ export class Flows extends PinnedCollection<Flow> {
   resolveForSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {
     const flows = this.findForSchema(schema);
     if (flows.length === 0) {
-      throw new ZitadelConfigResourceMissingError(`No login flow runs against ${schema.name}`, {
-        hint:
-          "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-          "names this schema. Check that the flow's user_schema names the schema's objectType.",
-        details: { schema: schema.path },
-      });
+      throw new ZitadelConfigResourceMissingError(
+        `No login flow runs against ${schema.name}: none of the files under .zitadel/flows/ names this schema; check that the flow's user_schema names the schema's objectType`,
+      );
     }
     for (const flow of flows) {
       flow.assertProviderEditable();

@@ -511,12 +511,9 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
       return { document: this, changed: false, skipped: [] };
     }
     if (method === "password" && !this.hasIdentifier) {
-      throw new ZitadelConfigError(`${this.path} has no x-identifier for password`, {
-        hint:
-          "A password is checked against the user found by the schema's identifier. " +
-          'Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.',
-        details: { file: this.path, method: "password" },
-      });
+      throw new ZitadelConfigError(
+        `${this.path} has no x-identifier for password: set "x-identifier" to the property users sign in with, e.g. "email"`,
+      );
     }
     const next = { ...this.writtenMethod(method), enabled: true };
     return {
@@ -640,12 +637,9 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
     if (!this.isExternal) {
       return;
     }
-    throw new ZitadelConfigError(`${this.path} points at an external schema`, {
-      hint:
-        "Its sign-in methods live in the schema at its url, which the server fetches. " +
-        "Edit x-auth-methods there instead.",
-      details: { file: this.path },
-    });
+    throw new ZitadelConfigError(
+      `${this.path} points at an external schema: its sign-in methods live in the schema at its url; edit x-auth-methods there`,
+    );
   }
 
   /**

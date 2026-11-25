@@ -965,11 +965,7 @@ export class SsoGenerator {
   ): void {
     if (actionNames.has(next)) {
       throw new ZitadelConfigError(
-        `steps.${step}: transition "${old}" is renamed to "${next}", which is an action on this step`,
-        {
-          hint: `Rename the action "${next}" on step "${step}" (and its transition), then run auth-method sso enable again.`,
-          details: { step, action: next },
-        },
+        `steps.${step}: transition "${old}" is renamed to "${next}", which is an action on this step; rename the action "${next}" on step "${step}" (and its transition)`,
       );
     }
     if (next in transitions) {
@@ -983,11 +979,7 @@ export class SsoGenerator {
     const action = transition.action ?? null;
     if (purpose !== null || action !== null) {
       throw new ZitadelConfigError(
-        `steps.${step}: transition "${old}" declares purpose or action, which "${next}" cannot`,
-        {
-          hint: `Remove purpose and action from the transition "${old}" on step "${step}", then run auth-method sso enable again.`,
-          details: { step, transition: old },
-        },
+        `steps.${step}: transition "${old}" declares purpose or action, which "${next}" cannot; remove purpose and action from the transition "${old}" on step "${step}"`,
       );
     }
   }
@@ -1036,11 +1028,7 @@ export class SsoGenerator {
         const actionName = action.name;
         if (keys.has(actionName)) {
           throw new ZitadelConfigError(
-            `steps.${name}: action "${actionName}" uses a name auth-method sso enable writes as an outcome on this step`,
-            {
-              hint: `Rename the action "${actionName}" on step "${name}" (and its transition), then run auth-method sso enable again.`,
-              details: { step: name, action: actionName },
-            },
+            `steps.${name}: action "${actionName}" uses a name auth-method sso enable writes as an outcome on this step; rename the action "${actionName}" on step "${name}" (and its transition)`,
           );
         }
       }

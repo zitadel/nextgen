@@ -419,8 +419,7 @@ export class ZitadelConfig {
     // anything is inlined or sent.
     if (brandingCount > 1) {
       throw new ZitadelConfigError(
-        `A release carries at most one branding, but .zitadel/branding/ holds ${brandingCount}`,
-        { hint: "A project has a single branding; keep one descriptor under .zitadel/branding/." },
+        `A release carries at most one branding, but .zitadel/branding/ holds ${brandingCount}; keep one descriptor under .zitadel/branding/`,
       );
     }
     const branding = this.branding.all[0]?.toWireBody(store);
@@ -456,9 +455,7 @@ export class ZitadelConfig {
         return file.kind !== "policy-test";
       }).length;
     if (fileCount === 0) {
-      throw new ZitadelConfigDeployEmptyError("There is nothing in .zitadel/ to deploy", {
-        hint: "Add a schema, flow, policy or branding under .zitadel/.",
-      });
+      throw new ZitadelConfigDeployEmptyError("There is nothing in .zitadel/ to deploy");
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
       throw new ZitadelConfigError(
@@ -752,10 +749,9 @@ export class ZitadelConfig {
       return PasswordPolicy.initial(options.passwordMinLength);
     }
     if (kept === undefined) {
-      throw new ZitadelConfigError(`${PasswordPolicy.PATH} is not a valid password policy`, {
-        hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
-        details: { file: PasswordPolicy.PATH },
-      });
+      throw new ZitadelConfigError(
+        `${PasswordPolicy.PATH} is not a valid password policy; fix it against .zitadel/meta/policy.json or move it aside`,
+      );
     }
     return kept.withMinLength(options.passwordMinLength).document;
   }
@@ -780,10 +776,9 @@ export class ZitadelConfig {
     }
     const kept = this.policies.signup;
     if (kept === undefined) {
-      throw new ZitadelConfigError(`${SignupPolicy.PATH} is not a valid sign-up policy`, {
-        hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from the default.",
-        details: { file: SignupPolicy.PATH },
-      });
+      throw new ZitadelConfigError(
+        `${SignupPolicy.PATH} is not a valid sign-up policy; fix it against .zitadel/meta/policy.json or move it aside`,
+      );
     }
     return kept;
   }

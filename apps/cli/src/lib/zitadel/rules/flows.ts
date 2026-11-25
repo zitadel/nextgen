@@ -22,7 +22,6 @@ import {
   ZitadelConfigFlowsUncheckedError,
 } from "@/lib/zitadel/errors";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
-import { PASSWORD_FIELD } from "@/lib/zitadel/resources/flows/types";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import type { FlowCheck, FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
@@ -42,14 +41,6 @@ type FlowFinding = {
    */
   readonly issue: FlowValidationIssue;
 };
-
-/**
- * What a step loses when each method is disabled, as the hint names it.
- */
-const REMOVED_PART = {
-  password: `${PASSWORD_FIELD} field`,
-  passkey: "passkey actions and their transitions",
-} as const satisfies Record<ToggleableMethod, string>;
 
 /**
  * The server's flow rules, as one rule that reports each under the server's
@@ -119,10 +110,7 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
     return;
   }
   throw new ZitadelConfigEditBreaksFlowsError({
-    kind: "broken",
-    file: edit.edited.path,
     heading: "A login flow would stop validating after this change:",
-    hint: "Fix the steps named above, then run the command again.",
     issues: introduced,
   });
 }
@@ -170,10 +158,7 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
     return { ...use, staying };
   });
   throw new ZitadelConfigEditMethodInUseError({
-    kind: "method-in-use",
-    file: edit.edited.path,
     heading: `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
-    hint: disableHint(method, uses),
     issues: introduced,
     uses,
   });
@@ -210,9 +195,7 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
   });
   if (unchecked.length > 0) {
     throw new ZitadelConfigFlowsUncheckedError({
-      file: edit.edited.path,
       heading: "A login flow has errors, so it cannot be checked against the changed schema:",
-      hint: "Fix those errors first, then run the command again.",
       issues: unchecked,
     });
   }
@@ -222,49 +205,6 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
     }
     return check.introduced;
   });
-}
-
-/**
- * What the developer edits before disabling.
- *
- * @remarks
- * Only the edits these steps need are named: a step left with nothing goes, so
- * what leads to it changes too.
- *
- * @param method - The method being disabled.
- * @param uses - The steps that use it.
- * @returns The hint.
- */
-function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): string {
-  const removed = REMOVED_PART[method];
-  const emptied = uses.filter((use) => {
-    return use.keeps.length === 0;
-  });
-  const incoming = emptied.flatMap((use) => {
-    return use.staying;
-  });
-  const viaPurpose = incoming.some((item) => {
-    return item.purpose !== undefined;
-  });
-  const retarget = viaPurpose
-    ? "retarget the transitions listed for it (one marked via purposes.<key> follows that key instead)"
-    : "retarget the transitions listed for it";
-  const isEntry = emptied.some((use) => {
-    return use.entryFor.length > 0;
-  });
-  const repoint = "point the purposes key it is the entry step of at another step";
-  const retargets = incoming.length > 0 ? [retarget] : [];
-  const repoints = isEntry ? [repoint] : [];
-  const fixes = [...retargets, ...repoints];
-  const deletion =
-    fixes.length > 0
-      ? `Delete a step left with no field or sign-in method: ${fixes.join(", and ")}.`
-      : "Delete a step left with no field or sign-in method.";
-  const deletions = emptied.length > 0 ? [deletion] : [];
-  return [
-    `Edit those steps first; login flows are not edited for you. From each step, remove its ${removed}.`,
-    ...deletions,
-  ].join(" ");
 }
 
 /**

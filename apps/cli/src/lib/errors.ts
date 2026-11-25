@@ -22,7 +22,6 @@ import type { Suggested } from "./suggestion";
 import { SyncError } from "./sync";
 import { UpgradeError } from "./upgrade";
 import { WizardError } from "./wizard";
-import { ZitadelConfigError } from "./zitadel";
 
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
@@ -329,13 +328,6 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof BackendError) {
     return fromBackendError(error);
-  }
-
-  if (error instanceof ZitadelConfigError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
   }
 
   if (error instanceof OrcaError) {

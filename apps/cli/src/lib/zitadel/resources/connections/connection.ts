@@ -38,11 +38,7 @@ import {
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
-import {
-  ZitadelConfigConnectionClientIdError,
-  ZitadelConfigConnectionNotOidcError,
-  ZitadelConfigConnectionUnusableError,
-} from "@/lib/zitadel/errors";
+import { ZitadelConfigError, ZitadelConfigResourceClashError } from "@/lib/zitadel/errors";
 import { type ClaimName, claimName, type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
@@ -494,7 +490,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * A connection that references a variable holds no id to disagree with.
    *
    * @param clientId - The client id the developer gave.
-   * @throws {@link ZitadelConfigConnectionClientIdError} When they differ.
+   * @throws {@link ZitadelConfigError} When they differ.
    */
   refuseDifferentClientId(clientId: string | undefined): void {
     const existing = this.credentials?.clientId;
@@ -504,18 +500,22 @@ export class Connection extends ConfigDocument<ConnectionValue> {
     if (existing.value === clientId) {
       return;
     }
-    throw new ZitadelConfigConnectionClientIdError(this.path, existing.value, clientId);
+    throw new ZitadelConfigError(
+      `${this.path} already uses client id ${existing.value}, not ${clientId}`,
+    );
   }
 
   /**
    * Refuse a connection with no issuer, which is not an OIDC connection to
    * reuse at all, whatever issuer is given.
    *
-   * @throws {@link ZitadelConfigConnectionNotOidcError} When the file has no issuer.
+   * @throws {@link ZitadelConfigResourceClashError} When the file has no issuer.
    */
   refuseNonOidc(): void {
     if (this.issuer === undefined) {
-      throw new ZitadelConfigConnectionNotOidcError(this.path, this.slug);
+      throw new ZitadelConfigResourceClashError(
+        `${this.path} is already named ${this.slug} and is not an OIDC connection`,
+      );
     }
   }
 
@@ -523,7 +523,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * Read the display name, held to the rules a typed one is.
    *
    * @returns The display name.
-   * @throws {@link ZitadelConfigConnectionUnusableError} When the platform would not take it,
+   * @throws {@link ZitadelConfigError} When the platform would not take it,
    *   naming the file.
    */
   readUsableDisplayName(): DisplayName {
@@ -534,14 +534,16 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * Read the issuer of an OIDC connection, held to the rules a typed one is.
    *
    * @returns The issuer.
-   * @throws {@link ZitadelConfigConnectionNotOidcError} When the file has no issuer.
-   * @throws {@link ZitadelConfigConnectionUnusableError} When the platform would not take it,
+   * @throws {@link ZitadelConfigResourceClashError} When the file has no issuer.
+   * @throws {@link ZitadelConfigError} When the platform would not take it,
    *   naming the file.
    */
   readUsableIssuer(): Issuer {
     const issuer = this.issuer;
     if (issuer === undefined) {
-      throw new ZitadelConfigConnectionNotOidcError(this.path, this.slug);
+      throw new ZitadelConfigResourceClashError(
+        `${this.path} is already named ${this.slug} and is not an OIDC connection`,
+      );
     }
     return this.readUsable("an issuer", issuer, parseIssuer);
   }
@@ -554,12 +556,14 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param stored - The setting as the file holds it.
    * @param parse - The rules a typed answer is held to.
    * @returns The setting as parsed.
-   * @throws {@link ZitadelConfigConnectionUnusableError} When the platform would not take it.
+   * @throws {@link ZitadelConfigError} When the platform would not take it.
    */
   private readUsable<T>(what: string, stored: string, parse: (value: string) => Parsed<T>): T {
     const parsed = parse(stored);
     if (!parsed.ok) {
-      throw new ZitadelConfigConnectionUnusableError(this.path, this.slug, what, parsed.problem);
+      throw new ZitadelConfigError(
+        `${this.path} holds ${what} that cannot be used: ${parsed.problem}`,
+      );
     }
     return parsed.value;
   }

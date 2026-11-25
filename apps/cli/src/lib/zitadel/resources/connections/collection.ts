@@ -68,7 +68,7 @@ export class Connections extends Collection<Connection> {
    * @throws {@link ZitadelConfigResourceClashError} When more than one connection could be it,
    *   its file name or slug is taken, its variables are another connection's,
    *   or an existing one of the developer's own connects to another issuer.
-   * @throws {@link ZitadelConfigConnectionClientIdError} When the existing one holds another client id.
+   * @throws {@link ZitadelConfigError} When the existing one holds another client id.
    */
   resolveExisting(candidate: Connection, options: LookupOptions = {}): Connection | undefined {
     if (candidate.template === undefined) {
@@ -87,11 +87,7 @@ export class Connections extends Collection<Connection> {
     });
     if (matches.all.length > 1) {
       throw new ZitadelConfigResourceClashError(
-        `More than one ${candidate.displayName} connection exists: ${matches.paths.join(", ")}`,
-        {
-          hint: "Keep the one this project should use and remove the others, then run the command again.",
-          details: { provider: candidate.slug, files: matches.paths },
-        },
+        `More than one ${candidate.displayName} connection exists: ${matches.paths.join(", ")}; keep the one this project should use and remove the others`,
       );
     }
     const match = matches.all[0];
@@ -127,11 +123,7 @@ export class Connections extends Collection<Connection> {
     });
     if (holders.all.length > 1) {
       throw new ZitadelConfigResourceClashError(
-        `More than one connection is named ${slug}: ${holders.paths.join(", ")}`,
-        {
-          hint: "A slug names one connection. Remove or rename all but one, then run the command again.",
-          details: { slug, files: holders.paths },
-        },
+        `More than one connection is named ${slug}: ${holders.paths.join(", ")}; remove or rename all but one`,
       );
     }
     const match = holders.all[0];
@@ -175,10 +167,8 @@ export class Connections extends Collection<Connection> {
    *   candidate when it is created, or the one the project already had.
    * @throws {@link ZitadelConfigResourceMissingError} When no flow runs against the schema.
    * @throws {@link ZitadelConfigResourceClashError} When the connection would step on another one.
-   * @throws {@link ZitadelConfigConnectionClientIdError} When the existing connection holds
-   *   another client id.
-   * @throws {@link ZitadelConfigError} When a region the edit writes is not the
-   *   shape it writes.
+   * @throws {@link ZitadelConfigError} When the existing connection holds another
+   *   client id, or a region the edit writes is not the shape it writes.
    * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow would stop validating.
    */
   enable(
@@ -538,10 +528,9 @@ export class Connections extends Collection<Connection> {
     const offered = schema.providers;
     const offeredList = offered.join(", ") || "none";
     const connectionList = connections.join(", ") || "none";
-    throw new ZitadelConfigResourceMissingError(`${schema.name} has no provider named ${slug}`, {
-      hint: `${schema.name} offers: ${offeredList}. Connections under ${CONFIG_DIRECTORIES.connections}/: ${connectionList}.`,
-      details: { requested: slug, offered, connections },
-    });
+    throw new ZitadelConfigResourceMissingError(
+      `${schema.name} has no provider named ${slug}; it offers: ${offeredList}; connections under ${CONFIG_DIRECTORIES.connections}/: ${connectionList}`,
+    );
   }
 
   /**
@@ -604,13 +593,6 @@ export class Connections extends Collection<Connection> {
       const path: ConnectionPath = `${CONFIG_DIRECTORIES.connections}/${slug}.json`;
       throw new ZitadelConfigResourceClashError(
         `${path} already exists and is not the ${slug} connection`,
-        {
-          hint: this.renameHint(slug),
-          details: {
-            file: path,
-            slug,
-          },
-        },
       );
     }
     const parsed = parseConnectionSlug(slug);
@@ -618,26 +600,6 @@ export class Connections extends Collection<Connection> {
       const derived = credentialVariables(parsed.value);
       this.refuseCollidingVariables([derived.clientId, derived.clientSecret], slug);
     }
-  }
-
-  /**
-   * How to get past a connection file that is in the way of a slug.
-   *
-   * @remarks
-   * A catalog provider's slug is the provider's own name, which
-   * `--provider` names and no flag changes, so only the file can move.
-   *
-   * @param slug - The slug the file is in the way of.
-   * @returns The hint.
-   */
-  private renameHint(slug: string): string {
-    const inCatalog = IDP_PROVIDERS.some((provider) => {
-      return provider === slug;
-    });
-    if (inCatalog) {
-      return "Rename or remove that file, then run the command again.";
-    }
-    return "Rename or remove that file, or choose another slug, then run the command again.";
   }
 
   /**
@@ -658,18 +620,10 @@ export class Connections extends Collection<Connection> {
       const issuer = candidate.issuer ?? "the same";
       throw new ZitadelConfigResourceClashError(
         `${candidate.path} is a connection called ${candidate.slug}, but not to ${candidate.displayName}: its issuer is not ${issuer}`,
-        {
-          hint: "Point it at the provider if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.",
-          details: { file: candidate.path, slug: candidate.slug },
-        },
       );
     }
     throw new ZitadelConfigResourceClashError(
       `${candidate.path} already exists and is not the ${candidate.slug} connection`,
-      {
-        hint: this.renameHint(candidate.slug),
-        details: { file: candidate.path, slug: occupied.slug },
-      },
     );
   }
 
@@ -693,17 +647,6 @@ export class Connections extends Collection<Connection> {
         : `connects to ${connection.issuer}, not ${issuer}`;
     throw new ZitadelConfigResourceClashError(
       `${connection.path} is already named ${slug} and ${found}`,
-      {
-        hint:
-          "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. " +
-          "Choose another slug for this connection, then move the schemas and flows that name the old one to it.",
-        details: {
-          file: connection.path,
-          slug,
-          issuer,
-          existing_issuer: connection.issuer ?? null,
-        },
-      },
     );
   }
 
@@ -728,14 +671,7 @@ export class Connections extends Collection<Connection> {
     });
     if (doubled !== undefined) {
       throw new ZitadelConfigResourceClashError(
-        `This connection points both credentials at ${doubled}`,
-        {
-          hint: "Give client_id and client_secret separate ${{ NAME }} references, then run the command again.",
-          details: {
-            slug,
-            variable: doubled,
-          },
-        },
+        `This connection points both credentials at ${doubled}; give client_id and client_secret separate \${{ NAME }} references`,
       );
     }
     const others = this.all.filter((connection) => {
@@ -748,16 +684,7 @@ export class Connections extends Collection<Connection> {
       });
       if (shared !== undefined) {
         throw new ZitadelConfigResourceClashError(
-          `${connection.path} and ${slug} both use ${shared}`,
-          {
-            hint: "Point one of them at a variable of its own, then run the command again.",
-            details: {
-              file: connection.path,
-              slug,
-              other_slug: connection.slug,
-              variable: shared,
-            },
-          },
+          `${connection.path} and ${slug} both use ${shared}; point one of them at a variable of its own`,
         );
       }
     }

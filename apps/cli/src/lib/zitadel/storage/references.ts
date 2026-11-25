@@ -129,9 +129,9 @@ export function inlineFileReferences(
       if (missing === "omit") {
         return omitted;
       }
-      throw new ZitadelConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
-        hint: "Create the referenced file or fix the path.",
-      });
+      throw new ZitadelConfigError(
+        `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`,
+      );
     }
     if (isJsonArray(node)) {
       return node.map(inline).filter((item): item is JsonValue => {
@@ -167,11 +167,9 @@ export function inlineFileReferences(
  * @returns The error to throw.
  */
 export function outsideProject(ref: string): ZitadelConfigError {
-  return new ZitadelConfigError(`$file ${JSON.stringify(ref)} points outside the project`, {
-    hint:
-      "Keep referenced files inside the project, next to the file that references them; " +
-      "a symlink on the way must resolve inside the project too.",
-  });
+  return new ZitadelConfigError(
+    `$file ${JSON.stringify(ref)} points outside the project; keep referenced files inside the project, next to the file that references them`,
+  );
 }
 
 /**
@@ -188,8 +186,7 @@ export const CONFIG_ROOT = ".zitadel";
  * @returns The error to throw.
  */
 export function outsideConfig(path: string): ZitadelConfigError {
-  return new ZitadelConfigError(`${path} points outside ${CONFIG_ROOT}/`, {
-    hint: "Files are only written and removed inside .zitadel/.",
-    details: { file: path },
-  });
+  return new ZitadelConfigError(
+    `${path} points outside ${CONFIG_ROOT}/; files are only written and removed inside it`,
+  );
 }
